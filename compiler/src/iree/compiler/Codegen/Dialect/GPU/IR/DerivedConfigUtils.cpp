@@ -46,12 +46,12 @@ static SmallVector<int64_t> getVectorSizeTileSizes(int64_t rank,
 /// would give tile sizes of [1, 1, 4] no matter what because we won't be able
 /// to collapse the vector.transfer_read that results from this choice of tile
 /// size.
-static SmallVector<int64_t>
-getVectorTileSizesFromLoopRanges(ArrayRef<int64_t> loopRanges,
-                                 int64_t numThreads, int64_t vectorSize,
-                                 bool allowMultiDimCollapse = true) {
+static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
+    ArrayRef<int64_t> loopRanges, int64_t numThreads, int64_t vectorSize,
+    bool allowMultiDimCollapse = true,
+    std::optional<int64_t> vectorizableDim = std::nullopt) {
   int64_t rank = loopRanges.size();
-  int64_t targetDim = rank - 1;
+  int64_t targetDim = vectorizableDim.has_value() ? *vectorizableDim : rank - 1;
   int64_t targetRange = loopRanges[targetDim];
 
   // If any loop ranges are dynamic, default to a simple vector size based
@@ -135,10 +135,23 @@ deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
                        getElementTypeOrSelf(im2colOp->getResultTypes()[0])
                            .getIntOrFloatBitWidth();
 
+  // Vectorize the innermost output dim that is vectorizable with the innermost
+  // input dim.
+  int64_t innerInputDim = im2colOp.getInputRank() - 1;
+  SmallVector<SmallVector<int64_t>> vectorizationMap =
+      im2colOp.getInputToOutputDimVectorizationMap();
+  SmallVector<int64_t> vectorizableOutputDims = vectorizationMap[innerInputDim];
+  std::optional<int64_t> vectorizableDim = std::nullopt;
+  if (!vectorizableOutputDims.empty()) {
+    vectorizableDim = *std::max_element(vectorizableOutputDims.begin(),
+                                        vectorizableOutputDims.end());
+  }
+
   // Im2col cannot coalesce past the inner/outer most dim so always default to
   // only the inner/outer most tile size being the vector size (or smaller).
   return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize,
-                                          /*allowMultiDimCollapse=*/false);
+                                          /*allowMultiDimCollapse=*/false,
+                                          vectorizableDim);
 }
 
 SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
