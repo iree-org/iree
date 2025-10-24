@@ -7,7 +7,10 @@ package(
     licenses = ["notice"],
 )
 
-exports_files(glob(["include/iree-dialects/Dialect/Input/*.td"]))
+exports_files(glob(
+    ["include/iree-dialects/Dialect/Input/*.td"],
+    allow_empty = True,
+))
 
 exports_files(glob(["python/*.cpp"]))
 
@@ -27,18 +30,24 @@ filegroup(
 
 filegroup(
     name = "TdFilegroup",
-    srcs = glob([
-        "include/iree-dialects/Dialect/Input/*.td",
-    ]),
+    srcs = glob(
+        [
+            "include/iree-dialects/Dialect/Input/*.td",
+        ],
+        allow_empty = True,
+    ),
 )
 
 td_library(
     name = "TdFiles",
-    srcs = glob([
-        "include/iree-dialects/Dialect/Input/*.td",
-        "include/iree-dialects/Dialect/LinalgTransform/*.td",
-        "python/iree/compiler/dialects/*.td",
-    ]),
+    srcs = glob(
+        [
+            "include/iree-dialects/Dialect/Input/*.td",
+            "include/iree-dialects/Dialect/LinalgTransform/*.td",
+            "python/iree/compiler/dialects/*.td",
+        ],
+        allow_empty = True,
+    ),
     includes = ["include"],
     deps = [
         "@llvm-project//mlir:BuiltinDialectTdFiles",
@@ -106,10 +115,13 @@ gentbl_cc_library(
 
 cc_library(
     name = "IREELinalgTransformDialect",
-    srcs = glob([
-        "lib/Dialect/LinalgTransform/IR/*.cpp",
-        "lib/Dialect/LinalgTransform/IR/*.h",
-    ]),
+    srcs = glob(
+        [
+            "lib/Dialect/LinalgTransform/IR/*.cpp",
+            "lib/Dialect/LinalgTransform/IR/*.h",
+        ],
+        allow_empty = True,
+    ),
     hdrs = glob([
         "include/iree-dialects/Dialect/LinalgTransform/*.h",
     ]),
@@ -250,9 +262,12 @@ cc_library(
 
 cc_library(
     name = "IREEDialectsTest",
-    srcs = glob([
-        "test/lib/**/*.cpp",
-    ]),
+    srcs = glob(
+        [
+            "test/lib/**/*.cpp",
+        ],
+        allow_empty = True,
+    ),
     deps = [
         ":IREEDialectsTransforms",
         ":IREELinalgTransformDialect",
