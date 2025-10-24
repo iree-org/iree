@@ -55,7 +55,8 @@ appendOrCreateInitFuncOp(IREE::VM::ModuleOp moduleOp, StringRef name,
   auto returnOps = llvm::to_vector(funcOp.getOps<IREE::VM::ReturnOp>());
   for (auto returnOp :
        llvm::make_early_inc_range(funcOp.getOps<IREE::VM::ReturnOp>())) {
-    OpBuilder(returnOp).create<IREE::VM::BranchOp>(returnOp.getLoc(), newBlock);
+    OpBuilder builder(returnOp);
+    IREE::VM::BranchOp::create(builder, returnOp.getLoc(), newBlock);
     returnOp.erase();
   }
 

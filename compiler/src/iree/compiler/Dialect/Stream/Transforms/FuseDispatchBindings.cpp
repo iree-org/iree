@@ -246,8 +246,8 @@ struct MemoizedCmdZeros {
     if (it != parentZeros.end()) {
       return it->second;
     }
-    auto zero =
-        OpBuilder(parentOp).create<arith::ConstantIndexOp>(op->getLoc(), 0);
+    OpBuilder builder(parentOp);
+    auto zero = arith::ConstantIndexOp::create(builder, op->getLoc(), 0);
     parentZeros[parentOp] = zero;
     return zero;
   }

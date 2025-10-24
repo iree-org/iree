@@ -262,8 +262,9 @@ public:
         // TODO(benvanik): see if we can allow this through; today it will pin
         // the function argument (constants most likely) and cause us to fail to
         // remove it later on.
-        Value dummySize = OpBuilder(sizeOp).create<arith::ConstantIndexOp>(
-            sizeOp.getLoc(), 0xCAFEF00D);
+        OpBuilder builder(sizeOp);
+        Value dummySize = arith::ConstantIndexOp::create(
+            builder, sizeOp.getLoc(), 0xCAFEF00D);
         sizeOp.replaceAllUsesWith(dummySize);
         sizeOp.erase();
         continue;

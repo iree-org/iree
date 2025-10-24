@@ -259,8 +259,8 @@ private:
       IREE::Util::ReturnOp::create(exitBuilder, exitLoc);
       returnOp.erase();
     }
-
-    OpBuilder::atBlockBegin(returnBlock).create<IREE::Util::ReturnOp>(loc);
+    OpBuilder builder = OpBuilder::atBlockBegin(returnBlock);
+    IREE::Util::ReturnOp::create(builder, loc);
 
     return calcFuncOp;
   }

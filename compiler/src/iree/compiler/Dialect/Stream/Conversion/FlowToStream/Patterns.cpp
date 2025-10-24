@@ -1062,8 +1062,9 @@ static bool insertBindingOp(BlockArgument arg,
 // this.
 static void convertReturnOps(Region &region) {
   region.walk([](IREE::Flow::ReturnOp oldOp) {
-    OpBuilder(oldOp).create<IREE::Stream::ReturnOp>(oldOp.getLoc(),
-                                                    oldOp.getOperands());
+    OpBuilder builder(oldOp);
+    IREE::Stream::ReturnOp::create(builder, oldOp.getLoc(),
+                                   oldOp.getOperands());
     oldOp.erase();
   });
 }
