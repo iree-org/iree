@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
+#include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -77,31 +78,30 @@ ValuePerAffinityHelper::ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
     : builder(moduleOp), symbolTable(moduleOp) {
   // Pre-compute the last initializer for each global for performance.
   // This avoids scanning all initializers multiple times during transformation.
-  for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
-    Operation *lastInitializer = globalOp.getOperation();
-    StringRef globalName = globalOp.getGlobalName();
+  IREE::Util::GlobalTable globalTable(moduleOp);
+  globalTable.forEach([&](IREE::Util::Global &global) {
+    Operation *lastInitializer = global.op.getOperation();
 
-    for (auto initOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
-      // Check if this initializer stores to this global.
-      bool referencesGlobal = false;
-      initOp.walk([&](IREE::Util::GlobalStoreOpInterface storeOp) {
-        if (storeOp.getGlobalName() == globalName) {
-          referencesGlobal = true;
-        }
-      });
+    // Iterate through store operations to find initializers.
+    for (auto storeOp : global.storeOps) {
+      // Get the parent initializer op if the store is within one.
+      auto initOp = storeOp->getParentOfType<IREE::Util::InitializerOp>();
+      if (!initOp)
+        continue;
 
-      // If this initializer references the global and comes after the global
-      // op, update the insertion point if this is the latest one we've seen.
-      if (referencesGlobal && globalOp->isBeforeInBlock(initOp)) {
-        if (lastInitializer == globalOp.getOperation() ||
+      // If this initializer comes after the global op, update the insertion
+      // point if this is the latest one we've seen.
+      if (global.op->isBeforeInBlock(initOp)) {
+        if (lastInitializer == global.op.getOperation() ||
             lastInitializer->isBeforeInBlock(initOp)) {
           lastInitializer = initOp;
         }
       }
     }
 
-    cachedLastInitializer[globalOp.getOperation()] = lastInitializer;
-  }
+    cachedLastInitializer[global.op.getOperation()] = lastInitializer;
+    return IREE::Util::GlobalAction::PRESERVE;
+  });
 }
 
 Value ValuePerAffinityHelper::getOrCreateValueForAffinity(
