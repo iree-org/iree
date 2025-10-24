@@ -42,6 +42,10 @@ struct OpInfo {
   llvm::BitVector membership;
   // Which partitions transitively depend on this operation.
   llvm::BitVector hazards;
+  // Hazards specifically from nested region captures creating circular
+  // dependencies. These must always be respected, even for operations with
+  // preferCloneToConsumers.
+  llvm::BitVector nestedRegionHazards;
 };
 
 struct PartitionBuilder {
@@ -64,8 +68,77 @@ struct PartitionBuilder {
       opInfo.hazards.reset(ordinal);
     ops.insert(op);
     hazards |= opInfo.hazards;
+    hazards |= opInfo.nestedRegionHazards;
   }
 };
+
+// Find the effective OpInfo for a user operation.
+// Returns the OpInfo* to use for hazard tracking, or nullptr if the user
+// should be skipped (either because hazards were already set or not found).
+static OpInfo *getEffectiveUserInfo(Operation *user, Block *block,
+                                    DenseMap<Operation *, OpInfo> &opInfos,
+                                    OpInfo &opInfo) {
+  // Check if user is in the same block we're partitioning.
+  if (user->getBlock() == block) {
+    // Direct lookup - user in same block.
+    LLVM_DEBUG(llvm::dbgs() << "  User in same block\n");
+    auto userInfoIt = opInfos.find(user);
+    if (userInfoIt != opInfos.end()) {
+      return &userInfoIt->second;
+    }
+    return nullptr;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "  User in different block (nested region)\n");
+
+  // User is in a nested region - find the containing operation in our block.
+  // This handles cases like scf.for where operations inside the loop body
+  // use values from the parent block. We treat the containing operation
+  // (scf.for) as a proxy for all its nested users.
+  Operation *containing = user->getParentOp();
+  while (containing && containing->getBlock() != block) {
+    containing = containing->getParentOp();
+  }
+
+  if (!containing) {
+    return nullptr;
+  }
+
+  // Use the containing op's info as proxy for nested users.
+  auto containingInfoIt = opInfos.find(containing);
+  if (containingInfoIt != opInfos.end()) {
+    // Only use containing op's info if it's streamable.
+    // Non-streamable ops (scf.for, scf.if) need special circular dependency
+    // tracking via nestedRegionHazards to prevent grouping captured values
+    // with operations that consume the containing op's results.
+    if (isa<IREE::Stream::StreamableOpInterface>(containing)) {
+      return &containingInfoIt->second;
+    }
+    // Fall through to set nestedRegionHazards for non-streamable containing
+    // ops.
+  }
+
+  // The containing operation is not streamable (e.g., scf.for).
+  // Values captured into it create circular dependency hazards with any
+  // partitions that use the containing operation's results.
+  for (auto result : containing->getResults()) {
+    for (auto resultUser : result.getUsers()) {
+      if (resultUser->getBlock() == block) {
+        auto resultUserInfoIt = opInfos.find(resultUser);
+        if (resultUserInfoIt != opInfos.end()) {
+          opInfo.nestedRegionHazards |= resultUserInfoIt->second.membership;
+          opInfo.nestedRegionHazards |= resultUserInfoIt->second.hazards;
+          LLVM_DEBUG({
+            llvm::dbgs() << "Setting nestedRegionHazards for captured value, "
+                         << "hazard count: "
+                         << opInfo.nestedRegionHazards.count() << "\n";
+          });
+        }
+      }
+    }
+  }
+  return nullptr;
+}
 
 // This is terrible. See Stream/Analysis/Partition.h for a description of what
 // a real implementation would do. We want cost modeling for tie breakers when
@@ -131,8 +204,31 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
           opHazardsInCandidatePartition |= opInfos[user].hazards;
         }
       }
+      // For preferCloneToConsumers ops, we DON'T include nestedRegionHazards
+      // because cloning into multiple partitions solves the circular
+      // dependency. The op will be duplicated in each consumer partition, so
+      // there's no shared state causing circular dependencies.
     } else {
-      opHazards = &opInfo.hazards;
+      // For non-clonable ops, nestedRegionHazards must be respected to prevent
+      // circular dependencies from nested region captures. Unlike normal
+      // hazards which propagate through use-def chains, nestedRegionHazards may
+      // not be fully captured in opInfo.hazards when the containing operation
+      // (e.g., scf.for) is not streamable and returns nullptr from
+      // getEffectiveUserInfo.
+      opHazardsInCandidatePartition = opInfo.hazards;
+      opHazardsInCandidatePartition |= opInfo.nestedRegionHazards;
+      opHazards = &opHazardsInCandidatePartition;
+    }
+
+    // Check nestedRegionHazards separately first. Unlike normal hazards
+    // (which indicate dependencies), nestedRegionHazards indicate partitions
+    // the op CANNOT join due to circular dependency constraints.
+    for (auto nestedHazardOrdinal : opInfo.nestedRegionHazards.set_bits()) {
+      if (nestedHazardOrdinal == partitionOrdinal) {
+        // This op cannot be in this partition due to nested region capture
+        // circular dependency constraints.
+        return false;
+      }
     }
 
     for (auto opHazardOrdinal : opHazards->set_bits()) {
@@ -224,11 +320,13 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     // dependency chain down the use-def chain to a partition.
     llvm::BitVector consumers(builders.size(), /*t=*/false);
     for (auto user : op.getUsers()) {
-      auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end()) {
+      OpInfo *effectiveUserInfo =
+          getEffectiveUserInfo(user, block, opInfos, opInfo);
+      if (!effectiveUserInfo) {
         continue;
       }
-      auto &userInfo = userInfoIt->second;
+
+      auto &userInfo = *effectiveUserInfo;
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
         user->print(llvm::dbgs(), *asmState);
@@ -247,12 +345,13 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
     for (auto syncOp : syncOps[&op]) {
       for (auto user : syncOp->getUsers()) {
-        auto userInfoIt = opInfos.find(user);
-        if (userInfoIt == opInfos.end()) {
+        OpInfo *effectiveUserInfo =
+            getEffectiveUserInfo(user, block, opInfos, opInfo);
+        if (!effectiveUserInfo) {
           continue;
         }
-        auto &userInfo = userInfoIt->second;
 
+        auto &userInfo = *effectiveUserInfo;
         LLVM_DEBUG({
           llvm::dbgs() << "Testing sync user:\n";
           user->print(llvm::dbgs(), *asmState);
@@ -382,8 +481,13 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     LLVM_DEBUG(llvm::dbgs() << "Moving to first candidate partition "
                             << firstCandidateOrdinal << " (continue)\n");
     // If we are a clonable op (like splat) clone us into every partition.
+    // We also clone if there are nested region hazards, indicating consumers
+    // in nested regions that will need their own copy.
     // Otherwise we just pick the first we find (probably a bad heuristic).
-    if (consumers.count() > 1 && streamableOp.preferCloneToConsumers()) {
+    bool shouldClone =
+        streamableOp.preferCloneToConsumers() &&
+        (consumers.count() > 1 || opInfo.nestedRegionHazards.any());
+    if (shouldClone) {
       for (auto consumerOrdinal : consumers.set_bits()) {
         LLVM_DEBUG(llvm::dbgs() << "Cloning into consumer partition "
                                 << consumerOrdinal << "\n");
