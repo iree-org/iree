@@ -9,6 +9,55 @@
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 
+def IREECodegen_InnerTiledSemanticsAttrInterface
+    : AttrInterface<"InnerTiledSemanticsAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Attribute interface used to describe aspects of tile shape semantics
+    that are orthogonal to InnerTileDescAttrInterface and that may change during
+    lowerings, whereas the InnerTileDescAttrInterface describes aspects that are
+    invariant during lowerings. This includes:
+    1. Expanded vs opaque tile shapes.
+    2. On GPU: distributed vs undistributed tile shapes.
+    Having this split into a separate interface allows mutating those
+    attribtutes separately.
+  }];
+
+  let methods =
+      [InterfaceMethod<
+           /*desc=*/[{
+        For each operand, return the vector type of the inner tile.
+
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
+      }],
+           /*retType=*/"void",
+           /*methodName=*/"getTileTypes",
+           /*args=*/
+           (ins "::mlir::iree_compiler::IREE::Codegen::"
+                "InnerTileDescAttrInterface":$kind,
+               "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)>,
+       InterfaceMethod<
+           /*desc=*/[{
+        Returns true for opaque semantics, meaning that the only significant
+        aspect of tile shapes is the number of elements. When false, tile shapes
+        are fully expanded and only unit dims are ignored.
+      }],
+           /*retTy=*/"bool",
+           /*methodName=*/"getOpaque",
+           /*args=*/(ins)>];
+}
+
+def IREECodegen_AnyInnerTiledSemanticscAttr
+    : Attr<Or<[CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Codegen::"
+                     "InnerTiledSemanticsAttrInterface>($_self)">,
+]>,
+           "buffer-like constant attribute values"> {
+  let storageType = [{ IREE::Codegen::InnerTiledSemanticsAttrInterface }];
+  let returnType = [{ IREE::Codegen::InnerTiledSemanticsAttrInterface }];
+  let convertFromStorage = "$_self";
+}
+
 def IREECodegen_InnerTileDescAttrInterface :
   AttrInterface<"InnerTileDescAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";

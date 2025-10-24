@@ -111,7 +111,21 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
   LogicalResult matchAndRewrite(Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (!tiledOp.hasTensorSemantics()) {
-      return failure();
+      return rewriter.notifyMatchFailure(tiledOp, "requires tensor semantics");
+    }
+    auto semantics =
+        dyn_cast<IREE::GPU::InnerTiledSemanticsAttr>(tiledOp.getSemantics());
+    if (!semantics) {
+      return rewriter.notifyMatchFailure(
+          tiledOp, "unexpected tiled op semantics attribute type");
+    }
+    if (semantics.getDistributed()) {
+      return rewriter.notifyMatchFailure(tiledOp,
+                                         "only applies to undistributed ops");
+    }
+    if (!semantics.getOpaque()) {
+      return rewriter.notifyMatchFailure(
+          tiledOp, "non-opaque ops are already expanded by definition");
     }
     Location loc = tiledOp.getLoc();
 
@@ -187,11 +201,15 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
       newPermutationsAttr = rewriter.getArrayAttr(newPermutations);
     }
     // Create the new inner_tiled op with the expanded type.
+    // Note on preserving existing semantics without trying to set opaque=false:
+    // Even in the cases where all operands and results have been expanded, when
+    // the target MMA vector type is flattened as in MMAAttr's vector type
+    // accessors, the opaque verifier semantics remain necessary.
     auto expandedTiledOp = Codegen::InnerTiledOp::create(
         rewriter, loc, /*inputs=*/ValueRange{newOperands}.take_front(numInputs),
         /*inits=*/ValueRange{newOperands}.drop_front(numInputs),
         tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
-        tiledOp.getKind(), newPermutationsAttr);
+        tiledOp.getKind(), tiledOp.getSemantics(), newPermutationsAttr);
 
     if (auto config = getLoweringConfig(tiledOp)) {
       setLoweringConfig(expandedTiledOp, config);
