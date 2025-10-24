@@ -117,13 +117,15 @@ performance if it is enabled. The targets that support data-tiling are:
 
 There are two paths in data-tiling:
 
-* `--iree-global-opt-data-tiling` (off): Starts data-tiling from global
-  optimization phase. This is the current default path, if the flag is on. The
-  path will be deprecated in the future, because the other one has better
-  support for multi-device cases.
 * `--iree-dispatch-creation-data-tiling` (off): Starts data-tiling from dispatch
-  creation phase. This is still under development and some features are missing.
-  The main difference is that it enables more fusion opportunities.
+  creation phase. This is the current default path, if the flag is on. This is
+  still under development and some features are missing. The main benefit from
+  the path is that it enables more fusion opportunities and supports
+  multi-devices.
+* `--iree-global-opt-data-tiling` (off): Starts data-tiling from global
+  optimization phase. The path will be deprecated in the future, because it
+  breaks the core IREE concept in terms of retargetability and modularity. Any
+  features built on top of the path may be deprecated.
 
 Note that the flag will override the other two flags if it is explicitly set,
 because it has higher priority. You have to disable the flag to use a specific
