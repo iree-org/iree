@@ -416,6 +416,15 @@ void buildStreamOptimizationPassPipeline(
 void buildStreamTransformPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   //----------------------------------------------------------------------------
+  // Precondition verification
+  //----------------------------------------------------------------------------
+
+  // Verify module initialization order - subsequent passes and pipelines rely
+  // on it being correct (and we maintain it as correct from this point on, so
+  // this is our gate).
+  passManager.addPass(IREE::Util::createVerifyInitializationOrderPass());
+
+  //----------------------------------------------------------------------------
   // Primary pipeline stages (required)
   //----------------------------------------------------------------------------
 

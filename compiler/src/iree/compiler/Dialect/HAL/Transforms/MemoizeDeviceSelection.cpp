@@ -81,6 +81,7 @@ static LogicalResult memoizeAllocatorSelectOp(
   selectedQueueAffinityGlobalOp.setPrivate();
 
   // Build initializer for the globals.
+  moduleBuilder.setInsertionPointAfter(selectedQueueAffinityGlobalOp);
   auto initializerOp =
       IREE::Util::InitializerOp::create(moduleBuilder, fusedLoc);
   {
