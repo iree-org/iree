@@ -4492,6 +4492,31 @@ MutableOperandRange YieldOp::getClosureResultsMutable() {
   return getResourceOperandsMutable();
 }
 
+//===----------------------------------------------------------------------===//
+// stream.test.timeline_aware
+//===----------------------------------------------------------------------===//
+
+SmallVector<Value>
+TestTimelineAwareOp::buildAwaitTimepoints(OpBuilder &builder) {
+  // Build timepoint.import ops for each wait fence.
+  SmallVector<Value> timepoints;
+  for (auto fence : getWaitFenceLikes()) {
+    auto importOp = IREE::Stream::TimepointImportOp::create(
+        builder, getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+        ValueRange{fence}, /*affinity=*/nullptr);
+    timepoints.push_back(importOp.getResultTimepoint());
+  }
+  return timepoints;
+}
+
+Value TestTimelineAwareOp::buildResultTimepoint(OpBuilder &builder) {
+  // Build timepoint.import for signal fence.
+  auto importOp = IREE::Stream::TimepointImportOp::create(
+      builder, getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      ValueRange{getSignalFenceLike()}, /*affinity=*/nullptr);
+  return importOp.getResultTimepoint();
+}
+
 } // namespace mlir::iree_compiler::IREE::Stream
 
 //===----------------------------------------------------------------------===//
