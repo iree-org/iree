@@ -18,12 +18,14 @@ iree_compiler_cc_library(
         "CPUEncodingExternalModels.cpp",
         "GPUEncodingExternalModels.cpp",
         "Interfaces.cpp",
+        "UtilExternalModels.cpp",
         "Utils.cpp",
     ],
     hdrs = [
         "CPUEncodingExternalModels.h",
         "GPUEncodingExternalModels.h",
         "Interfaces.h",
+        "UtilExternalModels.h",
         "Utils.h",
     ],
     deps = [
@@ -44,5 +46,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:ValueBoundsOpInterface",
     ],
 )
