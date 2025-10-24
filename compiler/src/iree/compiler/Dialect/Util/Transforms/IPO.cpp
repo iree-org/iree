@@ -617,11 +617,12 @@ static bool applyCallChanges(FuncAnalysis &analysis,
 
   // Fully replace call op because we may have changed result count.
   // TODO(benvanik): update tied operands, arg_attrs, and res_attrs.
-  auto newCallOp =
-      IREE::Util::CallOp::create(builder, callOp.getLoc(), newResultTypes,
-                                 callOp.getCalleeAttr(), newOperands,
-                                 /*tied_operands=*/ArrayAttr{},
-                                 /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
+  OpBuilder newCallBuilder(callOp);
+  auto newCallOp = IREE::Util::CallOp::create(
+      newCallBuilder, callOp.getLoc(), newResultTypes, callOp.getCalleeAttr(),
+      newOperands,
+      /*tied_operands=*/ArrayAttr{},
+      /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
   newCallOp->setDialectAttrs(callOp->getDialectAttrs());
 
   // Remap live old results -> new results.
