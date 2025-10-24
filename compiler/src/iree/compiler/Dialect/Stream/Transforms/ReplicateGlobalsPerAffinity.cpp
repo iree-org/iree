@@ -138,11 +138,11 @@ ValuePerAffinityHelper::getOrCreateGlobalForAffinity(
         referencesGlobal = true;
       }
     });
-    
+
     // If this initializer references the global and comes after the global op,
     // update the insertion point if this is the latest one we've seen.
     if (referencesGlobal && globalOp->isBeforeInBlock(initOp)) {
-      if (insertionPoint == globalOp.getOperation() || 
+      if (insertionPoint == globalOp.getOperation() ||
           insertionPoint->isBeforeInBlock(initOp)) {
         insertionPoint = initOp;
       }
