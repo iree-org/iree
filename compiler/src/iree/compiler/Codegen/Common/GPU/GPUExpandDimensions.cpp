@@ -31,9 +31,6 @@ namespace {
 struct GPUExpandDimensionsPass final
     : impl::GPUExpandDimensionsPassBase<GPUExpandDimensionsPass> {
   using Base::Base;
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect>();
-  }
   void runOnOperation() override;
 };
 } // namespace

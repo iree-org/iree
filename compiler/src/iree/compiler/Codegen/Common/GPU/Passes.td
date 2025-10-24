@@ -378,6 +378,9 @@ def GPUApplyPaddingLevelPass :
 def GPUExpandDimensionsPass :
     InterfacePass<"iree-codegen-gpu-expand-dimensions", "mlir::FunctionOpInterface"> {
   let summary = "Pass to expand tensor op dims based on `expand_dims` lowering_config";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Util::UtilDialect"
+  ];
 }
 
 def GPUTensorTileToSerialLoopsPass :
