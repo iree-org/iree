@@ -35,8 +35,7 @@ namespace {
 // from the new global op for the requested affinity.
 class ValuePerAffinityHelper {
 public:
-  explicit ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
-      : builder(moduleOp), symbolTable(moduleOp) {}
+  explicit ValuePerAffinityHelper(mlir::ModuleOp moduleOp);
   ~ValuePerAffinityHelper() = default;
 
   using OpAffinityPair = std::tuple<Operation *, IREE::Stream::AffinityAttr>;
@@ -73,6 +72,37 @@ private:
   // Cache the last initializer that references each global for performance.
   DenseMap<Operation *, Operation *> cachedLastInitializer;
 };
+
+ValuePerAffinityHelper::ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
+    : builder(moduleOp), symbolTable(moduleOp) {
+  // Pre-compute the last initializer for each global for performance.
+  // This avoids scanning all initializers multiple times during transformation.
+  for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
+    Operation *lastInitializer = globalOp.getOperation();
+    StringRef globalName = globalOp.getGlobalName();
+
+    for (auto initOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
+      // Check if this initializer stores to this global.
+      bool referencesGlobal = false;
+      initOp.walk([&](IREE::Util::GlobalStoreOpInterface storeOp) {
+        if (storeOp.getGlobalName() == globalName) {
+          referencesGlobal = true;
+        }
+      });
+
+      // If this initializer references the global and comes after the global
+      // op, update the insertion point if this is the latest one we've seen.
+      if (referencesGlobal && globalOp->isBeforeInBlock(initOp)) {
+        if (lastInitializer == globalOp.getOperation() ||
+            lastInitializer->isBeforeInBlock(initOp)) {
+          lastInitializer = initOp;
+        }
+      }
+    }
+
+    cachedLastInitializer[globalOp.getOperation()] = lastInitializer;
+  }
+}
 
 Value ValuePerAffinityHelper::getOrCreateValueForAffinity(
     OpOperand *opOperand, IREE::Stream::AffinityAttr affinityAttr) {
@@ -130,35 +160,11 @@ ValuePerAffinityHelper::getOrCreateGlobalForAffinity(
 
   // Find the insertion point: after the last initializer that references this
   // global, or after the global itself if no initializers exist.
+  // The cache was already populated in the constructor.
   Operation *insertionPoint = globalOp.getOperation();
-
-  // Check if we've already cached the last initializer for this global.
   auto cachedIt = cachedLastInitializer.find(globalOp.getOperation());
   if (cachedIt != cachedLastInitializer.end()) {
     insertionPoint = cachedIt->second;
-  } else {
-    // First time seeing this global, scan for its last initializer.
-    auto moduleOp = globalOp->getParentOfType<mlir::ModuleOp>();
-    for (auto initOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
-      // Check if this initializer stores to the original global.
-      bool referencesGlobal = false;
-      initOp.walk([&](IREE::Util::GlobalStoreOpInterface storeOp) {
-        if (storeOp.getGlobalName() == globalName) {
-          referencesGlobal = true;
-        }
-      });
-
-      // If this initializer references the global and comes after the global
-      // op, update the insertion point if this is the latest one we've seen.
-      if (referencesGlobal && globalOp->isBeforeInBlock(initOp)) {
-        if (insertionPoint == globalOp.getOperation() ||
-            insertionPoint->isBeforeInBlock(initOp)) {
-          insertionPoint = initOp;
-        }
-      }
-    }
-    // Cache the result for future calls.
-    cachedLastInitializer[globalOp.getOperation()] = insertionPoint;
   }
 
   // Create the new global and initializer after the insertion point.
