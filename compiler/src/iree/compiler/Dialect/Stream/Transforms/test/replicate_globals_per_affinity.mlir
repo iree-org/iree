@@ -75,9 +75,9 @@ util.initializer {
   util.return
 }
 
-// CHECK-LABEL: @unknown_global_device_with_initializer(
+// CHECK-LABEL: @unknown_global_device(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-util.func private @unknown_global_device_with_initializer(%arg0: tensor<10xf32>) -> (tensor<10xf32>, tensor<10xf32>) {
+util.func private @unknown_global_device(%arg0: tensor<10xf32>) -> (tensor<10xf32>, tensor<10xf32>) {
   // CHECK: %[[OPERAND_A:.+]] = flow.tensor.transfer %[[ARG0]] {{.+}} to #hal.device.affinity<@[[$DEVICE_A]]>
   %0 = flow.tensor.transfer %arg0 : tensor<10xf32> to #hal.device.affinity<@device_a>
 
