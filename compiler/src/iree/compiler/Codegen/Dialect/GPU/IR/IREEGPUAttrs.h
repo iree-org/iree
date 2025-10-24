@@ -150,7 +150,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 //    4 * 1 * 4 * 1 == 16.
 //    This corresponds to the @llvm.amdgcn.mfma.i32.32x32x8i8 intrinsic's vector
 //    operand type, <16 x i32>.
-// 3. The produce of the thread[i] is 2 * 32 == 64. This corresponds to the
+// 3. The product of the thread[i] is 2 * 32 == 64. This corresponds to the
 //    subgroup size 64 on CDNA3. It could also have been a divisor of that, but
 //    here the exact match means that each thread receives a different tile.
 //
@@ -171,8 +171,8 @@ namespace mlir::iree_compiler::IREE::GPU {
 //    that these vectors contain groups of 4 matrix elements that are contiguous
 //    along the M-dimension (the "element tiles"), but that there is a
 //    discontinuity as the next 4 elements (the next "element tile") comes from
-//    far away elsewhere in the C matrix. Specifically, 4 rows are skipped. For
-//    instance, thread 0 gets this accumulator ("C") operand:
+//    far away elsewhere in the C matrix, owing to the fact that thread[0] is
+//    greater than 1. Example: thread 0 gets this accumulator ("C") operand:
 //    { C[0, 0], C[1, 0], C[2, 0], C[3, 0],
 //      C[8, 0], C[9, 0], C[10, 0], C[11, 0],
 //      C[16, 0], C[17, 0], C[18, 0], C[19, 0],
