@@ -12,10 +12,12 @@
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -289,6 +291,22 @@ convertOperandUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
   arg.replaceAllUsesWith(loadOp);
 }
 
+// TODO: It might be a good idea to explain why tensor:writeonly doesn't map
+// exactly to readonly for these bits
+static IREE::HAL::MemoryAccessBitfield getBitfieldAccessFromDispatch(
+    IREE::TensorExt::DispatchTensorType dispatchType) {
+  IREE::HAL::MemoryAccessBitfield accessBitfield;
+  switch (dispatchType.getAccess()) {
+  case IREE::TensorExt::TensorAccess::ReadOnly:
+    accessBitfield = IREE::HAL::MemoryAccessBitfield::Read;
+    break;
+  default:
+    accessBitfield = IREE::HAL::MemoryAccessBitfield::None;
+    break;
+  }
+  return accessBitfield;
+}
+
 // Converts the usage of the given !stream.binding |arg| to interface methods.
 static void
 convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
@@ -303,10 +321,19 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
     OpBuilder builder(oldOp);
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
+
+    IREE::HAL::SubspanAccessAttr subspanAccessAttr;
+    if (auto dispatchTensorType =
+            dyn_cast<IREE::TensorExt::DispatchTensorType>(oldOp.getType())) {
+      subspanAccessAttr = IREE::HAL::SubspanAccessAttr::get(
+          builder.getContext(),
+          getBitfieldAccessFromDispatch(dispatchTensorType));
+    }
+
     auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
         builder, oldOp.getLoc(), oldOp.getType(), pipelineLayoutAttr,
         APInt(64, bindingOrdinal), oldOp.getByteOffset(),
-        oldOp.getDynamicDims(), alignmentAttr, bindingAttr.getFlags());
+        oldOp.getDynamicDims(), alignmentAttr, subspanAccessAttr);
     oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
   }
