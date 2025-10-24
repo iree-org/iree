@@ -144,16 +144,19 @@ static TuningSpecsToMerge collectTuningSpecsToMerge(ModuleOp module) {
 
 // Renames a `NamedSequenceOp` to resolve name conflicts caused by merging
 // tuning specs.
-// The name conflict resolution strategy follows below two rules:
+// The name conflict resolution strategy follows below rules:
 //   1. If the `NamedSequenceOp` is inside a module with a valid symbol name,
 //      its new name is prefixed with its containing module's symbol name.
 //   2. If the module has no symbol name, an incrementing counter is used
 //      to generate a unique prefix (e.g., `m0_`, `m1_`, etc.).
+//   3. If the prefixed name still conflicts with an existing name, a numeric
+//      suffix is appended (e.g., `m0_apply_op_config_0`) until a unique name
+//      is found.
 static void updateNamedSequenceOp(
     NamedSequenceOp op, OpBuilder &builder,
     llvm::DenseMap<NamedSequenceOp, ForeachMatchOp> &namedSequenceToUser,
     llvm::DenseMap<ModuleOp, std::string> &unnamedModuleNames,
-    unsigned &unnamedModuleCounter) {
+    unsigned &unnamedModuleCounter, llvm::DenseSet<StringRef> &seenNames) {
   StringRef specName = op.getSymName();
   ModuleOp parentModule = op->getParentOfType<ModuleOp>();
   assert(parentModule);
@@ -174,7 +177,17 @@ static void updateNamedSequenceOp(
   }
 
   std::string newSpecName = llvm::formatv("{}_{}", moduleName, specName).str();
-  op.setSymName(newSpecName);
+
+  // Ensure the new name is unique by appending a counter if needed.
+  std::string uniqueNewSpecName = newSpecName;
+  unsigned suffix = 0;
+  while (seenNames.contains(uniqueNewSpecName)) {
+    uniqueNewSpecName = llvm::formatv("{}_{}", newSpecName, suffix).str();
+    ++suffix;
+  }
+
+  seenNames.insert(builder.getStringAttr(uniqueNewSpecName).getValue());
+  op.setSymName(uniqueNewSpecName);
 
   // Skip updating ForeachMatchOp if the NamedSequenceOp is not used in it.
   if (!namedSequenceToUser.contains(op))
@@ -187,7 +200,7 @@ static void updateNamedSequenceOp(
   auto getUpdatedSymbol = [&](Attribute attr) -> SymbolRefAttr {
     StringRef name = cast<SymbolRefAttr>(attr).getRootReference();
     return (name == specName)
-               ? SymbolRefAttr::get(builder.getContext(), newSpecName)
+               ? SymbolRefAttr::get(builder.getContext(), uniqueNewSpecName)
                : cast<SymbolRefAttr>(attr);
   };
 
@@ -241,7 +254,8 @@ static LogicalResult resolveAndMoveNamedSequenceOps(
     unsigned unnamedModuleCounter = 0;
     for (NamedSequenceOp op : nameConflictOps) {
       updateNamedSequenceOp(op, builder, namedSequenceToUser,
-                            unnamedModuleNames, unnamedModuleCounter);
+                            unnamedModuleNames, unnamedModuleCounter,
+                            seenNames);
     }
   }
 
