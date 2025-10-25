@@ -43,6 +43,61 @@ util.func private @unknown_global_device(%arg0: tensor<10xf32>) -> (tensor<10xf3
 
 // -----
 
+// Test case with a global that has an initializer.
+// The new globals should be placed after the original global's initializer.
+
+// CHECK: util.global private @[[$DEVICE_A:.+]] : !hal.device
+// CHECK: util.global private @[[$DEVICE_B:.+]] : !hal.device
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
+// CHECK: util.global private @[[$GLOBAL:.+]] : tensor<10xf32>
+// CHECK: util.initializer {
+// CHECK:   %[[CST:.+]] = arith.constant dense<0.0{{.*}}> : tensor<10xf32>
+// CHECK:   util.global.store %[[CST]], @[[$GLOBAL]]
+// CHECK: }
+// CHECK: util.global private @[[$GLOBAL_B:.+]] : tensor<10xf32>
+// CHECK: util.initializer {
+// CHECK:   %[[LOAD:.+]] = util.global.load @[[$GLOBAL]]
+// CHECK:   %[[TRANSFER_B:.+]] = flow.tensor.transfer %[[LOAD]] {{.+}} to #hal.device.affinity<@[[$DEVICE_B]]>
+// CHECK:   util.global.store %[[TRANSFER_B]], @[[$GLOBAL_B]]
+// CHECK: }
+// CHECK: util.global private @[[$GLOBAL_A:.+]] : tensor<10xf32>
+// CHECK: util.initializer {
+// CHECK:   %[[LOAD:.+]] = util.global.load @[[$GLOBAL]]
+// CHECK:   %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[LOAD]] {{.+}} to #hal.device.affinity<@[[$DEVICE_A]]>
+// CHECK:   util.global.store %[[TRANSFER_A]], @[[$GLOBAL_A]]
+// CHECK: }
+util.global private @global : tensor<10xf32>
+util.initializer {
+  %0 = arith.constant dense<0.0> : tensor<10xf32>
+  util.global.store %0, @global : tensor<10xf32>
+  util.return
+}
+
+// CHECK-LABEL: @unknown_global_device_with_initializer(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+util.func private @unknown_global_device_with_initializer(%arg0: tensor<10xf32>) -> (tensor<10xf32>, tensor<10xf32>) {
+  // CHECK: %[[OPERAND_A:.+]] = flow.tensor.transfer %[[ARG0]] {{.+}} to #hal.device.affinity<@[[$DEVICE_A]]>
+  %0 = flow.tensor.transfer %arg0 : tensor<10xf32> to #hal.device.affinity<@device_a>
+
+  // CHECK: %[[LOAD_A:.+]] = util.global.load immutable @[[$GLOBAL_A]]
+  %global = util.global.load immutable @global : tensor<10xf32>
+
+  // CHECK: flow.dispatch @dispatch(%[[OPERAND_A]], %[[LOAD_A]])
+  %1 = flow.dispatch @dispatch(%0, %global) : (tensor<10xf32>, tensor<10xf32>) -> tensor<10xf32>
+
+  // CHECK: %[[OPERAND_B:.+]] = flow.tensor.transfer %[[ARG0]] {{.+}} to #hal.device.affinity<@[[$DEVICE_B]]>
+  %2 = flow.tensor.transfer %arg0 : tensor<10xf32> to #hal.device.affinity<@device_b>
+
+  // CHECK: %[[LOAD_B:.+]] = util.global.load immutable @[[$GLOBAL_B]]
+  // CHECK: flow.dispatch @dispatch(%[[OPERAND_B]], %[[LOAD_B]])
+  %3 = flow.dispatch @dispatch(%2, %global) : (tensor<10xf32>, tensor<10xf32>) -> tensor<10xf32>
+  util.return %1, %3 : tensor<10xf32>, tensor<10xf32>
+}
+
+// -----
+
 // CHECK: util.global private @[[$DEVICE_A:.+]] : !hal.device
 // CHECK: util.global private @[[$DEVICE_B:.+]] : !hal.device
 util.global private @device_a : !hal.device
