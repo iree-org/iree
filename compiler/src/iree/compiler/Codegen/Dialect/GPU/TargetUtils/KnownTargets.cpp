@@ -629,6 +629,9 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   static const ChipDetails w7900Chip = {96 / 2, "w7900"};
   static const ChipDetails w7800Chip = {70 / 2, "w7800"};
   static const ChipDetails w7700Chip = {48 / 2, "w7700"};
+  static const ChipDetails phoenixChip = {12 / 2, "phoenix"};
+  static const ChipDetails strixPointChip = {16 / 2, "strix-point"};
+  static const ChipDetails strixHaloChip = {40 / 2, "strix-halo"};
 
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
@@ -671,9 +674,15 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("w7800", TargetDetails{rdna3Wgp, &w7800Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-pro-w7700.c4184
       .Case("w7700", TargetDetails{rdna3Wgp, &w7700Chip})
+      // https://www.techpowerup.com/gpu-specs/amd-phoenix.g1024
+      .Cases({"phoenix", "gfx1103"}, TargetDetails{rdna3Wgp, &phoenixChip})
+      // https://www.techpowerup.com/gpu-specs/amd-strix-point.g1079
+      .Cases({"strix-point", "gfx1150"},
+             TargetDetails{rdna3Wgp, &strixPointChip})
+      // https://www.techpowerup.com/gpu-specs/amd-strix-halo.g1096
+      .Cases({"strix-halo", "gfx1151"}, TargetDetails{rdna3Wgp, &strixHaloChip})
       .Cases({"rdna4", "gfx1200", "gfx1201"}, TargetDetails{rdna4Wgp, nullptr})
-      .Cases({"rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
-              "gfx1151"},
+      .Cases({"rdna3", "gfx1100", "gfx1101", "gfx1102"},
              TargetDetails{rdna3Wgp, nullptr})
       .Cases({"rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",
               "gfx1035", "gfx1036"},
@@ -698,6 +707,9 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
              /*Value=*/"gfx1100")
       .Cases({"rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101"},
              /*Value=*/"gfx1101")
+      .Cases({"phoenix", "gfx1103"}, /*Value=*/"gfx1103")
+      .Cases({"strix-point", "gfx1150"}, /*Value=*/"gfx1150")
+      .Cases({"strix-halo", "gfx1151"}, /*Value=*/"gfx1151")
       .Case("gfx1250", /*Value=*/"gfx1250")
       .Default("");
 }
