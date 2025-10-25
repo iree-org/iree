@@ -2749,4 +2749,7 @@ DEFINE_OP_GET_EFFECTS(CustomOp)
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc" // IWYU pragma: keep
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtPureOps.cpp.inc" // IWYU pragma: keep
 // clang-format: on

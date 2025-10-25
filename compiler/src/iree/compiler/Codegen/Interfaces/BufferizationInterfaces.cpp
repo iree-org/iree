@@ -331,6 +331,15 @@ struct LinalgExtOpInterface
   }
 };
 
+template <typename... Ops>
+struct LinalgExtOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (void)std::initializer_list<int>{
+        0, (Ops::template attachInterface<LinalgExtOpInterface<Ops>>(*context),
+            0)...};
+  }
+};
+
 /// Returns the buffers of the source and destination for pack and unpack ops.
 /// Returns a failure if the buffers can not be found.
 template <typename OpTy>
@@ -686,37 +695,13 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             StoreToBufferOpInterface, StoreToBufferOpSubsetInterface,
             StoreToBufferOpSubsetInsertionInterface>(*ctx);
       });
-  registry.addExtension(+[](MLIRContext *ctx,
-                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-    IREE::LinalgExt::ArgCompareOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ArgCompareOp>>(*ctx);
-    IREE::LinalgExt::FftOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
-    IREE::LinalgExt::PackOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
-    IREE::LinalgExt::UnPackOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::UnPackOp>>(*ctx);
-    IREE::LinalgExt::ScanOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
-    IREE::LinalgExt::ScatterOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
-    IREE::LinalgExt::GatherOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::GatherOp>>(*ctx);
-    IREE::LinalgExt::SortOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
-    IREE::LinalgExt::TopkOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
-    IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(*ctx);
-    IREE::LinalgExt::WinogradFilterTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradFilterTransformOp>>(*ctx);
-    IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
-    IREE::LinalgExt::AttentionOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::AttentionOp>>(*ctx);
-    IREE::LinalgExt::MapScatterOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::MapScatterOp>>(*ctx);
-  });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+        LinalgExtOpInterfaceHelper<
+#define GET_OP_LIST
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
+            >::registerOpInterface(ctx);
+      });
   registry.insert<linalg::LinalgDialect>();
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(
