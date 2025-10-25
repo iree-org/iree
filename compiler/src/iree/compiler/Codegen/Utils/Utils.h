@@ -310,18 +310,12 @@ getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
 using SizesAndScalableFlags =
     std::pair<SmallVector<int64_t>, SmallVector<bool>>;
 
-// This utility function returns the static part of scalable inner tile sizes.
-// These are - as of now always and probably should always be - arith.muli ops
-// with `vector.vscale` on one side and an `arith.constant` on the other. It
-// returns the constant if found.
-FailureOr<int64_t> getStaticPartOfScalableTileSize(Operation *op);
-
 // This function takes a vector of mixed sizes and returns the static tile sizes
 // and scalable tile flags. For scalable inner tiles, it returns the static
 // counterpart and the corresponding flag. E.g. for [8, [8]] it returns [8, 8]
 // and [false, true].
-FailureOr<SizesAndScalableFlags>
-getScalableTileSizesAndFlags(SmallVector<OpFoldResult> mixedSizes);
+std::optional<SizesAndScalableFlags>
+getScalableTileSizesAndFlags(ArrayRef<OpFoldResult> mixedSizes);
 
 using DimBound = vector::ConstantOrScalableBound;
 using DimBoundSize = DimBound::BoundSize;

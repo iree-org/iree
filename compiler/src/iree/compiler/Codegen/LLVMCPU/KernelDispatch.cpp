@@ -1877,11 +1877,14 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
 
 // Utility function to return the result inner tile sizes associated with the
 // mmt4d op. I.e. returns the M1 and N1 dimensions of the result shape
-// BxM0xN0xM1xN1. In case of scalable dimensions, walks the IR and returns
-// the static inner tile size and the appropriate scalable flag.
+// BxM0xN0xM1xN1. It also explicitly checks for scalable dimensions of the form
+// %cst * vscale, returns the constant and sets the scalable flag of the
+// corresponding dimension to true. For example, if we have the inner tile sizes
+// [8, 8*vscale], this method returns [8, 8] as tile sizes and [false, true] as
+// scalable flags.
 // TODO: By using the IterationDimTracker, extend the logic to
 // infer all inner tile sizes - including the inner K dimension, if possible.
-static FailureOr<SizesAndScalableFlags>
+static std::optional<SizesAndScalableFlags>
 getMmt4dInnerTileSizes(linalg::LinalgOp op) {
   Value destValue = op.getDpsInitOperand(0)->get();
   ArrayRef<int64_t> destShape =
@@ -1895,17 +1898,20 @@ getMmt4dInnerTileSizes(linalg::LinalgOp op) {
   SmallVector<OpFoldResult> innerDims;
   // Currently, the only init tensor of the mmt4d seems to be linalg.fill ops
   // or the bindings. Otherwise, bail out.
+  // TODO: implement ShapeAwareOpInterface for tensor.empty and track the IR
+  // until it reaches an operation that implements that interface instead of
+  // hard-coding these ops.
   if (!isa<linalg::FillOp, IREE::TensorExt::DispatchTensorLoadOp>(destOp)) {
     LDBG() << "Mmt4d with non-fill or tensor load init buffer, cannot infer "
               "inner tile sizes!";
-    return failure();
+    return std::nullopt;
   }
   if (auto fillOp = dyn_cast<linalg::FillOp>(destOp)) {
     auto emptyOp =
         dyn_cast<tensor::EmptyOp>(fillOp.getDpsInitOperand(0)->getOwner());
     if (!emptyOp) {
       LDBG() << "Could not infer inner tile sizes of a scalable mmt4d op!";
-      return failure();
+      return std::nullopt;
     }
     innerDims = emptyOp.getMixedSizes();
   }
@@ -1917,61 +1923,33 @@ getMmt4dInnerTileSizes(linalg::LinalgOp op) {
   return getScalableTileSizesAndFlags(innerDims);
 }
 
-// Adjusts the tile sizes and scalable flags for SVE and SME in-place.
+// Adjusts the tile sizes and scalable flags for SVE in-place.
 // Returns failure if it cannot adjust tile sizes.
-static LogicalResult adjustVectorSizesForScalableVectorization(
-    linalg::LinalgOp op, DictionaryAttr targetConfig, int64_t M0, int64_t N0,
+static bool adjustVectorSizesForScalableVectorization(
+    linalg::LinalgOp op, DictionaryAttr targetConfig, int64_t m0, int64_t n0,
     SmallVector<int64_t> &vecTileSizes,
     IREE::Codegen::ScalableTileFlags &vecScalableTileFlags) {
   int64_t mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
-  ShapedType rhsType = cast<ShapedType>(op.getDpsInputs()[1].getType());
-  FailureOr<SizesAndScalableFlags> scalableInnerTilesAndFlags =
+  auto rhsType = cast<ShapedType>(op.getDpsInputs()[1].getType());
+  std::optional<SizesAndScalableFlags> scalableInnerTilesAndFlags =
       getMmt4dInnerTileSizes(op);
-  // TODO: Enable materialization and add corresponding tile size selection
-  // tests for SME.
-  if (hasSMEFeature(targetConfig) && !clDisableArmSMETiling &&
-      ShapedType::isDynamic(M0)) {
-    int64_t innerTileSize;
-    bool scalableFlag;
-    if (failed(scalableInnerTilesAndFlags)) {
-      // Use the current upper bound on the inner M dimension as a fallback
-      // option for SME.
-      LDBG() << "Using default vector parallel tile sizes for the inner M dim!";
-      innerTileSize = 8;
-      scalableFlag = true;
-    } else {
-      innerTileSize = scalableInnerTilesAndFlags.value().first[0];
-      scalableFlag = scalableInnerTilesAndFlags.value().second[0];
-    }
-    vecTileSizes[mmt4dDimBase + 3] = innerTileSize;
-    vecScalableTileFlags[mmt4dDimBase + 3] = scalableFlag;
+  if (!scalableInnerTilesAndFlags) {
+    LDBG() << "Scalable tile sizes cannot be inferred!";
+    return false;
   }
-  if ((hasAnySVEFeature(targetConfig) ||
-       (hasSMEFeature(targetConfig) && !clDisableArmSMETiling)) &&
-      ShapedType::isDynamic(N0)) {
-    int64_t innerTileSize;
-    bool scalableFlag;
-    if (failed(scalableInnerTilesAndFlags)) {
-      // For SVE, the N dimension is currently chosen as 8 - unless we have RHS
-      // with i4 type and target does not have "+dotprod" or "+i8mm" features.
-      // Currently, we hard-code that over here as a fallback option.
-      LDBG() << "Using default vector parallel tile sizes for the inner M dim!";
-      auto rhsElemType = rhsType.getElementType();
-      innerTileSize = rhsElemType.isSignlessInteger(4) &&
-                              !(hasFeature(targetConfig, "+i8mm") ||
-                                hasFeature(targetConfig, "+dotprod"))
-                          ? 16
-                          : 8;
-      scalableFlag = true;
-    } else {
-      innerTileSize = scalableInnerTilesAndFlags.value().first[1];
-      scalableFlag = scalableInnerTilesAndFlags.value().second[1];
-    }
-    vecTileSizes[mmt4dDimBase + 4] = innerTileSize;
-    vecScalableTileFlags[mmt4dDimBase + 4] = scalableFlag;
-    return success();
+  // TODO: Enable materialization and add corresponding mechanisms for SME.
+  if (hasSMEFeature(targetConfig) || !clDisableArmSMETiling) {
+    LDBG() << "SME is not supported yet!";
+    return false;
   }
-  return failure();
+  if (hasAnySVEFeature(targetConfig) && ShapedType::isDynamic(n0)) {
+    vecTileSizes[mmt4dDimBase + 4] =
+        scalableInnerTilesAndFlags.value().first[1];
+    vecScalableTileFlags[mmt4dDimBase + 4] =
+        scalableInnerTilesAndFlags.value().second[1];
+    return true;
+  }
+  return false;
 }
 
 static IREE::Codegen::LoweringConfigAttrInterface
@@ -2037,12 +2015,17 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   vecTileSizes[mmt4dDimBase + 5] = K0;
   IREE::Codegen::ScalableTileFlags vecScalableTileFlags(mmt4dDimBase + 6,
                                                         false);
-  if (!(targetConfig && isAArch64(targetConfig) &&
-        isScalableVectorizationEnabled() &&
-        succeeded(adjustVectorSizesForScalableVectorization(
-            op, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags)))) {
+  bool scalableTilesFound = false;
+  // If scalable vectorization is enabled, adjust the vector tile sizes and the
+  // corresponding scalable flags.
+  if (targetConfig && isScalableVectorizationEnabled())
+    scalableTilesFound = adjustVectorSizesForScalableVectorization(
+        op, targetConfig, M0, N0, vecTileSize, vecScalableFlags);
+  // In the existence of scalable tiles, we do not yet support limiting vector
+  // sizes as this assumes static tile sizes.
+  // TODO: extend this mechanism to handle _scalable_ tile sizes as well.
+  if (!scalableTilesFound)
     limitVectorTileSizes(op, vecTileSizes);
-  }
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
   generator.setVectorTileSizes(vecTileSizes, vecScalableTileFlags);

@@ -1614,38 +1614,19 @@ getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return std::nullopt;
 }
 
-FailureOr<int64_t> getStaticPartOfScalableTileSize(Operation *op) {
-  auto mulIOp = dyn_cast<arith::MulIOp>(op);
-  if (!mulIOp)
-    return failure();
-
-  auto lhs = mulIOp.getLhs().getDefiningOp();
-  auto rhs = mulIOp.getRhs().getDefiningOp();
-
-  auto cstOp = isa<arith::ConstantOp>(lhs) ? cast<arith::ConstantOp>(lhs)
-                                           : dyn_cast<arith::ConstantOp>(rhs);
-  if (!cstOp)
-    return failure();
-  if (!isa<vector::VectorScaleOp>(lhs) && !isa<vector::VectorScaleOp>(rhs))
-    return failure();
-  if (auto integerAttr = dyn_cast<IntegerAttr>(cstOp.getValue()))
-    return integerAttr.getInt();
-  return failure();
-}
-
-FailureOr<SizesAndScalableFlags>
-getScalableTileSizesAndFlags(SmallVector<OpFoldResult> mixedInnerTiles) {
+std::optional<SizesAndScalableFlags>
+getScalableTileSizesAndFlags(ArrayRef<OpFoldResult> mixedInnerTiles) {
   SmallVector<int64_t> tileSizes(mixedInnerTiles.size(), 0);
   IREE::Codegen::ScalableTileFlags scalableFlags(mixedInnerTiles.size(), false);
   for (unsigned pos = 0; pos < mixedInnerTiles.size(); ++pos) {
     // Check if we have SSA values that represent the inner tile sizes.
     // This is the case for scalable tile sizes.
     if (auto innerTileVal = dyn_cast<Value>(mixedInnerTiles[pos])) {
-      FailureOr<int64_t> innerTile =
-          getStaticPartOfScalableTileSize(innerTileVal.getDefiningOp());
-      if (failed(innerTile)) {
+      std::optional<int64_t> innerTile =
+          getConstantVscaleMultiplier(innerTileVal);
+      if (!innerTile) {
         LDBG() << "Found non-scalable dynamic inner tile!";
-        return failure();
+        return std::nullopt;
       }
       tileSizes[pos] = innerTile.value();
       scalableFlags[pos] = true;
@@ -1657,7 +1638,7 @@ getScalableTileSizesAndFlags(SmallVector<OpFoldResult> mixedInnerTiles) {
         getConstantIntValue(mixedInnerTiles[pos]);
     if (!innerTile.has_value()) {
       LDBG() << "Error while inferring static inner tile size!";
-      return failure();
+      return std::nullopt;
     }
     tileSizes[pos] = innerTile.value();
   }
