@@ -144,7 +144,6 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRVectorUtils
     iree::compiler::Codegen::Common
-    iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
