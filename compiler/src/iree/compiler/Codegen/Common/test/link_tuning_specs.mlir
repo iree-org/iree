@@ -268,8 +268,8 @@ module @td_module attributes { transform.with_named_sequence } {
 // CHECK:         @__kernel_config(
 // CHECK:         transform.foreach_match
 // CHECK:           @match -> @apply_op_config
-// CHECK:           @inner_module_b_match -> @inner_module_b_apply_op_config
-// CHECK:           @inner_module_c_match -> @apply_op_config_1
+// CHECK:           @match_0 -> @apply_op_config_0
+// CHECK:           @match_1 -> @apply_op_config_1
 
 // -----
 
@@ -338,14 +338,14 @@ module @td_module attributes { transform.with_named_sequence } {
 // CHECK:         @__kernel_config(
 // CHECK:         transform.foreach_match
 // CHECK:           @match -> @apply_op_config
-// CHECK:           @m0_match -> @m0_apply_op_config
-// CHECK:           @m1_match -> @apply_op_config_1
+// CHECK:           @match_0 -> @apply_op_config_0
+// CHECK:           @match_1 -> @apply_op_config_1
 
 // -----
 
-// Test that renaming handles secondary conflicts: when @apply_op_config from the
-// second unnamed module is renamed to @m0_apply_op_config, but that name already
-// exists in the same module, it should be further renamed to @m0_apply_op_config_0.
+// Test secondary conflict: when @apply_op_config from the second module conflicts
+// and would be renamed to @apply_op_config_0, but @apply_op_config_0 already
+// exists in the same module, it should skip to @apply_op_config_1.
 
 module @td_module_secondary_name_conflict attributes {transform.with_named_sequence} {
   module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence} {
@@ -366,7 +366,7 @@ module @td_module_secondary_name_conflict attributes {transform.with_named_seque
     transform.named_sequence @apply_op_config(%arg0: !transform.any_op {transform.readonly}) {
       transform.yield
     }
-    transform.named_sequence @m0_apply_op_config(%arg0: !transform.any_op {transform.readonly}) {
+    transform.named_sequence @apply_op_config_0(%arg0: !transform.any_op {transform.readonly}) {
       transform.yield
     }
     transform.named_sequence @match_b(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
@@ -379,7 +379,7 @@ module @td_module_secondary_name_conflict attributes {transform.with_named_seque
         attributes {iree_codegen.tuning_spec_entrypoint} {
       %updated_root = transform.foreach_match in %arg0
           @match_b -> @apply_op_config,
-          @match_c -> @m0_apply_op_config : (!transform.any_op) -> !transform.any_op
+          @match_c -> @apply_op_config_0 : (!transform.any_op) -> !transform.any_op
       transform.yield %updated_root : !transform.any_op
     }
   }
@@ -389,5 +389,5 @@ module @td_module_secondary_name_conflict attributes {transform.with_named_seque
 // CHECK:         @__kernel_config(
 // CHECK:         transform.foreach_match
 // CHECK:           @match_a -> @apply_op_config
-// CHECK:           @match_b -> @m0_apply_op_config_0
-// CHECK:           @match_c -> @m0_apply_op_config
+// CHECK:           @match_b -> @apply_op_config_1
+// CHECK:           @match_c -> @apply_op_config_0
