@@ -12,6 +12,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-constexpr"
@@ -416,7 +418,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
       for (int64_t dim : type.getShape()) {
         // Conservatively treat dynamic values as 1, to find a lower bound on
         // input size.
-        if (!ShapedType::isDynamic(dim)) {
+        if (ShapedType::isStatic(dim)) {
           elementCount *= dim;
         }
       }
@@ -468,6 +470,64 @@ void ConstExprHoistingPolicy::makeInvariantDecision(
   }
 }
 
+// Detects if an operation is part of a quantized weight dequantization pattern.
+// Quantized weights are typically stored as i8 constants and dequantized at
+// runtime via: i8 constant -> sitofp/uitofp -> mulf (scale factor)
+//
+// Hoisting the dequantization result would pull the entire conversion chain
+// into global initializers, creating large f32 globals instead of keeping
+// compact i8 weights. This function prevents that by detecting such patterns.
+//
+// Returns true if the operation is the final multiplication in a dequantization
+// chain that should not be hoisted.
+static bool isPartOfDequantizationPattern(
+    const ConstExprAnalysis::ConstValueInfo *info) {
+  Operation *op = info->getOperation();
+
+  // Check if this is a linalg.generic doing element-wise operations
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp)
+    return false;
+
+  // Check if the output is f32 (typical dequantized result)
+  auto resultType = dyn_cast<RankedTensorType>(info->constValue.getType());
+  if (!resultType || !resultType.getElementType().isF32())
+    return false;
+
+  // Look at the body to see if it's doing multiplication (scale application)
+  if (genericOp.getBody()->getOperations().size() != 2) // yield + one op
+    return false;
+
+  Operation &bodyOp = genericOp.getBody()->front();
+  if (!isa<arith::MulFOp>(bodyOp))
+    return false;
+
+  // Check if any producer is converting an integer type (likely quantized weights)
+  for (auto *producer : info->producers) {
+    Operation *producerOp = producer->getOperation();
+
+    // Check if producer is a linalg.generic (could be doing int->float conversion)
+    auto producerGeneric = dyn_cast<linalg::GenericOp>(producerOp);
+    if (!producerGeneric)
+      continue;
+
+    // Check if it has i8 input (quantized weights)
+    for (Value input : producerGeneric.getDpsInputs()) {
+      if (auto inputType = dyn_cast<RankedTensorType>(input.getType())) {
+        if (inputType.getElementType().isInteger(8)) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "[ConstExprPolicy] Detected dequantization pattern, "
+                         << "disabling hoisting to keep i8 weights compact\n";
+          });
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 void ConstExprHoistingPolicy::makeDecision(
     const ConstExprAnalysis::ConstValueInfo *info, Decision *decision) {
   // A const-expr value has a legal escape if:
@@ -498,6 +558,13 @@ void ConstExprHoistingPolicy::makeDecision(
 
   // If there is no legal escape, we can concretely disable.
   if (!hasLegalEscape) {
+    decision->disableHoist();
+    return;
+  }
+
+  // Check if this is part of a dequantization pattern - if so, don't hoist
+  // to avoid pulling i8 weights and conversion into initializers
+  if (isPartOfDequantizationPattern(info)) {
     decision->disableHoist();
     return;
   }
