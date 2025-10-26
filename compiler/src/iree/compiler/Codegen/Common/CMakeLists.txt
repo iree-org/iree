@@ -65,7 +65,6 @@ iree_cc_library(
     "TileInferenceUtils.h"
     "Transforms.h"
     "UserConfig.h"
-    "VectorLayoutAnalysis.h"
   SRCS
     "AddFastMathFlags.cpp"
     "BlockDynamicDimensions.cpp"

@@ -184,7 +184,6 @@ iree_compiler_cc_library(
         "TileInferenceUtils.h",
         "Transforms.h",
         "UserConfig.h",
-        "VectorLayoutAnalysis.h",
     ],
     deps = [
         ":PassHeaders",
