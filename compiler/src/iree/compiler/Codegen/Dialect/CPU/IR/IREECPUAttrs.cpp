@@ -161,7 +161,7 @@ Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
 SmallVector<LoweringConfigLevelInfo>
 LoweringConfigAttr::getAvailableTilingInfo() {
   SmallVector<LoweringConfigLevelInfo> result;
-  for (unsigned i = 0, e = llvm::to_underlying(TilingLevel::MaxNumTileLevels); i < e; ++i) {
+  for (int i = 0, e = llvm::to_underlying(TilingLevel::MaxNumTileLevels); i < e; ++i) {
     if (!hasTilingLevel(i)) {
       continue;
     }
