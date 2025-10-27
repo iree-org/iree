@@ -280,11 +280,7 @@ static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
 
   if (!llvm::offloading::amdgpu::getAMDGPUMetaDataFromImage(
           llvm::MemoryBufferRef(obj, ""), infoMap, abiVersion)) {
-    for (llvm::StringMapEntry<llvm::offloading::amdgpu::AMDGPUKernelMetaData>
-             &entry : infoMap) {
-      StringRef dispatchName = entry.getKey();
-      llvm::offloading::amdgpu::AMDGPUKernelMetaData &metaData =
-          entry.getValue();
+    for (const auto &[dispatchName, metaData] : infoMap) {
       if (metaData.SGPRSpillCount > 0 || metaData.VGPRSpillCount > 0) {
         emitWarning(variantOp.getLoc())
             << "Register spill: " << "VGPRSpillCount: "
