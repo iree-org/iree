@@ -68,6 +68,7 @@ iree_cc_library(
     "VectorLayoutAnalysis.h"
   SRCS
     "AddFastMathFlags.cpp"
+    "AlignMemRefOps.cpp"
     "BlockDynamicDimensions.cpp"
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
