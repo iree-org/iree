@@ -6032,7 +6032,6 @@ the intrinsic and may be opaque.</p>
 output arguments. An indexing map attribute specifies a mapping from each
 outer loop iterator in the iterator type list, to each dimension of each
 operand.</p>
-<p>The combiner type is defined by the intrinsic.</p>
 <p>Example:</p>
 <div class="highlight"><pre><span></span><code>#contraction_accesses = [
  affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
@@ -6042,7 +6041,9 @@ operand.</p>
 #contraction_trait = {
   indexing_maps = #contraction_accesses,
   iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;
+  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
+  distributed = true,
+  opaque = false
 }
 %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
   : vector&lt;2x3x4xf16&gt;, vector&lt;3x5x4xf16&gt; into vector&lt;2x5x4xf32&gt;
@@ -6072,7 +6073,7 @@ operand.</p>
   scf.yield %8 : tensor&lt;?x?x4xf32&gt;
 }
 </code></pre></div></p>
-<p>Or alternatively unrolled to a single intrinsic when operation on vectors.
+<p>Or alternatively unrolled to a single intrinsic when operating on vectors.
 <div class="highlight"><pre><span></span><code>#contraction_accesses = [
  affine_map&lt;() -&gt; ()&gt;,
  affine_map&lt;() -&gt; ()&gt;,
@@ -6081,28 +6082,40 @@ operand.</p>
 #contraction_trait = {
   indexing_maps = #contraction_accesses,
   iterator_types = [],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;
+  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
+  distributed = true,
+  opaque = false
 }
 %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
   : vector&lt;4xf16&gt;, vector&lt;4xf16&gt; into vector&lt;4xf32&gt;
 </code></pre></div></p>
 <p>This operation can represent an intrinsic both in undistributed
-(workgroup/subgroup/warp) and distributed (thread) level. The descriptor
-attribute specifies the inner tile sizes for both the undistributed form
-(where the operands represent the data to be processed by an entire group of
-parallel workers) and the distributed form (where the operands represent the
-data processed by a single workitem/thread).</p>
+(workgroup/subgroup/warp) and distributed (thread) level. This is indicated
+by the <code>distributed</code> boolean attribute. The same <code>kind</code> attribute may be
+used in both cases.</p>
+<p>The inner-tile shapes of tensor operands (defined as above as the trailing
+dimensions not present in the indexing maps) must agree with the shapes of
+the vector tiles implied by the intrinsic specified in <code>kind</code>. The exact
+criterion depends on the <code>opaque</code> boolean attribute:
+* When <code>opaque = true</code>, the only requirement is that they have the same
+  number of elements.
+* When <code>opaque = false</code>, the shapes must match exactly after omitting any
+  unit-dimensions.</p>
+<p>Note that different <code>kind</code> attributes may adopt different conventions as to
+the intrinsic vector tile formats. Some may use only flattened 1-D vectors,
+and it may be necessary to use <code>opaque = true</code> to accomodate them. Others
+may use higher-rank vectors with shapes reflecting semantics, allowing to
+use <code>opaque = false</code>, which is preferable when possible at all thanks to the
+stricter semantics. However, that is not only a function of the <code>kind</code>
+attribute: using <code>opaque = false</code> also requires the tensor operands to have
+appropriate shapes.</p>
 <p>In some cases, variations on the inner tiled operations can be expressed
 with the permutations attribute. This attribute represents the permutation
 from that intrinsic's "canonical" layout (in the case of matrix multiplication,
 this is row-major storage of the inner tile) to the format of the inner tile
 in the arguments, with a permutation specified for each argument.</p>
-<p>Since the canonical dimensionality of the inner dimensions are somewhat
-intrinsic specific, verification of this op requires only that element
-counts of the inner dimensions match the intrinsic.</p>
 <p>For example, an MMT product of inner dimensions with warp semantics can be
-represented with the following. Permutations are only allowed for ops with
-undistributed semantics and must be resolved before distribution.</p>
+represented with the following.</p>
 <div class="highlight"><pre><span></span><code>#contraction_accesses = [
  affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
  affine_map&lt;(i, j, k) -&gt; (k, j)&gt;,
@@ -6132,11 +6145,6 @@ intrinsics operate on vectors, we use this operation to bridge the gap. The
 choice for a shared operation is intended to ease the lowering process and
 allow for different transformations at different stages of the pipeline
 without needing to essentially clone this op.</p>
-<p>The choice to let the inner dimensions required to compute the intrinsic be
-implicit based on the indexing maps was made to make this operation easier
-to generate and to skip the need for type conversion ops. However this comes
-at the expense of ease of verification for the operation. It is also
-implicitly linked to a lane-level parent <code>scf.forall</code> operation.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>InferTypeOpAdaptor</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>DestinationStyleOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TilingInterface</code>, <code>VectorUnrollOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -6146,6 +6154,7 @@ implicitly linked to a lane-level parent <code>scf.forall</code> operation.</p>
 <tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>indxing affine maps</td></tr>
 <tr><td><code>iterator_types</code></td><td>::mlir::ArrayAttr</td><td>Iterator type should be an enum.</td></tr>
 <tr><td><code>kind</code></td><td>IREE::Codegen::InnerTileDescAttrInterface</td><td>buffer-like constant attribute values</td></tr>
+<tr><td><code>semantics</code></td><td>IREE::Codegen::InnerTiledSemanticsAttrInterface</td><td>Attribute implementing InnerTiledSemanticsAttrInterface</td></tr>
 <tr><td><code>permutations</code></td><td>::mlir::ArrayAttr</td><td>permutations</td></tr>
 </table>
 
