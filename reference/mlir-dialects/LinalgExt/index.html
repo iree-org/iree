@@ -2006,39 +2006,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#utility-ops" class="md-nav__link">
-    <span class="md-ellipsis">
-      Utility ops
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Utility ops">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_linalg_extindex-linalgextindexop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_linalg_ext.index (LinalgExt::IndexOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_linalg_extyield-linalgextyieldop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_linalg_ext.yield (LinalgExt::YieldOp)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#winograd-ops" class="md-nav__link">
     <span class="md-ellipsis">
       Winograd ops
@@ -2086,7 +2053,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_17" class="md-nav__link">
+  <a href="#attributes_16" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5121,39 +5088,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#utility-ops" class="md-nav__link">
-    <span class="md-ellipsis">
-      Utility ops
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Utility ops">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_linalg_extindex-linalgextindexop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_linalg_ext.index (LinalgExt::IndexOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_linalg_extyield-linalgextyieldop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_linalg_ext.yield (LinalgExt::YieldOp)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#winograd-ops" class="md-nav__link">
     <span class="md-ellipsis">
       Winograd ops
@@ -5201,7 +5135,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_17" class="md-nav__link">
+  <a href="#attributes_16" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5326,11 +5260,6 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <li><a href="#iree_linalg_exttopk-linalgexttopkop">iree_linalg_ext.topk (LinalgExt::TopkOp)</a></li>
 </ul>
 </li>
-<li><a href="#utility-ops">Utility ops</a><ul>
-<li><a href="#iree_linalg_extindex-linalgextindexop">iree_linalg_ext.index (LinalgExt::IndexOp)</a></li>
-<li><a href="#iree_linalg_extyield-linalgextyieldop">iree_linalg_ext.yield (LinalgExt::YieldOp)</a></li>
-</ul>
-</li>
 <li><a href="#winograd-ops">Winograd ops</a><ul>
 <li><a href="#iree_linalg_extwinogradfilter_transform-linalgextwinogradfiltertransformop">iree_linalg_ext.winograd.filter_transform (LinalgExt::WinogradFilterTransformOp)</a></li>
 <li><a href="#iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop">iree_linalg_ext.winograd.input_transform (LinalgExt::WinogradInputTransformOp)</a></li>
@@ -5339,7 +5268,7 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_17">Attributes</a><ul>
+<li><a href="#attributes_16">Attributes</a><ul>
 <li><a href="#iteratortypeattr">IteratorTypeAttr</a></li>
 <li><a href="#splitreductionmappingattr">SplitReductionMappingAttr</a></li>
 </ul>
@@ -6624,65 +6553,6 @@ Note: when the two values are equal, the first occurence is always selected.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="utility-ops">Utility ops<a class="headerlink" href="#utility-ops" title="Permanent link">link</a></h3>
-<h4 id="iree_linalg_extindex-linalgextindexop"><code>iree_linalg_ext.index</code> (LinalgExt::IndexOp)<a class="headerlink" href="#iree_linalg_extindex-linalgextindexop" title="Permanent link">link</a></h4>
-<p><em>LinalgExt index operation.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.index` $dim attr-dict `:` type($result)
-</code></pre></div>
-<p>This operation is a mirror of <code>linalg.index</code> operation and has the same
-semantics, except that <code>linalg.index</code> enforces that the parent op is a
-<code>LinalgOp</code>, and the <code>iree_linalg_ext.index</code> operation enforces that the
-parent op is a <code>IREE::LinalgExt::CustomOp</code>.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>dim</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute whose minimum value is 0</td></tr>
-</table>
-
-<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>index</td>
-</tr>
-</tbody>
-</table>
-<h4 id="iree_linalg_extyield-linalgextyieldop"><code>iree_linalg_ext.yield</code> (LinalgExt::YieldOp)<a class="headerlink" href="#iree_linalg_extyield-linalgextyieldop" title="Permanent link">link</a></h4>
-<p><em>LinalgExt yield op.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.yield` attr-dict ($operands^ `:` type($operands))?
-</code></pre></div>
-<p><code>iree_linalg_ext.yield</code> is a special terminator operation for blocks inside
-regions in <code>iree_linalg_ext</code> ops.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>operands</code></td>
-<td>variadic of any type</td>
-</tr>
-</tbody>
-</table>
 <h3 id="winograd-ops">Winograd ops<a class="headerlink" href="#winograd-ops" title="Permanent link">link</a></h3>
 <h4 id="iree_linalg_extwinogradfilter_transform-linalgextwinogradfiltertransformop"><code>iree_linalg_ext.winograd.filter_transform</code> (LinalgExt::WinogradFilterTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradfilter_transform-linalgextwinogradfiltertransformop" title="Permanent link">link</a></h4>
 <p><em>Winograd Filter Transform operator.</em></p>
@@ -6707,12 +6577,77 @@ of shape (H, W, C, F) or (F, C, H, W) and the output is an operator of shape
 and then fed to a batch matmul op.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
+<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
 <tr><td><code>kernel_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
 <tr><td><code>kernel_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+</table>
+
+<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>inputs</code></td>
+<td>variadic of shaped of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>outputs</code></td>
+<td>variadic of shaped of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>variadic of ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h4 id="iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop"><code>iree_linalg_ext.winograd.input_transform</code> (LinalgExt::WinogradInputTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop" title="Permanent link">link</a></h4>
+<p><em>Winograd Input Transform operator.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.input_transform` attr-dict
+              `output_tile_size` `(` $output_tile_size `)`
+              `kernel_size` `(` $kernel_size `)`
+              `image_dimensions` `(` $image_dimensions `)`
+              `ins` `(` $inputs `:` type($inputs) `)`
+              `outs` `(` $outputs `:` type($outputs) `)`
+              (`-&gt;` type($result)^)?
+</code></pre></div>
+<p>This operator is part of the first step in converting a convolution to
+its Winograd equivalent. Given a tile of an input image (I),
+this operator computes matmul(transpose(B), matmul(I, B)).
+The input tile is assumed to be square with each side of size m + r - 1,
+where the convolutional kernel is m x m and the output tile size is r x r.
+B is a constant 2-d square matrix of the same shape as the input tile I.
+The input to the operator is an image of shape (N, H, W, C) or (N, C, H, W)
+and the output is an operator of shape (m + r - 1, m + r - 1, N, H', W', C)
+where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
+of this operator is first collapsed and then fed to a batch matmul op.</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
+<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
+<tr><td><code>kernel_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
+<tr><td><code>image_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
 <h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
@@ -6749,10 +6684,10 @@ and then fed to a batch matmul op.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop"><code>iree_linalg_ext.winograd.input_transform</code> (LinalgExt::WinogradInputTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradinput_transform-linalgextwinogradinputtransformop" title="Permanent link">link</a></h4>
-<p><em>Winograd Input Transform operator.</em></p>
+<h4 id="iree_linalg_extwinogradoutput_transform-linalgextwinogradoutputtransformop"><code>iree_linalg_ext.winograd.output_transform</code> (LinalgExt::WinogradOutputTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradoutput_transform-linalgextwinogradoutputtransformop" title="Permanent link">link</a></h4>
+<p><em>Winograd Output Transform operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.input_transform` attr-dict
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.output_transform` attr-dict
               `output_tile_size` `(` $output_tile_size `)`
               `kernel_size` `(` $kernel_size `)`
               `image_dimensions` `(` $image_dimensions `)`
@@ -6760,16 +6695,20 @@ and then fed to a batch matmul op.</p>
               `outs` `(` $outputs `:` type($outputs) `)`
               (`-&gt;` type($result)^)?
 </code></pre></div>
-<p>This operator is part of the first step in converting a convolution to
-its Winograd equivalent. Given a tile of an input image (I),
-this operator computes matmul(transpose(B), matmul(I, B)).
-The input tile is assumed to be square with each side of size m + r - 1,
-where the convolutional kernel is m x m and the output tile size is r x r.
-B is a constant 2-d square matrix of the same shape as the input tile I.
-The input to the operator is an image of shape (N, H, W, C) or (N, C, H, W)
-and the output is an operator of shape (m + r - 1, m + r - 1, N, H', W', C)
-where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
-of this operator is first collapsed and then fed to a batch matmul op.</p>
+<p>This operator is the last transform in converting a convolution to
+its Winograd equivalent. After convolution in the Winograd domain
+(which turns into an elementwise product for a single channel and
+batch matrix multiplication for many channels), this operator converts
+the output back into the original domain. Given a tile of the
+output (O) in the Winograd domain, this operator computes
+matmul(transpose(A), matmul(O, A)). The output tile is square with
+each side of size m + r - 1, where the convolutional kernel is m x m
+and the output tile size is r x r. A is a constant 2-d matrix of
+shape (m + r - 1) x r. The input to the operator is a tensor of
+shape (m + r - 1, m + r - 1, N, H', W', C) and the output is a
+tensor of shape (N, H, W, C) or (N, C, H, W) where H = r H' and W = r W'.
+This operator is followed by a tensor.extract_slice which extracts
+only the non-padded part of the output.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
@@ -6814,76 +6753,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="iree_linalg_extwinogradoutput_transform-linalgextwinogradoutputtransformop"><code>iree_linalg_ext.winograd.output_transform</code> (LinalgExt::WinogradOutputTransformOp)<a class="headerlink" href="#iree_linalg_extwinogradoutput_transform-linalgextwinogradoutputtransformop" title="Permanent link">link</a></h4>
-<p><em>Winograd Output Transform operator.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.winograd.output_transform` attr-dict
-              `output_tile_size` `(` $output_tile_size `)`
-              `kernel_size` `(` $kernel_size `)`
-              `image_dimensions` `(` $image_dimensions `)`
-              `ins` `(` $inputs `:` type($inputs) `)`
-              `outs` `(` $outputs `:` type($outputs) `)`
-              (`-&gt;` type($result)^)?
-</code></pre></div>
-<p>This operator is the last transform in converting a convolution to
-its Winograd equivalent. After convolution in the Winograd domain
-(which turns into an elementwise product for a single channel and
-batch matrix multiplication for many channels), this operator converts
-the output back into the original domain. Given a tile of the
-output (O) in the Winograd domain, this operator computes
-matmul(transpose(A), matmul(O, A)). The output tile is square with
-each side of size m + r - 1, where the convolutional kernel is m x m
-and the output tile size is r x r. A is a constant 2-d matrix of
-shape (m + r - 1) x r. The input to the operator is a tensor of
-shape (m + r - 1, m + r - 1, N, H', W', C) and the output is a
-tensor of shape (N, H, W, C) or (N, C, H, W) where H = r H' and W = r W'.
-This operator is followed by a tensor.extract_slice which extracts
-only the non-padded part of the output.</p>
-<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>output_tile_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
-<tr><td><code>kernel_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
-<tr><td><code>image_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-</table>
-
-<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of shaped of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>outputs</code></td>
-<td>variadic of shaped of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>variadic of ranked tensor of any type values</td>
-</tr>
-</tbody>
-</table>
-<h2 id="attributes_17">Attributes<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h2>
+<h2 id="attributes_16">Attributes<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h2>
 <h3 id="iteratortypeattr">IteratorTypeAttr<a class="headerlink" href="#iteratortypeattr" title="Permanent link">link</a></h3>
 <p><em>Iterator type</em></p>
 <p>Syntax:</p>
