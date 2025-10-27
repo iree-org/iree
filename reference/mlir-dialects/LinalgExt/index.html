@@ -5673,6 +5673,7 @@ in the result, which is useful when reducing over a tiled or sliced subregion.</
 the scale to use.</p>
 <p>If an additional mask argument M is included, the result of the first matmul is modified according to:</p>
 <p>Q @ K.T += M</p>
+<p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>IndexingMapOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
@@ -6170,6 +6171,7 @@ iree_linalg_ext.yield op, which yields one index for each dimension in
 the <code>output</code>, and an additional <code>i1</code> Value, which represents a mask on
 whether or not to write to the <code>output</code> at the yielded set of indices. Iff
 the mask value is true, the input value will be written.</p>
+<p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
 <table>
@@ -6231,6 +6233,7 @@ its reduction dimension, making the online_attention operator:
 it over the entire softmax reduction dimension by:
   x, _, sum : results
   x = (1 / sum) * x</p>
+<p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>IndexingMapOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>PartialReductionOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
