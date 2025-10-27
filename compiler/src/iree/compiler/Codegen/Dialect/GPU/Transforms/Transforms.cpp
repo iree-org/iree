@@ -1413,9 +1413,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   // Step 3. Create the new inner_tiled op.
   auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
       rewriter, loc, inputSlices, initSlices, tiledOp.getIndexingMaps(),
-      tiledOp.getIteratorTypes(), tiledOp.getKind(),
-      cast<IREE::Codegen::InnerTiledSemanticsAttrInterface>(
-          distributedSemantics));
+      tiledOp.getIteratorTypes(), tiledOp.getKind(), distributedSemantics);
 
   newTiledOp->setDiscardableAttrs(tiledOp->getDiscardableAttrDictionary());
 

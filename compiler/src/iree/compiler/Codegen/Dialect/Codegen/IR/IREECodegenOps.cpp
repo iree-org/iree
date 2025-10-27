@@ -231,7 +231,7 @@ static LogicalResult verifyOperandTypes(InnerTiledOp tiledOp) {
         operandShape.drop_front(map.getNumResults()));
     ArrayRef<int64_t> mmaTileShape = mmaVectorType.getShape();
     SmallVector<int64_t> permutedMmaTileShape(mmaTileShape);
-    auto permutations = tiledOp.getPermutations();
+    std::optional<ArrayAttr> permutations = tiledOp.getPermutations();
     bool opaque = tiledOp.getSemantics().getOpaque();
     if (permutations && !opaque) {
       ArrayRef<int64_t> perm =
@@ -338,8 +338,15 @@ LogicalResult InnerTiledOp::verify() {
   }
 
   if (getPermutations()) {
-    for (auto [index, permAttr] :
-         llvm::enumerate(getPermutations()->getAsRange<DenseI64ArrayAttr>())) {
+    auto permRange = getPermutations()->getAsRange<DenseI64ArrayAttr>();
+    int permCount = permRange.end() - permRange.begin();
+    if (permCount != opTypes.size()) {
+      return emitOpError(
+          llvm::formatv("mismatch between the number of permutations ({}) and "
+                        "the number of operands ({})",
+                        permCount, opTypes.size()));
+    }
+    for (auto [index, permAttr] : llvm::enumerate(permRange)) {
       ArrayRef<int64_t> perm = permAttr.asArrayRef();
       ShapedType operandType = getOperandShapedTypes()[index];
       int64_t rank = operandType.getRank();

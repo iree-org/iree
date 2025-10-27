@@ -52,7 +52,7 @@ def IREECodegen_AnyInnerTiledSemanticscAttr
     : Attr<Or<[CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Codegen::"
                      "InnerTiledSemanticsAttrInterface>($_self)">,
 ]>,
-           "buffer-like constant attribute values"> {
+           "Attribute implementing InnerTiledSemanticsAttrInterface"> {
   let storageType = [{ IREE::Codegen::InnerTiledSemanticsAttrInterface }];
   let returnType = [{ IREE::Codegen::InnerTiledSemanticsAttrInterface }];
   let convertFromStorage = "$_self";
