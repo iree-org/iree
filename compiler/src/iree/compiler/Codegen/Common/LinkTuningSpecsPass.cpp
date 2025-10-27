@@ -152,10 +152,8 @@ static void updateNamedSequenceOp(
 
   // Ensure the name is unique by appending a numeric suffix if needed.
   std::string uniqueNewSpecName = specName.str();
-  unsigned suffix = 0;
-  while (seenNames.contains(uniqueNewSpecName)) {
+  for (unsigned suffix = 0; seenNames.contains(uniqueNewSpecName); ++suffix) {
     uniqueNewSpecName = llvm::formatv("{}_{}", specName, suffix).str();
-    ++suffix;
   }
 
   op.setSymName(uniqueNewSpecName);
@@ -222,10 +220,8 @@ static LogicalResult resolveAndMoveNamedSequenceOps(
   }
 
   // Update conflicted named sequence ops.
-  if (!nameConflictOps.empty()) {
-    for (NamedSequenceOp op : nameConflictOps) {
-      updateNamedSequenceOp(op, builder, namedSequenceToUser, seenNames);
-    }
+  for (NamedSequenceOp op : nameConflictOps) {
+    updateNamedSequenceOp(op, builder, namedSequenceToUser, seenNames);
   }
 
   // Move all named sequence ops to the top-level module.
