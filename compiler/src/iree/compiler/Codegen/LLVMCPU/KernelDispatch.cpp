@@ -3145,18 +3145,18 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
       sizes = rootLoweringConfig.getWorkgroupTileSizes();
       flags.resize(sizes.size(), false);
     } else if (level == IREE::CPU::TilingLevel::VectorCommonParallelTiles) {
-      if (rootLoweringConfig.hasTilingLevel(level)) {
+      if (rootLoweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
         auto attr = llvm::cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-            rootLoweringConfig.getTilingLevelAttr(level));
+            rootLoweringConfig.getTilingLevelAttr(llvm::to_underlying(level)));
         sizes.assign(attr.getSizes().begin(), attr.getSizes().end());
         // Only `VectorCommonParallel` has scalable flags.
         flags.assign(attr.getScalableFlags().begin(),
                      attr.getScalableFlags().end());
       }
     } else {
-      if (rootLoweringConfig.hasTilingLevel(level)) {
+      if (rootLoweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
         sizes =
-            rootLoweringConfig.getStaticTilingLevelSizes(level, rootOperation);
+            rootLoweringConfig.getStaticTilingLevelSizes(llvm::to_underlying(level), rootOperation);
         flags.resize(sizes.size(), false);
       }
     }

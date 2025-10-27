@@ -107,7 +107,7 @@ static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
   SmallVector<NamedAttribute> items;
   for (int i = 0, e = llvm::to_underlying(TilingLevel::MaxNumTileLevels); i < e; ++i) {
     auto level = static_cast<TilingLevel>(i);
-    if (!loweringConfig.hasTilingLevel(level)) {
+    if (!loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       continue;
     }
     switch (level) {
@@ -115,14 +115,14 @@ static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
     case TilingLevel::CacheParallelTiles:
     case TilingLevel::CacheReductionTiles: {
       items.emplace_back(IREE::CPU::getTilingLevelName(level),
-                         loweringConfig.getTilingLevelAttr(i));
+                         loweringConfig.getTilingLevelAttr(static_cast<unsigned>(i)));
       break;
     }
     case TilingLevel::VectorCommonParallelTiles:
     case TilingLevel::VectorReductionTiles:
     case TilingLevel::VectorInnerParallelTiles: {
       auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-          loweringConfig.getTilingLevelAttr(i));
+          loweringConfig.getTilingLevelAttr(static_cast<unsigned>(i)));
       SmallVector<int64_t> newSizes(attr.getSizes());
       SmallVector<bool> newScalableFlags(attr.getScalableFlags());
       newScalableFlags.resize(newSizes.size(), false);

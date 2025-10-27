@@ -46,7 +46,7 @@ static Operation *getRootOp(ArrayRef<Operation *> computeOps,
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
     if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel() &&
-        loweringConfig.hasTilingLevel(level)) {
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       if (rootOp) {
         return nullptr;
       }
@@ -63,7 +63,7 @@ static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
   for (Operation *op : llvm::reverse(computeOps)) {
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
-    if (loweringConfig && loweringConfig.hasTilingLevel(level)) {
+    if (loweringConfig && loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       return op;
     }
   }

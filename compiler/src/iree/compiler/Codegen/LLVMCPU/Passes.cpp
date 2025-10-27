@@ -230,7 +230,7 @@ void addMultiTilingExpertPassPipeline(
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
   for (int i = 0, e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels); i < e; ++i) {
     auto level = static_cast<IREE::CPU::TilingLevel>(i);
-    if (!loweringConfig.hasTilingLevel(level)) {
+    if (!loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       continue;
     }
 

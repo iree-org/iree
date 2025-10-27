@@ -65,13 +65,13 @@ static LogicalResult verifyMultiTilingExpertPassPipelineConfig(
 
   for (int i = 0, e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels); i < e;
        ++i) {
-    if (!loweringConfig.hasTilingLevel(i)) {
+    if (!loweringConfig.hasTilingLevel(static_cast<unsigned>(i))) {
       continue;
     }
 
     auto level = static_cast<IREE::CPU::TilingLevel>(i);
     auto tilingLevelAttr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        loweringConfig.getTilingLevelAttr(level));
+        loweringConfig.getTilingLevelAttr(llvm::to_underlying(level)));
     switch (level) {
     case IREE::CPU::TilingLevel::DistributionTiles:
     case IREE::CPU::TilingLevel::CacheParallelTiles:
