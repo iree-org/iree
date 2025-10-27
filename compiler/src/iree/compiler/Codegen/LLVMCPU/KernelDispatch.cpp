@@ -116,7 +116,6 @@ static llvm::cl::opt<bool> clEnableRiscvAggressiveDist(
     llvm::cl::init(false));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
-using IREE::CPU::TilingLevel;
 
 // Encodes the pre-processing strategy to be applied on a Linalg operation
 // before vectorization.
@@ -1005,11 +1004,11 @@ public:
   IREE::CPU::LoweringConfigAttr generateCPULoweringConfig() {
     SmallVector<NamedAttribute> items;
     if (!distTileSizes.empty()) {
-      appendLoweringConfigLevelAttr(items, TilingLevel::DistributionTiles,
+      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::DistributionTiles,
                                     distTileSizes);
     } else if (auto op = dyn_cast<TilingInterface>(rootOp)) {
       size_t numTilingDims = op.getLoopIteratorTypes().size();
-      appendLoweringConfigLevelAttr(items, TilingLevel::DistributionTiles,
+      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::DistributionTiles,
                                     SmallVector<int64_t>(numTilingDims, 0));
     }
     if (!cacheTileSizes.empty()) {
@@ -1017,9 +1016,9 @@ public:
       SmallVector<int64_t> reductionTileSizes;
       splitParallelAndReductionTiles(rootOp, parallelTileSizes,
                                      reductionTileSizes);
-      appendLoweringConfigLevelAttr(items, TilingLevel::CacheParallelTiles,
+      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::CacheParallelTiles,
                                     parallelTileSizes);
-      appendLoweringConfigLevelAttr(items, TilingLevel::CacheReductionTiles,
+      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::CacheReductionTiles,
                                     reductionTileSizes);
     }
     if (!vectorTileSizes.empty()) {
@@ -1032,9 +1031,9 @@ public:
                                      reductionTileSizes, &parallelScalableFlags,
                                      &reductionScalableFlags);
       appendLoweringConfigLevelAttr(items,
-                                    TilingLevel::VectorCommonParallelTiles,
+                                    IREE::CPU::TilingLevel::VectorCommonParallelTiles,
                                     parallelTileSizes, parallelScalableFlags);
-      appendLoweringConfigLevelAttr(items, TilingLevel::VectorReductionTiles,
+      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::VectorReductionTiles,
                                     reductionTileSizes, reductionScalableFlags);
     }
     return IREE::CPU::LoweringConfigAttr::get(ctx, items);
@@ -1046,10 +1045,10 @@ private:
   /// it means no tiling at all. Only the distribution tiling level is
   /// unconditionally added because a root op expects the level to be present.
   void appendLoweringConfigLevelAttr(SmallVectorImpl<NamedAttribute> &items,
-                                     TilingLevel level,
+                                     IREE::CPU::TilingLevel level,
                                      ArrayRef<int64_t> tileSizes,
                                      ArrayRef<bool> scalableFlags = {}) {
-    if (level != TilingLevel::DistributionTiles &&
+    if (level != IREE::CPU::TilingLevel::DistributionTiles &&
         llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
       return;
     }
@@ -1311,13 +1310,13 @@ getNewLoweringConfig(MLIRContext *ctx,
                      bool setDistributionConfig) {
   SmallVector<NamedAttribute> newItems;
   for (auto [level, tileSizes, scalableFlags] : tilingInfo) {
-    if (!setDistributionConfig && level == TilingLevel::DistributionTiles) {
+    if (!setDistributionConfig && level == IREE::CPU::TilingLevel::DistributionTiles) {
       continue;
     }
     // Distribution tile sizes is a must for rootOp, because it is the
     // definition of root op. An operation that has distribution tile sizes is
     // the root op. Other level can be dropped if all the tile sizes are zeros.
-    if (level != TilingLevel::DistributionTiles &&
+    if (level != IREE::CPU::TilingLevel::DistributionTiles &&
         llvm::all_of(tileSizes, [](int64_t val) { return val == 0; })) {
       continue;
     }
@@ -3137,15 +3136,15 @@ MultiLoweringConfigGenerator::create(Operation *rootOperation,
 void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
   const int64_t totalLoopNum = dimTracker.getTotalLoopNum();
 
-  auto loadTilingLevel = [&](TilingLevel level) {
+  auto loadTilingLevel = [&](IREE::CPU::TilingLevel level) {
     SmallVector<int64_t> sizes;
     SmallVector<bool> flags;
-    if (level == TilingLevel::DistributionTiles) {
+    if (level == IREE::CPU::TilingLevel::DistributionTiles) {
       assert(rootLoweringConfig.hasWorkgroupTilingLevel() &&
              "Expected root lowering config to have workgroup tiling level.");
       sizes = rootLoweringConfig.getWorkgroupTileSizes();
       flags.resize(sizes.size(), false);
-    } else if (level == TilingLevel::VectorCommonParallelTiles) {
+    } else if (level == IREE::CPU::TilingLevel::VectorCommonParallelTiles) {
       if (rootLoweringConfig.hasTilingLevel(level)) {
         auto attr = llvm::cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
             rootLoweringConfig.getTilingLevelAttr(level));
@@ -3184,9 +3183,9 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
   };
 
   // Load all tiling levels.
-  for (int i = 0, e = static_cast<int>(TilingLevel::MaxNumTileLevels); i < e;
+  for (int i = 0, e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels); i < e;
        ++i) {
-    loadTilingLevel(static_cast<TilingLevel>(i));
+    loadTilingLevel(static_cast<IREE::CPU::TilingLevel>(i));
   }
 }
 
@@ -3235,8 +3234,8 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
     if (isa<linalg::PackOp>(op)) {
       // For pack op, align the distribution tile size and overwrite the
       // vector parallel tile size.
-      adjust(op, vecTileSize, TilingLevel::DistributionTiles, align);
-      adjust(op, vecTileSize, TilingLevel::VectorCommonParallelTiles,
+      adjust(op, vecTileSize, IREE::CPU::TilingLevel::DistributionTiles, align);
+      adjust(op, vecTileSize, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
              overwrite);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
       // For unpack op, just overwrite the vector parallel tile size.
@@ -3265,7 +3264,7 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
         adjustedTileSize[dimExpr.getPosition()] = tileSize;
       }
       adjust(linalgOp.getOperation(), adjustedTileSize,
-             TilingLevel::VectorCommonParallelTiles, overwrite);
+             IREE::CPU::TilingLevel::VectorCommonParallelTiles, overwrite);
     }
   }
 
@@ -3289,7 +3288,7 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
     if (elementTypeSize == 1) {
       SmallVector<int64_t> vecTileSize(rootOpGlobalDims.size(), 0);
       vecTileSize.back() = 8;
-      adjust(rootOperation, vecTileSize, TilingLevel::VectorCommonParallelTiles,
+      adjust(rootOperation, vecTileSize, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
              align);
     }
   }
@@ -3310,7 +3309,7 @@ void MultiLoweringConfigGenerator::fillTileSizesWithNonRootOps() {
     for (auto [pos, size] : llvm::enumerate(vecTileSize)) {
       int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
       int64_t &tile =
-          globalTileSizes[TilingLevel::VectorCommonParallelTiles][globalDimIdx];
+          globalTileSizes[IREE::CPU::TilingLevel::VectorCommonParallelTiles][globalDimIdx];
       // Only set the tile size if it hasn't been assigned yet.
       if (tile == 0 && size > 0) {
         tile = size;
@@ -3333,9 +3332,9 @@ void MultiLoweringConfigGenerator::getGenericReductionTileSizes() {
         continue;
       }
       int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
-      globalTileSizes[TilingLevel::VectorReductionTiles][globalDimIdx] = size;
-      globalScalableTileFlags[TilingLevel::VectorReductionTiles][globalDimIdx] =
-          globalScalableTileFlags[TilingLevel::VectorCommonParallelTiles]
+      globalTileSizes[IREE::CPU::TilingLevel::VectorReductionTiles][globalDimIdx] = size;
+      globalScalableTileFlags[IREE::CPU::TilingLevel::VectorReductionTiles][globalDimIdx] =
+          globalScalableTileFlags[IREE::CPU::TilingLevel::VectorCommonParallelTiles]
                                  [globalDimIdx];
     }
   }
@@ -3347,23 +3346,23 @@ void MultiLoweringConfigGenerator::splitCommonInnerVectorTiles() {
   const int64_t totalLoopNum = dimTracker.getTotalLoopNum();
 
   // Initialize inner parallel tiles.
-  globalTileSizes[TilingLevel::VectorInnerParallelTiles].assign(totalLoopNum,
+  globalTileSizes[IREE::CPU::TilingLevel::VectorInnerParallelTiles].assign(totalLoopNum,
                                                                 0);
-  globalScalableTileFlags[TilingLevel::VectorInnerParallelTiles].assign(
+  globalScalableTileFlags[IREE::CPU::TilingLevel::VectorInnerParallelTiles].assign(
       totalLoopNum, false);
 
   auto isReductionDim = [&](int64_t globalDimIdx) {
-    return globalTileSizes[TilingLevel::VectorReductionTiles][globalDimIdx] > 0;
+    return globalTileSizes[IREE::CPU::TilingLevel::VectorReductionTiles][globalDimIdx] > 0;
   };
 
   SmallVector<int64_t> &commonSizes =
-      globalTileSizes[TilingLevel::VectorCommonParallelTiles];
+      globalTileSizes[IREE::CPU::TilingLevel::VectorCommonParallelTiles];
   SmallVector<bool> &commonFlags =
-      globalScalableTileFlags[TilingLevel::VectorCommonParallelTiles];
+      globalScalableTileFlags[IREE::CPU::TilingLevel::VectorCommonParallelTiles];
   SmallVector<int64_t> &innerSizes =
-      globalTileSizes[TilingLevel::VectorInnerParallelTiles];
+      globalTileSizes[IREE::CPU::TilingLevel::VectorInnerParallelTiles];
   SmallVector<bool> &innerFlags =
-      globalScalableTileFlags[TilingLevel::VectorInnerParallelTiles];
+      globalScalableTileFlags[IREE::CPU::TilingLevel::VectorInnerParallelTiles];
   for (auto [globalDimIdx, size, flag] :
        llvm::enumerate(commonSizes, commonFlags)) {
     // "Common" means a parallel loop present either in all compute ops or in
@@ -3406,7 +3405,7 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         //   - If the loop dimension is not a reduction but the current tiling
         //   level is `VectorReductionTiles`, skip it.
         if ((iterType == utils::IteratorType::reduction) ^
-            (level == TilingLevel::VectorReductionTiles)) {
+            (level == IREE::CPU::TilingLevel::VectorReductionTiles)) {
           continue;
         }
         tileSizes[pos] = globalTileSizes[level][globalDimIdx];

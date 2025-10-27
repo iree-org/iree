@@ -33,20 +33,20 @@ constexpr StringLiteral kVectorInnerParallelConfigKey = "vector_inner_parallel";
 /// Returns null if `level` is invalid.
 StringRef getTilingLevelName(TilingLevel level) {
   switch (level) {
-  case DistributionTiles:
+  case TilingLevel::DistributionTiles:
     return kDistributionConfigKey;
-  case CacheParallelTiles:
+  case TilingLevel::CacheParallelTiles:
     return kCacheParallelConfigKey;
-  case CacheReductionTiles:
+  case TilingLevel::CacheReductionTiles:
     return kCacheReductionConfigKey;
-  case VectorCommonParallelTiles:
+  case TilingLevel::VectorCommonParallelTiles:
     return kVectorCommonParallelConfigKey;
-  case VectorReductionTiles:
+  case TilingLevel::VectorReductionTiles:
     return kVectorReductionConfigKey;
-  case VectorInnerParallelTiles:
+  case TilingLevel::VectorInnerParallelTiles:
     return kVectorInnerParallelConfigKey;
-  case MaxNumTileLevels:
-  case InvalidLevel:
+  case TilingLevel::MaxNumTileLevels:
+  case TilingLevel::InvalidLevel:
   default:
     return StringRef();
   }
@@ -161,7 +161,7 @@ Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
 SmallVector<LoweringConfigLevelInfo>
 LoweringConfigAttr::getAvailableTilingInfo() {
   SmallVector<LoweringConfigLevelInfo> result;
-  for (unsigned i = 0, e = TilingLevel::MaxNumTileLevels; i < e; ++i) {
+  for (unsigned i = 0, e = llvm::to_underlying(TilingLevel::MaxNumTileLevels); i < e; ++i) {
     if (!hasTilingLevel(i)) {
       continue;
     }
@@ -177,7 +177,7 @@ LoweringConfigAttr::getAvailableTilingInfo() {
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
-  return getTileSizes(getConfig(), DistributionTiles);
+  return getTileSizes(getConfig(), TilingLevel::DistributionTiles);
 }
 
 SmallVector<OpFoldResult>

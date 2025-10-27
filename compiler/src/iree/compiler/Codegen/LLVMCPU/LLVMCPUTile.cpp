@@ -47,7 +47,7 @@ struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
 };
 
 void LLVMCPUTilePass::runOnOperation() {
-  if (tilingLevel == -1) {
+  if (tilingLevel == IREE::CPU::TilingLevel::InvalidLevel) {
     LDBG() << "tilingLevel not set, skip tiling";
     return;
   }
@@ -73,7 +73,7 @@ void LLVMCPUTilePass::runOnOperation() {
       LDBG() << "can't find lowering_config, skip tiling";
       continue;
     }
-    if (!maybeLoweringConfig.hasTilingLevel(tilingLevel)) {
+    if (!maybeLoweringConfig.hasTilingLevel(llvm::to_underlying(tilingLevel))) {
       LDBG() << "target tiling level does not exist";
       continue;
     }
@@ -85,7 +85,7 @@ void LLVMCPUTilePass::runOnOperation() {
     }
 
     auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getLoweringConfig(op).getTilingLevelAttr(tilingLevel));
+        getLoweringConfig(op).getTilingLevelAttr(llvm::to_underlying(tilingLevel)));
     SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
     SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
     scf::SCFTilingOptions tilingOptions;
@@ -124,7 +124,7 @@ void LLVMCPUTilePass::runOnOperation() {
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTilePass(int64_t tilingLevel, bool skipRootOp) {
   LLVMCPUTilePassOptions options;
-  options.tilingLevel = tilingLevel;
+  options.tilingLevel = static_cast<IREE::CPU::TilingLevel>(tilingLevel);
   options.skipRootOp = skipRootOp;
   return std::make_unique<LLVMCPUTilePass>(options);
 }

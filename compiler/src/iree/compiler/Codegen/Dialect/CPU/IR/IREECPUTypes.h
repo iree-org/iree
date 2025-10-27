@@ -15,7 +15,7 @@ namespace mlir::iree_compiler::IREE::CPU {
 
 /// Representation for all the supported tiling levels. All or just a subset of
 /// them may be available in a valid configuration.
-enum TilingLevel : unsigned {
+enum class TilingLevel : unsigned {
   DistributionTiles = 0,
   CacheParallelTiles = 1,
   CacheReductionTiles = 2,

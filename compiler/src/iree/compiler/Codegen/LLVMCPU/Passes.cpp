@@ -228,7 +228,7 @@ void addMultiTilingExpertPassPipeline(
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig,
     const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
-  for (int i = 0, e = IREE::CPU::TilingLevel::MaxNumTileLevels; i < e; ++i) {
+  for (int i = 0, e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels); i < e; ++i) {
     auto level = static_cast<IREE::CPU::TilingLevel>(i);
     if (!loweringConfig.hasTilingLevel(level)) {
       continue;
