@@ -125,9 +125,9 @@ namespace mlir::iree_compiler::IREE::GPU {
 //    into the grid of shape {outer[0], ..., outer[rank - 1]}.
 //    Just like the element-tiles, the layout of these "outer tiles" is
 //    row-major in the sense that the last-enumerated semantic dimension is the
-//    most-contiguous dimension. The outer dimensions describe the layout of
-//    element tiles in the overall vector operand of the intrinsic. This is used
-//    only by a minority of intrinsics to describe "non-contiguous" operand
+//    most-contiguous dimension. The outer dimensions describe the arrangement
+//    of element tiles in the overall vector operand of the intrinsic. This is
+//    used only by a minority of intrinsics to describe "non-contiguous" operand
 //    tiles.
 //
 // Example: MFMA_I32_32x32x8_I8 accumulator
@@ -173,10 +173,10 @@ namespace mlir::iree_compiler::IREE::GPU {
 //    discontinuity as the next 4 elements (the next "element tile") comes from
 //    far away elsewhere in the C matrix, owing to the fact that thread[0] is
 //    greater than 1. Example: thread 0 gets this accumulator ("C") operand:
-//    { C[0, 0], C[1, 0], C[2, 0], C[3, 0],
-//      C[8, 0], C[9, 0], C[10, 0], C[11, 0],
-//      C[16, 0], C[17, 0], C[18, 0], C[19, 0],
-//      C[24, 0], C[25, 0], C[26, 0], C[27, 0] }
+//    { C[0,  0],  C[1,  0],  C[2,  0],  C[3,  0],
+//      C[8,  0],  C[9,  0],  C[10, 0],  C[11, 0],
+//      C[16, 0],  C[17, 0],  C[18, 0],  C[19, 0],
+//      C[24, 0],  C[25, 0],  C[26, 0],  C[27, 0] }
 //
 struct MMASingleSubgroupLayout {
   // Internal dimensions (as in TileSwizzle::Dim::Kind::Internal) that are
