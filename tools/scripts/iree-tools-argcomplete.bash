@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Include this script in your shell to enable argument completion for IREE tools.
+# Include this script in your shell PATH to enable argument completion for IREE
+# tools.
 
 _iree_tools_autocomplete() {
     local tool="$1"
