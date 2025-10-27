@@ -164,6 +164,33 @@ def IREEGPU_DotProductOpsAttr : EnumAttr<
 }
 
 //===----------------------------------------------------------------------===//
+// InnerTiledSemantics
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_InnerTiledSemanticsAttr
+    : AttrDef<
+          IREEGPU_Dialect, "InnerTiledSemantics",
+          [DeclareAttrInterfaceMethods<
+               IREECodegen_InnerTiledSemanticsAttrInterface, ["getTileShapes",
+                                                              "getOpaque"]>,
+]> {
+  let mnemonic = "mma_semantics";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    Attribute describing aspects of MMA semantics that are orthogonal to the
+    aspects described in the mma_layout attrs, and that may change during
+    lowerings while the mma_layout's typically stay constant. This includes:
+    1. Expanded vs opaque tile shapes.
+    2. Distributed vs undistributed tile shapes.
+  }];
+
+  let parameters = (ins "bool":$distributed, "bool":$opaque);
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+//===----------------------------------------------------------------------===//
 // MMA intrinsic
 //===----------------------------------------------------------------------===//
 

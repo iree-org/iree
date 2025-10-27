@@ -88,7 +88,8 @@ func.func @accumulate_inner_tiled(%1 : tensor<?x?x4xf16>, %2 : tensor<?x?x4xf16>
                      affine_map<(i, j, k) -> (k, j)>,
                      affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %5 : tensor<?x?x4xf32>
 }

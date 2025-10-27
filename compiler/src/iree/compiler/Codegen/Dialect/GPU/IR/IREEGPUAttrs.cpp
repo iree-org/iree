@@ -534,6 +534,16 @@ getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
   return {};
 }
 
+void IREE::GPU::InnerTiledSemanticsAttr::getTileTypes(
+    IREE::Codegen::InnerTileDescAttrInterface kind,
+    llvm::SmallVectorImpl<mlir::VectorType> &result) const {
+  if (getDistributed()) {
+    kind.getDistributedTileTypes(result);
+  } else {
+    kind.getUndistributedTileTypes(result);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // MMA Attributes
 //===----------------------------------------------------------------------===//

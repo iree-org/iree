@@ -32,7 +32,8 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
   // succeeds so that other threads don't have to retry.
   OwningOpRef<ModuleOp> &parsedLibrary = builtinModules[path];
 
-  parsedLibrary = parseSourceString<mlir::ModuleOp>(maybeBuiltin.value(), ctx);
+  parsedLibrary = parseSourceString<mlir::ModuleOp>(maybeBuiltin.value(), ctx,
+                                                    /*sourceName=*/path);
   if (!parsedLibrary) {
     return failure();
   }

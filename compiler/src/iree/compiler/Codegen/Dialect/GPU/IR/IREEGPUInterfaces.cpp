@@ -138,6 +138,9 @@ LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
   SmallVector<OpFoldResult> tileStrides(tileSizes.size(),
                                         builder.getIndexAttr(1));
 
+  tileOffsets.assign(applyPermutation(tileOffsets, permutation));
+  tileSizes.assign(applyPermutation(tileSizes, permutation));
+
   offsets.append(tileOffsets);
   sizes.append(tileSizes);
   strides.append(tileStrides);

@@ -1153,12 +1153,14 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
 
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
+  auto semantics = InnerTiledSemanticsAttr::get(context, /*distributed=*/false,
+                                                /*opaque=*/true);
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
       ArrayRef<AffineMap>{outerLhsMap, outerSc1Map, outerRhsMap, outerSc2Map,
                           outerAccMap},
-      iteratorTypes, smmaKind, perms);
+      iteratorTypes, smmaKind, semantics, perms);
   if (maybeLoweringConfig) {
     setLoweringConfig(newMmaOp, maybeLoweringConfig);
   }
@@ -1295,11 +1297,13 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
 
+  auto semantics = InnerTiledSemanticsAttr::get(context, /*distributed=*/false,
+                                                /*opaque=*/true);
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
       ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerAccMap}, iteratorTypes,
-      mmaKind, perms);
+      mmaKind, semantics, perms);
   if (maybeLoweringConfig) {
     setLoweringConfig(newMmaOp, maybeLoweringConfig);
   }
@@ -1313,9 +1317,18 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
 FailureOr<Operation *>
 distributeInnerTiledOp(RewriterBase &rewriter,
                        IREE::Codegen::InnerTiledOp tiledOp) {
-  if (!tiledOp.hasTensorSemantics() || tiledOp.hasThreadSemantics()) {
+  auto semantics =
+      dyn_cast<IREE::GPU::InnerTiledSemanticsAttr>(tiledOp.getSemantics());
+  if (!semantics) {
     return rewriter.notifyMatchFailure(
-        tiledOp, "tiledOp must have vector and subgroup for distribution.");
+        tiledOp, "unexpected tiled op semantics attribute type");
+  }
+  if (semantics.getDistributed()) {
+    return rewriter.notifyMatchFailure(tiledOp, "tiledOp already distributed.");
+  }
+  if (!tiledOp.hasTensorSemantics()) {
+    return rewriter.notifyMatchFailure(
+        tiledOp, "tiledOp must have vector semantics for distribution.");
   }
 
   RewriterBase::InsertionGuard g(rewriter);
@@ -1394,10 +1407,13 @@ distributeInnerTiledOp(RewriterBase &rewriter,
     }
   }
 
+  auto distributedSemantics = IREE::GPU::InnerTiledSemanticsAttr::get(
+      context, /*distributed=*/true, semantics.getOpaque());
+
   // Step 3. Create the new inner_tiled op.
   auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
       rewriter, loc, inputSlices, initSlices, tiledOp.getIndexingMaps(),
-      tiledOp.getIteratorTypes(), tiledOp.getKind());
+      tiledOp.getIteratorTypes(), tiledOp.getKind(), distributedSemantics);
 
   newTiledOp->setDiscardableAttrs(tiledOp->getDiscardableAttrDictionary());
 
@@ -1467,7 +1483,7 @@ struct DropInnerTiledUnitDimsPattern
         ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
         ValueRange{newOperands}.drop_front(tiledOp.getNumInputs()),
         rewriter.getAffineMapArrayAttr(emptyMaps), rewriter.getArrayAttr({}),
-        tiledOp.getKind());
+        tiledOp.getKind(), tiledOp.getSemantics());
 
     SmallVector<Value> newResults(newTiledOp.getResults());
     for (auto [newResult, externalShape] :
@@ -1853,7 +1869,8 @@ vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
   auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
       rewriter, loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
       ValueRange{newOperands}.take_back(tiledOp.getNumOutputs()),
-      tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(), tiledOp.getKind());
+      tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(), tiledOp.getKind(),
+      tiledOp.getSemantics());
 
   auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   SmallVector<Value> transferWrites;
