@@ -765,8 +765,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
-    [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<LinalgFusionInterface,
+    [DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
@@ -876,8 +875,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
-    [AttrSizedOperandSegments,
-     IndexingMapOpInterface,
+    [IndexingMapOpInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
