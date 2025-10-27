@@ -30,6 +30,7 @@ iree_cc_library(
     "IPO.cpp"
     "ImportResources.cpp"
     "LiftCFGToSCF.cpp"
+    "LinkModules.cpp"
     "OptimizeIntArithmetic.cpp"
     "Passes.cpp"
     "Patterns.cpp"
@@ -59,6 +60,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRMathDialect
     MLIRMemRefDialect
+    MLIRParser
     MLIRPass
     MLIRSCFDialect
     MLIRSideEffectInterfaces

@@ -505,6 +505,7 @@ setup(
             "iree-compile = iree.compiler.tools.scripts.iree_compile.__main__:main",
             "iree-import-onnx = iree.compiler.tools.import_onnx.__main__:_cli_main",
             "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",
+            "iree-link = iree.compiler.tools.scripts.iree_link.__main__:main",
             "iree-opt = iree.compiler.tools.scripts.iree_opt.__main__:main",
         ],
     },

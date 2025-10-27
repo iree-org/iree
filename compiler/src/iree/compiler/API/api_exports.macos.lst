@@ -104,6 +104,7 @@ _ireeGPUReorderWorkgroupsStrategyAttrGetValue
 _ireeGPUTargetInfoGet
 _ireeGPUTargetInfoGetMMAIntrinsics
 _ireeHALExecutableTargetAttrGetGPUTargetInfo
+_ireeLinkRunMain
 _ireeMlirLspServerRunMain
 _ireeOptRunMain
 _ireeReduceRunMain
