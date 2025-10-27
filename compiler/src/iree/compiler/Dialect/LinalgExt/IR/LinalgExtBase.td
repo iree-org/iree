@@ -87,4 +87,12 @@ def SplitReductionMappingAttr :
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Base Op class.
+//===----------------------------------------------------------------------===//
+
+class IREELinalgExt_PureOp<string mnemonic, list<Trait> traits = []> :
+    Op<IREELinalgExt_Dialect, mnemonic, traits> {
+}
+
 #endif // IREE_DIALECT_LINALGEXT_BASE
