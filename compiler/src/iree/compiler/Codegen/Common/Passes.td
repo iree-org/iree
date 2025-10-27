@@ -833,6 +833,14 @@ def TestPartitionableLoopsInterfacePass :
   let summary = "Test the PartitionableLoopsInterface";
 }
 
+def TestVectorLayoutAnalysisPass : Pass<"iree-codegen-test-vector-layout-analysis", ""> {
+  let summary = "Test the vector layout analysis.";
+  let description = [{
+    Run VectorLayoutAnalysis on the root operation. The analysis emits remarks
+    for the layout for each SSA value infered on it's owning operation.
+  }];
+}
+
 def TileAndDistributeToWorkgroupsPass :
     InterfacePass<"iree-codegen-tile-and-distribute-to-workgroups", "mlir::FunctionOpInterface"> {
   let summary = "Tile and distribute operations to workgroups";

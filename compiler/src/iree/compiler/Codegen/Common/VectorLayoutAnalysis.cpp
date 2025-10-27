@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 
 #include <cassert>
 
@@ -1410,3 +1411,39 @@ void VectorLayoutAnalysis::dump() {
   print(llvm::dbgs());
   llvm::dbgs() << "\n";
 }
+
+namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_TESTVECTORLAYOUTANALYSISPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
+struct TestVectorLayoutAnalysisPass final
+    : impl::TestVectorLayoutAnalysisPassBase<TestVectorLayoutAnalysisPass> {
+  void runOnOperation() override {
+    Operation *root = getOperation();
+    VectorLayoutAnalysis analysis(getOperation());
+    if (failed(analysis.run())) {
+      root->emitError("layout analysis failed");
+      return signalPassFailure();
+    }
+
+    root->walk([&](Operation *op) {
+      if (isa<IREE::VectorExt::ToLayoutOp>(op)) {
+        return;
+      }
+
+      for (OpResult result : op->getOpResults()) {
+        if (auto layout = analysis.getLayout<Attribute>(result)) {
+          // Print layout attr to a string.
+          std::string layoutStr;
+          llvm::raw_string_ostream s(layoutStr);
+          s << layout;
+          // Emit remark.
+          op->emitRemark("layout of result #" +
+                         Twine(result.getResultNumber()) + " is " + s.str());
+        }
+      }
+    });
+  }
+};
+}; // namespace mlir::iree_compiler
