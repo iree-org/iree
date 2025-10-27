@@ -21,6 +21,7 @@ iree_cc_library(
     ::BufferizationInterfaces
     ::PartitionableLoopsInterface
     ::ProcessorOpInterfaces
+    ::TensorMaskingOpInterface
     ::UKernelOpInterface
     IREELinalgTransformDialect
     MLIRAMDGPUDialect
@@ -174,6 +175,33 @@ iree_tablegen_library(
   OUTS
     --gen-op-interface-decls ProcessorOpInterfaces.h.inc
     --gen-op-interface-defs ProcessorOpInterfaces.cpp.inc
+)
+
+iree_cc_library(
+  NAME
+    TensorMaskingOpInterface
+  HDRS
+    "TensorMaskingOpInterface.h"
+  TEXTUAL_HDRS
+    "TensorMaskingOpInterface.cpp.inc"
+    "TensorMaskingOpInterface.h.inc"
+  SRCS
+    "TensorMaskingOpInterface.cpp"
+  DEPS
+    ::TensorMaskingOpInterfaceGen
+    MLIRFunctionInterfaces
+    MLIRIR
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    TensorMaskingOpInterfaceGen
+  TD_FILE
+    "TensorMaskingOpInterface.td"
+  OUTS
+    --gen-op-interface-decls TensorMaskingOpInterface.h.inc
+    --gen-op-interface-defs TensorMaskingOpInterface.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
