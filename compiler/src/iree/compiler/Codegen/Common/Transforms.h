@@ -114,7 +114,7 @@ class VectorLayoutInterface;
 ///
 /// If at any point, a value has a layout, but the user of that value requires
 /// a different layout, the analysis inserts a resolution operation. This
-/// resolution operation is `iree_vector_ext.layout_conflict_resolution`.
+/// resolution operation is `iree_vector_ext.to_layout`.
 /// For Example:
 ///
 /// %0 = vector.transfer_read
@@ -136,13 +136,13 @@ class VectorLayoutInterface;
 /// %1 = vector.transfer_read
 ///  |
 ///  --> anchored to layout L'
-/// %resolved = iree_vector_ext.layout_conflict_resolution %1
+/// %resolved = iree_vector_ext.to_layout %1
 ///  |
 ///  --> infered to layout L
 /// arith.addf %0, %resolved
 ///
 /// The analysis itself will not try to resolve the conflict, but instead
-/// leaves it to the user to resolve the conflict.
+/// will leave it as a to_layout op, which can be rewritten by the caller.
 LogicalResult propagateVectorLayoutInfo(
     Operation *root,
     llvm::MapVector<Value, IREE::VectorExt::VectorLayoutInterface> &layouts);

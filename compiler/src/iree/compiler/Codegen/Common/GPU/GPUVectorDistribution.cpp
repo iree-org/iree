@@ -38,15 +38,15 @@ constexpr StringLiteral kVectorLayoutRedistributeAttrName =
 /// layout.
 LogicalResult
 setOpSignature(Operation *op,
-               llvm::MapVector<Value, VectorLayoutInterface> &layouts,
+               const llvm::MapVector<Value, VectorLayoutInterface> &layouts,
                const VectorLayoutOptions &options) {
   SmallVector<Attribute> operands;
   SmallVector<Attribute> results;
 
   for (Value operand : op->getOperands()) {
     if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
-      if (layouts.contains(vectorOperand)) {
-        operands.push_back(layouts[vectorOperand]);
+      if (auto layout = layouts.lookup(vectorOperand)) {
+        operands.push_back(layout);
         continue;
       }
       if (auto layout = options.getDefaultLayout(vectorOperand.getType())) {
@@ -60,8 +60,8 @@ setOpSignature(Operation *op,
 
   for (Value result : op->getResults()) {
     if (auto vectorResult = dyn_cast<VectorValue>(result)) {
-      if (layouts.contains(vectorResult)) {
-        results.push_back(layouts[vectorResult]);
+      if (auto layout = layouts.lookup(vectorResult)) {
+        results.push_back(layout);
         continue;
       }
       if (auto layout = options.getDefaultLayout(vectorResult.getType())) {

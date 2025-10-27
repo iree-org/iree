@@ -1401,7 +1401,7 @@ struct TestVectorLayoutAnalysisPass final
     Operation *root = getOperation();
     llvm::MapVector<Value, VectorLayoutInterface> layouts;
     if (failed(propagateVectorLayoutInfo(root, layouts))) {
-      root->emitError("layout propagation failed");
+      root->emitError("Layout Analysis Failed");
       return signalPassFailure();
     }
 
