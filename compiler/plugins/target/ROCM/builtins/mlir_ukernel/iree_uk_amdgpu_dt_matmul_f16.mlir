@@ -17,7 +17,24 @@
 util.func @pingpong_dt_large_f16(%lhs_base: !lhs_base_ty, %rhs_base: !rhs_base_ty, %unused_acc: !acc_base_ty) -> !acc_base_ty attributes {
   ukernel_info = #rocm.ukernel_info<
     match = {
-      types = [f16, f16, f32]
+      types = [f16, f16, f32],
+      iteration_sizes_constraints = [
+        #rocm.ukernel_interation_size_constraint<
+          index = 0,
+          size_min = 512,
+          size_div = 64
+        >,
+        #rocm.ukernel_interation_size_constraint<
+          index = 1,
+          size_min = 32832,
+          size_div = 64
+        >,
+        #rocm.ukernel_interation_size_constraint<
+          index = 2,
+          size_min = 512,
+          size_div = 64
+        >
+      ]
     },
     mma = #iree_gpu.data_tiled_mma_layout<
       intrinsic = MFMA_F32_16x16x16_F16,
