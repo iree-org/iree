@@ -20,15 +20,17 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-// MMASingleSubgroupLayout /////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+// MMASingleSubgroupLayout
+//////////////////////////////////////////////////////////////////////////////
 //
 // Overview, terminology
 // ---------------------
 //
 // MMASingleSubgroupLayout describes the layout of one operand of one subgroup
-// level operation such as a MMA intrinsic.
+// level operation such as an MMA intrinsic.
 //
-// A MMA intrinsic, running on one thread, takes a 1D vector for each operand.
+// An MMA intrinsic, running on one thread, takes a 1D vector for each operand.
 // The purpose of MMASingleSubgroupLayout is to describe the mapping
 // from thread-id and 1D-vector-index into "semantical" dimensions (see next
 // paragraph). For example, for the accumulator ("C") operand of
@@ -62,17 +64,17 @@ namespace mlir::iree_compiler::IREE::GPU {
 //    array elements outer[0], thread[0], element[0] correspond to the M
 //    dimension, and the [1] correspond to the K dimension.
 // 1. For each semantical dimension, the product (outer[i] * thread[i] *
-//    element[i]) equals the semantical dimension size, i.e. the tile size. For
-//    example, in MFMA_I32_32x32x8_I8, for the M and N dimensions, these
-//    products equal 32.
+//    element[i]) equals the semantical dimension size, i.e., the tile size. For
+//    example, in @llvm.amdgcn.mfma.i32.32x32x8i8, for the M and N dimensions,
+//    these products equal 32.
 // 2. The product of all the outer[i] times all the element[i] equals the
 //    length of the vector operand to the intrinsic. It is the number of
 //    elements that one intrinsic consumes on one thread.
 // 3. The product of all the thread[i] is a divisor of subgroup size. It is
 //    almost always equal to subgroup size. If not, then it is a strict divisor
-//    of subgroup size and that means that multiple threads read the exact same
-//    data, i.e. there is an implied broadcasting, as will be seen in the modulo
-//    (t % thread [0]) below.
+//    of subgroup size and that means that multiple threads get the exact same
+//    data, i.e., there is an implied broadcasting, as will be seen in the
+//    modulo (t % thread [0]) below.
 //
 // Detailed semantics: case of semantic rank 1
 // -------------------------------------------
@@ -96,7 +98,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 //
 // Also notice that in the (rare) case where thread [0] is smaller than subgroup
 // size, multiple threads will get the same value of (t % thread [0]) and thus
-// will read the same data.
+// will get the same data.
 //
 // Detailed semantics: general case
 // -------------------------------------------
@@ -130,10 +132,10 @@ namespace mlir::iree_compiler::IREE::GPU {
 //    used only by a minority of intrinsics to describe "non-contiguous" operand
 //    tiles.
 //
-// Example: MFMA_I32_32x32x8_I8 accumulator
+// Example: @llvm.amdgcn.mfma.i32.32x32x8i8 accumulator
 // ----------------------------------------
 //
-// For the accumulator operand of MFMA_I32_32x32x8_I8, we have:
+// For the accumulator operand of @llvm.amdgcn.mfma.i32.32x32x8i8, we have:
 //
 //   outer    = {4,  1}
 //   thread   = {2,  32}
@@ -180,7 +182,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 //
 struct MMASingleSubgroupLayout {
   // Internal dimensions (as in TileSwizzle::Dim::Kind::Internal) that are
-  // outer-most in the layout. This happens when a MMA op, seen on a single
+  // outer-most in the layout. This happens when an MMA op, seen on a single
   // thread, has an operand that consists of multiple elements, and these elems
   // are NOT contiguous.
   // This is not used by every MMA op; ops which don't use that simply have 1's.
@@ -193,7 +195,7 @@ struct MMASingleSubgroupLayout {
   // Strides corresponding to the cross-thread dimensions.
   SmallVector<int64_t, 2> tstrides;
   // Internal dimensions (as in TileSwizzle::Dim::Kind::Internal) that are
-  // inner-most in the layout. This happens when a MMA op, seen on a single
+  // inner-most in the layout. This happens when an MMA op, seen on a single
   // thread, has an operand that consists of multiple elements, and these elems
   // are contiguous.
   // This is not used by every MMA op; ops which don't use that simply have 1's.
