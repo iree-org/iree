@@ -3098,8 +3098,8 @@ private:
   IterationDimTracker dimTracker;
   // For each tiling level, store per-dimension tiling information.
   // TilingLevel -> (global loop dimension index -> tile size / scalable flag)
-  llvm::SmallDenseMap<TilingLevel, SmallVector<int64_t>> globalTileSizes;
-  llvm::SmallDenseMap<TilingLevel, SmallVector<bool>> globalScalableTileFlags;
+  llvm::SmallDenseMap<IREE::CPU::TilingLevel, SmallVector<int64_t>> globalTileSizes;
+  llvm::SmallDenseMap<IREE::CPU::TilingLevel, SmallVector<bool>> globalScalableTileFlags;
 
   // Store the vector parallel tile sizes preferred by non-root operations.
   // Operation -> (global loop dimension index -> tile size)
