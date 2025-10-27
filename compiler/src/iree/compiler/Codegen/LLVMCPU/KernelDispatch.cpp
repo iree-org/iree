@@ -3214,7 +3214,7 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
   ArrayRef<int64_t> rootOpGlobalDims =
       dimTracker.getAllGlobalDimIdx(rootOperation);
   auto adjust = [&](Operation *op, ArrayRef<int64_t> vecTileSize,
-                    TilingLevel level,
+                    IREE::CPU::TilingLevel level,
                     llvm::function_ref<int64_t(int64_t, int64_t)> updater) {
     for (auto [pos, size] : llvm::enumerate(vecTileSize)) {
       int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
@@ -3380,7 +3380,7 @@ void MultiLoweringConfigGenerator::splitCommonInnerVectorTiles() {
 }
 
 void MultiLoweringConfigGenerator::setNewTilingConfigs() {
-  SmallVector<TilingLevel> tilingLevels;
+  SmallVector<IREE::CPU::TilingLevel> tilingLevels;
   tilingLevels.reserve(globalTileSizes.size());
   for (const auto &entry : globalTileSizes) {
     tilingLevels.push_back(entry.first);
@@ -3393,7 +3393,7 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
     int numLoops = iterTypes.size();
     SmallVector<IREE::CPU::LoweringConfigLevelInfo> newTilingInfo;
     // Collect new tiling info.
-    for (TilingLevel level : tilingLevels) {
+    for (IREE::CPU::TilingLevel level : tilingLevels) {
       SmallVector<int64_t> tileSizes(numLoops, 0);
       SmallVector<bool> scalableFlags(numLoops, false);
       for (auto [pos, iterType] : llvm::enumerate(iterTypes)) {
