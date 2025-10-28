@@ -1527,6 +1527,37 @@ iree_generated_e2e_runner_test(
     "requires-gpu-${_CDNA_ARCH}"
 )
 
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_${_CDNA_ARCH}_tensor_ukernel_${_F8E4M3_TYPE}_medium
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=${_F8E4M3_TYPE}"
+    "--acc_type=f32"
+    "--shapes=custom_mnk"
+    "--mnk=640,1024,1024"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+    "--iree-hip-enable-tensor-ukernels"
+    "--iree-hip-specialize-dispatches"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-${_CDNA_ARCH}"
+)
+
 iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_${_CDNA_ARCH}_dt_${_F8E4M3_TYPE}_tensor_ukernel_large
@@ -1665,6 +1696,39 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-hip-enable-tensor-ukernels"
+    "--iree-hip-specialize-dispatches"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-${_CDNA_ARCH}"
+)
+
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_${_CDNA_ARCH}_tensor_ukernel_f16f16f32_medium
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=custom_mnk"
+    "--mnk=1152,1024,1024"
+    "--transpose_rhs"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+    "--iree-hip-enable-tensor-ukernels"
+    "--iree-hip-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -1726,6 +1790,37 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-hip-enable-tensor-ukernels"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-${_CDNA_ARCH}"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_${_CDNA_ARCH}_tensor_ukernel_bf16bf16f32_medium
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=bf16"
+    "--acc_type=f32"
+    "--shapes=custom_mnk"
+    "--mnk=1152,1024,1024"
+    "--transpose_rhs"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+    "--iree-hip-enable-tensor-ukernels"
+    "--iree-hip-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
