@@ -99,3 +99,172 @@ func.func @fft_rfft.last(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torch.vtensor<
 // CHECK:             %[[VAR12:.*]] = torch.aten.cat %[[VAR11]], %[[INTM1]] : !torch.list<vtensor<[3,8,9,1],f32>>, !torch.int -> !torch.vtensor<[3,8,9,2],f32>
 // CHECK:             %[[VAR13:.*]] = torch.aten.view_as_complex %[[VAR12]] : !torch.vtensor<[3,8,9,2],f32> -> !torch.vtensor<[3,8,9],complex<f32>>
 // CHECK:             return %[[VAR13]] : !torch.vtensor<[3,8,9],complex<f32>>
+
+// -----
+
+func.func @flex_attention_basic(%arg0: !torch.vtensor<[2,4,128,64],f32>, %arg1: !torch.vtensor<[2,4,128,64],f32>, %arg2: !torch.vtensor<[2,4,128,64],f32>) -> (!torch.vtensor<[2,4,128,64],f32>, !torch.none) {
+  %none = torch.constant.none
+  %none_0 = torch.constant.none
+  %float1.000000e00 = torch.constant.float 1.000000e+00
+  %false = torch.constant.bool false
+  %true = torch.constant.bool true
+  %list = torch.prim.ListConstruct : () -> !torch.list<vtensor>
+  %output, %logsumexp = torch.aten.flex_attention %arg0, %arg1, %arg2, %none, %list, %float1.000000e00, %false, %none_0, %false {kv_block_size = 128 : i64, q_block_size = 128 : i64, score_mod_fn = @score_mod, mask_mod_fn = @mask_mod} : !torch.vtensor<[2,4,128,64],f32>, !torch.vtensor<[2,4,128,64],f32>, !torch.vtensor<[2,4,128,64],f32>, !torch.none, !torch.list<vtensor>, !torch.float, !torch.bool, !torch.none, !torch.bool -> !torch.vtensor<[2,4,128,64],f32>, !torch.none
+  return %output, %logsumexp : !torch.vtensor<[2,4,128,64],f32>, !torch.none
+}
+
+func.func private @score_mod(%arg0: !torch.vtensor<[],f32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>, %arg4: !torch.vtensor<[],si32>) -> !torch.vtensor<[],f32> {
+  return %arg0 : !torch.vtensor<[],f32>
+}
+
+func.func private @mask_mod(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>) -> !torch.vtensor<[],i1> {
+  %0 = torch.aten.ge.Tensor %arg2, %arg3 : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
+  return %0 : !torch.vtensor<[],i1>
+}
+
+// CHECK-DAG: #[[$MAP_Q:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+// CHECK-DAG: #[[$MAP_K:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+// CHECK-DAG: #[[$MAP_V:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
+// CHECK-DAG: #[[$MAP_S:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+// CHECK-DAG: #[[$MAP_M:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+// CHECK-DAG: #[[$MAP_O:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+// CHECK-DAG: #[[$MAP_MAX:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+// CHECK-DAG: #[[$MAP_SUM:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+// CHECK-DAG: #[[$MAP_NORM_OUT:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-DAG: #[[$MAP_NORM_SUM:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK-DAG: #[[$MAP_IDENTITY3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+// CHECK-LABEL: func.func @flex_attention_basic(
+// CHECK-SAME:    %[[ARG0:.*]]: !torch.vtensor<[2,4,128,64],f32>,
+// CHECK-SAME:    %[[ARG1:.*]]: !torch.vtensor<[2,4,128,64],f32>,
+// CHECK-SAME:    %[[ARG2:.*]]: !torch.vtensor<[2,4,128,64],f32>)
+
+// Convert to builtin tensors
+// CHECK:         %[[QUERY:.*]] = torch_c.to_builtin_tensor %[[ARG0]]
+// CHECK:         %[[KEY:.*]] = torch_c.to_builtin_tensor %[[ARG1]]
+// CHECK:         %[[VALUE:.*]] = torch_c.to_builtin_tensor %[[ARG2]]
+
+// Create scale
+// CHECK:         %[[SCALE:.*]] = arith.constant 1.250000e-01 : f32
+
+// Create mask using linalg.generic
+// CHECK:         %[[MASK_EMPTY:.*]] = tensor.empty() : tensor<2x4x128x128xf32>
+// CHECK:         %[[MASK:.*]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:      ins()
+// CHECK-SAME:      outs(%[[MASK_EMPTY]] : tensor<2x4x128x128xf32>)
+// CHECK:         ^bb0(%{{.*}}: f32):
+// CHECK:           %[[B_IDX:.*]] = linalg.index 0
+// CHECK:           %[[H_IDX:.*]] = linalg.index 1
+// CHECK:           %[[Q_IDX:.*]] = linalg.index 2
+// CHECK:           %[[KV_IDX:.*]] = linalg.index 3
+// CHECK:           %[[B_I32:.*]] = arith.index_cast %[[B_IDX]] : index to i32
+// CHECK:           %[[H_I32:.*]] = arith.index_cast %[[H_IDX]] : index to i32
+// CHECK:           %[[Q_I32:.*]] = arith.index_cast %[[Q_IDX]] : index to i32
+// CHECK:           %[[KV_I32:.*]] = arith.index_cast %[[KV_IDX]] : index to i32
+// CHECK:           %[[B_TENSOR:.*]] = tensor.from_elements %[[B_I32]] : tensor<i32>
+// CHECK:           %[[H_TENSOR:.*]] = tensor.from_elements %[[H_I32]] : tensor<i32>
+// CHECK:           %[[Q_TENSOR:.*]] = tensor.from_elements %[[Q_I32]] : tensor<i32>
+// CHECK:           %[[KV_TENSOR:.*]] = tensor.from_elements %[[KV_I32]] : tensor<i32>
+// CHECK:           %[[MASK_RESULT:.*]] = func.call @mask_mod(%[[B_TENSOR]], %[[H_TENSOR]], %[[Q_TENSOR]], %[[KV_TENSOR]])
+// CHECK:           %[[MASK_BOOL:.*]] = tensor.extract %[[MASK_RESULT]][]
+// CHECK:           %[[ZERO:.*]] = arith.constant 0.000000e+00 : f32
+// CHECK:           %[[NEGINF:.*]] = arith.constant 0xFF800000 : f32
+// CHECK:           %[[MASK_VAL:.*]] = arith.select %[[MASK_BOOL]], %[[ZERO]], %[[NEGINF]] : f32
+// CHECK:           linalg.yield %[[MASK_VAL]]
+
+// Create output, max, sum tensors
+// CHECK:         %[[OUTPUT_EMPTY:.*]] = tensor.empty() : tensor<2x4x128x64xf32>
+// CHECK:         %[[MAX_EMPTY:.*]] = tensor.empty() : tensor<2x4x128xf32>
+// CHECK:         %[[SUM_EMPTY:.*]] = tensor.empty() : tensor<2x4x128xf32>
+
+// Create online_attention op
+// CHECK:         %[[ONLINE_ATTN:.*]]:3 = iree_linalg_ext.online_attention
+// CHECK-SAME:      indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_M]], #[[$MAP_O]], #[[$MAP_MAX]], #[[$MAP_SUM]]]
+// CHECK-SAME:      ins(%[[QUERY]], %[[KEY]], %[[VALUE]], %[[SCALE]], %[[MASK]]
+// CHECK-SAME:      outs(%[[OUTPUT_EMPTY]], %[[MAX_EMPTY]], %[[SUM_EMPTY]]
+// CHECK:         ^bb0(%[[SCORE:.*]]: f32):
+// CHECK:           %[[SCORE_B_IDX:.*]] = linalg.index 0
+// CHECK:           %[[SCORE_H_IDX:.*]] = linalg.index 1
+// CHECK:           %[[SCORE_Q_IDX:.*]] = linalg.index 2
+// CHECK:           %[[SCORE_KV_IDX:.*]] = linalg.index 3
+// CHECK:           %[[SCORE_B_I32:.*]] = arith.index_cast %[[SCORE_B_IDX]] : index to i32
+// CHECK:           %[[SCORE_H_I32:.*]] = arith.index_cast %[[SCORE_H_IDX]] : index to i32
+// CHECK:           %[[SCORE_Q_I32:.*]] = arith.index_cast %[[SCORE_Q_IDX]] : index to i32
+// CHECK:           %[[SCORE_KV_I32:.*]] = arith.index_cast %[[SCORE_KV_IDX]] : index to i32
+// CHECK:           %[[SCORE_TENSOR:.*]] = tensor.from_elements %[[SCORE]] : tensor<f32>
+// CHECK:           %[[SCORE_B_TENSOR:.*]] = tensor.from_elements %[[SCORE_B_I32]] : tensor<i32>
+// CHECK:           %[[SCORE_H_TENSOR:.*]] = tensor.from_elements %[[SCORE_H_I32]] : tensor<i32>
+// CHECK:           %[[SCORE_Q_TENSOR:.*]] = tensor.from_elements %[[SCORE_Q_I32]] : tensor<i32>
+// CHECK:           %[[SCORE_KV_TENSOR:.*]] = tensor.from_elements %[[SCORE_KV_I32]] : tensor<i32>
+// CHECK:           %[[MODIFIED_SCORE_TENSOR:.*]] = func.call @score_mod(%[[SCORE_TENSOR]], %[[SCORE_B_TENSOR]], %[[SCORE_H_TENSOR]], %[[SCORE_Q_TENSOR]], %[[SCORE_KV_TENSOR]])
+// CHECK:           %[[MODIFIED_SCORE:.*]] = tensor.extract %[[MODIFIED_SCORE_TENSOR]][]
+// CHECK:           iree_linalg_ext.yield %[[MODIFIED_SCORE]]
+
+// Normalize output
+// CHECK:         %[[NORM_EMPTY:.*]] = tensor.empty() : tensor<2x4x128x64xf32>
+// CHECK:         %[[NORMALIZED:.*]] = linalg.generic
+// CHECK-SAME:      indexing_maps = [#[[$MAP_NORM_OUT]], #[[$MAP_NORM_SUM]], #[[$MAP_NORM_OUT]]]
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:      ins(%[[ONLINE_ATTN]]#0, %[[ONLINE_ATTN]]#2
+// CHECK-SAME:      outs(%[[NORM_EMPTY]]
+// CHECK:         ^bb0(%[[UNNORM:.*]]: f32, %[[SUM_VAL:.*]]: f32, %{{.*}}: f32):
+// CHECK:           %[[NORM_VAL:.*]] = arith.divf %[[UNNORM]], %[[SUM_VAL]] : f32
+// CHECK:           linalg.yield %[[NORM_VAL]]
+
+// Convert back to torch tensor
+// CHECK:         %[[TORCH_OUTPUT:.*]] = torch_c.from_builtin_tensor %[[NORMALIZED]]
+// CHECK:         %[[NONE:.*]] = torch.constant.none
+// CHECK:         return %[[TORCH_OUTPUT]], %[[NONE]]
+
+// -----
+
+func.func @flex_attention_with_lse(%arg0: !torch.vtensor<[1,2,64,32],f32>, %arg1: !torch.vtensor<[1,2,64,32],f32>, %arg2: !torch.vtensor<[1,2,64,32],f32>) -> (!torch.vtensor<[1,2,64,32],f32>, !torch.vtensor<[1,2,64],f32>) {
+  %none = torch.constant.none
+  %none_0 = torch.constant.none
+  %float5.000000e-01 = torch.constant.float 5.000000e-01
+  %false = torch.constant.bool false
+  %true = torch.constant.bool true
+  %list = torch.prim.ListConstruct : () -> !torch.list<vtensor>
+  %output, %logsumexp = torch.aten.flex_attention %arg0, %arg1, %arg2, %none, %list, %float5.000000e-01, %false, %none_0, %true {kv_block_size = 64 : i64, q_block_size = 64 : i64} : !torch.vtensor<[1,2,64,32],f32>, !torch.vtensor<[1,2,64,32],f32>, !torch.vtensor<[1,2,64,32],f32>, !torch.none, !torch.list<vtensor>, !torch.float, !torch.bool, !torch.none, !torch.bool -> !torch.vtensor<[1,2,64,32],f32>, !torch.vtensor<[1,2,64],f32>
+  return %output, %logsumexp : !torch.vtensor<[1,2,64,32],f32>, !torch.vtensor<[1,2,64],f32>
+}
+
+// CHECK-LABEL: func.func @flex_attention_with_lse(
+// CHECK-SAME:    %[[ARG0:.*]]: !torch.vtensor<[1,2,64,32],f32>,
+// CHECK-SAME:    %[[ARG1:.*]]: !torch.vtensor<[1,2,64,32],f32>,
+// CHECK-SAME:    %[[ARG2:.*]]: !torch.vtensor<[1,2,64,32],f32>)
+
+// CHECK:         %[[QUERY:.*]] = torch_c.to_builtin_tensor %[[ARG0]]
+// CHECK:         %[[KEY:.*]] = torch_c.to_builtin_tensor %[[ARG1]]
+// CHECK:         %[[VALUE:.*]] = torch_c.to_builtin_tensor %[[ARG2]]
+// CHECK:         %[[SCALE:.*]] = arith.constant 5.000000e-01 : f32
+
+// CHECK:         %[[OUTPUT_EMPTY:.*]] = tensor.empty() : tensor<1x2x64x32xf32>
+// CHECK:         %[[MAX_EMPTY:.*]] = tensor.empty() : tensor<1x2x64xf32>
+// CHECK:         %[[SUM_EMPTY:.*]] = tensor.empty() : tensor<1x2x64xf32>
+
+// CHECK:         %[[ONLINE_ATTN:.*]]:3 = iree_linalg_ext.online_attention
+// CHECK:         ^bb0(%[[SCORE:.*]]: f32):
+// CHECK:           iree_linalg_ext.yield %[[SCORE]]
+
+// Normalize output
+// CHECK:         %[[NORM_EMPTY:.*]] = tensor.empty() : tensor<1x2x64x32xf32>
+// CHECK:         %[[NORMALIZED:.*]] = linalg.generic
+// CHECK-SAME:      ins(%[[ONLINE_ATTN]]#0, %[[ONLINE_ATTN]]#2
+
+// Compute logsumexp = max + log(sum)
+// CHECK:         %[[LSE_EMPTY:.*]] = tensor.empty() : tensor<1x2x64xf32>
+// CHECK:         %[[LSE:.*]] = linalg.generic
+// CHECK-SAME:      indexing_maps = [#[[$MAP_IDENTITY3]], #[[$MAP_IDENTITY3]], #[[$MAP_IDENTITY3]]]
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel"]
+// CHECK-SAME:      ins(%[[ONLINE_ATTN]]#1, %[[ONLINE_ATTN]]#2
+// CHECK-SAME:      outs(%[[LSE_EMPTY]]
+// CHECK:         ^bb0(%[[MAX_VAL:.*]]: f32, %[[SUM_VAL:.*]]: f32, %{{.*}}: f32):
+// CHECK:           %[[LOG_SUM:.*]] = math.log %[[SUM_VAL]] : f32
+// CHECK:           %[[LSE_VAL:.*]] = arith.addf %[[MAX_VAL]], %[[LOG_SUM]] : f32
+// CHECK:           linalg.yield %[[LSE_VAL]]
+
+// CHECK:         %[[TORCH_OUTPUT:.*]] = torch_c.from_builtin_tensor %[[NORMALIZED]]
+// CHECK:         %[[TORCH_LSE:.*]] = torch_c.from_builtin_tensor %[[LSE]]
+// CHECK:         return %[[TORCH_OUTPUT]], %[[TORCH_LSE]]
