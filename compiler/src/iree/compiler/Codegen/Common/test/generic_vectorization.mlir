@@ -823,27 +823,27 @@ func.func @ukernel_unpack_infer_vector_sizes() {
   %c16_i32 = arith.constant 16 : i32
   %c1 = arith.constant 1 : index
   %c16 = arith.constant 16 : index
-  
+
   %input1 = tensor.empty() : tensor<1x8x16x1xf32>
   %input2 = tensor.empty() : tensor<1x8x16x1xf32>
   %init = tensor.empty() : tensor<1x1x16x16xf32>
-  
-  %result:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d" 
-    ins(%input1, %input2 : tensor<1x8x16x1xf32>, tensor<1x8x16x1xf32>) 
-    outs(%init : tensor<1x1x16x16xf32>) 
-    (%c1, %c1, %c16, %c16_i32, %c16_i32, %c1_i32, %c1537_i32 : index, index, index, i32, i32, i32, i32) 
-    fn_def_attrs {hal.import.bitcode = true, hal.import.fields = ["processor_data"]} 
+
+  %result:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+    ins(%input1, %input2 : tensor<1x8x16x1xf32>, tensor<1x8x16x1xf32>)
+    outs(%init : tensor<1x1x16x16xf32>)
+    (%c1, %c1, %c16, %c16_i32, %c16_i32, %c1_i32, %c1537_i32 : index, index, index, i32, i32, i32, i32)
+    fn_def_attrs {hal.import.bitcode = true, hal.import.fields = ["processor_data"]}
     strided_outer_dims(1) -> tensor<1x1x16x16xf32>, i32
-  
+
   %output = tensor.empty() : tensor<16x16xf32>
-  %unpack = linalg.unpack %result#0 
-    outer_dims_perm = [0, 1] 
-    inner_dims_pos = [0, 1] 
-    inner_tiles = [16, 16] 
-    into %output 
-    {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [1, 1], [0, 0], [0, 0]]>} 
+  %unpack = linalg.unpack %result#0
+    outer_dims_perm = [0, 1]
+    inner_dims_pos = [0, 1]
+    inner_tiles = [16, 16]
+    into %output
+    {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [1, 1], [0, 0], [0, 0]]>}
     : tensor<1x1x16x16xf32> -> tensor<16x16xf32>
-  
+
   return
 }
 // CHECK-MASK-LABEL: func.func @ukernel_unpack_infer_vector_sizes
