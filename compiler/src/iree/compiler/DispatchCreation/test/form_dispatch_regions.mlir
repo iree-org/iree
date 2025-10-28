@@ -1391,15 +1391,16 @@ util.func public @avoid_illegal_consumer_fusion(%arg0: tensor<75600x5120xbf16>) 
   util.return %6 : tensor<75600x1x5120xbf16>
 }
 // CHECK-LABEL: @avoid_illegal_consumer_fusion(
-//       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
+//       CHECK:   %[[DISPATCH0:.+]]:2 = flow.dispatch.region
 //       CHECK:     %[[GENERIC0:.+]] = linalg.generic
 //       CHECK:     %[[GENERIC1:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[GENERIC0]] :
 //       CHECK:     flow.return %[[GENERIC1]], %[[GENERIC0]]
-//       CHECK:   %[[EXPAND_SHAPE:.+]] = tensor.expand_shape %[[DISPATCH]]#1
+//       CHECK:   %[[EXPAND_SHAPE:.+]] = tensor.expand_shape %[[DISPATCH0]]#1
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 //       CHECK:   %[[GENERIC2:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[EXPAND_SHAPE]], %[[DISPATCH]]#0 :
-//       CHECK:   util.return %[[GENERIC2]]
+//  CHECK-SAME:       ins(%[[EXPAND_SHAPE]], %[[DISPATCH0]]#0 :
+//       CHECK:   util.return %[[DISPATCH1]]
 
 // -----
 
