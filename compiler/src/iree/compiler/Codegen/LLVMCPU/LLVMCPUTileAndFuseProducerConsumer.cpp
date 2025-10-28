@@ -78,7 +78,7 @@ static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
 /// operands.
 static FailureOr<Operation *>
 tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
-                                int64_t tilingLevel,
+                                IREE::CPU::TilingLevel tilingLevel,
                                 bool onlyFuseProducerInputOperands) {
   auto *context = rewriter.getContext();
   mlir::DominanceInfo dominanceInfo(rootOp);
@@ -108,7 +108,8 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   int64_t numLoops = rootOp.getLoopIteratorTypes().size();
   auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-      getLoweringConfig(rootOp).getTilingLevelAttr(tilingLevel));
+      getLoweringConfig(rootOp).getTilingLevelAttr(
+          static_cast<unsigned>(llvm::to_underlying(tilingLevel))));
   SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
   SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
   tileSizes.resize(numLoops, 0);
