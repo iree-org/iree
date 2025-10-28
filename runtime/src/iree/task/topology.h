@@ -210,12 +210,31 @@ typedef enum iree_task_topology_performance_level_e {
   IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_HIGH,
 } iree_task_topology_performance_level_t;
 
+// Strategy for distributing cores across cache domains (CCXs) within the
+// selected NUMA node(s). NUMA locality is controlled by the node_id parameter -
+// use IREE_TASK_TOPOLOGY_NODE_ID_ANY to select cores from any node, or specify
+// a specific node_id to limit cores to that NUMA node.
+typedef enum iree_task_topology_distribution_e {
+  // Fill cache domains sequentially before moving to the next.
+  // Maximizes L3 cache locality - best for compute-intensive workloads where
+  // cache hit rate is critical (small working sets, frequent data reuse).
+  // Example: 10 cores on 2 CCXs of 8 → 8 cores on CCX0, 2 cores on CCX1.
+  IREE_TASK_TOPOLOGY_DISTRIBUTION_COMPACT = 0,
+  // Scatter cores across cache domains using round-robin distribution.
+  // Maximizes memory bandwidth by utilizing multiple memory controllers.
+  // Best for memory-bound workloads (large matmuls, streaming operations).
+  // Example: 10 cores on 2 CCXs → 0,8,1,9,2,10,3,11,4,12 (alternating).
+  IREE_TASK_TOPOLOGY_DISTRIBUTION_SCATTER = 1,
+} iree_task_topology_distribution_t;
+
 // Initializes a topology with one group for each physical core with the given
 // NUMA |node_id| (usually package or cluster). Up to |max_core_count| physical
-// cores will be selected from the node.
+// cores will be selected from the node and distributed according to
+// |distribution| strategy across cache domains.
 iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_node_id_t node_id,
     iree_task_topology_performance_level_t performance_level,
+    iree_task_topology_distribution_t distribution,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology);
 
 #ifdef __cplusplus

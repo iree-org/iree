@@ -20,7 +20,7 @@
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
 #
 # Select CMake options are available from environment variables:
-#   IREE_ENABLE_CPUINFO
+#   IREE_ENABLE_LLD
 #
 # If building from a development tree and aiming to get an "editable" install,
 # use the environment option CMAKE_INSTALL_MODE=ABS_SYMLINK on your
@@ -268,7 +268,6 @@ def prepare_installation():
             "-DPython3_EXECUTABLE={}".format(sys.executable),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
             # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU_SPIRV here (and in env)
-            get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
             get_env_cmake_option("IREE_TARGET_BACKEND_ROCM", "OFF"),
             get_env_cmake_option("IREE_TARGET_BACKEND_CUDA", "OFF"),
             get_env_cmake_option("IREE_ENABLE_LLD", "OFF"),

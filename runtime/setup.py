@@ -22,7 +22,6 @@
 #
 # Select CMake options are available from environment variables:
 #   IREE_HAL_DRIVER_VULKAN
-#   IREE_ENABLE_CPUINFO
 #
 # If building from a development tree and aiming to get an "editable" install,
 # use the environment option CMAKE_INSTALL_MODE=ABS_SYMLINK on your
@@ -323,7 +322,6 @@ def build_configuration(cmake_build_dir, cmake_install_dir, extra_cmake_args=())
                 "OFF",
             ),
             get_env_cmake_list("IREE_EXTERNAL_HAL_DRIVERS", ""),
-            get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
         ] + list(extra_cmake_args)
         add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER")
         add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER_H")
