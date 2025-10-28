@@ -1962,7 +1962,7 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
           if (ShapedType::isDynamic(dim)) {
             FailureOr<int64_t> maybeDimBound =
                 ValueBoundsConstraintSet::computeConstantBound(
-                    presburger::BoundType::UB, {val, idx},
+                    presburger::BoundType::UB, {val, static_cast<unsigned>(idx)},
                     /*stopCondition=*/nullptr, /*closedUB=*/true);
             if (failed(maybeDimBound)) {
               LDBG() << "failed to infer bounds for dynamic dim";
