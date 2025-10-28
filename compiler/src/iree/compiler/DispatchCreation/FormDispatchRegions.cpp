@@ -20,6 +20,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -151,6 +152,34 @@ public:
 
   // Check if adding `op` would exceed the operand limit.
   bool wouldExceedOperandLimit(Operation *op) const;
+
+  bool hasTransitiveDependencyOnFusionGroup(Operation *op) const {
+    BackwardSliceOptions options;
+    DominanceInfo dominance(op);
+    options.inclusive = true;
+    options.omitUsesFromAbove = false;
+    options.omitBlockArguments = true;
+    options.filter = [&](Operation *sliceBoundaryOp) {
+      return !llvm::all_of(
+          loopMaps.getArrayRef(), [&](std::pair<Operation *, AffineMap> pair) {
+            return dominance.properlyDominates(sliceBoundaryOp, pair.first);
+          });
+    };
+    llvm::SetVector<Operation *> slice;
+    for (Value operand : op->getOperands()) {
+      if (loopMaps.contains(operand.getDefiningOp())) {
+        continue;
+      }
+      LogicalResult result = getBackwardSlice(operand, &slice, options);
+      assert(result.succeeded() && "expected a backward slice");
+      (void)result;
+    }
+
+    return llvm::any_of(loopMaps.getArrayRef(),
+                        [&](std::pair<Operation *, AffineMap> pair) {
+                          return slice.contains(pair.first);
+                        });
+  }
 
 private:
   Operation *rootOp;
@@ -704,8 +733,11 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
           continue;
         }
 
-        // TODO: need a method to determine if its operands can be moved before
-        // the dispatch.
+        if (tracker.getFusionGroup(currRoot)
+                .hasTransitiveDependencyOnFusionGroup(fusableUse->getOwner())) {
+          continue;
+        }
+
         if (isFusableWithConsumer(*fusableUse, tracker, options)) {
           tracker.appendToFusionGroup(consumerOp, fusionGroup);
           workList.push_back(consumerOp);
