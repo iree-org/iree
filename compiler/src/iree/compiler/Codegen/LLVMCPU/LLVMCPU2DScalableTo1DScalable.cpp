@@ -115,9 +115,8 @@ static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
     case TilingLevel::DistributionTiles:
     case TilingLevel::CacheParallelTiles:
     case TilingLevel::CacheReductionTiles: {
-      items.emplace_back(
-          IREE::CPU::getTilingLevelName(level),
-          loweringConfig.getTilingLevelAttr(i));
+      items.emplace_back(IREE::CPU::getTilingLevelName(level),
+                         loweringConfig.getTilingLevelAttr(i));
       break;
     }
     case TilingLevel::VectorCommonParallelTiles:
