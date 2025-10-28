@@ -107,6 +107,7 @@ struct MaskListener : public RewriterBase::Listener {
 };
 
 static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
+                                       MaskListener &maskListener,
                                        TilingInterface tilingInterfaceOp,
                                        IREE::GPU::TilingLevel tilingLevel) {
   auto tensorMaskingOp =
@@ -122,6 +123,7 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   SmallVector<OpFoldResult> padSizes =
       getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
 
+  rewriter.setInsertionPointAfter(tilingInterfaceOp.getOperation());
   FailureOr<SmallVector<Value>> result =
       tensorMaskingOp.getMaskedImplementation(rewriter, padSizes);
   if (failed(result)) {
@@ -129,6 +131,13 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   }
 
   rewriter.replaceOp(tilingInterfaceOp.getOperation(), result.value());
+
+  // To workaround tensor.pad ops not being DPS and causing issues with dim
+  // reification, we explicitly make tensor.pad ops DPS by add a no-op
+  // linalg.copy on their result.
+  for (tensor::PadOp padOp : maskListener.pads) {
+    makePadDPS(rewriter, padOp);
+  }
 
   return success();
 }
@@ -138,18 +147,41 @@ void GPUApplyPaddingLevelPass::runOnOperation() {
   llvm::SmallDenseSet<TilingInterface> targetOps =
       getTiledOps(funcOp, tilingLevel);
 
-  MaskListener maskListener;
-  IRRewriter rewriter(funcOp, &maskListener);
   for (TilingInterface op : targetOps) {
+    MaskListener maskListener;
+    IRRewriter rewriter(funcOp, &maskListener);
     // If some op does not get padded, that is fine for now.
-    (void)applyPaddingLevel(rewriter, op, tilingLevel);
-  }
+    (void)applyPaddingLevel(rewriter, maskListener, op, tilingLevel);
+    // Pad every producer of tensor.pad.
+    while (!maskListener.pads.empty()) {
+      tensor::PadOp padOp = maskListener.pads.back();
+      maskListener.pads.pop_back();
 
-  // To workaround tensor.pad ops not being DPS and causing issues with dim
-  // reification, we explicitly make tensor.pad ops DPS by add a no-op
-  // linalg.copy on their result.
-  for (tensor::PadOp padOp : maskListener.pads) {
-    makePadDPS(rewriter, padOp);
+      auto resultVal = dyn_cast<OpResult>(padOp.getSource());
+      if (!resultVal) {
+        continue;
+      }
+      Operation *producer = resultVal.getOwner();
+      auto maskingIface = dyn_cast<TensorMaskingOpInterface>(producer);
+      if (!maskingIface) {
+        continue;
+      }
+      rewriter.setInsertionPointAfter(padOp);
+      SmallVector<OpFoldResult> padSizes =
+          tensor::getMixedSizes(rewriter, padOp.getLoc(), padOp.getResult());
+      FailureOr<Value> paddedResult = maskingIface.maskProducer(
+          rewriter,
+          /*resultNumber=*/resultVal.getResultNumber(), padSizes);
+      if (failed(paddedResult)) {
+        continue;
+      }
+      DominanceInfo domInfo(padOp);
+      rewriter.replaceUsesWithIf(
+          padOp.getResult(), paddedResult.value(), [&](OpOperand &use) {
+            Operation *user = use.getOwner();
+            return domInfo.properlyDominates(paddedResult.value(), user);
+          });
+    }
   }
 }
 

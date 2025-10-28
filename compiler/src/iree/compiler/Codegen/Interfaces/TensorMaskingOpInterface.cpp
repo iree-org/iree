@@ -144,6 +144,43 @@ static void selectNeutralElementForReducedDims(OpBuilder &b, OpOperand &operand,
   operand.set(genericOp.getResult(0));
 }
 
+FailureOr<Value> maskProducerTilingInterfaceOpImpl(
+    Operation *op, OpBuilder &b, AffineMap itDomainToSizeMap,
+    unsigned resultNumber, ArrayRef<OpFoldResult> sizes) {
+  auto tilingInterfaceOp = cast<TilingInterface>(op);
+  SmallVector<Range> itDomain = tilingInterfaceOp.getIterationDomain(b);
+  SmallVector<OpFoldResult> paddedDomainSizes =
+      llvm::map_to_vector(itDomain, [&](Range r) { return r.size; });
+  for (auto [expr, paddedSize] :
+       llvm::zip_equal(itDomainToSizeMap.getResults(), sizes)) {
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+    if (!dimExpr) {
+      op->emitError("only dim expressions supported in itDomainToSizeMap");
+      return failure();
+    }
+    unsigned dimPos = dimExpr.getPosition();
+    paddedDomainSizes[dimPos] = paddedSize;
+  }
+  // Pad to the padded domain sizes.
+  auto poison = ub::PoisonAttr::get(b.getContext());
+  SmallVector<Attribute> padValues(op->getNumOperands(), poison);
+  // Set options.
+  linalg::PadTilingInterfaceOptions options =
+      linalg::PadTilingInterfaceOptions()
+          .setPaddingSizes(paddedDomainSizes)
+          .setPaddingValues(padValues)
+          .setPadToMultipleOf(false);
+  FailureOr<linalg::PadTilingInterfaceResult> result =
+      linalg::rewriteAsPaddedOp(b, tilingInterfaceOp, options);
+  if (failed(result)) {
+    op->emitError("failed to pad op");
+    return failure();
+  }
+  // We only need the paddedOp here, not the "unpadded" replacements, because
+  // we actually want the padded version of the op.
+  return result->paddedOp->getResults()[resultNumber];
+}
+
 struct LinalgGenericOpInterface final
     : TensorMaskingOpInterface::ExternalModel<LinalgGenericOpInterface,
                                               linalg::GenericOp> {
@@ -156,8 +193,8 @@ struct LinalgGenericOpInterface final
     // Properly mask the reductions to avoid reducing poison values.
     auto paddedGeneric =
         cast<linalg::GenericOp>(result->paddedOp.getOperation());
-    // TODO: Add special handling for Contraction/Convolution with no selects in
-    // the body.
+    // TODO: Add special handling for Contraction/Convolution with no selects
+    // in the body.
     auto linalgOp = cast<linalg::GenericOp>(op);
     if (failed(maskReductionsInGenericBody(builder, linalgOp, paddedGeneric))) {
       return failure();
@@ -165,13 +202,24 @@ struct LinalgGenericOpInterface final
     return result->replacements;
   }
 
+  FailureOr<Value> maskProducer(Operation *op, OpBuilder &builder,
+                                unsigned resultNumber,
+                                ArrayRef<OpFoldResult> sizes) const {
+    auto generic = cast<linalg::GenericOp>(op);
+    AffineMap resultMap =
+        generic.getMatchingIndexingMap(generic.getDpsInitOperand(resultNumber));
+    return maskProducerTilingInterfaceOpImpl(op, builder, resultMap,
+                                             resultNumber, sizes);
+  }
+
 private:
-  /// Mask the poison inputs for reductions by selecting the neutral element on
-  /// the masked out-of-bounds iterations.
+  /// Mask the poison inputs for reductions by selecting the neutral element
+  /// on the masked out-of-bounds iterations.
   LogicalResult
   maskReductionsInGenericBody(OpBuilder &builder, linalg::GenericOp oldLinalgOp,
                               linalg::GenericOp paddedLinalgOp) const {
     Location loc = paddedLinalgOp.getLoc();
+    OpBuilder::InsertionGuard g(builder);
     builder.setInsertionPointToStart(paddedLinalgOp.getBody());
     SmallVector<OpFoldResult> oldBounds =
         getBoundsToGuard(builder, oldLinalgOp, paddedLinalgOp);
@@ -222,8 +270,8 @@ struct OnlineAttentionOpInterface final
                           ArrayRef<OpFoldResult> padMultiples) const {
     auto onlineAttentionOp = cast<IREE::LinalgExt::OnlineAttentionOp>(op);
     if (!onlineAttentionOp.getMask()) {
-      op->emitError(
-          "Padding OnlineAttention without existing mask is not yet supported");
+      op->emitError("Padding OnlineAttention without existing mask is not "
+                    "yet supported");
       return failure();
     }
 
@@ -252,6 +300,16 @@ struct OnlineAttentionOpInterface final
                                          *paddedOp.getMaskMap());
     }
     return result->replacements;
+  }
+
+  FailureOr<Value> maskProducer(Operation *op, OpBuilder &builder,
+                                unsigned resultNumber,
+                                ArrayRef<OpFoldResult> sizes) const {
+    auto onlineAtt = cast<IREE::LinalgExt::OnlineAttentionOp>(op);
+    AffineMap resultMap = onlineAtt.getMatchingIndexingMap(
+        onlineAtt.getDpsInitOperand(resultNumber));
+    return maskProducerTilingInterfaceOpImpl(op, builder, resultMap,
+                                             resultNumber, sizes);
   }
 };
 
