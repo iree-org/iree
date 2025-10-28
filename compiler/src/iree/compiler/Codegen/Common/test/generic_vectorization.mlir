@@ -817,15 +817,13 @@ func.func @negative_no_vectorize_large_vector(%arg0 : tensor<1x9007199254740991x
 // Test that unpack operations following ukernel operations can properly infer
 // vector sizes from the ukernel output shape.
 
-func.func @ukernel_unpack_infer_vector_sizes() {
+func.func @ukernel_unpack_infer_vector_sizes(%input1: tensor<1x8x16x1xf32>, %input2: tensor<1x8x16x1xf32>) -> tensor<16x16xf32> {
   %c1537_i32 = arith.constant 1537 : i32
   %c1_i32 = arith.constant 1 : i32
   %c16_i32 = arith.constant 16 : i32
   %c1 = arith.constant 1 : index
   %c16 = arith.constant 16 : index
 
-  %input1 = tensor.empty() : tensor<1x8x16x1xf32>
-  %input2 = tensor.empty() : tensor<1x8x16x1xf32>
   %init = tensor.empty() : tensor<1x1x16x16xf32>
 
   %result:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
@@ -841,10 +839,9 @@ func.func @ukernel_unpack_infer_vector_sizes() {
     inner_dims_pos = [0, 1]
     inner_tiles = [16, 16]
     into %output
-    {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [1, 1], [0, 0], [0, 0]]>}
     : tensor<1x1x16x16xf32> -> tensor<16x16xf32>
 
-  return
+  return %unpack : tensor<16x16xf32>
 }
 // CHECK-MASK-LABEL: func.func @ukernel_unpack_infer_vector_sizes
 // CHECK-MASK:         %[[UKERNEL:.*]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"

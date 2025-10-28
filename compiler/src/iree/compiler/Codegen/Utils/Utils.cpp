@@ -1958,13 +1958,11 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
           return;
         }
         VectorizationTileSizes sizes;
-        for (int64_t dim : resultType.getShape()) {
+        for (auto [idx, dim] : llvm::enumerate(resultType.getShape())) {
           if (ShapedType::isDynamic(dim)) {
-            // For dynamic dimensions, try to infer bounds
             FailureOr<int64_t> maybeDimBound =
                 ValueBoundsConstraintSet::computeConstantBound(
-                    presburger::BoundType::UB, val,
-                    /*dim=*/sizes.vectorSizes.size(),
+                    presburger::BoundType::UB, {val, idx},
                     /*stopCondition=*/nullptr, /*closedUB=*/true);
             if (failed(maybeDimBound)) {
               LDBG() << "failed to infer bounds for dynamic dim";
