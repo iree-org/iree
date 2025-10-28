@@ -108,6 +108,7 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::MFMA_F64_16x16x4_F64:
     return {f64, f64, f64};
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
+  case MMAIntrinsic::WMMA_F32_16x16x4_F32:
     return {f32, f32, f32};
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
@@ -116,9 +117,11 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::WMMAR3_F32_16x16x16_F16:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F16:
   case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
+  case MMAIntrinsic::WMMA_F32_16x16x32_F16:
     return {f16, f16, f32};
   case MMAIntrinsic::WMMAR3_F16_16x16x16_F16:
   case MMAIntrinsic::WMMAR4_F16_16x16x16_F16:
+  case MMAIntrinsic::WMMA_F16_16x16x32_F16:
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
     return {f16, f16, f16};
   case MMAIntrinsic::MFMA_F32_16x16x8_BF16:
@@ -129,9 +132,11 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::MFMA_F32_32x32x16_BF16:
   case MMAIntrinsic::WMMAR3_F32_16x16x16_BF16:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_BF16:
+  case MMAIntrinsic::WMMA_F32_16x16x32_BF16:
     return {bf16, bf16, f32};
   case MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16:
   case MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16:
+  case MMAIntrinsic::WMMA_BF16_16x16x32_BF16:
     return {bf16, bf16, bf16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
@@ -150,24 +155,44 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2:
   case MMAIntrinsic::MFMA_F32_32x32x64_F8E5M2:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2:
+  case MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2:
+  case MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2:
     return {f8E5M2, f8E5M2, f32};
+  case MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2:
+  case MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2:
+    return {f8E5M2, f8E5M2, f16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E5M2_F8E4M3FN:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E5M2_F8E4M3FN:
   case MMAIntrinsic::MFMA_F32_16x16x128_F8E5M2_F8E4M3FN:
   case MMAIntrinsic::MFMA_F32_32x32x64_F8E5M2_F8E4M3FN:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2_F8E4M3FN:
+    return {f8E5M2, f8E4M3FN, f32};
+  case MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2_F8E4M3FN:
     return {f8E5M2, f8E4M3FN, f32};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FN:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN:
   case MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN:
   case MMAIntrinsic::MFMA_F32_32x32x64_F8E4M3FN:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN:
+    return {f8E4M3FN, f8E4M3FN, f32};
+  case MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN:
     return {f8E4M3FN, f8E4M3FN, f32};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FN_F8E5M2:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN_F8E5M2:
   case MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN_F8E5M2:
   case MMAIntrinsic::MFMA_F32_32x32x64_F8E4M3FN_F8E5M2:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2:
+  case MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN_F8E5M2:
+  case MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN_F8E5M2:
+    return {f8E4M3FN, f8E5M2, f32};
+  case MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN_F8E5M2:
+  case MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN_F8E5M2:
     return {f8E4M3FN, f8E5M2, f32};
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
@@ -177,6 +202,7 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::MFMA_I32_32x32x32_I8:
   case MMAIntrinsic::WMMAR3_I32_16x16x16_I8:
   case MMAIntrinsic::WMMAR4_I32_16x16x16_I8:
+  case MMAIntrinsic::WMMA_I32_16x16x64_I8:
     return {i8, i8, i32};
   }
   assert(false && "unexpected enum value");
@@ -229,6 +255,24 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
       /*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
       /*element=*/{4, 1}};
 
+  // Note: For gfx12, we specify here that, for example with K=16, lane 0 takes
+  // A[0, 0..7] and that lane 16 takes A[0, 8..15]. The hardware will internally
+  // bounce between the low halves and high halves of lanes every two registers
+  // - that is, the value used for A[0, 4] comes out of lane 16's first register
+  // in an F16 or BF16 computation. This is noted here in case someone starts
+  // chasing some unusual rounding failure or is confused by why the tiling in
+  // the manual doesn't *technically* match the below.
+  auto gfx12Wmma16xK = [](int64_t k) -> MMASingleSubgroupLayout {
+    return {/*outer=*/{1, 1}, /*thread=*/{16, 2}, /*tstrides=*/{1, 16},
+            /*element=*/{1, k / 2}};
+  };
+  auto gfx12WmmaKx16 = [](int64_t k) -> MMASingleSubgroupLayout {
+    return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
+            /*element=*/{k / 2, 1}};
+  };
+  const MMASingleSubgroupLayout gfx12WmmaAcc16x16 = gfx12WmmaKx16(16);
+
+  // clang-format off
   switch (intrinsic) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
     switch (operandIndex) {
@@ -399,13 +443,6 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
       return {/*outer=*/{16, 1}, /*thread=*/{1, 16}, /*tstrides=*/{0, 1},
               /*element=*/{1, 1}};
     }
-  // Note: We specify here that, for examplee, lane 0 takes A[0, 0..7] and that
-  // lane 16 takes A[0, 8..15]. The hardware will internally bounce between
-  // the low halves and high halves of lanes every two registers - that is,
-  // the value used for A[0, 4] comes out of lane 16's first register in an F16
-  // or BF16 computation. This is noted here in case someone starts chasing
-  // some unusual rounding failure or is confused by why the tiling in the
-  // manual doesn't *technically* match the below.
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F16:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_BF16:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E5M2:
@@ -413,29 +450,69 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2:
   case MMAIntrinsic::WMMAR4_I32_16x16x16_I8:
-    switch (operandIndex) {
-    case kMMAOperandLhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 2}, /*strides=*/{1, 16},
-              /*element=*/{1, 8}};
-    case kMMAOperandRhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{8, 1}};
-    case kMMAOperandAcc:
-      return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{8, 1}};
-    }
   case MMAIntrinsic::WMMAR4_F16_16x16x16_F16:
   case MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16:
     switch (operandIndex) {
     case kMMAOperandLhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 2}, /*strides=*/{1, 16},
-              /*element=*/{1, 8}};
+      return gfx12Wmma16xK(16);
     case kMMAOperandRhs:
-      return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{8, 1}};
+      return gfx12WmmaKx16(16);
     case kMMAOperandAcc:
-      return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{8, 1}};
+      return gfx12WmmaAcc16x16;
+    }
+  case MMAIntrinsic::WMMA_F32_16x16x4_F32:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return gfx12Wmma16xK(4);
+    case kMMAOperandRhs:
+      return gfx12WmmaKx16(4);
+    case kMMAOperandAcc:
+      return gfx12WmmaAcc16x16;
+    }
+  case MMAIntrinsic::WMMA_F32_16x16x32_F16:
+  case MMAIntrinsic::WMMA_F32_16x16x32_BF16:
+  case MMAIntrinsic::WMMA_F16_16x16x32_F16:
+  case MMAIntrinsic::WMMA_BF16_16x16x32_BF16:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return gfx12Wmma16xK(32);
+    case kMMAOperandRhs:
+      return gfx12WmmaKx16(32);
+    case kMMAOperandAcc:
+      return gfx12WmmaAcc16x16;
+    }
+  case MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN_F8E5M2:
+  case MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2:
+  case MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN_F8E5M2:
+  case MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2:
+  case MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2_F8E4M3FN:
+  case MMAIntrinsic::WMMA_I32_16x16x64_I8:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return gfx12Wmma16xK(64);
+    case kMMAOperandRhs:
+      return gfx12WmmaKx16(64);
+    case kMMAOperandAcc:
+      return gfx12WmmaAcc16x16;
+    }
+  case MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2:
+  case MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN_F8E5M2:
+  case MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2:
+  case MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN:
+  case MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN_F8E5M2:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return gfx12Wmma16xK(128);
+    case kMMAOperandRhs:
+      return gfx12WmmaKx16(128);
+    case kMMAOperandAcc:
+      return gfx12WmmaAcc16x16;
     }
   case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
