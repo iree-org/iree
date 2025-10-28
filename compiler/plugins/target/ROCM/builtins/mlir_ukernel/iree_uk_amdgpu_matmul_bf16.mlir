@@ -642,8 +642,8 @@ util.func private @pingpong_large_bf16_expanded(%lhs_base: !bf16_exp_in_ty, %rhs
     %lhs_vec_1 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c1, %inner_id], %cst {in_bounds = [true, true, true, true]} : !bf16_shared_exp, vector<8x1x1x4xbf16>
     %rhs_vec_1 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c1, %inner_id], %cst {in_bounds = [true, true, true, true]} : !bf16_shared_exp, vector<4x1x1x4xbf16>
 
-    gpu.barrier
     rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
+    gpu.barrier
     rocdl.sched.barrier 0
 
     %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%3) {

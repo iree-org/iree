@@ -397,8 +397,8 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
     %lhs_vec_1 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c1, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp_f8, vector<8x1x1x8xf8E4M3FNUZ>
     %rhs_vec_1 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c1, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp_f8, vector<4x1x1x8xf8E4M3FNUZ>
 
-    gpu.barrier
     rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
+    gpu.barrier
     rocdl.sched.barrier 0
 
     %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%3) {
