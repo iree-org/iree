@@ -29,8 +29,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<4xf32>
-//       CHECK:   amdgpu.mfma %[[LHS]] * %[[RHS]] + %[[ACC]]
-//  CHECK-SAME:     blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+//       CHECK:   amdgpu.mfma 16x16x16 %[[LHS]] * %[[RHS]] + %[[ACC]]
 //  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 
 // -----
@@ -64,8 +63,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<16xf32>
-//       CHECK:   amdgpu.mfma %[[LHS]] * %[[RHS]] + %[[ACC]]
-//  CHECK-SAME:     blocks = 1 : i32, k = 8 : i32, m = 32 : i32, n = 32 : i32
+//       CHECK:   amdgpu.mfma 32x32x8 %[[LHS]] * %[[RHS]] + %[[ACC]]
 //  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
 
 // -----
@@ -99,8 +97,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<16xf32>
-//       CHECK:   amdgpu.mfma %[[RHS]] * %[[LHS]] + %[[ACC]]
-//  CHECK-SAME:     blocks = 1 : i32, k = 8 : i32, m = 32 : i32, n = 32 : i32
+//       CHECK:   amdgpu.mfma 32x32x8 %[[RHS]] * %[[LHS]] + %[[ACC]]
 //  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
 
 // -----
@@ -137,12 +134,10 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<4xf32>
 //  CHECK: %[[LHS0:.*]] = vector.extract_strided_slice %[[LHS]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 //  CHECK: %[[RHS0:.*]] = vector.extract_strided_slice %[[RHS]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-//  CHECK: %[[ACC0:.*]] = amdgpu.mfma %[[RHS0]] * %[[LHS0]] + %[[ACC]]
-//  CHECK-SAME: {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32}
+//  CHECK: %[[ACC0:.*]] = amdgpu.mfma 16x16x16 %[[RHS0]] * %[[LHS0]] + %[[ACC]]
 //  CHECK: %[[LHS1:.*]] = vector.extract_strided_slice %[[LHS]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 //  CHECK: %[[RHS1:.*]] = vector.extract_strided_slice %[[RHS]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-//  CHECK: %[[ACC1:.*]] = amdgpu.mfma %[[RHS1]] * %[[LHS1]] + %[[ACC0]]
-//  CHECK-SAME: {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32}
+//  CHECK: %[[ACC1:.*]] = amdgpu.mfma 16x16x16 %[[RHS1]] * %[[LHS1]] + %[[ACC0]]
 //  CHECK: return %[[ACC1]] : vector<4xf32>
 
 // -----
@@ -176,7 +171,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<16xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<16xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<8xf32>
-//       CHECK:   amdgpu.wmma %[[LHS]] * %[[RHS]] + %[[ACC]]
+//       CHECK:   amdgpu.wmma 16x16x16 %[[LHS]] * %[[RHS]] + %[[ACC]]
 //  CHECK-SAME:     : vector<16xf16>, vector<16xf16>, vector<8xf32>
 
 // -----
@@ -210,7 +205,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<8xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<8xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<8xf32>
-//       CHECK:   amdgpu.wmma %[[LHS]] * %[[RHS]] + %[[ACC]]
+//       CHECK:   amdgpu.wmma 16x16x16 %[[LHS]] * %[[RHS]] + %[[ACC]]
 //  CHECK-SAME:     : vector<8xf16>, vector<8xf16>, vector<8xf32>
 
 // -----
@@ -247,8 +242,7 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[LHSCAST:.+]] = vector.shape_cast %[[LHS]] : vector<1x4xf16> to vector<4xf16>
 //   CHECK-DAG:   %[[RHSCAST:.+]] = vector.shape_cast %[[RHS]] : vector<4x1xf16> to vector<4xf16>
 //   CHECK-DAG:   %[[ACCCAST:.+]] = vector.shape_cast %[[ACC]] : vector<4x1xf32> to vector<4xf32>
-//       CHECK:   %[[MMA:.+]] = amdgpu.mfma %[[LHSCAST]] * %[[RHSCAST]] + %[[ACCCAST]]
-//  CHECK-SAME:     blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+//       CHECK:   %[[MMA:.+]] = amdgpu.mfma 16x16x16 %[[LHSCAST]] * %[[RHSCAST]] + %[[ACCCAST]]
 //  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //       CHECK:   vector.shape_cast %[[MMA]] : vector<4xf32> to vector<4x1xf32>
 
@@ -296,8 +290,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK: %[[LHS_SCALE_LONG:.+]] = vector.insert %[[LHS_SCALE_SCALAR]], %[[CST]] [0]
 //  CHECK: %[[RHS_SCALE_SCALAR:.+]] = vector.extract %[[RHS_SCALE]][0]
 //  CHECK: %[[RHS_SCALE_LONG:.+]] = vector.insert %[[RHS_SCALE_SCALAR]], %[[CST]] [0]
-//  CHECK: amdgpu.scaled_mfma(%[[LHS_SCALE_LONG]][0] * %[[LHS]]) * (%[[RHS_SCALE_LONG]][0] * %[[RHS]]) + %[[ACC]]
-//  CHECK-SAME: k = 128 : i32, m = 16 : i32, n = 16 : i32
+//  CHECK: amdgpu.scaled_mfma 16x16x128 (%[[LHS_SCALE_LONG]][0] * %[[LHS]]) * (%[[RHS_SCALE_LONG]][0] * %[[RHS]]) + %[[ACC]]
 //  CHECK-SAME: vector<4xf8E8M0FNU>, vector<32xf4E2M1FN>, vector<4xf8E8M0FNU>, vector<32xf8E4M3FN>, vector<4xf32>
 
 // -----
@@ -344,6 +337,5 @@ module attributes { transform.with_named_sequence } {
 //  CHECK: %[[LHS_SCALE_LONG:.+]] = vector.insert %[[LHS_SCALE_SCALAR]], %[[CST]] [0]
 //  CHECK: %[[RHS_SCALE_SCALAR:.+]] = vector.extract %[[RHS_SCALE]][0]
 //  CHECK: %[[RHS_SCALE_LONG:.+]] = vector.insert %[[RHS_SCALE_SCALAR]], %[[CST]] [0]
-//  CHECK: amdgpu.scaled_mfma(%[[LHS_SCALE_LONG]][0] * %[[LHS]]) * (%[[RHS_SCALE_LONG]][0] * %[[RHS]]) + %[[ACC]]
-//  CHECK-SAME: k = 64 : i32, m = 32 : i32, n = 32 : i32
+//  CHECK: amdgpu.scaled_mfma 32x32x64 (%[[LHS_SCALE_LONG]][0] * %[[LHS]]) * (%[[RHS_SCALE_LONG]][0] * %[[RHS]]) + %[[ACC]]
 //  CHECK-SAME: vector<4xf8E8M0FNU>, vector<32xf4E2M1FN>, vector<4xf8E8M0FNU>, vector<32xf8E4M3FN>, vector<16xf32>

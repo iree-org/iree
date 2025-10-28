@@ -75,7 +75,7 @@
 // MERGE:         transform.foreach_match
 // MERGE:           @match_mmt -> @apply_op_config,
 // MERGE-NEXT:      @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config,
-// MERGE-NEXT:      @match_mmt_2048x1280x5120_f16_f16_f32 -> @iree_default_tuning_spec_gfx942_1_apply_op_config
+// MERGE-NEXT:      @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config_0
 
 // NOTE: The order matters above because `foreach_match` ops performs matching from top to bottom.
 

@@ -47,7 +47,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //          CHECK:   scf.for {{.*}} = %c0 to %c512 step %c256 iter_args({{.*}}) -> (vector<2x2x1x1x4x1xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
-// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x4x1xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
@@ -89,7 +89,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_256x256x512_f16_f16()
 //          CHECK:   scf.for {{.*}} = %c0 to %c512 step %c256 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x2x1x1x4x1xf16>)
 //          CHECK:     arith.extf %[[ARG]] : vector<2x2x1x1x4x1xf16> to vector<2x2x1x1x4x1xf32>
-// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<2x2x1x1x4x1xf32> to vector<2x2x1x1x4x1xf16>
 //          CHECK:     scf.yield %[[TRUNC]] : vector<2x2x1x1x4x1xf16>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>>
@@ -155,7 +155,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 256 = 1792.
 //          CHECK:   scf.for {{.*}} = %c0 to %c1792 step %c256 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x4x1xf16>)
 //          CHECK:     arith.extf %[[ARG]] : vector<4x1x1x1x4x1xf16> to vector<4x1x1x1x4x1xf32>
-// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<4x1x1x1x4x1xf32> to vector<4x1x1x1x4x1xf16>
 //          CHECK:     scf.yield %[[TRUNC]] : vector<4x1x1x1x4x1xf16>
 // CHECK-COUNT-32:   amdgpu.mfma
@@ -251,7 +251,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_256x256x256_16x16x128_f8_f32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 2 times
 // along the K dimension. So in total 8 mfma ops.
-// CHECK-COUNT-8:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 128 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<4xf32>
+// CHECK-COUNT-8:     amdgpu.mfma 16x16x128 {{.*}} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<4xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
@@ -296,7 +296,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_256x256x256_i8_i32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 4 times
 // along the K dimension. So in total 16 mfma ops.
-// CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 64 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
+// CHECK-COUNT-16:     amdgpu.mfma 16x16x64 {{.*}} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xi32>, memref<256x256xi32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
@@ -341,7 +341,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_256x256x256_32x32x64_f8_f32()
 // Each subgroup handles 1 * 1 tiles, and for each tile we accumulate (256/64) = 4 times
 // along the K dimension. So in total 4 mfma ops.
-//  CHECK-COUNT-4:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 64 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<16xf32>
+//  CHECK-COUNT-4:     amdgpu.mfma 32x32x64 {{.*}} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<16xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
@@ -392,7 +392,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_transpose_b_256x256x256_i8_i32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 4 times
 // along the K dimension. So in total 16 mfma ops.
-// CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 64 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
+// CHECK-COUNT-16:     amdgpu.mfma 16x16x64 {{.*}} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xi32>, memref<256x256xi32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
@@ -458,8 +458,8 @@ hal.executable private @attention_20x4096x64x4096x64 {
 
 // CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c128
 // CHECK-SAME: -> (vector<2x1x1xf32>, vector<2x1x1xf32>, vector<2x4x1x1x1x4xf32>)
-// CHECK-COUNT-32:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
-// CHECK-COUNT-16:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK-COUNT-32:  amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-16:  amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
@@ -526,8 +526,8 @@ hal.executable private @attention_mfma_32x32x16 {
 // CHECK-LABEL: func.func @attention_mfma_32x32x16()
 // CHECK: scf.for %{{.*}} = %c0 to %c4608 step %c64
 // CHECK-SAME: -> (vector<1x1x1xf32>, vector<1x1x1xf32>, vector<1x2x1x4x1x4xf32>)
-// CHECK-COUNT-16:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
-// CHECK-COUNT-8:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 8 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
+// CHECK-COUNT-16:  amdgpu.mfma 32x32x16 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
+// CHECK-COUNT-8:  amdgpu.mfma 32x32x8 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is

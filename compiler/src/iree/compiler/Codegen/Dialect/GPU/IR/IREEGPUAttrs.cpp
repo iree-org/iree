@@ -671,7 +671,8 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
         .getResult();
   }
   if (is_AMD_WMMA(intrinsic)) {
-    return amdgpu::WMMAOp::create(builder, loc, resultType, lhs, rhs, acc)
+    return amdgpu::WMMAOp::create(builder, loc, resultType, layout.mSize,
+                                  layout.nSize, layout.kSize, lhs, rhs, acc)
         .getResult();
   }
   return {};
