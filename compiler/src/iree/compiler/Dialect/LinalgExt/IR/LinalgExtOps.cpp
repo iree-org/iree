@@ -2290,6 +2290,21 @@ LogicalResult ExpReductionOp::verify() {
     }
   }
 
+  for (Value &input : getDpsInputs()) {
+    auto type = input.getType();
+    if (!llvm::isa<ShapedType>(type))
+      return op->emitOpError("input must have a shaped type");
+  }
+
+  for (Value init : getDpsInits()) {
+    auto type = init.getType();
+    if (!llvm::isa<ShapedType>(type))
+      return op->emitOpError("init must have a shaped type");
+  }
+
+  if (!linalg::allIndexingsAreProjectedPermutation(*this))
+    return op->emitOpError("all indexing maps must be projected permutations");
+
   return success();
 }
 

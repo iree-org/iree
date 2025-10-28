@@ -1939,6 +1939,10 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
   // Leave the `sizeBounds` value empty. That is only needed when the `sizes`
   // specified could lead to out of bounds accesses.
   Location loc = getLoc();
+
+  IndexingMapOpInterface indexingMapOp =
+      cast<IndexingMapOpInterface>(getOperation());
+
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
   SmallVector<Value> valuesToTile = linalgOp->getOperands();
   SmallVector<Value> tiledOperands =
