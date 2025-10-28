@@ -163,11 +163,11 @@ LoweringConfigAttr::getAvailableTilingInfo() {
   SmallVector<LoweringConfigLevelInfo> result;
   for (int i = 0, e = llvm::to_underlying(TilingLevel::MaxNumTileLevels); i < e;
        ++i) {
-    if (!hasTilingLevel(static_cast<unsigned>(i))) {
+    if (!hasTilingLevel(i)) {
       continue;
     }
     auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getTilingLevelAttr(static_cast<unsigned>(i)));
+        getTilingLevelAttr(i));
     LoweringConfigLevelInfo item;
     item.level = static_cast<TilingLevel>(i);
     llvm::append_range(item.sizes, attr.getSizes());
