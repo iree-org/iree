@@ -1526,7 +1526,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-hip-enable-tensor-ukernels"
     "--iree-hip-specialize-dispatches"
-    "--iree-hal-dump-executable-files-to=files"
   LABELS
     "noasan"
     "nomsan"
