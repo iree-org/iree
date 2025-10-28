@@ -138,8 +138,9 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
   };
 
   SmallVector<IREE::CPU::TilingLevel> requiredLevels = {
-      IREE::CPU::DistributionTiles, IREE::CPU::VectorCommonParallelTiles,
-      IREE::CPU::VectorReductionTiles};
+      IREE::CPU::TilingLevel::DistributionTiles,
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+      IREE::CPU::TilingLevel::VectorReductionTiles};
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
   SmallVector<int64_t> shapeAfterTiling = linalgOp.getStaticLoopRanges();
   for (auto level : requiredLevels) {
