@@ -1892,6 +1892,122 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
 }
 
 //===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<utils::IteratorType> ExpReductionOp::getLoopIteratorTypes() {
+  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
+    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
+  });
+}
+
+static SmallVector<OpFoldResult>
+createFlatListOfOperandDims(ExpReductionOp op, OpBuilder &b, Location loc) {
+  SmallVector<OpFoldResult> res;
+  for (OpOperand &opOperand : op->getOpOperands()) {
+    for (int64_t i = 0, e = op.getRank(&opOperand); i < e; ++i)
+      res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), i));
+  }
+  return res;
+}
+
+SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
+  ExpReductionOp op = *this;
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(op);
+  Location loc = getLoc();
+  auto allShapesSizes = createFlatListOfOperandDims(op, b, loc);
+  AffineMap map = getShapesToLoopsMap();
+
+  return llvm::to_vector(
+      llvm::map_range(map.getResults(), [&](AffineExpr loopExpr) {
+        OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
+            b, loc, loopExpr, allShapesSizes);
+        return Range{b.getIndexAttr(0), ofr, b.getIndexAttr(1)};
+      }));
+}
+
+FailureOr<TilingResult>
+ExpReductionOp::getTiledImplementation(OpBuilder &b,
+                                       ArrayRef<OpFoldResult> offsets,
+                                       ArrayRef<OpFoldResult> sizes) {
+  // Leave the `sizeBounds` value empty. That is only needed when the `sizes`
+  // specified could lead to out of bounds accesses.
+  Location loc = getLoc();
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
+  SmallVector<Value> valuesToTile = linalgOp->getOperands();
+  SmallVector<Value> tiledOperands =
+      makeTiledShapes(b, loc, linalgOp, valuesToTile, offsets, sizes, {}, true);
+  SmallVector<Operation *> generatedSlices = llvm::map_to_vector(
+      llvm::make_filter_range(
+          tiledOperands,
+          [](Value v) -> bool {
+            return isa_and_nonnull<tensor::ExtractSliceOp, memref::SubViewOp>(
+                v.getDefiningOp());
+          }),
+      [](Value v) -> Operation * { return v.getDefiningOp(); });
+
+  SmallVector<Type> resultTensorTypes =
+      getTensorOutputTypes(linalgOp, tiledOperands);
+
+  Operation *tiledOp =
+      mlir::clone(b, linalgOp, resultTensorTypes, tiledOperands);
+  offsetIndices(b, cast<linalg::LinalgOp>(tiledOp), offsets);
+
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), generatedSlices};
+  return failure();
+}
+
+LogicalResult ExpReductionOp::getResultTilePosition(
+    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  Location loc = getLoc();
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
+
+  AffineExpr d0;
+  bindDims(b.getContext(), d0);
+  SmallVector<OpFoldResult> subShapeSizes =
+      llvm::to_vector(llvm::map_range(sizes, [&](OpFoldResult ofr) {
+        return affine::makeComposedFoldedAffineApply(b, loc, d0 - 1, ofr);
+      }));
+
+  OpOperand *outOperand = linalgOp.getDpsInitOperand(resultNumber);
+  linalg::SliceParameters sliceParams = linalg::computeSliceParameters(
+      b, loc, outOperand->get(), sizes,
+      linalgOp.getMatchingIndexingMap(outOperand), offsets,
+      /*ubs*/ {}, subShapeSizes, true);
+  resultOffsets = sliceParams.offsets;
+  resultSizes = sliceParams.sizes;
+  return success();
+}
+
+FailureOr<TilingResult>
+ExpReductionOp::generateResultTileValue(OpBuilder &b, unsigned resultNumber,
+                                        ArrayRef<OpFoldResult> offsets,
+                                        ArrayRef<OpFoldResult> sizes) {
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromResultTile(
+          b, resultNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+    return failure();
+  }
+  FailureOr<TilingResult> tilingResult =
+      getTiledImplementation(b, mappedOffsets, mappedSizes);
+
+  if (failed(tilingResult))
+    return failure();
+
+  if (tilingResult->tiledOps.size() != 1)
+    return emitOpError("failed to generate tiled implementation");
+
+  return TilingResult{
+      tilingResult->tiledOps,
+      SmallVector<Value>{tilingResult->tiledValues[resultNumber]},
+      tilingResult->generatedSlices};
+}
+
+//===----------------------------------------------------------------------===//
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
