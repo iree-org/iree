@@ -319,6 +319,11 @@ def FuseEncodingOpsIntoDispatchRegionsPass :
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
   ];
+  let options = [
+    Option<"enableAggressiveFusion", "enable-aggressive-fusion", "bool",
+    /*default=*/"false",
+    "Enable encoding ops' fusion if the producer has more than one uses">,
+  ];
 }
 
 def HoistEncodingOpsPass : Pass<"iree-dispatch-creation-hoist-encoding-ops", "mlir::ModuleOp"> {

@@ -282,7 +282,13 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
   }
   FunctionLikeNest(passManager)
-      .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
+      .addPass([&]() {
+        FuseEncodingOpsIntoDispatchRegionsPassOptions passOptions;
+        passOptions.enableAggressiveFusion =
+            options.enableMultiUseEncodingFusion;
+        return DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass(
+            passOptions);
+      })
       .addPass(DispatchCreation::createConvertEncodingToFlowPass);
   // Hoist encoding operations into initializers when possible.
   if (options.constExprHoisting) {
