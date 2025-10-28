@@ -390,6 +390,102 @@ module {
 // -----
 
 module {
+  func.func @im2col_chwn_output_perm(%arg0: tensor<16x26x18x4xf32>, %arg1: index, %arg2: index, %arg3: index) -> tensor<2x2x2x4xf32> {
+    %0 = tensor.empty() : tensor<2x2x2x4xf32>
+    %1 = iree_linalg_ext.im2col
+            strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
+            m_offset = [%arg1, %arg2] * [3, 1] k_offset = [%arg3] * [1]
+            batch_pos = [3] m_pos = [1, 2] k_pos = [0]
+            input_k_perm = [0, 1, 2] output_perm = [3, 1, 2, 0]
+            ins(%arg0 : tensor<16x26x18x4xf32>)
+            outs(%0 : tensor<2x2x2x4xf32>) -> tensor<2x2x2x4xf32>
+    return %1 : tensor<2x2x2x4xf32>
+  }
+}
+
+//   CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * 3 + d1 + s0 * 3 + s1)>
+//   CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+// CHECK-LABEL: func.func @im2col_chwn_output_perm
+//  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x26x18x4xf32>
+//  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME: %[[ARG3:[a-zA-Z0-9_]+]]: index
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+//       CHECK: %[[INIT:.+]] = tensor.empty() : tensor<2x2x2x4xf32>
+//       CHECK: %[[LOOP0:.+]] = scf.for %[[IV0:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG4:.+]] = %[[INIT]])
+//       CHECK:   %[[LOOP1:.+]] = scf.for %[[IV1:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG5:.+]] = %[[ARG4]])
+//       CHECK:     %[[LOOP2:.+]] = scf.for %[[IV2:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[ARG5]])
+//   CHECK-DAG:       %[[kIDX:.+]] = affine.apply #[[$MAP]](%[[IV0]])[%[[ARG3]]]
+//   CHECK-DAG:       %[[kParts:.+]]:3 = affine.delinearize_index %[[kIDX]] into (16, 24, 16)
+//   CHECK-DAG:       %[[mIDX:.+]] = affine.apply #[[$MAP1]](%[[IV1]], %[[IV2]])[%[[ARG1]], %[[ARG2]]]
+//   CHECK-DAG:       %[[mParts:.+]]:2 = affine.delinearize_index %[[mIDX]] into (3, 3)
+//   CHECK-DAG:       %[[hIDX:.+]] = affine.apply #[[$MAP2]](%[[mParts]]#0, %[[kParts]]#1)
+//   CHECK-DAG:       %[[wIDX:.+]] = affine.apply #[[$MAP2]](%[[mParts]]#1, %[[kParts]]#2)
+//       CHECK:       %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[kParts]]#0, %[[hIDX]], %[[wIDX]], 0] [1, 1, 1, 4] [1, 1, 1, 1] : tensor<16x26x18x4xf32> to tensor<1x1x1x4xf32>
+//       CHECK:       %[[OUT_SLICE:.+]] = tensor.extract_slice %[[ARG6]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, 1, 1, 4] [1, 1, 1, 1] : tensor<2x2x2x4xf32> to tensor<1x1x1x4xf32>
+//       CHECK:       %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<1x1x1x4xf32>) outs(%[[OUT_SLICE]] : tensor<1x1x1x4xf32>)
+//       CHECK:       %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ARG6]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, 1, 1, 4] [1, 1, 1, 1] : tensor<1x1x1x4xf32> into tensor<2x2x2x4xf32>
+//       CHECK:       scf.yield %[[INSERT]] : tensor<2x2x2x4xf32>
+//       CHECK:     scf.yield %[[LOOP2]] : tensor<2x2x2x4xf32>
+//       CHECK:   scf.yield %[[LOOP1]] : tensor<2x2x2x4xf32>
+//       CHECK: return %[[LOOP0]] : tensor<2x2x2x4xf32>
+
+// -----
+
+module {
+  func.func @im2col_chwn_output_perm_expanded(%arg0: tensor<16x26x18x2x4xf32>, %arg1: index, %arg2: index, %arg3: index) -> tensor<2x2x2x2x2x4xf32> {
+    %0 = tensor.empty() : tensor<2x2x2x2x2x4xf32>
+    %1 = iree_linalg_ext.im2col
+            strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
+            m_offset = [%arg1, %arg2] * [3, 1] k_offset = [%arg3, 0] * [2, 1]
+            batch_pos = [3, 4] m_pos = [1, 2] k_pos = [0]
+            input_k_perm = [0, 1, 2] output_perm = [4, 5, 2, 3, 0, 1]
+            ins(%arg0 : tensor<16x26x18x2x4xf32>)
+            outs(%0 : tensor<2x2x2x2x2x4xf32>) -> tensor<2x2x2x2x2x4xf32>
+    return %1 : tensor<2x2x2x2x2x4xf32>
+  }
+}
+
+//   CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1)[s0] -> (d0 + d1 * 2 + s0 * 2)>
+//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * 3 + d1 + s0 * 3 + s1)>
+//   CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+// CHECK-LABEL: func.func @im2col_chwn_output_perm_expanded
+//  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x26x18x2x4xf32>
+//  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME: %[[ARG3:[a-zA-Z0-9_]+]]: index
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+//       CHECK: %[[INIT:.+]] = tensor.empty() : tensor<2x2x2x2x2x4xf32>
+//       CHECK: %[[LOOP0:.+]] = scf.for %[[IV0:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG4:.+]] = %[[INIT]])
+//       CHECK:   %[[LOOP1:.+]] = scf.for %[[IV1:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG5:.+]] = %[[ARG4]])
+//       CHECK:     %[[LOOP2:.+]] = scf.for %[[IV2:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG6:.+]] = %[[ARG5]])
+//       CHECK:       %[[LOOP3:.+]] = scf.for %[[IV3:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG7:.+]] = %[[ARG6]])
+//       CHECK:         %[[LOOP4:.+]] = scf.for %[[IV4:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[ARG8:.+]] = %[[ARG7]])
+//   CHECK-DAG:           %[[kIDX:.+]] = affine.apply #[[$MAP]](%[[IV1]], %[[IV0]])[%[[ARG3]]]
+//   CHECK-DAG:           %[[kParts:.+]]:3 = affine.delinearize_index %[[kIDX]] into (16, 24, 16)
+//   CHECK-DAG:           %[[mIDX:.+]] = affine.apply #[[$MAP1]](%[[IV2]], %[[IV3]])[%[[ARG1]], %[[ARG2]]]
+//   CHECK-DAG:           %[[mParts:.+]]:2 = affine.delinearize_index %[[mIDX]] into (3, 3)
+//   CHECK-DAG:           %[[hIDX:.+]] = affine.apply #[[$MAP2]](%[[mParts]]#0, %[[kParts]]#1)
+//   CHECK-DAG:           %[[wIDX:.+]] = affine.apply #[[$MAP2]](%[[mParts]]#1, %[[kParts]]#2)
+//       CHECK:           %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[kParts]]#0, %[[hIDX]], %[[wIDX]], %[[IV4]], 0] [1, 1, 1, 1, 4] [1, 1, 1, 1, 1] : tensor<16x26x18x2x4xf32> to tensor<1x1x1x1x4xf32>
+//       CHECK:           %[[OUT_SLICE:.+]] = tensor.extract_slice %[[ARG8]][%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]], %[[IV4]], 0] [1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1] : tensor<2x2x2x2x2x4xf32> to tensor<1x1x1x1x4xf32>
+//       CHECK:           %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<1x1x1x1x4xf32>) outs(%[[OUT_SLICE]] : tensor<1x1x1x1x4xf32>)
+//       CHECK:           %[[INSERT:.+]] = tensor.insert_slice %[[COPY]] into %[[ARG8]][%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]], %[[IV4]], 0] [1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1] : tensor<1x1x1x1x4xf32> into tensor<2x2x2x2x2x4xf32>
+//       CHECK:           scf.yield %[[INSERT]] : tensor<2x2x2x2x2x4xf32>
+//       CHECK:         scf.yield %[[LOOP4]] : tensor<2x2x2x2x2x4xf32>
+//       CHECK:       scf.yield %[[LOOP3]] : tensor<2x2x2x2x2x4xf32>
+//       CHECK:     scf.yield %[[LOOP2]] : tensor<2x2x2x2x2x4xf32>
+//       CHECK:   scf.yield %[[LOOP1]] : tensor<2x2x2x2x2x4xf32>
+//       CHECK: return %[[LOOP0]] : tensor<2x2x2x2x2x4xf32>
+
+// -----
+
+module {
   func.func @im2col_chwn_rank_reduce(%arg0: tensor<16x26x18x4xf32>, %arg1: index, %arg2: index, %m_size: index, %k_size: index) -> tensor<4x?x?xf32> {
     %0 = tensor.empty(%m_size, %k_size) : tensor<4x?x?xf32>
     %1 = iree_linalg_ext.im2col
