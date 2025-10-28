@@ -105,7 +105,8 @@ static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
   using TilingLevel = IREE::CPU::TilingLevel;
   MLIRContext *ctx = loweringConfig.getContext();
   SmallVector<NamedAttribute> items;
-  for (int i = 0, e = llvm::to_underlying(TilingLevel::MaxNumTileLevels); i < e; ++i) {
+  for (int i = 0, e = llvm::to_underlying(TilingLevel::MaxNumTileLevels); i < e;
+       ++i) {
     auto level = static_cast<TilingLevel>(i);
     if (!loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       continue;
@@ -114,8 +115,9 @@ static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
     case TilingLevel::DistributionTiles:
     case TilingLevel::CacheParallelTiles:
     case TilingLevel::CacheReductionTiles: {
-      items.emplace_back(IREE::CPU::getTilingLevelName(level),
-                         loweringConfig.getTilingLevelAttr(static_cast<unsigned>(i)));
+      items.emplace_back(
+          IREE::CPU::getTilingLevelName(level),
+          loweringConfig.getTilingLevelAttr(static_cast<unsigned>(i)));
       break;
     }
     case TilingLevel::VectorCommonParallelTiles:

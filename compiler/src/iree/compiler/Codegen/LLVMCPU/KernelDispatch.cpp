@@ -1004,11 +1004,12 @@ public:
   IREE::CPU::LoweringConfigAttr generateCPULoweringConfig() {
     SmallVector<NamedAttribute> items;
     if (!distTileSizes.empty()) {
-      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::DistributionTiles,
-                                    distTileSizes);
+      appendLoweringConfigLevelAttr(
+          items, IREE::CPU::TilingLevel::DistributionTiles, distTileSizes);
     } else if (auto op = dyn_cast<TilingInterface>(rootOp)) {
       size_t numTilingDims = op.getLoopIteratorTypes().size();
-      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::DistributionTiles,
+      appendLoweringConfigLevelAttr(items,
+                                    IREE::CPU::TilingLevel::DistributionTiles,
                                     SmallVector<int64_t>(numTilingDims, 0));
     }
     if (!cacheTileSizes.empty()) {
@@ -1016,9 +1017,10 @@ public:
       SmallVector<int64_t> reductionTileSizes;
       splitParallelAndReductionTiles(rootOp, parallelTileSizes,
                                      reductionTileSizes);
-      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::CacheParallelTiles,
-                                    parallelTileSizes);
-      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::CacheReductionTiles,
+      appendLoweringConfigLevelAttr(
+          items, IREE::CPU::TilingLevel::CacheParallelTiles, parallelTileSizes);
+      appendLoweringConfigLevelAttr(items,
+                                    IREE::CPU::TilingLevel::CacheReductionTiles,
                                     reductionTileSizes);
     }
     if (!vectorTileSizes.empty()) {
@@ -1030,11 +1032,12 @@ public:
       splitParallelAndReductionTiles(rootOp, parallelTileSizes,
                                      reductionTileSizes, &parallelScalableFlags,
                                      &reductionScalableFlags);
-      appendLoweringConfigLevelAttr(items,
-                                    IREE::CPU::TilingLevel::VectorCommonParallelTiles,
-                                    parallelTileSizes, parallelScalableFlags);
-      appendLoweringConfigLevelAttr(items, IREE::CPU::TilingLevel::VectorReductionTiles,
-                                    reductionTileSizes, reductionScalableFlags);
+      appendLoweringConfigLevelAttr(
+          items, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+          parallelTileSizes, parallelScalableFlags);
+      appendLoweringConfigLevelAttr(
+          items, IREE::CPU::TilingLevel::VectorReductionTiles,
+          reductionTileSizes, reductionScalableFlags);
     }
     return IREE::CPU::LoweringConfigAttr::get(ctx, items);
   }
@@ -1310,7 +1313,8 @@ getNewLoweringConfig(MLIRContext *ctx,
                      bool setDistributionConfig) {
   SmallVector<NamedAttribute> newItems;
   for (auto [level, tileSizes, scalableFlags] : tilingInfo) {
-    if (!setDistributionConfig && level == IREE::CPU::TilingLevel::DistributionTiles) {
+    if (!setDistributionConfig &&
+        level == IREE::CPU::TilingLevel::DistributionTiles) {
       continue;
     }
     // Distribution tile sizes is a must for rootOp, because it is the
@@ -3098,8 +3102,10 @@ private:
   IterationDimTracker dimTracker;
   // For each tiling level, store per-dimension tiling information.
   // TilingLevel -> (global loop dimension index -> tile size / scalable flag)
-  llvm::SmallDenseMap<IREE::CPU::TilingLevel, SmallVector<int64_t>> globalTileSizes;
-  llvm::SmallDenseMap<IREE::CPU::TilingLevel, SmallVector<bool>> globalScalableTileFlags;
+  llvm::SmallDenseMap<IREE::CPU::TilingLevel, SmallVector<int64_t>>
+      globalTileSizes;
+  llvm::SmallDenseMap<IREE::CPU::TilingLevel, SmallVector<bool>>
+      globalScalableTileFlags;
 
   // Store the vector parallel tile sizes preferred by non-root operations.
   // Operation -> (global loop dimension index -> tile size)
@@ -3155,8 +3161,8 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
       }
     } else {
       if (rootLoweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
-        sizes =
-            rootLoweringConfig.getStaticTilingLevelSizes(llvm::to_underlying(level), rootOperation);
+        sizes = rootLoweringConfig.getStaticTilingLevelSizes(
+            llvm::to_underlying(level), rootOperation);
         flags.resize(sizes.size(), false);
       }
     }
@@ -3183,8 +3189,9 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
   };
 
   // Load all tiling levels.
-  for (int i = 0, e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels); i < e;
-       ++i) {
+  for (int i = 0,
+           e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
+       i < e; ++i) {
     loadTilingLevel(static_cast<IREE::CPU::TilingLevel>(i));
   }
 }
@@ -3288,8 +3295,8 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
     if (elementTypeSize == 1) {
       SmallVector<int64_t> vecTileSize(rootOpGlobalDims.size(), 0);
       vecTileSize.back() = 8;
-      adjust(rootOperation, vecTileSize, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
-             align);
+      adjust(rootOperation, vecTileSize,
+             IREE::CPU::TilingLevel::VectorCommonParallelTiles, align);
     }
   }
 }
@@ -3309,7 +3316,8 @@ void MultiLoweringConfigGenerator::fillTileSizesWithNonRootOps() {
     for (auto [pos, size] : llvm::enumerate(vecTileSize)) {
       int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
       int64_t &tile =
-          globalTileSizes[IREE::CPU::TilingLevel::VectorCommonParallelTiles][globalDimIdx];
+          globalTileSizes[IREE::CPU::TilingLevel::VectorCommonParallelTiles]
+                         [globalDimIdx];
       // Only set the tile size if it hasn't been assigned yet.
       if (tile == 0 && size > 0) {
         tile = size;
@@ -3332,10 +3340,12 @@ void MultiLoweringConfigGenerator::getGenericReductionTileSizes() {
         continue;
       }
       int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
-      globalTileSizes[IREE::CPU::TilingLevel::VectorReductionTiles][globalDimIdx] = size;
-      globalScalableTileFlags[IREE::CPU::TilingLevel::VectorReductionTiles][globalDimIdx] =
-          globalScalableTileFlags[IREE::CPU::TilingLevel::VectorCommonParallelTiles]
-                                 [globalDimIdx];
+      globalTileSizes[IREE::CPU::TilingLevel::VectorReductionTiles]
+                     [globalDimIdx] = size;
+      globalScalableTileFlags
+          [IREE::CPU::TilingLevel::VectorReductionTiles]
+          [globalDimIdx] = globalScalableTileFlags
+              [IREE::CPU::TilingLevel::VectorCommonParallelTiles][globalDimIdx];
     }
   }
 }
@@ -3346,19 +3356,20 @@ void MultiLoweringConfigGenerator::splitCommonInnerVectorTiles() {
   const int64_t totalLoopNum = dimTracker.getTotalLoopNum();
 
   // Initialize inner parallel tiles.
-  globalTileSizes[IREE::CPU::TilingLevel::VectorInnerParallelTiles].assign(totalLoopNum,
-                                                                0);
-  globalScalableTileFlags[IREE::CPU::TilingLevel::VectorInnerParallelTiles].assign(
-      totalLoopNum, false);
+  globalTileSizes[IREE::CPU::TilingLevel::VectorInnerParallelTiles].assign(
+      totalLoopNum, 0);
+  globalScalableTileFlags[IREE::CPU::TilingLevel::VectorInnerParallelTiles]
+      .assign(totalLoopNum, false);
 
   auto isReductionDim = [&](int64_t globalDimIdx) {
-    return globalTileSizes[IREE::CPU::TilingLevel::VectorReductionTiles][globalDimIdx] > 0;
+    return globalTileSizes[IREE::CPU::TilingLevel::VectorReductionTiles]
+                          [globalDimIdx] > 0;
   };
 
   SmallVector<int64_t> &commonSizes =
       globalTileSizes[IREE::CPU::TilingLevel::VectorCommonParallelTiles];
-  SmallVector<bool> &commonFlags =
-      globalScalableTileFlags[IREE::CPU::TilingLevel::VectorCommonParallelTiles];
+  SmallVector<bool> &commonFlags = globalScalableTileFlags
+      [IREE::CPU::TilingLevel::VectorCommonParallelTiles];
   SmallVector<int64_t> &innerSizes =
       globalTileSizes[IREE::CPU::TilingLevel::VectorInnerParallelTiles];
   SmallVector<bool> &innerFlags =

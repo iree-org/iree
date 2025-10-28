@@ -85,7 +85,8 @@ void LLVMCPUTilePass::runOnOperation() {
     }
 
     auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getLoweringConfig(op).getTilingLevelAttr(llvm::to_underlying(tilingLevel)));
+        getLoweringConfig(op).getTilingLevelAttr(
+            llvm::to_underlying(tilingLevel)));
     SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
     SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
     scf::SCFTilingOptions tilingOptions;
@@ -122,9 +123,9 @@ void LLVMCPUTilePass::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTilePass(int64_t tilingLevel, bool skipRootOp) {
+createLLVMCPUTilePass(IREE::CPU::TilingLevel tilingLevel, bool skipRootOp) {
   LLVMCPUTilePassOptions options;
-  options.tilingLevel = static_cast<IREE::CPU::TilingLevel>(tilingLevel);
+  options.tilingLevel = tilingLevel;
   options.skipRootOp = skipRootOp;
   return std::make_unique<LLVMCPUTilePass>(options);
 }

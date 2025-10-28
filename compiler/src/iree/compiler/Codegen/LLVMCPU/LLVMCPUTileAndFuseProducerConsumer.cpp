@@ -63,7 +63,8 @@ static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
   for (Operation *op : llvm::reverse(computeOps)) {
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
-    if (loweringConfig && loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
+    if (loweringConfig &&
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       return op;
     }
   }
