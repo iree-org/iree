@@ -1941,6 +1941,7 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
   Location loc = getLoc();
 
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
+  auto oneAttr = b.getI64IntegerAttr(1);
 
   assert(linalg::allIndexingsAreProjectedPermutation(*this) &&
          "all indexing maps should be projected permutations");
@@ -1959,7 +1960,7 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
   SmallVector<Type, 4> resultTensorTypes;
   if (getNumResults()) {
     resultTensorTypes = llvm::map_to_vector<4>(
-        tiledOperands, [](Value v) { return v.getType(); });
+        getResults(), [](Value v) { return v.getType(); });
   }
 
   // Input
@@ -1975,19 +1976,22 @@ LogicalResult ExpReductionOp::getResultTilePosition(
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
   Location loc = getLoc();
-  // linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
-  IndexingMapOpInterface indexingMapOp =
-      cast<IndexingMapOpInterface>(getOperation());
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
+  // IndexingMapOpInterface indexingMapOp =
+  //     cast<IndexingMapOpInterface>(getOperation());
   AffineExpr d0;
   bindDims(b.getContext(), d0);
   SmallVector<OpFoldResult> subShapeSizes =
       llvm::map_to_vector(sizes, [&](OpFoldResult ofr) {
         return affine::makeComposedFoldedAffineApply(b, loc, d0 - 1, ofr);
       });
+
+  assert(resultNumber < getNumDpsInits());
+
   OpOperand *outOperand = getDpsInitOperand(resultNumber);
   linalg::SliceParameters sliceParams = linalg::computeSliceParameters(
       b, loc, outOperand->get(), sizes,
-      indexingMapOp.getMatchingIndexingMap(outOperand), offsets,
+      linalgOp.getMatchingIndexingMap(outOperand), offsets,
       /*ubs*/ {}, subShapeSizes, true);
   resultOffsets = sliceParams.offsets;
   resultSizes = sliceParams.sizes;
