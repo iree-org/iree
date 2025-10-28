@@ -78,18 +78,19 @@ class ShapesId(enum.Enum):
                 )
             return
 
-        try:
-            dynamicity_parts = dynamicity_string.split(",")
-            if len(dynamicity_parts) != 3:
-                raise ValueError(
-                    "--is_dynamic must have exactly 3 values: bool,bool,bool"
+        if not dynamicity_string:
+            try:
+                dynamicity_parts = dynamicity_string.split(",")
+                if len(dynamicity_parts) != 3:
+                    raise ValueError(
+                        "--is_dynamic must have exactly 3 values: bool,bool,bool"
+                    )
+                cls.custom_dynamicity = tuple(
+                    Dynamicity.DYNAMIC if (x.lower() == "true") else Dynamicity.STATIC
+                    for x in dynamicity_parts
                 )
-            cls.custom_dynamicity = tuple(
-                Dynamicity.DYNAMIC if (x.lower() == "true") else Dynamicity.STATIC
-                for x in dynamicity_parts
-            )
-        except ValueError as e:
-            raise ValueError(f"Invalid --is_dynamic format: {e}")
+            except ValueError as e:
+                raise ValueError(f"Invalid --is_dynamic format: {e}")
 
 
 # Class attribute to store custom MNK values
