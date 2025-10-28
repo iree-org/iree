@@ -108,10 +108,6 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   FunctionLikeNest(passManager)
       .addPass(mlir::createLoopInvariantCodeMotionPass)
       .addPass(mlir::createSCFToControlFlowPass)
-      // TODO: Maybe this should be a part of Affine lowering pass.
-      // Remove if it is added there.
-      // https://github.com/llvm/llvm-project/issues/78458
-      .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(mlir::createLowerAffinePass);
 
   passManager.addPass(mlir::arith::createArithUnsignedWhenEquivalentPass());
