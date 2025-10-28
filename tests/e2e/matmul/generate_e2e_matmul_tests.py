@@ -118,7 +118,6 @@ def generate(
     ):
         for shape in get_test_shapes(shapes_id):
             for dynamicity in get_dynamicities(shapes_id):
-                print(dynamicity)
                 function = generate_function(
                     lhs_rhs_type=lhs_rhs_type,
                     acc_type=acc_type,
@@ -247,9 +246,9 @@ def parse_arguments():
         required=False,
     )
     parser.add_argument(
-        "--dynamic_mask",
+        "--is_dynamic",
         type=str,
-        help="Custom dynamicity mask for m,n,k. Format: bool,bool,bool (e.g., dynamic_mask=True,False,False)",
+        help="Custom dynamicity mask for m,n,k. Format: bool,bool,bool (e.g., is_dynamic=True,False,False)",
         required=False,
     )
     return parser.parse_args()
@@ -302,7 +301,7 @@ def main(args):
     # Parse custom MNK values if provided
     shapes_id = ShapesId(args.shapes)
     ShapesId.set_custom_mnk(shapes_id, args.mnk)
-    ShapesId.set_dynamicity_mnk(shapes_id, args.dynamic_mask)
+    ShapesId.set_dynamicity(shapes_id, args.is_dynamic)
 
     (functions, calls) = generate(
         lhs_rhs_type=MatrixElemTypeId(args.lhs_rhs_type),

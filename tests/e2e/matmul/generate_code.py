@@ -149,9 +149,6 @@ def generate_function(
         + ", ".join([name + ": !hal.buffer_view" for name, ty in args])
         + ") -> !hal.buffer_view"
     )
-    print("-----")
-    print(func_name)
-    print(func_definition)
     return MLIRFunction(
         name=func_name,
         signature=signature,

@@ -69,33 +69,33 @@ class ShapesId(enum.Enum):
             raise ValueError(f"Invalid --mnk format: {e}")
 
     @classmethod
-    def set_dynamicity_mnk(cls, shapes_id, dynamicity_string):
+    def set_dynamicity(cls, shapes_id, dynamicity_string):
         """Parse and set MNK dynamicity from command line argument."""
         if shapes_id != cls.CUSTOM_MNK:
             if dynamicity_string:
                 raise ValueError(
-                    "--dynamicity can only be used with --shapes=custom_mnk"
+                    "--is_dynamic can only be used with --shapes=custom_mnk"
                 )
             return
 
         try:
             dynamicity_parts = dynamicity_string.split(",")
             if len(dynamicity_parts) != 3:
-                raise ValueError("--dynamicity must have exactly 3 values: m,n,k")
-            # cls.custom_dynamic_mask = tuple(bool(x.lower()=="true") for x in dynamicity_parts)
-            cls.custom_dynamic_mask = tuple(
+                raise ValueError(
+                    "--is_dynamic must have exactly 3 values: bool,bool,bool"
+                )
+            cls.custom_dynamicity = tuple(
                 Dynamicity.DYNAMIC if (x.lower() == "true") else Dynamicity.STATIC
                 for x in dynamicity_parts
             )
-            print("Parsing : ", cls.custom_dynamic_mask)
         except ValueError as e:
-            raise ValueError(f"Invalid --dynamic_mask format: {e}")
+            raise ValueError(f"Invalid --is_dynamic format: {e}")
 
 
 # Class attribute to store custom MNK values
 ShapesId.custom_mnk_values = None
-# Class attribute to store custom dynamic mask
-ShapesId.custom_dynamic_mask = None
+# Class attribute to store custom dynamicities for MNK
+ShapesId.custom_dynamicity = None
 
 
 # Returns the list of Dynamicity's to use for the collection of shapes
@@ -103,8 +103,8 @@ ShapesId.custom_dynamic_mask = None
 def get_dynamicities(shapes_id: ShapesId):
     if shapes_id == ShapesId.EASY_LARGE_STATIC:
         return [(Dynamicity.STATIC, Dynamicity.STATIC, Dynamicity.STATIC)]
-    elif shapes_id.custom_dynamic_mask:
-        return [shapes_id.custom_dynamic_mask]
+    elif shapes_id.custom_dynamicity:
+        return [shapes_id.custom_dynamicity]
     else:
         return [
             (Dynamicity.DYNAMIC, Dynamicity.DYNAMIC, Dynamicity.DYNAMIC),
