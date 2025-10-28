@@ -362,6 +362,7 @@ def generate(
     calls = []
 
     for shape in get_test_shapes(shapes_id):
+        print(shape)
         function = generate_function(
             query_type,
             key_type,
