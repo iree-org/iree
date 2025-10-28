@@ -28,17 +28,16 @@ class LegalizeSimpleIOPass
     // Add imports.
     auto m = getOperation();
     auto importBuilder = OpBuilder::atBlockBegin(m.getBody());
-    importBuilder
-        .create<func::FuncOp>(m.getLoc(), "simple_io.print",
-                              FunctionType::get(context, {}, {}))
+    func::FuncOp::create(importBuilder, m.getLoc(), "simple_io.print",
+                         FunctionType::get(context, {}, {}))
         .setPrivate();
 
     // Legalize operations.
     m.walk([&](Operation *op) {
       if (auto printOp = dyn_cast<IREE::SimpleIO::PrintOp>(op)) {
         OpBuilder b(op);
-        b.create<func::CallOp>(printOp.getLoc(), "simple_io.print",
-                               TypeRange{});
+        func::CallOp::create(b, printOp.getLoc(), "simple_io.print",
+                             TypeRange{});
         printOp.erase();
       }
     });
