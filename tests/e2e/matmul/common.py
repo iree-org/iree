@@ -78,7 +78,7 @@ class ShapesId(enum.Enum):
                 )
             return
 
-        if not dynamicity_string:
+        if dynamicity_string:
             try:
                 dynamicity_parts = dynamicity_string.split(",")
                 if len(dynamicity_parts) != 3:
