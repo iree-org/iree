@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
+#include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -35,8 +36,7 @@ namespace {
 // from the new global op for the requested affinity.
 class ValuePerAffinityHelper {
 public:
-  explicit ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
-      : builder(moduleOp), symbolTable(moduleOp) {}
+  explicit ValuePerAffinityHelper(mlir::ModuleOp moduleOp);
   ~ValuePerAffinityHelper() = default;
 
   using OpAffinityPair = std::tuple<Operation *, IREE::Stream::AffinityAttr>;
@@ -70,7 +70,40 @@ private:
   SymbolTable symbolTable;
   DenseMap<OpAffinityPair, IREE::Util::GlobalOpInterface> cachedGlobals;
   DenseMap<ValueAffinityPair, Value> cachedValuePerAffinity;
+
+  // Cache the insertion point (last initializer or the global itself) for each
+  // global for performance.
+  DenseMap<Operation *, Operation *> cachedInsertionPointForGlobal;
 };
+
+ValuePerAffinityHelper::ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
+    : builder(moduleOp), symbolTable(moduleOp) {
+  // Pre-compute the insertion point for each global for performance.
+  // This avoids scanning all initializers multiple times during transformation.
+  IREE::Util::GlobalTable globalTable(moduleOp);
+  globalTable.rebuild();
+  globalTable.forEach([&](IREE::Util::Global &global) {
+    // Initialize with the global op itself as the default insertion point.
+    Operation *insertionPoint = global.op.getOperation();
+
+    // Iterate through store operations to find initializers.
+    for (auto storeOp : global.storeOps) {
+      // Get the parent initializer op if the store is within one.
+      auto initOp = storeOp->getParentOfType<IREE::Util::InitializerOp>();
+      if (!initOp) {
+        continue;
+      }
+
+      // Update the insertion point if this is the latest initializer.
+      if (insertionPoint->isBeforeInBlock(initOp)) {
+        insertionPoint = initOp;
+      }
+    }
+
+    cachedInsertionPointForGlobal[global.op.getOperation()] = insertionPoint;
+    return IREE::Util::GlobalAction::PRESERVE;
+  });
+}
 
 Value ValuePerAffinityHelper::getOrCreateValueForAffinity(
     OpOperand *opOperand, IREE::Stream::AffinityAttr affinityAttr) {
@@ -126,9 +159,15 @@ ValuePerAffinityHelper::getOrCreateGlobalForAffinity(
     return cachedGlobals.lookup(key);
   }
 
-  // Create an initializer right after the global op.
+  // Find the insertion point: after the last initializer that references this
+  // global, or after the global itself if no initializers exist.
+  // The cache was already populated in the constructor.
+  Operation *insertionPoint =
+      cachedInsertionPointForGlobal.lookup(globalOp.getOperation());
+
+  // Create the new global and initializer after the insertion point.
   Location loc = globalOp.getLoc();
-  builder.setInsertionPointAfter(globalOp);
+  builder.setInsertionPointAfter(insertionPoint);
   std::string newGlobalName = getNewGlobalName(globalName, affinityAttr);
   auto newGlobalOp = IREE::Util::GlobalOp::create(builder, loc, newGlobalName,
                                                   /*isMutable=*/false,
