@@ -3,6 +3,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-sinking-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-bubbling-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=BUBBLE
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation-through-conv=true}))" --split-input-file %s | FileCheck %s --check-prefix=CONV
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-edge-reshape-propagation=true}))" %s -o - | FileCheck %s --check-prefix=ENABLE-EDGE-PROP
 
 util.func public @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
                                    %empty : tensor<3x2x1xf32>) -> tensor<3x2x1xf32> {
@@ -819,6 +820,11 @@ util.func @dont_propagate_edge_reshapes(%arg0: tensor<10x10x10xi32>) -> tensor<1
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
 //       CHECK:   %[[VAL:.+]] = linalg.transpose ins(%[[COLLAPSED]]
 //       CHECK:   util.return %[[VAL]]
+// ENABLE-EDGE-PROP-LABEL: util.func public @dont_propagate_edge_reshapes
+//  ENABLE-EDGE-PROP-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
+//       ENABLE-EDGE-PROP:   %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[ARG0]]
+//       ENABLE-EDGE-PROP:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRANSPOSED]]
+//       ENABLE-EDGE-PROP:   util.return %[[COLLAPSED]]
 
 // -----
 
@@ -833,3 +839,7 @@ util.func public @dont_sink_through_edge_expand_shape(%arg0 : tensor<2x3x4xf32>)
 //       SINK:   %[[TRANSPOSE:.+]] = linalg.transpose
 //       SINK:   %[[RES:.+]] = tensor.expand_shape %[[TRANSPOSE]]
 //       SINK:   util.return %[[RES]] : tensor<1x3x4x2xf32>
+// ENABLE-EDGE-PROP-LABEL: util.func public @dont_sink_through_edge_expand_shape
+//       ENABLE-EDGE-PROP:   %[[EXP:.+]] = tensor.expand_shape
+//       ENABLE-EDGE-PROP:   %[[RES:.+]] = linalg.transpose
+//       ENABLE-EDGE-PROP:   util.return %[[RES]]
