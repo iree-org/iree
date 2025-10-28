@@ -369,8 +369,8 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 }
 
 struct ConvToIgemmInfo {
-  bool isBatchDimLast;
-  bool isSpatialDimLast;
+  bool isBatchDimLast = false;
+  bool isSpatialDimLast = false;
   linalg::ConvolutionDimensions convDims;
   DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
   DenseMap<int64_t, int64_t> inputChannelDimToSize;
