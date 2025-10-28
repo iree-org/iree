@@ -1940,13 +1940,14 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
   // specified could lead to out of bounds accesses.
   Location loc = getLoc();
 
-  IndexingMapOpInterface indexingMapOp =
-      cast<IndexingMapOpInterface>(getOperation());
-
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
+
+  assert(linalg::allIndexingsAreProjectedPermutation(*this) &&
+         "all indexing maps should be projected permutations");
+
   SmallVector<Value> valuesToTile = linalgOp->getOperands();
-  SmallVector<Value> tiledOperands =
-      makeTiledShapes(b, loc, linalgOp, valuesToTile, offsets, sizes, {}, true);
+  SmallVector<Value> tiledOperands = linalg::makeTiledShapes(
+      b, loc, linalgOp, valuesToTile, offsets, sizes, {}, true);
   SmallVector<Operation *> generatedSlices = llvm::map_to_vector(
       llvm::make_filter_range(
           tiledOperands,
@@ -1960,6 +1961,8 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
     resultTensorTypes = llvm::map_to_vector<4>(
         tiledOperands, [](Value v) { return v.getType(); });
   }
+
+  // Input
 
   Operation *tiledOp = mlir::clone(b, *this, resultTensorTypes, tiledOperands);
   offsetIndices(b, cast<linalg::LinalgOp>(tiledOp), offsets);
