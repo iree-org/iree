@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
@@ -1947,6 +1948,35 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
         result = inferSizesFromMixedSizes(op.getMixedSizes());
+      })
+      .Case<IREE::Codegen::UKernelGenericOp>([&](auto op) {
+        // For ukernel operations, infer vector sizes from the result type.
+        // This is needed for operations like unpack that consume ukernel outputs.
+        auto opResult = cast<OpResult>(val);
+        auto resultType = dyn_cast<RankedTensorType>(opResult.getType());
+        if (!resultType) {
+          return;
+        }
+        VectorizationTileSizes sizes;
+        for (int64_t dim : resultType.getShape()) {
+          if (ShapedType::isDynamic(dim)) {
+            // For dynamic dimensions, try to infer bounds
+            FailureOr<int64_t> maybeDimBound =
+                ValueBoundsConstraintSet::computeConstantBound(
+                    presburger::BoundType::UB, val,
+                    /*dim=*/sizes.vectorSizes.size(),
+                    /*stopCondition=*/nullptr, /*closedUB=*/true);
+            if (failed(maybeDimBound)) {
+              LDBG() << "failed to infer bounds for dynamic dim";
+              return;
+            }
+            sizes.vectorSizes.push_back(maybeDimBound.value());
+          } else {
+            sizes.vectorSizes.push_back(dim);
+          }
+        }
+        sizes.destShape = sizes.vectorSizes;
+        result = sizes;
       })
       .Default([&](Operation *) {});
 
