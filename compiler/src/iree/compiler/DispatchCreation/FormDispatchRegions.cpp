@@ -213,12 +213,6 @@ bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
   for (auto [op, map] : this->loopMaps) {
     visitOp(op);
   }
-  if (((dispatchOperands.size() + numResults) > kIreeMaxOperandCount)) {
-    newOp->dump();
-    llvm::dbgs() << (dispatchOperands.size()) << '\n';
-    llvm::dbgs() << (numResults) << '\n';
-    assert(false);
-  }
   return (dispatchOperands.size() + numResults) > kIreeMaxOperandCount;
 }
 
@@ -703,13 +697,6 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         continue;
       }
 
-      if (fusableUses.size() != 1) {
-        llvm::dbgs() << "=============\n";
-        for (auto *use : fusableUses) {
-          use->getOwner()->dump();
-        }
-      }
-
       // Analyse the use to see if it is fusable.
       for (OpOperand *fusableUse : fusableUses) {
         Operation *consumerOp = fusableUse->getOwner();
@@ -717,10 +704,8 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
           continue;
         }
 
-        // TODO: need a method to determine if its operands can be moved before the dispatch.
-
-
-        
+        // TODO: need a method to determine if its operands can be moved before
+        // the dispatch.
         if (isFusableWithConsumer(*fusableUse, tracker, options)) {
           tracker.appendToFusionGroup(consumerOp, fusionGroup);
           workList.push_back(consumerOp);
