@@ -36,7 +36,8 @@ def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
     This operation is a mirror of `linalg.index` operation and has the same
     semantics, except that `linalg.index` enforces that the parent op is a
     `LinalgOp`, and the `iree_linalg_ext.index` operation enforces that the
-    parent op is a `IREE::LinalgExt::CustomOp`.
+    parent op is one of: `IREE::LinalgExt::CustomOp`, 
+    `IREE::LinalgExt::OnlineAttentionOp`, or `IREE::LinalgExt::AttentionOp`.
   }];
 
   let assemblyFormat = [{ $dim attr-dict `:` type($result) }];
