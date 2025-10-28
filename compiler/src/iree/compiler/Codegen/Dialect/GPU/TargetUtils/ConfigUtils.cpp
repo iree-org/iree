@@ -85,8 +85,8 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   MLIRContext *context = multiMmaOp.getContext();
   Builder b(context);
   SmallVector<NamedAttribute, 2> attrs = {
-      NamedAttribute{"workgroup", b.getI64ArrayAttr(workgroupTileSizes)},
-      NamedAttribute{"reduction", b.getI64ArrayAttr(reductionTileSizes)},
+      {"workgroup", b.getI64ArrayAttr(workgroupTileSizes)},
+      {"reduction", b.getI64ArrayAttr(reductionTileSizes)},
   };
   if (ukernelConfig) {
     op->setAttr(kUkernelAttrName, ukernelConfig);
@@ -1748,8 +1748,8 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
                                   ArrayRef<int64_t> threadSizes) {
     NamedAttribute attrs[2] = {
-        NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupSizes)),
-        NamedAttribute("thread", b.getI64ArrayAttr(threadSizes))};
+        {"workgroup", b.getI64ArrayAttr(workgroupSizes)},
+        {"thread", b.getI64ArrayAttr(threadSizes)}};
     auto configDict = b.getDictionaryAttr(attrs);
     return IREE::GPU::LoweringConfigAttr::get(context, configDict);
   };
