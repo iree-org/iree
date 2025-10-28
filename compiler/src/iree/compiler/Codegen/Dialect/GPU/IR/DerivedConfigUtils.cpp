@@ -143,8 +143,7 @@ deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
   SmallVector<int64_t> vectorizableOutputDims = vectorizationMap[innerInputDim];
   std::optional<int64_t> vectorizableDim = std::nullopt;
   if (!vectorizableOutputDims.empty()) {
-    vectorizableDim = *std::max_element(vectorizableOutputDims.begin(),
-                                        vectorizableOutputDims.end());
+    vectorizableDim = *llvm::max_element(vectorizableOutputDims);
   }
 
   // Im2col cannot coalesce past the inner/outer most dim so always default to

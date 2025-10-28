@@ -627,10 +627,7 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
   if (vectorizableOutputDims.empty()) {
     return std::nullopt;
   }
-  SmallVector<int64_t> kOutputDims = im2colOp.getKOutputDims();
-  SetVector<int64_t> kDimSet(kOutputDims.begin(), kOutputDims.end());
-  SetVector<int64_t> kPosSet(im2colOp.getKPos().begin(),
-                             im2colOp.getKPos().end());
+  SetVector<int64_t> kDimSet(llvm::from_range, im2colOp.getKOutputDims());
   // There may be multiple output dims that we can vectorize, so prioritize the
   // innermost dims first.
   std::sort(vectorizableOutputDims.begin(), vectorizableOutputDims.end());
@@ -638,12 +635,6 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
   // one that is vectorizable.
   while (!vectorizableOutputDims.empty()) {
     int64_t outputDimToVectorize = vectorizableOutputDims.pop_back_val();
-    OpFoldResult outputDimSize = iterationDomain[outputDimToVectorize].size;
-    auto constTileSize = getConstantIntValue(outputDimSize);
-    if (constTileSize) {
-      outputDimSize = b.getIndexAttr(constTileSize.value());
-    }
-
     // If a K dim is being vectorized, then it is contiguous along either the
     // input channel dimension, or the filter kernel window. If it is contiguous
     // along the kernel window, then the actual inner slice size is equal to the
@@ -670,6 +661,7 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
       // TODO(Max191): Support vectorization along the M dimension.
       continue;
     }
+    OpFoldResult outputDimSize = iterationDomain[outputDimToVectorize].size;
     if (!willBeContiguousSlice(innerSliceSize, outputDimSize, offset)) {
       continue;
     }

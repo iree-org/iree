@@ -415,6 +415,48 @@ bool isGatherlikeOp(Operation *op) {
 // IGEMM details for generic convolutions
 //===---------------------------------------------------------------------===//
 
+/// Computes the output permutation for the im2col tensor to match the
+/// dimension order of the input tensor.
+static SmallVector<int64_t> computeIm2colOutputPermutation(
+    AffineMap inputMap, AffineMap inputMapGEMM,
+    const DenseMap<int64_t, AffineExpr> &convToIgemmDimMap) {
+  llvm::SetVector<int64_t> capturedDims;
+  SmallVector<int64_t> colTensorDimsInConvInputOrder;
+  for (int64_t dim = 0; dim < inputMap.getNumResults(); ++dim) {
+    llvm::SetVector<int64_t> convDimsForInputDim;
+    AffineExpr dimExpr = inputMap.getResult(dim);
+    dimExpr.walk([&](AffineExpr expr) {
+      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+        convDimsForInputDim.insert(dimExpr.getPosition());
+      }
+    });
+    for (int64_t convDim : convDimsForInputDim) {
+      if (capturedDims.contains(convDim)) {
+        continue;
+      }
+      capturedDims.insert(convDim);
+      auto iGEMMDim = cast<AffineDimExpr>(convToIgemmDimMap.at(convDim));
+      int64_t colTensorDim = inputMapGEMM.getResultPosition(iGEMMDim).value();
+      colTensorDimsInConvInputOrder.push_back(colTensorDim);
+    }
+  }
+  llvm::SetVector<int64_t> capturedOutputPermDims;
+  SmallVector<int64_t> im2colOutputPerm;
+  // Iterate over the dimensions in reverse order, removing duplicates. The
+  // reverse order is used to ensure that we capture the innermost occurrences
+  // of each dimension when there are duplicates, because the innermost
+  // dimension has impact on contiguity of memory accesses.
+  for (int64_t dim : llvm::reverse(colTensorDimsInConvInputOrder)) {
+    if (capturedOutputPermDims.contains(dim)) {
+      continue;
+    }
+    capturedOutputPermDims.insert(dim);
+    im2colOutputPerm.push_back(dim);
+  }
+  std::reverse(im2colOutputPerm.begin(), im2colOutputPerm.end());
+  return im2colOutputPerm;
+}
+
 FailureOr<IGEMMGenericConvDetails>
 getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
@@ -621,37 +663,8 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 
   // Compute the output permutation for the im2col tensor to match the
   // dimension order of the input tensor.
-  auto inputMap = indexingMaps[0];
-  llvm::SetVector<int64_t> capturedDims;
-  SmallVector<int64_t> colTensorDimsInConvInputOrder;
-  for (int64_t dim = 0; dim < inputType.getRank(); ++dim) {
-    llvm::SetVector<int64_t> convDimsForInputDim;
-    AffineExpr dimExpr = inputMap.getResult(dim);
-    dimExpr.walk([&](AffineExpr expr) {
-      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-        convDimsForInputDim.insert(dimExpr.getPosition());
-      }
-    });
-    for (int64_t convDim : convDimsForInputDim) {
-      if (capturedDims.contains(convDim)) {
-        continue;
-      }
-      capturedDims.insert(convDim);
-      auto iGEMMDim = cast<AffineDimExpr>(convToIgemmDimMap[convDim]);
-      int64_t colTensorDim = inputMapGEMM.getResultPosition(iGEMMDim).value();
-      colTensorDimsInConvInputOrder.push_back(colTensorDim);
-    }
-  }
-  llvm::SetVector<int64_t> capturedOutputPermDims;
-  SmallVector<int64_t> im2colOutputPerm;
-  for (int64_t dim : llvm::reverse(colTensorDimsInConvInputOrder)) {
-    if (capturedOutputPermDims.contains(dim)) {
-      continue;
-    }
-    capturedOutputPermDims.insert(dim);
-    im2colOutputPerm.push_back(dim);
-  }
-  std::reverse(im2colOutputPerm.begin(), im2colOutputPerm.end());
+  SmallVector<int64_t> im2colOutputPerm = computeIm2colOutputPermutation(
+      indexingMaps[0], inputMapGEMM, convToIgemmDimMap);
   SmallVector<AffineExpr> colTensorResultExprs(inputMapGEMM.getResults());
   applyPermutationToVector(colTensorResultExprs, im2colOutputPerm);
   inputMapGEMM =

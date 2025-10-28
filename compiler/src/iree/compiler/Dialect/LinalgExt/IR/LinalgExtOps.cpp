@@ -2400,12 +2400,9 @@ SmallVector<int64_t> Im2colOp::getKOutputDims() {
 
 SmallVector<SmallVector<int64_t>>
 Im2colOp::getInputToOutputDimVectorizationMap() {
-  SetVector<int64_t> batchInputDims;
-  batchInputDims.insert(getBatchPos().begin(), getBatchPos().end());
-  SetVector<int64_t> mInputDims;
-  mInputDims.insert(getMPos().begin(), getMPos().end());
-  SetVector<int64_t> kInputDims;
-  kInputDims.insert(getKPos().begin(), getKPos().end());
+  SetVector<int64_t> batchInputDims(llvm::from_range, getBatchPos());
+  SetVector<int64_t> mInputDims(llvm::from_range, getMPos());
+  SetVector<int64_t> kInputDims(llvm::from_range, getKPos());
   SmallVector<SmallVector<int64_t>> vectorizationMap;
   vectorizationMap.resize(getInputRank());
   SmallVector<int64_t> batchOutputDims = getBatchOutputDims();
