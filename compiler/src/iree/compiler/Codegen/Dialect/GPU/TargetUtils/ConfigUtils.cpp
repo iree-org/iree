@@ -1747,9 +1747,8 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
 
   auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
                                   ArrayRef<int64_t> threadSizes) {
-    NamedAttribute attrs[2] = {
-        {"workgroup", b.getI64ArrayAttr(workgroupSizes)},
-        {"thread", b.getI64ArrayAttr(threadSizes)}};
+    NamedAttribute attrs[2] = {{"workgroup", b.getI64ArrayAttr(workgroupSizes)},
+                               {"thread", b.getI64ArrayAttr(threadSizes)}};
     auto configDict = b.getDictionaryAttr(attrs);
     return IREE::GPU::LoweringConfigAttr::get(context, configDict);
   };
