@@ -107,10 +107,10 @@ static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
   SmallVector<NamedAttribute> items;
   for (int i = 0, e = llvm::to_underlying(TilingLevel::MaxNumTileLevels); i < e;
        ++i) {
-    auto level = static_cast<TilingLevel>(i);
-    if (!loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
+    if (!loweringConfig.hasTilingLevel(i)) {
       continue;
     }
+    auto level = static_cast<TilingLevel>(i);
     switch (level) {
     case TilingLevel::DistributionTiles:
     case TilingLevel::CacheParallelTiles:

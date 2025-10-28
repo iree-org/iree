@@ -74,8 +74,7 @@ void LLVMCPUTilePass::runOnOperation() {
       continue;
     }
     if (!maybeLoweringConfig.hasTilingLevel(
-            static_cast<unsigned>(llvm::to_underlying(
-                static_cast<IREE::CPU::TilingLevel>(tilingLevel))))) {
+            static_cast<unsigned>(tilingLevel.getValue()))) {
       LDBG() << "target tiling level does not exist";
       continue;
     }
@@ -88,8 +87,7 @@ void LLVMCPUTilePass::runOnOperation() {
 
     auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
         getLoweringConfig(op).getTilingLevelAttr(
-            static_cast<unsigned>(llvm::to_underlying(
-                static_cast<IREE::CPU::TilingLevel>(tilingLevel)))));
+            static_cast<unsigned>(tilingLevel.getValue())));
     SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
     SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
     scf::SCFTilingOptions tilingOptions;

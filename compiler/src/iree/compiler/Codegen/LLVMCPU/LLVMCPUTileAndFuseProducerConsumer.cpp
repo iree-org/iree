@@ -109,7 +109,7 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
   int64_t numLoops = rootOp.getLoopIteratorTypes().size();
   auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
       getLoweringConfig(rootOp).getTilingLevelAttr(
-          static_cast<unsigned>(llvm::to_underlying(tilingLevel))));
+          static_cast<unsigned>(tilingLevel)));
   SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
   SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
   tileSizes.resize(numLoops, 0);

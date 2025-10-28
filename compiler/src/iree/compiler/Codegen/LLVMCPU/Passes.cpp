@@ -231,11 +231,10 @@ void addMultiTilingExpertPassPipeline(
   for (int i = 0,
            e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
        i < e; ++i) {
-    auto level = static_cast<IREE::CPU::TilingLevel>(i);
-    if (!loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
+    if (!loweringConfig.hasTilingLevel(i)) {
       continue;
     }
-
+    auto level = static_cast<IREE::CPU::TilingLevel>(i);
     switch (level) {
     case IREE::CPU::TilingLevel::CacheParallelTiles:
     case IREE::CPU::TilingLevel::VectorCommonParallelTiles:
