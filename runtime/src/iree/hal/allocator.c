@@ -234,3 +234,185 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_export_buffer(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+//===----------------------------------------------------------------------===//
+// Virtual Memory Management
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT bool iree_hal_allocator_supports_virtual_memory(
+    iree_hal_allocator_t* IREE_RESTRICT allocator) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  if (!_VTABLE_DISPATCH(allocator, supports_virtual_memory)) {
+    return false;
+  }
+  return _VTABLE_DISPATCH(allocator, supports_virtual_memory)(allocator);
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_allocator_virtual_memory_query_granularity(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params,
+    iree_device_size_t* IREE_RESTRICT out_minimum_page_size,
+    iree_device_size_t* IREE_RESTRICT out_recommended_page_size) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(out_minimum_page_size);
+  IREE_ASSERT_ARGUMENT(out_recommended_page_size);
+  *out_minimum_page_size = 0;
+  *out_recommended_page_size = 0;
+  if (!_VTABLE_DISPATCH(allocator, virtual_memory_query_granularity)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      _VTABLE_DISPATCH(allocator, virtual_memory_query_granularity)(
+          allocator, params, out_minimum_page_size, out_recommended_page_size);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_reserve(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_queue_affinity_t queue_affinity, iree_device_size_t size,
+    iree_hal_buffer_t** IREE_RESTRICT out_virtual_buffer) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(out_virtual_buffer);
+  *out_virtual_buffer = NULL;
+  if (!_VTABLE_DISPATCH(allocator, virtual_memory_reserve)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)size);
+  iree_status_t status = _VTABLE_DISPATCH(allocator, virtual_memory_reserve)(
+      allocator, queue_affinity, size, out_virtual_buffer);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_release(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(virtual_buffer);
+  if (!_VTABLE_DISPATCH(allocator, virtual_memory_release)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(allocator, virtual_memory_release)(
+      allocator, virtual_buffer);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_physical_memory_allocate(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t size,
+    iree_allocator_t host_allocator,
+    iree_hal_physical_memory_t** IREE_RESTRICT out_physical_memory) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(out_physical_memory);
+  *out_physical_memory = NULL;
+  if (!_VTABLE_DISPATCH(allocator, physical_memory_allocate)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)size);
+  iree_status_t status = _VTABLE_DISPATCH(allocator, physical_memory_allocate)(
+      allocator, params, size, host_allocator, out_physical_memory);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_physical_memory_free(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(physical_memory);
+  if (!_VTABLE_DISPATCH(allocator, physical_memory_free)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(allocator, physical_memory_free)(
+      allocator, physical_memory);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_map(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory,
+    iree_device_size_t physical_offset, iree_device_size_t size) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(virtual_buffer);
+  IREE_ASSERT_ARGUMENT(physical_memory);
+  if (!_VTABLE_DISPATCH(allocator, virtual_memory_map)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)size);
+  iree_status_t status = _VTABLE_DISPATCH(allocator, virtual_memory_map)(
+      allocator, virtual_buffer, virtual_offset, physical_memory,
+      physical_offset, size);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_unmap(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(virtual_buffer);
+  if (!_VTABLE_DISPATCH(allocator, virtual_memory_unmap)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(allocator, virtual_memory_unmap)(
+      allocator, virtual_buffer, virtual_offset, size);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_protect(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_protection_t protection) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(virtual_buffer);
+  if (!_VTABLE_DISPATCH(allocator, virtual_memory_protect)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(allocator, virtual_memory_protect)(
+      allocator, virtual_buffer, virtual_offset, size, queue_affinity,
+      protection);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_advise(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_advice_t advice) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(virtual_buffer);
+  if (!_VTABLE_DISPATCH(allocator, virtual_memory_advise)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "virtual memory not supported by allocator");
+  }
+  // No tracing for advise - it's a hint that may be called frequently.
+  return _VTABLE_DISPATCH(allocator, virtual_memory_advise)(
+      allocator, virtual_buffer, virtual_offset, size, queue_affinity, advice);
+}
