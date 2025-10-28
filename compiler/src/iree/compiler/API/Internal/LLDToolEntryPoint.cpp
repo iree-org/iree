@@ -59,8 +59,8 @@ LLD_HAS_DRIVER(wasm)
 
 static Flavor getFlavor(StringRef s) {
   return StringSwitch<Flavor>(s)
-      .CasesLower("ld", "ld.lld", "gnu", Gnu)
-      .CasesLower("wasm", "ld-wasm", Wasm)
+      .CasesLower({"ld", "ld.lld", "gnu"}, Gnu)
+      .CasesLower({"wasm", "ld-wasm"}, Wasm)
       .CaseLower("link", WinLink)
       .CasesLower(
           {"ld64", "ld64.lld", "darwin", "darwinnew", "ld64.lld.darwinnew"},
