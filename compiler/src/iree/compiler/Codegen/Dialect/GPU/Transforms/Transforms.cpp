@@ -41,6 +41,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Support/LLVM.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
@@ -291,6 +292,24 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   return success();
 }
 
+/// Check if a forall op uses iree_gpu.coalesced_gather_dma operations
+/// instead of tensor.parallel_insert_slice in its terminator.
+static bool isCoalescedGatherForallOp(scf::ForallOp forallOp) {
+  for (auto outArg : forallOp.getRegionOutArgs()) {
+    auto combiningOps = forallOp.getCombiningOps(outArg);
+    if (combiningOps.empty()) {
+      continue;
+    }
+    // Check if any combining op is a CoalescedGatherDMAOp
+    for (auto *op : combiningOps) {
+      if (isa<IREE::GPU::CoalescedGatherDMAOp>(op)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 FailureOr<scf::ForallOp>
 fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
                              scf::ForallOp laneForallOp) {
@@ -343,6 +362,11 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
       if (combiningOps.size() != 1) {
         return false;
       }
+      auto coalescedDMAOp =
+          dyn_cast<IREE::GPU::CoalescedGatherDMAOp>(combiningOps[0]);
+      if (coalescedDMAOp) {
+        continue;
+      }
       auto parallelInsertOp =
           dyn_cast<tensor::ParallelInsertSliceOp>(combiningOps[0]);
       if (!parallelInsertOp ||
@@ -361,6 +385,11 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
     return rewriter.notifyMatchFailure(warpForallOp,
                                        "forall op has strided combining op");
   }
+
+  bool hasCoalescedGatherDMA = isCoalescedGatherForallOp(laneForallOp);
+  assert(!hasCoalescedGatherDMA &&
+         "Coalesced gather DMA ops are not supported in lane forall ops");
+
   // Verify that the source of all combining ops of the warpForallOp are
   // produced by the laneForallOp, and that the laneForallOp combining ops
   // have the same rank as the corresponding combining op in the warpForallOp.

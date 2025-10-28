@@ -335,10 +335,9 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
         %2 = %arg6 * 4
         %thread_slice = tensor.extract_slice %source_slice[0, %2] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
         scf.forall.in_parallel {
-          iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%c0, %c0] dest_size = [4, 128] lane(%arg6)
-            : tensor<4x4xf32>, tensor<4x128xf32>, index, index, index
+          iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%c0, %c0] dest_size = [4, 128] lane(%arg6) :  ...
         }
-      } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+      } {mapping = [#gpu.lane_id<linear_dim_1>, #gpu.lane_id<linear_dim_0>]}
     ```
 
     ## Example using $dest_indices and $dest_size
