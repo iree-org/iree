@@ -77,6 +77,6 @@ hal.executable private @main {
 //          CHECK:           gpu.barrier
 //      CHECK-DAG:           %[[LHS_MM:.+]] = vector.transfer_read {{.*}} vector<4x4xf16>
 //      CHECK-DAG:           %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<4x4xf16>
-//  CHECK-COUNT-4:           amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+//  CHECK-COUNT-4:           amdgpu.mfma 16x16x16
 //          CHECK:     vector.transfer_write %{{.*}}, %[[BUF2]]
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}

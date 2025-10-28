@@ -148,7 +148,7 @@ hal.executable public @main {
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<2x1x2x4xf16>
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x4xf16>
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x4xf16>
-// CHECK-COUNT-4:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+// CHECK-COUNT-4:     amdgpu.mfma 16x16x16
 //       CHECK:       scf.yield
 //       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]], %[[BUF2]]
@@ -226,7 +226,7 @@ hal.executable public @main {
 //   CHECK-DAG:       vector.transfer_read {{.*}} vector<2x1x2x16xf16>
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x16xf16>
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x16xf16>
-// CHECK-COUNT-8:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
+// CHECK-COUNT-8:     amdgpu.wmma 16x16x16 {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
 //       CHECK:       scf.yield
 //       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 3, 1, 4] : vector<2x2x8x1x1xf32> to vector<2x8x1x2x1xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]], %[[BUF2]]
@@ -289,7 +289,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x10xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
 //       CHECK:     scf.for %{{.*}} = %c0 to %c320 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
-// CHECK-COUNT-8:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
+// CHECK-COUNT-8:     amdgpu.mfma 16x16x4
 //       CHECK:       scf.yield
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
@@ -350,7 +350,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x72xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
 //       CHECK:     scf.for %{{.*}} = %c0 to %c40 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
-// CHECK-COUNT-8:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32
+// CHECK-COUNT-8:     amdgpu.mfma 16x16x32
 //       CHECK:       scf.yield
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
@@ -411,7 +411,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
 //       CHECK:     scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<1x1x4x4x1xi32>)
-// CHECK-COUNT-2:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32
+// CHECK-COUNT-2:     amdgpu.mfma 32x32x16
 //       CHECK:       scf.yield
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
@@ -829,22 +829,22 @@ hal.executable public @main {
 // CHECK-DAG:  %[[B_EXTRACT11:.+]] = vector.extract %[[B_READ]][1, 0, 0, 1] : f32 from vector<2x1x1x4xf32>
 // CHECK-DAG:  %[[B_EXTRACT12:.+]] = vector.extract %[[B_READ]][1, 0, 0, 2] : f32 from vector<2x1x1x4xf32>
 // CHECK-DAG:  %[[B_EXTRACT13:.+]] = vector.extract %[[B_READ]][1, 0, 0, 3] : f32 from vector<2x1x1x4xf32>
-// CHECK-DAG:  %[[C_00_1:.+]] = amdgpu.mfma %[[A_EXTRACT00]] * %[[B_EXTRACT00]] + %[[C_INIT]]
-// CHECK-DAG:  %[[C_00_2:.+]] = amdgpu.mfma %[[A_EXTRACT01]] * %[[B_EXTRACT01]] + %[[C_00_1]]
-// CHECK-DAG:  %[[C_00_3:.+]] = amdgpu.mfma %[[A_EXTRACT02]] * %[[B_EXTRACT02]] + %[[C_00_2]]
-// CHECK-DAG:  %[[C_00_4:.+]] = amdgpu.mfma %[[A_EXTRACT03]] * %[[B_EXTRACT03]] + %[[C_00_3]]
-// CHECK-DAG:  %[[C_01_1:.+]] = amdgpu.mfma %[[A_EXTRACT00]] * %[[B_EXTRACT10]] + %[[C_INIT]]
-// CHECK-DAG:  %[[C_01_2:.+]] = amdgpu.mfma %[[A_EXTRACT01]] * %[[B_EXTRACT11]] + %[[C_01_1]]
-// CHECK-DAG:  %[[C_01_3:.+]] = amdgpu.mfma %[[A_EXTRACT02]] * %[[B_EXTRACT12]] + %[[C_01_2]]
-// CHECK-DAG:  %[[C_01_4:.+]] = amdgpu.mfma %[[A_EXTRACT03]] * %[[B_EXTRACT13]] + %[[C_01_3]]
-// CHECK-DAG:  %[[C_70_1:.+]] = amdgpu.mfma %[[A_EXTRACT70]] * %[[B_EXTRACT00]] + %[[C_INIT]]
-// CHECK-DAG:  %[[C_70_2:.+]] = amdgpu.mfma %[[A_EXTRACT71]] * %[[B_EXTRACT01]] + %[[C_70_1]]
-// CHECK-DAG:  %[[C_70_3:.+]] = amdgpu.mfma %[[A_EXTRACT72]] * %[[B_EXTRACT02]] + %[[C_70_2]]
-// CHECK-DAG:  %[[C_70_4:.+]] = amdgpu.mfma %[[A_EXTRACT73]] * %[[B_EXTRACT03]] + %[[C_70_3]]
-// CHECK-DAG:  %[[C_71_1:.+]] = amdgpu.mfma %[[A_EXTRACT70]] * %[[B_EXTRACT10]] + %[[C_INIT]]
-// CHECK-DAG:  %[[C_71_2:.+]] = amdgpu.mfma %[[A_EXTRACT71]] * %[[B_EXTRACT11]] + %[[C_71_1]]
-// CHECK-DAG:  %[[C_71_3:.+]] = amdgpu.mfma %[[A_EXTRACT72]] * %[[B_EXTRACT12]] + %[[C_71_2]]
-// CHECK-DAG:  %[[C_71_4:.+]] = amdgpu.mfma %[[A_EXTRACT73]] * %[[B_EXTRACT13]] + %[[C_71_3]]
+// CHECK-DAG:  %[[C_00_1:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT00]] * %[[B_EXTRACT00]] + %[[C_INIT]]
+// CHECK-DAG:  %[[C_00_2:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT01]] * %[[B_EXTRACT01]] + %[[C_00_1]]
+// CHECK-DAG:  %[[C_00_3:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT02]] * %[[B_EXTRACT02]] + %[[C_00_2]]
+// CHECK-DAG:  %[[C_00_4:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT03]] * %[[B_EXTRACT03]] + %[[C_00_3]]
+// CHECK-DAG:  %[[C_01_1:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT00]] * %[[B_EXTRACT10]] + %[[C_INIT]]
+// CHECK-DAG:  %[[C_01_2:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT01]] * %[[B_EXTRACT11]] + %[[C_01_1]]
+// CHECK-DAG:  %[[C_01_3:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT02]] * %[[B_EXTRACT12]] + %[[C_01_2]]
+// CHECK-DAG:  %[[C_01_4:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT03]] * %[[B_EXTRACT13]] + %[[C_01_3]]
+// CHECK-DAG:  %[[C_70_1:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT70]] * %[[B_EXTRACT00]] + %[[C_INIT]]
+// CHECK-DAG:  %[[C_70_2:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT71]] * %[[B_EXTRACT01]] + %[[C_70_1]]
+// CHECK-DAG:  %[[C_70_3:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT72]] * %[[B_EXTRACT02]] + %[[C_70_2]]
+// CHECK-DAG:  %[[C_70_4:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT73]] * %[[B_EXTRACT03]] + %[[C_70_3]]
+// CHECK-DAG:  %[[C_71_1:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT70]] * %[[B_EXTRACT10]] + %[[C_INIT]]
+// CHECK-DAG:  %[[C_71_2:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT71]] * %[[B_EXTRACT11]] + %[[C_71_1]]
+// CHECK-DAG:  %[[C_71_3:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT72]] * %[[B_EXTRACT12]] + %[[C_71_2]]
+// CHECK-DAG:  %[[C_71_4:.+]] = amdgpu.mfma 16x16x4 %[[A_EXTRACT73]] * %[[B_EXTRACT13]] + %[[C_71_3]]
 // CHECK:  vector.insert_strided_slice %[[C_00_4]], {{.*}}offsets = [0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:  vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:  vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
@@ -1150,7 +1150,7 @@ hal.executable public @main {
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<2x1x2x4xf16>
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x4xf16>
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x4xf16>
-// CHECK-COUNT-4:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+// CHECK-COUNT-4:     amdgpu.mfma 16x16x16
 //       CHECK:       scf.yield
 //       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]]
@@ -1223,7 +1223,7 @@ hal.executable public @main {
 //       CHECK:       gpu.barrier
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
-// CHECK-COUNT-1:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
+// CHECK-COUNT-1:     amdgpu.mfma 16x16x4
 //       CHECK:       scf.yield
 //       CHECK:     vector.transfer_write {{.*}} #gpu.address_space<workgroup>>
 //       CHECK:     scf.for {{.*}} {
@@ -1294,7 +1294,7 @@ hal.executable public @main {
 //         CHECK:       gpu.barrier
 //     CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 //     CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
-// CHECK-COUNT-1:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
+// CHECK-COUNT-1:     amdgpu.mfma 16x16x4
 //         CHECK:     scf.yield
 //         CHECK: } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
