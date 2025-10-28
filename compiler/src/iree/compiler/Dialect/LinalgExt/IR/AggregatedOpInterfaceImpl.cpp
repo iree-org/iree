@@ -630,7 +630,7 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
   SetVector<int64_t> kDimSet(llvm::from_range, im2colOp.getKOutputDims());
   // There may be multiple output dims that we can vectorize, so prioritize the
   // innermost dims first.
-  std::sort(vectorizableOutputDims.begin(), vectorizableOutputDims.end());
+  llvm::sort(vectorizableOutputDims);
   // Check each dim in order from innermost to outermost, and return the first
   // one that is vectorizable.
   while (!vectorizableOutputDims.empty()) {
@@ -652,8 +652,7 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
 
     // If the input slice is contiguous along the innermost dimension, then it
     // is vectorizable. If it is not, then move on to the next innermost dim.
-    SmallVector<int64_t> mOutputDims = im2colOp.getMOutputDims();
-    SetVector<int64_t> mDimSet(mOutputDims.begin(), mOutputDims.end());
+    SetVector<int64_t> mDimSet(llvm::from_range, im2colOp.getMOutputDims());
     OpFoldResult offset = b.getIndexAttr(0);
     if (kDimSet.contains(outputDimToVectorize)) {
       offset = kOffset;
@@ -771,6 +770,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   for (scf::ForOp loop : loopNest.loops) {
     ivs.push_back(loop.getInductionVar());
   }
+  // The index computation below uses the induction variables as the offsets
+  // into the output tensor, so we need an offset for each dim of the output.
+  // For the dimension that is vectorized, the offset is zero, because we
+  // take a full slice along that dimension.
   if (maybeOutputDimToVectorize.has_value()) {
     Value zero = arith::ConstantIndexOp::create(b, loc, 0);
     ivs.insert(ivs.begin() + maybeOutputDimToVectorize.value(), zero);
@@ -901,11 +904,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // Set the batch and K offsets for the input tensor.
   const int64_t kPos = getKPos().front();
   sliceOffsets[kPos] = inputKOffset.front();
-  int ivIdx = 0;
   SmallVector<int64_t> inverseOutputPerm =
       invertPermutationVector(getOutputPerm());
-  for (auto bPos : getBatchPos()) {
-    sliceOffsets[bPos] = ivs[inverseOutputPerm[ivIdx++]];
+  for (auto [ivIdx, bPos] : llvm::enumerate(getBatchPos())) {
+    sliceOffsets[bPos] = ivs[inverseOutputPerm[ivIdx]];
   }
 
   // Step 3. Decompose the im2col op into:
@@ -923,8 +925,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // For now, only extract a 1D slice when the vectorized dim is not innermost
   // in the output, and the input and output ranks are different. Otherwise,
   // try to preserve the original rank to avoid rank reducing slices.
-  int64_t sliceRank = std::min<int64_t>(inputRank, outputRank);
-  SmallVector<int64_t> inputToOutputSlicePerm =
+  int64_t sliceRank = std::min(inputRank, outputRank);
+  auto inputToOutputSlicePerm =
       llvm::to_vector(llvm::seq<int64_t>(0, sliceRank));
   if (maybeOutputDimToVectorize.has_value()) {
     int64_t outputDimToVectorize = maybeOutputDimToVectorize.value();
