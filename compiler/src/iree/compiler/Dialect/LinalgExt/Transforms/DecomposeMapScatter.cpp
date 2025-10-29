@@ -227,9 +227,7 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
   rewriter.eraseOp(genericOp);
 
   // Flatten all the vectors, since the scatter op lowering expects 1D vectors.
-  int64_t flatVectorSize =
-      std::reduce(inputType.getShape().begin(), inputType.getShape().end(), 1,
-                  std::multiplies<int64_t>());
+  int64_t flatVectorSize = llvm::product_of(inputType.getShape());
   rewriter.setInsertionPoint(mapScatterOp);
   auto flatIndexType =
       VectorType::get({flatVectorSize}, rewriter.getIndexType());
