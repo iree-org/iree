@@ -18,7 +18,6 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Location.h"
 
 #define DEBUG_TYPE "iree-codegen-vector-layout-analysis"
 
@@ -27,10 +26,10 @@ namespace mlir::iree_compiler {
 using namespace IREE::VectorExt;
 
 struct LayoutInfo {
-  /// Given a value, propagate it's layout information forward through it's
+  /// Given a value, propagate its layout information forward through its
   /// users.
   void propagateLayoutForward(Value val);
-  /// Given a value, propagate it's layout information backward through it's
+  /// Given a value, propagate its layout information backward through its
   /// defining operation.
   void propagateLayoutBackward(Value val);
 
@@ -47,41 +46,11 @@ struct LayoutInfo {
     forward.push(val);
     backward.push(val);
   }
-  void setLayoutOrClone(OpOperand *val, VectorLayoutInterface layout) {
-    if (!isa<ShapedType>(val->get().getType())) {
-      // Don't set layouts on non-shaped types. This would anyway be an empty
-      // layout.
-      return;
-    }
-    // Always clone constant like ops and set the layout on them.
-    OpBuilder b(val->getOwner());
-    Operation *defOp = val->get().getDefiningOp();
-    if (llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp,
-                              vector::CreateMaskOp, vector::ConstantMaskOp>(
-            defOp)) {
-      b.setInsertionPoint(defOp);
-      Operation *cloned = b.clone(*defOp);
-      val->set(cloned->getResult(0));
-      layouts[cloned->getResult(0)] = layout;
-      return;
-    }
-
-    if (!hasLayout(val->get())) {
-      layouts[val->get()] = layout;
-      forward.push(val->get());
-      backward.push(val->get());
-      return;
-    }
-
-    // Otherwise, create a to_layout op to change the layout.
-    Value v = val->get();
-    Value layourtedV = ToLayoutOp::create(b, v.getLoc(), v, layout);
-    val->set(layourtedV);
-    layouts[layourtedV] = layout;
-    return;
+  void setLayoutOrClone(OpOperand *val, VectorLayoutInterface layout);
+  VectorLayoutInterface getLayout(Value val) const {
+    return layouts.lookup(val);
   }
-  VectorLayoutInterface getLayout(Value val) { return layouts.lookup(val); }
-  bool hasLayout(Value val) { return layouts.contains(val); }
+  bool hasLayout(Value val) const { return layouts.contains(val); }
 
   llvm::MapVector<Value, VectorLayoutInterface> layouts;
   std::queue<Value> forward;
@@ -321,6 +290,42 @@ void LayoutInfo::propagateLayoutBackward(Value val) {
     }
     return;
   }
+}
+
+void LayoutInfo::setLayoutOrClone(OpOperand *val,
+                                  VectorLayoutInterface layout) {
+  if (!isa<ShapedType>(val->get().getType())) {
+    // Don't set layouts on non-shaped types. This would anyway be an empty
+    // layout.
+    return;
+  }
+  // Always clone constant like ops and set the layout on them.
+  OpBuilder b(val->getOwner());
+  Operation *defOp = val->get().getDefiningOp();
+  bool isConstantLike = defOp->hasTrait<OpTrait::ConstantLike>();
+  if (isConstantLike ||
+      llvm::isa_and_nonnull<vector::StepOp, vector::CreateMaskOp,
+                            vector::ConstantMaskOp>(defOp)) {
+    b.setInsertionPoint(defOp);
+    Operation *cloned = b.clone(*defOp);
+    val->set(cloned->getResult(0));
+    layouts[cloned->getResult(0)] = layout;
+    return;
+  }
+
+  if (!hasLayout(val->get())) {
+    layouts[val->get()] = layout;
+    forward.push(val->get());
+    backward.push(val->get());
+    return;
+  }
+
+  // Otherwise, create a to_layout op to change the layout.
+  Value v = val->get();
+  Value layourtedV = ToLayoutOp::create(b, v.getLoc(), v, layout);
+  val->set(layourtedV);
+  layouts[layourtedV] = layout;
+  return;
 }
 
 LogicalResult propagateVectorLayoutInfo(
