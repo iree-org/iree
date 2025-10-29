@@ -326,6 +326,15 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
       return getOutputType().getRank();
     }
 
+    // Return the input index at the provided position.
+    Value getInputIndex(int64_t position);
+
+    // Return the output index at the provided position.
+    Value getOutputIndex(int64_t position);
+
+    // Returns the mask value.
+    Value getMask();
+
     // Return true if the map_scatter op has vector semantics.
     bool isVectorized() {
       return isa<VectorType>(getInputType());
