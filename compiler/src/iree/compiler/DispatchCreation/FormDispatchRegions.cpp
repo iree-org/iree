@@ -165,14 +165,22 @@ public:
             return dominance.properlyDominates(sliceBoundaryOp, pair.first);
           });
     };
+
     llvm::SetVector<Operation *> slice;
-    for (Value operand : op->getOperands()) {
-      if (loopMaps.contains(operand.getDefiningOp())) {
-        continue;
+    auto populateSlice = [&](OpOperand *operand) {
+      // It's okay if the consumer directly uses an operation in the fusion
+      // group.
+      if (loopMaps.contains(operand->get().getDefiningOp())) {
+        return;
       }
-      LogicalResult result = getBackwardSlice(operand, &slice, options);
+      LogicalResult result = getBackwardSlice(operand->get(), &slice, options);
       assert(result.succeeded() && "expected a backward slice");
       (void)result;
+    };
+
+    mlir::visitUsedValuesDefinedAbove(op->getRegions(), populateSlice);
+    for (OpOperand &operand : op->getOpOperands()) {
+      populateSlice(&operand);
     }
 
     return llvm::any_of(loopMaps.getArrayRef(),
