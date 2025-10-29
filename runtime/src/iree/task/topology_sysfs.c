@@ -4,14 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Linux sysfs-based topology detection.
+// Defers to cpuinfo if available, otherwise provides sysfs implementation.
+//
+// Documentation:
+// https://docs.kernel.org/admin-guide/abi-stable-files.html#abi-file-stable-sysfs-devices-system-cpu
+
 // Must define _GNU_SOURCE before includes to get CPU_* macros from sched.h.
 #define _GNU_SOURCE
 
 #include "iree/base/internal/math.h"
 #include "iree/task/topology.h"
 
-// Linux sysfs-based topology detection.
-// Defers to cpuinfo if available, otherwise provides sysfs implementation.
 #if !defined(IREE_TASK_USE_CPUINFO) && defined(IREE_PLATFORM_LINUX) && \
     !defined(IREE_PLATFORM_EMSCRIPTEN)
 
@@ -80,7 +84,8 @@ static iree_status_t iree_sysfs_read_small_file(const char* path, char* buffer,
                             strerror(errno));
   }
 
-  // Read entire file into buffer.
+  // Read entire file into buffer, reserving one byte for NUL terminator.
+  // fread guarantees: bytes_read <= (buffer_size - 1).
   const size_t bytes_read = fread(buffer, 1, buffer_size - 1, file);
   if (ferror(file)) {
     fclose(file);
@@ -98,6 +103,10 @@ static iree_status_t iree_sysfs_read_small_file(const char* path, char* buffer,
   }
 
   fclose(file);
+
+  // Safety: bytes_read <= (buffer_size - 1), so buffer[bytes_read] is always
+  // a valid index (at most buffer[buffer_size - 1]) and we can add our NUL.
+  IREE_ASSERT(bytes_read < buffer_size);
 
   // NUL-terminate and return length.
   buffer[bytes_read] = '\0';
@@ -172,10 +181,13 @@ static iree_status_t iree_sysfs_parse_cpu_list(
   return iree_ok_status();
 }
 
-// Parses a size string with optional K/M/G suffix.
-// Examples: "32K" -> 32768, "1M" -> 1048576, "2G" -> 2147483648, "1024" -> 1024
-// Handles both uppercase and lowercase suffixes.
+// Parses a size string with optional K suffix (case-insensitive).
 // Whitespace is trimmed before parsing.
+// Examples: "32K" -> 32768, "1024K" -> 1048576, "1024" -> 1024
+//
+// Linux kernel cache size_show() only outputs K suffix and that's what we use
+// most frequently with CPU, but beware that other sysfs nodes are in unsuffixed
+// units of KB and we'll need to handle those differently.
 static iree_status_t iree_sysfs_parse_size_string(iree_string_view_t text,
                                                   uint64_t* out_size) {
   IREE_ASSERT_ARGUMENT(out_size);
@@ -187,17 +199,11 @@ static iree_status_t iree_sysfs_parse_size_string(iree_string_view_t text,
                             "size string is empty");
   }
 
-  // Check for optional suffix (K/M/G, case-insensitive).
+  // Check for optional K suffix (case-insensitive).
   uint64_t scale = 1;
   if (iree_string_view_consume_suffix(&text, IREE_SV("K")) ||
       iree_string_view_consume_suffix(&text, IREE_SV("k"))) {
     scale = 1024;
-  } else if (iree_string_view_consume_suffix(&text, IREE_SV("M")) ||
-             iree_string_view_consume_suffix(&text, IREE_SV("m"))) {
-    scale = 1024 * 1024;
-  } else if (iree_string_view_consume_suffix(&text, IREE_SV("G")) ||
-             iree_string_view_consume_suffix(&text, IREE_SV("g"))) {
-    scale = 1024ULL * 1024ULL * 1024ULL;
   }
 
   // Parse the numeric part.

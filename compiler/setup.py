@@ -19,9 +19,6 @@
 # On CIs, it is often advantageous to re-use/control the CMake build directory.
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
 #
-# Select CMake options are available from environment variables:
-#   IREE_ENABLE_LLD
-#
 # If building from a development tree and aiming to get an "editable" install,
 # use the environment option CMAKE_INSTALL_MODE=ABS_SYMLINK on your
 # `pip install -e .` invocation.

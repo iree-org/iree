@@ -118,9 +118,8 @@ IREE_FLAG(
 IREE_FLAG(
     string, task_topology_favor, "",
     "High-level preset for common deployment scenarios (overrides "
-    "distribution\n"
-    "and performance_level if specified):\n"
-    "  `latency` - Minimize single-request latency (compact + high-perf).\n"
+    "distribution and performance_level if specified):\n"
+    "  `latency`    - Minimize single-request latency (compact + high-perf).\n"
     "  `throughput` - Maximize batch throughput (scatter + any-perf).\n"
     "  `efficiency` - Minimize power consumption (compact + low-perf).");
 

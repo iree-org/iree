@@ -20,9 +20,6 @@
 # A custom package suffix can be specified with the environment variable:
 #   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX
 #
-# Select CMake options are available from environment variables:
-#   IREE_HAL_DRIVER_VULKAN
-#
 # If building from a development tree and aiming to get an "editable" install,
 # use the environment option CMAKE_INSTALL_MODE=ABS_SYMLINK on your
 # `pip install -e .` invocation.
