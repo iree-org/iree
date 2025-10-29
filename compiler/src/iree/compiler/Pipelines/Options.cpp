@@ -330,7 +330,6 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
       "iree-dispatch-creation-enable-multi-use-encoding-fusion",
       enableMultiUseEncodingFusion,
       {init_at_opt(llvm::OptimizationLevel::O0, false),
-       init_at_opt(llvm::OptimizationLevel::O2, false),
        init_at_opt(llvm::OptimizationLevel::O3, true)},
       llvm::cl::desc(
           "Enable encoding ops' fusion if the producer has more than one uses"),

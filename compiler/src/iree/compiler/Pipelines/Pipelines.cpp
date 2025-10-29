@@ -310,6 +310,8 @@ void buildIREEVMTransformPassPipeline(
     DispatchCreation::TransformOptions dispatchTransformOptions;
     dispatchTransformOptions.enableAggressiveFusion =
         dispatchCreationOptions.enableAggressiveFusion;
+    dispatchTransformOptions.enableMultiUseEncodingFusion =
+        dispatchCreationOptions.enableMultiUseEncodingFusion;
     dispatchTransformOptions.enableFuseMultiUse =
         dispatchCreationOptions.enableFuseMultiUse;
     // The pipeline option has higher priority.

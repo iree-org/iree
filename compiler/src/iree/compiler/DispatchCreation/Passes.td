@@ -322,7 +322,7 @@ def FuseEncodingOpsIntoDispatchRegionsPass :
   let options = [
     Option<"enableAggressiveFusion", "enable-aggressive-fusion", "bool",
     /*default=*/"false",
-    "Enable encoding ops' fusion if the producer has more than one uses">,
+    "Enable encoding op fusion if the producer has more than one use">,
   ];
 }
 
