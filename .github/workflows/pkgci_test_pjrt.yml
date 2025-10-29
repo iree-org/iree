@@ -33,9 +33,9 @@ jobs:
           - runner: ubuntu-24.04
             pjrt_platform: cuda
           # TODO: enable these AMD runners
-          # - runner: nodai-amdgpu-w7900-x86-64
+          # - runner: iree-7900xtx-1
           #   pjrt_platform: rocm
-          # - runner: nodai-amdgpu-w7900-x86-64
+          # - runner: iree-7900xtx-1
           #   pjrt_platform: vulkan
     name: Build and test
     runs-on: ${{ matrix.runner }}

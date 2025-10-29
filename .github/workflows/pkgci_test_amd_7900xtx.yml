@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: PkgCI Test AMD W7900
+name: PkgCI Test AMD 7900XTX
 on:
   workflow_call:
     inputs:
@@ -18,8 +18,8 @@ on:
         default: ""
 
 jobs:
-  test_w7900:
-    runs-on: nodai-amdgpu-w7900-x86-64
+  test_7900xtx:
+    runs-on: iree-7900xtx-1
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
