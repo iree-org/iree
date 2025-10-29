@@ -194,6 +194,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgTransforms
     MLIRUBDialect
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
