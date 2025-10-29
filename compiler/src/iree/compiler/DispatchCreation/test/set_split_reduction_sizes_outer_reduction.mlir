@@ -179,3 +179,24 @@ util.func public @arg_compare_negative_outer_dynamic_reduction(
 
   util.return %res_val, %res_idx : tensor<64xf32>, tensor<64xindex>
 }
+
+// -----
+
+// CHECK-LABEL: @arg_compare_large_inner_reduction
+util.func public @arg_compare_large_inner_reduction(%arg0: tensor<4x1x128256xf16>)
+    -> tensor<4x1xi32> {
+  // CHECK: iree_linalg_ext.split_reduction = [1336 : index]
+  %init_val = tensor.empty() : tensor<4x1xf16>
+  %init_idx = tensor.empty() : tensor<4x1xi32>
+
+  %res:2 = iree_linalg_ext.arg_compare
+    dimension(2)
+    ins(%arg0 : tensor<4x1x128256xf16>)
+    outs(%init_val, %init_idx : tensor<4x1xf16>, tensor<4x1xi32>) {
+  ^bb0(%arg1: f16, %arg2: f16):
+    %cmp = arith.cmpf ogt, %arg1, %arg2 : f16
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4x1xf16>, tensor<4x1xi32>
+
+  util.return %res#1 : tensor<4x1xi32>
+}
