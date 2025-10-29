@@ -356,9 +356,11 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     DenseI64ArrayAttr:$dest_size
   );
 
+  let results = (outs AnyRankedTensorOrMemRef:$result);
+
   let assemblyFormat = [{
     $source (`[` $indices^ `]`)? `into` $init (`[` $dest_indices^ `]`)? `dest_size` `=` $dest_size `lane` `(` $lane `)`
-    attr-dict `:` type(operands)
+    attr-dict `:` type(operands) `->` type($result)
   }];
 
   let hasVerifier = 1;

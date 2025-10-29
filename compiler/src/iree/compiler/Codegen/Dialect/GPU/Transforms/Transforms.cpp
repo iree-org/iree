@@ -268,20 +268,48 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   rewriter.mergeBlocks(producer.getBody(), loopBody, newBlockArgs);
 
   rewriter.setInsertionPointAfter(terminator);
-  auto parallelInsert =
-      cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
+  if (isa<tensor::ParallelInsertSliceOp>(
+          *terminator.getYieldingOps().begin())) {
+    auto parallelInsert = cast<tensor::ParallelInsertSliceOp>(
+        *terminator.getYieldingOps().begin());
 
-  // Create an insert_slice to yield from the loop body.
-  SmallVector<OpFoldResult, 4> sourceOffsets = parallelInsert.getMixedOffsets();
-  SmallVector<OpFoldResult, 4> sourceSizes = parallelInsert.getMixedSizes();
-  SmallVector<OpFoldResult, 4> sourceStrides = parallelInsert.getMixedStrides();
-  Value insertedSlice = tensor::InsertSliceOp::create(
-      rewriter, loc, parallelInsert.getSource(), parallelInsert.getDest(),
-      parallelInsert.getMixedOffsets(), parallelInsert.getMixedSizes(),
-      parallelInsert.getMixedStrides());
-  scf::YieldOp::create(rewriter, loc, insertedSlice);
-  rewriter.eraseOp(parallelInsert);
-  rewriter.eraseOp(terminator);
+    // Create an insert_slice to yield from the loop body.
+    SmallVector<OpFoldResult, 4> sourceOffsets =
+        parallelInsert.getMixedOffsets();
+    SmallVector<OpFoldResult, 4> sourceSizes = parallelInsert.getMixedSizes();
+    SmallVector<OpFoldResult, 4> sourceStrides =
+        parallelInsert.getMixedStrides();
+    Value insertedSlice = tensor::InsertSliceOp::create(
+        rewriter, loc, parallelInsert.getSource(), parallelInsert.getDest(),
+        parallelInsert.getMixedOffsets(), parallelInsert.getMixedSizes(),
+        parallelInsert.getMixedStrides());
+    scf::YieldOp::create(rewriter, loc, insertedSlice);
+    rewriter.eraseOp(parallelInsert);
+    rewriter.eraseOp(terminator);
+  } else {
+    assert(isa<IREE::GPU::CoalescedGatherDMAOp>(
+               *terminator.getYieldingOps().begin()) &&
+           "expected coalesced gather dma op");
+    // Create the new CoalescedGatherDMAOp outside the in_parallel region
+    // and remove the in_parallel terminator.
+    auto coalescedGather = cast<IREE::GPU::CoalescedGatherDMAOp>(
+        *terminator.getYieldingOps().begin());
+
+    // Create the new CoalescedGatherDMAOp with a result outside the in_parallel
+    rewriter.setInsertionPoint(terminator);
+    Value gatherResult = rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
+        loc, coalescedGather.getInit().getType(), coalescedGather.getSource(),
+        coalescedGather.getIndices(), coalescedGather.getInit(),
+        coalescedGather.getDestIndices(), coalescedGather.getLane(),
+        coalescedGather.getDestSizeAttr());
+
+    // Yield the gather result
+    scf::YieldOp::create(rewriter, loc, gatherResult);
+
+    // Erase the old coalesced gather op and the in_parallel terminator
+    rewriter.eraseOp(coalescedGather);
+    rewriter.eraseOp(terminator);
+  }
 
   // Step 7. Yield the result of the loop from the barrier op and replace the
   // producer.
@@ -394,7 +422,10 @@ static void composeCoalescedGatherDMA(
 
     // Create a new CoalescedGatherDMAOp with composed offsets
     OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(warpInsert);
+
+    // Set insertion point outside the in_parallel region (before the forall op)
+    auto warpForall = warpInsert->getParentOfType<scf::ForallOp>();
+    rewriter.setInsertionPoint(warpForall);
 
     // Convert composedOffsets to Values for dest_indices
     SmallVector<Value> newDestIndices;
@@ -402,18 +433,20 @@ static void composeCoalescedGatherDMA(
       if (auto val = dyn_cast<Value>(offset)) {
         newDestIndices.push_back(val);
       } else {
-        // Materialize attribute as constant
+        // Materialize attribute as constant outside the in_parallel region
         auto attr = cast<IntegerAttr>(cast<Attribute>(offset));
         newDestIndices.push_back(rewriter.create<arith::ConstantIndexOp>(
             laneInsert.getLoc(), attr.getInt()));
       }
     }
 
-    // Create new CoalescedGatherDMAOp with composed dest_indices
-    rewriter.replaceOpWithNewOp<IREE::GPU::CoalescedGatherDMAOp>(
-        warpInsert, laneInsert.getSource(), laneInsert.getIndices(),
-        warpInsert.getDest(), newDestIndices, laneInsert.getLane(),
-        laneInsert.getDestSizeAttr());
+    // Create new CoalescedGatherDMAOp inside the in_parallel region
+    rewriter.setInsertionPoint(warpInsert);
+    rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
+        warpInsert.getLoc(), warpInsert.getDest().getType(),
+        laneInsert.getSource(), laneInsert.getIndices(), warpInsert.getDest(),
+        newDestIndices, laneInsert.getLane(), laneInsert.getDestSizeAttr());
+    rewriter.eraseOp(warpInsert);
     rewriter.eraseOp(laneInsert);
   }
 }

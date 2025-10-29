@@ -315,8 +315,8 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
   }
 
   rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-      loc, TypeRange{}, source, indicesVec, sharedOut, destIndices, laneId,
-      destSizeAttr);
+      loc, sharedOut.getType(), source, indicesVec, sharedOut, destIndices,
+      laneId, destSizeAttr);
 
   // Erase the parallel_insert_slice ops and inner operation.
   for (auto insertOp : toErase) {
