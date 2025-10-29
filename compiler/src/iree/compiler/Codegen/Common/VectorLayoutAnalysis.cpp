@@ -250,7 +250,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Create a new value for the resolved value and subscribe it to propagation
   // and enforcement.
   // We possibly don't need to subscribe this since this value has already
-  // reached the top of the lattice and shouldn't do anything else. But it's
+  // reached the top of the lattice and shouldn't do anything else. But its
   // nicer to do it to have consistency.
   DistributionLayout *resolvedLayout =
       propagation->getLatticeElement(resolvedValue);
@@ -297,7 +297,7 @@ ChangeResult DistributionLayout::resolve(const VectorLayoutInterface &rhs,
   }
   }
 
-  // This return will never be reached, but it's here to make the compiler
+  // This return will never be reached, but its here to make the compiler
   // happy.
   return ChangeResult::NoChange;
 }
@@ -699,7 +699,7 @@ static void enforceLayoutToMultiReductionOp(
     return;
   }
   // Reductions should always propagate value layout to result. Result can
-  // enforce it's layout on init.
+  // enforce its layout on init.
   const DistributionLayout *result = resultLattices[0];
   DistributionLayout *init = operandLattices[1];
 
@@ -1377,7 +1377,7 @@ LogicalResult propagateVectorLayoutInfo(
     }
 
     for (Value operand : op->getOperands()) {
-      // Some operands may not have been visited as results (ex: block
+      // Some operands may not have been visited as results (e.g., block
       // arguments).
       if (layouts.contains(operand)) {
         continue;
@@ -1412,13 +1412,8 @@ struct TestVectorLayoutAnalysisPass final
 
       for (OpResult result : op->getOpResults()) {
         if (layouts.contains(result)) {
-          // Print layout attr to a string.
-          std::string layoutStr;
-          llvm::raw_string_ostream s(layoutStr);
-          s << layouts[result];
-          // Emit remark.
-          op->emitRemark("layout of result #" +
-                         Twine(result.getResultNumber()) + " is " + s.str());
+          op->emitRemark("layout of result #")
+              << result.getResultNumber() << " is " << layouts[result];
         }
       }
     });
