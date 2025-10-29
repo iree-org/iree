@@ -499,7 +499,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       %rhs_vec_3 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c3, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp, vector<4x1x1x4xf16>
 
       // rocdl.sched.barrier 0
-      gpu.barrier
+      // gpu.barrier
+      rocdl.s.barrier
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
       rocdl.sched.barrier 0
 
