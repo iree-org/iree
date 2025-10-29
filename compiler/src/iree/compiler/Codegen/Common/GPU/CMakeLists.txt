@@ -150,6 +150,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
+    iree::compiler::Codegen::Interfaces::TensorMaskingOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
