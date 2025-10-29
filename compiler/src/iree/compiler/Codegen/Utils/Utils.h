@@ -25,9 +25,7 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
 
-namespace mlir::iree_compiler::IREE::Codegen {
-class UKernelGenericOp;
-} // namespace mlir::iree_compiler::IREE::Codegen
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 
 namespace mlir::iree_compiler {
 
