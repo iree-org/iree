@@ -1482,7 +1482,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=1152,1024,1024"
-    "--is_dynamic=true,false,false"
+    "--mnk_dynamicities=dynamic,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1514,7 +1514,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=2048,2048,2048"
-    "--is_dynamic=true,false,false"
+    "--mnk_dynamicities=dynamic,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1719,7 +1719,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=1152,1024,1024"
-    "--is_dynamic=true,false,false"
+    "--mnk_dynamicities=dynamic,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1751,7 +1751,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=1024,1024,1024"
-    "--is_dynamic=false,false,false"
+    "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1783,7 +1783,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=2048,2048,4096"
-    "--is_dynamic=true,false,false"
+    "--mnk_dynamicities=dynamic,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1846,7 +1846,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=1152,1024,1024"
-    "--is_dynamic=true,false,false"
+    "--mnk_dynamicities=dynamic,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1878,7 +1878,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=2048,2048,2048"
-    "--is_dynamic=false,false,false"
+    "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1911,7 +1911,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=2048,2048,2048"
-    "--is_dynamic=true,false,false"
+    "--mnk_dynamicities=dynamic,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
