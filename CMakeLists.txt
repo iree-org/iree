@@ -897,7 +897,7 @@ else()
   if(IREE_INPUT_STABLEHLO)
     message(STATUS "Configuring third_party/stablehlo")
     list(APPEND CMAKE_MESSAGE_INDENT "  ")
-    iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
+    iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo SILENCE_DEPRECATIONS)
     list(POP_BACK CMAKE_MESSAGE_INDENT)
   endif()
 
