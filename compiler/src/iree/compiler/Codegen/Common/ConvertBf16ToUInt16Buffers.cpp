@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -92,6 +93,9 @@ struct ConvertHalInterfaceBindingSubspan final
             op, newResultTy, adaptor.getLayout(), adaptor.getBinding(),
             adaptor.getByteOffset(), adaptor.getDynamicDims(),
             adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
+    if (auto accessAttr = op->getDiscardableAttr(kSubspanAccessAttrName)) {
+      newOp->setDiscardableAttr(kSubspanAccessAttrName, accessAttr);
+    }
     LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");
     (void)newOp;
     return success();
