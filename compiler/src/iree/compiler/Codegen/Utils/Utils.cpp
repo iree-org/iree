@@ -1181,11 +1181,9 @@ Value findOrCreateSubspanBuffer(
         ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper().isAttrPresent(
             subspanOp);
   }
-  Attribute memorySpace = rewriter.getAttr<IREE::HAL::DescriptorTypeAttr>(
-      subspanOp.getDescriptorType());
-  auto memRefType =
-      MemRefType::get(shapedType.getShape(), shapedType.getBoundElementType(),
-                      layoutAttr, memorySpace);
+
+  auto memRefType = MemRefType::get(
+      shapedType.getShape(), shapedType.getBoundElementType(), layoutAttr);
 
   // Look for an existing op.
   Block *block = subspanOp->getBlock();
@@ -1202,7 +1200,6 @@ Value findOrCreateSubspanBuffer(
       continue;
 
     if (bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
-        bufferSubspanOp.getDescriptorType() != subspanOp.getDescriptorType() ||
         bufferSubspanOp.getByteOffset() != subspanOp.getByteOffset() ||
         !llvm::equal(bufferSubspanOp.getDynamicDims(),
                      subspanOp.getDynamicDims()) ||
@@ -1228,7 +1225,7 @@ Value findOrCreateSubspanBuffer(
       rewriter, subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
       subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
-      subspanOp.getDescriptorFlagsAttr());
+      subspanOp.getSubspanAccessAttr());
   if (useRocdlBuffers) {
     buffer = amdgpu::FatRawBufferCastOp::create(
         rewriter, subspanOp->getLoc(), buffer, /*validBytes=*/Value{},

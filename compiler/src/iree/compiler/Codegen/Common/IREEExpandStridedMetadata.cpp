@@ -205,7 +205,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
       newBinding = IREE::HAL::InterfaceBindingSubspanOp::create(
           rewriter, loc, newBufferType, binding.getLayoutAttr(),
           binding.getBindingAttr(), zero, dynamicLinearShape,
-          binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
+          binding.getAlignmentAttr(), binding.getSubspanAccessAttr());
     }
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() * 2 + 2);

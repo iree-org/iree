@@ -96,6 +96,74 @@ PipelineBindingAttr PipelineLayoutAttr::getBinding(int64_t ordinal) const {
 }
 
 //===----------------------------------------------------------------------===//
+// #hal.memory_access(*)
+//===----------------------------------------------------------------------===//
+
+// static
+Attribute SubspanAccessAttr::parse(AsmParser &p, Type type) {
+  if (p.parseLParen())
+    return {};
+
+  MemoryAccessBitfield value = MemoryAccessBitfield::None;
+
+  // Parse first access name
+  StringRef accessName;
+  if (p.parseKeyword(&accessName))
+    return {};
+
+  // Convert to enum
+  std::optional<MemoryAccessBitfield> firstAccess =
+      symbolizeMemoryAccessBitfield(accessName);
+  if (!firstAccess) {
+    p.emitError(p.getCurrentLocation(), "unknown memory access: ")
+        << accessName;
+    return {};
+  }
+  value = *firstAccess;
+
+  // Parse additional flags with |
+  while (succeeded(p.parseOptionalVerticalBar())) {
+    if (p.parseKeyword(&accessName))
+      return {};
+    auto access = symbolizeMemoryAccessBitfield(accessName);
+    if (!access) {
+      p.emitError(p.getCurrentLocation(), "unknown memory access: ")
+          << accessName;
+      return {};
+    }
+    value = value | *access;
+  }
+
+  if (p.parseRParen())
+    return {};
+
+  return get(p.getContext(), value);
+}
+
+void SubspanAccessAttr::print(AsmPrinter &p) const {
+  SmallVector<StringRef> parts;
+
+  auto value = getValue();
+  if (bitEnumContainsAny(value, MemoryAccessBitfield::Read))
+    parts.push_back("read");
+  if (bitEnumContainsAny(value, MemoryAccessBitfield::Write))
+    parts.push_back("write");
+  if (bitEnumContainsAny(value, MemoryAccessBitfield::Discard))
+    parts.push_back("discard");
+  if (bitEnumContainsAny(value, MemoryAccessBitfield::MayAlias))
+    parts.push_back("mayAlias");
+  if (bitEnumContainsAny(value, MemoryAccessBitfield::Unaligned))
+    parts.push_back("unaligned");
+  if (bitEnumContainsAny(value, MemoryAccessBitfield::Any))
+    parts.push_back("any");
+
+  if (parts.empty())
+    p << "none";
+  else
+    llvm::interleave(parts, p, "|");
+}
+
+//===----------------------------------------------------------------------===//
 // #hal.executable.target<*>
 //===----------------------------------------------------------------------===//
 

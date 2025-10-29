@@ -181,11 +181,8 @@ struct LoadFromBufferOpInterface
     // Conservatively return false if the subspan is not found.
     if (!subspanOp)
       return false;
-    std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
-        subspanOp->getDescriptorFlags();
-    return !descriptorFlags.has_value() ||
-           !bitEnumContainsAll(*descriptorFlags,
-                               IREE::HAL::DescriptorFlags::ReadOnly);
+    return subspanOp->getSubspanAccess().has_value() &&
+           !subspanOp->getSubspanAccessAttr().hasRead();
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
