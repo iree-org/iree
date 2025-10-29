@@ -67,19 +67,11 @@ static void makePadDPS(RewriterBase &rewriter, tensor::PadOp padOp) {
   rewriter.setInsertionPointAfter(padOp);
 
   // Record users for RAUW before creating new users.
-  llvm::SmallDenseSet<Operation *> users(padOp.getResult().getUsers().begin(),
-                                         padOp.getResult().getUsers().end());
-
+  llvm::SmallDenseSet<Operation *> users(llvm::from_range,
+                                         padOp.getResult().getUsers());
   RankedTensorType tensorTy = padOp.getResultType();
-  int64_t rank = tensorTy.getRank();
-  // TODO: Use getMixedSizes.
-  SmallVector<OpFoldResult> sizes(rank, OpFoldResult());
-  for (int64_t i = 0; i < rank; ++i) {
-    sizes[i] = rewriter.createOrFold<tensor::DimOp>(loc, padOp.getResult(), i);
-    if (auto v = dyn_cast<Value>(sizes[i]))
-      sizes[i] = getAsOpFoldResult(v);
-  }
-
+  SmallVector<OpFoldResult> sizes =
+      tensor::getMixedSizes(rewriter, loc, padOp.getResult());
   Value out = tensor::EmptyOp::create(rewriter, loc, sizes,
                                       getElementTypeOrSelf(tensorTy));
   auto copied = linalg::CopyOp::create(rewriter, loc, padOp.getResult(), out);
@@ -89,7 +81,7 @@ static void makePadDPS(RewriterBase &rewriter, tensor::PadOp padOp) {
                              });
 }
 
-struct MaskListener : public RewriterBase::Listener {
+struct MaskListener final : public RewriterBase::Listener {
   void notifyOperationInserted(Operation *op,
                                RewriterBase::InsertPoint previous) override {
     if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
@@ -99,7 +91,7 @@ struct MaskListener : public RewriterBase::Listener {
 
   void notifyOperationErased(Operation *op) override {
     if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
-      pads.erase(std::remove(pads.begin(), pads.end(), padOp), pads.end());
+      llvm::erase(pads, padOp);
     }
   }
 

@@ -57,9 +57,9 @@ getBoundsToGuard(OpBuilder &b, Operation *unpaddedOp, Operation *paddedOp) {
   b.setInsertionPoint(paddedOp);
   SmallVector<Range> newItSpace = paddedIface.getIterationDomain(b);
   SmallVector<OpFoldResult> oldDims =
-      llvm::map_to_vector(oldItSpace, [&](Range r) { return r.size; });
+      llvm::map_to_vector(oldItSpace, [](Range r) { return r.size; });
   SmallVector<OpFoldResult> newDims =
-      llvm::map_to_vector(newItSpace, [&](Range r) { return r.size; });
+      llvm::map_to_vector(newItSpace, [](Range r) { return r.size; });
   for (auto [oldDim, newDim, itType] : llvm::zip_equal(
            oldDims, newDims, unpaddedIface.getLoopIteratorTypes())) {
     // Non-reduction dimensions don't need to be guarded, as they will be
@@ -139,7 +139,7 @@ static void selectNeutralElementForReducedDims(OpBuilder &b, OpOperand &operand,
         Value selected = b.createOrFold<arith::SelectOp>(
             loc, getValueOrCreateConstantIntOp(b, loc, inBounds), args[0],
             neutralEl);
-        b.create<linalg::YieldOp>(loc, selected);
+        linalg::YieldOp::create(b, loc, selected);
       });
   operand.set(genericOp.getResult(0));
 }
