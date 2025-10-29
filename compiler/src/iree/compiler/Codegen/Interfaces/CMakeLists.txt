@@ -189,8 +189,13 @@ iree_cc_library(
     "TensorMaskingOpInterface.cpp"
   DEPS
     ::TensorMaskingOpInterfaceGen
+    MLIRAnalysis
+    MLIRArithDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRLinalgDialect
+    MLIRUBDialect
+    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 
