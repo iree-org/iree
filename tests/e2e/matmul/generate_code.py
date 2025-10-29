@@ -56,7 +56,7 @@ def generate_function(
     mx_block_size: int,
     shape: TestShape,
     transpose_rhs: bool,
-    dynamicity: Dynamicity,
+    dynamicities: tuple[Dynamicity, Dynamicity, Dynamicity],
     compilation_info: Optional[CompilationInfo] = None,
 ):
     if mx_scale_type:
@@ -67,11 +67,11 @@ def generate_function(
             mx_block_size=mx_block_size,
             shape=shape,
             transpose_rhs=transpose_rhs,
-            dynamicity=dynamicity,
+            dynamicities=dynamicities,
             compilation_info=compilation_info,
         )
 
-    shapes = generate_shapes(shape, transpose_rhs, dynamicity)
+    shapes = generate_shapes(shape, transpose_rhs, dynamicities)
     func_name = generate_function_name(
         lhs_rhs_type=lhs_rhs_type,
         acc_type=acc_type,

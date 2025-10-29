@@ -117,7 +117,7 @@ def generate(
         compilation_info_id, lhs_rhs_type
     ):
         for shape in get_test_shapes(shapes_id):
-            for dynamicity in get_dynamicities(shapes_id):
+            for dynamicities in get_dynamicities(shapes_id):
                 function = generate_function(
                     lhs_rhs_type=lhs_rhs_type,
                     acc_type=acc_type,
@@ -125,7 +125,7 @@ def generate(
                     mx_block_size=mx_block_size,
                     shape=shape,
                     transpose_rhs=transpose_rhs,
-                    dynamicity=dynamicity,
+                    dynamicities=dynamicities,
                     compilation_info=compilation_info,
                 )
                 # Different testcases may differ only by runtime parameters but
