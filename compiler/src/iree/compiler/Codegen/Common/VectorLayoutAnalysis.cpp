@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 
 #include <cassert>
 
@@ -249,7 +250,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Create a new value for the resolved value and subscribe it to propagation
   // and enforcement.
   // We possibly don't need to subscribe this since this value has already
-  // reached the top of the lattice and shouldn't do anything else. But it's
+  // reached the top of the lattice and shouldn't do anything else. But its
   // nicer to do it to have consistency.
   DistributionLayout *resolvedLayout =
       propagation->getLatticeElement(resolvedValue);
@@ -296,7 +297,7 @@ ChangeResult DistributionLayout::resolve(const VectorLayoutInterface &rhs,
   }
   }
 
-  // This return will never be reached, but it's here to make the compiler
+  // This return will never be reached, but its here to make the compiler
   // happy.
   return ChangeResult::NoChange;
 }
@@ -698,7 +699,7 @@ static void enforceLayoutToMultiReductionOp(
     return;
   }
   // Reductions should always propagate value layout to result. Result can
-  // enforce it's layout on init.
+  // enforce its layout on init.
   const DistributionLayout *result = resultLattices[0];
   DistributionLayout *init = operandLattices[1];
 
@@ -1352,67 +1353,44 @@ DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
   return layout;
 }
 
-/// ==========================================================================
-///        VectorLayoutAnalysis
-/// ==========================================================================
+namespace mlir::iree_compiler {
 
-LogicalResult VectorLayoutAnalysis::run() {
+LogicalResult propagateVectorLayoutInfo(
+    Operation *root, llvm::MapVector<Value, VectorLayoutInterface> &layouts) {
+  DataFlowSolver solver;
   // The order of loading matters here, because propagateLayout does anchoring
   // initialization which needs the lattice to know both enforcement and
   // propagation.
   solver.load<PropagateLayout>(root->getContext());
   solver.load<EnforceLayout>(root->getContext());
-  return solver.initializeAndRun(root);
-}
-
-VectorLayoutInterface VectorLayoutAnalysis::getLayout(Value val) {
-  const DistributionLayout *layout =
-      solver.lookupState<DistributionLayout>(val);
-  if (!layout) {
-    return VectorLayoutInterface();
+  if (failed(solver.initializeAndRun(root))) {
+    return failure();
   }
-  return layout->getLayout();
-}
-
-void VectorLayoutAnalysis::debugAnnotateLayouts() {
-  // Annotate each operation with the layout of it's result.
+  // Iterate over all values and extract their layouts.
   root->walk([&](Operation *op) {
-    if (op->getNumResults() == 0) {
-      return;
+    for (Value result : op->getResults()) {
+      const DistributionLayout *layout =
+          solver.lookupState<DistributionLayout>(result);
+      if (layout && layout->hasLayout()) {
+        layouts[result] = layout->getLayout();
+      }
     }
 
-    for (auto [index, result] : llvm::enumerate(op->getResults())) {
-      if (!isa<VectorType>(result.getType())) {
+    for (Value operand : op->getOperands()) {
+      // Some operands may not have been visited as results (e.g., block
+      // arguments).
+      if (layouts.contains(operand)) {
         continue;
       }
-
-      // Do not annotate to_layout operations since they already have
-      // this information in their attributes.
-      if (isa<IREE::VectorExt::ToLayoutOp>(op)) {
-        continue;
+      const DistributionLayout *layout =
+          solver.lookupState<DistributionLayout>(operand);
+      if (layout && layout->hasLayout()) {
+        layouts[operand] = layout->getLayout();
       }
-
-      Attribute layout = getLayout<Attribute>(result);
-      if (!layout) {
-        continue;
-      }
-
-      op->setAttr("layout_result_" + std::to_string(index), layout);
     }
   });
+  return success();
 }
-
-void VectorLayoutAnalysis::print(raw_ostream &os) {
-  debugAnnotateLayouts();
-  root->print(os);
-}
-
-void VectorLayoutAnalysis::dump() {
-  print(llvm::dbgs());
-  llvm::dbgs() << "\n";
-}
-
-namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_TESTVECTORLAYOUTANALYSISPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
@@ -1421,9 +1399,9 @@ struct TestVectorLayoutAnalysisPass final
     : impl::TestVectorLayoutAnalysisPassBase<TestVectorLayoutAnalysisPass> {
   void runOnOperation() override {
     Operation *root = getOperation();
-    VectorLayoutAnalysis analysis(getOperation());
-    if (failed(analysis.run())) {
-      root->emitError("layout analysis failed");
+    llvm::MapVector<Value, VectorLayoutInterface> layouts;
+    if (failed(propagateVectorLayoutInfo(root, layouts))) {
+      root->emitError("Layout Analysis Failed");
       return signalPassFailure();
     }
 
@@ -1433,14 +1411,9 @@ struct TestVectorLayoutAnalysisPass final
       }
 
       for (OpResult result : op->getOpResults()) {
-        if (auto layout = analysis.getLayout<Attribute>(result)) {
-          // Print layout attr to a string.
-          std::string layoutStr;
-          llvm::raw_string_ostream s(layoutStr);
-          s << layout;
-          // Emit remark.
-          op->emitRemark("layout of result #" +
-                         Twine(result.getResultNumber()) + " is " + s.str());
+        if (layouts.contains(result)) {
+          op->emitRemark("layout of result #")
+              << result.getResultNumber() << " is " << layouts[result];
         }
       }
     });
