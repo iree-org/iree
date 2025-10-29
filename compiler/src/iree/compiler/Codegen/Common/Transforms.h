@@ -81,7 +81,7 @@ namespace IREE::VectorExt {
 class VectorLayoutInterface;
 } // namespace IREE::VectorExt
 
-/// Analyzes the root op and it's nested ops to propagate vector layouts
+/// Analyzes the root op and its nested ops to propagate vector layouts
 /// originating from to_vector operations. Example:
 ///
 ///    %root = vector.transfer_read
@@ -95,8 +95,8 @@ class VectorLayoutInterface;
 ///          |
 ///          --> %root2, %b and %e must have the same layout
 ///
-/// Here, the user provided an anchor point for %root, fixing it's layout to L.
-/// The layout then uses it's inference rules to find the layout of other
+/// Here, the user provided an anchor point for %root, fixing its layout to L.
+/// The layout then uses its inference rules to find the layout of other
 /// values:
 ///
 ///    %root = vector.transfer_read
