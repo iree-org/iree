@@ -2548,7 +2548,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   constexpr int64_t kMinimumWorkload = 4096;
   SmallVector<int64_t> shape = genericOp.getStaticLoopRanges();
   int64_t numWorkload = 1;
-  for (const auto &[index, size] : llvm::enumerate(shape)) {
+  for (auto [index, size] : llvm::enumerate(shape)) {
     if (ShapedType::isDynamic(size)) {
       numWorkload = ShapedType::kDynamic;
       break;
