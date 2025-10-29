@@ -301,16 +301,18 @@ void LayoutInfo::setLayoutOrClone(OpOperand *val,
   }
   // Always clone constant like ops and set the layout on them.
   OpBuilder b(val->getOwner());
-  Operation *defOp = val->get().getDefiningOp();
-  bool isConstantLike = defOp->hasTrait<OpTrait::ConstantLike>();
-  if (isConstantLike ||
-      llvm::isa_and_nonnull<vector::StepOp, vector::CreateMaskOp,
-                            vector::ConstantMaskOp>(defOp)) {
-    b.setInsertionPoint(defOp);
-    Operation *cloned = b.clone(*defOp);
-    val->set(cloned->getResult(0));
-    layouts[cloned->getResult(0)] = layout;
-    return;
+  if (Operation *defOp = val->get().getDefiningOp()) {
+    bool isConstantLike = defOp->hasTrait<OpTrait::ConstantLike>();
+    bool isDuplicatable =
+        isa<vector::StepOp, vector::CreateMaskOp, vector::ConstantMaskOp>(
+            defOp);
+    if (isConstantLike || isDuplicatable) {
+      b.setInsertionPoint(defOp);
+      Operation *cloned = b.clone(*defOp);
+      val->set(cloned->getResult(0));
+      layouts[cloned->getResult(0)] = layout;
+      return;
+    }
   }
 
   if (!hasLayout(val->get())) {
