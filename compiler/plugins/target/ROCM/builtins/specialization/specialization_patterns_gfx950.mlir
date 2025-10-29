@@ -70,7 +70,7 @@ pdl.pattern @f8E4M3_pingpong : benefit(1) {
     affine_map<(d0, d1, d2) -> (d1, d2)>,
     affine_map<(d0, d1, d2) -> (d0, d1)>
   ]
-  %elemtypes = pdl.attribute = [f8E4M3FNUZ, f8E4M3FNUZ, f32]
+  %elemtypes = pdl.attribute = [f8E4M3FN, f8E4M3FN, f32]
   %operands = pdl.operands
   %types = pdl.types
   %matmul = pdl.operation (%operands : !pdl.range<value>) -> (%types : !pdl.range<type>)

@@ -68,22 +68,53 @@ class ShapesId(enum.Enum):
         except ValueError as e:
             raise ValueError(f"Invalid --mnk format: {e}")
 
+    @classmethod
+    def set_dynamicity(cls, shapes_id, dynamicity_string):
+        """Parse and set MNK dynamicity from command line argument."""
+        if shapes_id != cls.CUSTOM_MNK:
+            if dynamicity_string:
+                raise ValueError(
+                    "--mnk_dynamicities can only be used with --shapes=custom_mnk"
+                )
+            return
+
+        if dynamicity_string:
+            try:
+                dynamicity_parts = dynamicity_string.split(",")
+                if len(dynamicity_parts) != 3:
+                    raise ValueError(
+                        "--mnk_dynamicities must have exactly 3 values, each being either 'dynamic' or 'static'"
+                    )
+                allowed_values = {"dynamic", "static"}
+                for x in dynamicity_parts:
+                    if x.lower() not in allowed_values:
+                        raise ValueError(f"Invalid dynamicity value: {x}")
+
+                cls.custom_dynamicity = tuple(
+                    Dynamicity.DYNAMIC if x.lower() == "dynamic" else Dynamicity.STATIC
+                    for x in dynamicity_parts
+                )
+            except ValueError as e:
+                raise ValueError(f"Invalid --mnk_dynamicities format: {e}")
+
 
 # Class attribute to store custom MNK values
 ShapesId.custom_mnk_values = None
+# Class attribute to store custom dynamicities for MNK
+ShapesId.custom_dynamicity = None
 
 
 # Returns the list of Dynamicity's to use for the collection of shapes
 # identified by shapes_id.
 def get_dynamicities(shapes_id: ShapesId):
     if shapes_id == ShapesId.EASY_LARGE_STATIC:
-        return [
-            Dynamicity.STATIC,
-        ]
+        return [(Dynamicity.STATIC, Dynamicity.STATIC, Dynamicity.STATIC)]
+    elif shapes_id.custom_dynamicity:
+        return [shapes_id.custom_dynamicity]
     else:
         return [
-            Dynamicity.DYNAMIC,
-            Dynamicity.STATIC,
+            (Dynamicity.DYNAMIC, Dynamicity.DYNAMIC, Dynamicity.DYNAMIC),
+            (Dynamicity.STATIC, Dynamicity.STATIC, Dynamicity.STATIC),
         ]
     raise ValueError(shapes_id)
 
@@ -177,19 +208,25 @@ class TestCall:
 
 
 # Helper for generate_function. Generates TestInputMatricesShapes, i.e.
-# converts from the runtime shape dimensions in TestShape and given dynamicity to
+# converts from the runtime shape dimensions in TestShape and given dynamicities(m,n,k) to
 # the set of shapes to be used in a test function's input tensors.
-def generate_shapes(shape: TestShape, transpose_rhs: bool, dynamicity: Dynamicity):
-    lhs_rows = shape_dim(shape.m, dynamicity)
-    lhs_cols = shape_dim(shape.k, dynamicity)
-    acc_rows = shape_dim(shape.m, dynamicity)
-    acc_cols = shape_dim(shape.n, dynamicity)
+def generate_shapes(
+    shape: TestShape,
+    transpose_rhs: bool,
+    dynamicities: tuple[Dynamicity, Dynamicity, Dynamicity],
+):
+    dynamicity_m, dynamicity_n, dynamicity_k = dynamicities
+
+    lhs_rows = shape_dim(shape.m, dynamicity_m)
+    lhs_cols = shape_dim(shape.k, dynamicity_k)
+    acc_rows = shape_dim(shape.m, dynamicity_m)
+    acc_cols = shape_dim(shape.n, dynamicity_n)
     if transpose_rhs:
-        rhs_rows = shape_dim(shape.n, dynamicity)
-        rhs_cols = shape_dim(shape.k, dynamicity)
+        rhs_rows = shape_dim(shape.n, dynamicity_n)
+        rhs_cols = shape_dim(shape.k, dynamicity_k)
     else:
-        rhs_rows = shape_dim(shape.k, dynamicity)
-        rhs_cols = shape_dim(shape.n, dynamicity)
+        rhs_rows = shape_dim(shape.k, dynamicity_k)
+        rhs_cols = shape_dim(shape.n, dynamicity_n)
     shapes = TestInputMatricesShapes(
         lhs_rows=lhs_rows,
         lhs_cols=lhs_cols,
