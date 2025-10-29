@@ -1365,7 +1365,7 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // The LLVM backend struggles to legalize non-power-of-two scalable vectors,
   // hence the extra rounding up.
-  for (const auto &[index, size] : llvm::enumerate(roundedVecTileSizes)) {
+  for (auto [index, size] : llvm::enumerate(roundedVecTileSizes)) {
     if (!size)
       continue;
     roundedVecTileSizes[index] =
@@ -1373,10 +1373,9 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
                       /*predicate=*/inputVecScalableTileFlags[index]);
   }
 
-  SmallVector<int64_t> vectorTileSizes(roundedVecTileSizes.begin(),
-                                       roundedVecTileSizes.end());
-  SmallVector<bool> vectorScalableFlags(inputVecScalableTileFlags.begin(),
-                                        inputVecScalableTileFlags.end());
+  auto vectorTileSizes = llvm::to_vector_of<int64_t>(roundedVecTileSizes);
+  auto vectorScalableFlags =
+      llvm::to_vector_of<bool>(inputVecScalableTileFlags);
   vectorScalableFlags.back() = false;
 
   LoweringConfigGenerator generator(op);
