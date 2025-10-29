@@ -20,6 +20,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -37,8 +38,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-hoist-encoding-ops"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_HOISTENCODINGOPSPASS
@@ -330,7 +329,7 @@ void HoistEncodingOpsPass::runOnOperation() {
     const IREE::Util::ConstExprAnalysis::ConstValueInfo *constInfo =
         constExprs.lookup(setEncodingOp.getSource());
     if (!constInfo) {
-      LDBG("Non-hoistable op (failed to get constInfo): " << setEncodingOp);
+      LDBG() << "Non-hoistable op (failed to get constInfo): " << setEncodingOp;
       return;
     }
     if (policy.getDecision(constInfo)->getOutcome() ==
@@ -338,12 +337,12 @@ void HoistEncodingOpsPass::runOnOperation() {
       candidates.push_back(llvm::to_vector(llvm::reverse(opsWithinDispatch)));
       return;
     }
-    LDBG("Non-hoistable op: " << setEncodingOp);
+    LDBG() << "Non-hoistable op: " << setEncodingOp;
   });
 
   IRRewriter rewriter(ctx);
   for (ArrayRef<Operation *> hoistableOps : candidates) {
-    LDBG("Hoisting the ops for " << *hoistableOps.back());
+    LDBG() << "Hoisting the ops for " << *hoistableOps.back();
     for (Operation *op : hoistableOps) {
       if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, op))) {
         op->emitOpError("failed to hoist the op out of dispatch");
