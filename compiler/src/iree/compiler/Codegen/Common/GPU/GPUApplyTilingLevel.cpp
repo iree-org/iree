@@ -65,7 +65,8 @@ void GPUApplyTilingLevelPass::runOnOperation() {
   if (tilingLevel != IREE::GPU::TilingLevel::Reduction &&
       tilingLevel != IREE::GPU::TilingLevel::Thread &&
       tilingLevel != IREE::GPU::TilingLevel::Subgroup &&
-      tilingLevel != IREE::GPU::TilingLevel::PartialReduction) {
+      tilingLevel != IREE::GPU::TilingLevel::PartialReduction &&
+      tilingLevel != IREE::GPU::TilingLevel::Serial) {
     funcOp.emitError() << "unsupported tiling level: "
                        << IREE::GPU::stringifyEnum(tilingLevel) << "\n";
     return signalPassFailure();
