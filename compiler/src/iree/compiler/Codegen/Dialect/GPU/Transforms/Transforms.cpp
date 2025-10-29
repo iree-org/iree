@@ -1004,8 +1004,9 @@ void populateIREEGPULowerInnerTiledPatterns(RewritePatternSet &patterns) {
 // Conversion to MultiMmaOp
 //===----------------------------------------------------------------------===//
 
-AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
-                   llvm::SmallDenseMap<int64_t, int64_t> &oldDimsToNewDimsMap) {
+static AffineMap
+dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
+         llvm::SmallDenseMap<int64_t, int64_t> &oldDimsToNewDimsMap) {
   assert(map.isProjectedPermutation() && "expected projected permutation");
 
   SmallVector<AffineExpr> newResults;
@@ -1021,7 +1022,8 @@ AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
                         context);
 }
 
-FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
+static FailureOr<IREE::Codegen::InnerTiledOp>
+convertScaledContractionToInnerTiledMma(
     RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     IREE::Codegen::InnerTileDescAttrInterface kind) {
   auto smmaKind = dyn_cast<IREE::GPU::ScaledMMAAttr>(kind);
@@ -1096,27 +1098,16 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
     return failure();
   }
 
-  auto reorderInputs = [](SmallVector<Value> inputs) {
-    SmallVector<Value> res;
-    int numInputs = inputs.size() - 1;
-    int offset = numInputs / 2;
-    for (int i = 0; i < numInputs; i++) {
-      res.push_back(inputs[i / 2 + (i % 2) * offset]);
-    }
-    res.push_back(inputs.back());
-    return res;
-  };
-  SmallVector<Value> inputs = reorderInputs(linalgOp->getOperands());
+  ValueRange inputs = linalgOp->getOperands();
 
   SmallVector<Type> eltTypes;
   smmaKind.getElementTypes(eltTypes);
-  if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
-          eltTypes[0] ||
-      cast<RankedTensorType>(inputs[2].getType()).getElementType() !=
-          eltTypes[2] ||
-      cast<RankedTensorType>(inputs[4].getType()).getElementType() !=
-          eltTypes[4]) {
-    return failure();
+  for (int i :
+       {kScaledMMAOperandLhs, kScaledMMAOperandRhs, kScaledMMAOperandAcc}) {
+    if (cast<RankedTensorType>(inputs[i].getType()).getElementType() !=
+        eltTypes[i]) {
+      return failure();
+    }
   }
 
   SmallVector<utils::IteratorType> linalgIteratorTypes =
@@ -1145,7 +1136,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
       dropDims(context, numDims - 4, accMap, oldDimsToNewDimsMap);
   std::optional<SmallVector<SmallVector<int64_t>>> perms =
       SmallVector<SmallVector<int64_t>>{
-          lhsInnerPerm, sc1InnerPerm, rhsInnerPerm, sc2InnerPerm, accInnerPerm};
+          lhsInnerPerm, rhsInnerPerm, sc1InnerPerm, sc2InnerPerm, accInnerPerm};
   SmallVector<int64_t> identityPerm = {0, 1};
   if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
       accInnerPerm == identityPerm)
@@ -1158,7 +1149,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
-      ArrayRef<AffineMap>{outerLhsMap, outerSc1Map, outerRhsMap, outerSc2Map,
+      ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerSc1Map, outerSc2Map,
                           outerAccMap},
       iteratorTypes, smmaKind, semantics, perms);
   if (maybeLoweringConfig) {

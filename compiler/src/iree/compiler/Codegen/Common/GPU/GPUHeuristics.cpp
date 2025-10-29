@@ -797,9 +797,9 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
       const GPUIntrinsicType &intrinsicA = intrinsics[qkIndex];
       const GPUIntrinsicType &intrinsicB = intrinsics[pvIndex];
       if (!matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
-                                               IREE::GPU::MMAFragment::Acc),
+                                               IREE::GPU::kMMAOperandAcc),
                        getSingleSubgroupLayout(intrinsicB.mmaKind,
-                                               IREE::GPU::MMAFragment::Acc))) {
+                                               IREE::GPU::kMMAOperandAcc))) {
         continue;
       }
 
@@ -807,14 +807,14 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
       // intrinsicB.
       bool canReuseAOutForBLhs =
           matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
-                                              IREE::GPU::MMAFragment::Acc),
+                                              IREE::GPU::kMMAOperandAcc),
                       getSingleSubgroupLayout(intrinsicB.mmaKind,
-                                              IREE::GPU::MMAFragment::Lhs));
+                                              IREE::GPU::kMMAOperandLhs));
       bool canReuseAOutForBRhs =
           matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
-                                              IREE::GPU::MMAFragment::Acc),
+                                              IREE::GPU::kMMAOperandAcc),
                       getSingleSubgroupLayout(intrinsicB.mmaKind,
-                                              IREE::GPU::MMAFragment::Rhs));
+                                              IREE::GPU::kMMAOperandRhs));
       intrinsicPairs.push_back(
           {intrinsicA, intrinsicB, canReuseAOutForBLhs || canReuseAOutForBRhs});
     }

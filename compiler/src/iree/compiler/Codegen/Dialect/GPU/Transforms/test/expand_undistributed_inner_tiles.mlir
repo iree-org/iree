@@ -422,16 +422,15 @@ func.func @concretize_WMMAR4_I32_16x16x16_I8(%lhs: tensor<16x16xi8>, %rhs: tenso
 
 #contraction_accesses = [
  affine_map<(i, j, k, b) -> (i, k, b)>,
- affine_map<(i, j, k, b) -> (i, k)>,
  affine_map<(i, j, k, b) -> (k, b, j)>,
+ affine_map<(i, j, k, b) -> (i, k)>,
  affine_map<(i, j, k, b) -> (k, j)>,
  affine_map<(i, j, k, b) -> (i, j)>
 ]
 
-func.func @expand_output_tile_scaled_mfma_32x32x64(%lhs: tensor<?x?x1x32x2x32xf4E2M1FN>, %lhsScale: tensor<?x?x32x2xf8E8M0FNU>,
-    %rhs: tensor<?x1x?x32x2x32xf8E4M3FN>, %rhsScale: tensor<?x?x32x2xf8E8M0FNU>,
+func.func @expand_output_tile_scaled_mfma_32x32x64(%lhs: tensor<?x?x1x32x2x32xf4E2M1FN>, %rhs: tensor<?x1x?x32x2x32xf8E4M3FN>, %lhsScale: tensor<?x?x32x2xf8E8M0FNU>, %rhsScale: tensor<?x?x32x2xf8E8M0FNU>,
     %acc: tensor<?x?x32x32xf32>) -> tensor<?x?x32x32xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %lhsScale, %rhs, %rhsScale) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhsScale, %rhsScale) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.scaled_mma_layout<
@@ -440,11 +439,9 @@ func.func @expand_output_tile_scaled_mfma_32x32x64(%lhs: tensor<?x?x1x32x2x32xf4
       rhs_elem_type = f8E4M3FN,
       acc_elem_type = f32>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
-    permutations = [array<i64: 0, 1, 2>, array<i64: 0, 1>,
-      array<i64: 2, 0, 1>, array<i64: 1, 0>,
+    permutations = [array<i64: 0, 1, 2>, array<i64: 2, 0, 1>, array<i64: 0, 1>, array<i64: 1, 0>,
       array<i64: 0, 1>]
-  } : tensor<?x?x1x32x2x32xf4E2M1FN>, tensor<?x?x32x2xf8E8M0FNU>,
-    tensor<?x1x?x32x2x32xf8E4M3FN>, tensor<?x?x32x2xf8E8M0FNU>
+  } : tensor<?x?x1x32x2x32xf4E2M1FN>, tensor<?x1x?x32x2x32xf8E4M3FN>, tensor<?x?x32x2xf8E8M0FNU>, tensor<?x?x32x2xf8E8M0FNU>
     into tensor<?x?x32x32xf32>
   return %0 : tensor<?x?x32x32xf32>
 }
@@ -460,16 +457,15 @@ func.func @expand_output_tile_scaled_mfma_32x32x64(%lhs: tensor<?x?x1x32x2x32xf4
 
 #contraction_accesses = [
  affine_map<(i, j, k, b) -> (i, k, b)>,
- affine_map<(i, j, k, b) -> (i, k)>,
  affine_map<(i, j, k, b) -> (k, b, j)>,
+ affine_map<(i, j, k, b) -> (i, k)>,
  affine_map<(i, j, k, b) -> (k, j)>,
  affine_map<(i, j, k, b) -> (i, j)>
 ]
 
-func.func @expand_output_tile_scaled_mfma_32x32x64_col_major(%lhs: tensor<?x?x1x32x2x32xf4E2M1FN>, %lhsScale: tensor<?x?x32x2xf8E8M0FNU>,
-    %rhs: tensor<?x1x?x32x2x32xf8E4M3FN>, %rhsScale: tensor<?x?x32x2xf8E8M0FNU>,
+func.func @expand_output_tile_scaled_mfma_32x32x64_col_major(%lhs: tensor<?x?x1x32x2x32xf4E2M1FN>, %rhs: tensor<?x1x?x32x2x32xf8E4M3FN>, %lhsScale: tensor<?x?x32x2xf8E8M0FNU>, %rhsScale: tensor<?x?x32x2xf8E8M0FNU>,
     %acc: tensor<?x?x32x32xf32>) -> tensor<?x?x32x32xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %lhsScale, %rhs, %rhsScale) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhsScale, %rhsScale) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.scaled_mma_layout<
@@ -478,11 +474,9 @@ func.func @expand_output_tile_scaled_mfma_32x32x64_col_major(%lhs: tensor<?x?x1x
       rhs_elem_type = f8E4M3FN,
       acc_elem_type = f32, col_major = true>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
-    permutations = [array<i64: 0, 1, 2>, array<i64: 0, 1>,
-      array<i64: 2, 0, 1>, array<i64: 1, 0>,
+    permutations = [array<i64: 0, 1, 2>,array<i64: 2, 0, 1>,  array<i64: 0, 1>, array<i64: 1, 0>,
       array<i64: 0, 1>]
-  } : tensor<?x?x1x32x2x32xf4E2M1FN>, tensor<?x?x32x2xf8E8M0FNU>,
-    tensor<?x1x?x32x2x32xf8E4M3FN>, tensor<?x?x32x2xf8E8M0FNU>
+  } : tensor<?x?x1x32x2x32xf4E2M1FN>, tensor<?x1x?x32x2x32xf8E4M3FN>, tensor<?x?x32x2xf8E8M0FNU>, tensor<?x?x32x2xf8E8M0FNU>
     into tensor<?x?x32x32xf32>
   return %0 : tensor<?x?x32x32xf32>
 }

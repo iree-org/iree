@@ -254,9 +254,10 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       auto [m, n, k, kB] = smma.getScaledMNKShape();
       SmallVector<Type> elementTypes;
       smma.getElementTypes(elementTypes);
-      intrinsics.emplace_back(GPUIntrinsicType({m}, {n}, {k, kB}, {},
-                                               elementTypes[0], elementTypes[2],
-                                               elementTypes[4], smma));
+      intrinsics.emplace_back(GPUIntrinsicType(
+          {m}, {n}, {k, kB}, {}, elementTypes[kScaledMMAOperandLhs],
+          elementTypes[kScaledMMAOperandRhs],
+          elementTypes[kScaledMMAOperandAcc], smma));
     }
   } else {
     for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
