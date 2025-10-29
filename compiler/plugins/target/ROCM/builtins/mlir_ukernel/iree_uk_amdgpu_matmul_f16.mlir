@@ -323,9 +323,102 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
 
     %cmp0 = arith.cmpi slt, %id, %c256 : index
     %cmp1 = arith.cmpi sge, %id, %c256 : index
-    scf.if %cmp0 {
-      rocdl.s.barrier
-    }
+    // 1st Wave specialization.
+    // We do LONG_READ - SHORT MFMA - WRITE - LONG MFMA
+
+    %res = scf.if %cmp0 -> vector<4x4x1x4xf32> {
+        rocdl.s.barrier
+        %3 = scf.for %i = %c64 to %dim step %c64 iter_args(%iter = %2) -> vector<4x4x1x4xf32> {
+        // Global loads of rhs.
+        %rhs_block = tensor.extract_slice %rhs [0, %i] [256, 64] [1, 1] : !in_ty to !block_in
+        %rhs_thread_0 = tensor.extract_slice %rhs_block [%glb0, %gko] [1, 8] [1, 1] : !block_in to tensor<1x8xf16>
+        %rhs_vec_local_0 = vector.transfer_read %rhs_thread_0 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x8xf16>, vector<1x8xf16>
+        %rhs_thread_1 = tensor.extract_slice %rhs_block [%glb1, %gko] [1, 8] [1, 1] : !block_in to tensor<1x8xf16>
+        %rhs_vec_local_1 = vector.transfer_read %rhs_thread_1 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x8xf16>, vector<1x8xf16>
+        %rhs_thread_2 = tensor.extract_slice %rhs_block [%glb2, %gko] [1, 8] [1, 1] : !block_in to tensor<1x8xf16>
+        %rhs_vec_local_2 = vector.transfer_read %rhs_thread_2 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x8xf16>, vector<1x8xf16>
+        %rhs_thread_3 = tensor.extract_slice %rhs_block [%glb3, %gko] [1, 8] [1, 1] : !block_in to tensor<1x8xf16>
+        %rhs_vec_local_3 = vector.transfer_read %rhs_thread_3 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x8xf16>, vector<1x8xf16>
+
+        rocdl.sched.barrier 0
+        //LDS loads
+        %lhs_vec_0 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c0, %inner_id], %cst {in_bounds = [true, true, true, true]} : !mshared_exp, vector<4x1x1x4xf16>
+        %rhs_vec_0 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c0, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp, vector<4x1x1x4xf16>
+
+        %lhs_vec_1 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c1, %inner_id], %cst {in_bounds = [true, true, true, true]} : !mshared_exp, vector<4x1x1x4xf16>
+        %rhs_vec_1 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c1, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp, vector<4x1x1x4xf16>
+
+      rocdl.sched.barrier 0
+        // Global loads of lhs.
+        %lhs_block = tensor.extract_slice %lhs [0, 0, %i] [1, 128, 64] [1, 1, 1] : !mexp_in_ty to !mexp_block_in
+        %lhs_thread_0 = tensor.extract_slice %lhs_block [0, %glb0_lhs, %gko] [1, 1, 8] [1, 1, 1] : !mexp_block_in to tensor<1x1x8xf16>
+        %lhs_vec_local_0 = vector.transfer_read %lhs_thread_0 [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x8xf16>, vector<1x8xf16>
+        %lhs_thread_1 = tensor.extract_slice %lhs_block [0, %glb1_lhs, %gko] [1, 1, 8] [1, 1, 1] : !mexp_block_in to tensor<1x1x8xf16>
+        %lhs_vec_local_1 = vector.transfer_read %lhs_thread_1 [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x8xf16>, vector<1x8xf16>
+
+        rocdl.sched.barrier 0
+
+        %lhs_vec_2 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c2, %inner_id], %cst {in_bounds = [true, true, true, true]} : !mshared_exp, vector<4x1x1x4xf16>
+        %rhs_vec_2 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c2, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp, vector<4x1x1x4xf16>
+
+        %lhs_vec_3 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c3, %inner_id], %cst {in_bounds = [true, true, true, true]} : !mshared_exp, vector<4x1x1x4xf16>
+        %rhs_vec_3 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c3, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp, vector<4x1x1x4xf16>
+
+        // rocdl.sched.barrier 0
+        gpu.barrier
+        rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
+        rocdl.sched.barrier 0
+
+        %valu0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%iter) {
+            indexing_maps = #contraction_accesses,
+            iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+          } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
+
+        rocdl.sched.barrier 0
+        gpu.barrier
+        rocdl.s.setprio 0
+
+        // LDS Writes
+        vector.transfer_write %rhs_vec_local_0, %rhs_shared [%glb0, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !shared
+        vector.transfer_write %rhs_vec_local_1, %rhs_shared [%glb1, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !shared
+        vector.transfer_write %rhs_vec_local_2, %rhs_shared [%glb2, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !shared
+        vector.transfer_write %rhs_vec_local_3, %rhs_shared [%glb3, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !shared
+
+        vector.transfer_write %lhs_vec_local_0, %lhs_shared [%glb0_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
+        vector.transfer_write %lhs_vec_local_1, %lhs_shared [%glb1_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
+
+        gpu.barrier
+        rocdl.sched.barrier 0
+        rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
+
+        %dot1 = iree_codegen.inner_tiled ins(%lhs_vec_1, %rhs_vec_1) outs(%valu0) {
+            indexing_maps = #contraction_accesses,
+            iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+          } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
+
+        %dot2 = iree_codegen.inner_tiled ins(%lhs_vec_2, %rhs_vec_2) outs(%dot1) {
+            indexing_maps = #contraction_accesses,
+            iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+          } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
+
+        %valu1 = iree_codegen.inner_tiled ins(%lhs_vec_3, %rhs_vec_3) outs(%dot2) {
+          indexing_maps = #contraction_accesses,
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+          kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+        } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
+
+        rocdl.sched.barrier 0
+        gpu.barrier
+        rocdl.s.setprio 0
+
+        scf.yield %valu1 : vector<4x4x1x4xf32>
+      }
+      scf.yield %3 : vector<4x4x1x4xf32>
+    }else{
+
     %3 = scf.for %i = %c64 to %dim step %c64 iter_args(%iter = %2) -> vector<4x4x1x4xf32> {
 
     // Global loads of rhs.
@@ -365,40 +458,30 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
 
       // rocdl.sched.barrier 0
       gpu.barrier
-      rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
-
-      //We do large MFMA portion (48)
-      %valu0 = scf.if %cmp1 -> vector<4x4x1x4xf32>{
-            %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%iter) {
-              indexing_maps = #contraction_accesses,
-              iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-              kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
-            } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
-
-            %dot1 = iree_codegen.inner_tiled ins(%lhs_vec_1, %rhs_vec_1) outs(%dot0) {
-              indexing_maps = #contraction_accesses,
-              iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-              kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
-            } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
-
-            %dot2 = iree_codegen.inner_tiled ins(%lhs_vec_2, %rhs_vec_2) outs(%dot1) {
-              indexing_maps = #contraction_accesses,
-              iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-              kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
-            } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
-            scf.yield %dot2 : vector<4x4x1x4xf32>
-      }else{
-          %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%iter) {
-              indexing_maps = #contraction_accesses,
-              iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-              kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
-            } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
-          scf.yield %dot0 : vector<4x4x1x4xf32>
-      }
-
-      gpu.barrier
       rocdl.sched.barrier 0
+
+      %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%iter) {
+        indexing_maps = #contraction_accesses,
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+      } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
+
+      %dot1 = iree_codegen.inner_tiled ins(%lhs_vec_1, %rhs_vec_1) outs(%dot0) {
+        indexing_maps = #contraction_accesses,
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+      } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
+
+      %valu0 = iree_codegen.inner_tiled ins(%lhs_vec_2, %rhs_vec_2) outs(%dot1) {
+        indexing_maps = #contraction_accesses,
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+      } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
+
+
+      rocdl.sched.barrier 0
+      gpu.barrier
       rocdl.s.setprio 0
 
       // LDS Writes
@@ -414,43 +497,24 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
-      %valu1 = scf.if %cmp0 -> vector<4x4x1x4xf32>{
-          %dot1 = iree_codegen.inner_tiled ins(%lhs_vec_1, %rhs_vec_1) outs(%valu0) {
-              indexing_maps = #contraction_accesses,
-              iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-              kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
-            } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
+      %valu1 = iree_codegen.inner_tiled ins(%lhs_vec_3, %rhs_vec_3) outs(%valu0) {
+        indexing_maps = #contraction_accesses,
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+      } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
 
-          %dot2 = iree_codegen.inner_tiled ins(%lhs_vec_2, %rhs_vec_2) outs(%dot1) {
-              indexing_maps = #contraction_accesses,
-              iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-              kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
-           } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
-
-          %dot3 = iree_codegen.inner_tiled ins(%lhs_vec_3, %rhs_vec_3) outs(%dot2) {
-          indexing_maps = #contraction_accesses,
-          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-          kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
-        } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
-        scf.yield %dot3 : vector<4x4x1x4xf32>
-      }else{
-        %dot3 = iree_codegen.inner_tiled ins(%lhs_vec_3, %rhs_vec_3) outs(%valu0) {
-          indexing_maps = #contraction_accesses,
-          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-          kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
-        } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
-        scf.yield %dot3 : vector<4x4x1x4xf32>
-      }
-
-      rocdl.s.setprio 0
-      gpu.barrier
       rocdl.sched.barrier 0
+      gpu.barrier
+      rocdl.s.setprio 0
+
 
       scf.yield %valu1 : vector<4x4x1x4xf32>
     }
-    scf.if %cmp1 {
+
       rocdl.s.barrier
+      scf.yield %3 : vector<4x4x1x4xf32>
     }
+
 
     // // Epilogue
     // %lhs_vec_0 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c0, %inner_id], %cst {in_bounds = [true, true, true, true]} : !mshared_exp, vector<4x1x2x4xf16>
@@ -476,7 +540,7 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
     // } : vector<4x2x1x4xf16>, vector<4x2x1x4xf16> into vector<4x4x1x4xf32>
 
     // %tp = vector.transpose %dot2, [0, 2, 1, 3] : vector<4x4x1x4xf32> to vector<4x1x4x4xf32>
-    %tp = vector.transpose %3, [0, 2, 1, 3] : vector<4x4x1x4xf32> to vector<4x1x4x4xf32>
+    %tp = vector.transpose %res, [0, 2, 1, 3] : vector<4x4x1x4xf32> to vector<4x1x4x4xf32>
     %empty = tensor.empty() : tensor<1x4x1x4x4xf32>
     %4 = vector.transfer_write %tp, %empty[%c0, %c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<4x1x4x4xf32>, tensor<1x4x1x4x4xf32>
     scf.forall.in_parallel {
