@@ -1951,7 +1951,8 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
       })
       .Case<IREE::Codegen::UKernelGenericOp>([&](auto op) {
         // For ukernel operations, infer vector sizes from the result type.
-        // This is needed for operations like unpack that consume ukernel outputs.
+        // This is needed for operations like unpack that consume ukernel
+        // outputs.
         auto opResult = cast<OpResult>(val);
         auto resultType = dyn_cast<RankedTensorType>(opResult.getType());
         if (!resultType) {
@@ -1962,7 +1963,8 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
           if (ShapedType::isDynamic(dim)) {
             FailureOr<int64_t> maybeDimBound =
                 ValueBoundsConstraintSet::computeConstantBound(
-                    presburger::BoundType::UB, {val, static_cast<unsigned>(idx)},
+                    presburger::BoundType::UB,
+                    {val, static_cast<unsigned>(idx)},
                     /*stopCondition=*/nullptr, /*closedUB=*/true);
             if (failed(maybeDimBound)) {
               LDBG() << "failed to infer bounds for dynamic dim";
