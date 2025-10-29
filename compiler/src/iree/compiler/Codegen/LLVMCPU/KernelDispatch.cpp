@@ -1374,8 +1374,8 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
 
   auto vectorTileSizes = llvm::to_vector_of<int64_t>(roundedVecTileSizes);
-  auto vectorScalableFlags =
-      llvm::to_vector_of<bool>(inputVecScalableTileFlags);
+  SmallVector<bool> vectorScalableFlags(inputVecScalableTileFlags.begin(),
+                                        inputVecScalableTileFlags.end());
   vectorScalableFlags.back() = false;
 
   LoweringConfigGenerator generator(op);
