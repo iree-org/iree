@@ -318,7 +318,10 @@ struct CoalescedGatherDMAOpBufferizationInterface
   bufferization::AliasingValueList
   getAliasingValues(Operation *op, OpOperand &opOperand,
                     const AnalysisState &state) const {
-    // No result value, so no aliasing
+    auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
+    if (opOperand.get() == gatherOp.getInit()) {
+      return {{gatherOp.getResult(), BufferRelation::Equivalent}};
+    }
     return {};
   }
 
@@ -336,33 +339,16 @@ struct CoalescedGatherDMAOpBufferizationInterface
       return failure();
     }
 
-    // Check if we're inside an scf.forall.in_parallel block.
-    // If so, we need to move the op outside of it.
-    Operation *parentOp = gatherOp->getParentOp();
-    if (isa_and_nonnull<scf::InParallelOp>(parentOp)) {
-      // Get the forall op containing the in_parallel.
-      auto forallOp = parentOp->getParentOfType<scf::ForallOp>();
-      if (forallOp) {
-        rewriter.setInsertionPoint(parentOp);
-        // Create dest_indices as zeros for all dimensions
-        auto initType = cast<MemRefType>(initBuffer->getType());
-        SmallVector<Value> destIndices;
-        Value zero =
-            rewriter.create<arith::ConstantIndexOp>(gatherOp.getLoc(), 0);
-        for (int64_t i = 0; i < initType.getRank(); ++i) {
-          destIndices.push_back(zero);
-        }
-        // Create dest_size attribute from init memref dimensions
-        auto destSizeAttr = rewriter.getDenseI64ArrayAttr(initType.getShape());
-        rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-            gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
-            gatherOp.getIndices(), *initBuffer, destIndices, gatherOp.getLane(),
-            destSizeAttr);
-        rewriter.eraseOp(op);
-        return success();
-      }
-    }
-    return failure();
+    SmallVector<Value> destIndices = gatherOp.getDestIndices();
+
+    rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
+        gatherOp.getLoc(), initBuffer->getType(), *sourceBuffer,
+        gatherOp.getIndices(), *initBuffer, destIndices, gatherOp.getLane(),
+        gatherOp.getDestSizeAttr());
+
+    rewriter.replaceOp(op, *initBuffer);
+
+    return success();
   }
 };
 
