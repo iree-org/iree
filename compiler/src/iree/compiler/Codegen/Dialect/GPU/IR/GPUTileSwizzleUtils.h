@@ -17,7 +17,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 /// `predicate` returns false.
 SmallVector<int64_t> sliceSwizzledShape(
     const Codegen::TileSwizzle &swizzle,
-    const std::function<bool(Codegen::TileSwizzle::Dim)> &predicate);
+    llvm::function_ref<bool(Codegen::TileSwizzle::Dim)> predicate);
 
 /// Returns the swizzle for the full data-tiled-mma tile, including all the
 /// relevant unrolling and expansion factors.
