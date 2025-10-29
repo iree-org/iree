@@ -1913,6 +1913,44 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   return result;
 }
 
+std::optional<VectorizationTileSizes>
+inferSizesFromIR(IREE::Codegen::UKernelGenericOp ukernelOp, OpResult opResult) {
+  LDBG() << "Inferring dest sizes for: " << ukernelOp;
+  auto resultType = dyn_cast<RankedTensorType>(opResult.getType());
+  if (!resultType) {
+    LDBG()
+        << "failed to infer sizes because result type is not a ranked tensor";
+    return std::nullopt;
+  }
+
+  VectorizationTileSizes result;
+  for (auto [idx, dim] : llvm::enumerate(resultType.getShape())) {
+    if (ShapedType::isDynamic(dim)) {
+      FailureOr<int64_t> maybeDimBound =
+          ValueBoundsConstraintSet::computeConstantBound(
+              presburger::BoundType::UB, {opResult, static_cast<unsigned>(idx)},
+              /*stopCondition=*/nullptr, /*closedUB=*/true);
+      if (failed(maybeDimBound)) {
+        LDBG() << "failed to infer bounds for dynamic dim";
+        return std::nullopt;
+      }
+      result.vectorSizes.push_back(maybeDimBound.value());
+    } else {
+      result.vectorSizes.push_back(dim);
+    }
+  }
+  result.destShape = result.vectorSizes;
+
+  LLVM_DEBUG({
+    LDBG() << "Inferred vector sizes:";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      LDBG() << "Dim #" << idx << ": " << val;
+    }
+  });
+
+  return result;
+}
+
 std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
     SmallVector<OpFoldResult> shape) {
   VectorizationTileSizes result;
@@ -1949,35 +1987,8 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
         // the values.
         result = inferSizesFromMixedSizes(op.getMixedSizes());
       })
-      .Case<IREE::Codegen::UKernelGenericOp>([&](auto op) {
-        // For ukernel operations, infer vector sizes from the result type.
-        // This is needed for operations like unpack that consume ukernel
-        // outputs.
-        auto opResult = cast<OpResult>(val);
-        auto resultType = dyn_cast<RankedTensorType>(opResult.getType());
-        if (!resultType) {
-          return;
-        }
-        VectorizationTileSizes sizes;
-        for (auto [idx, dim] : llvm::enumerate(resultType.getShape())) {
-          if (ShapedType::isDynamic(dim)) {
-            FailureOr<int64_t> maybeDimBound =
-                ValueBoundsConstraintSet::computeConstantBound(
-                    presburger::BoundType::UB,
-                    {val, static_cast<unsigned>(idx)},
-                    /*stopCondition=*/nullptr, /*closedUB=*/true);
-            if (failed(maybeDimBound)) {
-              LDBG() << "failed to infer bounds for dynamic dim";
-              return;
-            }
-            sizes.vectorSizes.push_back(maybeDimBound.value());
-          } else {
-            sizes.vectorSizes.push_back(dim);
-          }
-        }
-        sizes.destShape = sizes.vectorSizes;
-        result = sizes;
-      })
+      .Case<IREE::Codegen::UKernelGenericOp>(
+          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Default([&](Operation *) {});
 
   return result;
