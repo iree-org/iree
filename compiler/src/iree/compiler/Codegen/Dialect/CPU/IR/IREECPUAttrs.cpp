@@ -29,6 +29,11 @@ constexpr StringLiteral kVectorCommonParallelConfigKey =
 constexpr StringLiteral kVectorReductionConfigKey = "vector_reduction";
 constexpr StringLiteral kVectorInnerParallelConfigKey = "vector_inner_parallel";
 
+SmallVector<int> getTilingLevelsAsInts() {
+  return llvm::to_vector(
+      llvm::seq<int>(0, llvm::to_underlying(TilingLevel::MaxNumTileLevels)));
+}
+
 /// Returns the entry key for the config in IREE::CPU::LoweringConfigAttr.
 /// Returns null if `level` is invalid.
 StringRef getTilingLevelName(TilingLevel level) {
@@ -161,9 +166,7 @@ Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
 SmallVector<LoweringConfigLevelInfo>
 LoweringConfigAttr::getAvailableTilingInfo() {
   SmallVector<LoweringConfigLevelInfo> result;
-  const int numTilingLevels =
-      llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
-  for (int i = 0; i < numTilingLevels; ++i) {
+  for (auto i : IREE::CPU::getTilingLevelsAsInts()) {
     if (!hasTilingLevel(i)) {
       continue;
     }

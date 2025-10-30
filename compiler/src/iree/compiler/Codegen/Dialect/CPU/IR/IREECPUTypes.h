@@ -32,6 +32,9 @@ struct LoweringConfigLevelInfo {
   SmallVector<bool> scalableFlags;
 };
 
+/// Returns all the tiling levels as integer values.
+SmallVector<int> getTilingLevelsAsInts();
+
 /// Returns the corresponding key string for `level`.
 StringRef getTilingLevelName(TilingLevel level);
 
