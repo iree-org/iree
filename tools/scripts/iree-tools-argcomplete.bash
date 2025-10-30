@@ -25,7 +25,6 @@ _iree_tools_autocomplete() {
     return 0
 }
 
-# Register the completion function for iree-opt
-complete -F _iree_tools_autocomplete iree-opt
-# Register the completion function for iree-compile
 complete -F _iree_tools_autocomplete iree-compile
+complete -F _iree_tools_autocomplete iree-link
+complete -F _iree_tools_autocomplete iree-opt

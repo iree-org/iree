@@ -244,6 +244,16 @@ iree_compiler_cc_binary(
 )
 
 iree_compiler_cc_binary(
+    name = "iree-link",
+    srcs = ["iree-link-main.cc"],
+    tags = ["hostonly"],
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:Impl",
+    ],
+)
+
+iree_compiler_cc_binary(
     name = "iree-reduce",
     srcs = ["iree-reduce.cc"],
     tags = ["hostonly"],

@@ -334,6 +334,13 @@ add_iree_compiler_busybox_tool(
 )
 
 add_iree_compiler_busybox_tool(
+  IREECompilerIREELinkTool
+  OUTPUT_NAME iree-link
+  SRCS
+    IREELinkTool.c
+)
+
+add_iree_compiler_busybox_tool(
   IREECompilerIREEOptTool
   OUTPUT_NAME iree-opt
   SRCS

@@ -91,6 +91,25 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    IREELinkToolEntryPoint
+  SRCS
+    "IREELinkToolEntryPoint.cpp"
+  DEPS
+    LLVMSupport
+    MLIRBytecodeWriter
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRSupport
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Tools::init_passes_and_dialects
+    iree::compiler::Utils
+    iree::compiler::bindings::c::headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     IREEReduceToolEntryPoint
   SRCS
     "IREEReduceToolEntryPoint.cpp"
