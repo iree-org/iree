@@ -14,7 +14,6 @@
 #include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
 #include "compiler/plugins/target/LLVMCPU/LibraryBuilder.h"
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
-#include "compiler/plugins/target/LLVMCPU/Passes.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
@@ -26,7 +25,6 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/compiler/Dialect/HAL/Utils/LLVMCodeGenUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -314,14 +312,10 @@ public:
         LLVM::LLVMDialect::getTargetTripleAttrName(),
         executableBuilder.getStringAttr(targetTriple.str()));
 
-    ModuleOp variantModOp = variantOp.getInnerModule();
-    // Propagate target features and cpu to function ops.
-    populateLLVMFuncTargetAttrs(variantModOp, *targetMachine);
-
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
-    auto llvmModule =
-        mlir::translateModuleToLLVMIR(variantModOp, context, libraryName);
+    auto llvmModule = mlir::translateModuleToLLVMIR(variantOp.getInnerModule(),
+                                                    context, libraryName);
     if (!llvmModule) {
       return variantOp.emitError() << "failed to translate the MLIR LLVM "
                                       "dialect to the native llvm::Module";
@@ -864,7 +858,6 @@ private:
 struct LLVMCPUSession
     : public PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  static void registerPasses() { registerLLVMCPUTargetPasses(); }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"llvm-cpu", ...
     targets.add("llvm-cpu", [=]() {
