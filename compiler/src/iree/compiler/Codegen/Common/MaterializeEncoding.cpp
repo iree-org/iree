@@ -151,7 +151,10 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     typeConverter.addTargetMaterialization(castFnArguments);
     typeConverter.addSourceMaterialization(castFnArguments);
 
-    if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
+    mlir::ConversionConfig config;
+    config.allowPatternRollback = false;
+    if (failed(applyPartialConversion(funcOp, target, std::move(patterns),
+                                      config))) {
       return funcOp.emitOpError("materialization failed");
     }
 
