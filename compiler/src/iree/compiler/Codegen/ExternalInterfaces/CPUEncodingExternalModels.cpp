@@ -332,8 +332,8 @@ Operation *lowerContractionOpWithEncoding(
                  dyn_cast<IREE::CPU::VMVXEncodingResolverAttr>(layoutAttr)) {
     config = vmvxAttr.getConfiguration();
   }
-  
-  bool transpose = isNarrowNResult(resultEncoding) && hasUkernel(config);
+
+  bool transpose = config && isNarrowNResult(resultEncoding) && hasUkernel(config);
   SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
   SmallVector<ReassociationIndices> ri;
   Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder, ri,
