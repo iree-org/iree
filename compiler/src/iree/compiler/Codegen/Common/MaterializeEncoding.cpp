@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -71,31 +72,32 @@ static LogicalResult materializeFuncOpEncodings(
         targetAttr ? targetAttr.getConfiguration() : nullptr;
     auto getTestTargetResolverOrIdentityResolver =
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
-      LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
-                "attribute. (testCLGPUTarget)";
       SmallVector<NamedAttribute> configItems;
       IREE::GPU::TargetAttr targetAttr =
           getGPUTargetAttr(ctx, /*target=*/nullptr);
-      addConfigGPUTarget(ctx, targetAttr, configItems);
-      switch (resolverSource) {
-      case ::mlir::iree_compiler::detail::TestingResolverKind::kGPUDataTiling: {
-        LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
-                  "attribute. (kGPUDataTiling)";
-        return cast<IREE::Encoding::LayoutMaterializerAttr>(
-            IREE::GPU::GPUEncodingResolverAttr::get(
-                ctx, DictionaryAttr::get(ctx, configItems)));
-      }
-      case ::mlir::iree_compiler::detail::TestingResolverKind::kGPUPadding: {
-        LDBG() << "Select GPUPaddingResolverAttr attribute as the layout "
-                  "attribute. (kGPUPadding)";
-        std::optional<IREE::GPU::L1CacheInfo> cache =
-            IREE::GPU::getL1CacheInfo(targetAttr);
-        return cast<IREE::Encoding::LayoutMaterializerAttr>(
-            IREE::GPU::GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes,
-                                                   cache->cacheSets));
-      }
-      case ::mlir::iree_compiler::detail::TestingResolverKind::kNone:
-        break;
+      if (targetAttr) {
+        addConfigGPUTarget(ctx, targetAttr, configItems);
+        switch (resolverSource) {
+        case ::mlir::iree_compiler::detail::TestingResolverKind::
+            kGPUDataTiling: {
+          LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
+                    "attribute. (kGPUDataTiling)";
+          return cast<IREE::Encoding::LayoutMaterializerAttr>(
+              IREE::GPU::GPUEncodingResolverAttr::get(
+                  ctx, DictionaryAttr::get(ctx, configItems)));
+        }
+        case ::mlir::iree_compiler::detail::TestingResolverKind::kGPUPadding: {
+          LDBG() << "Select GPUPaddingResolverAttr attribute as the layout "
+                    "attribute. (kGPUPadding)";
+          std::optional<IREE::GPU::L1CacheInfo> cache =
+              IREE::GPU::getL1CacheInfo(targetAttr);
+          return cast<IREE::Encoding::LayoutMaterializerAttr>(
+              IREE::GPU::GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes,
+                                                     cache->cacheSets));
+        }
+        case ::mlir::iree_compiler::detail::TestingResolverKind::kNone:
+          break;
+        }
       }
       LDBG() << "Select IdentityResolverAttr attribute as the layout "
                 "attribute (Encoding resolver unknown or unsupported).";
@@ -298,7 +300,8 @@ struct MaterializeDeviceEncodingPass final
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    vector::VectorDialect, IREE::Codegen::IREECodegenDialect,
+                    vector::VectorDialect, IREE::Encoding::IREEEncodingDialect,
+                    IREE::Codegen::IREECodegenDialect,
                     IREE::CPU::IREECPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 
