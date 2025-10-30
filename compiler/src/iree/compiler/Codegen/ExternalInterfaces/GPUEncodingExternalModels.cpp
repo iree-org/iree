@@ -170,10 +170,10 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     // to the total LHS and RHS sizes, because we use these sizes to select the
     // unrolling factors for M, N, and K, which affect both the input and the
     // scale operands.
-    intrinsicSizeBitsLHS =
-        sizeInBits(vectorTypes[0]) + sizeInBits(vectorTypes[1]);
-    intrinsicSizeBitsRHS =
-        sizeInBits(vectorTypes[2]) + sizeInBits(vectorTypes[3]);
+    intrinsicSizeBitsLHS = sizeInBits(vectorTypes[kScaledMMAOperandLhs]) +
+                           sizeInBits(vectorTypes[kScaledMMAOperandLhsScale]);
+    intrinsicSizeBitsRHS = sizeInBits(vectorTypes[kScaledMMAOperandRhs]) +
+                           sizeInBits(vectorTypes[kScaledMMAOperandRhsScale]);
     intrinsicSizeBitsACC = sizeInBits(vectorTypes[4]);
     intrinsicMSize = getMSize(intrinsicScaledMma.getIntrinsic());
     intrinsicNSize = getNSize(intrinsicScaledMma.getIntrinsic());

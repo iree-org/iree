@@ -318,17 +318,6 @@ def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
       VMFMA_F32_32x32x16_F8E4M3FNUZ,
     ]>;
 
-def MMA_LHS : I32EnumAttrCase<"Lhs", 0>;
-def MMA_RHS : I32EnumAttrCase<"Rhs", 1>;
-def MMA_ACC : I32EnumAttrCase<"Acc", 2>;
-
-def IREEGPU_MMAFragment : IREEGPU_I32EnumAttr<"MMAFragment",
-    "Descriptor for a particular fragment of an MMA operation", [
-      MMA_LHS,
-      MMA_RHS,
-      MMA_ACC
-    ]>;
-
 // Enum for scaled mma intrinsic, loosely matching the MMAIntrinsic enum above
 // but not including the input types.
 //

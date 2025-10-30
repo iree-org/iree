@@ -22,7 +22,7 @@ SmallVector<int64_t> sliceSwizzledShape(
 /// Returns the swizzle for the full data-tiled-mma tile, including all the
 /// relevant unrolling and expansion factors.
 Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
-                                IREE::GPU::MMAFragment fragment);
+                                int operandIndex);
 
 /// Returns the swizzle for the full data-tiled-scaled-mma tile, including all
 /// the relevant unrolling and expansion factors.

@@ -9,7 +9,7 @@
 #scale_n = affine_map<(M, N, Ko, Kb) -> (N, Ko)>
 #out_map = affine_map<(M, N, Ko, Kb) -> (M, N)>
 func.func @scaled_matmul(
-    %A: tensor<1024x512x32xf4E2M1FN>, %B: tensor<1024x512x32xf4E2M1FN>, %A_scales: tensor<1024x512xf8E8M0FNU>, %B_scales: tensor<1024x512xf8E8M0FNU>, %C: tensor<1024x1024xf32>) -> tensor<1024x1024xf32> {
+    %A: tensor<1024x512x32xf4E2M1FN>, %B: tensor<1024x512x32xf4E2M1FN>, %B_scales: tensor<1024x512xf8E8M0FNU>, %A_scales: tensor<1024x512xf8E8M0FNU>, %C: tensor<1024x1024xf32>) -> tensor<1024x1024xf32> {
   %0 = linalg.generic {
     indexing_maps = [#lhs_map, #rhs_map, #scale_m, #scale_n, #out_map],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]

@@ -90,13 +90,13 @@ module {
 //       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:     indexing_maps =
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
-//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 //  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>}>
-// CHECK-SAME:      permutations = [array<i64: 0, 1, 2>, array<i64: 0, 1>, array<i64: 2, 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
-//  CHECK-SAME:     : tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x16x4xf8E8M0FNU>, tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x16x4xf8E8M0FNU> into tensor<?x?x16x16xf32>
+// CHECK-SAME:      permutations = [array<i64: 0, 1, 2>, array<i64: 2, 0, 1>, array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
+//  CHECK-SAME:     : tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x16x4xf8E8M0FNU>, tensor<?x?x16x4xf8E8M0FNU> into tensor<?x?x16x16xf32>
 
 // -----
 
@@ -129,13 +129,13 @@ module {
 //       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:     indexing_maps =
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
-//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 //  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>}>
-// CHECK-SAME:      permutations = [array<i64: 0, 1, 2>, array<i64: 0, 1>, array<i64: 2, 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
-//  CHECK-SAME:     : tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x16x4xf8E8M0FNU>, tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x16x4xf8E8M0FNU> into tensor<?x?x16x16xf32>
+// CHECK-SAME:      permutations = [array<i64: 0, 1, 2>, array<i64: 2, 0, 1>, array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
+//  CHECK-SAME:     : tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x?x16x4x32xf4E2M1FN>, tensor<?x?x16x4xf8E8M0FNU>, tensor<?x?x16x4xf8E8M0FNU> into tensor<?x?x16x16xf32>
 
 // -----
 
@@ -168,13 +168,13 @@ module {
 //       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:     indexing_maps =
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
-//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 //  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E8M0FNU, rhs_elem_type = f8E8M0FNU, acc_elem_type = f32>}>
-// CHECK-SAME:      permutations = [array<i64: 0, 1, 2>, array<i64: 0, 1>, array<i64: 2, 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
-//  CHECK-SAME:     : tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf8E8M0FNU>, tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf8E8M0FNU> into tensor<?x?x32x32xf32>
+// CHECK-SAME:      permutations = [array<i64: 0, 1, 2>, array<i64: 2, 0, 1>, array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
+//  CHECK-SAME:     : tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf8E8M0FNU>, tensor<?x?x32x2xf8E8M0FNU> into tensor<?x?x32x32xf32>
 
 // -----
 
