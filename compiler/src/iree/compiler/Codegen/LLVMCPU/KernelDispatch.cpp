@@ -3185,9 +3185,9 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
   };
 
   // Load all tiling levels.
-  for (int i = 0,
-           e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
-       i < e; ++i) {
+  const int numTilingLevels =
+      llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
+  for (int i = 0; i < numTilingLevels; ++i) {
     loadTilingLevel(static_cast<IREE::CPU::TilingLevel>(i));
   }
 }

@@ -63,9 +63,9 @@ static LogicalResult verifyMultiTilingExpertPassPipelineConfig(
     }
   }
 
-  for (int i = 0,
-           e = llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
-       i < e; ++i) {
+  const int numTilingLevels =
+      llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
+  for (int i = 0; i < numTilingLevels; ++i) {
     if (!loweringConfig.hasTilingLevel(i)) {
       continue;
     }
