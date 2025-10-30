@@ -13,6 +13,8 @@
 #if defined(IREE_DEVICE_STANDALONE)
 // Standalone builds (e.g. bitcode) use our own Clang, supporting everything.
 #define IREE_UK_BUILD_RISCV_64_V
+#define IREE_UK_BUILD_RISCV_64_ZVFHMIN
+#define IREE_UK_BUILD_RISCV_64_ZVFH
 #else
 // Compiling with the system toolchain. Include the configured header.
 #include "iree/builtins/ukernel/arch/riscv_64/config_riscv_64.h"
@@ -25,6 +27,15 @@ static inline bool iree_uk_cpu_riscv_64(const iree_uk_uint64_t* cpu_data) {
 
 static inline bool iree_uk_cpu_riscv_64_v(const iree_uk_uint64_t* cpu_data) {
   return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_V);
+}
+
+static inline bool iree_uk_cpu_riscv_64_zvfhmin(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVFHMIN);
+}
+
+static inline bool iree_uk_cpu_riscv_64_zvfh(const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVFH);
 }
 
 #endif  // IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_COMMON_RISCV_64_H_

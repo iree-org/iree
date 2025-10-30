@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -109,8 +108,7 @@ namespace {
 class SPIRVTileAndDistributePass final
     : public impl::SPIRVTileAndDistributePassBase<SPIRVTileAndDistributePass> {
 public:
-  using impl::SPIRVTileAndDistributePassBase<
-      SPIRVTileAndDistributePass>::SPIRVTileAndDistributePassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect,
@@ -128,7 +126,7 @@ public:
 
 void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   if (!isEntryPoint(funcOp))
     return;
 

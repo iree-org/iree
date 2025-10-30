@@ -56,7 +56,7 @@ struct MetalSPIRVOptions {
 // TODO: MetalOptions for choosing the Metal version.
 class MetalTargetDevice : public TargetDevice {
 public:
-  MetalTargetDevice(const MetalSPIRVOptions &options) : options(options) {}
+  MetalTargetDevice(const MetalSPIRVOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -74,9 +74,6 @@ public:
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("metal"),
                                             configAttr, executableTargetAttrs);
   }
-
-private:
-  const MetalSPIRVOptions &options;
 };
 
 class MetalSPIRVTargetBackend : public TargetBackend {
@@ -308,8 +305,8 @@ public:
     iree_hal_metal_ExecutableDef_end_as_root(builder);
 
     // 5. Add the binary data to the target executable.
-    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.setMimeTypeAttr(

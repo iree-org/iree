@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
@@ -21,8 +20,7 @@ namespace {
 class DropVectorUnitDimsPass
     : public impl::DropVectorUnitDimsPassBase<DropVectorUnitDimsPass> {
 public:
-  using impl::DropVectorUnitDimsPassBase<
-      DropVectorUnitDimsPass>::DropVectorUnitDimsPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<memref::MemRefDialect, vector::VectorDialect>();
@@ -32,7 +30,7 @@ public:
 
 void DropVectorUnitDimsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // Apply transfer ops write to read forwarding and dead transfer write
   // optimizations.

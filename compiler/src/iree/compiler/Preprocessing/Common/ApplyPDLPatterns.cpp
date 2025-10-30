@@ -109,10 +109,10 @@ getBasePtrAndOffsetForTensor(PatternRewriter &rewriter, Location loc,
                              RankedTensorType tensorType, Value value,
                              Value bindingOffset, ValueRange dynamicDims) {
   auto memrefType = getMemRefTypeFor(rewriter.getContext(), tensorType);
-  Value memrefVal = rewriter.create<IREE::Stream::BindingSubspanOp>(
-      loc, memrefType, value, bindingOffset, dynamicDims);
+  Value memrefVal = IREE::Stream::BindingSubspanOp::create(
+      rewriter, loc, memrefType, value, bindingOffset, dynamicDims);
   auto extractMetadataOp =
-      rewriter.create<IREE::Codegen::ExtractStridedMetadataOp>(loc, memrefVal);
+      IREE::Codegen::ExtractStridedMetadataOp::create(rewriter, loc, memrefVal);
   return std::make_pair<Value, Value>(extractMetadataOp.getResult(0),
                                       extractMetadataOp.getResult(1));
 }
@@ -165,7 +165,7 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
   auto entryPointFnType = FunctionType::get(context, entryPointInputTypes,
                                             /*results=*/TypeRange{});
   auto entryPointFn =
-      rewriter.create<func::FuncOp>(loc, entryPointFnName, entryPointFnType);
+      func::FuncOp::create(rewriter, loc, entryPointFnName, entryPointFnType);
   Region &body = entryPointFn.getBody();
   SmallVector<Location> locs(entryPointInputTypes.size(), loc);
   rewriter.createBlock(&body, body.begin(), entryPointInputTypes, locs);
@@ -175,7 +175,7 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
   auto scalarArgs = entryPointArgs.slice(numTensorOperands, numScalarOperands);
   auto dynamicDimArgs = entryPointArgs.take_back(totalNumDynamicDims);
   SmallVector<Value> callOperands;
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
 
   // Method to marshal tensor types into call operands.
   auto marshalTensorTypes = [&](RankedTensorType tensorType) {
@@ -204,8 +204,8 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
   });
   llvm::for_each(otherOperandTypes, marshalInputTypes);
 
-  rewriter.create<func::CallOp>(loc, externalFn, callOperands);
-  rewriter.create<func::ReturnOp>(loc, /*operands=*/ValueRange{});
+  func::CallOp::create(rewriter, loc, externalFn, callOperands);
+  func::ReturnOp::create(rewriter, loc, /*operands=*/ValueRange{});
   return entryPointFn;
 }
 
@@ -263,13 +263,13 @@ createStreamExecutableOp(PatternRewriter &rewriter, Operation *rootOp,
       externalFnName.str(), inputTypes, resultTypes, otherOperandTypes);
   std::string executableOpName = uniqueExternalFnName + "_executable";
   auto executableOp =
-      rewriter.create<IREE::Stream::ExecutableOp>(loc, executableOpName);
+      IREE::Stream::ExecutableOp::create(rewriter, loc, executableOpName);
   executableOp.setPrivate();
   Block &executableOpBody = executableOp.getBlock();
   rewriter.setInsertionPointToStart(&executableOpBody);
 
   // Create the dispatch inner module.
-  auto innerModule = rewriter.create<ModuleOp>(loc);
+  auto innerModule = ModuleOp::create(rewriter, loc);
   Block *moduleBody = innerModule.getBody();
   rewriter.setInsertionPointToStart(moduleBody);
 
@@ -278,7 +278,7 @@ createStreamExecutableOp(PatternRewriter &rewriter, Operation *rootOp,
   FunctionType externalFnCallType = getExternalFunctionCallType(
       context, loc, inputTypes, resultTypes, otherOperandTypes);
   func::FuncOp externalFnCall =
-      rewriter.create<func::FuncOp>(loc, externalFnName, externalFnCallType);
+      func::FuncOp::create(rewriter, loc, externalFnName, externalFnCallType);
   externalFnCall.setPrivate();
   externalFnCall->setAttr("llvm.bareptr", rewriter.getBoolArrayAttr(true));
 
@@ -290,8 +290,9 @@ createStreamExecutableOp(PatternRewriter &rewriter, Operation *rootOp,
 
   // Create the export operation.
   rewriter.setInsertionPoint(innerModule);
-  auto exportOp = rewriter.create<IREE::Stream::ExecutableExportOp>(
-      loc, entryPointName, FlatSymbolRefAttr::get(context, entryPointName));
+  auto exportOp = IREE::Stream::ExecutableExportOp::create(
+      rewriter, loc, entryPointName,
+      FlatSymbolRefAttr::get(context, entryPointName));
 
   // Create the body of the export operation.
   // TODO(MaheshRavishankar): This represents the number of workgroups to use.
@@ -301,8 +302,8 @@ createStreamExecutableOp(PatternRewriter &rewriter, Operation *rootOp,
   Block *exportOpBody =
       rewriter.createBlock(&exportOpRegion, exportOpRegion.begin());
   rewriter.setInsertionPointToStart(exportOpBody);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-  rewriter.create<IREE::Stream::ReturnOp>(loc, ValueRange{one, one, one});
+  Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+  IREE::Stream::ReturnOp::create(rewriter, loc, ValueRange{one, one, one});
   return SymbolRefAttr::get(rewriter.getStringAttr(executableOpName),
                             SymbolRefAttr::get(entryFn));
 }
@@ -326,7 +327,7 @@ createFlowDispatchOp(PatternRewriter &rewriter, SymbolRefAttr exportOp,
       if (ShapedType::isStatic(shape))
         continue;
 
-      Value dim = rewriter.create<tensor::DimOp>(loc, operand, index);
+      Value dim = tensor::DimOp::create(rewriter, loc, operand, index);
       operandDynamicDims.push_back(dim);
     }
   }
@@ -336,8 +337,8 @@ createFlowDispatchOp(PatternRewriter &rewriter, SymbolRefAttr exportOp,
   operandsVec.append(resultDynamicDims.begin(), resultDynamicDims.end());
 
   // Insert the `flow.dispatch`.
-  auto dispatchOp = rewriter.create<IREE::Flow::DispatchOp>(
-      loc, exportOp,
+  auto dispatchOp = IREE::Flow::DispatchOp::create(
+      rewriter, loc, exportOp,
       /*workload=*/ValueRange{}, resultTypes, resultDynamicDims, operandsVec,
       operandDynamicDims, /*tiedOperands=*/nullptr);
   return dispatchOp;

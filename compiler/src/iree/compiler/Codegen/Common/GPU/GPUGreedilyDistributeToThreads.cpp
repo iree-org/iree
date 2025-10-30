@@ -154,7 +154,7 @@ static void processRegion(RewriterBase &rewriter, Region *region) {
 }
 
 void GPUGreedilyDistributeToThreadsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(funcOp->getContext());
   for (auto &region : funcOp->getRegions()) {

@@ -34,7 +34,7 @@ struct ResolveDevicePromisesPass
       ResolveDevicePromisesPass>::ResolveDevicePromisesPassBase;
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Resolves a #hal.device.promise attr to a #hal.device.affinity. Fails if
     // the referenced device is not found.

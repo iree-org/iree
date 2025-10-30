@@ -57,7 +57,7 @@ static Storage getResourceStorage(Location loc, Value resource,
 
 struct ResourceAllocOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceAllocOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocOp allocOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -66,11 +66,11 @@ struct ResourceAllocOpPattern
 
     // For now we don't have this information and assume something conservative.
     Value minAlignment =
-        rewriter.create<arith::ConstantIndexOp>(allocOp.getLoc(), 64);
+        arith::ConstantIndexOp::create(rewriter, allocOp.getLoc(), 64);
 
-    auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
-        allocOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
-        adaptor.getStorageSize());
+    auto allocateOp = IREE::HAL::Inline::BufferAllocateOp::create(
+        rewriter, allocOp.getLoc(), deviceBufferType, hostBufferType,
+        minAlignment, adaptor.getStorageSize());
     rewriter.replaceOp(allocOp, allocateOp.getResult());
 
     return success();
@@ -79,7 +79,7 @@ struct ResourceAllocOpPattern
 
 struct ResourceAllocaOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceAllocaOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -88,13 +88,13 @@ struct ResourceAllocaOpPattern
 
     // For now we don't have this information and assume something conservative.
     Value minAlignment =
-        rewriter.create<arith::ConstantIndexOp>(allocaOp.getLoc(), 64);
-    auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
-        allocaOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
-        adaptor.getStorageSize());
+        arith::ConstantIndexOp::create(rewriter, allocaOp.getLoc(), 64);
+    auto allocateOp = IREE::HAL::Inline::BufferAllocateOp::create(
+        rewriter, allocaOp.getLoc(), deviceBufferType, hostBufferType,
+        minAlignment, adaptor.getStorageSize());
 
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(allocaOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, allocaOp.getLoc(), 0, 64)
             .getResult();
 
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), resolvedTimepoint});
@@ -104,14 +104,14 @@ struct ResourceAllocaOpPattern
 
 struct ResourceDeallocaOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceDeallocaOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceDeallocaOp deallocaOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): discard op?
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(deallocaOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, deallocaOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(deallocaOp, {resolvedTimepoint});
     return success();
@@ -120,7 +120,7 @@ struct ResourceDeallocaOpPattern
 
 struct ResourceRetainOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceRetainOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceRetainOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -132,7 +132,7 @@ struct ResourceRetainOpPattern
 
 struct ResourceReleaseOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceReleaseOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceReleaseOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -145,7 +145,7 @@ struct ResourceReleaseOpPattern
 
 struct ResourceIsTerminalOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceIsTerminalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceIsTerminalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -158,7 +158,7 @@ struct ResourceIsTerminalOpPattern
 
 struct ResourceSizeOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceSizeOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceSizeOp sizeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -173,16 +173,16 @@ struct ResourceSizeOpPattern
 // (after taking a subspan for the defined range).
 struct ResourceTryMapOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceTryMapOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value subspan = rewriter.create<IREE::Util::BufferSubspanOp>(
-        tryMapOp.getLoc(), adaptor.getSource(),
+    Value subspan = IREE::Util::BufferSubspanOp::create(
+        rewriter, tryMapOp.getLoc(), adaptor.getSource(),
         getResourceSize(tryMapOp.getLoc(), adaptor.getSource(), rewriter),
         adaptor.getSourceOffset(), adaptor.getResultSize());
     Value didMap =
-        rewriter.create<arith::ConstantIntOp>(tryMapOp.getLoc(), 1, 1);
+        arith::ConstantIntOp::create(rewriter, tryMapOp.getLoc(), 1, 1);
     rewriter.replaceOp(tryMapOp, {didMap, subspan});
     return success();
   }
@@ -190,7 +190,7 @@ struct ResourceTryMapOpPattern
 
 struct ResourceLoadOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceLoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceLoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -210,7 +210,7 @@ struct ResourceLoadOpPattern
 
 struct ResourceStoreOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceStoreOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceStoreOp storeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -228,7 +228,7 @@ struct ResourceStoreOpPattern
 
 struct ResourceSubviewOpPattern
     : public OpConversionPattern<IREE::Stream::ResourceSubviewOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceSubviewOp subviewOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -250,7 +250,7 @@ struct ResourceSubviewOpPattern
 
 struct FileConstantOpPattern
     : public OpConversionPattern<IREE::Stream::FileConstantOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::FileConstantOp constantOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -263,21 +263,21 @@ struct FileConstantOpPattern
 
 struct FileReadOpPattern
     : public OpConversionPattern<IREE::Stream::FileReadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::FileReadOp readOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value sourceSize = rewriter.create<IREE::Util::BufferSizeOp>(
-        readOp.getLoc(), adaptor.getSource());
-    rewriter.create<IREE::Util::BufferCopyOp>(
-        readOp.getLoc(), adaptor.getSource(), sourceSize,
+    Value sourceSize = IREE::Util::BufferSizeOp::create(
+        rewriter, readOp.getLoc(), adaptor.getSource());
+    IREE::Util::BufferCopyOp::create(
+        rewriter, readOp.getLoc(), adaptor.getSource(), sourceSize,
         rewriter.createOrFold<arith::IndexCastOp>(readOp.getLoc(),
                                                   rewriter.getIndexType(),
                                                   adaptor.getSourceOffset()),
         adaptor.getTarget(), adaptor.getTargetSize(), adaptor.getTargetOffset(),
         adaptor.getLength());
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(readOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, readOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(readOp, resolvedTimepoint);
     return success();
@@ -286,21 +286,22 @@ struct FileReadOpPattern
 
 struct FileWriteOpPattern
     : public OpConversionPattern<IREE::Stream::FileWriteOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::FileWriteOp writeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value targetSize = rewriter.create<IREE::Util::BufferSizeOp>(
-        writeOp.getLoc(), adaptor.getTarget());
-    rewriter.create<IREE::Util::BufferCopyOp>(
-        writeOp.getLoc(), adaptor.getSource(), adaptor.getSourceSize(),
-        adaptor.getSourceOffset(), adaptor.getTarget(), targetSize,
+    Value targetSize = IREE::Util::BufferSizeOp::create(
+        rewriter, writeOp.getLoc(), adaptor.getTarget());
+    IREE::Util::BufferCopyOp::create(
+        rewriter, writeOp.getLoc(), adaptor.getSource(),
+        adaptor.getSourceSize(), adaptor.getSourceOffset(), adaptor.getTarget(),
+        targetSize,
         rewriter.createOrFold<arith::IndexCastOp>(writeOp.getLoc(),
                                                   rewriter.getIndexType(),
                                                   adaptor.getTargetOffset()),
         adaptor.getLength());
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(writeOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, writeOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(writeOp, resolvedTimepoint);
     return success();
@@ -309,7 +310,7 @@ struct FileWriteOpPattern
 
 struct TensorImportBufferOpPattern
     : public OpConversionPattern<IREE::Stream::TensorImportOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -326,7 +327,7 @@ struct TensorImportBufferOpPattern
 
 struct TensorImportBufferViewOpPattern
     : public OpConversionPattern<IREE::Stream::TensorImportOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -346,7 +347,7 @@ struct TensorImportBufferViewOpPattern
 
 struct TensorExportBufferOpPattern
     : public OpConversionPattern<IREE::Stream::TensorExportOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -360,7 +361,7 @@ struct TensorExportBufferOpPattern
 
 struct TensorExportBufferViewOpPattern
     : public OpConversionPattern<IREE::Stream::TensorExportOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -376,10 +377,10 @@ struct TensorExportBufferViewOpPattern
 
     // NOTE: we should have verified supported encodings/types at entry into the
     // HAL pipeline.
-    auto encodingType = rewriter.create<IREE::HAL::EncodingTypeOp>(
-        loc, tensorType.getEncoding());
-    auto elementType = rewriter.create<IREE::HAL::ElementTypeOp>(
-        loc, tensorType.getElementType());
+    auto encodingType = IREE::HAL::EncodingTypeOp::create(
+        rewriter, loc, tensorType.getEncoding());
+    auto elementType = IREE::HAL::ElementTypeOp::create(
+        rewriter, loc, tensorType.getElementType());
 
     // Flatten static + dynamic shape dimensions.
     SmallVector<Value> dims;
@@ -388,14 +389,14 @@ struct TensorExportBufferViewOpPattern
       if (tensorType.isDynamicDim(idx)) {
         dims.push_back(dynamicDims[dynamicIdx++]);
       } else {
-        dims.push_back(rewriter.create<arith::ConstantIndexOp>(
-            loc, tensorType.getDimSize(idx)));
+        dims.push_back(arith::ConstantIndexOp::create(
+            rewriter, loc, tensorType.getDimSize(idx)));
       }
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::Inline::BufferViewCreateOp>(
         exportOp, adaptor.getSource(),
-        rewriter.create<arith::ConstantIndexOp>(loc, 0),
+        arith::ConstantIndexOp::create(rewriter, loc, 0),
         adaptor.getSourceSize(), elementType, encodingType, dims);
     return success();
   }
@@ -403,28 +404,29 @@ struct TensorExportBufferViewOpPattern
 
 struct TensorTraceOpPattern
     : public OpConversionPattern<IREE::Stream::TensorTraceOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
     auto bufferViewType = rewriter.getType<IREE::HAL::BufferViewType>();
-    auto zero = rewriter.create<arith::ConstantIndexOp>(traceOp.getLoc(), 0);
+    auto zero = arith::ConstantIndexOp::create(rewriter, traceOp.getLoc(), 0);
     auto resourceEncodingDims = adaptor.getResourceEncodingDims();
     SmallVector<Value> bufferViews;
     for (auto [resource, resourceSize, resourceEncoding] : llvm::zip_equal(
              adaptor.getResources(), adaptor.getResourceSizes(),
              adaptor.getResourceEncodings().getAsRange<TypeAttr>())) {
-      Value resourceBuffer = rewriter.create<IREE::HAL::Inline::BufferWrapOp>(
-          traceOp.getLoc(), bufferType, resource,
+      Value resourceBuffer = IREE::HAL::Inline::BufferWrapOp::create(
+          rewriter, traceOp.getLoc(), bufferType, resource,
           /*offset=*/
           zero,
           /*length=*/resourceSize);
       int64_t dynamicDimCount =
           cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims();
-      bufferViews.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
-          traceOp.getLoc(), bufferViewType, resourceBuffer, resourceEncoding,
-          resourceEncodingDims.take_front(dynamicDimCount), resourceSize,
+      bufferViews.push_back(IREE::Stream::TensorExportOp::create(
+          rewriter, traceOp.getLoc(), bufferViewType, resourceBuffer,
+          resourceEncoding, resourceEncodingDims.take_front(dynamicDimCount),
+          resourceSize,
           /*affinity=*/IREE::Stream::AffinityAttr{}));
       resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
     }
@@ -436,7 +438,7 @@ struct TensorTraceOpPattern
 
 struct CmdFlushOpPattern
     : public OpConversionPattern<IREE::Stream::CmdFlushOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFlushOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -447,7 +449,7 @@ struct CmdFlushOpPattern
 
 struct CmdInvalidateOpPattern
     : public OpConversionPattern<IREE::Stream::CmdInvalidateOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdInvalidateOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -458,7 +460,7 @@ struct CmdInvalidateOpPattern
 
 struct CmdDiscardOpPattern
     : public OpConversionPattern<IREE::Stream::CmdDiscardOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdDiscardOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -468,7 +470,7 @@ struct CmdDiscardOpPattern
 };
 
 struct CmdFillOpPattern : public OpConversionPattern<IREE::Stream::CmdFillOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFillOp fillOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -483,7 +485,7 @@ struct CmdFillOpPattern : public OpConversionPattern<IREE::Stream::CmdFillOp> {
 };
 
 struct CmdCopyOpPattern : public OpConversionPattern<IREE::Stream::CmdCopyOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdCopyOp copyOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -503,7 +505,7 @@ struct CmdCopyOpPattern : public OpConversionPattern<IREE::Stream::CmdCopyOp> {
 
 struct CmdDispatchOpPattern
     : public OpConversionPattern<IREE::Stream::CmdDispatchOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -543,7 +545,7 @@ struct CmdDispatchOpPattern
 };
 
 struct CmdFuncOpPattern : public OpConversionPattern<IREE::Stream::CmdFuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -567,7 +569,7 @@ struct CmdFuncOpPattern : public OpConversionPattern<IREE::Stream::CmdFuncOp> {
 };
 
 struct CmdCallOpPattern : public OpConversionPattern<IREE::Stream::CmdCallOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdCallOp callOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -611,7 +613,7 @@ struct CmdCallOpPattern : public OpConversionPattern<IREE::Stream::CmdCallOp> {
 
 struct CmdExecuteOpPattern
     : public OpConversionPattern<IREE::Stream::CmdExecuteOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdExecuteOp executeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -620,7 +622,7 @@ struct CmdExecuteOpPattern
                                adaptor.getResourceOperands());
     // Immediately resolve the timepoint.
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(executeOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, executeOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(executeOp, resolvedTimepoint);
     return success();
@@ -629,7 +631,7 @@ struct CmdExecuteOpPattern
 
 struct CmdSerialOpPattern
     : public OpConversionPattern<IREE::Stream::CmdSerialOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdSerialOp serialOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -642,7 +644,7 @@ struct CmdSerialOpPattern
 
 struct CmdConcurrentOpPattern
     : public OpConversionPattern<IREE::Stream::CmdConcurrentOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdConcurrentOp concurrentOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -657,7 +659,7 @@ struct CmdConcurrentOpPattern
 // equivalent we have access to so that we could do it in a generic way.
 struct GlobalTimepointConversionPattern
     : public OpConversionPattern<IREE::Util::GlobalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -674,7 +676,7 @@ struct GlobalTimepointConversionPattern
 
 struct TimepointImmediateOpPattern
     : public OpConversionPattern<IREE::Stream::TimepointImmediateOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointImmediateOp immediateOp,
                   OpAdaptor adaptor,
@@ -686,7 +688,7 @@ struct TimepointImmediateOpPattern
 
 struct TimepointImportOpPattern
     : public OpConversionPattern<IREE::Stream::TimepointImportOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointImportOp importOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -698,7 +700,7 @@ struct TimepointImportOpPattern
 
 struct TimepointExportOpPattern
     : public OpConversionPattern<IREE::Stream::TimepointExportOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointExportOp exportOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -710,7 +712,7 @@ struct TimepointExportOpPattern
 
 struct TimepointChainExternalOpPattern
     : public OpConversionPattern<IREE::Stream::TimepointChainExternalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointChainExternalOp exportOp,
                   OpAdaptor adaptor,
@@ -723,7 +725,7 @@ struct TimepointChainExternalOpPattern
 
 struct TimepointJoinOpPattern
     : public OpConversionPattern<IREE::Stream::TimepointJoinOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointJoinOp joinOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -734,14 +736,14 @@ struct TimepointJoinOpPattern
 
 struct TimepointBarrierOpPattern
     : public OpConversionPattern<IREE::Stream::TimepointBarrierOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointBarrierOp barrierOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(barrierOp, {
                                       adaptor.getResource(),
-                                      rewriter.create<arith::ConstantIntOp>(
-                                          barrierOp.getLoc(), 0, 64),
+                                      arith::ConstantIntOp::create(
+                                          rewriter, barrierOp.getLoc(), 0, 64),
                                   });
     return success();
   }
@@ -749,7 +751,7 @@ struct TimepointBarrierOpPattern
 
 struct TimepointAwaitOpPattern
     : public OpConversionPattern<IREE::Stream::TimepointAwaitOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::TimepointAwaitOp awaitOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -759,7 +761,7 @@ struct TimepointAwaitOpPattern
 };
 
 struct ElideYieldOpPattern : public OpConversionPattern<IREE::Stream::YieldOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::YieldOp yieldOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

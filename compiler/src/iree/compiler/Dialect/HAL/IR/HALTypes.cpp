@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Utils/StringUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -84,9 +83,9 @@ Value BufferViewType::inferSizeFromValue(Location loc, Value value,
 
 // static
 Value DeviceType::resolveAny(Location loc, OpBuilder &builder) {
-  Value deviceIndex = builder.create<arith::ConstantIndexOp>(loc, 0);
-  return builder.create<IREE::HAL::DevicesGetOp>(
-      loc, builder.getType<IREE::HAL::DeviceType>(), deviceIndex);
+  Value deviceIndex = arith::ConstantIndexOp::create(builder, loc, 0);
+  return IREE::HAL::DevicesGetOp::create(
+      builder, loc, builder.getType<IREE::HAL::DeviceType>(), deviceIndex);
 }
 
 //===----------------------------------------------------------------------===//

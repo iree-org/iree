@@ -148,8 +148,9 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     // Create a zero vector with the full distributed vector shape for
     // accumulating unrolled contraction results.
     auto tileType = VectorType::get(distShape, resultType.getElementType());
-    Value zero = rewriter.create<arith::ConstantOp>(
-        contractOp.getLoc(), tileType, rewriter.getZeroAttr(tileType));
+    Value zero =
+        arith::ConstantOp::create(rewriter, contractOp.getLoc(), tileType,
+                                  rewriter.getZeroAttr(tileType));
     VectorValue finalTile = cast<VectorValue>(zero);
     LLVM_DEBUG(llvm::dbgs() << "init tile: " << finalTile << "\n");
 
@@ -195,7 +196,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
       // Get the slice of the accumulator in this batch.
       Value accSlice =
-          rewriter.create<vector::ExtractOp>(loc, acc, resultBatchOffsets);
+          vector::ExtractOp::create(rewriter, loc, acc, resultBatchOffsets);
 
       // Get the k batch size for LHS and RHS vector.
       std::optional<int64_t> kBatch =
@@ -221,14 +222,14 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                << llvm::interleaved_array(rhsBatchOffsets);
 
         Value lhsSlice =
-            rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);
+            vector::ExtractOp::create(rewriter, loc, lhs, lhsBatchOffsets);
         Value rhsSlice =
-            rewriter.create<vector::ExtractOp>(loc, rhs, rhsBatchOffsets);
+            vector::ExtractOp::create(rewriter, loc, rhs, rhsBatchOffsets);
         accSlice =
             computeMMA(rewriter, loc, mmaKind, lhsSlice, rhsSlice, accSlice);
       }
-      finalTile = rewriter.create<vector::InsertOp>(loc, accSlice, finalTile,
-                                                    resultBatchOffsets);
+      finalTile = vector::InsertOp::create(rewriter, loc, accSlice, finalTile,
+                                           resultBatchOffsets);
     }
 
     replaceOpWithDistributedValues(rewriter, contractOp, finalTile);
@@ -286,18 +287,18 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     // Get the storage vector types that each thread is in charge of.
     auto [aVectorType, bVectorType, cVectorType] = mmaKind.getABCVectorTypes();
     Value aCast =
-        builder.create<vector::ShapeCastOp>(a.getLoc(), aVectorType, a);
+        vector::ShapeCastOp::create(builder, a.getLoc(), aVectorType, a);
     Value bCast =
-        builder.create<vector::ShapeCastOp>(b.getLoc(), bVectorType, b);
+        vector::ShapeCastOp::create(builder, b.getLoc(), bVectorType, b);
     Value cCast =
-        builder.create<vector::ShapeCastOp>(c.getLoc(), cVectorType, c);
+        vector::ShapeCastOp::create(builder, c.getLoc(), cVectorType, c);
     SmallVector<Value> results;
     [[maybe_unused]] LogicalResult createdMmaOp =
         mmaKind.buildUnderlyingOperations(builder, loc, {aCast, bCast}, {cCast},
                                           results);
     assert(succeeded(createdMmaOp) && "Should never fail to construct mma op");
-    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(),
-                                               results[0]);
+    return vector::ShapeCastOp::create(builder, c.getLoc(), c.getType(),
+                                       results[0]);
   }
 };
 

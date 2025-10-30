@@ -20,7 +20,7 @@ struct LLVMCPUAssignImportOrdinalsPass
     : public impl::LLVMCPUAssignImportOrdinalsPassBase<
           LLVMCPUAssignImportOrdinalsPass> {
   void runOnOperation() override {
-    auto variantOp = getOperation();
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
 
     auto *context = variantOp.getContext();
     auto unitAttr = UnitAttr::get(context);

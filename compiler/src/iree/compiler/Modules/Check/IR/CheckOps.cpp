@@ -16,10 +16,10 @@ namespace mlir::iree_compiler::IREE::Check {
 namespace {
 // Rewrites expect_eq_const -> expect_eq
 struct ExpectEqConstOpToExpectEqOp : public OpRewritePattern<ExpectEqConstOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ExpectEqConstOp op,
                                 PatternRewriter &rewriter) const override {
-    auto rhs = rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
+    auto rhs = arith::ConstantOp::create(rewriter, op.getLoc(), op.getValue());
     rewriter.replaceOpWithNewOp<ExpectEqOp>(op, op.getDevice(), op.getLhs(),
                                             rhs);
     return success();
@@ -29,10 +29,10 @@ struct ExpectEqConstOpToExpectEqOp : public OpRewritePattern<ExpectEqConstOp> {
 // Rewrites expect_almost_eq_const -> expect_almost_eq
 struct ExpectAlmostEqConstOpToExpectAlmostEqOp
     : public OpRewritePattern<ExpectAlmostEqConstOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ExpectAlmostEqConstOp op,
                                 PatternRewriter &rewriter) const override {
-    auto rhs = rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
+    auto rhs = arith::ConstantOp::create(rewriter, op.getLoc(), op.getValue());
     rewriter.replaceOpWithNewOp<ExpectAlmostEqOp>(
         op, op.getDevice(), op.getLhs(), rhs, op.getAtolAttr(),
         op.getRtolAttr());

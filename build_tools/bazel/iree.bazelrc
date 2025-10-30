@@ -106,30 +106,11 @@ build:generic_clang --copt=-Wall
 # Disable warnings we don't care about or that generally have a low signal/noise
 # ratio.
 build:generic_clang --copt=-Wno-ambiguous-member-template
-build:generic_clang --copt=-Wno-char-subscripts
 build:generic_clang --copt=-Wno-extern-c-compat # Matches upstream. Cannot impact due to extern C inclusion method.
-build:generic_clang --copt=-Wno-gnu-alignof-expression
-build:generic_clang --copt=-Wno-gnu-variable-sized-type-not-at-end
-build:generic_clang --copt=-Wno-ignored-optimization-argument
 build:generic_clang --copt=-Wno-invalid-offsetof # Technically UB but needed for intrusive ptrs
-build:generic_clang --copt=-Wno-invalid-source-encoding
-build:generic_clang --copt=-Wno-mismatched-tags
-build:generic_clang --copt=-Wno-pointer-sign
-build:generic_clang --copt=-Wno-reserved-user-defined-literal
-build:generic_clang --copt=-Wno-return-type-c-linkage
-build:generic_clang --copt=-Wno-self-assign-overloaded
-build:generic_clang --copt=-Wno-sign-compare
-build:generic_clang --copt=-Wno-signed-unsigned-wchar
-build:generic_clang --copt=-Wno-strict-overflow
-build:generic_clang --copt=-Wno-trigraphs
-build:generic_clang --copt=-Wno-unknown-pragmas
-build:generic_clang --copt=-Wno-unknown-warning-option
-build:generic_clang --copt=-Wno-unused-command-line-argument
 build:generic_clang --copt=-Wno-unused-const-variable
 build:generic_clang --copt=-Wno-unused-function
-build:generic_clang --copt=-Wno-unused-local-typedef
 build:generic_clang --copt=-Wno-unused-private-field
-build:generic_clang --copt=-Wno-user-defined-warnings
 
 # Explicitly enable some additional warnings.
 # Some of these aren't on by default, or under -Wall, or are subsets of warnings

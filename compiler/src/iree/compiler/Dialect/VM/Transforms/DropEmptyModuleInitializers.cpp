@@ -29,7 +29,7 @@ class DropEmptyModuleInitializersPass
     : public IREE::VM::impl::DropEmptyModuleInitializersPassBase<
           DropEmptyModuleInitializersPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     // Find all export ops so they are easier to remove.

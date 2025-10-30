@@ -46,3 +46,76 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
 //      CHECK:        }
 //      CHECK:      } {mapping = [#gpu.thread<linear_dim_0>]}
 //      CHECK:    } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+func.func @no_fold_simple_relayout_op_chain(%source : tensor<256x128xf32>, %result : memref<120x250xf32>) {
+  %empty0 = tensor.empty() : tensor<256x128xf32>
+  %copy = linalg.copy ins(%source : tensor<256x128xf32>) outs(%empty0 : tensor<256x128xf32>) -> tensor<256x128xf32>
+  %empty1 = tensor.empty() : tensor<128x256xf32>
+  %transpose = linalg.transpose ins(%copy : tensor<256x128xf32>) outs(%empty1 : tensor<128x256xf32>) permutation = [1, 0]
+  %extract_slice = tensor.extract_slice %transpose [0, 0][120, 250][1, 1] : tensor<128x256xf32> to tensor<120x250xf32>
+  iree_codegen.store_to_buffer %extract_slice, %result : tensor<120x250xf32> into memref<120x250xf32>
+  return
+}
+
+// CHECK-LABEL: @no_fold_simple_relayout_op_chain
+//   CHECK-NOT:   iree_linalg_ext.map_scatter
+//       CHECK:   linalg.copy
+//       CHECK:   linalg.transpose
+//       CHECK:   tensor.extract_slice
+//       CHECK:   iree_codegen.store_to_buffer
+
+// -----
+
+func.func @fold_pack_op(%source : tensor<256x128xf32>, %result : memref<2x2x128x64xf32>) {
+  %dest = tensor.empty() : tensor<2x2x128x64xf32>
+  %pack = linalg.pack %source
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 64]
+      into %dest : tensor<256x128xf32> -> tensor<2x2x128x64xf32>
+  iree_codegen.store_to_buffer %pack, %result : tensor<2x2x128x64xf32> into memref<2x2x128x64xf32>
+  return
+}
+
+// CHECK-LABEL: @fold_pack_op
+//   CHECK-NOT:   linalg.pack
+//       CHECK:   iree_linalg_ext.map_scatter
+
+// -----
+
+func.func @fold_unpack_op(%source : tensor<2x2x128x64xf32>, %result : memref<256x128xf32>) {
+  %dest = tensor.empty() : tensor<256x128xf32>
+  %unpack = linalg.unpack %source
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 64]
+      into %dest : tensor<2x2x128x64xf32> -> tensor<256x128xf32>
+  iree_codegen.store_to_buffer %unpack, %result : tensor<256x128xf32> into memref<256x128xf32>
+  return
+}
+
+// CHECK-LABEL: @fold_unpack_op
+//   CHECK-NOT:   linalg.unpack
+//       CHECK:   iree_linalg_ext.map_scatter
+
+// -----
+
+func.func @fold_expand_shape_op(%source : tensor<8x16xf32>, %result : memref<2x4x16xf32>) {
+  %expand = tensor.expand_shape %source [[0, 1], [2]] output_shape [2, 4, 16] : tensor<8x16xf32> into tensor<2x4x16xf32>
+  iree_codegen.store_to_buffer %expand, %result : tensor<2x4x16xf32> into memref<2x4x16xf32>
+  return
+}
+
+// CHECK-LABEL: @fold_expand_shape_op
+//   CHECK-NOT:   tensor.expand_shape
+//       CHECK:   iree_linalg_ext.map_scatter
+
+// -----
+
+func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref<8x16xf32>) {
+  %collapse = tensor.collapse_shape %source [[0, 1], [2]] : tensor<2x4x16xf32> into tensor<8x16xf32>
+  iree_codegen.store_to_buffer %collapse, %result : tensor<8x16xf32> into memref<8x16xf32>
+  return
+}
+
+// CHECK-LABEL: @fold_collapse_shape_op
+//   CHECK-NOT:   tensor.collapse_shape
+//       CHECK:   iree_linalg_ext.map_scatter

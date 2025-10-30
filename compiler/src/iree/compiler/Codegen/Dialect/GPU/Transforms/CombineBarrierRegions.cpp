@@ -63,8 +63,8 @@ combineBarrierRegionPair(RewriterBase &rewriter,
   combinedYields.append(bYield.getValues().begin(), bYield.getValues().end());
 
   // Create the new barrier op.
-  auto combinedBarrierOp = rewriter.create<IREE::GPU::BarrierRegionOp>(
-      fusedLoc, combinedTypes, combinedOperands);
+  auto combinedBarrierOp = IREE::GPU::BarrierRegionOp::create(
+      rewriter, fusedLoc, combinedTypes, combinedOperands);
 
   MutableArrayRef<BlockArgument> barrierABbArgReplacements =
       combinedBarrierOp.getBody()->getArguments().take_front(
@@ -85,7 +85,7 @@ combineBarrierRegionPair(RewriterBase &rewriter,
   rewriter.eraseOp(bYield);
 
   rewriter.setInsertionPointToEnd(combinedBarrierOp.getBody());
-  rewriter.create<IREE::GPU::YieldOp>(fusedLoc, combinedYields);
+  IREE::GPU::YieldOp::create(rewriter, fusedLoc, combinedYields);
 
   SmallVector<Value> valuesToReplace = barrierA.getResults();
   ValueRange bResults = barrierB.getResults();
@@ -98,7 +98,7 @@ combineBarrierRegionPair(RewriterBase &rewriter,
 
 struct CombineAdjacentBarrierRegions final
     : OpRewritePattern<IREE::GPU::BarrierRegionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierOp,
                                 PatternRewriter &rewriter) const override {
     auto prevBarrier = llvm::dyn_cast_if_present<IREE::GPU::BarrierRegionOp>(

@@ -226,7 +226,7 @@ replaceOffsetSizesAndStridesWith(RewriterBase &rewriter,
 namespace {
 
 struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto subview = op.getSource().template getDefiningOp<memref::SubViewOp>();
@@ -249,8 +249,8 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
     for (int i = 0; i < sourceRank; i++) {
       sizeStrideTypes.push_back(indexType);
     }
-    auto sourceDesc = rewriter.create<GetBufferDescriptorOp>(
-        loc, op.getBaseBuffer().getType(), indexType, sizeStrideTypes,
+    auto sourceDesc = GetBufferDescriptorOp::create(
+        rewriter, loc, op.getBaseBuffer().getType(), indexType, sizeStrideTypes,
         sizeStrideTypes, source);
 
     FailureOr<DescriptorInfo> resultDescriptor =
@@ -291,7 +291,7 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
 
 struct FromHalInterfaceBindingSubspan
     : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto binding =
@@ -312,12 +312,10 @@ struct FromHalInterfaceBindingSubspan
 
     // Base buffer.
     rewriter.replaceAllUsesWith(
-        op.getBaseBuffer(),
-        rewriter
-            .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
-                loc, op.getBaseBuffer().getType(), binding.getLayout(),
-                binding.getBindingAttr())
-            .getResult());
+        op.getBaseBuffer(), IREE::VMVX::GetRawInterfaceBindingBufferOp::create(
+                                rewriter, loc, op.getBaseBuffer().getType(),
+                                binding.getLayout(), binding.getBindingAttr())
+                                .getResult());
 
     rewriter.eraseOp(op);
     return success();
@@ -330,15 +328,14 @@ static Value
 getBaseBufferReplacementForDescriptor(GetBufferDescriptorOp descriptorOp,
                                       RewriterBase &rewriter, Location loc,
                                       Value source) {
-  return rewriter
-      .create<UnrealizedConversionCastOp>(
-          loc, descriptorOp.getBaseBuffer().getType(), source)
+  return UnrealizedConversionCastOp::create(
+             rewriter, loc, descriptorOp.getBaseBuffer().getType(), source)
       .getResult(0);
 }
 
 struct FromMemRefAssumeAlignment
     : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto assumeOp = op.getSource().getDefiningOp<memref::AssumeAlignmentOp>();
@@ -365,12 +362,10 @@ struct FromMemRefAssumeAlignment
 
     // Base buffer.
     rewriter.replaceAllUsesWith(
-        op.getBaseBuffer(),
-        rewriter
-            .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
-                loc, op.getBaseBuffer().getType(), binding.getLayout(),
-                binding.getBindingAttr())
-            .getResult());
+        op.getBaseBuffer(), IREE::VMVX::GetRawInterfaceBindingBufferOp::create(
+                                rewriter, loc, op.getBaseBuffer().getType(),
+                                binding.getLayout(), binding.getBindingAttr())
+                                .getResult());
 
     rewriter.eraseOp(op);
     return success();
@@ -380,7 +375,7 @@ struct FromMemRefAssumeAlignment
 // Allocations always return a non-offset memref and are matched by this
 // pattern.
 struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto alloca = op.getSource().template getDefiningOp<memref::AllocaOp>();
@@ -414,7 +409,7 @@ struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
 // MemRef globals are always static shaped and reference a non-offset
 // buffer.
 struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto global = op.getSource().template getDefiningOp<memref::GetGlobalOp>();

@@ -38,4 +38,30 @@ bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
   return numNonmatchingSSADims <= 1;
 }
 
+bool isCastableToTensorType(Type from, RankedTensorType to) {
+  auto tensorType = dyn_cast<RankedTensorType>(from);
+  if (!tensorType) {
+    return false;
+  }
+  if (tensorType.getRank() != to.getRank()) {
+    return false;
+  }
+  if (tensorType.getElementType() != to.getElementType()) {
+    return false;
+  }
+  for (auto [fromSize, toSize] :
+       llvm::zip_equal(tensorType.getShape(), to.getShape())) {
+    // If the target dimension is dynamic we can always cast to it.
+    if (ShapedType::isDynamic(toSize)) {
+      continue;
+    }
+    // Casting a dynamic dimension to a static one is never valid, and static
+    // sizes must always match.
+    if (toSize != fromSize) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace mlir::iree_compiler

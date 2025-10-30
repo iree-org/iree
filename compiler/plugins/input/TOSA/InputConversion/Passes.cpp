@@ -53,8 +53,10 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   TosaToLinalgNamedOptions tosaToLinalgNamedOptions;
   tosaToLinalgNamedOptions.preferConv2DKernelLayoutHWCF = true;
   tosa::TosaValidationOptions tosaValidationOptions;
-  tosaValidationOptions.profile = {"pro_int", "pro_fp"};
-  tosaValidationOptions.extension = {"dynamic"};
+  tosa::TosaAttachTargetOptions tosaTargetOptions;
+  tosaTargetOptions.extensions = {"dynamic"};
+  tosaTargetOptions.profiles = {"pro_int", "pro_fp"};
+  passManager.addPass(tosa::createTosaAttachTarget(tosaTargetOptions));
   tosa::addTosaToLinalgPasses(passManager, TosaToLinalgOptions(),
                               tosaToLinalgNamedOptions, tosaValidationOptions);
   passManager.addNestedPass<func::FuncOp>(

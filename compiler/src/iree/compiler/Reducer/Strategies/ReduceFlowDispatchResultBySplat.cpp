@@ -53,8 +53,8 @@ void mlir::iree_compiler::Reducer::reduceFlowDispatchResultBySplatDelta(
   for (auto dispatchOp : keepOps) {
     builder.setInsertionPointAfter(dispatchOp);
     for (Value result : dispatchOp.getResults()) {
-      builder.create<IREE::Util::OptimizationBarrierOp>(dispatchOp.getLoc(),
-                                                        result);
+      IREE::Util::OptimizationBarrierOp::create(builder, dispatchOp.getLoc(),
+                                                result);
     }
   }
 
@@ -69,10 +69,10 @@ void mlir::iree_compiler::Reducer::reduceFlowDispatchResultBySplatDelta(
       auto tensorType = cast<RankedTensorType>(result.getType());
       auto elType = tensorType.getElementType();
       auto zeroAttr = builder.getZeroAttr(elType);
-      auto zero = builder.create<arith::ConstantOp>(result.getLoc(), zeroAttr);
+      auto zero = arith::ConstantOp::create(builder, result.getLoc(), zeroAttr);
 
-      auto splat = builder.create<IREE::Flow::TensorSplatOp>(
-          result.getLoc(), tensorType, zero, dynamicDims);
+      auto splat = IREE::Flow::TensorSplatOp::create(
+          builder, result.getLoc(), tensorType, zero, dynamicDims);
       result.replaceAllUsesWith(splat);
     }
 

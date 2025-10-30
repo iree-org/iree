@@ -19,7 +19,6 @@ iree_lit_test_suite(
     "buffer_ops.mlir"
     "comparison_ops.mlir"
     "global_ops.mlir"
-    "hint_ops.mlir"
     "list_ops.mlir"
     "status_ops.mlir"
     "structural_ops.mlir"

@@ -27,7 +27,6 @@ iree_check_single_backend_test_suite(
     srcs = LDS_SRCS,
     compiler_flags = [
         "--iree-llvmgpu-use-direct-load",
-        "--iree-codegen-llvmgpu-early-tile-and-fuse-matmul",
     ],
     driver = "hip",
     tags = ["requires-gpu-cdna3"],

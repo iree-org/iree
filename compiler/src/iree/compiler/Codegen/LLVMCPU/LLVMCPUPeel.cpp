@@ -63,7 +63,7 @@ public:
 
 void LLVMCPUPeelPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   llvm::SmallSetVector<scf::ForOp, 8> uniqueLoopsToPeel;
   funcOp.walk([&](Operation *op) {

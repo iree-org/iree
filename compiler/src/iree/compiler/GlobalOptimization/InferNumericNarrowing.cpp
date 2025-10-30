@@ -123,8 +123,8 @@ class InferNumericNarrowingPass
     if (type.getWidth() != 0) {
       range = std::make_pair(minValue, maxValue);
     }
-    auto annotationOp = builder.create<IREE::Util::NumericOptionalNarrowOp>(
-        probePoint.getLoc(), probePoint, type, range);
+    auto annotationOp = IREE::Util::NumericOptionalNarrowOp::create(
+        builder, probePoint.getLoc(), probePoint, type, range);
     probePoint.replaceAllUsesExcept(annotationOp, annotationOp);
   }
 };

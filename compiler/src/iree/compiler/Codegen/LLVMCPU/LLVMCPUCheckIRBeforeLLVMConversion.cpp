@@ -114,7 +114,7 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     return;
   }
 
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   if (failed(checkStackAllocationSize(funcOp))) {
     return signalPassFailure();
   }

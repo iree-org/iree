@@ -21,6 +21,7 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
+
 /// Typedef for tile sizes to use at different levels of tiling.
 using TileSizesListType = SmallVector<SmallVector<int64_t>>;
 using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t>>;
@@ -51,6 +52,7 @@ constexpr StringLiteral kTuningSpecEntrypointAttrName =
 constexpr StringLiteral kSerializedTuningSpecAttrName =
     "iree_codegen.tuning_spec_mlirbc";
 constexpr StringLiteral kKernelConfigSpecName = "__kernel_config";
+constexpr StringLiteral kUkernelAttrName = "iree_codegen.ukernel";
 constexpr StringLiteral kUKernelProviderName = "iree_codegen.ukernel_provider";
 
 //===----------------------------------------------------------------------===//

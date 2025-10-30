@@ -20,7 +20,10 @@ iree_lit_test_suite(
     "default_tuning_specs_amdgpu.mlir"
     "enable_tensor_ukernels.mlir"
     "gpu_encoding_attrs.mlir"
+    "lower_rocm_tensor_ukernel_descriptor.mlir"
+    "lower_rocm_ukernel_descriptor.mlir"
     "lowering_strategy_from_tuning_spec.mlir"
+    "materialize_encoding_ukernel_gfx942.mlir"
     "ukernel_pipeline_transform.mlir"
   TOOLS
     FileCheck
@@ -41,6 +44,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "emit_debug_info.mlir"
     "external_function_validation.mlir"
     "smoketest.mlir"
     "smoketest_hsaco.mlir"

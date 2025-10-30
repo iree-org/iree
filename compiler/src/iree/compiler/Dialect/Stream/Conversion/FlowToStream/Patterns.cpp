@@ -39,9 +39,9 @@ static Value buildResultSizeOf(Location loc, Value tensorValue,
                                ConversionPatternRewriter &rewriter) {
   // TODO(benvanik): see if we can stash this on the side to avoid expensive
   // materialization of a bunch of redundant IR.
-  return rewriter.create<IREE::Stream::TensorSizeOfOp>(
-      loc, rewriter.getIndexType(), TypeAttr::get(tensorValue.getType()),
-      dynamicDims, affinityAttr);
+  return IREE::Stream::TensorSizeOfOp::create(
+      rewriter, loc, rewriter.getIndexType(),
+      TypeAttr::get(tensorValue.getType()), dynamicDims, affinityAttr);
 }
 
 struct ConvertTensorConstantOp
@@ -55,8 +55,8 @@ public:
     // Capture the tensor constant strongly typed with constant lifetime.
     auto constantType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::Constant);
-    auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
-        constantOp.getLoc(), constantType,
+    auto newOp = IREE::Stream::TensorConstantOp::create(
+        rewriter, constantOp.getLoc(), constantType,
         convertAttributeToStream(constantOp.getValue()),
         TypeAttr::get(constantOp.getType()), ValueRange{},
         executionAffinityAttr);
@@ -65,9 +65,9 @@ public:
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto constantSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
         constantOp.getLoc(), rewriter.getIndexType(), newOp.getResult());
-    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-        constantOp.getLoc(), unknownType, newOp.getResult(), constantSize,
-        constantSize,
+    auto transferOp = IREE::Stream::AsyncTransferOp::create(
+        rewriter, constantOp.getLoc(), unknownType, newOp.getResult(),
+        constantSize, constantSize,
         /*source_affinity=*/executionAffinityAttr,
         /*result_affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(constantOp,
@@ -94,11 +94,10 @@ public:
     SmallVector<Value> dynamicDims;
     for (unsigned i = 0; i < resultType.getRank(); ++i) {
       if (resultType.isDynamicDim(i)) {
-        Value staticDim = rewriter.create<arith::ConstantIndexOp>(
-            constantOp.getLoc(), attrType.getDimSize(i));
-        Value dynamicDim = rewriter
-                               .create<IREE::Util::OptimizationBarrierOp>(
-                                   constantOp.getLoc(), staticDim)
+        Value staticDim = arith::ConstantIndexOp::create(
+            rewriter, constantOp.getLoc(), attrType.getDimSize(i));
+        Value dynamicDim = IREE::Util::OptimizationBarrierOp::create(
+                               rewriter, constantOp.getLoc(), staticDim)
                                .getResult(0);
         dynamicDims.push_back(dynamicDim);
       }
@@ -107,8 +106,8 @@ public:
     // Capture the tensor constant strongly typed with constant lifetime.
     auto constantType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::Constant);
-    auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
-        constantOp.getLoc(), constantType,
+    auto newOp = IREE::Stream::TensorConstantOp::create(
+        rewriter, constantOp.getLoc(), constantType,
         convertAttributeToStream(constantOp.getValue()),
         TypeAttr::get(resultType), dynamicDims, executionAffinityAttr);
 
@@ -116,9 +115,9 @@ public:
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto constantSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
         constantOp.getLoc(), rewriter.getIndexType(), newOp.getResult());
-    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-        constantOp.getLoc(), unknownType, newOp.getResult(), constantSize,
-        constantSize,
+    auto transferOp = IREE::Stream::AsyncTransferOp::create(
+        rewriter, constantOp.getLoc(), unknownType, newOp.getResult(),
+        constantSize, constantSize,
         /*source_affinity=*/executionAffinityAttr,
         /*result_affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(constantOp, {{transferOp, constantSize}});
@@ -150,10 +149,11 @@ struct ConvertTensorCastLikeOp
         buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
                           resultAffinityAttr, rewriter);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    Value cloneOp = rewriter.create<IREE::Stream::TensorCloneOp>(
-        op.getLoc(), unknownType, source.resource, op.getSource().getType(),
-        op.getSourceDims(), source.resourceSize, op.getResult().getType(),
-        flattenValues(adaptor.getResultDims()), resultSize, resultAffinityAttr);
+    Value cloneOp = IREE::Stream::TensorCloneOp::create(
+        rewriter, op.getLoc(), unknownType, source.resource,
+        op.getSource().getType(), op.getSourceDims(), source.resourceSize,
+        op.getResult().getType(), flattenValues(adaptor.getResultDims()),
+        resultSize, resultAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{cloneOp, resultSize}});
     return success();
   }
@@ -170,8 +170,8 @@ struct ConvertTensorAllocaOp
         buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
                           executionAffinityAttr, rewriter);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto allocaOp = rewriter.create<IREE::Stream::AsyncAllocaOp>(
-        op.getLoc(), unknownType, resultSize, executionAffinityAttr);
+    auto allocaOp = IREE::Stream::AsyncAllocaOp::create(
+        rewriter, op.getLoc(), unknownType, resultSize, executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{allocaOp.getResult(), resultSize}});
     return success();
   }
@@ -188,8 +188,8 @@ struct ConvertTensorEmptyOp
         buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
                           executionAffinityAttr, rewriter);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto emptyOp = rewriter.create<IREE::Stream::TensorEmptyOp>(
-        op.getLoc(), unknownType, op.getResult().getType(),
+    auto emptyOp = IREE::Stream::TensorEmptyOp::create(
+        rewriter, op.getLoc(), unknownType, op.getResult().getType(),
         flattenValues(adaptor.getResultDims()), resultSize,
         executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{emptyOp.getResult(), resultSize}});
@@ -208,8 +208,8 @@ struct ConvertTensorSplatOp
         buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
                           executionAffinityAttr, rewriter);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto splatOp = rewriter.create<IREE::Stream::TensorSplatOp>(
-        op.getLoc(), unknownType, adaptor.getValue().front(),
+    auto splatOp = IREE::Stream::TensorSplatOp::create(
+        rewriter, op.getLoc(), unknownType, adaptor.getValue().front(),
         op.getResult().getType(), flattenValues(adaptor.getResultDims()),
         resultSize, executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{splatOp, resultSize}});
@@ -228,11 +228,11 @@ struct ConvertTensorCloneOp
                                           adaptor.getOperand(),
                                           executionAffinityAttr, rewriter);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto cloneOp = rewriter.create<IREE::Stream::TensorCloneOp>(
-        op.getLoc(), unknownType, operand.resource, op.getOperand().getType(),
-        op.getOperandDims(), operand.resourceSize, op.getResult().getType(),
-        flattenValues(adaptor.getOperandDims()), operand.resourceSize,
-        executionAffinityAttr);
+    auto cloneOp = IREE::Stream::TensorCloneOp::create(
+        rewriter, op.getLoc(), unknownType, operand.resource,
+        op.getOperand().getType(), op.getOperandDims(), operand.resourceSize,
+        op.getResult().getType(), flattenValues(adaptor.getOperandDims()),
+        operand.resourceSize, executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{cloneOp, operand.resourceSize}});
     return success();
   }
@@ -252,11 +252,11 @@ struct ConvertTensorEncodeOp
     auto resultSize =
         buildResultSizeOf(op.getLoc(), op.getResult(), op.getOperandDims(),
                           executionAffinityAttr, rewriter);
-    auto encodeOp = rewriter.create<IREE::Stream::TensorEncodeOp>(
-        op.getLoc(), unknownType, operand.resource, op.getOperand().getType(),
-        op.getOperandDims(), operand.resourceSize, op.getResult().getType(),
-        flattenValues(adaptor.getResultDims()), resultSize,
-        executionAffinityAttr);
+    auto encodeOp = IREE::Stream::TensorEncodeOp::create(
+        rewriter, op.getLoc(), unknownType, operand.resource,
+        op.getOperand().getType(), op.getOperandDims(), operand.resourceSize,
+        op.getResult().getType(), flattenValues(adaptor.getResultDims()),
+        resultSize, executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{encodeOp, resultSize}});
     return success();
   }
@@ -271,8 +271,8 @@ struct ConvertTensorBarrierOp
       ConversionPatternRewriter &rewriter) const override {
     auto operand = resolveTensorOperands(op.getLoc(), op.getOperand(),
                                          adaptor.getOperand(), rewriter);
-    auto barrierOp = rewriter.create<IREE::Stream::AsyncBarrierOp>(
-        op.getLoc(), operand.resource.getType(), operand.resource,
+    auto barrierOp = IREE::Stream::AsyncBarrierOp::create(
+        rewriter, op.getLoc(), operand.resource.getType(), operand.resource,
         operand.resourceSize,
         /*affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{barrierOp, operand.resourceSize}});
@@ -293,9 +293,9 @@ struct ConvertTensorTransferOp
     auto operand = resolveTensorOperands(op.getLoc(), op.getOperand(),
                                          adaptor.getOperand(), rewriter);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-        op.getLoc(), unknownType, operand.resource, operand.resourceSize,
-        operand.resourceSize,
+    auto transferOp = IREE::Stream::AsyncTransferOp::create(
+        rewriter, op.getLoc(), unknownType, operand.resource,
+        operand.resourceSize, operand.resourceSize,
         /*source_affinity=*/operand.affinity,
         /*result_affinity=*/executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{transferOp, operand.resourceSize}});
@@ -317,9 +317,9 @@ struct ConvertTensorSliceOp
         buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
                           executionAffinityAttr, rewriter);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto sliceOp = rewriter.create<IREE::Stream::TensorSliceOp>(
-        op.getLoc(), unknownType, source.resource, op.getSource().getType(),
-        op.getSourceDims(), source.resourceSize,
+    auto sliceOp = IREE::Stream::TensorSliceOp::create(
+        rewriter, op.getLoc(), unknownType, source.resource,
+        op.getSource().getType(), op.getSourceDims(), source.resourceSize,
         flattenValues(adaptor.getStartIndices()),
         flattenValues(adaptor.getLengths()), op.getResult().getType(),
         flattenValues(adaptor.getResultDims()), resultSize,
@@ -342,8 +342,8 @@ struct ConvertTensorUpdateOp
     auto update =
         transferTensorOperands(op.getLoc(), op.getUpdate(), adaptor.getUpdate(),
                                executionAffinityAttr, rewriter);
-    auto updateOp = rewriter.create<IREE::Stream::TensorUpdateOp>(
-        op.getLoc(), target.resource.getType(), target.resource,
+    auto updateOp = IREE::Stream::TensorUpdateOp::create(
+        rewriter, op.getLoc(), target.resource.getType(), target.resource,
         op.getTarget().getType(), flattenValues(adaptor.getTargetDims()),
         target.resourceSize, flattenValues(adaptor.getStartIndices()),
         update.resource, op.getUpdate().getType(), op.getUpdateDims(),
@@ -397,9 +397,9 @@ struct ConvertTensorLoadOp
     // Scalar tensors get transferred without slicing.
     auto sourceEncoding = op.getSource().getType();
     if (isScalarTensor(sourceEncoding)) {
-      auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-          op.getLoc(), stagingType, source.resource, source.resourceSize,
-          source.resourceSize,
+      auto transferOp = IREE::Stream::AsyncTransferOp::create(
+          rewriter, op.getLoc(), stagingType, source.resource,
+          source.resourceSize, source.resourceSize,
           /*source_affinity=*/source.affinity,
           /*result_affinity=*/source.affinity);
       rewriter.replaceOpWithNewOp<IREE::Stream::TensorLoadOp>(
@@ -425,15 +425,16 @@ struct ConvertTensorLoadOp
     auto resultEncoding =
         RankedTensorType::get(resultDims, sourceEncoding.getElementType(),
                               sourceEncoding.getEncoding());
-    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
-        op.getLoc(), resultEncoding, ValueRange{}, source.affinity);
-    auto sliceOp = rewriter.create<IREE::Stream::TensorSliceOp>(
-        op.getLoc(), source.resource.getType(), source.resource, sourceEncoding,
-        convertedSourceDims, source.resourceSize, sliceIndices, sliceLengths,
-        resultEncoding, ValueRange{}, resultSize, source.affinity);
-    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-        op.getLoc(), stagingType, sliceOp.getResult(), sliceOp.getResultSize(),
-        sliceOp.getResultSize(),
+    Value resultSize = IREE::Stream::TensorSizeOfOp::create(
+        rewriter, op.getLoc(), resultEncoding, ValueRange{}, source.affinity);
+    auto sliceOp = IREE::Stream::TensorSliceOp::create(
+        rewriter, op.getLoc(), source.resource.getType(), source.resource,
+        sourceEncoding, convertedSourceDims, source.resourceSize, sliceIndices,
+        sliceLengths, resultEncoding, ValueRange{}, resultSize,
+        source.affinity);
+    auto transferOp = IREE::Stream::AsyncTransferOp::create(
+        rewriter, op.getLoc(), stagingType, sliceOp.getResult(),
+        sliceOp.getResultSize(), sliceOp.getResultSize(),
         /*source_affinity=*/source.affinity,
         /*result_affinity=*/source.affinity);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorLoadOp>(
@@ -458,8 +459,8 @@ struct ConvertTensorStoreOp
     auto stagingType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::Staging);
     if (target.resource.getType() == stagingType) {
-      auto storeOp = rewriter.create<IREE::Stream::TensorStoreOp>(
-          op.getLoc(), target.resource.getType(), target.resource,
+      auto storeOp = IREE::Stream::TensorStoreOp::create(
+          rewriter, op.getLoc(), target.resource.getType(), target.resource,
           op.getTarget().getType(), flattenValues(adaptor.getTargetDims()),
           target.resourceSize, flattenValues(adaptor.getIndices()),
           adaptor.getValue().front());
@@ -474,8 +475,8 @@ struct ConvertTensorStoreOp
     indexSet.populate(convertedIndices);
     SmallVector<Value> lengths(convertedIndices.size(), indexSet.get(1));
     auto targetEncoding = op.getTarget().getType();
-    auto fillOp = rewriter.create<IREE::Stream::TensorFillOp>(
-        op.getLoc(), target.resource, targetEncoding,
+    auto fillOp = IREE::Stream::TensorFillOp::create(
+        rewriter, op.getLoc(), target.resource, targetEncoding,
         flattenValues(adaptor.getTargetDims()), target.resourceSize,
         convertedIndices, lengths, adaptor.getValue().front(), target.affinity);
     rewriter.replaceOpWithMultiple(op, {{fillOp, target.resourceSize}});
@@ -500,9 +501,9 @@ struct ConvertTensorTraceOp
           IREE::Stream::Lifetime::Staging);
       auto traceSource = source.resource;
       if (source.resource.getType() != stagingType) {
-        traceSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
-            op.getLoc(), stagingType, source.resource, source.resourceSize,
-            source.resourceSize,
+        traceSource = IREE::Stream::AsyncTransferOp::create(
+            rewriter, op.getLoc(), stagingType, source.resource,
+            source.resourceSize, source.resourceSize,
             /*source_affinity=*/source.affinity,
             /*result_affinity=*/source.affinity);
       }
@@ -537,7 +538,7 @@ struct ConvertChannelDefaultOp
 
 struct ConvertChannelSplitOp
     : public OpConversionPattern<IREE::Flow::ChannelSplitOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ChannelSplitOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -549,7 +550,7 @@ struct ConvertChannelSplitOp
 
 struct ConvertChannelRankOp
     : public OpConversionPattern<IREE::Flow::ChannelRankOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ChannelRankOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -561,7 +562,7 @@ struct ConvertChannelRankOp
 
 struct ConvertChannelCountOp
     : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -583,9 +584,9 @@ struct ConvertAllGatherOp
         /*reduction=*/std::nullopt,
         static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
 
-    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
-        op.getLoc(), op.getType().getNumElements());
+    auto zeroOffset = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
+    auto elementCount = arith::ConstantIndexOp::create(
+        rewriter, op.getLoc(), op.getType().getNumElements());
     auto newTargetCast =
         transferTensorOperands(op.getLoc(), op.getTarget(), adaptor.getTarget(),
                                executionAffinityAttr, rewriter);
@@ -593,8 +594,8 @@ struct ConvertAllGatherOp
         transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
                                executionAffinityAttr, rewriter);
 
-    auto collectiveOp = rewriter.create<IREE::Stream::AsyncCollectiveOp>(
-        op.getLoc(), collectiveAttr,
+    auto collectiveOp = IREE::Stream::AsyncCollectiveOp::create(
+        rewriter, op.getLoc(), collectiveAttr,
         /*target=*/newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
@@ -626,9 +627,9 @@ struct ConvertAllReduceOp
         static_cast<IREE::Stream::CollectiveReductionOp>(op.getReductionOp()),
         static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
 
-    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
-        op.getLoc(), op.getType().getNumElements());
+    auto zeroOffset = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
+    auto elementCount = arith::ConstantIndexOp::create(
+        rewriter, op.getLoc(), op.getType().getNumElements());
     auto newTargetCast =
         transferTensorOperands(op.getLoc(), op.getTarget(), adaptor.getTarget(),
                                executionAffinityAttr, rewriter);
@@ -636,8 +637,8 @@ struct ConvertAllReduceOp
         transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
                                executionAffinityAttr, rewriter);
 
-    auto collectiveOp = rewriter.create<IREE::Stream::AsyncCollectiveOp>(
-        op.getLoc(), collectiveAttr,
+    auto collectiveOp = IREE::Stream::AsyncCollectiveOp::create(
+        rewriter, op.getLoc(), collectiveAttr,
         /*target=*/newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
@@ -669,9 +670,9 @@ struct ConvertAllToAllOp
         /*reduction=*/std::nullopt,
         static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
 
-    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
-        op.getLoc(), op.getType().getNumElements());
+    auto zeroOffset = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
+    auto elementCount = arith::ConstantIndexOp::create(
+        rewriter, op.getLoc(), op.getType().getNumElements());
     auto newTargetCast =
         transferTensorOperands(op.getLoc(), op.getTarget(), adaptor.getTarget(),
                                executionAffinityAttr, rewriter);
@@ -679,8 +680,8 @@ struct ConvertAllToAllOp
         transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
                                executionAffinityAttr, rewriter);
 
-    auto collectiveOp = rewriter.create<IREE::Stream::AsyncCollectiveOp>(
-        op.getLoc(), collectiveAttr,
+    auto collectiveOp = IREE::Stream::AsyncCollectiveOp::create(
+        rewriter, op.getLoc(), collectiveAttr,
         /*target=*/newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
@@ -712,9 +713,9 @@ struct ConvertReduceScatterOp : public AffinityOpConversionPattern<
         static_cast<IREE::Stream::CollectiveReductionOp>(op.getReductionOp()),
         static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
 
-    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
-        op.getLoc(), op.getType().getNumElements());
+    auto zeroOffset = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
+    auto elementCount = arith::ConstantIndexOp::create(
+        rewriter, op.getLoc(), op.getType().getNumElements());
     auto newTargetCast =
         transferTensorOperands(op.getLoc(), op.getTarget(), adaptor.getTarget(),
                                executionAffinityAttr, rewriter);
@@ -722,8 +723,8 @@ struct ConvertReduceScatterOp : public AffinityOpConversionPattern<
         transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
                                executionAffinityAttr, rewriter);
 
-    auto collectiveOp = rewriter.create<IREE::Stream::AsyncCollectiveOp>(
-        op.getLoc(), collectiveAttr,
+    auto collectiveOp = IREE::Stream::AsyncCollectiveOp::create(
+        rewriter, op.getLoc(), collectiveAttr,
         /*target=*/newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
@@ -755,9 +756,9 @@ struct ConvertCollectiveSendRecvOp
         /*reduction=*/std::nullopt,
         static_cast<IREE::Stream::CollectiveElementType>(op.getElementType()));
 
-    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-    auto elementCount = rewriter.create<arith::ConstantIndexOp>(
-        op.getLoc(), op.getType().getNumElements());
+    auto zeroOffset = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
+    auto elementCount = arith::ConstantIndexOp::create(
+        rewriter, op.getLoc(), op.getType().getNumElements());
     auto newTargetCast =
         transferTensorOperands(op.getLoc(), op.getTarget(), adaptor.getTarget(),
                                executionAffinityAttr, rewriter);
@@ -767,20 +768,20 @@ struct ConvertCollectiveSendRecvOp
 
     // Pack send, recv into param. The values are checked to be within the
     // 16-bit range during lowering to Flow dialect.
-    auto send = rewriter.create<arith::IndexCastOp>(
-        op.getLoc(), rewriter.getI32Type(), adaptor.getSend());
-    auto lo = rewriter.create<arith::AndIOp>(
-        op.getLoc(), send,
-        rewriter.create<arith::ConstantIntOp>(op.getLoc(), 0xFFFF, 32));
-    auto recv = rewriter.create<arith::IndexCastOp>(
-        op.getLoc(), rewriter.getI32Type(), adaptor.getRecv());
-    auto hi = rewriter.create<arith::ShLIOp>(
-        op.getLoc(), recv,
-        rewriter.create<arith::ConstantIntOp>(op.getLoc(), 16, 32));
-    auto param = rewriter.create<arith::OrIOp>(op.getLoc(), hi, lo);
+    auto send = arith::IndexCastOp::create(
+        rewriter, op.getLoc(), rewriter.getI32Type(), adaptor.getSend());
+    auto lo = arith::AndIOp::create(
+        rewriter, op.getLoc(), send,
+        arith::ConstantIntOp::create(rewriter, op.getLoc(), 0xFFFF, 32));
+    auto recv = arith::IndexCastOp::create(
+        rewriter, op.getLoc(), rewriter.getI32Type(), adaptor.getRecv());
+    auto hi = arith::ShLIOp::create(
+        rewriter, op.getLoc(), recv,
+        arith::ConstantIntOp::create(rewriter, op.getLoc(), 16, 32));
+    auto param = arith::OrIOp::create(rewriter, op.getLoc(), hi, lo);
 
-    auto collectiveOp = rewriter.create<IREE::Stream::AsyncCollectiveOp>(
-        op.getLoc(), collectiveAttr,
+    auto collectiveOp = IREE::Stream::AsyncCollectiveOp::create(
+        rewriter, op.getLoc(), collectiveAttr,
         /*target=*/newTargetCast.resource,
         /*target_size=*/newTargetCast.resourceSize,
         /*target_offset=*/zeroOffset,
@@ -861,13 +862,13 @@ struct ConvertDispatchOp
       }
     }
 
-    auto newOp = rewriter.create<IREE::Stream::TensorDispatchOp>(
-        op.getLoc(), resultTypes, flattenValues(adaptor.getWorkload()),
-        adaptor.getEntryPointsAttr(), operands, operandSizes,
-        rewriter.getTypeArrayAttr(operandEncodings), op.getArgumentDims(),
-        resultSizes, rewriter.getTypeArrayAttr(resultEncodings),
-        op.getResultDims(), adaptor.getTiedOperandsAttr(),
-        executionAffinityAttr);
+    auto newOp = IREE::Stream::TensorDispatchOp::create(
+        rewriter, op.getLoc(), resultTypes,
+        flattenValues(adaptor.getWorkload()), adaptor.getEntryPointsAttr(),
+        operands, operandSizes, rewriter.getTypeArrayAttr(operandEncodings),
+        op.getArgumentDims(), resultSizes,
+        rewriter.getTypeArrayAttr(resultEncodings), op.getResultDims(),
+        adaptor.getTiedOperandsAttr(), executionAffinityAttr);
     newOp->setDialectAttrs(
         llvm::make_filter_range(op->getDialectAttrs(), [](NamedAttribute attr) {
           return attr.getName() != "stream.affinity";
@@ -884,7 +885,7 @@ struct ConvertDispatchOp
 };
 
 struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -925,7 +926,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     // Zero is going to be used for each operand to start.
-    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto zeroOffset = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
 
     // Query and resolve all operands and their sizes.
     SmallVector<Value> callOperands;
@@ -981,9 +982,9 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
       }
     }
 
-    auto newOp = rewriter.create<IREE::Stream::AsyncCallOp>(
-        op.getLoc(), resultTypes, adaptor.getCalleeAttr(), callOperands,
-        callOperandSizes, callOperandOffsets, callOperandEnds,
+    auto newOp = IREE::Stream::AsyncCallOp::create(
+        rewriter, op.getLoc(), resultTypes, adaptor.getCalleeAttr(),
+        callOperands, callOperandSizes, callOperandOffsets, callOperandEnds,
         callOperandLengths, resultSizes, adaptor.getTiedOperandsAttr(),
         op.getArgAttrsAttr(), op.getResAttrsAttr(), executionAffinityAttr);
     newOp->setDialectAttrs(op->getDialectAttrs());
@@ -1041,8 +1042,8 @@ static bool insertBindingOp(BlockArgument arg,
     }
   }
 
-  auto subspanOp = builder.create<IREE::Stream::BindingSubspanOp>(
-      arg.getLoc(), tensorType, arg, zero, dynamicDims);
+  auto subspanOp = IREE::Stream::BindingSubspanOp::create(
+      builder, arg.getLoc(), tensorType, arg, zero, dynamicDims);
   arg.replaceAllUsesExcept(subspanOp.getResult(), subspanOp);
 
   // If we needed to insert at a special point restore back to the original
@@ -1061,8 +1062,9 @@ static bool insertBindingOp(BlockArgument arg,
 // this.
 static void convertReturnOps(Region &region) {
   region.walk([](IREE::Flow::ReturnOp oldOp) {
-    OpBuilder(oldOp).create<IREE::Stream::ReturnOp>(oldOp.getLoc(),
-                                                    oldOp.getOperands());
+    OpBuilder builder(oldOp);
+    IREE::Stream::ReturnOp::create(builder, oldOp.getLoc(),
+                                   oldOp.getOperands());
     oldOp.erase();
   });
 }
@@ -1088,21 +1090,21 @@ struct ConvertDispatchWorkgroupInfoOp : public OpConversionPattern<FlowOpT> {
 
 struct ConvertExecutableOp
     : public OpConversionPattern<IREE::Flow::ExecutableOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ExecutableOp flowOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // flow.executable -> stream.executable
-    auto streamOp = rewriter.create<IREE::Stream::ExecutableOp>(
-        flowOp.getLoc(), flowOp.getSymName());
+    auto streamOp = IREE::Stream::ExecutableOp::create(
+        rewriter, flowOp.getLoc(), flowOp.getSymName());
     streamOp.setVisibility(flowOp.getVisibility());
     streamOp->setDialectAttrs(flowOp->getDialectAttrs());
     rewriter.setInsertionPointToStart(&streamOp.getBody().front());
 
     // flow.executable.export -> stream.executable.export
     for (auto exportOp : flowOp.getOps<IREE::Flow::ExecutableExportOp>()) {
-      auto newOp = rewriter.create<IREE::Stream::ExecutableExportOp>(
-          exportOp.getLoc(), exportOp.getSymName(),
+      auto newOp = IREE::Stream::ExecutableExportOp::create(
+          rewriter, exportOp.getLoc(), exportOp.getSymName(),
           exportOp.getFunctionRefAttr());
       newOp->setDialectAttrs(exportOp->getDialectAttrs());
       if (!exportOp.getWorkgroupCount().empty()) {
@@ -1132,7 +1134,8 @@ struct ConvertExecutableOp
                "flow dispatches have no results");
 
         rewriter.setInsertionPointToStart(&funcOp.front());
-        auto zero = rewriter.create<arith::ConstantIndexOp>(funcOp.getLoc(), 0);
+        auto zero =
+            arith::ConstantIndexOp::create(rewriter, funcOp.getLoc(), 0);
         for (auto arg : funcOp.front().getArguments()) {
           auto oldType = arg.getType();
           if (auto tensorType =
@@ -1192,7 +1195,7 @@ struct ConvertExecutableOp
 };
 
 struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

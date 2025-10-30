@@ -463,3 +463,27 @@ module @partially_analyzed_op {
     util.return %barrier1#0, %barrier1#1 : i32, i32
   }
 }
+
+// -----
+
+// Check that hoisting happens in a determinsitic order. If this is ordered
+// incorrectly it will result in >1 util.initializer.
+
+// CHECK-LABEL: @hoist_multiple_globals_ordered
+module @hoist_multiple_globals_ordered {
+  util.global private @global_a : tensor<f32>
+  util.global private @global_b : tensor<f32>
+
+  //     CHECK: util.initializer
+  //     CHECK:   iree_unregistered.const_expr
+  // CHECK-NOT: util.initializer
+  //     CHECK:   iree_unregistered.const_expr
+  util.func public @main() -> (f32, f32) {
+    %global_a = util.global.load immutable @global_a : tensor<f32>
+    %1 = "iree_unregistered.const_expr"(%global_a) : (tensor<f32>) -> tensor<f32>
+    %global_b = util.global.load immutable @global_b : tensor<f32>
+    %4 = "iree_unregistered.const_expr"(%1, %global_b) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+    %extracted = tensor.extract %4[] : tensor<f32>
+    util.return %extracted, %extracted : f32, f32
+  }
+}

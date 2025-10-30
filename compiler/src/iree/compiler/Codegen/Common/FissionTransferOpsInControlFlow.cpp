@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -32,11 +32,17 @@ static memref::AllocaOp createAlloca(IRRewriter &rewriter,
                                      vector::TransferReadOp readOp,
                                      scf::ForOp forOp) {
   auto loc = forOp.getLoc();
-  auto allocaSize = rewriter.create<arith::CeilDivUIOp>(
-      loc,
-      rewriter.create<arith::SubIOp>(loc, forOp.getUpperBound(),
-                                     forOp.getLowerBound()),
-      forOp.getStep());
+  // We use an affine map to calculate the size of the alloca rather
+  // than arith ops directly due to an issue with finding the static upper bound
+  // when using arith.ceildivui described in
+  // https://github.com/iree-org/iree/issues/21872
+  AffineExpr lb, ub, step;
+  bindSymbols(rewriter.getContext(), lb, ub, step);
+  AffineMap sizeMap = AffineMap::get(0, 3, (ub - lb).ceilDiv(step));
+  auto allocaSize = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, sizeMap,
+      getAsOpFoldResult(ValueRange{forOp.getLowerBound(), forOp.getUpperBound(),
+                                   forOp.getStep()}));
 
   auto vectorType = cast<VectorType>(readOp.getVectorType());
   SmallVector<int64_t> memrefShape(vectorType.getShape());
@@ -46,18 +52,19 @@ static memref::AllocaOp createAlloca(IRRewriter &rewriter,
   auto memrefType = MemRefType::get(memrefShape, vectorType.getElementType(),
                                     AffineMap{}, privateAddrSpaceAttr);
 
-  return rewriter.create<memref::AllocaOp>(loc, memrefType,
-                                           ValueRange{allocaSize});
+  return memref::AllocaOp::create(
+      rewriter, loc, memrefType,
+      ValueRange{getValueOrCreateConstantIndexOp(rewriter, loc, allocaSize)});
 }
 
 /// Creates an index for accessing the memref in the loop. This index is
 /// normalized into step of one in order to access the correct element from the
 /// alloca. %index = (%loop_index - %loop_lower_bound) / %loop_step
 static Value createMemrefAccessIndex(IRRewriter &rewriter, scf::ForOp forOp) {
-  auto subIOp = rewriter.create<arith::SubIOp>(
-      forOp.getLoc(), forOp.getInductionVar(), forOp.getLowerBound());
+  auto subIOp = arith::SubIOp::create(
+      rewriter, forOp.getLoc(), forOp.getInductionVar(), forOp.getLowerBound());
   auto divUIOp =
-      rewriter.create<arith::DivUIOp>(forOp.getLoc(), subIOp, forOp.getStep());
+      arith::DivUIOp::create(rewriter, forOp.getLoc(), subIOp, forOp.getStep());
   return divUIOp.getResult();
 }
 
@@ -82,7 +89,7 @@ static void setupReadLoop(IRRewriter &rewriter, const FissionTarget &target,
   rewriter.setInsertionPoint(readLoop.getBody()->getTerminator());
   auto allocaIndex = createMemrefAccessIndex(rewriter, readLoop);
   auto constantZero =
-      rewriter.create<arith::ConstantIndexOp>(readLoop.getLoc(), 0);
+      arith::ConstantIndexOp::create(rewriter, readLoop.getLoc(), 0);
 
   // Store 'transfer_read' results into the corresponding 'alloca'.
   for (size_t i = 0; i < allocaOps.size(); i++) {
@@ -92,8 +99,8 @@ static void setupReadLoop(IRRewriter &rewriter, const FissionTarget &target,
 
     SmallVector<Value> indices = {allocaIndex};
     indices.append(allocaOp.getType().getShape().size() - 1, constantZero);
-    rewriter.create<vector::TransferWriteOp>(readOp.getLoc(), readOp, allocaOp,
-                                             indices);
+    vector::TransferWriteOp::create(rewriter, readOp.getLoc(), readOp, allocaOp,
+                                    indices);
   }
 
   LDBG() << "Read loop: \n" << readLoop << "\n";
@@ -111,7 +118,7 @@ static void setupWriteLoop(IRRewriter &rewriter, const FissionTarget &target,
   rewriter.setInsertionPointToStart(writeLoop.getBody());
   auto allocaIndex = createMemrefAccessIndex(rewriter, writeLoop);
   auto constantZero =
-      rewriter.create<arith::ConstantIndexOp>(writeLoop.getLoc(), 0);
+      arith::ConstantIndexOp::create(rewriter, writeLoop.getLoc(), 0);
   for (size_t i = 0; i < allocaOps.size(); i++) {
     memref::AllocaOp allocaOp = allocaOps[i];
     auto readOp = cast<vector::TransferReadOp>(

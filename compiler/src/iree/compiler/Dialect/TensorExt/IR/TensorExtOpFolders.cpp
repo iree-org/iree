@@ -17,7 +17,7 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 
 namespace {
 struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BitCastOp op,
                                 PatternRewriter &rewriter) const override {
     auto emptyOp =
@@ -31,7 +31,7 @@ struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
 };
 
 struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const final {
@@ -80,14 +80,15 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
         newResultSizes[resDynamicDim] = castSize;
       }
       ++intermediateDynamicDim;
+      ++resDynamicDim;
     }
 
     auto newType =
         RankedTensorType::get(newResultSizes, resTensorType.getElementType(),
                               resTensorType.getEncoding());
-    Value newBitcast = rewriter.create<BitCastOp>(
-        bitcastOp.getLoc(), newType, tensorCastOp.getOperand(), newDynamicDims,
-        newDynamicDims);
+    Value newBitcast = BitCastOp::create(rewriter, bitcastOp.getLoc(), newType,
+                                         tensorCastOp.getOperand(),
+                                         newDynamicDims, newDynamicDims);
     // We create a new cast to continue propagating static information.
     rewriter.replaceOpWithNewOp<tensor::CastOp>(bitcastOp, resTensorType,
                                                 newBitcast);
@@ -152,7 +153,7 @@ static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
 
 struct ReuseDispatchTensorLoadShapeDims
     : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     return success(updateTensorOpDims(rewriter, loadOp, loadOp.getSource(),
@@ -173,7 +174,7 @@ struct ReuseDispatchTensorLoadShapeDims
 // subtensor %v[..] [..] [..]
 struct ConvertDispatchInputLoadOfTensorToSubTensor
     : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     if (!llvm::isa<RankedTensorType>(loadOp.getSource().getType())) {
@@ -248,7 +249,7 @@ canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
 /// Pattern to rewrite a subview op with constant arguments.
 struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<OpFoldResult> mixedOffsets, mixedSizes, mixedStrides;
@@ -260,12 +261,12 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
 
     // We need to resolve the new inferred type with the specified type.
     Location loc = loadOp.getLoc();
-    Value replacement = rewriter.create<DispatchTensorLoadOp>(
-        loc, newResultType.value(), loadOp.getSource(), loadOp.getSourceDims(),
-        mixedOffsets, mixedSizes, mixedStrides);
+    Value replacement = DispatchTensorLoadOp::create(
+        rewriter, loc, newResultType.value(), loadOp.getSource(),
+        loadOp.getSourceDims(), mixedOffsets, mixedSizes, mixedStrides);
     if (newResultType.value() != resultType) {
       replacement =
-          rewriter.create<tensor::CastOp>(loc, resultType, replacement);
+          tensor::CastOp::create(rewriter, loc, resultType, replacement);
     }
     rewriter.replaceOp(loadOp, replacement);
     return success();
@@ -305,7 +306,7 @@ namespace {
 
 struct ReuseDispatchTensorStoreShapeDims
     : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     return success(updateTensorOpDims(rewriter, storeOp, storeOp.getTarget(),
@@ -315,7 +316,7 @@ struct ReuseDispatchTensorStoreShapeDims
 
 struct FoldCastOpIntoDispatchStoreOp
     : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto parentOp = storeOp.getValue().getDefiningOp<tensor::CastOp>();
@@ -348,7 +349,7 @@ struct FoldCastOpIntoDispatchStoreOp
 
 struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
     final : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<OpFoldResult> mixedOffsets, mixedSizes, mixedStrides;
@@ -361,7 +362,8 @@ struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
     Value value = storeOp.getValue();
     Location loc = storeOp.getLoc();
     if (newValueType.value() != valueType) {
-      value = rewriter.create<tensor::CastOp>(loc, newValueType.value(), value);
+      value =
+          tensor::CastOp::create(rewriter, loc, newValueType.value(), value);
     }
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
         storeOp, value, storeOp.getTarget(), storeOp.getTargetDims(),
@@ -388,7 +390,7 @@ namespace {
 
 // Bubble up the ordinal ops so that all uses go through this operation.
 struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchWorkloadOrdinalOp ordinalOp,
                                 PatternRewriter &rewriter) const override {
     auto blockArg = dyn_cast<BlockArgument>(ordinalOp.getOperand());
@@ -412,8 +414,8 @@ struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
       }
       break;
     }
-    auto newOrdinalOp = rewriter.create<DispatchWorkloadOrdinalOp>(
-        ordinalOp.getLoc(), blockArg, ordinalOp.getOrdinalAttr());
+    auto newOrdinalOp = DispatchWorkloadOrdinalOp::create(
+        rewriter, ordinalOp.getLoc(), blockArg, ordinalOp.getOrdinalAttr());
     rewriter.replaceAllUsesExcept(blockArg, newOrdinalOp, newOrdinalOp);
     rewriter.replaceOp(ordinalOp, newOrdinalOp.getResult());
     return success();

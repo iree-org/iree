@@ -166,14 +166,14 @@ void Converti48Toi64Pass::runOnOperation() {
   });
 
   auto *ctx = &getContext();
-  auto func = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   RewritePatternSet patterns(&getContext());
   patterns.add<GenericTypeConvert>(ctx, converter);
   populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(patterns,
                                                                  converter);
 
-  if (failed(applyFullConversion(func, target, std::move(patterns)))) {
+  if (failed(applyFullConversion(funcOp, target, std::move(patterns)))) {
     signalPassFailure();
   }
 }

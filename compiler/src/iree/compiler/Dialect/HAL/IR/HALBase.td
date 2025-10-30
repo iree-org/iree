@@ -20,7 +20,7 @@ include "mlir/IR/EnumAttr.td"
 
 def HAL_Allocator : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::AllocatorType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::AllocatorType>($_self)">,
     "allocator"> {
   let description = [{
     Allocates buffers for a particular device memory space.
@@ -30,7 +30,7 @@ def HAL_Allocator : DialectType<
 
 def HAL_Buffer : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::BufferType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::BufferType>($_self)">,
     "buffer"> {
   let description = [{
     A memory buffer with a specific memory_type that is used to describe the
@@ -39,12 +39,12 @@ def HAL_Buffer : DialectType<
     various usages. Depending on these memory types the buffers may be mapped
     for access on the host as memory though certain restrictions may be imposed.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::BufferType>()";
+  let builderCall = "$_builder.getType<::mlir::iree_compiler::IREE::HAL::BufferType>()";
 }
 
 def HAL_BufferView : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::BufferViewType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::BufferViewType>($_self)">,
     "buffer_view"> {
   let description = [{
     A shaped and typed buffer reference. This just wraps an existing hal.buffer
@@ -52,44 +52,44 @@ def HAL_BufferView : DialectType<
     boundaries. In most cases buffer views can be elided entirely by the
     compiler and they'll only be seen when calling external functions.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::BufferViewType>()";
+  let builderCall = "$_builder.getType<::mlir::iree_compiler::IREE::HAL::BufferViewType>()";
 }
 
 def HAL_Channel : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::ChannelType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::ChannelType>($_self)">,
     "collective.channel"> {
   let description = [{
     Channel identifier used to allow for participation in multiple collective
     groups.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::ChannelType>()";
+  let builderCall = "$_builder.getType<::mlir::iree_compiler::IREE::HAL::ChannelType>()";
 }
 
 def HAL_CommandBuffer : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::CommandBufferType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::CommandBufferType>($_self)">,
     "command_buffer"> {
   let description = [{
     Asynchronous command buffer recording interface. Commands are recorded by
     the implementation for later submission to command queues.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::CommandBufferType>()";
+  let builderCall = "$_builder.getType<::mlir::iree_compiler::IREE::HAL::CommandBufferType>()";
 }
 
 def HAL_Device : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::DeviceType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::DeviceType>($_self)">,
     "device"> {
   let description = [{
     Logical device instance.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::DeviceType>()";
+  let builderCall = "$_builder.getType<::mlir::iree_compiler::IREE::HAL::DeviceType>()";
 }
 
 def HAL_Event : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::EventType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::EventType>($_self)">,
     "event"> {
   let description = [{
     Events are used for defining synchronization scopes within CommandBuffers.
@@ -100,34 +100,34 @@ def HAL_Event : DialectType<
 
 def HAL_Executable : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::ExecutableType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::ExecutableType>($_self)">,
     "executable"> {
   let description = [{
     A prepared and ready-to-dispatch executable.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::ExecutableType>()";
+  let builderCall = "$_builder.getType<::mlir::iree_compiler::IREE::HAL::ExecutableType>()";
 }
 
 def HAL_Fence : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::FenceType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::FenceType>($_self)">,
     "fence"> {
   let description = [{
     A set of semaphore timepoints defining a common point in time across
     multiple timelines.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::FenceType>()";
+  let builderCall = "$_builder.getType<::mlir::iree_compiler::IREE::HAL::FenceType>()";
 }
 
 def HAL_File : DialectType<
     HAL_Dialect,
-    CPred<"isa<IREE::HAL::FileType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::HAL::FileType>($_self)">,
     "buffer"> {
   let description = [{
     A stateless file handle that can be read/written using queue-ordered
     transfer operations.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::FileType>()";
+  let builderCall = "$_builder.getType<::mlir::iree_compiler::IREE::HAL::FileType>()";
 }
 
 def HAL_ObjectType : AnyTypeOf<[

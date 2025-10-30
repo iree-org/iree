@@ -60,7 +60,7 @@ namespace {
 /// ```
 struct DropUnitDimsFromCollapseOfExpand
     : OpRewritePattern<tensor::CollapseShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
                                 PatternRewriter &rewriter) const override {
@@ -87,9 +87,10 @@ struct DropUnitDimsFromCollapseOfExpand
           continue;
         }
 
-        // If we are collapsing multiple unit dims together, at least 1 must be
-        // kept (prefer the first).
-        if (outShape[outDim] == 1 && innerIdx != 0) {
+        // If outShape[outDim] == 1, we must preserve 1 unit dim,
+        // so we drop the first. If the first is the only unit dim,
+        // we can't drop it anyway.
+        if (outShape[outDim] == 1 && innerIdx == 0) {
           continue;
         }
         toDrop.insert(inDim);
@@ -99,8 +100,13 @@ struct DropUnitDimsFromCollapseOfExpand
     // Remove dimensions from `toDrop` that weren't introduced by the
     // `expandOp` op.
     const auto expandReassoc = expandOp.getReassociationIndices();
-    for (const auto &[inDim, indices] : llvm::enumerate(expandReassoc)) {
-      if (indices.size() == 1) {
+    for (const auto &indices : expandReassoc) {
+      // If all of indices are in `toDrop`, we must preserve at least one
+      // to avoid an empty reassociation map during expansion.
+      // This can happen when outShape does not have a unit dimension
+      // corresponding to the unit dimensions being dropped here.
+      if (llvm::all_of(indices,
+                       [&](int64_t idx) { return toDrop.contains(idx); })) {
         toDrop.erase(indices[0]);
       }
     }
@@ -179,8 +185,8 @@ struct DropUnitDimsFromCollapseOfExpand
     Value newExpanded = expandOp.getSrc();
     if (!llvm::all_of(newExpandReassoc,
                       llvm::hasSingleElement<ReassociationIndicesRef>)) {
-      newExpanded = rewriter.create<tensor::ExpandShapeOp>(
-          expandOp.getLoc(),
+      newExpanded = tensor::ExpandShapeOp::create(
+          rewriter, expandOp.getLoc(),
           RankedTensorType::get(newInterShape,
                                 expandOp.getType().getElementType()),
           expandOp.getSrc(), newExpandReassoc, newInterSizes);
@@ -189,9 +195,9 @@ struct DropUnitDimsFromCollapseOfExpand
     Value result = newExpanded;
     if (!llvm::all_of(newCollapseReassoc,
                       llvm::hasSingleElement<ReassociationIndicesRef>)) {
-      result = rewriter.create<tensor::CollapseShapeOp>(
-          collapseOp.getLoc(), collapseOp.getType(), newExpanded,
-          newCollapseReassoc);
+      result = tensor::CollapseShapeOp::create(rewriter, collapseOp.getLoc(),
+                                               collapseOp.getType(),
+                                               newExpanded, newCollapseReassoc);
     }
     rewriter.replaceOp(collapseOp, result);
     return success();
@@ -293,8 +299,8 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
   }
   for (auto store : storeOps) {
     rewriter.setInsertionPoint(store);
-    Value collapse = rewriter.create<tensor::CollapseShapeOp>(
-        store.getLoc(), newGlobalType, store->getOperand(0),
+    Value collapse = tensor::CollapseShapeOp::create(
+        rewriter, store.getLoc(), newGlobalType, store->getOperand(0),
         expandShapeReInds.value());
     auto newStore =
         clone(rewriter, store, store->getResultTypes(), store->getOperands());
@@ -321,7 +327,7 @@ struct FoldUnitExtentDimsForFuncPass final
 } // namespace
 
 void FoldUnitExtentDimsPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   MLIRContext *context = &getContext();
 
   SymbolTable moduleSymbols(moduleOp);

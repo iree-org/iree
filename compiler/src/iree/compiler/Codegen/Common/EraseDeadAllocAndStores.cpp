@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
@@ -22,8 +21,7 @@ class EraseDeadAllocAndStoresPass final
     : public impl::EraseDeadAllocAndStoresPassBase<
           EraseDeadAllocAndStoresPass> {
 public:
-  using impl::EraseDeadAllocAndStoresPassBase<
-      EraseDeadAllocAndStoresPass>::EraseDeadAllocAndStoresPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
@@ -32,7 +30,7 @@ public:
 };
 
 void EraseDeadAllocAndStoresPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(&getContext());
   memref::eraseDeadAllocAndStores(rewriter, funcOp);
 }

@@ -48,7 +48,6 @@ func.func @transpose_leading_one_dim(%input: tensor<4x1x1xf32>) -> tensor<1x1x4x
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
-//   CHECK-DAG:   %[[ZERO:.+]] = ub.poison : vector<4xf32>
 
 //       CHECK:   %[[R0:.+]] = vector.transfer_read %[[INPUT]][%[[C0]], %[[C0]], %[[C0]]]{{.+}} : tensor<4x1x1xf32>, vector<1xf32>
 //       CHECK:   %[[R1:.+]] = vector.transfer_read %[[INPUT]][%[[C1]], %[[C0]], %[[C0]]]{{.+}} : tensor<4x1x1xf32>, vector<1xf32>
@@ -56,15 +55,12 @@ func.func @transpose_leading_one_dim(%input: tensor<4x1x1xf32>) -> tensor<1x1x4x
 //       CHECK:   %[[R3:.+]] = vector.transfer_read %[[INPUT]][%[[C3]], %[[C0]], %[[C0]]]{{.+}} : tensor<4x1x1xf32>, vector<1xf32>
 
 //       CHECK:   %[[E0:.+]] = vector.extract %[[R0]][0] : f32 from vector<1xf32>
-//       CHECK:   %[[I0:.+]] = vector.insert %[[E0]], %[[ZERO]] [0] : f32 into vector<4xf32>
 //       CHECK:   %[[E1:.+]] = vector.extract %[[R1]][0] : f32 from vector<1xf32>
-//       CHECK:   %[[I1:.+]] = vector.insert %[[E1]], %[[I0]] [1] : f32 into vector<4xf32>
 //       CHECK:   %[[E2:.+]] = vector.extract %[[R2]][0] : f32 from vector<1xf32>
-//       CHECK:   %[[I2:.+]] = vector.insert %[[E2]], %[[I1]] [2] : f32 into vector<4xf32>
 //       CHECK:   %[[E3:.+]] = vector.extract %[[R3]][0] : f32 from vector<1xf32>
-//       CHECK:   %[[I3:.+]] = vector.insert %[[E3]], %[[I2]] [3] : f32 into vector<4xf32>
+//       CHECK:   %[[RES:.+]] = vector.from_elements %[[E0]], %[[E1]], %[[E2]], %[[E3]] : vector<4xf32>
 
-//       CHECK:   %[[W:.+]] = vector.transfer_write %[[I3]], %{{.+}}
+//       CHECK:   %[[W:.+]] = vector.transfer_write %[[RES]], %{{.+}}
 //       CHECK:   return %[[W]] : tensor<1x1x4xf32>
 
 // -----
@@ -93,8 +89,6 @@ func.func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
 
-//   CHECK-DAG:   %[[OINIT:.+]] = ub.poison : vector<4xf32>
-
 //       CHECK:   %[[LHS0:.+]] = vector.transfer_read %[[LHS]][%[[C0]], %[[C0]]]{{.+}} : tensor<4x2xf32>, vector<2xf32>
 //       CHECK:   %[[LHS1:.+]] = vector.transfer_read %[[LHS]][%[[C1]], %[[C0]]]{{.+}} : tensor<4x2xf32>, vector<2xf32>
 //       CHECK:   %[[LHS2:.+]] = vector.transfer_read %[[LHS]][%[[C2]], %[[C0]]]{{.+}} : tensor<4x2xf32>, vector<2xf32>
@@ -107,24 +101,18 @@ func.func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2
 //       CHECK:   %[[ADD3:.+]] = arith.addf %[[LHS3]], %[[RHS0]]
 
 //       CHECK:   %[[E0:.+]] = vector.extract %[[ADD0]][0]
-//       CHECK:   %[[I0:.+]] = vector.insert %[[E0]], %[[OINIT]] [0]
 //       CHECK:   %[[E1:.+]] = vector.extract %[[ADD1]][0]
-//       CHECK:   %[[I1:.+]] = vector.insert %[[E1]], %[[I0]] [1]
 //       CHECK:   %[[E2:.+]] = vector.extract %[[ADD2]][0]
-//       CHECK:   %[[I2:.+]] = vector.insert %[[E2]], %[[I1]] [2]
 //       CHECK:   %[[E3:.+]] = vector.extract %[[ADD3]][0]
-//       CHECK:   %[[I3:.+]] = vector.insert %[[E3]], %[[I2]] [3]
+//       CHECK:   %[[R0:.+]] = vector.from_elements %[[E0]], %[[E1]], %[[E2]], %[[E3]] : vector<4xf32>
 //       CHECK:   %[[E4:.+]] = vector.extract %[[ADD0]][1]
-//       CHECK:   %[[I4:.+]] = vector.insert %[[E4]], %[[OINIT]] [0]
 //       CHECK:   %[[E5:.+]] = vector.extract %[[ADD1]][1]
-//       CHECK:   %[[I5:.+]] = vector.insert %[[E5]], %[[I4]] [1]
 //       CHECK:   %[[E6:.+]] = vector.extract %[[ADD2]][1]
-//       CHECK:   %[[I6:.+]] = vector.insert %[[E6]], %[[I5]] [2]
 //       CHECK:   %[[E7:.+]] = vector.extract %[[ADD3]][1]
-//       CHECK:   %[[I7:.+]] = vector.insert %[[E7]], %[[I6]] [3]
+//       CHECK:   %[[R1:.+]] = vector.from_elements %[[E4]], %[[E5]], %[[E6]], %[[E7]] : vector<4xf32>
 
-//       CHECK:   %[[W0:.+]] = vector.transfer_write %[[I3]], %{{.+}}[%[[C0]], %[[C0]]]
-//       CHECK:   %[[W1:.+]] = vector.transfer_write %[[I7]], %[[W0]][%[[C1]], %[[C0]]]
+//       CHECK:   %[[W0:.+]] = vector.transfer_write %[[R0]], %{{.+}}[%[[C0]], %[[C0]]]
+//       CHECK:   %[[W1:.+]] = vector.transfer_write %[[R1]], %[[W0]][%[[C1]], %[[C0]]]
 //       CHECK:   return %[[W1]]
 
 // -----
@@ -146,5 +134,5 @@ func.func @transpose_nd(%input: tensor<2x4x2x1x1xf32>) -> tensor<2x2x1x1x4xf32> 
 //    CHECK-LABEL: func @transpose_nd
 //     CHECK-SAME: (%[[INPUT:.+]]: tensor<2x4x2x1x1xf32>)
 // CHECK-COUNT-16:   vector.transfer_read %[[INPUT]]{{.+}} : tensor<2x4x2x1x1xf32>, vector<1xf32>
-// CHECK-COUNT-16:   vector.insert {{.+}} : f32 into vector<4xf32>
+//  CHECK-COUNT-4:   vector.from_elements {{.+}} : vector<4xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} : vector<4xf32>, tensor<2x2x1x1x4xf32>

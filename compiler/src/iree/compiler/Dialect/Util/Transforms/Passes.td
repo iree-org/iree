@@ -19,6 +19,9 @@ def ApplyPatternsPass : Pass<"iree-util-apply-patterns", ""> {
 
 def CombineInitializersPass : Pass<"iree-util-combine-initializers", "mlir::ModuleOp"> {
   let summary = "Combines global initializers into one.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Util::UtilDialect"
+  ];
 }
 
 def DropCompilerHintsPass : Pass<"iree-util-drop-compiler-hints", ""> {
@@ -73,6 +76,42 @@ def IPOPass : Pass<"iree-util-ipo", "mlir::ModuleOp"> {
   ];
 }
 
+def LiftCFGToSCFPass : Pass<"iree-util-lift-cfg-to-scf", "mlir::ModuleOp"> {
+  let summary = "Lift unstructured control flow to SCF/Util dialect for callable ops.";
+  let description = [{
+    Transforms unstructured control flow (CFG) in `util.initializer`/`util.func`
+    ops to structured control flow (SCF) operations. All CFG terminator ops like
+    `cf.br` and `cf.cond_br` along with non-terminator ops like `cf.switch` are
+    converted to their structured equivalents like `scf.if`, `scf.while`, and
+    `scf.index_switch` ops.
+
+    Limitations:
+    * Irreducible control flow (loops with multiple entry points) will cause
+      the transformation to fail. This is rare in practice as most high-level
+      languages and ML frameworks generate reducible control flow.
+    * Operations with side-effecting branches are not supported.
+    * Operations that produce successor operands dynamically are not supported.
+    * Infinite loops require the insertion of `util.unreachable` terminators.
+
+    The algorithm handles:
+    * Simple if/else patterns -> `scf.if`
+    * Loops with single entry -> `scf.while`
+    * Switch statements -> `scf.index_switch`
+    * Multiple returns -> exit block combining
+    * Unreachable code -> `util.unreachable` insertion
+
+    Based on the algorithm from:
+    Bahmann et al. 2015. Perfect Reconstructability of Control Flow from
+    Demand Dependence Graphs. ACM TACO. https://dl.acm.org/doi/10.1145/2693261
+  }];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::cf::ControlFlowDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::ub::UBDialect",
+  ];
+}
+
 def OptimizeIntArithmeticPass : Pass<"iree-util-optimize-int-arithmetic", ""> {
   let summary = "Optimizes integer arithmetic using a variety of dataflow analysis and patterns.";
   let dependentDialects = [
@@ -106,6 +145,36 @@ def StripAndSplatConstantsPass :
 
 def StripDebugOpsPass : Pass<"iree-util-strip-debug-ops", ""> {
   let summary = "Strips debug ops, like assertions.";
+}
+
+def VerifyInitializationOrderPass :
+    Pass<"iree-util-verify-initialization-order", "mlir::ModuleOp"> {
+  let summary = "Verifies module initialization order constraints.";
+  let description = [{
+    Verifies that module initialization follows the rules documented in the
+    util.initializer and util.global operations:
+
+    1. Initializers can only access globals defined before them in module order.
+    2. Immutable globals can only be initialized once (either by initial_value
+       OR by stores in initializers, never both).
+    3. Globals with initial values cannot be modified by initializers that
+       precede them in module order.
+    4. Stores to immutable globals must occur in initializers or functions
+       only reachable from initializers.
+
+    The pass uses conservative analysis and emits warnings for patterns it
+    cannot definitively verify (e.g. conditional stores in initializer-only
+    functions).
+  }];
+}
+
+def VerifyStructuredControlFlowPass :
+    InterfacePass<"iree-util-verify-structured-control-flow", "mlir::FunctionOpInterface"> {
+  let summary = "Verifies that functions contain only structured control flow.";
+  let description = [{
+    Verifies that functions contain only structured control flow (no ops
+    implementing `BranchOpInterface` like `cf.br` or `cf.cond_br`).
+  }];
 }
 
 //===----------------------------------------------------------------------===//

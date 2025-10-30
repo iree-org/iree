@@ -80,7 +80,7 @@ def IREEGPU_MmaInterfaceAttr
 }
 
 def IREEGPU_AnyMmaAttr : Attr<Or<[
-  CPred<"isa<IREE::GPU::MmaInterfaceAttr>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr>($_self)">,
 ]>, "buffer-like constant attribute values"> {
   let storageType = [{ IREE::GPU::MmaInterfaceAttr }];
   let returnType = [{ IREE::GPU::MmaInterfaceAttr }];
@@ -112,6 +112,95 @@ def IREEGPU_PromotionAttr
       }]
     >,
   ];
+}
+
+def IREEGPU_DataTiledMMAInterfaceAttr
+    : AttrInterface<"DataTiledMMAInterfaceAttr", []> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    Interface used to query information needed to define layouts and
+    distribution of data-tiled MMA operations. This interface is used to
+    materialize data tiled layouts for matrix multiplication operations into
+    iree_codegen.inner_tiled ops, and to lower the resulting data tiled
+    operation.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the TileSwizzle for the given operand index. This is the swizzle
+        that defines the layout of the packed inner tiles for the data tiled
+        operand. For data tiling materialization, this is the swizzle in the
+        MaterializeEncodingInfo.
+      }],
+      /*retType=*/"::mlir::iree_compiler::IREE::Codegen::TileSwizzle",
+      /*methodName=*/"getTileSwizzle",
+      /*args=*/(ins "unsigned":$operandIndex)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the packed inner tile shapes for the data tiled layout. For data
+        tiling materialization, these correspond to the innerTileSizes in the
+        MaterializeEncodingInfo.
+      }],
+      /*retType=*/"::mlir::iree_compiler::IREE::Codegen::TileMxNxKxKb",
+      /*methodName=*/"getTileMNKKb",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the element types of the data tiled operation corresponding to
+        the DataTiledMMAInterfaceAttr.
+      }],
+      /*retType=*/"void",
+      /*methodName=*/"getElementTypes",
+      /*args=*/(ins "SmallVectorImpl<Type>&":$result)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the subgroup size for distribution of the data tiled operation
+        described by the DataTiledMMAInterfaceAttr.
+      }],
+      /*retType=*/"int64_t",
+      /*methodName=*/"getSubgroupSize",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the flat workgroup size for distribution of the data tiled
+        operation described by the DataTiledMMAInterfaceAttr.
+      }],
+      /*retType=*/"int64_t",
+      /*methodName=*/"getFlatWorkgroupSize",
+      /*args=*/(ins)
+    >,
+  ];
+
+  let extraClassDeclaration = [{
+    //========================================================================//
+    // Declare interface methods for InnerTileDescAttrInterface with shared
+    // implementation among DataTiledMMAInterfaceAttr.
+    //========================================================================//
+
+    void getUndistributedTileTypes(SmallVectorImpl<VectorType>& result);
+
+    void getDistributedTileTypes(SmallVectorImpl<VectorType>& result);
+
+    std::optional<::mlir::SmallVector<int64_t, 2>>
+    getUndistributedTileDimExpansion(int64_t operandIndex, int64_t logicalDim);
+
+    LogicalResult populateOperandOffsetsSizesStrides(
+        OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+        ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+        SmallVectorImpl<OpFoldResult> &sizes,
+        SmallVectorImpl<OpFoldResult> &strides);
+
+    Attribute getDistributionMappingKind();
+
+    OpFoldResult getDistributionWorkerCount(
+        OpBuilder &builder, Location loc, Operation *opToDistribute);
+  }];
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES

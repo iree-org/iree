@@ -52,7 +52,7 @@ namespace {
 /// so we use this lowering instead with a higher pattern benefit.
 struct ConcatenateOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConcatenateOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ConcatenateOp op, OpAdaptor adaptor,
@@ -72,13 +72,13 @@ struct ConcatenateOpConversion final
     SmallVector<Value, 3> strides;
 
     for (int64_t i = 0; i < rank; ++i) {
-      offsets.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
+      offsets.push_back(arith::ConstantIndexOp::create(rewriter, loc, 0));
       sizes.push_back(rewriter.createOrFold<tensor::DimOp>(
           loc, adaptor.getOperands()[0], i));
-      strides.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
+      strides.push_back(arith::ConstantIndexOp::create(rewriter, loc, 1));
     }
 
-    Value resultDimSize = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value resultDimSize = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (Value arg : adaptor.getOperands()) {
       auto size = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
       resultDimSize =
@@ -86,8 +86,8 @@ struct ConcatenateOpConversion final
     }
     sizes[dim] = resultDimSize;
 
-    Value result = rewriter.create<tensor::EmptyOp>(
-        loc, resultType.getShape(), resultType.getElementType());
+    Value result = tensor::EmptyOp::create(rewriter, loc, resultType.getShape(),
+                                           resultType.getElementType());
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
       auto op = v.getDefiningOp<arith::ConstantIndexOp>();
@@ -96,15 +96,16 @@ struct ConcatenateOpConversion final
       return op.getValue();
     };
 
-    Value accBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value accBound = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (Value arg : adaptor.getOperands()) {
       offsets[dim] = accBound;
       sizes[dim] = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
-      result = rewriter.create<tensor::InsertSliceOp>(
-          loc, arg, result, llvm::map_to_vector(offsets, toOpFoldResult),
+      result = tensor::InsertSliceOp::create(
+          rewriter, loc, arg, result,
+          llvm::map_to_vector(offsets, toOpFoldResult),
           llvm::map_to_vector(sizes, toOpFoldResult),
           llvm::map_to_vector(strides, toOpFoldResult));
-      accBound = rewriter.create<arith::AddIOp>(loc, accBound, sizes[dim]);
+      accBound = arith::AddIOp::create(rewriter, loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);
     return success();
@@ -131,31 +132,31 @@ Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
       values.push_back(b.getF32FloatAttr(v));
     }
   }
-  return b.create<arith::ConstantOp>(
-      loc, matrixType, DenseFPElementsAttr::get(matrixType, values));
+  return arith::ConstantOp::create(
+      b, loc, matrixType, DenseFPElementsAttr::get(matrixType, values));
 }
 
 Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                   RankedTensorType resultType, Value lhs,
                                   Value rhs) {
-  Value zero = b.create<arith::ConstantOp>(
-      loc, b.getZeroAttr(resultType.getElementType()));
-  Value emptyTensor = b.create<mlir::tensor::EmptyOp>(
-      loc, resultType.getShape(), resultType.getElementType(),
+  Value zero = arith::ConstantOp::create(
+      b, loc, b.getZeroAttr(resultType.getElementType()));
+  Value emptyTensor = mlir::tensor::EmptyOp::create(
+      b, loc, resultType.getShape(), resultType.getElementType(),
       /*dyn_size=*/ValueRange{});
   Value zeroTensor =
-      b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
+      linalg::FillOp::create(b, loc, zero, emptyTensor).getResult(0);
 
   switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
   case 1:
-    return b
-        .create<linalg::VecmatOp>(loc, TypeRange{resultType},
-                                  ValueRange{lhs, rhs}, ValueRange{zeroTensor})
+    return linalg::VecmatOp::create(b, loc, TypeRange{resultType},
+                                    ValueRange{lhs, rhs},
+                                    ValueRange{zeroTensor})
         .getResult(0);
   case 2:
-    return b
-        .create<linalg::MatmulOp>(loc, TypeRange{resultType},
-                                  ValueRange{lhs, rhs}, ValueRange{zeroTensor})
+    return linalg::MatmulOp::create(b, loc, TypeRange{resultType},
+                                    ValueRange{lhs, rhs},
+                                    ValueRange{zeroTensor})
         .getResult(0);
   default:
     assert(false && "unhandled matmul type");
@@ -165,7 +166,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
 
 /// Converts stablehlo.fft operation to Linalg ops.
 struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
@@ -210,17 +211,16 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
 
 struct OptimizationBarrierOpConversion final
     : OpConversionPattern<mlir::stablehlo::OptimizationBarrierOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::OptimizationBarrierOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> outputs;
     for (Value operand : adaptor.getOperands()) {
-      outputs.push_back(
-          rewriter
-              .create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), operand)
-              .getResult(0));
+      outputs.push_back(IREE::Util::OptimizationBarrierOp::create(
+                            rewriter, op.getLoc(), operand)
+                            .getResult(0));
     }
     rewriter.replaceOp(op, outputs);
     return success();
@@ -291,7 +291,7 @@ static void rewriteFuncAttrs(func::FuncOp funcOp) {
 
 // We need to convert func ops in order to convert types.
 struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
@@ -340,7 +340,7 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
 };
 
 struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
-  using OpConversionPattern<tensor::EmptyOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(tensor::EmptyOp op, OpAdaptor adaptor,
@@ -362,7 +362,7 @@ struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
 };
 
 struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
-  using OpConversionPattern<ml_program::GlobalOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(ml_program::GlobalOp globalOp, OpAdaptor adaptor,
@@ -433,10 +433,9 @@ Value scalarToTensor(OpBuilder &builder, Type /*type*/, ValueRange inputs,
   if (isa<ShapedType>(inputs.front().getType())) {
     return Value();
   }
-  return builder
-      .create<tensor::FromElementsOp>(
-          loc, RankedTensorType::get({}, inputs.front().getType()),
-          inputs.front())
+  return tensor::FromElementsOp::create(
+             builder, loc, RankedTensorType::get({}, inputs.front().getType()),
+             inputs.front())
       .getResult();
 }
 

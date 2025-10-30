@@ -211,11 +211,53 @@ static iree_status_t iree_hal_elf_executable_issue_call(
                         ret);
 }
 
+static iree_host_size_t iree_hal_elf_executable_export_count(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_elf_executable_t* executable =
+      (iree_hal_elf_executable_t*)base_executable;
+  return iree_hal_executable_library_export_count(executable->library.v0);
+}
+
+static iree_status_t iree_hal_elf_executable_export_info(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  iree_hal_elf_executable_t* executable =
+      (iree_hal_elf_executable_t*)base_executable;
+  return iree_hal_executable_library_export_info(executable->library.v0,
+                                                 export_ordinal, out_info);
+}
+
+static iree_status_t iree_hal_elf_executable_export_parameters(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  iree_hal_elf_executable_t* executable =
+      (iree_hal_elf_executable_t*)base_executable;
+  return iree_hal_executable_library_export_parameters(
+      executable->library.v0, export_ordinal, capacity, out_parameters);
+}
+
+static iree_status_t iree_hal_elf_executable_lookup_export_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  iree_hal_elf_executable_t* executable =
+      (iree_hal_elf_executable_t*)base_executable;
+  return iree_hal_executable_library_lookup_export_by_name(
+      executable->library.v0, name, out_export_ordinal);
+}
+
 static const iree_hal_local_executable_vtable_t iree_hal_elf_executable_vtable =
     {
         .base =
             {
                 .destroy = iree_hal_elf_executable_destroy,
+                .export_count = iree_hal_elf_executable_export_count,
+                .export_info = iree_hal_elf_executable_export_info,
+                .export_parameters = iree_hal_elf_executable_export_parameters,
+                .lookup_export_by_name =
+                    iree_hal_elf_executable_lookup_export_by_name,
             },
         .issue_call = iree_hal_elf_executable_issue_call,
 };

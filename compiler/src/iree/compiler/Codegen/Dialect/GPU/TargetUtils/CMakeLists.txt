@@ -17,8 +17,10 @@ iree_cc_library(
     "ConfigUtils.h"
   SRCS
     "ConfigUtils.cpp"
+    "ReductionConfigUtils.cpp"
   DEPS
     LLVMSupport
+    MLIRAnalysis
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
@@ -33,6 +35,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )
 

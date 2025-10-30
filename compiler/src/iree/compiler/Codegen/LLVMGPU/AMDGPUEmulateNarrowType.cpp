@@ -24,7 +24,7 @@ namespace {
 
 struct ConvertRawBufferCast final
     : OpConversionPattern<amdgpu::FatRawBufferCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(amdgpu::FatRawBufferCastOp op, OpAdaptor adaptor,

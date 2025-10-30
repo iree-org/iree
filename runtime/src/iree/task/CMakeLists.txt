@@ -68,11 +68,12 @@ iree_cc_library(
     "topology_cpuinfo.c"
     "topology_darwin.c"
     "topology_emscripten.c"
+    "topology_fallback.c"
+    "topology_sysfs.c"
     "topology_win32.c"
     "worker.c"
     "worker.h"
   DEPS
-    ${IREE_CPUINFO_TARGET}
     iree::base
     iree::base::internal
     iree::base::internal::atomic_slist
@@ -199,9 +200,27 @@ iree_cc_test(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-if(NOT IREE_ENABLE_CPUINFO)
-  target_compile_definitions(iree_task_task
-    PUBLIC
-      "IREE_TASK_CPUINFO_DISABLED=1"
-  )
+# Topology implementation selection.
+# All topology sources are compiled unconditionally (required for Bazel).
+# Files self-select based on platform guards and IREE_HAVE_CPUINFO.
+#
+# Priority (first match wins):
+# 1. cpuinfo (if IREE_ENABLE_CPUINFO=ON)
+# 2. sysfs (Linux/Android, excluding Emscripten)
+# 3. Platform-specific (Darwin, Windows, Emscripten)
+# 4. Fallback (single-threaded conservative topology)
+
+if(IREE_ENABLE_CPUINFO)
+  target_compile_definitions(iree_task_task PRIVATE IREE_TASK_USE_CPUINFO=1)
+  message(STATUS "IREE task topology: using cpuinfo")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN)
+  message(STATUS "IREE task topology: using sysfs (Linux)")
+elseif(APPLE)
+  message(STATUS "IREE task topology: using platform-specific (Darwin)")
+elseif(WIN32)
+  message(STATUS "IREE task topology: using platform-specific (Windows)")
+elseif(EMSCRIPTEN)
+  message(STATUS "IREE task topology: using platform-specific (Emscripten)")
+else()
+  message(STATUS "IREE task topology: using fallback (single-threaded)")
 endif()

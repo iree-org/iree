@@ -1,0 +1,125 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+CHECK_TESTS = [
+    "dynamic_abs.mlir",
+    "dynamic_add.mlir",
+    "dynamic_dot.mlir",
+    "dynamic_reduce_min.mlir",
+    "dynamic_torch_index_select_high_rank.mlir",
+    "dynamic_torch_index_select_negative.mlir",
+    "dynamic_torch_index_select_scalar.mlir",
+    "dynamic_torch_index_select_vector.mlir",
+]
+
+CPU_SPECIFIC_TESTS = [
+    "lowering_config.mlir",
+]
+
+NON_CHECK_TESTS = [
+    "globals_ml_program.mlir",
+]
+
+iree_check_single_backend_test_suite(
+    name = "check_stablehlo_regression_llvm-cpu",
+    srcs = enforce_glob(
+        CHECK_TESTS + CPU_SPECIFIC_TESTS,
+        include = ["*.mlir"],
+        exclude = NON_CHECK_TESTS,
+    ),
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_stablehlo_regression_vmvx",
+    srcs = enforce_glob(
+        CHECK_TESTS,
+        include = ["*.mlir"],
+        exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
+    ),
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_stablehlo_regression_vulkan-spirv",
+    srcs = enforce_glob(
+        CHECK_TESTS,
+        include = ["*.mlir"],
+        exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
+    ),
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_stablehlo_regression_cuda",
+    srcs = enforce_glob(
+        CHECK_TESTS,
+        include = ["*.mlir"],
+        exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
+    ),
+    driver = "cuda",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_stablehlo_regression_hip",
+    srcs = enforce_glob(
+        CHECK_TESTS,
+        include = ["*.mlir"],
+        exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
+    ),
+    compiler_flags = [
+        "--iree-opt-level=O3",
+    ],
+    driver = "hip",
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-amd",
+    ],
+    target_backend = "rocm",
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        NON_CHECK_TESTS,
+        include = ["*.mlir"],
+        exclude = CPU_SPECIFIC_TESTS + CHECK_TESTS,
+    ),
+    cfg = "//tests:lit.cfg.py",
+    tags = [
+        "driver=local-task",
+        "hostonly",
+    ],
+    tools = [
+        "//tools:iree-run-mlir",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
@@ -190,15 +191,14 @@ struct GlobalOpInterfaceExternalModel
     auto globalOp = cast<ml_program::GlobalOp>(op);
     if (globalOp.getIsMutable()) {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadOp::create(builder, loc, globalOp.getType(),
+                                           FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     } else {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadConstOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadConstOp::create(
+              builder, loc, globalOp.getType(),
+              FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     }
   }
@@ -208,9 +208,8 @@ struct GlobalOpInterfaceExternalModel
                                                    OpBuilder &builder) const {
     auto globalOp = cast<ml_program::GlobalOp>(op);
     return cast<IREE::Util::GlobalStoreOpInterface>(
-        builder
-            .create<ml_program::GlobalStoreOp>(
-                loc, FlatSymbolRefAttr::get(globalOp), value)
+        ml_program::GlobalStoreOp ::create(
+            builder, loc, FlatSymbolRefAttr::get(globalOp), value)
             .getOperation());
   }
 };
@@ -401,6 +400,18 @@ struct HoistableLinalgOpInterfaceHelper {
   }
 };
 
+/// TODO(jtuyls): Remove when added to upstream.
+struct ExpandShapeOpValueBoundsInterface
+    : public ValueBoundsOpInterface::ExternalModel<
+          ExpandShapeOpValueBoundsInterface, memref::ExpandShapeOp> {
+  void populateBoundsForShapedValueDim(Operation *op, Value value, int64_t dim,
+                                       ValueBoundsConstraintSet &cstr) const {
+    auto expandOp = cast<memref::ExpandShapeOp>(op);
+    assert(value == expandOp.getResult() && "invalid value");
+    cstr.bound(value)[dim] == expandOp.getOutputShape()[dim];
+  }
+};
+
 } // namespace
 
 void registerUtilExternalModels(DialectRegistry &registry) {
@@ -448,33 +459,12 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             >::registerOpInterface(context);
       });
 
-  // TODO(matthias-springer): Use a helper instead of listing all ops. This is
-  // tricky because LinalgExtOps.td includes YieldOp.
   registry.addExtension(+[](MLIRContext *context,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-    IREE::LinalgExt::ScatterOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::ScatterOp>>(*context);
-    IREE::LinalgExt::SortOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::SortOp>>(*context);
-    IREE::LinalgExt::FftOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::FftOp>>(*context);
-    IREE::LinalgExt::ScanOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::ScanOp>>(*context);
-    IREE::LinalgExt::TopkOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::TopkOp>>(*context);
-    IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(
-        *context);
-    IREE::LinalgExt::WinogradFilterTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradFilterTransformOp>>(
-        *context);
-    IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(
-        *context);
-    IREE::LinalgExt::Im2colOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::Im2colOp>>(*context);
-    IREE::LinalgExt::AttentionOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::AttentionOp>>(*context);
+    LinalgOpTiedOpInterfaceHelper<
+#define GET_OP_LIST
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
+        >::registerOpInterface(context);
   });
 
   // Hoistable Op Interface registration.
@@ -539,6 +529,12 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         IREE::Util::AssumeIntOp::attachInterface<
             UtilAssumeIntValueBoundsOpInterface>(*context);
       });
+
+  registry.addExtension(+[](MLIRContext *context,
+                            memref::MemRefDialect *dialect) {
+    memref::ExpandShapeOp::attachInterface<ExpandShapeOpValueBoundsInterface>(
+        *context);
+  });
 }
 
 } // namespace mlir::iree_compiler

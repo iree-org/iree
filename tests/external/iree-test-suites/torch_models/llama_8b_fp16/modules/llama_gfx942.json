@@ -1,0 +1,14 @@
+{
+  "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/llama_8b_fp16/bs4-2025-10-22.mlir",
+  "compiler_flags": [
+      "--iree-hal-target-device=hip",
+      "--iree-hip-target=gfx942",
+      "--iree-opt-level=O3",
+      "--iree-dispatch-creation-propagate-collapse-across-expands=true",
+      "--iree-hip-enable-tensor-ukernels",
+      "--iree-hip-specialize-dispatches",
+      "--iree-stream-resource-memory-model=discrete",
+      "--iree-hal-indirect-command-buffers=true",
+      "--iree-hal-memoization=true"
+  ]
+}

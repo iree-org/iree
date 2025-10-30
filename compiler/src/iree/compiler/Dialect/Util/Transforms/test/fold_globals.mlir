@@ -98,6 +98,21 @@ util.func @foo(%arg0: index) -> (index, index, index) {
 
 // -----
 
+// Tests that we don't inline immutable globals with dialect attrs.
+// We could support this with an attr interface but today are conservative. The
+// loss here is that CSE is unlikely to fold identical globals in local scopes.
+
+// CHECK: util.global private @dont_inline
+util.global private @dont_inline {some.attr = "hello!"} = 5 : index
+// CHECK: @ignore_dialect_attrs
+util.func @ignore_dialect_attrs() -> index {
+  // CHECK: util.global.load immutable @dont_inline
+  %0 = util.global.load immutable @dont_inline : index
+  util.return %0 : index
+}
+
+// -----
+
 // CHECK: util.global private @immutable_initializer_local
 util.global private mutable @immutable_initializer_local : index
 // CHECK: util.global private @immutable_initializer_callee

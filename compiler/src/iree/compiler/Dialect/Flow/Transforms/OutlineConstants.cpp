@@ -114,7 +114,7 @@ static std::string getConstantName(ConstantDef &def) {
 struct OutlineConstantsPass
     : public IREE::Flow::impl::OutlineConstantsPassBase<OutlineConstantsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
       return;
 
@@ -132,9 +132,9 @@ struct OutlineConstantsPass
 
       // New immutable global takes the constant attribute in its specified
       // encoding.
-      auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-          def.op->getLoc(), getConstantName(def), /*isMutable=*/false, def.type,
-          def.value);
+      auto globalOp = IREE::Util::GlobalOp::create(
+          moduleBuilder, def.op->getLoc(), getConstantName(def),
+          /*isMutable=*/false, def.type, def.value);
       globalOp.setPrivate();
       IREE::Util::HoistableAttrInterface::gatherHoistableAttrs(def.op,
                                                                globalOp);

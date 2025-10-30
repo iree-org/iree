@@ -27,16 +27,17 @@ namespace {
 static Value getStringRodata(Location loc, StringAttr attr,
                              OpBuilder &builder) {
   if (!attr) {
-    return builder.create<IREE::VM::ConstRefZeroOp>(
-        loc, IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()));
+    return IREE::VM::ConstRefZeroOp::create(
+        builder, loc,
+        IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()));
   }
-  return builder.create<IREE::VM::RodataInlineOp>(loc, attr);
+  return IREE::VM::RodataInlineOp::create(builder, loc, attr);
 }
 
 static std::pair<Value, Value> buildKeyTable(Location loc, ArrayAttr keysAttr,
                                              OpBuilder &builder) {
-  auto tableOp = builder.create<IREE::VM::RodataTableInlineOp>(
-      loc, builder.getIntegerType(32), keysAttr);
+  auto tableOp = IREE::VM::RodataTableInlineOp::create(
+      builder, loc, builder.getIntegerType(32), keysAttr);
   return {tableOp.getTableResult(), tableOp.getDataResult()};
 }
 
@@ -64,8 +65,9 @@ static Value buildIndirectSpans(Location loc, ValueRange parameterOffsets,
     recordValue(bufferOffset);
     recordValue(bufferLength);
   }
-  Value rodataBuffer = builder.create<IREE::VM::RodataInlineOp>(
-      loc, IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()),
+  Value rodataBuffer = IREE::VM::RodataInlineOp::create(
+      builder, loc,
+      IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()),
       builder.getI64VectorAttr(values));
   if (dynamicUpdates.empty()) {
     // Fast-path for all constant data.
@@ -73,18 +75,19 @@ static Value buildIndirectSpans(Location loc, ValueRange parameterOffsets,
   }
 
   // Clone the rodata so we can mutate it.
-  Value rodataSize = builder.create<IREE::VM::BufferLengthOp>(
-      loc, builder.getI64Type(), rodataBuffer);
-  Value clonedBuffer = builder.create<IREE::VM::BufferCloneOp>(
-      loc, IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()),
-      rodataBuffer, builder.create<IREE::VM::ConstI32ZeroOp>(loc), rodataSize,
-      builder.create<IREE::VM::ConstI32Op>(loc, sizeof(uint32_t)));
+  Value rodataSize = IREE::VM::BufferLengthOp::create(
+      builder, loc, builder.getI64Type(), rodataBuffer);
+  Value clonedBuffer = IREE::VM::BufferCloneOp::create(
+      builder, loc,
+      IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()),
+      rodataBuffer, IREE::VM::ConstI32ZeroOp::create(builder, loc), rodataSize,
+      IREE::VM::ConstI32Op::create(builder, loc, sizeof(uint32_t)));
 
   // Perform all updates.
   for (auto [index, value] : dynamicUpdates) {
-    builder.create<IREE::VM::BufferStoreI64Op>(
-        loc, clonedBuffer, builder.create<IREE::VM::ConstI64Op>(loc, index),
-        value);
+    IREE::VM::BufferStoreI64Op::create(
+        builder, loc, clonedBuffer,
+        IREE::VM::ConstI64Op::create(builder, loc, index), value);
   }
 
   return clonedBuffer;
@@ -105,15 +108,15 @@ struct LoadOpConversion
         buildKeyTable(loadOp.getLoc(), adaptor.getSourceKeysAttr(), rewriter);
     SmallVector<Value> targetOffsets(
         adaptor.getSourceOffsets().size(),
-        rewriter.create<IREE::VM::ConstI64Op>(loadOp.getLoc(), 0));
+        IREE::VM::ConstI64Op::create(rewriter, loadOp.getLoc(), 0));
     auto spans =
         buildIndirectSpans(loadOp.getLoc(), adaptor.getSourceOffsets(),
                            targetOffsets, adaptor.getLengths(), rewriter);
     auto bufferType =
         IREE::VM::RefType::get(rewriter.getType<IREE::HAL::BufferType>());
     auto listType = IREE::VM::RefType::get(IREE::VM::ListType::get(bufferType));
-    auto callOp = rewriter.create<IREE::VM::CallOp>(
-        loadOp.getLoc(), importOp.getSymNameAttr(),
+    auto callOp = IREE::VM::CallOp::create(
+        rewriter, loadOp.getLoc(), importOp.getSymNameAttr(),
         TypeRange{
             listType,
         },
@@ -137,9 +140,9 @@ struct LoadOpConversion
     SmallVector<Value> buffers;
     buffers.reserve(targetOffsets.size());
     for (size_t i = 0; i < targetOffsets.size(); ++i) {
-      buffers.push_back(rewriter.create<IREE::VM::ListGetRefOp>(
-          loadOp.getLoc(), bufferType, callOp.getResult(0),
-          rewriter.create<IREE::VM::ConstI32Op>(loadOp.getLoc(), (int32_t)i)));
+      buffers.push_back(IREE::VM::ListGetRefOp::create(
+          rewriter, loadOp.getLoc(), bufferType, callOp.getResult(0),
+          IREE::VM::ConstI32Op::create(rewriter, loadOp.getLoc(), (int32_t)i)));
     }
     rewriter.replaceOp(loadOp, buffers);
     return success();

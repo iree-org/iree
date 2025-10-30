@@ -43,7 +43,7 @@ struct VerifyAffinitiesPass
     : public IREE::Stream::impl::VerifyAffinitiesPassBase<
           VerifyAffinitiesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp
             .walk<WalkOrder::PreOrder>([&](Operation *op) {
               if (isa<mlir::ModuleOp>(op)) {
@@ -62,6 +62,9 @@ struct VerifyAffinitiesPass
             })
             .wasInterrupted())
       return signalPassFailure();
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 

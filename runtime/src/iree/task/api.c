@@ -107,6 +107,22 @@ IREE_FLAG(string, task_topology_performance_level, "any",
           "Selects only cores that match the specified performance level from\n"
           "[`any`, `low` (or `efficiency`), `high` (or `performance`)].");
 
+IREE_FLAG(
+    string, task_topology_distribution, "scatter",
+    "Strategy for distributing cores across cache domains (CCXs) within the\n"
+    "selected NUMA node(s) (use --task_topology_nodes to control NUMA "
+    "locality):\n"
+    "  `compact` - Fill cache domains sequentially (better for compute).\n"
+    "  `scatter` - Round-robin across domains (better for memory bandwidth).");
+
+IREE_FLAG(
+    string, task_topology_favor, "",
+    "High-level preset for common deployment scenarios (overrides "
+    "distribution and performance_level if specified):\n"
+    "  `latency`    - Minimize single-request latency (compact + high-perf).\n"
+    "  `throughput` - Maximize batch throughput (scatter + any-perf).\n"
+    "  `efficiency` - Minimize power consumption (compact + low-perf).");
+
 // Builds a bitmask of NUMA nodes that topologies should be created for.
 //
 // NOTE: because of the mask being 64-bits we have a 64-node limit.
@@ -179,6 +195,52 @@ static iree_status_t iree_task_topology_parse_performance_level(
                           value);
 }
 
+static iree_status_t iree_task_topology_parse_distribution(
+    const char* value, iree_task_topology_distribution_t* out_distribution) {
+  *out_distribution = IREE_TASK_TOPOLOGY_DISTRIBUTION_SCATTER;
+  if (strcmp(value, "compact") == 0) {
+    *out_distribution = IREE_TASK_TOPOLOGY_DISTRIBUTION_COMPACT;
+    return iree_ok_status();
+  } else if (strcmp(value, "scatter") == 0) {
+    *out_distribution = IREE_TASK_TOPOLOGY_DISTRIBUTION_SCATTER;
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "unknown value `%s` for distribution strategy; "
+                          "expected one of [compact, scatter]",
+                          value);
+}
+
+// Parses --task_topology_favor presets into distribution + performance_level.
+// Returns true if a preset was specified, false if flag was empty.
+static bool iree_task_topology_parse_favor_preset(
+    const char* value, iree_task_topology_performance_level_t* out_perf_level,
+    iree_task_topology_distribution_t* out_distribution) {
+  if (!value || strcmp(value, "") == 0) {
+    return false;  // No preset specified.
+  }
+
+  if (strcmp(value, "latency") == 0) {
+    // Minimize single-request latency: compact + high-performance cores.
+    *out_perf_level = IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_HIGH;
+    *out_distribution = IREE_TASK_TOPOLOGY_DISTRIBUTION_COMPACT;
+    return true;
+  } else if (strcmp(value, "throughput") == 0) {
+    // Maximize batch throughput: scatter + all available cores.
+    *out_perf_level = IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_ANY;
+    *out_distribution = IREE_TASK_TOPOLOGY_DISTRIBUTION_SCATTER;
+    return true;
+  } else if (strcmp(value, "efficiency") == 0) {
+    // Minimize power: compact + low-power cores.
+    *out_perf_level = IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_LOW;
+    *out_distribution = IREE_TASK_TOPOLOGY_DISTRIBUTION_COMPACT;
+    return true;
+  }
+
+  // Unknown preset - caller will handle error.
+  return false;
+}
+
 iree_status_t iree_task_topology_initialize_from_flags(
     iree_task_topology_node_id_t node_id, iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
@@ -193,11 +255,24 @@ iree_status_t iree_task_topology_initialize_from_flags(
     // Physical cores sourced from a specific NUMA node.
     iree_task_topology_performance_level_t performance_level =
         IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_ANY;
-    IREE_RETURN_IF_ERROR(iree_task_topology_parse_performance_level(
-        FLAG_task_topology_performance_level, &performance_level));
+    iree_task_topology_distribution_t distribution =
+        IREE_TASK_TOPOLOGY_DISTRIBUTION_SCATTER;
+
+    // Check if --task_topology_favor preset overrides individual flags.
+    if (iree_task_topology_parse_favor_preset(
+            FLAG_task_topology_favor, &performance_level, &distribution)) {
+      // Preset specified - use its values.
+    } else {
+      // No preset - parse individual flags.
+      IREE_RETURN_IF_ERROR(iree_task_topology_parse_performance_level(
+          FLAG_task_topology_performance_level, &performance_level));
+      IREE_RETURN_IF_ERROR(iree_task_topology_parse_distribution(
+          FLAG_task_topology_distribution, &distribution));
+    }
+
     return iree_task_topology_initialize_from_physical_cores(
-        node_id, performance_level, FLAG_task_topology_max_group_count,
-        out_topology);
+        node_id, performance_level, distribution,
+        FLAG_task_topology_max_group_count, out_topology);
   } else {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -287,6 +362,7 @@ static iree_status_t iree_task_flags_dump_task_topologies(
     iree_host_size_t topology_count = iree_math_count_ones_u64(node_mask);
     uint64_t node_mask_bits = node_mask;
     iree_task_topology_node_id_t node_base_id = 0;
+    iree_host_size_t topology_index = 0;
     for (iree_host_size_t i = 0; i < topology_count; ++i) {
       int node_offset =
           iree_task_affinity_set_count_trailing_zeros(node_mask_bits);
@@ -296,16 +372,23 @@ static iree_status_t iree_task_flags_dump_task_topologies(
       iree_task_topology_t topology;
       IREE_RETURN_IF_ERROR(
           iree_task_topology_initialize_from_flags(node_id, &topology));
-      iree_task_flags_dump_task_topology(i, &topology);
+      // Skip topologies with no worker groups.
+      if (topology.group_count > 0) {
+        iree_task_flags_dump_task_topology(topology_index++, &topology);
+      }
       iree_task_topology_deinitialize(&topology);
     }
   } else {
+    iree_host_size_t topology_index = 0;
     for (iree_host_size_t i = 0; i < cpu_ids_list.count; ++i) {
       iree_task_topology_t topology;
       IREE_RETURN_IF_ERROR(
           iree_task_topology_initialize_from_logical_cpu_set_string(
               cpu_ids_list.values[i], &topology));
-      iree_task_flags_dump_task_topology(i, &topology);
+      // Skip topologies with no worker groups.
+      if (topology.group_count > 0) {
+        iree_task_flags_dump_task_topology(topology_index++, &topology);
+      }
       iree_task_topology_deinitialize(&topology);
     }
   }
@@ -381,6 +464,7 @@ iree_status_t iree_task_executors_create_from_flags(
 
   // Create one executor per topology.
   iree_status_t status = iree_ok_status();
+  iree_host_size_t executor_index = 0;
   if (cpu_ids_list.count == 0) {
     // TODO(benvanik): macros to make this iteration easier (ala cpu_set
     // iterators).
@@ -398,14 +482,12 @@ iree_status_t iree_task_executors_create_from_flags(
       status = iree_task_topology_initialize_from_flags(node_id, &topology);
       if (!iree_status_is_ok(status)) break;
 
-      // TODO(benvanik): if group count is 0 then don't create the executor.
-      // Today the executor creation will fail with 0 groups so the program
-      // won't get in a weird state but it's probably not what a user would
-      // expect.
-
-      // Create executor with the given topology.
-      status = iree_task_executor_create(options, &topology, host_allocator,
-                                         &executors[i]);
+      // Skip topologies with no worker groups.
+      if (topology.group_count > 0) {
+        // Create executor with the given topology.
+        status = iree_task_executor_create(options, &topology, host_allocator,
+                                           &executors[executor_index++]);
+      }
 
       // Executor has consumed the topology and it can be dropped now.
       iree_task_topology_deinitialize(&topology);
@@ -419,14 +501,12 @@ iree_status_t iree_task_executors_create_from_flags(
           cpu_ids_list.values[i], &topology);
       if (!iree_status_is_ok(status)) break;
 
-      // TODO(benvanik): if group count is 0 then don't create the executor.
-      // Today the executor creation will fail with 0 groups so the program
-      // won't get in a weird state but it's probably not what a user would
-      // expect.
-
-      // Create executor with the given topology.
-      status = iree_task_executor_create(options, &topology, host_allocator,
-                                         &executors[i]);
+      // Skip topologies with no worker groups.
+      if (topology.group_count > 0) {
+        // Create executor with the given topology.
+        status = iree_task_executor_create(options, &topology, host_allocator,
+                                           &executors[executor_index++]);
+      }
 
       // Executor has consumed the topology and it can be dropped now.
       iree_task_topology_deinitialize(&topology);
@@ -435,10 +515,10 @@ iree_status_t iree_task_executors_create_from_flags(
   }
 
   if (iree_status_is_ok(status)) {
-    *out_executor_count = topology_count;
+    *out_executor_count = executor_index;
   } else {
     // Release executors for the caller in case we partially initialized them.
-    for (iree_host_size_t i = 0; i < topology_count; ++i) {
+    for (iree_host_size_t i = 0; i < executor_index; ++i) {
       iree_task_executor_release(executors[i]);
     }
   }

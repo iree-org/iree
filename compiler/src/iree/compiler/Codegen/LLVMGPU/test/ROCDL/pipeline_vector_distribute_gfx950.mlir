@@ -8,7 +8,7 @@
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target{for-rocdl=true})))))" \
 // RUN:   %s | FileCheck %s --check-prefix=MEMORY
 
-#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 256], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 256], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -47,13 +47,13 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //          CHECK:   scf.for {{.*}} = %c0 to %c512 step %c256 iter_args({{.*}}) -> (vector<2x2x1x1x4x1xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
-// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x4x1xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
-#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 256], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 256], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -89,14 +89,14 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_256x256x512_f16_f16()
 //          CHECK:   scf.for {{.*}} = %c0 to %c512 step %c256 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x2x1x1x4x1xf16>)
 //          CHECK:     arith.extf %[[ARG]] : vector<2x2x1x1x4x1xf16> to vector<2x2x1x1x4x1xf32>
-// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<2x2x1x1x4x1xf32> to vector<2x2x1x1x4x1xf16>
 //          CHECK:     scf.yield %[[TRUNC]] : vector<2x2x1x1x4x1xf16>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
-#config = #iree_gpu.lowering_config<{workgroup = [1, 1, 64, 64, 0], reduction = [0, 0, 0, 0, 256], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_m_count = 1, subgroup_n_count = 4}>
+#config = #iree_gpu.lowering_config<{workgroup = [1, 1, 64, 64, 0], reduction = [0, 0, 0, 0, 256], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_basis = [[1, 1, 1, 4, 1], [0, 1, 2, 3, 4]]}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -155,7 +155,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 256 = 1792.
 //          CHECK:   scf.for {{.*}} = %c0 to %c1792 step %c256 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x4x1xf16>)
 //          CHECK:     arith.extf %[[ARG]] : vector<4x1x1x1x4x1xf16> to vector<4x1x1x1x4x1xf32>
-// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<4x1x1x1x4x1xf32> to vector<4x1x1x1x4x1xf16>
 //          CHECK:     scf.yield %[[TRUNC]] : vector<4x1x1x1x4x1xf16>
 // CHECK-COUNT-32:   amdgpu.mfma
@@ -186,7 +186,7 @@ hal.executable @matmul_multiple_k {
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [10, 128, 64, 2048], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x128x64x2048xf16>> -> tensor<10x128x64x2048xf16>
         %5 = tensor.empty() : tensor<2x10x64x64xf16>
         %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2x10x64x64xf16>) -> tensor<2x10x64x64xf16>
-        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d2, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d4, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%3, %4 : tensor<2x128x64x2048xf16>, tensor<10x128x64x2048xf16>) outs(%6 : tensor<2x10x64x64xf16>) attrs =  {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 0, 1, 128], workgroup = [1, 1, 64, 64, 0, 0], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 4}>} {
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d2, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d4, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%3, %4 : tensor<2x128x64x2048xf16>, tensor<10x128x64x2048xf16>) outs(%6 : tensor<2x10x64x64xf16>) attrs =  {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 0, 1, 128], workgroup = [1, 1, 64, 64, 0, 0], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_basis = [[1, 1, 1, 4, 1, 1], [0, 1, 2, 3, 4, 5]]}>} {
         ^bb0(%in: f16, %in_0: f16, %out: f16):
           %8 = arith.mulf %in, %in_0 : f16
           %9 = arith.addf %8, %out : f16
@@ -213,7 +213,7 @@ hal.executable @matmul_multiple_k {
 
 // Basic f8, f8 -> f32 matmul. (intrinsic with shape, m = 16, n = 16, k = 128)
 
-#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 1024], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x128_F8E4M3FN>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 1024], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x128_F8E4M3FN>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -251,14 +251,14 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_256x256x256_16x16x128_f8_f32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 2 times
 // along the K dimension. So in total 8 mfma ops.
-// CHECK-COUNT-8:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 128 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<4xf32>
+// CHECK-COUNT-8:     amdgpu.mfma 16x16x128 {{.*}} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<4xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
 // Basic i8, i8 -> i32 matmul.
 
-#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 512], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x64_I8>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 512], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x64_I8>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -296,14 +296,14 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_256x256x256_i8_i32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 4 times
 // along the K dimension. So in total 16 mfma ops.
-// CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 64 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
+// CHECK-COUNT-16:     amdgpu.mfma 16x16x64 {{.*}} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xi32>, memref<256x256xi32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
 // Basic f8, f8 -> f32 matmul. (intrinsic with shape, m = 32, n = 32, k = 64)
 
-#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 1024], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x64_F8E4M3FN>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 1024], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x64_F8E4M3FN>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -341,14 +341,14 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_256x256x256_32x32x64_f8_f32()
 // Each subgroup handles 1 * 1 tiles, and for each tile we accumulate (256/64) = 4 times
 // along the K dimension. So in total 4 mfma ops.
-//  CHECK-COUNT-4:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 64 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<16xf32>
+//  CHECK-COUNT-4:     amdgpu.mfma 32x32x64 {{.*}} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<16xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
 // Basic i8, i8 -> i32 matmul_transpose_b.
 
-#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 512], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x64_I8>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 512], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x64_I8>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -392,7 +392,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func.func @matmul_transpose_b_256x256x256_i8_i32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 4 times
 // along the K dimension. So in total 16 mfma ops.
-// CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 64 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
+// CHECK-COUNT-16:     amdgpu.mfma 16x16x64 {{.*}} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xi32>, memref<256x256xi32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
@@ -431,8 +431,8 @@ hal.executable private @attention_20x4096x64x4096x64 {
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>],
                      lowering_config = #config,
                      decomposition_config = {
-                      qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_m_count = 2, subgroup_n_count = 1, promote_operands = [0, 1]}>},
-                      pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 1, promote_operands = [1]}>}
+                      qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>, subgroup_basis = [[1, 2, 1, 1, 1], [0, 1, 2, 3]], promote_operands = [0, 1]}>},
+                      pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_basis = [[1, 2, 1, 1, 1], [0, 1, 3, 4]], promote_operands = [1]}>}
                      }}
                      ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x4096x64xf16>) {
                       ^bb0(%score: f32):
@@ -458,8 +458,8 @@ hal.executable private @attention_20x4096x64x4096x64 {
 
 // CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c128
 // CHECK-SAME: -> (vector<2x1x1xf32>, vector<2x1x1xf32>, vector<2x4x1x1x1x4xf32>)
-// CHECK-COUNT-32:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 32 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
-// CHECK-COUNT-16:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK-COUNT-32:  amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-16:  amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
@@ -505,8 +505,8 @@ hal.executable private @attention_mfma_32x32x16 {
                                                          affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>],
                                                          lowering_config = #config,
                                                          decomposition_config = {
-                                                          qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>, subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [0, 1]}>},
-                                                          pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>, subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1]}>}
+                                                          qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>, subgroup_basis = [[1, 1, 4, 1, 1, 1], [0, 1, 2, 3, 4]], promote_operands = [0, 1]}>},
+                                                          pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>, subgroup_basis = [[1, 1, 4, 1, 1, 1], [0, 1, 2, 4, 5]], promote_operands = [1]}>}
                                                          }}
         ins(%4, %5, %6, %cst : tensor<24x64x4608x128xf16>, tensor<24x4608x128xf16>, tensor<24x4608x128xf16>, f16) outs(%8 : tensor<24x64x4608x128xf16>) {
               ^bb0(%score: f32):
@@ -526,8 +526,8 @@ hal.executable private @attention_mfma_32x32x16 {
 // CHECK-LABEL: func.func @attention_mfma_32x32x16()
 // CHECK: scf.for %{{.*}} = %c0 to %c4608 step %c64
 // CHECK-SAME: -> (vector<1x1x1xf32>, vector<1x1x1xf32>, vector<1x2x1x4x1x4xf32>)
-// CHECK-COUNT-16:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
-// CHECK-COUNT-8:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 8 : i32, m = 32 : i32, n = 32 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
+// CHECK-COUNT-16:  amdgpu.mfma 32x32x16 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
+// CHECK-COUNT-8:  amdgpu.mfma 32x32x8 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is

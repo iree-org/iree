@@ -51,7 +51,7 @@ static SmallVector<unsigned> getReductionDims(TilingInterface op) {
 
 static FailureOr<IREE::Flow::DispatchRegionOp>
 tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
-                        ArrayRef<OpFoldResult> splitSize) {
+                        ArrayRef<OpFoldResult> splitSize, bool fusePad) {
   IRRewriter::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
 
@@ -86,7 +86,7 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   // Only fuse along the dest operand.
   scf::SCFTileAndFuseOptions::ControlFnTy fusionControlFn =
-      [](tensor::ExtractSliceOp, OpResult, bool isDestArg)
+      [](tensor::ExtractSliceOp, OpResult result, bool isDestArg)
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
     if (isDestArg) {
       return scf::SCFTileAndFuseOptions::ControlFnResult{false};
@@ -95,6 +95,17 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   };
   tileAndFuseOptions.setFusionControlFn(fusionControlFn);
   tileAndFuseOptions.setTilingOptions(std::move(options));
+
+  if (fusePad) {
+    MLIRContext *context = rewriter.getContext();
+    RewritePatternSet cleanupPatterns(context);
+    // When fusing pads we do not want to generate zeroSliceGuards.
+    cleanupPatterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+        context,
+        [](tensor::ExtractSliceOp) { return /*zeroSliceGuard=*/false; });
+    tileAndFuseOptions.cleanupPatterns =
+        FrozenRewritePatternSet(std::move(cleanupPatterns));
+  }
 
   FailureOr<scf::SCFTileAndFuseResult> result =
       scf::tileConsumerAndFuseProducersUsingSCF(rewriter, op,
@@ -178,15 +189,13 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
     return;
   }
 
-  SmallVector<IREE::Flow::DispatchRegionOp> splitReductionDispatches;
   for (auto [op, tileSizes] : reductionOps) {
     FailureOr<IREE::Flow::DispatchRegionOp> formedDispatch =
-        tileOpAndWrapInDispatch(rewriter, op, tileSizes);
+        tileOpAndWrapInDispatch(rewriter, op, tileSizes, enableFusePad);
     if (failed(formedDispatch)) {
       op->emitOpError("failed to form split reduction dispatch");
       return signalPassFailure();
     }
-    splitReductionDispatches.push_back(formedDispatch.value());
   }
 
   // Run some canonicalization patterns within dispatches.

@@ -46,8 +46,7 @@ class SPIRVLowerExecutableTargetPass final
     : public impl::SPIRVLowerExecutableTargetPassBase<
           SPIRVLowerExecutableTargetPass> {
 public:
-  using impl::SPIRVLowerExecutableTargetPassBase<
-      SPIRVLowerExecutableTargetPass>::SPIRVLowerExecutableTargetPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -64,7 +63,7 @@ public:
 } // namespace
 
 void SPIRVLowerExecutableTargetPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);

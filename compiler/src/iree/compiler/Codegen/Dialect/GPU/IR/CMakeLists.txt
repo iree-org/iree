@@ -54,11 +54,15 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowInterfaces
+    MLIRDestinationStyleOpInterface
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLoopLikeInterface
+    MLIRParallelCombiningOpInterface
     MLIRParser
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
@@ -70,6 +74,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
     iree::compiler::bindings::c::headers

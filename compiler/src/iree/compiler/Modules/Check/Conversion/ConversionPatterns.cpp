@@ -26,21 +26,21 @@ struct OptionalCheckImportConversion : public VMImportOpConversion<T, Adaptor> {
   LogicalResult
   matchAndRewrite(T op, typename T::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto hasImport = rewriter.create<IREE::VM::ImportResolvedOp>(
-        op.getLoc(), rewriter.getI32Type(), this->importOp.getName());
+    auto hasImport = IREE::VM::ImportResolvedOp::create(
+        rewriter, op.getLoc(), rewriter.getI32Type(), this->importOp.getName());
     auto *followingBlock = rewriter.splitBlock(rewriter.getInsertionBlock(),
                                                rewriter.getInsertionPoint());
     auto *callBlock = rewriter.createBlock(followingBlock);
     rewriter.setInsertionPointAfter(hasImport);
-    rewriter.create<IREE::VM::CondBranchOp>(op.getLoc(), hasImport, callBlock,
-                                            followingBlock);
+    IREE::VM::CondBranchOp::create(rewriter, op.getLoc(), hasImport, callBlock,
+                                   followingBlock);
     rewriter.setInsertionPointToStart(callBlock);
     auto results = rewriteToCall(op, adaptor, this->importOp,
                                  *this->getTypeConverter(), rewriter);
     if (!results.has_value())
       return failure();
     rewriter.replaceOp(op, results.value());
-    rewriter.create<IREE::VM::BranchOp>(op.getLoc(), followingBlock);
+    IREE::VM::BranchOp::create(rewriter, op.getLoc(), followingBlock);
     return success();
   }
 };

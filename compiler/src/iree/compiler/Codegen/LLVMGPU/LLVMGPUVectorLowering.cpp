@@ -49,9 +49,9 @@ struct PromoteContractOperands final
     Value rhs =
         promoteToElementType(loc, rewriter, contractOp.getRhs(), resultElType);
 
-    auto replacement = rewriter.create<vector::ContractionOp>(
-        loc, lhs, rhs, contractOp.getAcc(), contractOp.getIndexingMaps(),
-        contractOp.getIteratorTypes());
+    auto replacement = vector::ContractionOp::create(
+        rewriter, loc, lhs, rhs, contractOp.getAcc(),
+        contractOp.getIndexingMaps(), contractOp.getIteratorTypes());
 
     if (!maskOp) {
       return replacement.getResult();
@@ -77,10 +77,10 @@ struct PromoteContractOperands final
       promotedType = vecType.clone(promotedType);
 
     if (isa<FloatType>(dstElementType))
-      return rewriter.create<arith::ExtFOp>(loc, promotedType, v);
+      return arith::ExtFOp::create(rewriter, loc, promotedType, v);
     // For integer types, vector.contract only supports signless integer types
     // and promotion happens via sign extension.
-    return rewriter.create<arith::ExtSIOp>(loc, promotedType, v);
+    return arith::ExtSIOp::create(rewriter, loc, promotedType, v);
   }
 };
 
@@ -97,7 +97,7 @@ struct PromoteContractOperands final
 /// upstream does not have a mechanism of registering canonicalization without
 /// adding dependencies like this, we manually add it where it is needed.
 struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(arith::SelectOp selectOp,
                                 PatternRewriter &rewriter) const override {
@@ -147,7 +147,7 @@ struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
 // Set FMF to fold arith.mulf + arith.addf -> math.fma and thus enable
 // optimizations w.r.t vector.multi_reduction(fma).
 struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::MultiDimReductionOp redOp,
                                 PatternRewriter &rewriter) const override {
@@ -193,7 +193,7 @@ struct LLVMGPUVectorLoweringPass final
     registry.insert<math::MathDialect>();
   }
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *ctx = &getContext();
 
     // Uplift arith ops to math.fma before lowering high level vector ops.

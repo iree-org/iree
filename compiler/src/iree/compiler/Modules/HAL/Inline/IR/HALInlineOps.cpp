@@ -151,7 +151,7 @@ namespace {
 /// Folds hal_inline.buffer_view.subspans into buffer view creation subspans.
 struct FoldBufferViewCreateSubspan
     : public OpRewritePattern<BufferViewCreateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BufferViewCreateOp op,
                                 PatternRewriter &rewriter) const override {
     auto ip = rewriter.saveInsertionPoint();
@@ -199,7 +199,7 @@ namespace {
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BufferViewBufferOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(

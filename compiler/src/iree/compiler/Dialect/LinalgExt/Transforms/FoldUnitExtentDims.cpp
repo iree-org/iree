@@ -20,8 +20,7 @@ namespace {
 
 struct FoldUnitExtentDimsPass final
     : impl::FoldUnitExtentDimsPassBase<FoldUnitExtentDimsPass> {
-  using impl::FoldUnitExtentDimsPassBase<
-      FoldUnitExtentDimsPass>::FoldUnitExtentDimsPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry

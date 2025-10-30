@@ -57,7 +57,7 @@ static SmallVector<T> applyProjectedPermutation(const SmallVectorImpl<T> &input,
 // is not affine (index values come from a tensor).
 namespace {
 struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
     // Check if extractOp is inside a generic op
@@ -96,8 +96,8 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
           });
       SmallVector<Value, 4> indices = extractOp.getIndices();
       indices = applyProjectedPermutation(indices, perm);
-      auto newExtract = rewriter.create<tensor::ExtractOp>(
-          extractOp.getLoc(), operand.get(), indices);
+      auto newExtract = tensor::ExtractOp::create(rewriter, extractOp.getLoc(),
+                                                  operand.get(), indices);
       extractOps.push_back(newExtract);
     }
     rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
@@ -167,6 +167,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
         ElementwiseOpsFusabilityOptions options;
         options.fuseMultiReduction = fuseMultiReduction;
         options.fuseTruncateOps = fuseTruncateOps;
+        options.fuseBroadcastConsumers = fuseBroadcastOps;
         return areFusableAsElementwiseOps(context, fusedOperand, options);
       };
 

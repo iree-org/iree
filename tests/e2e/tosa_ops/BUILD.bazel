@@ -63,7 +63,6 @@ iree_check_single_backend_test_suite(
     srcs = ALL_SRCS,
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
-    input_type = "tosa",
     target_backend = "llvm-cpu",
 )
 
@@ -71,7 +70,6 @@ iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task",
     srcs = ALL_SRCS,
     driver = "local-task",
-    input_type = "tosa",
     target_backend = "vmvx",
 )
 
@@ -83,7 +81,6 @@ iree_check_single_backend_test_suite(
     ],
     # Sync has more strict runtime error checking for mis-compiled programs.
     driver = "local-sync",
-    input_type = "tosa",
     target_backend = "vmvx",
 )
 
@@ -91,7 +88,6 @@ iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = ALL_SRCS,
     driver = "vulkan",
-    input_type = "tosa",
     target_backend = "vulkan-spirv",
 )
 
@@ -99,7 +95,6 @@ iree_check_single_backend_test_suite(
     name = "check_metal-spirv_metal",
     srcs = ALL_SRCS,
     driver = "metal",
-    input_type = "tosa",
     target_backend = "metal-spirv",
 )
 
@@ -159,7 +154,6 @@ iree_check_single_backend_test_suite(
         "--iree-stream-emulate-memset",
     ],
     driver = "cuda",
-    input_type = "tosa",
     runner_args = ["--cuda_use_streams=false"],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -176,7 +170,6 @@ iree_check_single_backend_test_suite(
     name = "check_cuda_stream",
     srcs = ROCM_AND_CUDA_SRCS,
     driver = "cuda",
-    input_type = "tosa",
     runner_args = ["--cuda_use_streams=true"],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -193,7 +186,6 @@ iree_check_single_backend_test_suite(
     name = "check_rocm_hip_stream",
     srcs = ROCM_AND_CUDA_SRCS,
     driver = "hip",
-    input_type = "tosa",
     runner_args = [
         "--hip_use_streams=true",
     ],

@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow{fission-multi-trip}))" %s | FileCheck %s --check-prefixes=CHECK-ALL,MULTI
-// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow))" %s | FileCheck %s --check-prefixes=CHECK-ALL,SINGLE
+// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow{fission-multi-trip}))" --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,MULTI
+// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow))" --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,SINGLE
 
 // CHECK-ALL-LABEL: @fission_global_read_to_private_write
 // CHECK-ALL-SAME: %[[ARG0:.*]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
@@ -66,8 +66,7 @@ func.func @fission_global_read_to_workgroup_write(%arg0: index, %arg1: memref<?x
   }
   return
 }
-// MULTI: %[[SUB:.*]] = arith.subi %c16, %[[ARG0]]
-// MULTI: %[[DIV:.*]] = arith.ceildivui %[[SUB]], %c128
+// MULTI: %[[DIV:.*]] = affine.apply affine_map<()[s0] -> ((-s0 + 16) ceildiv 128)>()[%[[ARG0]]]
 // MULTI: %[[ALLOCA:.*]] = memref.alloca(%[[DIV]])
 // MULTI: scf.for %[[ITER:.*]] = %[[ARG0]] to %c16 step %c128 {
 // MULTI:   %[[READ:.*]] = vector.transfer_read %arg1[%c0, %c0], %cst {in_bounds = [true, true]}

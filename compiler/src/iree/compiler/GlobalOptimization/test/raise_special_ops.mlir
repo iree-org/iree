@@ -293,6 +293,26 @@ util.func public @test_slice_middle(%A : tensor<64x64x64xf32>, %B : tensor<64x64
 
 // -----
 
+#map = affine_map<(d0, d1) -> (d0, d1)>
+util.func public @test_extract_to_transpose(%A : tensor<64x64xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
+  ^bb0(%out: f32):
+    %i0 = linalg.index 0 : index
+    %i1 = linalg.index 1 : index
+    %extracted = tensor.extract %A[%i1, %i0] : tensor<64x64xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<64x64xf32>
+  util.return %0 : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: util.func public @test_extract_to_transpose
+//       CHECK:   %[[RESULT:.+]] = linalg.generic
+//  CHECK-SAME:     affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
 util.func public @test_trailing_elementwise(%arg0: tensor<180x320x1xf32>) -> tensor<320xf32> {
   %c0 = arith.constant 0 : index
   %c179 = arith.constant 179 : index

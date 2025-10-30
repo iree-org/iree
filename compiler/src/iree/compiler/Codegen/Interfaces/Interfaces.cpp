@@ -15,6 +15,7 @@
 // have a better registration mechanism.
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
+#include "iree/compiler/Codegen/Interfaces/TensorMaskingOpInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h"
@@ -47,6 +48,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerProcessorOpInterfaceExternalModels(registry);
   registerCodegenExternalInterfaces(registry);
   registerBufferizationInterfaces(registry);
+  registerTensorMaskingOpInterface(registry);
   // TODO: Remove this dependency once the transform dialect extensions
   // have a better registration mechanism.
   // TODO: when warranted, move to its own file.

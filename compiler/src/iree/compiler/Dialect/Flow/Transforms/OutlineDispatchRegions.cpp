@@ -39,15 +39,15 @@ static ExecutableOp createExecutable(Location loc, StringRef executableName,
   // Create the executable that will contain the outlined region.
   // NOTE: this will get uniquified if we have multiple in the same block.
   OpBuilder parentModuleBuilder(&parentModuleOp.getBody()->back());
-  auto executableOp =
-      parentModuleBuilder.create<IREE::Flow::ExecutableOp>(loc, executableName);
+  auto executableOp = IREE::Flow::ExecutableOp::create(parentModuleBuilder, loc,
+                                                       executableName);
 
   // Create the inner ModuleOp that contains the original functions. We need
   // to provide this shim as some ops (like std.call) look for the
   // containing module to provide symbol resolution.
   OpBuilder executableBuilder(executableOp);
   executableBuilder.setInsertionPointToStart(&executableOp.getBlock());
-  auto innerModule = executableBuilder.create<mlir::ModuleOp>(loc);
+  auto innerModule = mlir::ModuleOp::create(executableBuilder, loc);
   for (auto funcOp : funcOps) {
     innerModule.push_back(funcOp);
   }
@@ -72,8 +72,8 @@ static LogicalResult convertDispatchWorkgroupsToDispatchOp(
   // Create the dispatch op to the executable function.
   // Note that we copy the tied operand indices from the workgroups op - it
   // lines up 1:1 with the dispatch once we've outlined things.
-  auto dispatchOp = builder.create<IREE::Flow::DispatchOp>(
-      dispatchWorkgroupsOp.getLoc(), exportOp,
+  auto dispatchOp = IREE::Flow::DispatchOp::create(
+      builder, dispatchWorkgroupsOp.getLoc(), exportOp,
       dispatchWorkgroupsOp.getWorkload(), dispatchWorkgroupsOp.getResultTypes(),
       dispatchWorkgroupsOp.getResultDims(), dispatchWorkgroupsOp.getArguments(),
       dispatchWorkgroupsOp.getArgumentDims(),
@@ -106,8 +106,8 @@ createWorkgroupFunc(Location loc, StringRef functionName, Region &region) {
   for (auto &block : funcOp.getBlocks()) {
     if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
       OpBuilder builder(returnOp);
-      builder.create<mlir::func::ReturnOp>(
-          returnOp.getLoc(), llvm::to_vector(returnOp.getOperands()));
+      mlir::func::ReturnOp::create(builder, returnOp.getLoc(),
+                                   llvm::to_vector(returnOp.getOperands()));
       returnOp.erase();
     }
   }
@@ -138,8 +138,8 @@ static LogicalResult outlineDispatchWorkgroupsOp(
 
   // Add an export pointing at the entry point function.
   OpBuilder builder(executableOp.getBody());
-  auto exportOp = builder.create<IREE::Flow::ExecutableExportOp>(
-      dispatchWorkgroupsOp.getLoc(), workgroupFuncOp.getName(),
+  auto exportOp = IREE::Flow::ExecutableExportOp::create(
+      builder, dispatchWorkgroupsOp.getLoc(), workgroupFuncOp.getName(),
       SymbolRefAttr::get(workgroupFuncOp));
   exportOp->setDialectAttrs(dispatchWorkgroupsOp->getDialectAttrs());
 

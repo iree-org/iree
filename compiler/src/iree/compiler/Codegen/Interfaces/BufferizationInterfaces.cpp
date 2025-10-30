@@ -144,8 +144,8 @@ struct DispatchTensorStoreOpInterface
               cast<MemRefType>(target.getType()), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides()));
 
-      target = rewriter.create<memref::SubViewOp>(
-          storeOp->getLoc(), subviewMemRefType, target,
+      target = memref::SubViewOp::create(
+          rewriter, storeOp->getLoc(), subviewMemRefType, target,
           storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
           storeOp.getMixedStrides());
     } // else: Writing the entire tensor, no subview required.
@@ -172,36 +172,20 @@ struct LoadFromBufferOpInterface
           LoadFromBufferOpInterface, IREE::Codegen::LoadFromBufferOp> {
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
-    // Walk memref Value producers until a hal.interface.binding.subspan op is
-    // found, and check if the subspan is read only.
-    Operation *currentOp = op;
-    while (currentOp) {
-      if (auto subspanOp =
-              dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp)) {
-        std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
-            subspanOp.getDescriptorFlags();
-        return !descriptorFlags.has_value() ||
-               descriptorFlags.value() != IREE::HAL::DescriptorFlags::ReadOnly;
-      }
-      // There is expected to be only a single memref source for a given memref
-      // OpResult, because producers of memref Values are expected to be
-      // view-like or cast-like operations. If multiple operands have a memref
-      // type, then conservatively return not writable.
-      if (llvm::count_if(currentOp->getOperandTypes(),
-                         llvm::IsaPred<MemRefType>) != 1) {
-        return false;
-      }
-      // Otherwise, follow the memref operand to find the source buffer.
-      for (Value operand : currentOp->getOperands()) {
-        if (isa<MemRefType>(operand.getType())) {
-          currentOp = operand.getDefiningOp();
-          break;
-        }
-      }
-    }
-    // Conservatively default to not writable if the source of the buffer is
-    // not found.
-    return false;
+    // Search for a hal.interface.binding.subspan op that is the source of the
+    // buffer, and check if the subspan is read only.
+    auto loadFromBufferOp = cast<IREE::Codegen::LoadFromBufferOp>(op);
+    std::optional<IREE::HAL::InterfaceBindingSubspanOp> subspanOp =
+        getSourceSubspanMemref(
+            cast<TypedValue<MemRefType>>(loadFromBufferOp.getBuffer()));
+    // Conservatively return false if the subspan is not found.
+    if (!subspanOp)
+      return false;
+    std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
+        subspanOp->getDescriptorFlags();
+    return !descriptorFlags.has_value() ||
+           !bitEnumContainsAll(*descriptorFlags,
+                               IREE::HAL::DescriptorFlags::ReadOnly);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -347,6 +331,15 @@ struct LinalgExtOpInterface
   }
 };
 
+template <typename... Ops>
+struct LinalgExtOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (void)std::initializer_list<int>{
+        0, (Ops::template attachInterface<LinalgExtOpInterface<Ops>>(*context),
+            0)...};
+  }
+};
+
 /// Returns the buffers of the source and destination for pack and unpack ops.
 /// Returns a failure if the buffers can not be found.
 template <typename OpTy>
@@ -390,9 +383,9 @@ static LogicalResult bufferizePackOp(RewriterBase &rewriter, linalg::PackOp op,
 
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
-  rewriter.create<IREE::LinalgExt::PackOp>(
-      op.getLoc(), source, dest, op.getInnerDimsPos(), op.getMixedTiles(),
-      op.getPaddingValue(), op.getOuterDimsPerm());
+  IREE::LinalgExt::PackOp::create(rewriter, op.getLoc(), source, dest,
+                                  op.getInnerDimsPos(), op.getMixedTiles(),
+                                  op.getPaddingValue(), op.getOuterDimsPerm());
 
   // Replace the results of the old op with the new output buffers.
   bufferization::replaceOpWithBufferizedValues(rewriter, op, dest);
@@ -416,9 +409,9 @@ static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
 
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
-  rewriter.create<IREE::LinalgExt::UnPackOp>(
-      op.getLoc(), source, dest, op.getInnerDimsPos(), op.getMixedTiles(),
-      op.getOuterDimsPerm());
+  IREE::LinalgExt::UnPackOp::create(rewriter, op.getLoc(), source, dest,
+                                    op.getInnerDimsPos(), op.getMixedTiles(),
+                                    op.getOuterDimsPerm());
 
   // Replace the results of the old op with the new output buffers.
   bufferization::replaceOpWithBufferizedValues(rewriter, op, dest);
@@ -557,8 +550,9 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
                               Location loc) const {
     auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
-    auto loadOp = builder.create<IREE::TensorExt::DispatchTensorLoadOp>(
-        loc, llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
+    auto loadOp = IREE::TensorExt::DispatchTensorLoadOp::create(
+        builder, loc,
+        llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
         storeOp.getTarget(), storeOp.getTargetDims(), storeOp.getMixedOffsets(),
         storeOp.getMixedSizes(), storeOp.getMixedStrides());
     return loadOp.getResult();
@@ -650,8 +644,8 @@ struct StoreToBufferOpSubsetInsertionInterface
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
                               Location loc) const {
     auto storeOp = cast<IREE::Codegen::StoreToBufferOp>(op);
-    auto loadOp = builder.create<IREE::Codegen::LoadFromBufferOp>(
-        loc, storeOp.getTensor().getType(), storeOp.getBuffer());
+    auto loadOp = IREE::Codegen::LoadFromBufferOp::create(
+        builder, loc, storeOp.getTensor().getType(), storeOp.getBuffer());
     return loadOp.getResult();
   }
 
@@ -701,37 +695,13 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             StoreToBufferOpInterface, StoreToBufferOpSubsetInterface,
             StoreToBufferOpSubsetInsertionInterface>(*ctx);
       });
-  registry.addExtension(+[](MLIRContext *ctx,
-                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-    IREE::LinalgExt::ArgCompareOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ArgCompareOp>>(*ctx);
-    IREE::LinalgExt::FftOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
-    IREE::LinalgExt::PackOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
-    IREE::LinalgExt::UnPackOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::UnPackOp>>(*ctx);
-    IREE::LinalgExt::ScanOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
-    IREE::LinalgExt::ScatterOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
-    IREE::LinalgExt::GatherOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::GatherOp>>(*ctx);
-    IREE::LinalgExt::SortOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
-    IREE::LinalgExt::TopkOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
-    IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(*ctx);
-    IREE::LinalgExt::WinogradFilterTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradFilterTransformOp>>(*ctx);
-    IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
-    IREE::LinalgExt::AttentionOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::AttentionOp>>(*ctx);
-    IREE::LinalgExt::MapScatterOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::MapScatterOp>>(*ctx);
-  });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+        LinalgExtOpInterfaceHelper<
+#define GET_OP_LIST
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
+            >::registerOpInterface(ctx);
+      });
   registry.insert<linalg::LinalgDialect>();
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(

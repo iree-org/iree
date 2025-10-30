@@ -94,6 +94,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
                             PadDistributionConfigFn padDistributionConfigFn,
+                            bool doReshapeByExpansion,
                             CombineRelayoutOpsControlFnRef controlFn = nullptr);
 
 } // namespace mlir::iree_compiler

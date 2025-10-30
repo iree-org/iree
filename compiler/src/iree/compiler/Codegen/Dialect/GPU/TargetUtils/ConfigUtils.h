@@ -16,9 +16,16 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 /// Helper for setting up a data tiled multi-MMA inner_tiled config based on the
 /// specified target.
-LogicalResult setDataTiledMultiMmaLoweringConfig(
+LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig);
+    Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig);
+
+/// Helper for setting up a convolution config using direct convolution based on
+/// the specified target.
+LogicalResult
+setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
+                                   mlir::FunctionOpInterface entryPoint,
+                                   Operation *op);
 
 /// Helper for setting up a convolution config using IGEMM based on the
 /// specified target.
@@ -50,6 +57,12 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
 LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *op);
+
+/// Helper for setting up a memory bound reduction configuration, focusing
+/// on getting peak global memory bandwidth.
+LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
+                                 mlir::FunctionOpInterface entryPoint,
+                                 linalg::LinalgOp op);
 
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Options

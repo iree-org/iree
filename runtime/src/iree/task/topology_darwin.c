@@ -143,7 +143,13 @@ static iree_task_hw_perflevel_t iree_task_query_hw_perflevel(int level) {
 iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_node_id_t node_id,
     iree_task_topology_performance_level_t performance_level,
+    iree_task_topology_distribution_t distribution,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  // NOTE: darwin implementation doesn't currently support cache-domain-aware
+  // distribution strategies. The distribution parameter is accepted for API
+  // compatibility but ignored.
+  (void)distribution;
+
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)node_id);
 

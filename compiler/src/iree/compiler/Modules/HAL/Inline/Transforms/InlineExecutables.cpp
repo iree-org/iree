@@ -38,7 +38,7 @@ public:
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Inline variants and produce a function map.
     DenseMap<Attribute, Attribute> exportToFuncMap;
@@ -235,8 +235,8 @@ public:
       newArgTypes.push_back(indexType);
       auto oldArg = entryBlock->getArgument(argOffset++);
       auto newArg = entryBlock->addArgument(indexType, oldArg.getLoc());
-      oldArg.replaceAllUsesWith(entryBuilder.create<arith::IndexCastOp>(
-          oldArg.getLoc(), i32Type, newArg));
+      oldArg.replaceAllUsesWith(arith::IndexCastOp::create(
+          entryBuilder, oldArg.getLoc(), i32Type, newArg));
     }
 
     // Erase the original args.
@@ -262,8 +262,9 @@ public:
         // TODO(benvanik): see if we can allow this through; today it will pin
         // the function argument (constants most likely) and cause us to fail to
         // remove it later on.
-        Value dummySize = OpBuilder(sizeOp).create<arith::ConstantIndexOp>(
-            sizeOp.getLoc(), 0xCAFEF00D);
+        OpBuilder builder(sizeOp);
+        Value dummySize = arith::ConstantIndexOp::create(
+            builder, sizeOp.getLoc(), 0xCAFEF00D);
         sizeOp.replaceAllUsesWith(dummySize);
         sizeOp.erase();
         continue;
@@ -355,13 +356,13 @@ public:
     for (unsigned i = 0; i < workloadArgCount; ++i) {
       workload.push_back(dispatchFuncOp.getArgument(argOffset++));
     }
-    Value device = builder.create<IREE::Util::NullOp>(
-        loc, builder.getType<IREE::HAL::DeviceType>());
+    Value device = IREE::Util::NullOp::create(
+        builder, loc, builder.getType<IREE::HAL::DeviceType>());
     std::array<Value, 3> workgroupCount =
         exportOp.calculateWorkgroupCount(loc, device, workload, builder);
 
     // For now we don't handle local memory.
-    Value localMemory = builder.create<IREE::Util::NullOp>(loc, bufferType);
+    Value localMemory = IREE::Util::NullOp::create(builder, loc, bufferType);
     workgroupArgs.push_back(localMemory);
 
     // Pass all constants through.
@@ -378,9 +379,10 @@ public:
       auto bindingLength = dispatchFuncOp.getArgument(argOffset + bindingCount +
                                                       bindingCount + i);
       Value bufferSize =
-          builder.create<IREE::Util::BufferSizeOp>(loc, bindingBuffer);
-      Value bindingView = builder.create<IREE::Util::BufferSubspanOp>(
-          loc, bindingBuffer, bufferSize, bindingOffset, bindingLength);
+          IREE::Util::BufferSizeOp::create(builder, loc, bindingBuffer);
+      Value bindingView = IREE::Util::BufferSubspanOp::create(
+          builder, loc, bindingBuffer, bufferSize, bindingOffset,
+          bindingLength);
       workgroupArgs.push_back(bindingView);
     }
 
@@ -390,33 +392,34 @@ public:
     llvm::append_range(workgroupArgs, workgroupCount); // workgroup_count_xyz
 
     // Z -> Y -> Z loop nest.
-    builder.create<scf::ForOp>(
-        loc, indexSet.get(0), workgroupCount[2], indexSet.get(1), ValueRange{},
+    scf::ForOp::create(
+        builder, loc, indexSet.get(0), workgroupCount[2], indexSet.get(1),
+        ValueRange{},
         [&](OpBuilder &forZBuilder, Location loc, Value iz, ValueRange iters) {
           workgroupArgs[workgroupXYZOffset + 2] = iz;
-          forZBuilder.create<scf::ForOp>(
-              loc, indexSet.get(0), workgroupCount[1], indexSet.get(1),
-              ValueRange{},
+          scf::ForOp::create(
+              forZBuilder, loc, indexSet.get(0), workgroupCount[1],
+              indexSet.get(1), ValueRange{},
               [&](OpBuilder &forYBuilder, Location loc, Value iy,
                   ValueRange iters) {
                 workgroupArgs[workgroupXYZOffset + 1] = iy;
-                forYBuilder.create<scf::ForOp>(
-                    loc, indexSet.get(0), workgroupCount[0], indexSet.get(1),
-                    ValueRange{},
+                scf::ForOp::create(
+                    forYBuilder, loc, indexSet.get(0), workgroupCount[0],
+                    indexSet.get(1), ValueRange{},
                     [&](OpBuilder &forXBuilder, Location loc, Value ix,
                         ValueRange iters) {
                       workgroupArgs[workgroupXYZOffset + 0] = ix;
-                      forXBuilder.create<func::CallOp>(
-                          loc, bodyFuncOp.getNameAttr(),
+                      func::CallOp::create(
+                          forXBuilder, loc, bodyFuncOp.getNameAttr(),
                           bodyFuncOp.getResultTypes(), workgroupArgs);
-                      forXBuilder.create<scf::YieldOp>(loc);
+                      scf::YieldOp::create(forXBuilder, loc);
                     });
-                forYBuilder.create<scf::YieldOp>(loc);
+                scf::YieldOp::create(forYBuilder, loc);
               });
-          forZBuilder.create<scf::YieldOp>(loc);
+          scf::YieldOp::create(forZBuilder, loc);
         });
 
-    builder.create<IREE::Util::ReturnOp>(loc);
+    IREE::Util::ReturnOp::create(builder, loc);
   }
 };
 

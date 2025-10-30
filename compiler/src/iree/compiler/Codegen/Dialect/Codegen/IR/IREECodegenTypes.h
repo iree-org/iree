@@ -60,9 +60,26 @@ struct TileSwizzle {
     // The size of the dimension.
     int16_t size = 0;
 
+    // The size of the dimension for distribution. This is used for CrossThread
+    // dimensions, because we may want to distribute more than `size` threads to
+    // this dimension. The `distributionSize` is expected to be greater than or
+    // equal to `size`, and the mapping of the delinearized (by the distribution
+    // sizes) thread ID index to the offset into the Dim is
+    // `delinearized_tid / (distributionSize / size)`. The `distributionSize`
+    // for non-CrossThread dimensions should always be 1, since there is no
+    // distribution for these dimensions.
+    int16_t distributionSize = 1;
+
     // Support constructing from any size type.
     template <typename T>
-    Dim(Kind kind, T size) : kind(kind), size(size) {}
+    Dim(Kind kind, T size) : kind(kind), size(size) {
+      if (kind == Kind::CrossThread) {
+        distributionSize = size;
+      }
+    }
+    template <typename T>
+    Dim(Kind kind, T size, T distributionSize)
+        : kind(kind), size(size), distributionSize(distributionSize) {}
   };
 
   using ExpandShapeDimVectorType = llvm::SmallVector<Dim, 4>;

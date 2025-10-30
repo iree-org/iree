@@ -115,7 +115,7 @@ class OrdinalAllocationPass
 
       OpBuilder builder(op);
       auto ordinalOp =
-          builder.create<IREE::VM::ConstI32Op>(op.getLoc(), ordinal);
+          IREE::VM::ConstI32Op::create(builder, op.getLoc(), ordinal);
       op.getReturnedGlobalRef().replaceAllUsesWith(ordinalOp);
 
       deadOps.push_back(op);

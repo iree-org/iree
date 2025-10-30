@@ -152,8 +152,8 @@ static IREE::Util::FuncOp outlineMemoizeRegionBody(
                                 [](Value value) { return value.getType(); }));
   auto funcType =
       moduleBuilder.getFunctionType(argTypes, memoizeOp.getResultTypes());
-  auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(memoizeOp.getLoc(),
-                                                         name, funcType);
+  auto funcOp = IREE::Util::FuncOp::create(moduleBuilder, memoizeOp.getLoc(),
+                                           name, funcType);
   moduleSymbolTable.insert(funcOp);
   funcOp.setVisibility(SymbolTable::Visibility::Private);
   funcOp.setInliningPolicyAttr(
@@ -203,15 +203,16 @@ static IREE::Util::FuncOp outlineMemoizeRegionBody(
   // cloneRegionBefore is unfriendly and requires that we poke into the block
   // list to get the first block and insert the branch to it.
   auto &entryBlock = funcOp.getBlocks().front();
-  OpBuilder::atBlockEnd(&entryBlock)
-      .create<cf::BranchOp>(memoizeOp.getLoc(), entryBlock.getNextNode());
+  OpBuilder entryBuilder = OpBuilder::atBlockEnd(&entryBlock);
+  cf::BranchOp::create(entryBuilder, memoizeOp.getLoc(),
+                       entryBlock.getNextNode());
 
   // Rewrite hal.return ops to util.return.
   for (auto returnOp :
        llvm::make_early_inc_range(funcOp.getOps<IREE::HAL::ReturnOp>())) {
     OpBuilder returnBuilder(returnOp);
-    returnBuilder.create<IREE::Util::ReturnOp>(returnOp.getLoc(),
-                                               returnOp.getOperands());
+    IREE::Util::ReturnOp::create(returnBuilder, returnOp.getLoc(),
+                                 returnOp.getOperands());
     returnOp.erase();
   }
 
@@ -236,8 +237,8 @@ static void replaceMemoizeOpWithApply(IREE::HAL::DeviceMemoizeOp memoizeOp,
 
   // Call the function.
   OpBuilder callerBuilder(memoizeOp);
-  auto callOp = callerBuilder.create<IREE::Util::CallOp>(
-      memoizeOp.getLoc(), applyFuncOp, callOperands);
+  auto callOp = IREE::Util::CallOp::create(callerBuilder, memoizeOp.getLoc(),
+                                           applyFuncOp, callOperands);
 
   // Replace memoize op with the results of the function call.
   memoizeOp.replaceAllUsesWith(callOp.getResults());
@@ -261,17 +262,19 @@ static SmallVector<IREE::Util::GlobalOpInterface> createMemoizedDeviceGlobals(
         (namePrefix + "_result_" + std::to_string(result.getResultNumber()) +
          "_" + deviceName)
             .str();
-    auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-        resultLoc, globalName, /*isMutable=*/false, result.getType());
+    auto globalOp =
+        IREE::Util::GlobalOp::create(moduleBuilder, resultLoc, globalName,
+                                     /*isMutable=*/false, result.getType());
     moduleSymbolTable.insert(globalOp);
     globalOp.setVisibility(SymbolTable::Visibility::Private);
     resultGlobalOps.push_back(globalOp);
   }
 
   // Create an initializer to call the apply function and store the results into
-  // globals.
+  // globals. Ensure it's placed after the globals it initializes.
+  moduleBuilder.setInsertionPointAfter(resultGlobalOps.back());
   auto initializerOp =
-      moduleBuilder.create<IREE::Util::InitializerOp>(memoizeOp.getLoc());
+      IREE::Util::InitializerOp::create(moduleBuilder, memoizeOp.getLoc());
   auto initializerBuilder =
       OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
 
@@ -283,8 +286,9 @@ static SmallVector<IREE::Util::GlobalOpInterface> createMemoizedDeviceGlobals(
   Value deviceValue = deviceLoadOp.getLoadedGlobalValue();
   deviceLoadOp.setGlobalImmutable(true);
   mapping.map(memoizeOp.getDevice(), deviceValue);
-  Value queueAffinityValue = initializerBuilder.create<arith::ConstantIntOp>(
-      memoizeOp.getLoc(), memoizeAnalysis.queueAffinity.value_or(-1), 64);
+  Value queueAffinityValue = arith::ConstantIntOp::create(
+      initializerBuilder, memoizeOp.getLoc(),
+      memoizeAnalysis.queueAffinity.value_or(-1), 64);
   mapping.map(memoizeOp.getQueueAffinity(), queueAffinityValue);
 
   // We'll pass the device, affinity, and all dynamic operands to the apply
@@ -307,8 +311,8 @@ static SmallVector<IREE::Util::GlobalOpInterface> createMemoizedDeviceGlobals(
          "dynamic values not allowed in memoized initialization functions");
 
   // Call the apply function to produce the memoized results.
-  auto callOp = initializerBuilder.create<IREE::Util::CallOp>(
-      memoizeOp.getLoc(), applyFuncOp, callOperands);
+  auto callOp = IREE::Util::CallOp::create(
+      initializerBuilder, memoizeOp.getLoc(), applyFuncOp, callOperands);
 
   // Store the results to the globals.
   for (auto [result, resultGlobalOp] :
@@ -317,7 +321,7 @@ static SmallVector<IREE::Util::GlobalOpInterface> createMemoizedDeviceGlobals(
                                  initializerBuilder);
   }
 
-  initializerBuilder.create<IREE::Util::ReturnOp>(memoizeOp.getLoc());
+  IREE::Util::ReturnOp::create(initializerBuilder, memoizeOp.getLoc());
 
   return resultGlobalOps;
 }
@@ -355,13 +359,13 @@ static scf::ValueVector recursivelyEmitDeviceTree(
   Value deviceGlobal =
       deviceGlobalOp.createLoadOp(loc, builder).getLoadedGlobalValue();
   Value isDevice =
-      builder.create<IREE::Util::CmpEQOp>(loc, device, deviceGlobal);
-  auto ifOp = builder.create<scf::IfOp>(
-      loc, resultTypes, isDevice, /*addThenBlock=*/true, /*addElseBlock=*/true);
+      IREE::Util::CmpEQOp::create(builder, loc, device, deviceGlobal);
+  auto ifOp = scf::IfOp::create(builder, loc, resultTypes, isDevice,
+                                /*addThenBlock=*/true, /*addElseBlock=*/true);
 
   auto thenBuilder = ifOp.getThenBodyBuilder();
   scf::ValueVector thenResults = perDevice(deviceGlobalOp, thenBuilder);
-  thenBuilder.create<scf::YieldOp>(loc, thenResults);
+  scf::YieldOp::create(thenBuilder, loc, thenResults);
 
   auto elseBuilder = ifOp.getElseBodyBuilder();
   scf::ValueVector elseResults;
@@ -373,7 +377,7 @@ static scf::ValueVector recursivelyEmitDeviceTree(
         remainingDeviceGlobalOps.drop_front(1), perDevice, fallback,
         elseBuilder);
   }
-  elseBuilder.create<scf::YieldOp>(loc, elseResults);
+  scf::YieldOp::create(elseBuilder, loc, elseResults);
 
   return llvm::to_vector_of<Value>(ifOp.getResults());
 }
@@ -412,10 +416,11 @@ createDeviceResultSelectTree(Location loc, TypeRange resultTypes, Value device,
         for (auto resultType : resultTypes) {
           Value fallbackValue;
           if (resultType.isIntOrIndexOrFloat()) {
-            fallbackValue = builder.create<arith::ConstantOp>(
-                loc, resultType, builder.getZeroAttr(resultType));
+            fallbackValue = arith::ConstantOp::create(
+                builder, loc, resultType, builder.getZeroAttr(resultType));
           } else {
-            fallbackValue = builder.create<IREE::Util::NullOp>(loc, resultType);
+            fallbackValue =
+                IREE::Util::NullOp::create(builder, loc, resultType);
           }
           fallbackValues.push_back(fallbackValue);
         }
@@ -444,8 +449,8 @@ static IREE::Util::FuncOp createLookupFunc(IREE::HAL::DeviceMemoizeOp memoizeOp,
                                 [](Value value) { return value.getType(); }));
   auto funcType =
       moduleBuilder.getFunctionType(argTypes, memoizeOp.getResultTypes());
-  auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(memoizeOp.getLoc(),
-                                                         name, funcType);
+  auto funcOp = IREE::Util::FuncOp::create(moduleBuilder, memoizeOp.getLoc(),
+                                           name, funcType);
   moduleSymbolTable.insert(funcOp);
   funcOp.setVisibility(SymbolTable::Visibility::Private);
   auto funcBuilder = OpBuilder::atBlockBegin(funcOp.addEntryBlock());
@@ -483,7 +488,8 @@ static IREE::Util::FuncOp createLookupFunc(IREE::HAL::DeviceMemoizeOp memoizeOp,
       memoizeOp.getLoc(), funcType.getResults(),
       mapping.lookup(memoizeOp.getDevice()), deviceResultMap, funcBuilder);
 
-  funcBuilder.create<IREE::Util::ReturnOp>(memoizeOp.getLoc(), selectedResults);
+  IREE::Util::ReturnOp::create(funcBuilder, memoizeOp.getLoc(),
+                               selectedResults);
 
   return funcOp;
 }
@@ -500,8 +506,8 @@ static void replaceMemoizeOpWithLookup(IREE::HAL::DeviceMemoizeOp memoizeOp,
 
   // Call the function.
   OpBuilder callerBuilder(memoizeOp);
-  auto callOp = callerBuilder.create<IREE::Util::CallOp>(
-      memoizeOp.getLoc(), lookupFuncOp, callOperands);
+  auto callOp = IREE::Util::CallOp::create(callerBuilder, memoizeOp.getLoc(),
+                                           lookupFuncOp, callOperands);
 
   // Replace memoize op with the results of the function call.
   memoizeOp.replaceAllUsesWith(callOp.getResults());
@@ -572,7 +578,7 @@ struct OutlineMemoizeRegionsPass
     : public IREE::HAL::impl::OutlineMemoizeRegionsPassBase<
           OutlineMemoizeRegionsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Analyze the module to determine which devices are used where.
     DeviceAnalysis deviceAnalysis(moduleOp);

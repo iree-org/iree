@@ -42,17 +42,6 @@ TEST_F(EncodingAttrsTest, EncodingAttr) {
   EXPECT_TRUE(attr.isIdentityLayout());
 }
 
-TEST_F(EncodingAttrsTest, MatulKAttr) {
-  MLIRContext *ctx = getContext();
-  Builder builder(ctx);
-  auto attr = cast<SerializableAttr>(MatmulKAttr::get(ctx, /*k_dims=*/{1}));
-  EXPECT_FALSE(attr.isIdentityLayout());
-
-  attr = cast<SerializableAttr>(
-      attr.cloneWithLayouts(PaddingAttr::getIdentityAttr(ctx, /*rank=*/2)));
-  EXPECT_TRUE(attr.isIdentityLayout());
-}
-
 TEST_F(EncodingAttrsTest, PaddingAttr) {
   MLIRContext *ctx = getContext();
   auto zeroPaddingAttr = PaddingAttr::getIdentityAttr(ctx, /*rank=*/2);

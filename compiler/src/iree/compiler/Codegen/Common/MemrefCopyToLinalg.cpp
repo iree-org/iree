@@ -18,7 +18,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(memref::CopyOp copyOp,
                                 PatternRewriter &rewriter) const override {

@@ -255,6 +255,58 @@ typedef struct iree_hal_external_buffer_t {
 } iree_hal_external_buffer_t;
 
 //===----------------------------------------------------------------------===//
+// Virtual Memory Management
+//===----------------------------------------------------------------------===//
+
+// Opaque handle to a physical memory allocation.
+// Physical memory represents actual device memory that is not accessible until
+// mapped to a virtual address space.
+typedef struct iree_hal_physical_memory_t iree_hal_physical_memory_t;
+
+// Memory protection flags for controlling access to virtual address ranges.
+// Maps to mprotect/VirtualProtect (POSIX/Windows), cuMemSetAccess (CUDA), etc.
+enum iree_hal_memory_protection_bits_t {
+  // No access. Removes existing access permissions.
+  // Platform: PROT_NONE (POSIX), PAGE_NOACCESS (Windows), PROT_NONE (CUDA).
+  IREE_HAL_MEMORY_PROTECTION_NONE = 0ull,
+
+  // Read-only access.
+  // Platform: PROT_READ (POSIX), PAGE_READONLY (Windows), PROT_READ (CUDA).
+  IREE_HAL_MEMORY_PROTECTION_READ = 1ull << 0,
+
+  // Write-only access (uncommon, typically combined with READ).
+  // Platform: Not directly supported on CPU (needs READ), PROT_WRITE (CUDA).
+  IREE_HAL_MEMORY_PROTECTION_WRITE = 1ull << 1,
+
+  // Read-write access (most common).
+  // Platform: PROT_READ|PROT_WRITE (POSIX), PAGE_READWRITE (Windows),
+  //           PROT_READWRITE (CUDA).
+  IREE_HAL_MEMORY_PROTECTION_READ_WRITE =
+      IREE_HAL_MEMORY_PROTECTION_READ | IREE_HAL_MEMORY_PROTECTION_WRITE,
+};
+typedef uint64_t iree_hal_memory_protection_t;
+
+// Memory usage advice flags for optimizing access patterns.
+// Maps to madvise (POSIX) or an implementation-defined behavior.
+enum iree_hal_memory_advice_bits_t {
+  // No specific advice. Use default behavior.
+  // Platform: MADV_NORMAL (POSIX).
+  IREE_HAL_MEMORY_ADVICE_NORMAL = 0ull,
+
+  // Will access this memory soon. Prefetch into cache/VRAM.
+  // Platform: MADV_WILLNEED (POSIX), no direct equivalent (Windows/CUDA/HIP).
+  IREE_HAL_MEMORY_ADVICE_WILL_NEED = 1ull << 0,
+
+  // Don't need this memory anymore. Can discard and zero on next access.
+  // Platform: MADV_DONTNEED (POSIX - zeros immediately),
+  //           MADV_FREE (POSIX - lazy), no direct equivalent
+  //           (Windows/CUDA/HIP).
+  // NOTE: On CPU, this may immediately free physical memory.
+  IREE_HAL_MEMORY_ADVICE_DONT_NEED = 1ull << 1,
+};
+typedef uint64_t iree_hal_memory_advice_t;
+
+//===----------------------------------------------------------------------===//
 // Statistics/reporting
 //===----------------------------------------------------------------------===//
 
@@ -423,6 +475,167 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_export_buffer(
     iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer);
 
 //===----------------------------------------------------------------------===//
+// Virtual Memory Management (Optional)
+//===----------------------------------------------------------------------===//
+
+// Returns true if the allocator supports virtual memory management operations.
+// When false all virtual/physical memory functions will return
+// IREE_STATUS_UNAVAILABLE.
+IREE_API_EXPORT bool iree_hal_allocator_supports_virtual_memory(
+    iree_hal_allocator_t* IREE_RESTRICT allocator);
+
+// Queries the minimum and recommended granularity for virtual memory
+// operations.
+//
+// |params| specifies the intended memory type and usage for allocation.
+// Returns the minimum granularity in |out_minimum_page_size| and the
+// recommended allocation granularity in |out_recommended_page_size|.
+//
+// All sizes and offsets passed to virtual memory operations must be aligned to
+// at least the minimum page size. Allocations should use the recommended page
+// size for optimal performance (typically 2MB on CUDA, 64KB on HIP, 4-64KB on
+// CPU).
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t
+iree_hal_allocator_virtual_memory_query_granularity(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params,
+    iree_device_size_t* IREE_RESTRICT out_minimum_page_size,
+    iree_device_size_t* IREE_RESTRICT out_recommended_page_size);
+
+// Reserves a contiguous virtual address range without allocating physical
+// memory.
+//
+// |size| must be aligned to at least the minimum page size from
+// iree_hal_allocator_virtual_memory_query_granularity. |queue_affinity|
+// specifies which device queues will access this address range.
+//
+// The reserved range has no access permissions and cannot be accessed until
+// physical memory is mapped via iree_hal_allocator_virtual_memory_map and
+// permissions are granted via iree_hal_allocator_virtual_memory_protect.
+//
+// The returned |out_virtual_buffer| is a buffer representing the reserved VA
+// range. It must be released by the caller with
+// iree_hal_allocator_virtual_memory_release.
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_reserve(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_queue_affinity_t queue_affinity, iree_device_size_t size,
+    iree_hal_buffer_t** IREE_RESTRICT out_virtual_buffer);
+
+// Releases a virtual address reservation created by virtual_memory_reserve.
+//
+// All physical memory must be unmapped before releasing. The |virtual_buffer|
+// must not be used after this call.
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_release(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer);
+
+// Allocates a physical memory handle without mapping to virtual address space.
+//
+// |params| specifies the memory type and usage. |size| must be aligned to at
+// least the minimum page size from virtual_memory_granularity. The physical
+// memory can be mapped to one or more virtual address ranges using
+// iree_hal_allocator_virtual_memory_map.
+//
+// |out_physical_memory| must be freed by the caller with
+// iree_hal_allocator_physical_memory_free.
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_physical_memory_allocate(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t size,
+    iree_allocator_t host_allocator,
+    iree_hal_physical_memory_t** IREE_RESTRICT out_physical_memory);
+
+// Frees a physical memory handle allocated by
+// iree_hal_allocator_physical_memory_allocate.
+//
+// All mappings of this physical memory must be unmapped before freeing. The
+// |physical_memory| handle must not be used after this call.
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_physical_memory_free(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory);
+
+// Maps physical memory into a virtual address range.
+//
+// |virtual_buffer| is the reserved VA range from
+// iree_hal_allocator_virtual_memory_reserve. |virtual_offset| is the offset
+// within the VA range to map at (must be page aligned).
+//
+// |physical_memory| is the physical allocation to map.
+// |physical_offset| is the offset within the physical memory (must be page
+// aligned).
+//
+// |size| is the number of bytes to map (must be page aligned).
+//
+// The same physical memory can be mapped to multiple virtual address ranges,
+// enabling patterns like ringbuffers with aliasing.
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_map(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset,
+    iree_hal_physical_memory_t* IREE_RESTRICT physical_memory,
+    iree_device_size_t physical_offset, iree_device_size_t size);
+
+// Unmaps a virtual address range.
+//
+// |virtual_buffer| is the reserved VA range. |virtual_offset| and |size|
+// specify the range to unmap (must be page aligned). The range must have been
+// previously mapped with iree_hal_allocator_virtual_memory_map.
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_unmap(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size);
+
+// Sets access permissions for a virtual address range.
+//
+// |virtual_buffer| is the reserved VA range. |virtual_offset| and |size|
+// specify the range (must be page aligned). |queue_affinity| specifies which
+// device queues get the specified permissions. |protection| is a bitmask of
+// iree_hal_memory_protection_bits_t flags.
+//
+// By default, reserved VA ranges have no access permissions. Callers must
+// explicitly grant permissions after mapping physical memory.
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_protect(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_protection_t protection);
+
+// Provides usage hints for a virtual address range to optimize performance.
+//
+// |virtual_buffer| is the reserved VA range. |virtual_offset| and |size|
+// specify the range (does not need to be page aligned). |queue_affinity|
+// specifies which devices the advice applies to. |advice| is a bitmask of
+// iree_hal_memory_advice_bits_t flags.
+//
+// Advice is advisory only - incorrect hints may reduce performance but will
+// not cause incorrect behavior. Unsupported hints are silently ignored. On CPU
+// this maps to madvise (POSIX). On GPU (CUDA/HIP) this is currently a no-op
+// but reserved for future prefetch/eviction support.
+//
+// Returns IREE_STATUS_UNAVAILABLE if virtual memory is not supported.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_virtual_memory_advise(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+    iree_device_size_t virtual_offset, iree_device_size_t size,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_advice_t advice);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_heap_allocator_t
 //===----------------------------------------------------------------------===//
 
@@ -489,6 +702,53 @@ typedef struct iree_hal_allocator_vtable_t {
       iree_hal_external_buffer_type_t requested_type,
       iree_hal_external_buffer_flags_t requested_flags,
       iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer);
+
+  // Virtual memory management operations (optional).
+  // All entries may be NULL if virtual memory is not supported.
+  bool(IREE_API_PTR* supports_virtual_memory)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator);
+  iree_status_t(IREE_API_PTR* virtual_memory_query_granularity)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_params_t params,
+      iree_device_size_t* IREE_RESTRICT out_minimum_page_size,
+      iree_device_size_t* IREE_RESTRICT out_recommended_page_size);
+  iree_status_t(IREE_API_PTR* virtual_memory_reserve)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_queue_affinity_t queue_affinity, iree_device_size_t size,
+      iree_hal_buffer_t** IREE_RESTRICT out_virtual_buffer);
+  iree_status_t(IREE_API_PTR* virtual_memory_release)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_t* IREE_RESTRICT virtual_buffer);
+  iree_status_t(IREE_API_PTR* physical_memory_allocate)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_params_t params, iree_device_size_t size,
+      iree_allocator_t host_allocator,
+      iree_hal_physical_memory_t** IREE_RESTRICT out_physical_memory);
+  iree_status_t(IREE_API_PTR* physical_memory_free)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_physical_memory_t* IREE_RESTRICT physical_memory);
+  iree_status_t(IREE_API_PTR* virtual_memory_map)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+      iree_device_size_t virtual_offset,
+      iree_hal_physical_memory_t* IREE_RESTRICT physical_memory,
+      iree_device_size_t physical_offset, iree_device_size_t size);
+  iree_status_t(IREE_API_PTR* virtual_memory_unmap)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+      iree_device_size_t virtual_offset, iree_device_size_t size);
+  iree_status_t(IREE_API_PTR* virtual_memory_protect)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+      iree_device_size_t virtual_offset, iree_device_size_t size,
+      iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_memory_protection_t protection);
+  iree_status_t(IREE_API_PTR* virtual_memory_advise)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_t* IREE_RESTRICT virtual_buffer,
+      iree_device_size_t virtual_offset, iree_device_size_t size,
+      iree_hal_queue_affinity_t queue_affinity,
+      iree_hal_memory_advice_t advice);
 } iree_hal_allocator_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_allocator_vtable_t);
 

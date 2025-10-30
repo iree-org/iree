@@ -36,9 +36,9 @@ appendOrCreateInitFuncOp(IREE::VM::ModuleOp moduleOp, StringRef name,
   OpBuilder funcBuilder(moduleOp.getContext());
   if (!funcOp) {
     // Create a new empty function.
-    funcOp = moduleBuilder.create<IREE::VM::FuncOp>(
-        moduleBuilder.getUnknownLoc(), name,
-        moduleBuilder.getFunctionType({}, {}));
+    funcOp =
+        IREE::VM::FuncOp::create(moduleBuilder, moduleBuilder.getUnknownLoc(),
+                                 name, moduleBuilder.getFunctionType({}, {}));
     funcBuilder = OpBuilder::atBlockEnd(funcOp.addEntryBlock());
     return std::make_tuple(funcOp, funcBuilder);
   }
@@ -55,7 +55,8 @@ appendOrCreateInitFuncOp(IREE::VM::ModuleOp moduleOp, StringRef name,
   auto returnOps = llvm::to_vector(funcOp.getOps<IREE::VM::ReturnOp>());
   for (auto returnOp :
        llvm::make_early_inc_range(funcOp.getOps<IREE::VM::ReturnOp>())) {
-    OpBuilder(returnOp).create<IREE::VM::BranchOp>(returnOp.getLoc(), newBlock);
+    OpBuilder builder(returnOp);
+    IREE::VM::BranchOp::create(builder, returnOp.getLoc(), newBlock);
     returnOp.erase();
   }
 
@@ -80,7 +81,7 @@ static void exportFuncIfNeeded(IREE::VM::ModuleOp moduleOp,
 
   // Add vm.export if needed.
   OpBuilder moduleBuilder(funcOp);
-  moduleBuilder.create<IREE::VM::ExportOp>(funcOp.getLoc(), funcOp);
+  IREE::VM::ExportOp::create(moduleBuilder, funcOp.getLoc(), funcOp);
 }
 
 // Updates the mutability of globals based on whether they are stored anywhere
@@ -129,7 +130,7 @@ class GlobalInitializationPass
     : public IREE::VM::impl::GlobalInitializationPassBase<
           GlobalInitializationPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     // Create the __init and __deinit functions. They may be empty if there are
@@ -148,45 +149,51 @@ class GlobalInitializationPass
     std::tie(deinitFuncOp, deinitBuilder) = appendOrCreateInitFuncOp(
         moduleOp, "__deinit", symbolTable, moduleBuilder);
 
-    // Build out the functions with logic from all globals.
-    // Note that the initialization order here is undefined (in that it's just
-    // module op order). If we ever want to make this more deterministic we
-    // could gather the ops, sort them (by some rule), and then build the
-    // initialization function.
+    // Build out the functions with logic from all globals and initializers.
+    // We use a two-phase approach to ensure correct initialization order:
+    // Phase 1: Initialize all globals with initial values in module order.
+    // Phase 2: Execute all initializers in module order.
+    //
+    // This ensures that initializers can safely reference globals even if the
+    // initializer appears before the global in module order, which can happen
+    // after passes like CombineInitializersPass reorder operations.
     InlinerInterface inlinerInterface(&getContext());
-    SmallVector<Operation *> deadOps;
-    for (auto &op : moduleOp.getBlock().getOperations()) {
-      if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
-        if (llvm::isa<IREE::VM::RefType>(globalOp.getGlobalType())) {
-          if (failed(appendRefInitialization(globalOp, initBuilder))) {
-            globalOp.emitOpError()
-                << "ref-type global unable to be initialized";
-            return signalPassFailure();
-          }
-        } else {
-          if (failed(appendPrimitiveInitialization(globalOp, initBuilder))) {
-            globalOp.emitOpError()
-                << "primitive global unable to be initialized";
-            return signalPassFailure();
-          }
-        }
-      } else if (auto initializerOp = dyn_cast<IREE::VM::InitializerOp>(op)) {
-        if (failed(appendInitializer(initializerOp, inlinerInterface,
-                                     initBuilder))) {
-          initializerOp.emitOpError() << "unable to be initialized";
+
+    // Phase 1: Initialize all globals with initial values.
+    // This ensures all globals reach a valid state before any initializers run.
+    for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
+      if (llvm::isa<IREE::VM::RefType>(globalOp.getGlobalType())) {
+        if (failed(appendRefInitialization(globalOp, initBuilder))) {
+          globalOp.emitOpError() << "ref-type global unable to be initialized";
           return signalPassFailure();
         }
-        deadOps.push_back(initializerOp);
-        initBuilder.setInsertionPointToEnd(&initFuncOp.back());
+      } else {
+        if (failed(appendPrimitiveInitialization(globalOp, initBuilder))) {
+          globalOp.emitOpError() << "primitive global unable to be initialized";
+          return signalPassFailure();
+        }
       }
+    }
+
+    // Phase 2: Execute all initializers in module order.
+    // Initializers can now safely reference globals initialized in phase 1.
+    SmallVector<Operation *> deadOps;
+    for (auto initializerOp : moduleOp.getOps<IREE::VM::InitializerOp>()) {
+      if (failed(appendInitializer(initializerOp, inlinerInterface,
+                                   initBuilder))) {
+        initializerOp.emitOpError() << "unable to be initialized";
+        return signalPassFailure();
+      }
+      deadOps.push_back(initializerOp);
+      initBuilder.setInsertionPointToEnd(&initFuncOp.back());
     }
     for (auto *deadOp : deadOps) {
       deadOp->erase();
     }
 
     // Add returns to the initializers.
-    initBuilder.create<IREE::VM::ReturnOp>(initBuilder.getUnknownLoc());
-    deinitBuilder.create<IREE::VM::ReturnOp>(deinitBuilder.getUnknownLoc());
+    IREE::VM::ReturnOp::create(initBuilder, initBuilder.getUnknownLoc());
+    IREE::VM::ReturnOp::create(deinitBuilder, deinitBuilder.getUnknownLoc());
 
     // Correct mutability of all globals.
     fixupGlobalMutability(moduleOp, symbolTable);
@@ -265,10 +272,10 @@ class GlobalInitializationPass
     if (auto integerType = llvm::dyn_cast<IntegerType>(value.getType())) {
       switch (integerType.getIntOrFloatBitWidth()) {
       case 32:
-        builder.create<IREE::VM::GlobalStoreI32Op>(loc, value, symName);
+        IREE::VM::GlobalStoreI32Op::create(builder, loc, value, symName);
         return success();
       case 64:
-        builder.create<IREE::VM::GlobalStoreI64Op>(loc, value, symName);
+        IREE::VM::GlobalStoreI64Op::create(builder, loc, value, symName);
         return success();
       default:
         return failure();
@@ -276,10 +283,10 @@ class GlobalInitializationPass
     } else if (auto floatType = llvm::dyn_cast<FloatType>(value.getType())) {
       switch (floatType.getIntOrFloatBitWidth()) {
       case 32:
-        builder.create<IREE::VM::GlobalStoreF32Op>(loc, value, symName);
+        IREE::VM::GlobalStoreF32Op::create(builder, loc, value, symName);
         return success();
       case 64:
-        builder.create<IREE::VM::GlobalStoreF64Op>(loc, value, symName);
+        IREE::VM::GlobalStoreF64Op::create(builder, loc, value, symName);
         return success();
       default:
         return failure();

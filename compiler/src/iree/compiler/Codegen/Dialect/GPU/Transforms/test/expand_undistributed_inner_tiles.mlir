@@ -11,7 +11,9 @@ func.func @concretize_multi_mma_F32_16x16x16_F16(%lhs: tensor<2x2x16x16xf16>, %r
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, lowering_config = #config
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
+    lowering_config = #config
   } : tensor<2x2x16x16xf16>, tensor<2x2x16x16xf16> into tensor<2x2x16x16xf32>
   return %0 : tensor<2x2x16x16xf32>
 }
@@ -43,7 +45,9 @@ func.func @concretize_multi_mma_I32_16x16x16_I8(%lhs: tensor<2x2x16x16xi8>, %rhs
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_I32_16x16x16_I8>, lowering_config = #config
+    kind = #iree_gpu.mma_layout<MFMA_I32_16x16x16_I8>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
+    lowering_config = #config
   } : tensor<2x2x16x16xi8>, tensor<2x2x16x16xi8> into tensor<2x2x16x16xi32>
   return %0 : tensor<2x2x16x16xi32>
 }
@@ -76,7 +80,9 @@ func.func @concretize_multi_mma_I32_16x16x32_I8(%lhs: tensor<2x2x16x32xi8>, %rhs
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
-    permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>], lowering_config = #config
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
+    permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>],
+    lowering_config = #config
   } : tensor<2x2x16x32xi8>, tensor<2x2x16x32xi8> into tensor<2x2x16x16xi32>
   return %0 : tensor<2x2x16x16xi32>
 }
@@ -109,7 +115,9 @@ func.func @concretize_multi_mma_F32_32x32x8_F16(%lhs: tensor<2x2x32x8xf16>, %rhs
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>, lowering_config = #config
+    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
+    lowering_config = #config
   } : tensor<2x2x32x8xf16>, tensor<2x2x8x32xf16> into tensor<2x2x32x32xf32>
   return %0 : tensor<2x2x32x32xf32>
 }
@@ -143,7 +151,9 @@ func.func @concretize_multi_mma_I32_32x32x8_I8(%lhs: tensor<2x2x32x8xi8>, %rhs: 
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_I32_32x32x8_I8>, lowering_config = #config
+    kind = #iree_gpu.mma_layout<MFMA_I32_32x32x8_I8>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
+    lowering_config = #config
   } : tensor<2x2x32x8xi8>, tensor<2x2x8x32xi8> into tensor<2x2x32x32xi32>
   return %0 : tensor<2x2x32x32xi32>
 }
@@ -177,7 +187,9 @@ func.func @concretize_multi_mma_F32_32x32x8_F16(%lhs: tensor<2x2x32x8xf16>, %rhs
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>, lowering_config = #config,
+    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
+    lowering_config = #config,
     permutations = [array<i64: 0, 1>, array<i64: 0, 1>, array<i64: 1, 0>]
   } : tensor<2x2x32x8xf16>, tensor<2x2x8x32xf16> into tensor<2x2x32x32xf32>
   return %0 : tensor<2x2x32x32xf32>
@@ -207,7 +219,8 @@ func.func @concretize_F32_16x16x4_F32(%lhs: tensor<16x4xf32>, %rhs: tensor<4x16x
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<16x4xf32>, tensor<4x16xf32> into tensor<16x16xf32>
   return %0 : tensor<16x16xf32>
 }
@@ -233,7 +246,8 @@ func.func @concretize_F32_16x16x32_F8E4M3FNUZ(%lhs: tensor<16x32xf8E4M3FNUZ>, %r
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F8E4M3FNUZ>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F8E4M3FNUZ>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<16x32xf8E4M3FNUZ>, tensor<32x16xf8E4M3FNUZ> into tensor<16x16xf32>
   return %0 : tensor<16x16xf32>
 }
@@ -259,7 +273,8 @@ func.func @concretize_I32_32x32x16_I8(%lhs: tensor<32x16xi8>, %rhs: tensor<16x32
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_I32_32x32x16_I8>
+    kind = #iree_gpu.mma_layout<MFMA_I32_32x32x16_I8>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<32x16xi8>, tensor<16x32xi8> into tensor<32x32xi32>
   return %0 : tensor<32x32xi32>
 }
@@ -290,7 +305,8 @@ func.func @concretize_WMMAR3_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: ten
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<WMMAR3_F16_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<WMMAR3_F16_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<16x16xf16>, tensor<16x16xf16> into tensor<16x16xf16>
   return %0 : tensor<16x16xf16>
 }
@@ -321,7 +337,8 @@ func.func @concretize_WMMAR3_I32_16x16x16_I8(%lhs: tensor<16x16xi8>, %rhs: tenso
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<WMMAR3_I32_16x16x16_I8>
+    kind = #iree_gpu.mma_layout<WMMAR3_I32_16x16x16_I8>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<16x16xi8>, tensor<16x16xi8> into tensor<16x16xi32>
   return %0 : tensor<16x16xi32>
 }
@@ -352,7 +369,8 @@ func.func @concretize_WMMAR4_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: ten
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<WMMAR4_F16_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<WMMAR4_F16_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<16x16xf16>, tensor<16x16xf16> into tensor<16x16xf16>
   return %0 : tensor<16x16xf16>
 }
@@ -381,7 +399,8 @@ func.func @concretize_WMMAR4_I32_16x16x16_I8(%lhs: tensor<16x16xi8>, %rhs: tenso
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<WMMAR4_I32_16x16x16_I8>
+    kind = #iree_gpu.mma_layout<WMMAR4_I32_16x16x16_I8>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<16x16xi8>, tensor<16x16xi8> into tensor<16x16xi32>
   return %0 : tensor<16x16xi32>
 }
@@ -420,6 +439,7 @@ func.func @expand_output_tile_scaled_mfma_32x32x64(%lhs: tensor<?x?x1x32x2x32xf4
       lhs_elem_type = f4E2M1FN,
       rhs_elem_type = f8E4M3FN,
       acc_elem_type = f32>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
     permutations = [array<i64: 0, 1, 2>, array<i64: 0, 1>,
       array<i64: 2, 0, 1>, array<i64: 1, 0>,
       array<i64: 0, 1>]
@@ -457,6 +477,7 @@ func.func @expand_output_tile_scaled_mfma_32x32x64_col_major(%lhs: tensor<?x?x1x
       lhs_elem_type = f4E2M1FN,
       rhs_elem_type = f8E4M3FN,
       acc_elem_type = f32, col_major = true>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
     permutations = [array<i64: 0, 1, 2>, array<i64: 0, 1>,
       array<i64: 2, 0, 1>, array<i64: 1, 0>,
       array<i64: 0, 1>]

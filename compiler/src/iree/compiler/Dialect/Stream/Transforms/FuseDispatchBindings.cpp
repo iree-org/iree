@@ -246,8 +246,8 @@ struct MemoizedCmdZeros {
     if (it != parentZeros.end()) {
       return it->second;
     }
-    auto zero =
-        OpBuilder(parentOp).create<arith::ConstantIndexOp>(op->getLoc(), 0);
+    OpBuilder builder(parentOp);
+    auto zero = arith::ConstantIndexOp::create(builder, op->getLoc(), 0);
     parentZeros[parentOp] = zero;
     return zero;
   }
@@ -298,8 +298,8 @@ static void updateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
 
   // Replace the old dispatch op with a new one.
   OpBuilder builder(dispatchOp);
-  auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      dispatchOp.getLoc(), dispatchOp.getWorkload(),
+  auto newOp = IREE::Stream::CmdDispatchOp::create(
+      builder, dispatchOp.getLoc(), dispatchOp.getWorkload(),
       dispatchOp.getEntryPointsAttr(), newOperands, newResources,
       newResourceSizes, newOffsets, newLengths,
       builder.getArrayAttr(newAccesses));

@@ -196,19 +196,13 @@ util.func public @attention_dynamic(%arg0: tensor<?x?x?xf16>, %arg1: tensor<?x?x
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C2]]
-//  CHECK-DAG:   %[[D4:.+]] = tensor.dim %[[ARG2]], %[[C2]]
 //  CHECK-DAG:   %[[SPLIT0:.+]] = arith.divsi %[[D0]]
-//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[SPLIT0]], %[[D1]], %[[D4]]) : tensor<2x?x?x?xf16>
 //  CHECK-DAG:   %[[QUERY:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT0]], %[[D1]], %[[D2]]]
-//  CHECK-DAG:   %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[D6:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//  CHECK-DAG:   %[[D7:.+]] = tensor.dim %[[ARG1]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT1:.+]] = arith.divsi %[[D5]], %[[C2]]
-//  CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT1]], %[[D6]], %[[D7]]]
-//  CHECK-DAG:   %[[D8:.+]] = tensor.dim %[[ARG2]], %[[C0]]
-//  CHECK-DAG:   %[[D9:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//  CHECK-DAG:   %[[SPLIT2:.+]] = arith.divsi %[[D8]], %[[C2]]
-//  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT2]], %[[D9]], %[[D4]]]
+//  CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT0]], %[[D6]], %[[D2]]]
+//  CHECK-DAG:   %[[D9:.+]] = tensor.dim %[[ARG2]], %[[C2]]
+//  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT0]], %[[D6]], %[[D9]]]
+//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[SPLIT0]], %[[D1]], %[[D9]]) : tensor<2x?x?x?xf16>
 //      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:       indexing_maps =
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
@@ -256,29 +250,13 @@ util.func public @attention_dynamic_masked(%arg0: tensor<?x?x?xf16>, %arg1: tens
 // CHECK-SAME:     %[[ARG3:.+]]: f16
 // CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: tensor<?x?x?xf16>)
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
-//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C2]]
-//  CHECK-DAG:   %[[D4:.+]] = tensor.dim %[[ARG2]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT0:.+]] = arith.divsi %[[D0]]
-//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[SPLIT0]], %[[D1]], %[[D4]]) : tensor<2x?x?x?xf16>
-//  CHECK-DAG:   %[[QUERY:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT0]], %[[D1]], %[[D2]]]
-//  CHECK-DAG:   %[[D5:.+]] = tensor.dim %[[ARG1]], %[[C0]]
-//  CHECK-DAG:   %[[D6:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//  CHECK-DAG:   %[[D7:.+]] = tensor.dim %[[ARG1]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT1:.+]] = arith.divsi %[[D5]], %[[C2]]
-//  CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT1]], %[[D6]], %[[D7]]]
-//  CHECK-DAG:   %[[D8:.+]] = tensor.dim %[[ARG2]], %[[C0]]
-//  CHECK-DAG:   %[[D9:.+]] = tensor.dim %[[ARG2]], %[[C1]]
-//  CHECK-DAG:   %[[SPLIT2:.+]] = arith.divsi %[[D8]], %[[C2]]
-//  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT2]], %[[D9]], %[[D4]]]
-//  CHECK-DAG:   %[[D10:.+]] = tensor.dim %[[ARG4]], %[[C0]]
-//  CHECK-DAG:   %[[D11:.+]] = tensor.dim %[[ARG4]], %[[C1]]
-//  CHECK-DAG:   %[[D12:.+]] = tensor.dim %[[ARG4]], %[[C2]]
-//  CHECK-DAG:   %[[SPLIT3:.+]] = arith.divsi %[[D10]], %[[C2]]
-//  CHECK-DAG:   %[[MASK:.+]] = tensor.expand_shape %[[ARG4]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT3]], %[[D11]], %[[D12]]]
+//  CHECK-DAG:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[SPLIT:.+]] = arith.divsi %[[DIM]], %[[C2]]
+//  CHECK-DAG:   %[[QUERY:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT]],
+//  CHECK-DAG:   %[[KEY:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT]],
+//  CHECK-DAG:   %[[CACHE:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT]],
+//  CHECK-DAG:   %[[MASK:.+]] = tensor.expand_shape %[[ARG4]] {{\[}}[0, 1], [2], [3]{{\]}} output_shape [2, %[[SPLIT]],
 //      CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:       indexing_maps =
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
@@ -288,7 +266,6 @@ util.func public @attention_dynamic_masked(%arg0: tensor<?x?x?xf16>, %arg1: tens
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
 // CHECK-SAME:       ins(%[[QUERY]], %[[KEY]], %[[CACHE]], %[[ARG3]], %[[MASK]] :
-// CHECK-SAME:       outs(%[[EMPTY]] :
 //      CHECK:   util.return %[[ATTENTION]]
 
 // -----
@@ -707,6 +684,23 @@ util.func public @scatter_collapse_noop(%arg0: tensor<10xf16>, %arg1: tensor<10x
 //  CHECK-SAME:       outs(%[[ARG2]]
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SCATTER]]
 //       CHECK:   util.return %[[EXPANDED]]
+
+// -----
+
+util.func public @scatter_collapse_multiple_dynamic(%arg0 : tensor<?x?x4x32x32xf16>, %arg1 : tensor<?xi64>, %arg2 : tensor<?x4x32x32xf16>) -> (tensor<?x4x32x32xf16>){
+  %collapsed = tensor.collapse_shape %arg0 [[0, 1], [2], [3], [4]] : tensor<?x?x4x32x32xf16> into tensor<?x4x32x32xf16>
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%collapsed, %arg1 : tensor<?x4x32x32xf16>, tensor<?xi64>) outs(%arg2 : tensor<?x4x32x32xf16>) {
+  ^bb0(%arg7: f16, %arg8: f16):
+    iree_linalg_ext.yield %arg7 : f16
+  } -> tensor<?x4x32x32xf16>
+  util.return %0 : tensor<?x4x32x32xf16>
+}
+// CHECK-LABEL: util.func public @scatter_collapse_multiple_dynamic
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]:
+//       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:       ins({{.*}} : tensor<?x?x4x32x32xf16>, tensor<?x?xi64>
 
 // -----
 

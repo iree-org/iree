@@ -87,12 +87,12 @@ typedef struct iree_hal_executable_environment_v0_t
 // or some semantic versioning we track in whatever spec we end up having.
 typedef uint32_t iree_hal_executable_library_version_t;
 
-#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_5 0x00000005u
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_6 0x00000006u
 
 // The latest version of the library API; can be used to populate the
 // iree_hal_executable_library_header_t::version when building libraries.
 #define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST \
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_5
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_6
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
@@ -379,10 +379,25 @@ typedef int (*iree_hal_executable_dispatch_v0_t)(
 // Maximum number of bindings that can be used by a single dispatch.
 #define IREE_HAL_EXECUTABLE_MAX_BINDING_COUNT 64
 
+// Flags defining dispatch behavior.
+enum iree_hal_executable_dispatch_flag_v0_bits_e {
+  IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_NONE = 0ull,
+  // Contiguous workgroups in workgroup space process data sequentially.
+  // Dispatch performance can benefit from scheduling multiple contiguous
+  // workgroups on execution units that share caches.
+  IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_SEQUENTIAL = 1ull << 0,
+  // Workgroup size is dynamic at dispatch time.
+  // The workgroup size specified on the export info is the minimum size and
+  // granularity and any dynamic workgroup size chosen must be a multiple.
+  IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_WORKGROUP_SIZE_DYNAMIC = 1ull << 1,
+};
+typedef uint64_t iree_hal_executable_dispatch_flags_v0_t;
+
 // Attributes for exported dispatch functions defining how they are to be
-// executed. 0 defaults are well-specified and the entire attributes table may
-// be omitted if no dispatch functions require these fields.
+// executed. Required for all dispatches to specify constant and binding counts.
 typedef struct iree_hal_executable_dispatch_attrs_v0_t {
+  // Flags defining dispatch behavior.
+  iree_hal_executable_dispatch_flags_v0_t flags;
   // Number of IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE byte pages
   // (or 0) indicating how much workgroup local memory is required for the
   // dispatch. This is the size of the buffer referenced by the `local_memory`
@@ -392,11 +407,67 @@ typedef struct iree_hal_executable_dispatch_attrs_v0_t {
   uint8_t constant_count;
   // Total number of bindings used by the dispatch.
   uint8_t binding_count;
-  // Unused to pad the structure. Must be 0.
-  uint32_t reserved_0;
+  // Constant workgroup size if specified by the compiler.
+  uint32_t workgroup_size_x;
+  uint32_t workgroup_size_y;
+  uint16_t workgroup_size_z;
+  // Total number of logical parameters.
+  // Indicates the size of the parameter array for this export in the export
+  // table.
+  uint16_t parameter_count;
   // Unused. Must be 0.
-  uint64_t reserved_1[8];
+  uint64_t reserved_1[5];
 } iree_hal_executable_dispatch_attrs_v0_t;
+static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) <= 64,
+              "try keeping dispatch attrs small enough to fit in a cache line");
+
+// Specifies the type of a parameter.
+enum iree_hal_executable_dispatch_parameter_type_v0_e {
+  // Parameter is a constant uniform value.
+  // Passed to the dispatch in the constants table. The offset indicates the
+  // byte offset from the start of the constants table. The size is the total
+  // bytes the constant occupies in the constant table without padding.
+  IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_CONSTANT = 0,
+  // Parameter is a buffer binding.
+  // Passed to the dispatch in the binding_ptrs table and the length is
+  // available. The offset indicates which binding in the table this parameter
+  // maps to. The parameter size is ignored.
+  IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BINDING = 1,
+  // Parameter is a raw buffer pointer.
+  // Passed to the dispatch in the constants table and the length is
+  // unavailable. The offset indicates the byte offset from the start of the
+  // constants table. The size is the width in bytes of the pointer (always the
+  // machine pointer width).
+  IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BUFFER_PTR = 2,
+};
+typedef uint8_t iree_hal_executable_dispatch_parameter_type_v0_t;
+
+// Defines parameter handling behavior.
+enum iree_hal_executable_dispatch_parameter_flag_v0_bits_e {
+  IREE_HAL_EXECUTABLE_DISPATCH_PARAM_FLAG_V0_NONE = 0,
+};
+typedef uint16_t iree_hal_executable_dispatch_parameter_flags_v0_t;
+
+// Declares properties of a parameter to a dispatch function.
+typedef struct iree_hal_executable_dispatch_parameter_v0_t {
+  // Type of the parameter.
+  iree_hal_executable_dispatch_parameter_type_v0_t type;
+  // Size of the parameter in bytes. Does not contain padding.
+  uint8_t size;
+  // Flags indicating parameter behavior.
+  iree_hal_executable_dispatch_parameter_flags_v0_t flags;
+  // Ordinal in the parameter name table or -1 if unnamed.
+  uint16_t name;
+  // Offset of the parameter in bytes or binding ordinal, depending on type.
+  uint16_t offset;
+} iree_hal_executable_dispatch_parameter_v0_t;
+
+// Information used to calculate occupancy.
+typedef struct iree_hal_executable_dispatch_occupancy_v0_t {
+  // TODO(benvanik): implement this. It's optional and not used yet but here
+  // as a placeholder in the format.
+  int reserved;
+} iree_hal_executable_dispatch_occupancy_v0_t;
 
 // Source location information for a dispatch function indicating what code was
 // used to generate it. This only represents a single source snapshot, of which
@@ -432,10 +503,48 @@ typedef struct iree_hal_executable_export_table_v0_t {
   // Function pointers for each exported entry point.
   const iree_hal_executable_dispatch_v0_t* ptrs;
 
-  // Optional table of attributes 1:1 with ptrs.
-  // Omitting the table entirely means that no exports need workgroup local
-  // memory (or whatever else we pack into the attributes).
+  // Table of attributes 1:1 with ptrs.
   const iree_hal_executable_dispatch_attrs_v0_t* attrs;
+
+  // Optional parameter declarations per entry point in original logical order.
+  // The offset of each parameter for a particular entry point may jump around
+  // as alignment and padding are accounted for. Each entry point has as many
+  // parameters as the attributes constant_count + binding_count indicate.
+  // When omitted the function is assumed to follow the IREE HAL ABI.
+  //
+  // Example of a raw C function:
+  //   int my_dispatch(uint32_t a, uint64_t b, void* c);
+  // Params:
+  // - "a": type=CONSTANT, offset=0, size=4
+  // - "b": type=CONSTANT, offset=8, size=8
+  // - "c": type=BUFFER_PTR, offset=0, size=8  (64-bit system)
+  //
+  // Example of a (hypothetical) HAL ABI-aware C function:
+  //   int my_dispatch(
+  //       iree_hal_abi_workgroup_count_t wg_count,
+  //       iree_hal_abi_workgroup_size_t wg_size,
+  //       uint32_t a,
+  //       uint64_t b,
+  //       iree_hal_abi_binding_t c);
+  // Params:
+  // - "a": type=CONSTANT, offset=0, size=4
+  // - "b": type=CONSTANT, offset=8, size=8
+  // - "c": type=BINDING, offset=0
+  //
+  // The packing logic for producing constants and bindings from a list of raw
+  // parameters roughly follows:
+  //   for (param, value) in zip(params[entry_point], param_values):
+  //     if param.type == constant || buffer_ptr:
+  //       memcpy(constants[param.offset / 4], &value, param.size)
+  //     elif param.type == binding:
+  //       bindings[param.offset] = make_binding(value, IREE_HAL_WHOLE_BUFFER)
+  const iree_hal_executable_dispatch_parameter_v0_t** params;
+
+  // Optional occupancy information used to calculate ideal workgroup count and
+  // size. Information is intended to be derived from analysis or extracted from
+  // the final machine code and be accurate enough to trust for distribution.
+  // If unavailable then workgroup sizes must be specified on each export.
+  const iree_hal_executable_dispatch_occupancy_v0_t* occupancy;
 
   // Optional table of export function entry point names 1:1 with ptrs.
   // These names are only used for tracing/debugging and can be omitted to save
@@ -447,6 +556,10 @@ typedef struct iree_hal_executable_export_table_v0_t {
   // verbose logging. The string values, when present, may be attached to
   // tracing/debugging events related to the entry point.
   const char* const* tags;
+
+  // Optional string table of parameter names.
+  // Names are NUL-terminated. May be omitted if names are not available.
+  const char* const* parameter_names;
 
   // Optional table of source locations 1:1 with ptrs.
   // These are the canonical source location in the compiler.

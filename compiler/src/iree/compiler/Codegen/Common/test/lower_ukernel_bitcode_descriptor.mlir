@@ -1,6 +1,6 @@
-// RUN: iree-opt --iree-codegen-lower-bitcode-ukernels %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-lower-bitcode-ukernels --split-input-file %s | FileCheck %s
 
-// CHECK-LABEL: @ukernel_test
+// CHECK-LABEL: @ukernel_test_without_provider
 // CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>
 // CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>
 // CHECK-NOT:     linalg.generic
@@ -14,7 +14,7 @@
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
-  func.func @ukernel_test(%arg0: tensor<16x32xf32>, %arg1: tensor<16x32xf32>) -> tensor<16x16xf32> {
+  func.func @ukernel_test_without_provider(%arg0: tensor<16x32xf32>, %arg1: tensor<16x32xf32>) -> tensor<16x16xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<16x16xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<16x16xf32>) -> tensor<16x16xf32>
