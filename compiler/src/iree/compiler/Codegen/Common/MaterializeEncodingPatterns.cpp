@@ -140,29 +140,6 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
   return newEmptyOp;
 }
 
-/// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
-/// returns the dynamic dimensions of the materialized shape of the
-/// `dispatchTensorType`. The dynamic dimensions of the `dispatchTensorType` are
-/// provided in `dynamicDims`.
-static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
-    OpBuilder &builder, Location loc,
-    const MaterializeEncodingTypeConverter &typeConverter,
-    IREE::TensorExt::DispatchTensorType dispatchTensorType,
-    ValueRange dynamicDims) {
-  FailureOr<SmallVector<OpFoldResult>> convertedTargetShape =
-      typeConverter.getPackedDimsForDispatchTensor(
-          builder, loc, dispatchTensorType, dynamicDims);
-  if (failed(convertedTargetShape)) {
-    return failure();
-  }
-  SmallVector<int64_t> convertedStaticTargetShape;
-  SmallVector<Value> convertedDynamicTargetShape;
-  dispatchIndexOpFoldResults(convertedTargetShape.value(),
-                             convertedDynamicTargetShape,
-                             convertedStaticTargetShape);
-  return convertedDynamicTargetShape;
-}
-
 namespace {
 /// Pattern to materialize the encoding for `hal.interface.binding.subspan`
 /// operations.
@@ -175,44 +152,60 @@ struct MaterializeInterfaceBindingEncoding
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+    auto origResultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
         subspanOp.getResult().getType());
-    if (!resultType) {
+    if (!origResultType) {
       return rewriter.notifyMatchFailure(
           subspanOp,
           "expected result type to be !iree_tensor_ext.dispatch.tensor");
     }
-    auto boundTensorType =
-        llvm::dyn_cast<RankedTensorType>(resultType.getBoundType());
-    if (!boundTensorType) {
+    auto origBoundTensorType =
+        dyn_cast<RankedTensorType>(origResultType.getBoundType());
+    if (!origBoundTensorType) {
       return rewriter.notifyMatchFailure(
           subspanOp, "bound type is not a RankedTensorType");
     }
 
-    auto convertedBoundType = getTypeConverter()->convertType(boundTensorType);
-    if (convertedBoundType == boundTensorType) {
-      return rewriter.notifyMatchFailure(subspanOp, "bound type already valid");
-    }
-
     auto typeConverter = getTypeConverter<MaterializeEncodingTypeConverter>();
-    // Get the dynamic dims of the target.
-    Location loc = subspanOp.getLoc();
-    SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();
-    FailureOr<SmallVector<Value>> convertedDynamicDims =
-        getPackedDynamicDimsForDispatchTensor(rewriter, loc, *typeConverter,
-                                              resultType,
-                                              subspanOp.getDynamicDims());
-    // Drop the encoding if the target does not support it.
-    if (succeeded(convertedDynamicDims)) {
-      newDynamicDims = convertedDynamicDims.value();
+    auto convertedResultType =
+        typeConverter->convertType<IREE::TensorExt::DispatchTensorType>(
+            origResultType);
+    if (!convertedResultType) {
+      return rewriter.notifyMatchFailure(subspanOp,
+                                         "expected converted result type to be "
+                                         "!iree_tensor_ext.dispatch.tensor");
+    }
+    if (origResultType == convertedResultType) {
+      return rewriter.notifyMatchFailure(
+          subspanOp, "DispatchTensorType type already valid");
     }
 
-    auto newResultType = IREE::TensorExt::DispatchTensorType::get(
-        resultType.getAccess(), convertedBoundType);
+    // Get the dynamic dims of the target.
+    // TODO(hanchung): We only have getOffsetsSizesStrides interface method that
+    // handles all three together. It would be cleaner to have a separate method
+    // to get dynamic sizes only.
+    Location loc = subspanOp.getLoc();
+    ValueRange origDynamicDims = subspanOp.getDynamicDims();
+    SmallVector<OpFoldResult> origSizes = getMixedValues(
+        origBoundTensorType.getShape(), origDynamicDims, rewriter);
+    SmallVector<OpFoldResult> origOffsets(origDynamicDims.size(),
+                                          rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> origStrides(origDynamicDims.size(),
+                                          rewriter.getIndexAttr(1));
+    SmallVector<OpFoldResult> newOffsets, newSizes, newStrides;
+    if (failed(typeConverter->getOffsetsSizesStrides(
+            rewriter, loc, origResultType, origDynamicDims, origOffsets,
+            origSizes, origStrides, newOffsets, newSizes, newStrides))) {
+      return failure();
+    }
+
+    SmallVector<int64_t> newStaticDims;
+    SmallVector<Value> newDynamicDims;
+    dispatchIndexOpFoldResults(newSizes, newDynamicDims, newStaticDims);
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, newResultType, subspanOp.getLayout(), subspanOp.getBinding(),
-        subspanOp.getByteOffset(), newDynamicDims, subspanOp.getAlignmentAttr(),
-        subspanOp.getDescriptorFlagsAttr());
+        subspanOp, convertedResultType, subspanOp.getLayout(),
+        subspanOp.getBinding(), subspanOp.getByteOffset(), newDynamicDims,
+        subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
     return success();
   }
 };
