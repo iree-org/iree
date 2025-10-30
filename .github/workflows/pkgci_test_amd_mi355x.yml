@@ -18,7 +18,7 @@ on:
         default: ""
 
 jobs:
-  test_mi355:
+  test_mi355x:
     runs-on: linux-mi35x-1gpu-ossci-iree-org
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
