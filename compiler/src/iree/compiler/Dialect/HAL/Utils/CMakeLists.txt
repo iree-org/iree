@@ -27,23 +27,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    LLVMCodeGenUtils
-  HDRS
-    "LLVMCodeGenUtils.h"
-  SRCS
-    "LLVMCodeGenUtils.cpp"
-  DEPS
-    LLVMCore
-    LLVMMC
-    LLVMSupport
-    LLVMTarget
-    MLIRIR
-    MLIRLLVMDialect
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     LLVMLinkerUtils
   HDRS
     "LLVMLinkerUtils.h"
