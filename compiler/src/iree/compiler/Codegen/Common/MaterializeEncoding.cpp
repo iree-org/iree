@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
@@ -59,42 +60,42 @@ updateFuncSignature(FunctionOpInterface funcOp,
   }
 }
 
-static LogicalResult
-materializeFuncOpEncodings(FunctionOpInterface funcOp,
-                           IREE::HAL::ExecutableTargetAttr targetAttr,
-                           bool testCLGPUTarget = false) {
+static LogicalResult materializeFuncOpEncodings(
+    FunctionOpInterface funcOp, IREE::HAL::ExecutableTargetAttr targetAttr,
+    ::mlir::iree_compiler::detail::TestingResolverKind resolverSource =
+        ::mlir::iree_compiler::detail::TestingResolverKind::kNone) {
   MLIRContext *ctx = funcOp.getContext();
   {
     RewritePatternSet patterns(ctx);
     DictionaryAttr targetConfig =
         targetAttr ? targetAttr.getConfiguration() : nullptr;
-    // Check if the encoding resolver is a GPUPaddingResolverAttr. For padding
-    // encoding materialization, we use a separate pass, so skip materialization
-    // here.
-    // TODO(#20160): Support GPUPaddingResolverAttr materialization through this
-    // pass, and remove the ad-hoc materialization pass for padding.
-    if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPaddingResolverAttr>(
-                            IREE::Encoding::kEncodingResolverAttrName)) {
-      LDBG()
-          << "Found GPUPaddingResolverAttr encoding resolver. Materialization "
-             "will be handled later.";
-      return success();
-    }
-
     auto getTestTargetOrNopLayout =
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
-      if (testCLGPUTarget) {
+      LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
+                "attribute. (testCLGPUTarget)";
+      SmallVector<NamedAttribute> configItems;
+      IREE::GPU::TargetAttr targetAttr =
+          getGPUTargetAttr(ctx, /*target=*/nullptr);
+      addConfigGPUTarget(ctx, targetAttr, configItems);
+      switch (resolverSource) {
+      case ::mlir::iree_compiler::detail::TestingResolverKind::kGPUDataTiling: {
         LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
-                  "attribute. (testCLGPUTarget)";
-        SmallVector<NamedAttribute> configItems;
-        // Setting a nullptr to `target` below returns the target from command
-        // line.
-        IREE::GPU::TargetAttr targetAttr =
-            getGPUTargetAttr(ctx, /*target=*/nullptr);
-        addConfigGPUTarget(ctx, targetAttr, configItems);
+                  "attribute. (kGPUDataTiling)";
         return cast<IREE::Encoding::LayoutMaterializerAttr>(
             IREE::GPU::GPUEncodingResolverAttr::get(
                 ctx, DictionaryAttr::get(ctx, configItems)));
+      }
+      case ::mlir::iree_compiler::detail::TestingResolverKind::kGPUPadding: {
+        LDBG() << "Select GPUPaddingResolverAttr attribute as the layout "
+                  "attribute. (kGPUPadding)";
+        std::optional<IREE::GPU::L1CacheInfo> cache =
+            IREE::GPU::getL1CacheInfo(targetAttr);
+        return cast<IREE::Encoding::LayoutMaterializerAttr>(
+            IREE::GPU::GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes,
+                                                   cache->cacheSets));
+      }
+      case ::mlir::iree_compiler::detail::TestingResolverKind::kNone:
+        break;
       }
       LDBG() << "Select IdentityResolverAttr attribute as the layout "
                 "attribute (Encoding resolver unknown or unsupported).";
@@ -132,10 +133,10 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
     // Replace any unrealized conversions to tensor.cast ops if they come from
-    // block arguments. The function signature is updated to match the converted
-    // types after the partial conversion. This is used in testing, where
-    // function arguments have encodings to reduce the amount of IR, but we do
-    // not expect function arguments to have encodings in practice.
+    // block arguments. The function signature is updated to match the
+    // converted types after the partial conversion. This is used in testing,
+    // where function arguments have encodings to reduce the amount of IR, but
+    // we do not expect function arguments to have encodings in practice.
     auto castFnArguments = [](OpBuilder &builder, Type resultTy,
                               ValueRange inputs, Location loc) -> Value {
       if (inputs.size() != 1) {
@@ -177,11 +178,11 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
         patterns, [](OpOperand *opOperand) {
           Operation *producer = opOperand->get().getDefiningOp();
           Operation *consumer = opOperand->getOwner();
-          // If we have a pack/unpack consumer and a producer that has multiple
-          // uses, this _probably_ means the producer won't get dce'd. If that
-          // is the case, by folding the consumer pack/unpack, we break the
-          // producer consumer chain between them and inhibit fusion later in
-          // the pipeline.
+          // If we have a pack/unpack consumer and a producer that has
+          // multiple uses, this _probably_ means the producer won't get
+          // dce'd. If that is the case, by folding the consumer pack/unpack,
+          // we break the producer consumer chain between them and inhibit
+          // fusion later in the pipeline.
           if (isa<linalg::PackOp, linalg::UnPackOp>(consumer) &&
               isa_and_nonnull<TilingInterface>(producer) &&
               !producer->hasOneUse())
@@ -304,7 +305,7 @@ struct MaterializeDeviceEncodingPass final
     FunctionOpInterface funcOp = getOperation();
     auto executableTargetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     if (failed(materializeFuncOpEncodings(funcOp, executableTargetAttr,
-                                          testCLGPUTarget))) {
+                                          testGPUEncodingResolver))) {
       return signalPassFailure();
     }
   }
