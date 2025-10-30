@@ -255,6 +255,27 @@ endif()
 # deployable code which need to specify the proper target chip.
 #-------------------------------------------------------------------------------
 
+# When ROCm is detected, force the user to make a conscious decision to enable
+# or disable ROCm testing. It's hard to enable automatically for a given target
+# chip because that would rely too much on guessing what the target chip is.
+# But silently continuing with ROCm testing disabled by default has also been
+# surprising.
+if (NOT DEFINED CACHE{IREE_HIP_TEST_TARGET_CHIP})
+  find_program(_ROCMINFO_COMMAND rocminfo)
+  if (_ROCMINFO_COMMAND)
+    execute_process(COMMAND ${_ROCMINFO_COMMAND} OUTPUT_VARIABLE _ROCMINFO_OUTPUT)
+    string(REGEX MATCH "Name:[ ]*gfx[0-9]+" _ROCMINFO_OUTPUT_NAME_LINE "${_ROCMINFO_OUTPUT}")
+    string(REGEX MATCH "gfx[0-9]+" _ROCMINFO_GFX_NAME "${_ROCMINFO_OUTPUT_NAME_LINE}")
+    if (_ROCMINFO_GFX_NAME)
+      # This needs to be FATAL_ERROR not SEND_ERROR, else the set(CACHE) below
+      # will prematurely hide this error in case cmake is run again without
+      # addressing the issue.
+      message(FATAL_ERROR "ROCm device detected: ${_ROCMINFO_GFX_NAME}. Please explicitly either enable or disable ROCm testing.\n"
+                      "To enable ROCm testing:\n    cmake -DIREE_HIP_TEST_TARGET_CHIP=${_ROCMINFO_GFX_NAME}\n"
+                      "To disable ROCm testing:\n    cmake -DIREE_HIP_TEST_TARGET_CHIP=\n" )
+    endif()
+  endif()
+endif()
 set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
   "Target chip for HIP tests that need to compile device code. \
    Defaults to empty string to disable tests.")
