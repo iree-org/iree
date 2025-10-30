@@ -21,9 +21,12 @@ namespace mlir::iree_compiler {
 namespace detail {
 /// Kinds of testing resolvers for MaterializeDeviceEncodingPass.
 enum class TestingResolverKind {
-  kGPUDataTiling, // iree_gpu.gpu_encoding_resolver<>
-  kGPUPadding,    // iree_gpu.gpu_padding_resolver<>
-  kNone           // Do not create any specific resolver.
+  // iree_gpu.gpu_encoding_resolver<>
+  kGPUDataTiling,
+  // iree_gpu.gpu_padding_resolver<>
+  kGPUPadding,
+  // Do not create any GPU specific resolver, so fallback to identity resolver.
+  kNone
 };
 } // namespace detail
 
