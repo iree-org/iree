@@ -69,7 +69,7 @@ static LogicalResult materializeFuncOpEncodings(
     RewritePatternSet patterns(ctx);
     DictionaryAttr targetConfig =
         targetAttr ? targetAttr.getConfiguration() : nullptr;
-    auto getTestTargetOrNopLayout =
+    auto getTestTargetResolverOrIdentityResolver =
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
       LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
                 "attribute. (testCLGPUTarget)";
@@ -108,8 +108,9 @@ static LogicalResult materializeFuncOpEncodings(
     // so it can access the target info during materialization.
     //
     // If the layoutAttr was not found, or if it does not implement the layout
-    // resolver interface, fall back to the resolver for getCLGPUTarget. If
-    // there is also no test target set, fall back to the nop layout.
+    // resolver interface, fall back to the resolver for TestingResolverKind
+    // resolver. If there is also no test target set or it is kNone, fall back
+    // to the identity resolver.
     IREE::Encoding::LayoutMaterializerAttr layoutAttr =
         targetConfig
             ? targetConfig.getAs<IREE::Encoding::LayoutMaterializerAttr>(
@@ -122,7 +123,7 @@ static LogicalResult materializeFuncOpEncodings(
         layoutAttr && resolverAttr
             ? cast<IREE::Encoding::LayoutMaterializerAttr>(
                   resolverAttr.cloneWithSimplifiedConfig(targetConfig))
-            : getTestTargetOrNopLayout();
+            : getTestTargetResolverOrIdentityResolver();
 
     LDBG() << "Selected Encoding::LayoutMaterializerAttr with target "
               "configuration: "
