@@ -114,6 +114,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   SmallVector<OpFoldResult> padSizes =
       getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
 
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(tilingInterfaceOp);
   FailureOr<SmallVector<Value>> result =
       tensorMaskingOp.getMaskedImplementation(rewriter, padSizes);
   if (failed(result)) {
