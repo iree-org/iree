@@ -40,7 +40,7 @@
 /build_tools/python_deploy/ @stellaraccident
 /build_tools/scripts/ @ScottTodd
 /build_tools/third_party/ @ScottTodd @stellaraccident
-/.github/ @ScottTodd
+/.github/ @ScottTodd @Groverkss
 
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
