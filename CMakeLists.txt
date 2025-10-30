@@ -248,18 +248,6 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
-# HIP Default Target Configuration.
-#
-# HIP does not have a stable instruction set like NVIDIA PTX; it requires
-# binaries specific to a target chip. We have tests that generate and run
-# deployable code which need to specify the proper target chip.
-#-------------------------------------------------------------------------------
-
-set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
-  "Target chip for HIP tests that need to compile device code. \
-   Defaults to empty string to disable tests.")
-
-#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:
@@ -417,6 +405,44 @@ endif()
 if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
   message(STATUS "  - system-library")
 endif()
+
+#-------------------------------------------------------------------------------
+# HIP Default Target Configuration.
+#
+# HIP does not have a stable instruction set like NVIDIA PTX; it requires
+# binaries specific to a target chip. We have tests that generate and run
+# deployable code which need to specify the proper target chip.
+#-------------------------------------------------------------------------------
+
+# When ROCm is detected on the build host and a corresponding HAL driver is enabled,
+# force the user to make a conscious decision to enable or disable ROCm testing.
+# It's hard to enable automatically for a given target
+# chip because that would rely too much on guessing what the target chip is.
+# But silently continuing with ROCm testing disabled by default has also been
+# surprising.
+if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_HIP_TEST_TARGET_CHIP})
+  find_program(_ROCMINFO_COMMAND rocminfo)
+  if (_ROCMINFO_COMMAND)
+    execute_process(COMMAND ${_ROCMINFO_COMMAND} OUTPUT_VARIABLE _ROCMINFO_OUTPUT)
+    string(REGEX MATCH "Name:[ ]*gfx[0-9]+" _ROCMINFO_OUTPUT_NAME_LINE "${_ROCMINFO_OUTPUT}")
+    string(REGEX MATCH "gfx[0-9]+" _ROCMINFO_GFX_NAME "${_ROCMINFO_OUTPUT_NAME_LINE}")
+    if (_ROCMINFO_GFX_NAME)
+      # This needs to be FATAL_ERROR not SEND_ERROR, else the set(CACHE) below
+      # will prematurely hide this error in case cmake is run again without
+      # addressing the issue.
+      # Also note that in the unusual case of multiple devices with distinct
+      # architectures, we only detected one of them, so the message needs to
+      # be conservative.
+      message(FATAL_ERROR "At least one ROCm device detected, with architecture: ${_ROCMINFO_GFX_NAME}.\n"
+                      "Explicitly either enable or disable ROCm testing.\n"
+                      "To enable ROCm testing for ${_ROCMINFO_GFX_NAME}:\n    cmake -DIREE_HIP_TEST_TARGET_CHIP=${_ROCMINFO_GFX_NAME}\n"
+                      "To disable ROCm testing:\n    cmake -DIREE_HIP_TEST_TARGET_CHIP=\n" )
+    endif()
+  endif()
+endif()
+set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
+  "Target chip for HIP tests that need to compile device code. \
+   Defaults to empty string to disable tests.")
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
