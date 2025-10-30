@@ -319,10 +319,6 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
       (destination-passing style).
     * `$dest_indices`: Offsets into the destination tensor/memref where
       the gathered data should be written.
-    * `$dest_size`: The full size of the destination tensor/memref, used to
-      compute the correct global memory offsets for coalesced writes. `$dest_size`
-      along with `$dest_indices` define the shape and location of the destination
-      to write into.
     * `lane`: The lane that specifies the coalescing store's offset within the
       workgroup/shared memory.
 
@@ -335,14 +331,14 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
         %2 = %arg6 * 4
         %thread_slice = tensor.extract_slice %source_slice[0, %2] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
         scf.forall.in_parallel {
-          iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%c0, %c0] dest_size = [4, 128] lane(%arg6) :  ...
+          iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%c0, %c0] lane(%arg6) :  ...
         }
       } {mapping = [#gpu.lane_id<linear_dim_1>, #gpu.lane_id<linear_dim_0>]}
     ```
 
-    ## Example using $dest_indices and $dest_size
+    ## Example using $dest_indices
     ```mlir
-    iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%offset0, %offset1] dest_size = [4, 128] lane(%lane_id)
+    iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%offset0, %offset1] lane(%lane_id)
       : tensor<4x4xf32>, tensor<4x128xf32>, index, index, index
     ```
   }];
@@ -352,14 +348,13 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     Variadic<AnyTypeOf<[RankedTensorOf<[Index]>, VectorOfAnyRankOf<[Index]>]>>:$indices,
     AnyRankedTensorOrMemRef:$init,
     Variadic<Index>:$dest_indices,
-    Index:$lane,
-    DenseI64ArrayAttr:$dest_size
+    Index:$lane
   );
 
   let results = (outs AnyRankedTensorOrMemRef:$result);
 
   let assemblyFormat = [{
-    $source (`[` $indices^ `]`)? `into` $init (`[` $dest_indices^ `]`)? `dest_size` `=` $dest_size `lane` `(` $lane `)`
+    $source (`[` $indices^ `]`)? `into` $init (`[` $dest_indices^ `]`)? `lane` `(` $lane `)`
     attr-dict `:` type(operands) `->` type($result)
   }];
 

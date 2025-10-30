@@ -304,9 +304,6 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     destIndices.push_back(zero);
   }
 
-  // Create dest_size attribute from init tensor dimensions
-  auto destSizeAttr = rewriter.getDenseI64ArrayAttr(initType.getShape());
-
   // Create the DMA op in the in_parallel region.
   rewriter.setInsertionPointToStart(&inParallelBlock);
   SmallVector<Value> indicesVec;
@@ -316,7 +313,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
   rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
       loc, sharedOut.getType(), source, indicesVec, sharedOut, destIndices,
-      laneId, destSizeAttr);
+      laneId);
 
   // Erase the parallel_insert_slice ops and inner operation.
   for (auto insertOp : toErase) {

@@ -36,7 +36,7 @@ func.func @copy(%source: tensor<64x1024xf32>, %init: tensor<64x1024xf32>) -> ten
   // CHECK-SAME:     : tensor<4x128xf32> to tensor<4x4xf32>
 
   // CHECK:     scf.forall.in_parallel {
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[ELEM_SLICE]] into %[[THREAD_INIT]][%{{.+}}, %{{.+}}] dest_size = [4, 128] lane(%[[TIV1]])
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[ELEM_SLICE]] into %[[THREAD_INIT]][%{{.+}}, %{{.+}}] lane(%[[TIV1]])
   // CHECK-SAME:       : tensor<4x4xf32>, tensor<4x128xf32>, index, index, index
   // CHECK:     }
 
@@ -93,7 +93,7 @@ func.func @gather(%source: tensor<4x256xf32>, %indices: tensor<4x256xindex>, %in
   // CHECK-SAME:     : tensor<4x1xindex>, vector<4x1xindex>
 
   // CHECK:     scf.forall.in_parallel
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[ELEM_SLICE]][%[[INDICES_VEC]]] into %[[THREAD_INIT]][%{{.+}}, %{{.+}}] dest_size = [4, 256] lane(%[[TIV1]])
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[ELEM_SLICE]][%[[INDICES_VEC]]] into %[[THREAD_INIT]][%{{.+}}, %{{.+}}] lane(%[[TIV1]])
   // CHECK-SAME:       : tensor<4x1xf32>, vector<4x1xindex>, tensor<4x256xf32>, index, index, index
 
   // CHECK:   {mapping = [#iree_gpu.lane_id<1>, #iree_gpu.lane_id<0>]}

@@ -343,8 +343,7 @@ struct CoalescedGatherDMAOpBufferizationInterface
 
     rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
         gatherOp.getLoc(), initBuffer->getType(), *sourceBuffer,
-        gatherOp.getIndices(), *initBuffer, destIndices, gatherOp.getLane(),
-        gatherOp.getDestSizeAttr());
+        gatherOp.getIndices(), *initBuffer, destIndices, gatherOp.getLane());
 
     rewriter.replaceOp(op, *initBuffer);
 

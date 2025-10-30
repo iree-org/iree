@@ -300,8 +300,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
     Value gatherResult = rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
         loc, coalescedGather.getInit().getType(), coalescedGather.getSource(),
         coalescedGather.getIndices(), coalescedGather.getInit(),
-        coalescedGather.getDestIndices(), coalescedGather.getLane(),
-        coalescedGather.getDestSizeAttr());
+        coalescedGather.getDestIndices(), coalescedGather.getLane());
 
     // Yield the gather result
     scf::YieldOp::create(rewriter, loc, gatherResult);
@@ -445,7 +444,7 @@ static void composeCoalescedGatherDMA(
     rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
         warpInsert.getLoc(), warpInsert.getDest().getType(),
         laneInsert.getSource(), laneInsert.getIndices(), warpInsert.getDest(),
-        newDestIndices, laneInsert.getLane(), laneInsert.getDestSizeAttr());
+        newDestIndices, laneInsert.getLane());
     rewriter.eraseOp(warpInsert);
     rewriter.eraseOp(laneInsert);
   }
