@@ -36,7 +36,7 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTilePass(int64_t tilingLevel, bool skipRootOp);
+createLLVMCPUTilePass(IREE::CPU::TilingLevel tilingLevel, bool skipRootOp);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileAndFuseProducerConsumerPass(
