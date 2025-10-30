@@ -152,7 +152,7 @@ struct MaterializeInterfaceBindingEncoding
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto origResultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+    auto origResultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
         subspanOp.getResult().getType());
     if (!origResultType) {
       return rewriter.notifyMatchFailure(
@@ -160,17 +160,21 @@ struct MaterializeInterfaceBindingEncoding
           "expected result type to be !iree_tensor_ext.dispatch.tensor");
     }
     auto origBoundTensorType =
-        llvm::dyn_cast<RankedTensorType>(origResultType.getBoundType());
+        dyn_cast<RankedTensorType>(origResultType.getBoundType());
     if (!origBoundTensorType) {
       return rewriter.notifyMatchFailure(
           subspanOp, "bound type is not a RankedTensorType");
     }
 
-    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
-        getTypeConverter());
+    auto typeConverter = getTypeConverter<MaterializeEncodingTypeConverter>();
     auto convertedResultType =
         typeConverter->convertType<IREE::TensorExt::DispatchTensorType>(
             origResultType);
+    if (!convertedResultType) {
+      return rewriter.notifyMatchFailure(subspanOp,
+                                         "expected converted result type to be "
+                                         "!iree_tensor_ext.dispatch.tensor");
+    }
     if (origResultType == convertedResultType) {
       return rewriter.notifyMatchFailure(
           subspanOp, "DispatchTensorType type already valid");

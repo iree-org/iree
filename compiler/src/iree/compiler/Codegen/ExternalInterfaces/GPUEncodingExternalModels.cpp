@@ -610,6 +610,9 @@ static RankedTensorType
 getPaddedType(IREE::Encoding::LayoutResolverAttr layoutAttr,
               RankedTensorType type) {
   IREE::Encoding::PaddingAttr layout = getPadLayout(layoutAttr, type);
+  if (!layout) {
+    return nullptr;
+  }
   if (layout.isIdentityLayout()) {
     return type.dropEncoding();
   }
@@ -632,26 +635,25 @@ struct GPUPadEncodingLayoutMaterializerAttr final
   Type convertType(Attribute attr, Type type) const {
     auto layoutAttr = cast<IREE::Encoding::LayoutResolverAttr>(attr);
     return TypeSwitch<Type, Type>(type)
-        .Case<RankedTensorType>([&](auto type) {
+        .Case([&](RankedTensorType type) {
           // By the definition, the final converted type is the same tensor type
           // without encodings.
           return type.dropEncoding();
         })
-        .Case<IREE::TensorExt::DispatchTensorType>(
-            [&](auto dispatchTensorType) {
-              auto type =
-                  dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-              if (!type || !type.getEncoding()) {
-                return dispatchTensorType;
-              }
-              // The incoming bindings have the padded type, if `padding` is
-              // present.
-              if (getPadLayout(layoutAttr, type)) {
-                type = getPaddedType(layoutAttr, type);
-              }
-              return IREE::TensorExt::DispatchTensorType::get(
-                  dispatchTensorType.getAccess(), type);
-            })
+        .Case([&](IREE::TensorExt::DispatchTensorType dispatchTensorType) {
+          auto type =
+              dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+          if (!type || !type.getEncoding()) {
+            return dispatchTensorType;
+          }
+          // The incoming bindings have the padded type, if `padding` is
+          // present.
+          if (getPadLayout(layoutAttr, type)) {
+            type = getPaddedType(layoutAttr, type);
+          }
+          return IREE::TensorExt::DispatchTensorType::get(
+              dispatchTensorType.getAccess(), type);
+        })
         .Default([&](Type type) { return type; });
   }
 
