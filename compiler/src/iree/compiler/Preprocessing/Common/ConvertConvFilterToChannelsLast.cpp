@@ -7,6 +7,7 @@
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -20,8 +21,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-preprocessing-convert-conv-filter-to-channels-last"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::Preprocessing {
 
@@ -265,15 +264,15 @@ public:
 
     RewritePatternSet patterns(context);
     if (filterLayout == "hwfc") {
-      LDBG("Converting filter layout to hwfc.");
+      LDBG() << "Converting filter layout to hwfc.";
       patterns.add<ConvertHwcfToHwfc>(context);
     } else if (filterLayout == "fhwc") {
-      LDBG("Converting filter layout to fhwc.");
+      LDBG() << "Converting filter layout to fhwc.";
       patterns.add<ConvertHwcfToFhwc, ConvertGenericChwfToFhwc>(context);
     } else {
-      LDBG("convert-filter-to-channels-last pass didn't apply since an "
-           "unsupported layout is given. Please use hwfc or fhwc as pass "
-           "filter-layout option.");
+      LDBG() << "convert-filter-to-channels-last pass didn't apply since an "
+                "unsupported layout is given. Please use hwfc or fhwc as pass "
+                "filter-layout option.";
       return signalPassFailure();
     }
 

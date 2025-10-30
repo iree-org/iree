@@ -119,7 +119,6 @@ class TargetConverter:
                 "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
                 "@com_google_googletest//:gtest": ["gmock", "gtest"],
                 "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
-                "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
                 "@hsa_runtime_headers": ["hsa_runtime::headers"],
                 "@webgpu_headers": [],
             }

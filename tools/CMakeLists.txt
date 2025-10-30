@@ -42,6 +42,7 @@ configure_file(build_config_template.txt.in build_config.txt)
 if(IREE_HOST_BIN_DIR AND NOT IREE_BUILD_COMPILER)
   iree_import_binary(NAME iree-tblgen OPTIONAL)
   iree_import_binary(NAME iree-compile OPTIONAL)
+  iree_import_binary(NAME iree-link OPTIONAL)
   iree_import_binary(NAME iree-opt OPTIONAL)
   iree_import_binary(NAME iree-run-mlir OPTIONAL)
   iree_import_binary(NAME FileCheck OPTIONAL)
@@ -334,6 +335,19 @@ if(IREE_BUILD_COMPILER)
       iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
+    HOSTONLY
+    SETUP_INSTALL_RPATH
+    INSTALL_COMPONENT IREETools-Compiler
+  )
+
+  iree_cc_binary(
+    NAME
+      iree-link
+    SRCS
+      "iree-link-main.cc"
+    DEPS
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
     HOSTONLY
     SETUP_INSTALL_RPATH
     INSTALL_COMPONENT IREETools-Compiler

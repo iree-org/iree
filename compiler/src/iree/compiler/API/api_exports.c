@@ -115,6 +115,7 @@ extern void ireeGPUReorderWorkgroupsStrategyAttrGetValue();
 extern void ireeGPUTargetInfoGet();
 extern void ireeGPUTargetInfoGetMMAIntrinsics();
 extern void ireeHALExecutableTargetAttrGetGPUTargetInfo();
+extern void ireeLinkRunMain();
 extern void ireeMlirLspServerRunMain();
 extern void ireeOptRunMain();
 extern void ireeReduceRunMain();
@@ -1031,6 +1032,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeGPUTargetInfoGet;
   x += (uintptr_t)&ireeGPUTargetInfoGetMMAIntrinsics;
   x += (uintptr_t)&ireeHALExecutableTargetAttrGetGPUTargetInfo;
+  x += (uintptr_t)&ireeLinkRunMain;
   x += (uintptr_t)&ireeMlirLspServerRunMain;
   x += (uintptr_t)&ireeOptRunMain;
   x += (uintptr_t)&ireeReduceRunMain;

@@ -69,10 +69,7 @@ if(IREE_ENABLE_COMPILER_TRACING AND NOT IREE_ENABLE_RUNTIME_TRACING)
 endif()
 
 # TODO(#8469): remove the dependency on cpuinfo entirely.
-set(IREE_ENABLE_CPUINFO_DEFAULT ON)
-if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Emscripten|Windows|WindowsStore")
-  set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
-endif()
+set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
@@ -897,7 +894,7 @@ else()
   if(IREE_INPUT_STABLEHLO)
     message(STATUS "Configuring third_party/stablehlo")
     list(APPEND CMAKE_MESSAGE_INDENT "  ")
-    iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
+    iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo SILENCE_DEPRECATIONS)
     list(POP_BACK CMAKE_MESSAGE_INDENT)
   endif()
 
@@ -960,10 +957,23 @@ if(IREE_ENABLE_THREADING)
     COMPONENT IREEBundledLibraries
     EXPORT_SET Runtime
   )
+endif()
 
-  if(IREE_ENABLE_CPUINFO)
+# TODO(#8469): remove the dependency on cpuinfo entirely.
+if(IREE_ENABLE_CPUINFO)
+  if(IREE_USE_SYSTEM_DEPS)
+    message(STATUS "Using system cpuinfo (requires: sudo apt install libcpuinfo-dev or equivalent)...")
+    find_package(cpuinfo REQUIRED)
+  else()
+    message(STATUS "Using fetched cpuinfo...")
     iree_set_cpuinfo_cmake_options()
-    add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+    include(FetchContent)
+    FetchContent_Declare(
+      cpuinfo
+      GIT_REPOSITORY https://github.com/pytorch/cpuinfo.git
+      GIT_TAG        3c8b1533ac03dd6531ab6e7b9245d488f13a82a5
+    )
+    FetchContent_MakeAvailable(cpuinfo)
     iree_install_targets(
       TARGETS cpuinfo
       COMPONENT IREEBundledLibraries

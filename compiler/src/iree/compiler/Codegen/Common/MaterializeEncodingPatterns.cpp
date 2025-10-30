@@ -223,8 +223,7 @@ struct MaterializeTensorExtDispatchTensorLoadOp
                   ConversionPatternRewriter &rewriter) const override {
     auto sourceType = loadOp.getSourceType();
     auto boundTensorType = cast<RankedTensorType>(sourceType.getBoundType());
-    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
-        getTypeConverter());
+    auto typeConverter = getTypeConverter<MaterializeEncodingTypeConverter>();
     if (typeConverter->convertType(boundTensorType) == boundTensorType) {
       return rewriter.notifyMatchFailure(loadOp, "bound type already valid");
     }
@@ -259,9 +258,7 @@ struct MaterializeTensorExtDispatchTensorStoreOp
                   ConversionPatternRewriter &rewriter) const override {
     auto targetType = storeOp.getTargetType();
     auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
-    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
-        getTypeConverter());
-
+    auto typeConverter = getTypeConverter<MaterializeEncodingTypeConverter>();
     if (typeConverter->convertType(boundTensorType) == boundTensorType) {
       return rewriter.notifyMatchFailure(storeOp, "bound type already valid");
     }
@@ -298,8 +295,8 @@ struct MaterializeOperation : public OpConversionPattern<OpTy> {
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
-        this->getTypeConverter());
+    auto converter =
+        this->template getTypeConverter<MaterializeEncodingTypeConverter>();
     FailureOr<Operation *> convertedOp =
         lowerOpWithEncoding(rewriter, op, adaptor.getOperands(), *converter);
     if (failed(convertedOp))
@@ -361,8 +358,7 @@ struct SetEncodingOpLoweringConversion
       rewriter.replaceOp(encodingOp, adaptor.getSource());
       return success();
     }
-    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
-        getTypeConverter());
+    auto converter = getTypeConverter<MaterializeEncodingTypeConverter>();
     auto packedValue = lowerSetEncodingOpToPackOp(
         rewriter, encodingOp, adaptor.getSource(), *converter);
     if (failed(packedValue)) {
@@ -424,9 +420,7 @@ struct UnsetEncodingOpLoweringConversion
   matchAndRewrite(IREE::Encoding::UnsetEncodingOp unsetEncodingOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
-        getTypeConverter());
-
+    auto converter = getTypeConverter<MaterializeEncodingTypeConverter>();
     MaterializeEncodingInfo encodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
     if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
@@ -497,9 +491,7 @@ public:
   LogicalResult
   matchAndRewrite(linalg::LinalgOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
-        this->getTypeConverter());
-
+    auto converter = getTypeConverter<MaterializeEncodingTypeConverter>();
     IREE::Encoding::LayoutMaterializerAttr layoutAttr =
         converter->getLayoutAttr();
     SmallVector<Type> convertedResTypes;

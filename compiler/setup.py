@@ -19,9 +19,6 @@
 # On CIs, it is often advantageous to re-use/control the CMake build directory.
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
 #
-# Select CMake options are available from environment variables:
-#   IREE_ENABLE_CPUINFO
-#
 # If building from a development tree and aiming to get an "editable" install,
 # use the environment option CMAKE_INSTALL_MODE=ABS_SYMLINK on your
 # `pip install -e .` invocation.
@@ -268,7 +265,6 @@ def prepare_installation():
             "-DPython3_EXECUTABLE={}".format(sys.executable),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
             # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU_SPIRV here (and in env)
-            get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
             get_env_cmake_option("IREE_TARGET_BACKEND_ROCM", "OFF"),
             get_env_cmake_option("IREE_TARGET_BACKEND_CUDA", "OFF"),
             get_env_cmake_option("IREE_ENABLE_LLD", "OFF"),
@@ -509,6 +505,7 @@ setup(
             "iree-compile = iree.compiler.tools.scripts.iree_compile.__main__:main",
             "iree-import-onnx = iree.compiler.tools.import_onnx.__main__:_cli_main",
             "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",
+            "iree-link = iree.compiler.tools.scripts.iree_link.__main__:main",
             "iree-opt = iree.compiler.tools.scripts.iree_opt.__main__:main",
         ],
     },
