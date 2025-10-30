@@ -2635,6 +2635,30 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-util-link-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-util-link-modules
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-util-link-modules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-util-optimize-int-arithmetic" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-util-optimize-int-arithmetic
@@ -2645,7 +2669,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_3" class="md-nav__link">
+  <a href="#options_4" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -2705,7 +2729,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_4" class="md-nav__link">
+  <a href="#options_5" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5060,6 +5084,30 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-util-link-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-util-link-modules
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-util-link-modules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-util-optimize-int-arithmetic" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-util-optimize-int-arithmetic
@@ -5070,7 +5118,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_3" class="md-nav__link">
+  <a href="#options_4" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5130,7 +5178,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_4" class="md-nav__link">
+  <a href="#options_5" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5271,9 +5319,42 @@ converted to their structured equivalents like <code>scf.if</code>, <code>scf.wh
 <p>Based on the algorithm from:
 Bahmann et al. 2015. Perfect Reconstructability of Control Flow from
 Demand Dependence Graphs. ACM TACO. <a href="https://dl.acm.org/doi/10.1145/2693261">https://dl.acm.org/doi/10.1145/2693261</a></p>
+<h3 id="-iree-util-link-modules"><code>-iree-util-link-modules</code><a class="headerlink" href="#-iree-util-link-modules" title="Permanent link">link</a></h3>
+<p><em>Links external functions from source modules into the target module.</em></p>
+<p>Resolves external function declarations by loading definitions from source
+modules. This pass enables composing programs from multiple MLIR modules
+where functions can reference implementations from separately compiled
+modules using dotted name scoping (e.g., <code>@module_a.compute</code>).</p>
+<p>For each external function in the target module:</p>
+<ol>
+<li>Searches for the definition in explicitly provided source modules</li>
+<li>If not found and the symbol has a module prefix (<code>@prefix.name</code>) attempts
+   to automatically load <code>prefix.mlir</code> or <code>prefix.mlirbc</code> from library paths</li>
+<li>Clones the function definition along with transitive dependencies
+   (including <code>IREE::Util::ObjectLike</code> operations like <code>flow.executable</code>)</li>
+<li>Detects and resolves conflicts between private symbols from different
+   source modules or with existing target module definitions by renaming
+   conflicting symbols (e.g., <code>@scale_factor</code>, <code>@scale_factor_0</code>)</li>
+<li>Renames imported symbols to match the external declaration name</li>
+<li>Forces all imported symbols to private visibility</li>
+</ol>
+<p>ObjectLike operations (such as <code>flow.executable</code>) are treated as
+self-contained units: their internal structure is preserved but not scanned
+for additional dependencies, preventing nested symbols from being treated as
+external references.</p>
+<p>Module name scoping: Source modules with <code>module @foo { util.func @bar }</code>
+export public symbols as <code>@foo.bar</code>. Private symbols keep their local names.
+Internal references within the module use the simple name <code>@bar</code>, while
+external references use the dotted notation.</p>
+<p>Supports both text (<code>.mlir</code>) and bytecode (<code>.mlirbc</code>) formats for all
+modules.</p>
+<h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-link-module  : Explicit paths to source modules to link from.
+-library-path : Directories to search for modules during automatic discovery.
+</code></pre></div>
 <h3 id="-iree-util-optimize-int-arithmetic"><code>-iree-util-optimize-int-arithmetic</code><a class="headerlink" href="#-iree-util-optimize-int-arithmetic" title="Permanent link">link</a></h3>
 <p><em>Optimizes integer arithmetic using a variety of dataflow analysis and patterns.</em></p>
-<h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
+<h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-narrow-to-i32 : Flag indicating if computations that can be performed with 32 bits should be. Mainly used for GPU code generation to not waste registers.
 </code></pre></div>
 <h3 id="-iree-util-propagate-subranges"><code>-iree-util-propagate-subranges</code><a class="headerlink" href="#-iree-util-propagate-subranges" title="Permanent link">link</a></h3>
@@ -5286,7 +5367,7 @@ Demand Dependence Graphs. ACM TACO. <a href="https://dl.acm.org/doi/10.1145/2693
 <p><em>Strips debug ops, like assertions.</em></p>
 <h3 id="-iree-util-test-conversion"><code>-iree-util-test-conversion</code><a class="headerlink" href="#-iree-util-test-conversion" title="Permanent link">link</a></h3>
 <p><em>Tests util dialect conversion patterns.</em></p>
-<h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
+<h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-widen-integers        : Tests type conversion by widening integers to i32.
 -structural-conversion : Tests generic structural conversion ops.
 </code></pre></div>
