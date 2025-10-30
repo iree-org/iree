@@ -302,8 +302,28 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
         coalescedGather.getIndices(), coalescedGather.getInit(),
         coalescedGather.getDestIndices(), coalescedGather.getLane());
 
-    // Yield the gather result
-    scf::YieldOp::create(rewriter, loc, gatherResult);
+    // Use a tensor.insert_slice to insert the gather result back into the
+    // shared memory destination at the location specified by dest_indices.
+    SmallVector<OpFoldResult> destIndices;
+    for (Value idx : coalescedGather.getDestIndices()) {
+      destIndices.push_back(idx);
+    }
+
+    auto initType = cast<ShapedType>(coalescedGather.getInit().getType());
+    SmallVector<OpFoldResult> sizes;
+    for (int64_t dim : initType.getShape()) {
+      sizes.push_back(rewriter.getIndexAttr(dim));
+    }
+    SmallVector<OpFoldResult> strides(initType.getRank(),
+                                      rewriter.getIndexAttr(1));
+
+    // Get the destination tensor from the loop's iter_args
+    Value dest = newProducer.getRegionIterArgs()[0];
+    Value sharedInsert = tensor::InsertSliceOp::create(
+        rewriter, loc, gatherResult, dest, destIndices, sizes, strides);
+
+    // Yield the result with the inserted slice
+    scf::YieldOp::create(rewriter, loc, sharedInsert);
 
     // Erase the old coalesced gather op and the in_parallel terminator
     rewriter.eraseOp(coalescedGather);
@@ -422,9 +442,9 @@ static void composeCoalescedGatherDMA(
     // Create a new CoalescedGatherDMAOp with composed offsets
     OpBuilder::InsertionGuard g(rewriter);
 
-    // Set insertion point outside the in_parallel region (before the forall op)
-    auto warpForall = warpInsert->getParentOfType<scf::ForallOp>();
-    rewriter.setInsertionPoint(warpForall);
+    // Extract a slice from warpInsert's dest that matches warpInsert's
+    // insertion size and is located at the composed offsets (newDestIndices)
+    // This is done outside the in_parallel region
 
     // Convert composedOffsets to Values for dest_indices
     SmallVector<Value> newDestIndices;
@@ -439,12 +459,23 @@ static void composeCoalescedGatherDMA(
       }
     }
 
-    // Create new CoalescedGatherDMAOp inside the in_parallel region
+    // Convert newDestIndices to OpFoldResult for ExtractSliceOp
+    SmallVector<OpFoldResult> offsets;
+    for (Value idx : newDestIndices) {
+      offsets.push_back(idx);
+    }
+
+    rewriter.setInsertionPoint(warpInsert->getParentOp());
+    auto destSlice = rewriter.create<tensor::ExtractSliceOp>(
+        warpInsert.getLoc(), warpInsert.getDest(), offsets,
+        warpInsert.getMixedSizes(), warpInsert.getMixedStrides());
+
     rewriter.setInsertionPoint(warpInsert);
+    // Create new CoalescedGatherDMAOp inside the in_parallel region
     rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-        warpInsert.getLoc(), warpInsert.getDest().getType(),
-        laneInsert.getSource(), laneInsert.getIndices(), warpInsert.getDest(),
-        newDestIndices, laneInsert.getLane());
+        warpInsert.getLoc(), destSlice.getType(), laneInsert.getSource(),
+        laneInsert.getIndices(), destSlice, newDestIndices,
+        laneInsert.getLane());
     rewriter.eraseOp(warpInsert);
     rewriter.eraseOp(laneInsert);
   }
