@@ -389,24 +389,17 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
     llvm::dbgs() << "\n";
   });
 
-  // If this clone is performing a type change we need to preserve it.
+  // If this clone is performing a lifetime conversion we need to preserve it.
+  // Clones can change resource lifetime (e.g., * -> variable, external -> *)
+  // and these conversions are semantically meaningful and must be preserved.
   //
   // TODO(benvanik): remove this carveout - could make clone not change type
   // and transfer be needed instead.
-  //
-  // HACK: the constant check is to support initializers that have lifetime
-  // transfers to constants. This is clearly bad and can lead to additional
-  // weirdness later on in the program, but without it resource usage analysis
-  // will try to treat entire IR trees that result in a constant transfer as if
-  // they are unknown. The real fix is to the analysis by possibly marking
-  // values as "eventually constant" to allow us to promote to constant
-  // lifetime.
   auto sourceType =
       llvm::cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
   auto targetType =
       llvm::cast<IREE::Stream::ResourceType>(cloneOp.getResult().getType());
-  if (sourceType != targetType &&
-      sourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
+  if (sourceType.getLifetime() != targetType.getLifetime()) {
     LLVM_DEBUG(llvm::dbgs()
                << "  - clone is a resource lifetime cast (" << sourceType
                << " to " << targetType << "); cannot elide\n");
