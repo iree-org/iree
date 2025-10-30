@@ -522,7 +522,7 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       } : vector<2x1x1x4xf16>, vector<4x1x1x4xf16> into vector<2x4x1x4xf32>
 
       rocdl.sched.barrier 0
-      gpu.barrier
+      gpu.barrier // lkgmcnt for safety
       rocdl.s.setprio 0
 
       // LDS Writes
@@ -534,7 +534,7 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       vector.transfer_write %lhs_vec_local_0, %lhs_shared [%glb0_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
       vector.transfer_write %lhs_vec_local_1, %lhs_shared [%glb1_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
 
-      gpu.barrier
+      rocdl.s.barrier
       rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
@@ -566,7 +566,7 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
 
       rocdl.sched.barrier 0
-      gpu.barrier
+      gpu.barrier // we need lkgmcnt here
       rocdl.s.setprio 0
 
       scf.yield %valu1 : vector<4x4x1x4xf32>
