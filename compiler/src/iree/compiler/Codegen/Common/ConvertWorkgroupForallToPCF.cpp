@@ -45,7 +45,7 @@ ConvertWorkgroupForall::matchAndRewrite(scf::ForallOp op,
   }
   // Interface is implemented via external models hence the cast.
   auto scope = cast<IREE::PCF::ScopeAttr>(
-      IREE::Codegen::WorkgroupAttr::get(rewriter.getContext()));
+      IREE::Codegen::WorkgroupAttr::get(rewriter.getContext(), true));
   return convertForallToPCF(rewriter, op, scope, 3);
 }
 

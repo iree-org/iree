@@ -11,6 +11,7 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Utils/ParseUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"

@@ -656,8 +656,10 @@ def WorkgroupAttr :
   let description = [{
     Scope that maps to workgroup execution.
   }];
-  let parameters = (ins);
-  let assemblyFormat = [{}];
+  let parameters = (ins "bool":$linearize);
+  let assemblyFormat = [{
+    custom<BoolAsUnitAttr>($linearize, "\"linearize\"")
+  }];
 
   // Interface is registered as an external model to avoid HAL dep.
 }
