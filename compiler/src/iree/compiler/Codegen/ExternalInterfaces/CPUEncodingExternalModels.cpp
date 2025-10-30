@@ -323,7 +323,17 @@ Operation *lowerContractionOpWithEncoding(
                                   operands.drop_front(inputs.size()));
   }
 
-  bool transpose = isNarrowNResult(resultEncoding);
+  // Get the configuration to check if ukernels are enabled.
+  // Transposition should only happen when ukernels are enabled.
+  DictionaryAttr config;
+  if (auto cpuAttr = dyn_cast<IREE::CPU::CPUEncodingResolverAttr>(layoutAttr)) {
+    config = cpuAttr.getConfiguration();
+  } else if (auto vmvxAttr =
+                 dyn_cast<IREE::CPU::VMVXEncodingResolverAttr>(layoutAttr)) {
+    config = vmvxAttr.getConfiguration();
+  }
+  
+  bool transpose = isNarrowNResult(resultEncoding) && hasUkernel(config);
   SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
   SmallVector<ReassociationIndices> ri;
   Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder, ri,
@@ -717,7 +727,9 @@ struct CPUEncodingPackedLayoutMaterializerAttr
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    if (IREE::Encoding::isNarrowNResult(encoding)) {
+    // Only transpose when ukernels are enabled and N is narrow.
+    if (IREE::Encoding::isNarrowNResult(encoding) &&
+        hasUkernel(layoutAttr.getConfiguration())) {
       transposeInPlace(info);
     }
     FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
@@ -876,7 +888,9 @@ struct VMVXEncodingPackedLayoutMaterializerAttr final
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    if (IREE::Encoding::isNarrowNResult(encoding)) {
+    // Only transpose when ukernels are enabled and N is narrow.
+    if (IREE::Encoding::isNarrowNResult(encoding) &&
+        hasUkernel(layoutAttr.getConfiguration())) {
       transposeInPlace(info);
     }
     return info;
