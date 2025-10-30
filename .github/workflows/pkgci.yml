@@ -58,6 +58,12 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi325')
     uses: ./.github/workflows/pkgci_test_amd_mi325.yml
 
+  test_amd_mi35x:
+    name: Test AMD MI35x
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi35x')
+    uses: ./.github/workflows/pkgci_test_amd_mi35x.yml
+
   test_amd_w7900:
     name: Test AMD W7900
     needs: [setup, build_packages]
