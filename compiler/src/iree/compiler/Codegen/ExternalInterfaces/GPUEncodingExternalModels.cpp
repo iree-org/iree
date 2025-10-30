@@ -635,7 +635,7 @@ struct GPUPadEncodingLayoutMaterializerAttr final
   Type convertType(Attribute attr, Type type) const {
     auto layoutAttr = cast<IREE::Encoding::LayoutResolverAttr>(attr);
     return TypeSwitch<Type, Type>(type)
-        .Case([&](RankedTensorType type) {
+        .Case([](RankedTensorType type) {
           // By the definition, the final converted type is the same tensor type
           // without encodings.
           return type.dropEncoding();
@@ -654,7 +654,7 @@ struct GPUPadEncodingLayoutMaterializerAttr final
           return IREE::TensorExt::DispatchTensorType::get(
               dispatchTensorType.getAccess(), type);
         })
-        .Default([&](Type type) { return type; });
+        .Default([](Type type) { return type; });
   }
 
   LogicalResult getOffsetsSizesStrides(
