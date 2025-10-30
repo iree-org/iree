@@ -1016,28 +1016,28 @@ struct RaiseSpecialOpsPass
 
     // First walk the IR and try to raise any slice-like generics to tensor.
     IRRewriter rewriter(context);
-    funcOp->walk([&](linalg::GenericOp op) {
-      linalg::GenericOp linalgOp = op;
+    SmallVector<linalg::GenericOp> genericOps;
+    funcOp->walk([&](linalg::GenericOp op) { genericOps.push_back(op); });
 
+    for (linalg::GenericOp linalgOp : genericOps) {
+      // Try raising to tensor.extract to an input and create an linalg.generic.
       OpBuilder::InsertionGuard guard(rewriter);
-
-      // Try raising to tensor.export and create an intermediate linalg.generic.
-      rewriter.setInsertionPoint(op);
+      rewriter.setInsertionPoint(linalgOp);
       FailureOr<linalg::GenericOp> maybeNewOp =
           raiseTensorExtractToInput(linalgOp, rewriter);
       if (succeeded(maybeNewOp)) {
+        rewriter.replaceOp(linalgOp, *maybeNewOp);
         linalgOp = *maybeNewOp;
       }
 
       // Try raising to a view-like operation. Replace if the op raising was
       // successful.
-      rewriter.setInsertionPoint(op);
       FailureOr<Operation *> maybeRaisedView =
           tryRaiseToView(linalgOp, rewriter);
       if (succeeded(maybeRaisedView)) {
-        rewriter.replaceOp(op, *maybeRaisedView);
+        rewriter.replaceOp(linalgOp, *maybeRaisedView);
       }
-    });
+    }
 
     // Next run a variety of raising patterns.
     {

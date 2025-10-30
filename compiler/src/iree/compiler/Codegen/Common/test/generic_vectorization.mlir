@@ -811,3 +811,28 @@ func.func @negative_no_vectorize_large_vector(%arg0 : tensor<1x9007199254740991x
 // CHECK-MASK:           } -> tensor<1x9007199254740991xf32>
 // CHECK-MASK:           return %[[VAL_2]] : tensor<1x9007199254740991xf32>
 // CHECK-MASK:         }
+
+// -----
+
+// Test that unpack operations following ukernel operations can properly infer
+// vector sizes from the ukernel output shape.
+
+func.func @ukernel_unpack_infer_vector_sizes(%lhs: tensor<1x8x16x1xf32>, %rhs: tensor<1x8x16x1xf32>, %dest: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %init = tensor.empty() : tensor<1x1x16x16xf32>
+  %ukernel = iree_codegen.ukernel.generic "foo"
+    ins(%lhs, %rhs : tensor<1x8x16x1xf32>, tensor<1x8x16x1xf32>)
+    outs(%init : tensor<1x1x16x16xf32>)
+    -> tensor<1x1x16x16xf32>
+  %unpack = linalg.unpack %ukernel
+    outer_dims_perm = [0, 1]
+    inner_dims_pos = [0, 1]
+    inner_tiles = [16, 16]
+    into %dest
+    : tensor<1x1x16x16xf32> -> tensor<16x16xf32>
+  return %unpack : tensor<16x16xf32>
+}
+// CHECK-MASK-LABEL: func.func @ukernel_unpack_infer_vector_sizes
+// CHECK-MASK:         %[[UKERNEL:.*]] = iree_codegen.ukernel.generic "foo"
+// CHECK-MASK:         %[[READ:.*]] = vector.transfer_read %[[UKERNEL]]{{.*}} : tensor<1x1x16x16xf32>, vector<1x1x16x16xf32>
+// CHECK-MASK:         %[[CAST:.*]] = vector.shape_cast %[[READ]] : vector<1x1x16x16xf32> to vector<16x16xf32>
+// CHECK-MASK:         vector.transfer_write %[[CAST]]{{.*}} : vector<16x16xf32>, tensor<16x16xf32>

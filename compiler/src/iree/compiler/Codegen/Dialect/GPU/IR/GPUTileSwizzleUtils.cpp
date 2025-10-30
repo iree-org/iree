@@ -4,10 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <numeric>
-
-#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -23,7 +21,7 @@ using Kind = TileSwizzle::Dim::Kind;
 
 SmallVector<int64_t>
 sliceSwizzledShape(const TileSwizzle &swizzle,
-                   const std::function<bool(TileSwizzle::Dim)> &predicate) {
+                   llvm::function_ref<bool(TileSwizzle::Dim)> predicate) {
   SmallVector<int64_t> shape;
   for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape) {
     for (TileSwizzle::Dim d : e) {
@@ -66,7 +64,7 @@ static void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim) {
   // Since we are not interleaving here, generating side-by-side copies of the
   // original layout, the new unrolling dimension is the new outermost
   // dimension. Existing entries get shifted to make room for it.
-  for (auto &p : swizzle.permutation) {
+  for (int64_t &p : swizzle.permutation) {
     p += (p >= dstIdx);
   }
   swizzle.permutation.insert(swizzle.permutation.begin(), dstIdx);
@@ -174,9 +172,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   }
   // Next come `layout.thread` dims.
   int64_t subgroupSize = getIntrinsicSubgroupSize(intrinsic);
-  int64_t numThreadsInLayout =
-      std::reduce(layout.thread.begin(), layout.thread.end(), 1LL,
-                  std::multiplies<int64_t>());
+  int64_t numThreadsInLayout = llvm::product_of(layout.thread);
   assert(subgroupSize % numThreadsInLayout == 0 &&
          "expected subgroupSize to be divisible by numThreadsInLayout");
   assert(subgroupSize >= numThreadsInLayout &&

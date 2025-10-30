@@ -415,12 +415,11 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
       if (minTileSizes[unrollDim] <= 1) {
         continue;
       }
-      int64_t factor = seen ? 1LL : maxUnrollFactor;
+      int64_t factor = seen ? 1 : maxUnrollFactor;
       seen = true;
       LDBG() << "Adjusted min tile sizes: " << minTileSizes[unrollDim]
              << " with factor=" << factor << "\n";
-      minTileSizes[unrollDim] =
-          std::min<int64_t>(minTileSizes[unrollDim], factor);
+      minTileSizes[unrollDim] = std::min(minTileSizes[unrollDim], factor);
     }
   };
 
@@ -468,7 +467,7 @@ static void reduceDistributionWorkgroups(
       continue;
     }
 
-    int64_t newSize = std::min<int64_t>(currSize * 2, workload[index]);
+    int64_t newSize = std::min(currSize * 2, workload[index]);
     int64_t vectorSize = vectorSizeHints ? vectorSizeHints.value()[index] : 0;
 
     // Chech if it's the ideal size with vector size hint. And skip if the new
@@ -557,14 +556,14 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     }
     // Fallback to power of 2 if there's no hint or can't find the ideal size.
     if (vectorSize <= 1 || candidateTileSize == 1) {
-      candidateTileSize = std::max<int64_t>(
-          llvm::bit_floor<uint64_t>(targetSize), minTileSizes[i]);
+      candidateTileSize =
+          std::max(static_cast<int64_t>(llvm::bit_floor<uint64_t>(targetSize)),
+                   minTileSizes[i]);
     }
 
     // Limit the workload per workgroup to the default being the max to keep the
     // work per invocation reasonable.
-    distributedTileSizes[i] =
-        std::min<int64_t>(candidateTileSize, maxTileSizes[i]);
+    distributedTileSizes[i] = std::min(candidateTileSize, maxTileSizes[i]);
   }
 
   reduceDistributionWorkgroups(workload, distributedTileSizes, maxTileSizes,
@@ -790,7 +789,7 @@ static void limitVectorTileSizes(SmallVectorImpl<int64_t> &vecTileSizes,
   // Note that if `eachOperandMaxTileBits` falls below some element type bit
   // width, it will trigger an early-return above, so we don't need to worry
   // about that here.
-  if (std::reduce(tileBits.begin(), tileBits.end()) > allOperandsMaxTileBits) {
+  if (llvm::sum_of(tileBits) > allOperandsMaxTileBits) {
     limitVectorTileSizes(vecTileSizes, eachOperandMaxTileBits / 2,
                          allOperandsMaxTileBits, operandTypes, indexingMaps,
                          bounds);
@@ -938,11 +937,10 @@ static void splitParallelAndReductionTiles(
     SmallVectorImpl<int64_t> &reductionSizes,
     SmallVectorImpl<bool> *parallelScalableFlags = nullptr,
     SmallVectorImpl<bool> *reductionScalableFlags = nullptr) {
-  reductionSizes.assign(parallelSizes.begin(), parallelSizes.end());
+  reductionSizes.assign(parallelSizes);
   if (reductionScalableFlags) {
     assert(parallelScalableFlags && "expected parallel scalable flags!");
-    reductionScalableFlags->assign(parallelScalableFlags->begin(),
-                                   parallelScalableFlags->end());
+    reductionScalableFlags->assign(*parallelScalableFlags);
   }
   TilingInterface tilingOp = cast<TilingInterface>(op);
   for (auto [index, iteratorType] :
@@ -983,19 +981,19 @@ public:
 
   void setDistributionTileSizes(ArrayRef<int64_t> tileSizes) {
     assert(distTileSizes.empty() && "expected to set only once");
-    distTileSizes.assign(tileSizes.begin(), tileSizes.end());
+    distTileSizes.assign(tileSizes);
   }
 
   void setCacheTileSizes(ArrayRef<int64_t> tileSizes) {
     assert(cacheTileSizes.empty() && "expected to set only once");
-    cacheTileSizes.assign(tileSizes.begin(), tileSizes.end());
+    cacheTileSizes.assign(tileSizes);
   }
 
   void setVectorTileSizes(ArrayRef<int64_t> tileSizes,
                           ArrayRef<bool> scalableFlags = {}) {
     assert(vectorTileSizes.empty() && "expected to set only once");
-    vectorTileSizes.assign(tileSizes.begin(), tileSizes.end());
-    vectorScalableFlags.assign(scalableFlags.begin(), scalableFlags.end());
+    vectorTileSizes.assign(tileSizes);
+    vectorScalableFlags.assign(scalableFlags);
   }
 
   /// Returns a `IREE::CPU::LoweringConfigAttr` that is constructed by the
@@ -1370,7 +1368,7 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // The LLVM backend struggles to legalize non-power-of-two scalable vectors,
   // hence the extra rounding up.
-  for (const auto &[index, size] : llvm::enumerate(roundedVecTileSizes)) {
+  for (auto [index, size] : llvm::enumerate(roundedVecTileSizes)) {
     if (!size)
       continue;
     roundedVecTileSizes[index] =
@@ -1378,8 +1376,7 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
                       /*predicate=*/inputVecScalableTileFlags[index]);
   }
 
-  SmallVector<int64_t> vectorTileSizes(roundedVecTileSizes.begin(),
-                                       roundedVecTileSizes.end());
+  auto vectorTileSizes = llvm::to_vector_of<int64_t>(roundedVecTileSizes);
   SmallVector<bool> vectorScalableFlags(inputVecScalableTileFlags.begin(),
                                         inputVecScalableTileFlags.end());
   vectorScalableFlags.back() = false;
@@ -1538,7 +1535,7 @@ static void getMatmulVectorSizesUsingFullVectorHeuristics(
       mmType = shType.getElementType();
 
     if (mmType.isSignlessIntOrFloat())
-      minSize = std::min<int64_t>(minSize, mmType.getIntOrFloatBitWidth());
+      minSize = std::min(minSize, int64_t{mmType.getIntOrFloatBitWidth()});
   }
 
   LDBG() << "Smallest type found: " << minSize << " bits";
@@ -1550,7 +1547,7 @@ static void getMatmulVectorSizesUsingFullVectorHeuristics(
   constexpr int64_t byteSizeInBits = 8;
   int64_t minNumElements =
       (getNativeVectorSizeInBytes(entryPointFn) * byteSizeInBits) / minSize;
-  sizes[1] = std::max<int64_t>(sizes[1], minNumElements);
+  sizes[1] = std::max(sizes[1], minNumElements);
 }
 
 /// Utility to compute the tile sizes for RISC-V Vector.
@@ -1732,7 +1729,7 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
       if (numScalableDims >= 2 && scalableTileFlags[i]) {
         continue;
       }
-      tileSizes[i] = std::min<int64_t>(tileSize, dimSize);
+      tileSizes[i] = std::min(tileSize, dimSize);
     }
   }
 
@@ -1915,7 +1912,7 @@ getMmt4dLoweringConfig(linalg::LinalgOp op) {
     int64_t targetRhsTileElems = targetTileBytes * 8 / bitWidth;
     int64_t targetRhsTileNSize = targetRhsTileElems / reductionSize;
     int64_t tileSize = llvm::divideCeil(targetRhsTileNSize, tile0Size);
-    tileSize = std::max<int64_t>(tileSize, 1);
+    tileSize = std::max(tileSize, int64_t{1});
     return tileSize;
   };
   int64_t tileBytes =
@@ -2027,7 +2024,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size))
       continue;
     distTileSizes[pos] = distTileSizes[pos] / size;
-    distTileSizes[pos] = std::max<int64_t>(distTileSizes[pos], 1);
+    distTileSizes[pos] = std::max(distTileSizes[pos], int64_t{1});
   }
 
   // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
@@ -2413,7 +2410,7 @@ static void getTransposeX86VectorSizes(
   }
 
   // Replace dims to be vectorized with the new tile sizes.
-  sizes.assign(minTileSizes.begin(), minTileSizes.end());
+  sizes.assign(minTileSizes);
   std::replace_if(
       sizes.begin(), sizes.end(), [](int64_t tileSize) { return tileSize > 1; },
       targetVectorSize);
@@ -2551,9 +2548,9 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   // prevents the runtime overheads domiating the execution time. The number is
   // derived from experimients. We should be able to make it related to target.
   constexpr int64_t kMinimumWorkload = 4096;
-  auto shape = genericOp.getStaticLoopRanges();
+  SmallVector<int64_t> shape = genericOp.getStaticLoopRanges();
   int64_t numWorkload = 1;
-  for (const auto &[index, size] : llvm::enumerate(shape)) {
+  for (auto [index, size] : llvm::enumerate(shape)) {
     if (ShapedType::isDynamic(size)) {
       numWorkload = ShapedType::kDynamic;
       break;
@@ -2569,7 +2566,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
       currDim++;
       continue;
     }
-    int64_t newSize = std::min<int64_t>(currSize * 2, shape[currDim]);
+    int64_t newSize = std::min(currSize * 2, shape[currDim]);
     numWorkload = numWorkload / currSize * newSize;
     distTileSizes[currDim] = newSize;
   }
@@ -3154,10 +3151,9 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
       if (rootLoweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
         auto attr = llvm::cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
             rootLoweringConfig.getTilingLevelAttr(llvm::to_underlying(level)));
-        sizes.assign(attr.getSizes().begin(), attr.getSizes().end());
+        sizes.assign(attr.getSizes());
         // Only `VectorCommonParallel` has scalable flags.
-        flags.assign(attr.getScalableFlags().begin(),
-                     attr.getScalableFlags().end());
+        flags.assign(attr.getScalableFlags());
       }
     } else {
       if (rootLoweringConfig.hasTilingLevel(llvm::to_underlying(level))) {

@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
@@ -1912,6 +1913,44 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   return result;
 }
 
+std::optional<VectorizationTileSizes>
+inferSizesFromIR(IREE::Codegen::UKernelGenericOp ukernelOp, OpResult opResult) {
+  LDBG() << "Inferring dest sizes for: " << ukernelOp;
+  auto resultType = dyn_cast<RankedTensorType>(opResult.getType());
+  if (!resultType) {
+    LDBG()
+        << "failed to infer sizes because result type is not a ranked tensor";
+    return std::nullopt;
+  }
+
+  VectorizationTileSizes result;
+  for (auto [idx, dim] : llvm::enumerate(resultType.getShape())) {
+    if (ShapedType::isDynamic(dim)) {
+      FailureOr<int64_t> maybeDimBound =
+          ValueBoundsConstraintSet::computeConstantBound(
+              presburger::BoundType::UB, {opResult, static_cast<unsigned>(idx)},
+              /*stopCondition=*/nullptr, /*closedUB=*/true);
+      if (failed(maybeDimBound)) {
+        LDBG() << "failed to infer bounds for dynamic dim";
+        return std::nullopt;
+      }
+      result.vectorSizes.push_back(maybeDimBound.value());
+    } else {
+      result.vectorSizes.push_back(dim);
+    }
+  }
+  result.destShape = result.vectorSizes;
+
+  LLVM_DEBUG({
+    LDBG() << "Inferred vector sizes:";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      LDBG() << "Dim #" << idx << ": " << val;
+    }
+  });
+
+  return result;
+}
+
 std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
     SmallVector<OpFoldResult> shape) {
   VectorizationTileSizes result;
@@ -1948,6 +1987,8 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
         // the values.
         result = inferSizesFromMixedSizes(op.getMixedSizes());
       })
+      .Case<IREE::Codegen::UKernelGenericOp>(
+          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Default([&](Operation *) {});
 
   return result;

@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -364,6 +365,12 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
 /// Returns std::nullopt if vector sizes can't be inferred.
 std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
                                                        OpResult opResult);
+
+/// Returns the result sizes and vector input sizes of the ukernel.generic op.
+/// The inferred bounding size is returned if it is dynamic shape. Returns
+/// std::nullopt if the shape inference failed.
+std::optional<VectorizationTileSizes>
+inferSizesFromIR(IREE::Codegen::UKernelGenericOp ukernelOp, OpResult opResult);
 
 /// Returns the underlying index if the given value is a constant index.
 std::optional<int64_t> getConstantIndex(Value value);

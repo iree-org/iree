@@ -68,6 +68,15 @@ static llvm::cl::opt<bool> clWarnOnUninitializedValues(
     "iree-global-opt-enable-warn-on-uninitialized-values",
     llvm::cl::desc("Warn on some classes of uses of uninitialized values."),
     llvm::cl::init(true));
+
+static llvm::cl::opt<bool> clEnableEdgeReshapePropagation(
+    "iree-global-opt-experimental-enable-edge-reshape-propagation",
+    llvm::cl::desc(
+        "Enables propagation of reshapes on the edges of the program "
+        "in transpose propagation. This workaround for better performance and "
+        "will be removed soon."),
+    llvm::cl::init(false));
+
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -170,6 +179,8 @@ void buildGlobalOptimizationPassPipeline(
                                transformOptions.aggressiveTransposePropagation;
                            options.enableAttentionVTranspose =
                                clEnableAttentionVTranspose;
+                           options.enableEdgeReshapePropagation =
+                               clEnableEdgeReshapePropagation;
                            return createPropagateLinalgTransposePass(options);
                          })
       .addPass(IREE::Flow::createCanonicalizePass)

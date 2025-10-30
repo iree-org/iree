@@ -283,14 +283,14 @@ module {
     rocdl.s.setprio 2 { iree_gpu.swap_mfma = 1 }
     rocdl.s.setprio 3 { iree_gpu.swap_mfma = 2 }
     rocdl.s.setprio 4 { iree_gpu.swap_mfma = 5 }
-    %0 = amdgpu.mfma %in * %in + %out {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %0 = amdgpu.mfma 4x4x1 %in * %in + %out {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
-    %1 = amdgpu.mfma %in * %in + %0 {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %1 = amdgpu.mfma 4x4x1 %in * %in + %0 {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
-    %2 = amdgpu.mfma %in * %in + %1 {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %2 = amdgpu.mfma 4x4x1 %in * %in + %1 {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
     call @foo(%2) : (vector<4xf32>) -> ()
     return

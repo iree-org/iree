@@ -184,7 +184,6 @@ class BaseCMakeBuildPy(_build_py):
             "-DPython3_EXECUTABLE={}".format(sys.executable),
             "-DPython_EXECUTABLE={}".format(sys.executable),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
-            get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
         ] + list(extra_cmake_args)
         add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER")
         add_env_cmake_setting(cmake_args, "IREE_TRACING_PROVIDER_H")

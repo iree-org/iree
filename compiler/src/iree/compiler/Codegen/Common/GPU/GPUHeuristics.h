@@ -54,11 +54,11 @@ struct GPUIntrinsicType : public GPUMatmulShapeType {
 /// Struct containing seed tile sizes for GPU MMA heuristics deduction logic.
 struct GPUMMAHeuristicSeeds {
   // The best number of subgroups to use per workgroup
-  int64_t bestSubgroupCountPerWorkgroup;
+  int64_t bestSubgroupCountPerWorkgroup = 0;
   // The best number of total tiles along M*N dimensions per subgroup
-  int64_t bestMNTileCountPerSubgroup;
+  int64_t bestMNTileCountPerSubgroup = 0;
   // The best number of tiles along K dimension per subgroup
-  int64_t bestKTileCountPerSubgroup;
+  int64_t bestKTileCountPerSubgroup = 0;
   // The best number of elements along K dimension per subgroup. This is
   // equivalent to `bestKTileCountPerSubgroup * bestIntrinsic.kSize`, for
   // some chosen intrinsic `bestIntrinsic`.
@@ -68,9 +68,12 @@ struct GPUMMAHeuristicSeeds {
 struct GPUMMASchedule {
   // The MMA intrinsic kind to use for this schedule.
   IREE::Codegen::InnerTileDescAttrInterface mmaKind;
-  int64_t mSize; // Native MMA intrinsic size along M dimension for a subgroup.
-  int64_t nSize; // Native MMA intrinsic size along N dimension for a subgroup.
-  int64_t kSize; // Native MMA intrinsic size along K dimension for a subgroup.
+  // Native MMA intrinsic size along M dimension for a subgroup.
+  int64_t mSize = 0;
+  // Native MMA intrinsic size along N dimension for a subgroup.
+  int64_t nSize = 0;
+  // Native MMA intrinsic size along K dimension for a subgroup.
+  int64_t kSize = 0;
 
   // Number of subgroups along each M and N dimension.
   SmallVector<int64_t> mSubgroupCounts;

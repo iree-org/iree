@@ -8,6 +8,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -22,8 +23,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-preprocessing-convert-conv-to-channels-last"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::Preprocessing {
 
@@ -672,7 +671,7 @@ public:
       }
     }
 
-    LDBG("after converting convolutions to channels last\n" << *op);
+    LDBG() << "after converting convolutions to channels last\n" << *op;
 
     // Propagate packs introduced by the conversion patterns through adjacent
     // pads. Note that packs introduced by the above patterns will never include
@@ -688,7 +687,7 @@ public:
       }
     }
 
-    LDBG("after propagating packs/unpacks\n" << *op);
+    LDBG() << "after propagating packs/unpacks\n" << *op;
 
     // Run pack/unpack canonicalization to try to cancel any packs.
     {
@@ -701,7 +700,7 @@ public:
       }
     }
 
-    LDBG("after canonicalizing packs/unpacks\n" << *op);
+    LDBG() << "after canonicalizing packs/unpacks\n" << *op;
 
     // Generalize leftover packs and unpacks that are just transposes to allow
     // for transpose propagation and unit dim folding to handle them more
@@ -715,7 +714,7 @@ public:
       }
     }
 
-    LDBG("after generalizing all remaining packs/unpacks\n" << *op);
+    LDBG() << "after generalizing all remaining packs/unpacks\n" << *op;
   }
 };
 
