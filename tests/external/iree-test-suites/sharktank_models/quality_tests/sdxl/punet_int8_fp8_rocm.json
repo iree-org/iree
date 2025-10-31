@@ -27,12 +27,12 @@
     ],
     "outputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output_v2.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output_v5.bin",
             "value": "1x4x128x128xf16"
         }
     ],
     "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_fp8_weights.irpa",
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/08122025_transpose_manual/mlir/punet_fp8.mlir",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/08122025_transpose_manual/mlir/punet_fp8_2.mlir",
     "device": "hip",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
