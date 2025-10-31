@@ -160,7 +160,7 @@ jobs:
 
   # These temporary tests are designed for targets who do not have cached
   # artifacts and unable to run quality and benchmark tests
-  # TODO (geomin12): add cached artifact support for w7900
+  # TODO (geomin12): add cached artifact support for 7900xtx
   model-test:
     name: "sharktank_model_tests :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
@@ -168,10 +168,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: rocm_hip_w7900
+          - name: rocm_hip_7900xtx
             rocm-chip: gfx1100
             target: target_hip
-            runs-on: nodai-amdgpu-w7900-x86-64
+            runs-on: iree-7900xtx-1
     env:
       VENV_DIR: ${{ github.workspace }}/venv
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
