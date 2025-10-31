@@ -2290,6 +2290,10 @@ LogicalResult ExpReductionOp::verify() {
     return op->emitOpError("all indexing maps must be projected permutations");
   }
 
+  if (!getBody()->getOps<linalg::IndexOp>().empty()) {
+    return op->emitOpError("linalg.index is not supported in body");
+  }
+
   return success();
 }
 

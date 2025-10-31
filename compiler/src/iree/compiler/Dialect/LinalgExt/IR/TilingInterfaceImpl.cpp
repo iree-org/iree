@@ -1964,11 +1964,6 @@ FailureOr<TilingResult>
 ExpReductionOp::getTiledImplementation(OpBuilder &b,
                                        ArrayRef<OpFoldResult> offsets,
                                        ArrayRef<OpFoldResult> sizes) {
-  if (!getBody()->getOps<linalg::IndexOp>().empty()) {
-    return getOperation()->emitOpError(
-        "tiling of operations using linalg.index is not supported for now");
-  }
-
   Location loc = getLoc();
   auto indexingMapOp = cast<IndexingMapOpInterface>(getOperation());
   SmallVector<Value> tiledOperands;
@@ -1984,7 +1979,11 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
   SmallVector<Type, 4> resultTensorTypes;
   if (getNumResults()) {
     resultTensorTypes = llvm::map_to_vector<4>(
-        getResults(), [](Value v) { return v.getType(); });
+        getDpsInitsMutable(), [&generatedSlices](OpOperand &opOperand) {
+          return generatedSlices[opOperand.getOperandNumber()]
+              ->getResult(0)
+              .getType();
+        });
   }
 
   Operation *tiledOp = mlir::clone(b, *this, resultTensorTypes, tiledOperands);
