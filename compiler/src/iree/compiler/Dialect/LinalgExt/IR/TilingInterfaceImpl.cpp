@@ -1916,9 +1916,11 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
 //===----------------------------------------------------------------------===//
 
 SmallVector<utils::IteratorType> ExpReductionOp::getLoopIteratorTypes() {
-  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
-    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
-  });
+  SmallVector<utils::IteratorType> iteratorTypes(
+      getIteratorTypes()
+          .getAsValueRange<IREE::LinalgExt::IteratorTypeAttr,
+                           utils::IteratorType>());
+  return iteratorTypes;
 }
 SmallVector<utils::IteratorType> ExpReductionOp::getIteratorTypesArray() {
   return getLoopIteratorTypes();
@@ -3220,9 +3222,11 @@ LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
 /// `getIterationDomain` of `LinalgOp`s.
 
 SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
-  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
-    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
-  });
+  SmallVector<utils::IteratorType> iteratorTypes(
+      getIteratorTypes()
+          .getAsValueRange<IREE::LinalgExt::IteratorTypeAttr,
+                           utils::IteratorType>());
+  return iteratorTypes;
 }
 
 SmallVector<Range> CustomOp::getIterationDomainForDimensions(
