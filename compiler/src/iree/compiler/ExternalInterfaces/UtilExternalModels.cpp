@@ -400,18 +400,6 @@ struct HoistableLinalgOpInterfaceHelper {
   }
 };
 
-/// TODO(jtuyls): Remove when added to upstream.
-struct ExpandShapeOpValueBoundsInterface
-    : public ValueBoundsOpInterface::ExternalModel<
-          ExpandShapeOpValueBoundsInterface, memref::ExpandShapeOp> {
-  void populateBoundsForShapedValueDim(Operation *op, Value value, int64_t dim,
-                                       ValueBoundsConstraintSet &cstr) const {
-    auto expandOp = cast<memref::ExpandShapeOp>(op);
-    assert(value == expandOp.getResult() && "invalid value");
-    cstr.bound(value)[dim] == expandOp.getOutputShape()[dim];
-  }
-};
-
 } // namespace
 
 void registerUtilExternalModels(DialectRegistry &registry) {
@@ -529,12 +517,7 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         IREE::Util::AssumeIntOp::attachInterface<
             UtilAssumeIntValueBoundsOpInterface>(*context);
       });
-
-  registry.addExtension(+[](MLIRContext *context,
-                            memref::MemRefDialect *dialect) {
-    memref::ExpandShapeOp::attachInterface<ExpandShapeOpValueBoundsInterface>(
-        *context);
-  });
+});
 }
 
 } // namespace mlir::iree_compiler
