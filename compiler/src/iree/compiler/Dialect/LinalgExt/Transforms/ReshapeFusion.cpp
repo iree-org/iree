@@ -815,7 +815,7 @@ struct DropScatterUnitDims final : public OpRewritePattern<ScatterOp> {
     auto newScatter = ScatterOp::create(
         rewriter, scatterOp.getLoc(), TypeRange{original.getType()},
         ValueRange{updates, indices}, ValueRange{original},
-        scatterOp.getDimensionMap());
+        scatterOp.getDimensionMap(), scatterOp.getUniqueIndices());
     rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
                                 newScatter.getRegion().begin());
     rewriter.replaceOp(scatterOp,

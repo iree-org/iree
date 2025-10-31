@@ -12,7 +12,6 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
@@ -1091,52 +1090,6 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
 }
 
 void transform_dialect::TestGpuVectorDistribution::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTargetMutable(), effects);
-  transform::modifiesPayload(effects);
-}
-
-//===----------------------------------------------------------------------===//
-// TestVectorLayoutAnalysisOp
-//===----------------------------------------------------------------------===//
-
-static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
-                              mlir::FunctionOpInterface funcOp) {
-  funcOp.walk([&](Operation *op) {
-    // Do not emit remarks for conflict operations.
-    if (isa<VectorExt::ToLayoutOp>(op)) {
-      return;
-    }
-
-    for (OpResult result : op->getOpResults()) {
-      if (auto layout = analysis.getLayout<Attribute>(result)) {
-        // Print layout attr to a string.
-        std::string layoutStr;
-        llvm::raw_string_ostream s(layoutStr);
-        s << layout;
-        // Emit remark.
-        op->emitRemark("layout of result #" + Twine(result.getResultNumber()) +
-                       " is " + s.str());
-      }
-    }
-  });
-}
-
-DiagnosedSilenceableFailure
-transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
-    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  VectorLayoutAnalysis analysis(target);
-  if (failed(analysis.run())) {
-    target.emitError("layout analysis failed");
-    return emitDefaultSilenceableFailure(target);
-  }
-  emitLayoutRemarks(analysis, target);
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);

@@ -500,7 +500,7 @@ static bool iree_hal_hip_driver_is_path_uuid(iree_string_view_t device_path) {
 }
 
 static bool iree_hal_hip_driver_is_path_index(iree_string_view_t device_path) {
-  uint32_t unused_device_index = 0;
+  int32_t unused_device_index = 0;
   return iree_string_view_atoi_int32(device_path, &unused_device_index);
 }
 

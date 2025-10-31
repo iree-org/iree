@@ -111,14 +111,14 @@ def IREEGPU_PromoteWithCacheSwizzle :
     swizzle inserted if possible. For example,
 
     ```
-    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
     %1 = linalg.matmul ins(%0, ...)
     ```
 
     Becomes with `#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>`
 
     ```
-    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
     %1 = iree_gpu.buffer_resource_cast cache_swizzle(8192)
     %2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
     %3 = linalg.matmul ins(%2, ...)
@@ -161,6 +161,33 @@ def IREEGPU_DotProductOpsAttr : EnumAttr<
   IREEGPU_Dialect, IREEGPU_DotProductOps, "dotproduct_ops"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
   let assemblyFormat = "$value";
+}
+
+//===----------------------------------------------------------------------===//
+// InnerTiledSemantics
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_InnerTiledSemanticsAttr
+    : AttrDef<
+          IREEGPU_Dialect, "InnerTiledSemantics",
+          [DeclareAttrInterfaceMethods<
+               IREECodegen_InnerTiledSemanticsAttrInterface, ["getTileShapes",
+                                                              "getOpaque"]>,
+]> {
+  let mnemonic = "mma_semantics";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    Attribute describing aspects of MMA semantics that are orthogonal to the
+    aspects described in the mma_layout attrs, and that may change during
+    lowerings while the mma_layout's typically stay constant. This includes:
+    1. Expanded vs opaque tile shapes.
+    2. Distributed vs undistributed tile shapes.
+  }];
+
+  let parameters = (ins "bool":$distributed, "bool":$opaque);
+
+  let assemblyFormat = "`<` struct(params) `>`";
 }
 
 //===----------------------------------------------------------------------===//

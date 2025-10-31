@@ -10,6 +10,7 @@
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -23,8 +24,6 @@
 #include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-linalgExt-utils"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -447,15 +446,15 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto outputType = llvm::cast<ShapedType>(output.getType());
 
   if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
-    LDBG("[unimplemented] expected 'filterType' and 'inputType' to have static "
-         "shapes.");
+    LDBG() << "[unimplemented] expected 'filterType' and 'inputType' to have "
+              "static shapes.";
     return failure();
   }
 
   // TODO: Support pooling operations. For pooling ops, the input/output channel
   // size will be categorized as the additional batch dimension.
   if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
-    LDBG("[unimplemented] expected no pooling operations");
+    LDBG() << "[unimplemented] expected no pooling operations.";
     return failure();
   }
   auto filterShape = filterType.getShape();
@@ -480,7 +479,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   std::optional<int64_t> outputImageFirstDim = outputMap.getResultPosition(
       getAffineDimExpr(outputImagePos[0], outputMap.getContext()));
   if (!outputImageFirstDim || !outputChannelLastDim) {
-    LDBG("output image or output channel dim not found in output.");
+    LDBG() << "output image or output channel dim not found in output.";
     return failure();
   }
   if (outputChannelLastDim.value() < outputImageFirstDim.value())

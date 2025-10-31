@@ -138,6 +138,9 @@ struct MaterializeDispatchInstrumentationPass
         moduleBuilder.getType<IREE::Stream::ResourceType>(
             IREE::Stream::Lifetime::External));
     {
+      // Ensure initializer comes after the global.
+      OpBuilder::InsertionGuard moduleGuard(moduleBuilder);
+      moduleBuilder.setInsertionPointAfter(globalOp);
       auto initializerOp =
           IREE::Util::InitializerOp::create(moduleBuilder, loc);
       auto initializerBuilder =

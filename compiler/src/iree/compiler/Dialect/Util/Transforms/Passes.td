@@ -19,6 +19,9 @@ def ApplyPatternsPass : Pass<"iree-util-apply-patterns", ""> {
 
 def CombineInitializersPass : Pass<"iree-util-combine-initializers", "mlir::ModuleOp"> {
   let summary = "Combines global initializers into one.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Util::UtilDialect"
+  ];
 }
 
 def DropCompilerHintsPass : Pass<"iree-util-drop-compiler-hints", ""> {
@@ -109,6 +112,61 @@ def LiftCFGToSCFPass : Pass<"iree-util-lift-cfg-to-scf", "mlir::ModuleOp"> {
   ];
 }
 
+def LinkModulesPass : Pass<"iree-util-link-modules", "mlir::ModuleOp"> {
+  let summary = "Links external functions from source modules into the target module.";
+  let description = [{
+    Resolves external function declarations by loading definitions from source
+    modules. This pass enables composing programs from multiple MLIR modules
+    where functions can reference implementations from separately compiled
+    modules using dotted name scoping (e.g., `@module_a.compute`).
+
+    For each external function in the target module:
+
+    1. Searches for the definition in explicitly provided source modules
+    2. If not found and the symbol has a module prefix (`@prefix.name`) attempts
+       to automatically load `prefix.mlir` or `prefix.mlirbc` from library paths
+    3. Clones the function definition along with transitive dependencies
+       (including `IREE::Util::ObjectLike` operations like `flow.executable`)
+    4. Detects and resolves conflicts between private symbols from different
+       source modules or with existing target module definitions by renaming
+       conflicting symbols (e.g., `@scale_factor`, `@scale_factor_0`)
+    5. Renames imported symbols to match the external declaration name
+    6. Forces all imported symbols to private visibility
+
+    ObjectLike operations (such as `flow.executable`) are treated as
+    self-contained units: their internal structure is preserved but not scanned
+    for additional dependencies, preventing nested symbols from being treated as
+    external references.
+
+    Module name scoping: Source modules with `module @foo { util.func @bar }`
+    export public symbols as `@foo.bar`. Private symbols keep their local names.
+    Internal references within the module use the simple name `@bar`, while
+    external references use the dotted notation.
+
+    Supports both text (`.mlir`) and bytecode (`.mlirbc`) formats for all
+    modules.
+  }];
+
+  let options = [
+    ListOption<
+      "linkModules", "link-module",
+      "std::string",
+      "Explicit paths to source modules to link from."
+    >,
+    ListOption<
+      "libraryPaths", "library-path",
+      "std::string",
+      "Directories to search for modules during automatic discovery."
+    >,
+  ];
+
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::Util::UtilDialect"
+  ];
+}
+
 def OptimizeIntArithmeticPass : Pass<"iree-util-optimize-int-arithmetic", ""> {
   let summary = "Optimizes integer arithmetic using a variety of dataflow analysis and patterns.";
   let dependentDialects = [
@@ -142,6 +200,27 @@ def StripAndSplatConstantsPass :
 
 def StripDebugOpsPass : Pass<"iree-util-strip-debug-ops", ""> {
   let summary = "Strips debug ops, like assertions.";
+}
+
+def VerifyInitializationOrderPass :
+    Pass<"iree-util-verify-initialization-order", "mlir::ModuleOp"> {
+  let summary = "Verifies module initialization order constraints.";
+  let description = [{
+    Verifies that module initialization follows the rules documented in the
+    util.initializer and util.global operations:
+
+    1. Initializers can only access globals defined before them in module order.
+    2. Immutable globals can only be initialized once (either by initial_value
+       OR by stores in initializers, never both).
+    3. Globals with initial values cannot be modified by initializers that
+       precede them in module order.
+    4. Stores to immutable globals must occur in initializers or functions
+       only reachable from initializers.
+
+    The pass uses conservative analysis and emits warnings for patterns it
+    cannot definitively verify (e.g. conditional stores in initializer-only
+    functions).
+  }];
 }
 
 def VerifyStructuredControlFlowPass :

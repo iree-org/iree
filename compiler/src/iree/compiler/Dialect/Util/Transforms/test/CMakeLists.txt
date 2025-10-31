@@ -25,6 +25,9 @@ iree_lit_test_suite(
     "integer_divisibility.mlir"
     "ipo.mlir"
     "lift_cfg_to_scf.mlir"
+    "link_modules.mlir"
+    "link_modules_auto.mlir"
+    "link_modules_error.mlir"
     "optimize_int_arithmetic.mlir"
     "optimize_int_arithmetic_narrowing.mlir"
     "patterns.mlir"
@@ -35,10 +38,15 @@ iree_lit_test_suite(
     "strip_debug_ops.mlir"
     "test_float_range_analysis.mlir"
     "test_float_range_analysis_linalg.mlir"
+    "verify_initialization_order.mlir"
     "verify_structured_control_flow.mlir"
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    link_module_a.mlir
+    link_module_b.mlir
+    link_modules_bundle.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

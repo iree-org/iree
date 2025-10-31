@@ -122,7 +122,7 @@ inferIteratorsFromOutMap(AffineMap map) {
   return iterators;
 }
 
-bool isScaledContractionBody(Block &block) {
+static bool isScaledContractionBody(Block &block) {
   if (block.empty() || !block.back().mightHaveTrait<OpTrait::IsTerminator>()) {
     LDBG() << "no terminator in the block";
     return false;

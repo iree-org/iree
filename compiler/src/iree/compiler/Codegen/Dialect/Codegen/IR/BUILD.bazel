@@ -37,6 +37,7 @@ iree_td_library(
     ),
     deps = [
         "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
+        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:LinalgOpsTdFiles",

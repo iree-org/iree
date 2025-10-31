@@ -1004,8 +1004,9 @@ void populateIREEGPULowerInnerTiledPatterns(RewritePatternSet &patterns) {
 // Conversion to MultiMmaOp
 //===----------------------------------------------------------------------===//
 
-AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
-                   llvm::SmallDenseMap<int64_t, int64_t> &oldDimsToNewDimsMap) {
+static AffineMap
+dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
+         llvm::SmallDenseMap<int64_t, int64_t> &oldDimsToNewDimsMap) {
   assert(map.isProjectedPermutation() && "expected projected permutation");
 
   SmallVector<AffineExpr> newResults;
@@ -1021,7 +1022,8 @@ AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
                         context);
 }
 
-FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
+static FailureOr<IREE::Codegen::InnerTiledOp>
+convertScaledContractionToInnerTiledMma(
     RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     IREE::Codegen::InnerTileDescAttrInterface kind) {
   auto smmaKind = dyn_cast<IREE::GPU::ScaledMMAAttr>(kind);
@@ -1096,27 +1098,16 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
     return failure();
   }
 
-  auto reorderInputs = [](SmallVector<Value> inputs) {
-    SmallVector<Value> res;
-    int numInputs = inputs.size() - 1;
-    int offset = numInputs / 2;
-    for (int i = 0; i < numInputs; i++) {
-      res.push_back(inputs[i / 2 + (i % 2) * offset]);
-    }
-    res.push_back(inputs.back());
-    return res;
-  };
-  SmallVector<Value> inputs = reorderInputs(linalgOp->getOperands());
+  ValueRange inputs = linalgOp->getOperands();
 
   SmallVector<Type> eltTypes;
   smmaKind.getElementTypes(eltTypes);
-  if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
-          eltTypes[0] ||
-      cast<RankedTensorType>(inputs[2].getType()).getElementType() !=
-          eltTypes[2] ||
-      cast<RankedTensorType>(inputs[4].getType()).getElementType() !=
-          eltTypes[4]) {
-    return failure();
+  for (int i :
+       {kScaledMMAOperandLhs, kScaledMMAOperandRhs, kScaledMMAOperandAcc}) {
+    if (cast<RankedTensorType>(inputs[i].getType()).getElementType() !=
+        eltTypes[i]) {
+      return failure();
+    }
   }
 
   SmallVector<utils::IteratorType> linalgIteratorTypes =
@@ -1145,7 +1136,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
       dropDims(context, numDims - 4, accMap, oldDimsToNewDimsMap);
   std::optional<SmallVector<SmallVector<int64_t>>> perms =
       SmallVector<SmallVector<int64_t>>{
-          lhsInnerPerm, sc1InnerPerm, rhsInnerPerm, sc2InnerPerm, accInnerPerm};
+          lhsInnerPerm, rhsInnerPerm, sc1InnerPerm, sc2InnerPerm, accInnerPerm};
   SmallVector<int64_t> identityPerm = {0, 1};
   if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
       accInnerPerm == identityPerm)
@@ -1153,12 +1144,14 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
 
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
+  auto semantics = InnerTiledSemanticsAttr::get(context, /*distributed=*/false,
+                                                /*opaque=*/true);
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
-      ArrayRef<AffineMap>{outerLhsMap, outerSc1Map, outerRhsMap, outerSc2Map,
+      ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerSc1Map, outerSc2Map,
                           outerAccMap},
-      iteratorTypes, smmaKind, perms);
+      iteratorTypes, smmaKind, semantics, perms);
   if (maybeLoweringConfig) {
     setLoweringConfig(newMmaOp, maybeLoweringConfig);
   }
@@ -1295,11 +1288,13 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
 
+  auto semantics = InnerTiledSemanticsAttr::get(context, /*distributed=*/false,
+                                                /*opaque=*/true);
   auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
       linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
       /*inits=*/ValueRange{inputs}.back(),
       ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerAccMap}, iteratorTypes,
-      mmaKind, perms);
+      mmaKind, semantics, perms);
   if (maybeLoweringConfig) {
     setLoweringConfig(newMmaOp, maybeLoweringConfig);
   }
@@ -1313,9 +1308,18 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
 FailureOr<Operation *>
 distributeInnerTiledOp(RewriterBase &rewriter,
                        IREE::Codegen::InnerTiledOp tiledOp) {
-  if (!tiledOp.hasTensorSemantics() || tiledOp.hasThreadSemantics()) {
+  auto semantics =
+      dyn_cast<IREE::GPU::InnerTiledSemanticsAttr>(tiledOp.getSemantics());
+  if (!semantics) {
     return rewriter.notifyMatchFailure(
-        tiledOp, "tiledOp must have vector and subgroup for distribution.");
+        tiledOp, "unexpected tiled op semantics attribute type");
+  }
+  if (semantics.getDistributed()) {
+    return rewriter.notifyMatchFailure(tiledOp, "tiledOp already distributed.");
+  }
+  if (!tiledOp.hasTensorSemantics()) {
+    return rewriter.notifyMatchFailure(
+        tiledOp, "tiledOp must have vector semantics for distribution.");
   }
 
   RewriterBase::InsertionGuard g(rewriter);
@@ -1394,10 +1398,13 @@ distributeInnerTiledOp(RewriterBase &rewriter,
     }
   }
 
+  auto distributedSemantics = IREE::GPU::InnerTiledSemanticsAttr::get(
+      context, /*distributed=*/true, semantics.getOpaque());
+
   // Step 3. Create the new inner_tiled op.
   auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
       rewriter, loc, inputSlices, initSlices, tiledOp.getIndexingMaps(),
-      tiledOp.getIteratorTypes(), tiledOp.getKind());
+      tiledOp.getIteratorTypes(), tiledOp.getKind(), distributedSemantics);
 
   newTiledOp->setDiscardableAttrs(tiledOp->getDiscardableAttrDictionary());
 
@@ -1467,7 +1474,7 @@ struct DropInnerTiledUnitDimsPattern
         ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
         ValueRange{newOperands}.drop_front(tiledOp.getNumInputs()),
         rewriter.getAffineMapArrayAttr(emptyMaps), rewriter.getArrayAttr({}),
-        tiledOp.getKind());
+        tiledOp.getKind(), tiledOp.getSemantics());
 
     SmallVector<Value> newResults(newTiledOp.getResults());
     for (auto [newResult, externalShape] :
@@ -1853,7 +1860,8 @@ vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
   auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
       rewriter, loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
       ValueRange{newOperands}.take_back(tiledOp.getNumOutputs()),
-      tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(), tiledOp.getKind());
+      tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(), tiledOp.getKind(),
+      tiledOp.getSemantics());
 
   auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   SmallVector<Value> transferWrites;

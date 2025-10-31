@@ -783,15 +783,16 @@ static void rewriteToOneReturn(int numResults, Region &region,
   auto resultLocs = gatherResultLocations(anyReturnOp.getNumOperands(), region);
   auto &exitBlock = region.emplaceBlock();
   exitBlock.addArguments(anyReturnOp.getOperandTypes(), resultLocs);
-  OpBuilder::atBlockBegin(&exitBlock)
-      .create<IREE::HAL::ReturnOp>(
-          FusedLoc::get(region.getContext(), returnLocs),
-          exitBlock.getArguments());
+  OpBuilder builder = OpBuilder::atBlockBegin(&exitBlock);
+  IREE::HAL::ReturnOp::create(builder,
+                              FusedLoc::get(region.getContext(), returnLocs),
+                              exitBlock.getArguments());
 
   // Rewrite all return ops to branch to the exit block.
   for (auto returnOp : returnOps) {
-    OpBuilder(returnOp).create<cf::BranchOp>(returnOp.getLoc(), &exitBlock,
-                                             returnOp.getOperands());
+    OpBuilder builder(returnOp);
+    cf::BranchOp::create(builder, returnOp.getLoc(), &exitBlock,
+                         returnOp.getOperands());
     rewriter.eraseOp(returnOp);
   }
 }
@@ -853,8 +854,9 @@ struct MergeExecutableConstantBlocks
       targetBlocks.push_back(&targetRegion.emplaceBlock());
     }
     auto *postBlock = &targetRegion.emplaceBlock();
-    OpBuilder::atBlockBegin(preBlock).create<cf::BranchOp>(
-        blockOps.front().getLoc(), targetBlocks.front());
+    OpBuilder builder = OpBuilder::atBlockBegin(preBlock);
+    cf::BranchOp::create(builder, blockOps.front().getLoc(),
+                         targetBlocks.front());
 
     // Inline all source constant block regions (which may have multiple
     // Blocks).
@@ -881,23 +883,24 @@ struct MergeExecutableConstantBlocks
       if (firstBlock->getNumArguments() > 0) {
         firstBranchOperands.push_back(newBlockOp.getArgument(0));
       }
-      OpBuilder::atBlockEnd(headerBlock)
-          .create<cf::BranchOp>(newBlockOp.getLoc(), firstBlock,
-                                firstBranchOperands);
+      OpBuilder headerBuilder = OpBuilder::atBlockEnd(headerBlock);
+      cf::BranchOp::create(headerBuilder, newBlockOp.getLoc(), firstBlock,
+                           firstBranchOperands);
 
       // Find the single expected return, capture its operands, and rewrite it
       // to branch to the next block.
       for (auto returnOp : llvm::make_early_inc_range(
                targetRegion.getOps<IREE::HAL::ReturnOp>())) {
+        OpBuilder builder(returnOp);
         llvm::append_range(resultValues, returnOp.getOperands());
-        OpBuilder(returnOp).create<cf::BranchOp>(returnOp.getLoc(), nextBlock);
+        cf::BranchOp::create(builder, returnOp.getLoc(), nextBlock);
         rewriter.eraseOp(returnOp);
       }
     }
 
     // Return from the constant block with all operands.
-    OpBuilder::atBlockBegin(postBlock).create<IREE::HAL::ReturnOp>(
-        fusedLoc, resultValues);
+    OpBuilder postBlockbuilder = OpBuilder::atBlockBegin(postBlock);
+    IREE::HAL::ReturnOp::create(postBlockbuilder, fusedLoc, resultValues);
 
     rewriter.finalizeOpModification(variantOp);
 

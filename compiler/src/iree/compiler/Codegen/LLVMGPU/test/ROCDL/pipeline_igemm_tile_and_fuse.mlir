@@ -76,7 +76,7 @@ hal.executable private @main {
 //      CHECK-DAG:       %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x4x4x1xf16>
 //      CHECK-DAG:       vector.transpose %[[LHS_MM1]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x1x2x4xf16> to vector<1x4x1x2x1x4xf16>
 //      CHECK-DAG:       vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x4x1xf16> to vector<2x4x1x4xf16>
-// CHECK-COUNT-32:       amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+// CHECK-COUNT-32:       amdgpu.mfma 16x16x16
 //          CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x4x4x1xf32> to vector<1x4x1x4x4x1xf32>
 //          CHECK:     %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<4x1x4x4x1xf32> from vector<1x4x1x4x4x1xf32>
 //          CHECK:     vector.transfer_write %[[EXTRACT]], %[[BUF2]]
@@ -154,7 +154,7 @@ hal.executable private @main {
 //          CHECK:       gpu.barrier
 //      CHECK-DAG:       %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<4xf16>
 //      CHECK-DAG:       %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<4xf16>
-// CHECK-COUNT-1:       amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+// CHECK-COUNT-1:       amdgpu.mfma 16x16x16
 //          CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x1x4x1xf32> to vector<4xf32>
 //          CHECK:     vector.transfer_write %[[LOOP_T]]
 // Note there is a writeback loop here that is skipped to simplify the test.
@@ -231,8 +231,7 @@ hal.executable private @main {
 //          CHECK:       gpu.barrier
 //      CHECK-DAG:       %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<4xf16>
 //      CHECK-DAG:       %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<4xf16>
-// CHECK-COUNT-1:       amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
-//      CHECK-NOT:     scf.for
+//  CHECK-COUNT-1:       amdgpu.mfma 16x16x16
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----

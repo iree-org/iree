@@ -203,8 +203,9 @@ static IREE::Util::FuncOp outlineMemoizeRegionBody(
   // cloneRegionBefore is unfriendly and requires that we poke into the block
   // list to get the first block and insert the branch to it.
   auto &entryBlock = funcOp.getBlocks().front();
-  OpBuilder::atBlockEnd(&entryBlock)
-      .create<cf::BranchOp>(memoizeOp.getLoc(), entryBlock.getNextNode());
+  OpBuilder entryBuilder = OpBuilder::atBlockEnd(&entryBlock);
+  cf::BranchOp::create(entryBuilder, memoizeOp.getLoc(),
+                       entryBlock.getNextNode());
 
   // Rewrite hal.return ops to util.return.
   for (auto returnOp :
@@ -270,7 +271,8 @@ static SmallVector<IREE::Util::GlobalOpInterface> createMemoizedDeviceGlobals(
   }
 
   // Create an initializer to call the apply function and store the results into
-  // globals.
+  // globals. Ensure it's placed after the globals it initializes.
+  moduleBuilder.setInsertionPointAfter(resultGlobalOps.back());
   auto initializerOp =
       IREE::Util::InitializerOp::create(moduleBuilder, memoizeOp.getLoc());
   auto initializerBuilder =

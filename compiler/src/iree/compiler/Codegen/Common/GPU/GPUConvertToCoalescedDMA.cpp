@@ -73,7 +73,7 @@ static Value castIndicesToIndexType(OpBuilder &rewriter, Location loc,
   }
   auto indexIndicesType =
       RankedTensorType::get(indicesType.getShape(), rewriter.getIndexType());
-  return rewriter.create<arith::IndexCastOp>(loc, indexIndicesType, indices);
+  return arith::IndexCastOp::create(rewriter, loc, indexIndicesType, indices);
 }
 
 // Tiles linalg_ext.gather ops with two-level nested scf.forall structure:
@@ -186,9 +186,9 @@ struct ConvertGatherOpToCoalescedDMA
     SmallVector<Attribute> outerMapping =
         createGPUMappingAttrs(rewriter.getContext(), rank,
                               /*useWarpMapping=*/true);
-    auto outerForallOp = rewriter.create<scf::ForallOp>(
-        loc, outerLowerBounds, outerUpperBounds, subgroupTileSizes, init,
-        rewriter.getArrayAttr(outerMapping));
+    auto outerForallOp = scf::ForallOp::create(
+        rewriter, loc, outerLowerBounds, outerUpperBounds, subgroupTileSizes,
+        init, rewriter.getArrayAttr(outerMapping));
 
     // Build the body of outer forall
     OpBuilder::InsertionGuard guard(rewriter);
@@ -203,11 +203,12 @@ struct ConvertGatherOpToCoalescedDMA
     SmallVector<OpFoldResult> outerOffsets(outerIVs.begin(), outerIVs.end());
     SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
 
-    auto indicesWgSlice = rewriter.create<tensor::ExtractSliceOp>(
-        loc, indices, outerOffsets, subgroupTileSizes, strides);
+    auto indicesWgSlice = tensor::ExtractSliceOp::create(
+        rewriter, loc, indices, outerOffsets, subgroupTileSizes, strides);
 
-    auto destWgSlice = rewriter.create<tensor::ExtractSliceOp>(
-        loc, outerSharedOut, outerOffsets, subgroupTileSizes, strides);
+    auto destWgSlice = tensor::ExtractSliceOp::create(
+        rewriter, loc, outerSharedOut, outerOffsets, subgroupTileSizes,
+        strides);
 
     // Cast indices to index type if needed
     Value indexIndices = castIndicesToIndexType(rewriter, loc, indicesWgSlice);
@@ -219,8 +220,8 @@ struct ConvertGatherOpToCoalescedDMA
     SmallVector<Attribute> innerMapping =
         createGPUMappingAttrs(rewriter.getContext(), rank,
                               /*useWarpMapping=*/false);
-    auto innerForallOp = rewriter.create<scf::ForallOp>(
-        loc, innerLowerBounds, innerUpperBounds, threadTileSizes,
+    auto innerForallOp = scf::ForallOp::create(
+        rewriter, loc, innerLowerBounds, innerUpperBounds, threadTileSizes,
         destWgSlice.getResult(), rewriter.getArrayAttr(innerMapping));
 
     // Build the body of inner forall with DMA op
@@ -233,8 +234,9 @@ struct ConvertGatherOpToCoalescedDMA
     Block &innerInParallelBlock = innerInParallelOp.getRegion().front();
     rewriter.setInsertionPointToStart(&innerInParallelBlock);
 
-    rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-        loc, innerSharedOut.getType(), indexIndices, source, innerSharedOut);
+    IREE::GPU::CoalescedGatherDMAOp::create(
+        rewriter, loc, innerSharedOut.getType(), indexIndices, source,
+        innerSharedOut);
 
     // Insert the result of inner forall back into outer forall's output.
     rewriter.setInsertionPointAfter(innerForallOp);
@@ -243,8 +245,8 @@ struct ConvertGatherOpToCoalescedDMA
     Block &outerInParallelBlock = outerInParallelOp.getRegion().front();
     rewriter.setInsertionPointToStart(&outerInParallelBlock);
 
-    rewriter.create<tensor::ParallelInsertSliceOp>(
-        loc, innerForallOp.getResult(0), outerSharedOut, outerOffsets,
+    tensor::ParallelInsertSliceOp::create(
+        rewriter, loc, innerForallOp.getResult(0), outerSharedOut, outerOffsets,
         subgroupTileSizes, strides);
 
     rewriter.replaceOp(gatherOp, outerForallOp.getResults());

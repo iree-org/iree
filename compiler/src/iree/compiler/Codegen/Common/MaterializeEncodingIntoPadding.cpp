@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
@@ -37,205 +36,6 @@ namespace mlir::iree_compiler {
 using namespace IREE::Encoding;
 
 namespace {
-
-// Returns the pad encoding layout, or nullptr if this is not the only layout or
-// if there's no encoding at all.
-static PaddingAttr getPadLayout(Attribute layoutAttr, RankedTensorType type) {
-  if (!type.getEncoding()) {
-    return nullptr;
-  }
-  auto encoding =
-      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
-  if (encoding) {
-    ArrayAttr layouts = encoding.getLayouts();
-    if (layouts.size() != 1) {
-      return nullptr;
-    }
-    return dyn_cast<PaddingAttr>(*layouts.begin());
-  }
-  Attribute resolvedEncoding =
-      cast<IREE::Encoding::LayoutResolverAttr>(layoutAttr).getLayout(type);
-  LLVM_DEBUG({
-    llvm::dbgs() << "Unresolved type: " << type << "\n";
-    llvm::dbgs() << "layoutAttr: " << layoutAttr << "\n";
-    llvm::dbgs() << "Resolved into: " << resolvedEncoding << "\n";
-  });
-  return dyn_cast<PaddingAttr>(resolvedEncoding);
-}
-
-// Returns a padded tensor type (without encoding) for tensor types with the pad
-// encoding layout, or the same type for all other tensors.
-static RankedTensorType getPaddedType(Attribute layoutAttr,
-                                      RankedTensorType type) {
-  PaddingAttr layout = getPadLayout(layoutAttr, type);
-  if (layout.isIdentityLayout()) {
-    return type.dropEncoding();
-  }
-
-  ArrayRef<int64_t> padding = layout.getPadding().asArrayRef();
-  auto newShape = llvm::to_vector_of<int64_t>(type.getShape());
-  for (auto [newDim, padValue] : llvm::zip_equal(newShape, padding)) {
-    assert((padValue == 0 || ShapedType::isStatic(newDim)) &&
-           "Padding dynamic dims not supported");
-    newDim += padValue;
-  }
-
-  return RankedTensorType::get(newShape, type.getElementType());
-}
-
-struct MaterializePadEncodingTypeConverter final
-    : MaterializeEncodingTypeConverter {
-  MaterializePadEncodingTypeConverter(
-      IREE::Encoding::LayoutMaterializerAttr layoutAttr)
-      : MaterializeEncodingTypeConverter(layoutAttr) {
-    addConversion([](RankedTensorType type) -> std::optional<RankedTensorType> {
-      // The type converter is designed for `padding` encoding
-      // attribute. By the definition, the final converted type is the same
-      // tensor type without encodings.
-      return type.dropEncoding();
-    });
-    addConversion([&](IREE::TensorExt::DispatchTensorType dispatchTensorType)
-                      -> IREE::TensorExt::DispatchTensorType {
-      auto type = dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-      if (!type || !type.getEncoding()) {
-        return dispatchTensorType;
-      }
-      // The incoming bindings have the padded type, if `padding` is
-      // present.
-      if (getPadLayout(getLayoutAttr(), type)) {
-        type = getPaddedType(getLayoutAttr(), type);
-      }
-      return IREE::TensorExt::DispatchTensorType::get(
-          dispatchTensorType.getAccess(), type);
-    });
-  }
-
-  bool hasNonZeroPadding(RankedTensorType type) const {
-    PaddingAttr layout = getPadLayout(getLayoutAttr(), type);
-    return layout && !layout.isIdentityLayout();
-  }
-};
-
-/// Pattern to convert `iree_tensor_ext.dispatch.tensor.load` operation when
-/// materializing the encoding.
-struct MaterializeFlowDispatchTensorLoadOp final
-    : OpConversionPattern<IREE::TensorExt::DispatchTensorLoadOp> {
-  using Base::Base;
-
-  LogicalResult
-  matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp loadOp,
-                  OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Only handle operations where the load covers the entire
-    // `!iree_tensor_ext.dispatch.tensor` type.
-    if (!loadOp.isLoadOfWholeSource()) {
-      return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
-    }
-
-    auto &typeConverter =
-        *getTypeConverter<MaterializePadEncodingTypeConverter>();
-    IREE::TensorExt::DispatchTensorType sourceType = loadOp.getSourceType();
-    auto boundTensorType = cast<RankedTensorType>(sourceType.getBoundType());
-    if (!typeConverter.hasNonZeroPadding(boundTensorType)) {
-      // Let the Nop pattern handle this.
-      return rewriter.notifyMatchFailure(loadOp, "no padding applied");
-    }
-
-    auto paddedType =
-        typeConverter.convertType<RankedTensorType>(boundTensorType);
-    assert(paddedType != boundTensorType && "Expected conversion with padding");
-
-    SmallVector<OpFoldResult> newMixedSizes =
-        getMixedValues(paddedType.getShape(), loadOp.getSourceDims(), rewriter);
-
-    SmallVector<OpFoldResult> newOffsets(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> newStrides(newMixedSizes.size(),
-                                         rewriter.getIndexAttr(1));
-    SmallVector<OpFoldResult> extractSizes = getMixedValues(
-        boundTensorType.getShape(), loadOp.getSourceDims(), rewriter);
-    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
-        loadOp, adaptor.getSource(), loadOp.getSourceDims(), newOffsets,
-        extractSizes, newStrides);
-    return success();
-  }
-};
-
-/// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
-/// materializing the encoding.
-struct MaterializeFlowDispatchTensorStoreOp final
-    : OpConversionPattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using Base::Base;
-
-  LogicalResult
-  matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
-                  OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Only handle operations where the store covers the entire
-    // `!iree_tensor_ext.dispatch.tensor` type.
-    if (!storeOp.isStoreToWholeTarget()) {
-      return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
-    }
-
-    auto &typeConverter =
-        *getTypeConverter<MaterializePadEncodingTypeConverter>();
-    IREE::TensorExt::DispatchTensorType targetType = storeOp.getTargetType();
-    auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
-    if (!typeConverter.hasNonZeroPadding(boundTensorType)) {
-      // Let the Nop pattern handle this.
-      return rewriter.notifyMatchFailure(storeOp, "no padding applied");
-    }
-
-    IREE::TensorExt::DispatchTensorType newTargetType =
-        typeConverter.convertType<IREE::TensorExt::DispatchTensorType>(
-            targetType);
-    RankedTensorType paddedType = newTargetType.asRankedTensorType();
-
-    Location loc = storeOp.getLoc();
-    SmallVector<OpFoldResult> offsets(paddedType.getRank(),
-                                      rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> strides(paddedType.getRank(),
-                                      rewriter.getIndexAttr(1));
-    SmallVector<OpFoldResult> sizes =
-        tensor::getMixedSizes(rewriter, loc, adaptor.getValue());
-    rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
-        storeOp, adaptor.getValue(), adaptor.getTarget(),
-        adaptor.getTargetDims(), offsets, sizes, strides);
-    return success();
-  }
-};
-
-/// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
-/// materializing the encoding. We can not reuse the existing one because it
-/// does not transform new dynamic dimension through interface. The other
-/// difference is that the converted type of the padding attribute is not as the
-/// same as the tensor type that drops encoding.
-/// TODO(#20160): Abstract new interface methods and collapse two patterns.
-struct MaterializeInterfaceBindingEncoding final
-    : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using Base::Base;
-
-  LogicalResult
-  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
-                  OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
-        subspanOp.getResult().getType());
-    if (!resultType) {
-      return rewriter.notifyMatchFailure(
-          subspanOp,
-          "expected result type to be !iree_tensor_ext.dispatch.tensor");
-    }
-    auto newResultType = getTypeConverter()->convertType(resultType);
-    SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();
-    rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, newResultType, subspanOp.getLayout(), subspanOp.getBinding(),
-        subspanOp.getByteOffset(), newDynamicDims, subspanOp.getAlignmentAttr(),
-        subspanOp.getDescriptorFlagsAttr());
-    return success();
-  }
-};
-
 struct MaterializeEncodingIntoPaddingPass final
     : impl::MaterializeEncodingIntoPaddingPassBase<
           MaterializeEncodingIntoPaddingPass> {
@@ -280,24 +80,14 @@ struct MaterializeEncodingIntoPaddingPass final
           resolverAttr.cloneWithSimplifiedConfig(targetConfig));
     } else {
       layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(
-          IREE::Codegen::EncodingNopLayoutAttr::get(context));
+          IREE::Encoding::IdentityResolverAttr::get(context));
     }
 
     RewritePatternSet materializeEncodingPattern(context);
-    MaterializePadEncodingTypeConverter typeConverter(layoutAttr);
+    MaterializeEncodingTypeConverter typeConverter(layoutAttr);
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingPatterns(materializeEncodingPattern, target,
                                         typeConverter);
-
-    // The majority of this conversion is based on the 'Nop' materialization,
-    // with the exception of a few ops that have to account for padding.
-    // We add custom patterns with much higher priority to run before the
-    // equivalent 'Nop' patterns.
-    materializeEncodingPattern.add<MaterializeFlowDispatchTensorLoadOp,
-                                   MaterializeFlowDispatchTensorStoreOp,
-                                   MaterializeInterfaceBindingEncoding>(
-        typeConverter, context, PatternBenefit{100});
-
     if (failed(applyPartialConversion(operation, target,
                                       std::move(materializeEncodingPattern)))) {
       operation.emitOpError("materialization failed");

@@ -12,3 +12,23 @@ IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 1, 1, _v)
 IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 2, 1, _v)
 IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 4, 1, _v)
 IREE_UK_MMT4D_TILE(riscv_64, f32, f32, f32, 7, 1, _v)
+
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f32, 1, 1, _zvfhmin)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f32, 2, 1, _zvfhmin)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f32, 4, 1, _zvfhmin)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f32, 6, 1, _zvfhmin)
+
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f16, 1, 1, _zvfhmin)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f16, 2, 1, _zvfhmin)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f16, 4, 1, _zvfhmin)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f16, 6, 1, _zvfhmin)
+
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f32, 1, 1, _zvfh)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f32, 2, 1, _zvfh)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f32, 4, 1, _zvfh)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f32, 7, 1, _zvfh)
+
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f16, 1, 1, _zvfh)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f16, 2, 1, _zvfh)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f16, 4, 1, _zvfh)
+IREE_UK_MMT4D_TILE(riscv_64, f16, f16, f16, 7, 1, _zvfh)

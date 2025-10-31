@@ -425,21 +425,6 @@ def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> 
 }
 
 //===---------------------------------------------------------------------===//
-// iree_codegen.encoding_nop_layout
-//===---------------------------------------------------------------------===//
-
-def IREECodegen_EncodingNopLayoutAttr  :
-    AttrDef<IREECodegen_Dialect, "EncodingNopLayout"> {
-  let mnemonic = "encoding_nop_layout";
-  let summary = [{An attribute with implementation that treats encoding as nop.}];
-  let description = [{
-    An attribute that implements the interface methods that discards the
-    encodings. It can be a default attribute when a backend does not implement
-    encoding details.
-  }];
-}
-
-//===---------------------------------------------------------------------===//
 // iree_codegen.rotate_rows
 //===---------------------------------------------------------------------===//
 

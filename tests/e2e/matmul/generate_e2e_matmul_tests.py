@@ -117,7 +117,7 @@ def generate(
         compilation_info_id, lhs_rhs_type
     ):
         for shape in get_test_shapes(shapes_id):
-            for dynamicity in get_dynamicities(shapes_id):
+            for dynamicities in get_dynamicities(shapes_id):
                 function = generate_function(
                     lhs_rhs_type=lhs_rhs_type,
                     acc_type=acc_type,
@@ -125,7 +125,7 @@ def generate(
                     mx_block_size=mx_block_size,
                     shape=shape,
                     transpose_rhs=transpose_rhs,
-                    dynamicity=dynamicity,
+                    dynamicities=dynamicities,
                     compilation_info=compilation_info,
                 )
                 # Different testcases may differ only by runtime parameters but
@@ -245,6 +245,12 @@ def parse_arguments():
         help="Custom MNK values for CUSTOM_MNK shape. Format: m,n,k (e.g., --mnk=64,128,256)",
         required=False,
     )
+    parser.add_argument(
+        "--mnk_dynamicities",
+        type=str,
+        help="Custom dynamicity mask for m,n,k. Format: dynamic|static,dynamic|static,dynamic|static (e.g., --mnk_dynamicities=dynamic,static,static)",
+        required=False,
+    )
     return parser.parse_args()
 
 
@@ -295,6 +301,7 @@ def main(args):
     # Parse custom MNK values if provided
     shapes_id = ShapesId(args.shapes)
     ShapesId.set_custom_mnk(shapes_id, args.mnk)
+    ShapesId.set_dynamicity(shapes_id, args.mnk_dynamicities)
 
     (functions, calls) = generate(
         lhs_rhs_type=MatrixElemTypeId(args.lhs_rhs_type),

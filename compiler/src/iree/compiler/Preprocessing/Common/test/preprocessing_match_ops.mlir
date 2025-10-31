@@ -964,7 +964,7 @@ func.func @attention_ops(
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_attention(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch, %m, %k1, %k2, %n =
+    %batch, %m, %n, %k1, %k2 =
       transform.iree.match.attention %op,
         query_type = f16, key_type = f16, value_type = f16, output_type = f16,
         indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output] :
@@ -1087,7 +1087,7 @@ func.func @indexing_maps_test(
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_with_wrong_maps(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch, %m, %k1, %k2, %n =
+    %batch, %m, %n, %k1, %k2 =
       transform.iree.match.attention %op,
         query_type = f16, key_type = f16, value_type = f16, output_type = f16,
         indexing_maps = [#map_query, #map_wrong_key, #map_value, #map_scale, #map_output] :

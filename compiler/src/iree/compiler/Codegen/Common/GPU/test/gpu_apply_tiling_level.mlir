@@ -4,6 +4,7 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=partial_reduction}, canonicalize, cse))" %s | FileCheck %s --check-prefix=PARTRED
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{normalize-loops}, canonicalize, cse))" %s | FileCheck %s --check-prefix=NORM-REDUCTION
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=serial}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SERIAL
 
 #config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
@@ -228,6 +229,7 @@ module {
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+      semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>,
       lowering_config = #config
     } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
     return %0 : tensor<?x?x4xf32>
@@ -653,3 +655,27 @@ func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf3
 //       NORM-REDUCTION:     tensor.extract_slice {{.*}} tensor<2592x32xf32> to tensor<2592x?xf32>
 //   NORM-REDUCTION-NOT:     tensor.collapse_shape
 //       NORM-REDUCTION:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{serial = [0, 16]}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @serial_tiling(%3: tensor<4x256xf32>, %4: tensor<4x256xf32>, %5: tensor<4x256xf32>) -> tensor<4x256xf32> {
+    %6 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]
+      } ins(%3, %4 : tensor<4x256xf32>, tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %7 = arith.addf %in, %in_0 : f32
+      linalg.yield %7 : f32
+    } -> tensor<4x256xf32>
+    return %6 : tensor<4x256xf32>
+  }
+}
+
+// SERIAL-LABEL: func.func @serial_tiling
+// SERIAL: scf.forall ({{.*}}) = (0) to (256) step (16)
+// SERIAL: linalg.generic
+// SERIAL: scf.forall.in_parallel
+// SERIAL-NOT: mapping

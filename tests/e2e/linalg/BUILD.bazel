@@ -24,6 +24,7 @@ LLVM_SRCS = enforce_glob(
         "conv2d.mlir",
         "fp4_f32_conversion.mlir",
         "fp_to_subbyte.mlir",
+        "gather_like_ops.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
@@ -34,9 +35,9 @@ LLVM_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "large_linalg_matmul.mlir",
-        "index.mlir",
         "argmax.mlir",
+        "index.mlir",
+        "large_linalg_matmul.mlir",
     ],
 )
 
@@ -73,6 +74,7 @@ VMVX_SRCS = enforce_glob(
     # keep sorted
     [
         "conv2d.mlir",
+        "gather_like_ops.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
@@ -82,12 +84,12 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "argmax.mlir",
         "fp_to_subbyte.mlir",
         "fp4_f32_conversion.mlir",
+        "index.mlir",
         "large_linalg_matmul.mlir",
         "subbyte_to_fp.mlir",
-        "index.mlir",
-        "argmax.mlir",
     ],
 )
 
@@ -123,12 +125,14 @@ VULKAN_SRCS = enforce_glob(
     # keep sorted
     [
         "conv2d.mlir",
+        "gather_like_ops.mlir",
         "narrow_n_matmuls.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
+        "argmax.mlir",
         "fp_to_subbyte.mlir",
         "fp4_f32_conversion.mlir",
         "index.mlir",
@@ -137,7 +141,6 @@ VULKAN_SRCS = enforce_glob(
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
         "unpack.mlir",
-        "argmax.mlir",
     ],
 )
 
@@ -188,13 +191,14 @@ CUDA_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "argmax.mlir",
         "fp4_f32_conversion.mlir",
+        "gather_like_ops.mlir",
         "index.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
-        "argmax.mlir",
     ],
 )
 
@@ -217,6 +221,7 @@ ROCM_SRCS = enforce_glob(
     # keep sorted
     [
         "argmax.mlir",
+        "gather_like_ops.mlir",
         "pack_i8.mlir",
         "softmax.mlir",
         "unpack.mlir",

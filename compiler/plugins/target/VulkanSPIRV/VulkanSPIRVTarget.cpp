@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -209,7 +210,8 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
+    registry.insert<IREE::Codegen::IREECodegenDialect,
+                    IREE::Encoding::IREEEncodingDialect, spirv::SPIRVDialect,
                     gpu::GPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 

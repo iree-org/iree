@@ -262,7 +262,7 @@ module @elementwise_large_rank {
 
 module {
   func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32(
-        %3: tensor<1x8x8x4x16x4xf32>, %4: tensor<1x8x4x2x4x16x4xf32>, %5: tensor<1x1x8x4x2x4x16x4xf32>) -> tensor<1x1x8x4x2x4x16x4xf32> {
+        %3: tensor<1x8x8x4x16x4xf32>, %4: tensor<1x8x4x2x4x16x4xf32>, %5: tensor<1x1x4x8x2x4x16x4xf32>) -> tensor<1x1x4x8x2x4x16x4xf32> {
     %c0 = arith.constant 0 : index
     %c65536 = arith.constant 65536 : index
     %c131072 = arith.constant 131072 : index
@@ -277,9 +277,10 @@ module {
                           intrinsic =  MFMA_F32_16x16x4_F32,
                           intrinsics_m = 8, intrinsics_n = 2,
                           subgroups_n = 4,
-                          intrinsics_k = 4>}
-        : tensor<1x8x8x4x16x4xf32>, tensor<1x8x4x2x4x16x4xf32> into tensor<1x1x8x4x2x4x16x4xf32>
-    return %6 : tensor<1x1x8x4x2x4x16x4xf32>
+                          intrinsics_k = 4>,
+        semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
+        : tensor<1x8x8x4x16x4xf32>, tensor<1x8x4x2x4x16x4xf32> into tensor<1x1x4x8x2x4x16x4xf32>
+    return %6 : tensor<1x1x4x8x2x4x16x4xf32>
   }
 }
 
@@ -293,12 +294,12 @@ module {
 // -----
 
 module {
-func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x2x577xf32>, %rhs : tensor<12x577x577xf32>) -> tensor<12x2x577xf32> {
+func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x8x577xf32>, %rhs : tensor<12x577x577xf32>) -> tensor<12x8x577xf32> {
     %c0 = arith.constant 0.0 : f32
-    %empty = tensor.empty() : tensor<12x2x577xf32>
-    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<12x2x577xf32>) -> tensor<12x2x577xf32>
-    %mm = linalg.batch_matmul ins(%lhs, %rhs : tensor<12x2x577xf32>, tensor<12x577x577xf32>) outs(%fill : tensor<12x2x577xf32>) -> tensor<12x2x577xf32>
-    return %mm :  tensor<12x2x577xf32>
+    %empty = tensor.empty() : tensor<12x8x577xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<12x8x577xf32>) -> tensor<12x8x577xf32>
+    %mm = linalg.batch_matmul ins(%lhs, %rhs : tensor<12x8x577xf32>, tensor<12x577x577xf32>) outs(%fill : tensor<12x8x577xf32>) -> tensor<12x8x577xf32>
+    return %mm :  tensor<12x8x577xf32>
 }
 }
 

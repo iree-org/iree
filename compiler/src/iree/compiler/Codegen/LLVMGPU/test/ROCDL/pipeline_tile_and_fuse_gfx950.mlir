@@ -60,7 +60,8 @@ hal.executable public @main {
           kind = #iree_gpu.data_tiled_scaled_mma_layout<
             intrinsic = MFMA_SCALE_F32_16x16x128_B32,
             lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32,
-            intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4>}
+            intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4>,
+          semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
           : tensor<9x9x1x8x4x4x16x32xf4E2M1FN>, tensor<9x9x1x4x2x4x4x16x32xf4E2M1FN>, tensor<9x9x8x4x16x4xf8E8M0FNU>, tensor<9x9x4x2x4x16x4xf8E8M0FNU> into tensor<9x9x4x8x2x4x16x4xf32>
         iree_tensor_ext.dispatch.tensor.store %10, %4, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<9x9x4x8x2x4x16x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<9x9x4x8x2x4x16x4xf32>>
         return
@@ -126,22 +127,22 @@ hal.executable public @main {
 // CHECK-DAG:    %[[C_INIT01:.+]] = vector.extract %[[C_LOOP_INIT]][0, 0, 0, 0, 1, 0, 0] : vector<4xf32> from vector<1x1x1x8x2x1x1x4xf32>
 // CHECK-DAG:    %[[C_INIT70:.+]] = vector.extract %[[C_LOOP_INIT]][0, 0, 0, 7, 0, 0, 0] : vector<4xf32> from vector<1x1x1x8x2x1x1x4xf32>
 // CHECK-DAG:    %[[C_INIT71:.+]] = vector.extract %[[C_LOOP_INIT]][0, 0, 0, 7, 1, 0, 0] : vector<4xf32> from vector<1x1x1x8x2x1x1x4xf32>
-// CHECK-DAG:    %[[C_00_1:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %[[C_INIT00]]
-// CHECK-DAG:    %[[C_00_2:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR0]][1] * %[[A_EXTRACT01]]) * (%[[B_SCALE_VECTOR0]][1] * %[[B_EXTRACT01]]) + %[[C_00_1]]
-// CHECK-DAG:    %[[C_00_3:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR0]][2] * %[[A_EXTRACT02]]) * (%[[B_SCALE_VECTOR0]][2] * %[[B_EXTRACT02]]) + %[[C_00_2]]
-// CHECK-DAG:    %[[C_00_4:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR0]][3] * %[[A_EXTRACT03]]) * (%[[B_SCALE_VECTOR0]][3] * %[[B_EXTRACT03]]) + %[[C_00_3]]
-// CHECK-DAG:    %[[C_01_1:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %[[C_INIT01]]
-// CHECK-DAG:    %[[C_01_2:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR0]][1] * %[[A_EXTRACT01]]) * (%[[B_SCALE_VECTOR1]][1] * %[[B_EXTRACT11]]) + %[[C_01_1]]
-// CHECK-DAG:    %[[C_01_3:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR0]][2] * %[[A_EXTRACT02]]) * (%[[B_SCALE_VECTOR1]][2] * %[[B_EXTRACT12]]) + %[[C_01_2]]
-// CHECK-DAG:    %[[C_01_4:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR0]][3] * %[[A_EXTRACT03]]) * (%[[B_SCALE_VECTOR1]][3] * %[[B_EXTRACT13]]) + %[[C_01_3]]
-// CHECK-DAG:    %[[C_70_1:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %[[C_INIT70]]
-// CHECK-DAG:    %[[C_70_2:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR7]][1] * %[[A_EXTRACT71]]) * (%[[B_SCALE_VECTOR0]][1] * %[[B_EXTRACT01]]) + %[[C_70_1]]
-// CHECK-DAG:    %[[C_70_3:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR7]][2] * %[[A_EXTRACT72]]) * (%[[B_SCALE_VECTOR0]][2] * %[[B_EXTRACT02]]) + %[[C_70_2]]
-// CHECK-DAG:    %[[C_70_4:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR7]][3] * %[[A_EXTRACT73]]) * (%[[B_SCALE_VECTOR0]][3] * %[[B_EXTRACT03]]) + %[[C_70_3]]
-// CHECK-DAG:    %[[C_71_1:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %[[C_INIT71]]
-// CHECK-DAG:    %[[C_71_2:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR7]][1] * %[[A_EXTRACT71]]) * (%[[B_SCALE_VECTOR1]][1] * %[[B_EXTRACT11]]) + %[[C_71_1]]
-// CHECK-DAG:    %[[C_71_3:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR7]][2] * %[[A_EXTRACT72]]) * (%[[B_SCALE_VECTOR1]][2] * %[[B_EXTRACT12]]) + %[[C_71_2]]
-// CHECK-DAG:    %[[C_71_4:.+]] = amdgpu.scaled_mfma(%[[A_SCALE_VECTOR7]][3] * %[[A_EXTRACT73]]) * (%[[B_SCALE_VECTOR1]][3] * %[[B_EXTRACT13]]) + %[[C_71_3]]
+// CHECK-DAG:    %[[C_00_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %[[C_INIT00]]
+// CHECK-DAG:    %[[C_00_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][1] * %[[A_EXTRACT01]]) * (%[[B_SCALE_VECTOR0]][1] * %[[B_EXTRACT01]]) + %[[C_00_1]]
+// CHECK-DAG:    %[[C_00_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][2] * %[[A_EXTRACT02]]) * (%[[B_SCALE_VECTOR0]][2] * %[[B_EXTRACT02]]) + %[[C_00_2]]
+// CHECK-DAG:    %[[C_00_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][3] * %[[A_EXTRACT03]]) * (%[[B_SCALE_VECTOR0]][3] * %[[B_EXTRACT03]]) + %[[C_00_3]]
+// CHECK-DAG:    %[[C_01_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %[[C_INIT01]]
+// CHECK-DAG:    %[[C_01_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][1] * %[[A_EXTRACT01]]) * (%[[B_SCALE_VECTOR1]][1] * %[[B_EXTRACT11]]) + %[[C_01_1]]
+// CHECK-DAG:    %[[C_01_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][2] * %[[A_EXTRACT02]]) * (%[[B_SCALE_VECTOR1]][2] * %[[B_EXTRACT12]]) + %[[C_01_2]]
+// CHECK-DAG:    %[[C_01_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][3] * %[[A_EXTRACT03]]) * (%[[B_SCALE_VECTOR1]][3] * %[[B_EXTRACT13]]) + %[[C_01_3]]
+// CHECK-DAG:    %[[C_70_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %[[C_INIT70]]
+// CHECK-DAG:    %[[C_70_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][1] * %[[A_EXTRACT71]]) * (%[[B_SCALE_VECTOR0]][1] * %[[B_EXTRACT01]]) + %[[C_70_1]]
+// CHECK-DAG:    %[[C_70_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][2] * %[[A_EXTRACT72]]) * (%[[B_SCALE_VECTOR0]][2] * %[[B_EXTRACT02]]) + %[[C_70_2]]
+// CHECK-DAG:    %[[C_70_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][3] * %[[A_EXTRACT73]]) * (%[[B_SCALE_VECTOR0]][3] * %[[B_EXTRACT03]]) + %[[C_70_3]]
+// CHECK-DAG:    %[[C_71_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %[[C_INIT71]]
+// CHECK-DAG:    %[[C_71_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][1] * %[[A_EXTRACT71]]) * (%[[B_SCALE_VECTOR1]][1] * %[[B_EXTRACT11]]) + %[[C_71_1]]
+// CHECK-DAG:    %[[C_71_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][2] * %[[A_EXTRACT72]]) * (%[[B_SCALE_VECTOR1]][2] * %[[B_EXTRACT12]]) + %[[C_71_2]]
+// CHECK-DAG:    %[[C_71_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][3] * %[[A_EXTRACT73]]) * (%[[B_SCALE_VECTOR1]][3] * %[[B_EXTRACT13]]) + %[[C_71_3]]
 // CHECK:        vector.insert_strided_slice %[[C_00_4]], {{.*}}offsets = [0, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:        vector.insert_strided_slice %[[C_01_4]], {{.*}}offsets = [0, 1, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>
 // CHECK:        vector.insert_strided_slice %[[C_70_4]], {{.*}}offsets = [7, 0, 0, 0, 0]{{.*}} : vector<4xf32> into vector<8x2x1x1x4xf32>

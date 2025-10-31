@@ -177,7 +177,7 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:    outs(%{{.*}} : tensor<2x32x10x16384xf32>)
 // CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
 // CHECK-SAME:              lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]]
-// CHECK-SAME:              reduction = [0, 0, 1, 8192],
+// CHECK-SAME:              serial = [0, 0, 1, 8192],
 // CHECK-SAME:              subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
 // CHECK-SAME:              thread = [0, 0, 0, 8],
 
@@ -252,7 +252,7 @@ func.func @test_multiple_stores(%arg0: !iree_tensor_ext.dispatch.tensor<readonly
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //  CHECK-SAME:               lane_basis = {{\[}}[1, 64], [0, 1]],
-//  CHECK-SAME:               reduction = [0, 4096],
+//  CHECK-SAME:               serial = [0, 4096],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 16], [0, 1]],
 //  CHECK-SAME:               thread = [0, 4],
 //  CHECK-SAME:               workgroup = [1, 0]

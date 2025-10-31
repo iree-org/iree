@@ -25,8 +25,6 @@
 #include <cassert>
 
 #define DEBUG_TYPE "iree-encoding-attrs"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
@@ -522,6 +520,44 @@ IdentityResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
 
 Attribute IdentityResolverAttr::getLayout(RankedTensorType type) const {
   return Encoding::IdentityAttr::get(getContext());
+}
+
+Type IdentityResolverAttr::convertType(Type type) const {
+  using IREE::TensorExt::DispatchTensorType;
+  return TypeSwitch<Type, Type>(type)
+      .Case<RankedTensorType>([&](auto rankedTensorType) {
+        return rankedTensorType.dropEncoding();
+      })
+      .Case<DispatchTensorType>([&](auto dispatchTensorType) {
+        auto boundType =
+            dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+        if (!boundType || !boundType.getEncoding()) {
+          return dispatchTensorType;
+        }
+        Type convertedBoundType = this->convertType(boundType);
+        return DispatchTensorType::get(dispatchTensorType.getAccess(),
+                                       convertedBoundType);
+      })
+      .Default([&](auto concreteType) { return concreteType; });
+}
+
+LogicalResult IdentityResolverAttr::getOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, IREE::TensorExt::DispatchTensorType type,
+    ValueRange dynamicDims, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<OpFoldResult> strides,
+    SmallVectorImpl<OpFoldResult> &newOffsets,
+    SmallVectorImpl<OpFoldResult> &newSizes,
+    SmallVectorImpl<OpFoldResult> &newStrides) const {
+  newSizes.assign(sizes.begin(), sizes.end());
+  newOffsets.assign(offsets.begin(), offsets.end());
+  newStrides.assign(strides.begin(), strides.end());
+  return success();
+}
+
+Operation *IdentityResolverAttr::lowerOp(OpBuilder &b, Operation *op,
+                                         TypeRange convertedResTypes,
+                                         ValueRange convertedOperands) const {
+  return clone(b, op, convertedResTypes, convertedOperands);
 }
 
 //===---------------------------------------------------------------------===//

@@ -9,7 +9,7 @@
 #scale_n = affine_map<(M, N, Ko, Kb) -> (N, Ko)>
 #out_map = affine_map<(M, N, Ko, Kb) -> (M, N)>
 func.func @scaled_matmul(
-    %A: tensor<1024x512x32xf4E2M1FN>, %B: tensor<1024x512x32xf4E2M1FN>, %A_scales: tensor<1024x512xf8E8M0FNU>, %B_scales: tensor<1024x512xf8E8M0FNU>, %C: tensor<1024x1024xf32>) -> tensor<1024x1024xf32> {
+    %A: tensor<1024x512x32xf4E2M1FN>, %B: tensor<1024x512x32xf4E2M1FN>, %B_scales: tensor<1024x512xf8E8M0FNU>, %A_scales: tensor<1024x512xf8E8M0FNU>, %C: tensor<1024x1024xf32>) -> tensor<1024x1024xf32> {
   %0 = linalg.generic {
     indexing_maps = [#lhs_map, #rhs_map, #scale_m, #scale_n, #out_map],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]
@@ -31,9 +31,9 @@ func.func @scaled_matmul(
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //   CHECK-NOT:     promotion_types = [{{.*}}#iree_gpu.use_global_load_dma{{.*}}
-//  CHECK-SAME:     reduction = [0, 0, 32, 1]
-//  CHECK-SAME:     subgroup = [1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [32, 32, 0, 0]
+//  CHECK-SAME:     reduction = [0, 0, 4, 1]
+//  CHECK-SAME:     subgroup = [2, 4, 0, 0]
+//  CHECK-SAME:     workgroup = [64, 128, 0, 0]
 
 // -----
 
@@ -66,9 +66,9 @@ func.func @scaled_matmul_with_batch(
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //   CHECK-NOT:     promotion_types = [{{.*}}#iree_gpu.use_global_load_dma{{.*}}
-//  CHECK-SAME:     reduction = [0, 0, 0, 32, 1]
-//  CHECK-SAME:     subgroup = [0, 1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 32, 32, 0, 0]
+//  CHECK-SAME:     reduction = [0, 0, 0, 4, 1]
+//  CHECK-SAME:     subgroup = [0, 2, 4, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 64, 128, 0, 0]
 
 // -----
 
@@ -146,7 +146,8 @@ module {
                        affine_map<(m, n, k, kb) -> (n, k)>,
                        affine_map<(m, n, k, kb) -> (m, n)>],
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
-      kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, subgroups_m = 2, subgroups_n = 2, intrinsics_k = 4>}
+      kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, subgroups_m = 2, subgroups_n = 2, intrinsics_k = 4>,
+      semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
       : tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x2x4x16x4xf8E8M0FNU>, tensor<1x1x2x4x16x4xf8E8M0FNU> into tensor<1x1x2x2x4x16x4xf32>
       return %0 : tensor<1x1x2x2x4x16x4xf32>
   }

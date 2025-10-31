@@ -314,10 +314,8 @@ pdl.pattern @annotate_matmul_like_f16_medium_expanded : benefit(1) {
   // M, N >= 1024, K >= 256
   %c1024 = pdl.attribute = 1024
 
-  // TODO: Kernel specialization is needed to apply this strategy selectively at
-  // runtime. Additionally model exports don't specify lower bounds so it is
-  // impossible to use this strategy with this check.
-  // pdl.apply_native_constraint "dimIsBound"(%lhs, %c0, %c4, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
+  // From experimental results, see #22393, we should start using this ukernel if B * M >= 1024.
+  pdl.apply_native_constraint "dimsMultipliedIsBound"(%lhs, %c0, %c1, %c1024, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute, !pdl.attribute)
 
   pdl.apply_native_constraint "dimIsBound"(%rhs, %c0, %c1024, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
   pdl.apply_native_constraint "dimIsBound"(%lhs, %c2, %c256, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
@@ -720,7 +718,7 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_medium : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
   pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
-  %lhs_cast_type = pdl.type : tensor<?x?x8x4x4x4x2x8xf8E4M3FNUZ>
+  %lhs_cast_type = pdl.type : tensor<?x?x8x4x16x2x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
   %rhs_cast_type = pdl.type : tensor<?x?x8x2x4x16x2x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
@@ -777,7 +775,7 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_large : benefit(2) {
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
   pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
-  %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x4x4x8xf8E4M3FNUZ>
+  %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x16x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
   %rhs_cast_type = pdl.type : tensor<?x?x4x4x4x16x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
@@ -834,7 +832,7 @@ pdl.pattern @annotate_inner_tiled_f16_large : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
   pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
-  %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x4x4x4xf16>
+  %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x16x4xf16>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
   %rhs_cast_type = pdl.type : tensor<?x?x4x4x4x16x4xf16>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)

@@ -1161,7 +1161,7 @@ static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
       auto terminatorOp =
           cast<RegionBranchTerminatorOpInterface>(block.getTerminator());
       value = terminatorOp.getSuccessorOperands(
-          RegionBranchPoint::parent())[resultIndex];
+          RegionSuccessor(definingOp, definingOp->getResults()))[resultIndex];
     } else if (auto tiedOp =
                    dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
       // If the producer is tied then try to get the operand.
@@ -1971,7 +1971,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
   scope.replaceRootOp(newExecuteOp);
 
   // Drop the operands on the yield op now that all are aliased.
-  OpBuilder(yieldOp).create<IREE::Stream::YieldOp>(yieldOp.getLoc());
+  OpBuilder yieldOpBuilder(yieldOp);
+  IREE::Stream::YieldOp::create(yieldOpBuilder, yieldOp.getLoc());
   yieldOp.erase();
 
   // Apply mappings from the parent execute op into all waves; as we allocate
@@ -2062,17 +2063,19 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
 }
 
 static LogicalResult convertAsyncLoadOp(IREE::Stream::AsyncLoadOp asyncOp) {
-  auto newOp = OpBuilder(asyncOp).create<IREE::Stream::ResourceLoadOp>(
-      asyncOp.getLoc(), asyncOp.getResult().getType(), asyncOp.getSource(),
-      asyncOp.getSourceSize(), asyncOp.getSourceOffset());
+  OpBuilder builder(asyncOp);
+  auto newOp = IREE::Stream::ResourceLoadOp::create(
+      builder, asyncOp.getLoc(), asyncOp.getResult().getType(),
+      asyncOp.getSource(), asyncOp.getSourceSize(), asyncOp.getSourceOffset());
   asyncOp.replaceAllUsesWith(newOp.getResult());
   asyncOp.erase();
   return success();
 }
 
 static LogicalResult convertAsyncStoreOp(IREE::Stream::AsyncStoreOp asyncOp) {
-  auto newOp = OpBuilder(asyncOp).create<IREE::Stream::ResourceStoreOp>(
-      asyncOp.getLoc(), asyncOp.getTarget(), asyncOp.getTargetSize(),
+  OpBuilder builder(asyncOp);
+  auto newOp = IREE::Stream::ResourceStoreOp::create(
+      builder, asyncOp.getLoc(), asyncOp.getTarget(), asyncOp.getTargetSize(),
       asyncOp.getTargetOffset(), asyncOp.getValue());
   asyncOp.replaceAllUsesWith(newOp.getTarget());
   asyncOp.erase();

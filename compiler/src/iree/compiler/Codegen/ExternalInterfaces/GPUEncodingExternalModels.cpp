@@ -33,11 +33,9 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
@@ -172,10 +170,10 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     // to the total LHS and RHS sizes, because we use these sizes to select the
     // unrolling factors for M, N, and K, which affect both the input and the
     // scale operands.
-    intrinsicSizeBitsLHS =
-        sizeInBits(vectorTypes[0]) + sizeInBits(vectorTypes[1]);
-    intrinsicSizeBitsRHS =
-        sizeInBits(vectorTypes[2]) + sizeInBits(vectorTypes[3]);
+    intrinsicSizeBitsLHS = sizeInBits(vectorTypes[kScaledMMAOperandLhs]) +
+                           sizeInBits(vectorTypes[kScaledMMAOperandLhsScale]);
+    intrinsicSizeBitsRHS = sizeInBits(vectorTypes[kScaledMMAOperandRhs]) +
+                           sizeInBits(vectorTypes[kScaledMMAOperandRhsScale]);
     intrinsicSizeBitsACC = sizeInBits(vectorTypes[4]);
     intrinsicMSize = getMSize(intrinsicScaledMma.getIntrinsic());
     intrinsicNSize = getNSize(intrinsicScaledMma.getIntrinsic());
@@ -335,10 +333,6 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
   if (!linalgOp.hasPureTensorSemantics()) {
     return nullptr;
   }
-  if (!linalg::isaContractionOpInterface(linalgOp) &&
-      !IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
-    return nullptr;
-  }
 
   SmallVector<Value> inputs = linalgOp.getDpsInputs();
   SmallVector<Value> outputs = linalgOp.getDpsInits();
@@ -418,6 +412,8 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
   Location loc = linalgOp.getLoc();
   SmallVector<utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
+  auto semantics = InnerTiledSemanticsAttr::get(
+      builder.getContext(), /*distributed=*/false, /*opaque=*/false);
   switch (resultEncoding.getOpType().getValue()) {
   case IREE::Encoding::EncodingOpType::matmul: {
     indexingMaps.push_back(AffineMap::get(numDims, 0, lhsExprs, ctx));
@@ -426,7 +422,7 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
     return Codegen::InnerTiledOp::create(
         builder, loc, operands.take_front(inputs.size()),
         operands.take_back(outputs.size()), indexingMaps, iteratorTypes,
-        cast<IREE::GPU::DataTiledMMAAttr>(dataTiledAttr));
+        cast<IREE::GPU::DataTiledMMAAttr>(dataTiledAttr), semantics);
   }
   case IREE::Encoding::EncodingOpType::scaled_matmul: {
     SmallVector<AffineExpr> lhsScalesExprs, rhsScalesExprs;
@@ -447,7 +443,7 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
     return Codegen::InnerTiledOp::create(
         builder, loc, operands.take_front(inputs.size()),
         operands.take_back(outputs.size()), indexingMaps, iteratorTypes,
-        cast<IREE::GPU::DataTiledScaledMMAAttr>(dataTiledAttr));
+        cast<IREE::GPU::DataTiledScaledMMAAttr>(dataTiledAttr), semantics);
   }
   default: {
     assert(false && "unexpected encoding op type");
@@ -517,8 +513,21 @@ struct GPUEncodingResolverMaterializerAttr
     if (!linalgOp) {
       return nullptr;
     }
-    return lowerContractionOrScaledContractionOpToInnerTiledOp(
-        b, linalgOp, convertedOperands, resolverAttr);
+    if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
+      return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
+                                            convertedOperands);
+    }
+    if (linalg::isaContractionOpInterface(linalgOp) ||
+        IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
+      return lowerContractionOrScaledContractionOpToInnerTiledOp(
+          b, linalgOp, convertedOperands, resolverAttr);
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      return lowerGenericOpWithResolvedLayouts(
+          b, genericOp, convertedResTypes, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(attr));
+    }
+    return nullptr;
   }
 };
 
@@ -571,9 +580,100 @@ struct GPULayoutResolverAttr final
   }
 };
 
+// Returns the pad encoding layout, or nullptr if this is not the only layout or
+// if there's no encoding at all.
+static IREE::Encoding::PaddingAttr
+getPadLayout(IREE::Encoding::LayoutResolverAttr layoutAttr,
+             RankedTensorType type) {
+  if (!type.getEncoding()) {
+    return nullptr;
+  }
+  auto encoding =
+      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
+  if (encoding) {
+    ArrayAttr layouts = encoding.getLayouts();
+    if (layouts.size() != 1) {
+      return nullptr;
+    }
+    return dyn_cast<IREE::Encoding::PaddingAttr>(*layouts.begin());
+  }
+  Attribute resolvedEncoding = layoutAttr.getLayout(type);
+  LDBG() << "Unresolved type: " << type;
+  LDBG() << "layoutAttr: " << layoutAttr;
+  LDBG() << "Resolved into: " << resolvedEncoding;
+  return dyn_cast<IREE::Encoding::PaddingAttr>(resolvedEncoding);
+}
+
+// Returns a padded tensor type (without encoding) for tensor types with the pad
+// encoding layout, or the same type for all other tensors.
+static RankedTensorType
+getPaddedType(IREE::Encoding::LayoutResolverAttr layoutAttr,
+              RankedTensorType type) {
+  IREE::Encoding::PaddingAttr layout = getPadLayout(layoutAttr, type);
+  if (!layout) {
+    return nullptr;
+  }
+  if (layout.isIdentityLayout()) {
+    return type.dropEncoding();
+  }
+
+  ArrayRef<int64_t> padding = layout.getPadding().asArrayRef();
+  auto newShape = llvm::to_vector_of<int64_t>(type.getShape());
+  for (auto [newDim, padValue] : llvm::zip_equal(newShape, padding)) {
+    assert((padValue == 0 || ShapedType::isStatic(newDim)) &&
+           "Padding dynamic dims not supported");
+    newDim += padValue;
+  }
+
+  return RankedTensorType::get(newShape, type.getElementType());
+}
+
 struct GPUPadEncodingLayoutMaterializerAttr final
     : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
           GPUPadEncodingLayoutMaterializerAttr, GPUPaddingResolverAttr> {
+
+  Type convertType(Attribute attr, Type type) const {
+    auto layoutAttr = cast<IREE::Encoding::LayoutResolverAttr>(attr);
+    return TypeSwitch<Type, Type>(type)
+        .Case([](RankedTensorType type) {
+          // By the definition, the final converted type is the same tensor type
+          // without encodings.
+          return type.dropEncoding();
+        })
+        .Case([&](IREE::TensorExt::DispatchTensorType dispatchTensorType) {
+          auto type =
+              dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+          if (!type || !type.getEncoding()) {
+            return dispatchTensorType;
+          }
+          // The incoming bindings have the padded type, if `padding` is
+          // present.
+          if (getPadLayout(layoutAttr, type)) {
+            type = getPaddedType(layoutAttr, type);
+          }
+          return IREE::TensorExt::DispatchTensorType::get(
+              dispatchTensorType.getAccess(), type);
+        })
+        .Default([](Type type) { return type; });
+  }
+
+  LogicalResult getOffsetsSizesStrides(
+      Attribute attr, OpBuilder &builder, Location loc,
+      IREE::TensorExt::DispatchTensorType type, ValueRange dynamicDims,
+      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+      ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
+      SmallVectorImpl<OpFoldResult> &newSizes,
+      SmallVectorImpl<OpFoldResult> &newStrides) const {
+    auto boundType = dyn_cast<RankedTensorType>(type.getBoundType());
+    if (!boundType || !boundType.getEncoding()) {
+      return failure();
+    }
+    newSizes.assign(sizes.begin(), sizes.end());
+    newOffsets.assign(offsets.begin(), offsets.end());
+    newStrides.assign(strides.begin(), strides.end());
+    return success();
+  }
+
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {

@@ -25,7 +25,7 @@ func.func @static_batch_matvec() {
 
 
 // CHECK:     LLVMGPUVectorDistribute
-// CDNA3:     LLVMGPUTileAndFuse
+// CDNA3:     LLVMGPUVectorDistribute
 
 // -----
 

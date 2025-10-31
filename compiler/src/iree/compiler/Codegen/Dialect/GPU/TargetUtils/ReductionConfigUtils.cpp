@@ -166,12 +166,12 @@ getVectorDistributeReductionConfig(
   // Set the configuration for the operation with no reduction dims.
   // The workgroup tile sizes are set by the reduction operation.
   if (reductionDims.empty()) {
-    SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 1);
+    SmallVector<int64_t> serialTileSizes(op.getNumLoops(), 1);
 
-    // For the shared wgp dimension, set the reduction tile sizes to be zero.
+    // For the shared wgp dimension, set the serial tile sizes to be zero.
     // Copy the workgroup tiles sizes from the sharedWgpDims.
     for (const auto &[dim, tile_size] : sharedWgpTiles) {
-      reductionTileSizes[dim] = 0;
+      serialTileSizes[dim] = 0;
       workgroupTileSizes[dim] = tile_size;
     }
 
@@ -214,7 +214,7 @@ getVectorDistributeReductionConfig(
       subgroupBasis = 1;
     }
 
-    reductionTileSizes[parallelDims.back()] = lastDimReductionTileSize;
+    serialTileSizes[parallelDims.back()] = lastDimReductionTileSize;
     threadTileSizes[parallelDims.back()] = threadLoads;
     threadCounts[parallelDims.back()] = threadBasis;
     subGroupCounts[parallelDims.back()] = subgroupBasis;
@@ -227,7 +227,7 @@ getVectorDistributeReductionConfig(
 
     NamedAttribute configAttrs[] = {
         NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
-        NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
+        NamedAttribute("serial", b.getI64ArrayAttr(serialTileSizes)),
         NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
         NamedAttribute("lane_basis", laneBasisAttr),
         NamedAttribute("subgroup_basis", subgroupBasisAttr)};
@@ -737,6 +737,9 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
       context, CodeGenPipeline::LLVMGPUVectorDistribute, SymbolRefAttr(),
       {workgroupSize, 1, 1}, subgroupSize, pipelineConfig);
 
+  if (clSetTunerAttr) {
+    setRootOpInfo(op);
+  }
   return setTranslationInfo(entryPoint, translationInfo);
 }
 

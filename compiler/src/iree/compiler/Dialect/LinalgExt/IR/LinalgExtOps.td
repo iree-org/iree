@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
+include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
@@ -21,14 +22,9 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 // Base class.
 //===----------------------------------------------------------------------===//
 
-class IREELinalgExt_PureOp<string mnemonic, list<Trait> traits = []> :
-    Op<IREELinalgExt_Dialect, mnemonic, traits> {
-}
-
 class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
     IREELinalgExt_PureOp<mnemonic, !listconcat(traits,
-        [AttrSizedOperandSegments,
-         DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
          DestinationStyleOpInterface, LinalgExtInterface,
          SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">
   ])> {
@@ -36,50 +32,6 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
   let hasCustomAssemblyFormat = 1;
   code extraLinalgExtOpClassDeclaration = "";
 }
-
-//===----------------------------------------------------------------------===//
-// Utility ops
-//===----------------------------------------------------------------------===//
-
-def OpGroupUtilityOps : OpDocGroup {
-  let summary = "Utility ops";
-  let description = "";
-}
-
-let opDocGroup = OpGroupUtilityOps in {
-
-def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
-    Arguments<(ins ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dim)>,
-    Results<(outs Index:$result)> {
-  let summary = [{LinalgExt index operation.}];
-  let description = [{
-    This operation is a mirror of `linalg.index` operation and has the same
-    semantics, except that `linalg.index` enforces that the parent op is a
-    `LinalgOp`, and the `iree_linalg_ext.index` operation enforces that the
-    parent op is a `IREE::LinalgExt::CustomOp`.
-  }];
-
-  let assemblyFormat = [{ $dim attr-dict `:` type($result) }];
-  let hasVerifier = 1;
-}
-
-def IREELinalgExt_YieldOp : IREELinalgExt_PureOp<"yield", [Pure, ReturnLike, Terminator]> {
-  let summary = [{LinalgExt yield op.}];
-  let description = [{
-    `iree_linalg_ext.yield` is a special terminator operation for blocks inside
-    regions in `iree_linalg_ext` ops.
-  }];
-
-  let arguments = (ins Variadic<AnyType>:$operands);
-
-  let builders = [
-    OpBuilder<(ins), [{ /* nothing to do */ }]>,
-  ];
-
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
-}
-
-} // OpGroupUtilityOps
 
 //===----------------------------------------------------------------------===//
 // Non-structured ops
@@ -93,7 +45,8 @@ def OpGroupNonStructuredOps : OpDocGroup {
 let opDocGroup = OpGroupNonStructuredOps in {
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
@@ -146,8 +99,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
       https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update
   }];
   let arguments = (ins
-      Variadic<AnyRankedTensorOrMemRefType>:$inputs,
-      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      Variadic<AnyRankedTensorOrMemRef>:$inputs,
+      Variadic<AnyRankedTensorOrMemRef>:$outputs,
       DenseI64ArrayAttr:$dimension_map,
       DefaultValuedAttr<BoolAttr, "true">:$unique_indices
   );
@@ -224,7 +177,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 }
 
 def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
@@ -252,8 +206,8 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     semantics.
   }];
   let arguments = (ins
-      Variadic<AnyRankedTensorOrMemRefType>:$inputs,
-      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      Variadic<AnyRankedTensorOrMemRef>:$inputs,
+      Variadic<AnyRankedTensorOrMemRef>:$outputs,
       DenseI64ArrayAttr:$dimension_map
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -318,10 +272,8 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
   let hasCanonicalizer = 1;
 }
 
-def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
-    [LinalgExtInterface, DestinationStyleOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     DeclareOpInterfaceMethods<TilingInterface,
+def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
+    [DeclareOpInterfaceMethods<TilingInterface,
         ["getIterationDomain",
          "getLoopIteratorTypes",
          "getResultTilePosition",
@@ -348,7 +300,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
   }];
   let arguments = (ins
       AnyShaped:$input,
-      AnyRankedTensorOrMemRefType:$output
+      AnyRankedTensorOrMemRef:$output
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$transformation_region);
@@ -422,7 +374,8 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
 }
 
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",
          "getIterationDomain",
@@ -475,6 +428,7 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 }
 
 def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
+  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
@@ -545,7 +499,8 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 }
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
@@ -601,6 +556,7 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 }
 
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
+  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
@@ -678,6 +634,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 }
 
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
+  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgFusionInterface,
    ["getIndexingMapsForResults", "getIndexingMapsForOperands",
@@ -807,10 +764,8 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
 // Attention
 //===----------------------------------------------------------------------===//
 
-def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     DestinationStyleOpInterface, LinalgExtInterface,
-     DeclareOpInterfaceMethods<LinalgFusionInterface,
+def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
+    [DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
@@ -919,11 +874,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 // OnlineAttention
 //===----------------------------------------------------------------------===//
 
-def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     DestinationStyleOpInterface,
-     IndexingMapOpInterface,
-     LinalgExtInterface,
+def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
+    [IndexingMapOpInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -1055,7 +1007,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
 // ExpReduction
 //===----------------------------------------------------------------------===//
 
-def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction"> {
+def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction",
+    [AttrSizedOperandSegments]> {
   let summary = [{
     A linalg.generic extension with support for exponential reduction.
   }];
@@ -1210,7 +1163,8 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction"> {
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
@@ -1405,6 +1359,7 @@ def OpGroupDataTilingOps : OpDocGroup {
 let opDocGroup = OpGroupDataTilingOps in {
 
 def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
+  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
@@ -1568,6 +1523,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 }
 
 def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
+  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
@@ -1702,7 +1658,8 @@ def OpGroupWinogradOps : OpDocGroup {
 let opDocGroup = OpGroupWinogradOps in {
 
 def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_transform",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -1807,7 +1764,8 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
 }
 
 def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_transform",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -1917,7 +1875,8 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
 }
 
 def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_transform",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [AttrSizedOperandSegments,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -2032,6 +1991,7 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
 //===---------------------------------------------------------------------===//
 
 def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
+  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<AggregatedOpInterface, [
     "decomposeOperation"]>,
   DeclareOpInterfaceMethods<LinalgFusionInterface>,

@@ -329,6 +329,10 @@ LogicalResult applyTileAndFuseToEachRoot(
       tilingOptions.setMapping(llvm::to_vector(llvm::reverse(mapping)));
     }
 
+    if (tilingLevel == IREE::GPU::TilingLevel::Serial) {
+      tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+    }
+
     if (tilingLevel == IREE::GPU::TilingLevel::PartialReduction) {
       tilingOptions.setReductionTilingStrategy(
           ReductionTilingStrategy::PartialReductionOuterReduction);

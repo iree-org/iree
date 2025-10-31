@@ -32,8 +32,9 @@ struct ResolveExportOrdinalsPass
         auto exportOp =
             symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
                 ordinalOp, ordinalOp.getEntryPointAttr());
-        Value value = OpBuilder(ordinalOp).create<arith::ConstantIndexOp>(
-            ordinalOp.getLoc(), exportOp.getOrdinalAttr().getInt());
+        OpBuilder builder(ordinalOp);
+        Value value = arith::ConstantIndexOp::create(
+            builder, ordinalOp.getLoc(), exportOp.getOrdinalAttr().getInt());
         ordinalOp.replaceAllUsesWith(value);
         ordinalOp.erase();
       });

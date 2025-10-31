@@ -63,15 +63,13 @@ static LogicalResult verifyMultiTilingExpertPassPipelineConfig(
     }
   }
 
-  for (unsigned i = 0, e = IREE::CPU::TilingLevel::MaxNumTileLevels; i < e;
-       ++i) {
+  for (auto i : IREE::CPU::getTilingLevelsAsInts()) {
     if (!loweringConfig.hasTilingLevel(i)) {
       continue;
     }
-
-    auto level = static_cast<IREE::CPU::TilingLevel>(i);
     auto tilingLevelAttr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        loweringConfig.getTilingLevelAttr(level));
+        loweringConfig.getTilingLevelAttr(i));
+    auto level = static_cast<IREE::CPU::TilingLevel>(i);
     switch (level) {
     case IREE::CPU::TilingLevel::DistributionTiles:
     case IREE::CPU::TilingLevel::CacheParallelTiles:
@@ -137,17 +135,18 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
   };
 
   SmallVector<IREE::CPU::TilingLevel> requiredLevels = {
-      IREE::CPU::DistributionTiles, IREE::CPU::VectorCommonParallelTiles,
-      IREE::CPU::VectorReductionTiles};
+      IREE::CPU::TilingLevel::DistributionTiles,
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+      IREE::CPU::TilingLevel::VectorReductionTiles};
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
   SmallVector<int64_t> shapeAfterTiling = linalgOp.getStaticLoopRanges();
   for (auto level : requiredLevels) {
-    if (!loweringConfig.hasTilingLevel(level)) {
+    if (!loweringConfig.hasTilingLevel(static_cast<unsigned>(level))) {
       return op->emitOpError("expected ")
              << IREE::CPU::getTilingLevelName(level) << " is set";
     }
     auto tilingLevelAttr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        loweringConfig.getTilingLevelAttr(level));
+        loweringConfig.getTilingLevelAttr(static_cast<unsigned>(level)));
     for (size_t i = 0, e = tilingLevelAttr.getSizes().size(); i < e; ++i) {
       auto [size, scalableFlag] = getTileSizeAtIndex(
           tilingLevelAttr.getSizes(), tilingLevelAttr.getScalableFlags(), i);
