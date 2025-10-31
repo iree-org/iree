@@ -181,11 +181,11 @@ static LogicalResult materializeFuncOpEncodings(
         patterns, [](OpOperand *opOperand) {
           Operation *producer = opOperand->get().getDefiningOp();
           Operation *consumer = opOperand->getOwner();
-          // If we have a pack/unpack consumer and a producer that has
-          // multiple uses, this _probably_ means the producer won't get
-          // dce'd. If that is the case, by folding the consumer pack/unpack,
-          // we break the producer consumer chain between them and inhibit
-          // fusion later in the pipeline.
+          // If we have a pack/unpack consumer and a producer that has multiple
+          // uses, this _probably_ means the producer won't get dce'd. If that
+          // is the case, by folding the consumer pack/unpack, we break the
+          // producer consumer chain between them and inhibit fusion later in
+          // the pipeline.
           if (isa<linalg::PackOp, linalg::UnPackOp>(consumer) &&
               isa_and_nonnull<TilingInterface>(producer) &&
               !producer->hasOneUse())
