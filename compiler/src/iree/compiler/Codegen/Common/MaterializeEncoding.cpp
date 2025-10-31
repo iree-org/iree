@@ -38,8 +38,6 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_MATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-using namespace IREE::Encoding;
-
 namespace {
 
 static void
@@ -61,10 +59,11 @@ updateFuncSignature(FunctionOpInterface funcOp,
   }
 }
 
-static LogicalResult materializeFuncOpEncodings(
-    FunctionOpInterface funcOp, IREE::HAL::ExecutableTargetAttr targetAttr,
-    ::mlir::iree_compiler::detail::TestingResolverKind resolverSource =
-        ::mlir::iree_compiler::detail::TestingResolverKind::kNone) {
+static LogicalResult
+materializeFuncOpEncodings(FunctionOpInterface funcOp,
+                           IREE::HAL::ExecutableTargetAttr targetAttr,
+                           detail::TestingResolverKind resolverSource =
+                               detail::TestingResolverKind::kNone) {
   MLIRContext *ctx = funcOp.getContext();
   {
     RewritePatternSet patterns(ctx);
@@ -78,15 +77,14 @@ static LogicalResult materializeFuncOpEncodings(
       if (targetAttr) {
         addConfigGPUTarget(ctx, targetAttr, configItems);
         switch (resolverSource) {
-        case ::mlir::iree_compiler::detail::TestingResolverKind::
-            kGPUDataTiling: {
+        case detail::TestingResolverKind::kGPUDataTiling: {
           LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
                     "attribute. (kGPUDataTiling)";
           return cast<IREE::Encoding::LayoutMaterializerAttr>(
               IREE::GPU::GPUEncodingResolverAttr::get(
                   ctx, DictionaryAttr::get(ctx, configItems)));
         }
-        case ::mlir::iree_compiler::detail::TestingResolverKind::kGPUPadding: {
+        case detail::TestingResolverKind::kGPUPadding: {
           LDBG() << "Select GPUPaddingResolverAttr attribute as the layout "
                     "attribute. (kGPUPadding)";
           std::optional<IREE::GPU::L1CacheInfo> cache =
@@ -95,7 +93,7 @@ static LogicalResult materializeFuncOpEncodings(
               IREE::GPU::GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes,
                                                      cache->cacheSets));
         }
-        case ::mlir::iree_compiler::detail::TestingResolverKind::kNone:
+        case detail::TestingResolverKind::kNone:
           break;
         }
       }

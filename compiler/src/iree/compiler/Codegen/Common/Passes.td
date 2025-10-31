@@ -616,15 +616,15 @@ def MaterializeDeviceEncodingPass :
     InterfacePass<"iree-codegen-materialize-device-encoding", "mlir::FunctionOpInterface"> {
   let summary = "Materialize the encoding for tensor as specified by the backend.";
   let options = [
-    Option<"testGPUEncodingResolver", "test-gpu-encoding-resolver", "::mlir::iree_compiler::detail::TestingResolverKind",
+    Option<"testGPUEncodingResolver", "test-gpu-encoding-resolver", "detail::TestingResolverKind",
            /*default=*/"detail::TestingResolverKind::kNone",
            "Flag used for lit-testing GPU target only. Not for general usage",
            [{llvm::cl::values(
-             clEnumValN(::mlir::iree_compiler::detail::TestingResolverKind::kGPUDataTiling, "gpu_data_tiling",
+             clEnumValN(detail::TestingResolverKind::kGPUDataTiling, "gpu_data_tiling",
                         "Use iree_gpu.gpu_encoding_resolver<>."),
-             clEnumValN(::mlir::iree_compiler::detail::TestingResolverKind::kGPUPadding, "gpu_padding",
+             clEnumValN(detail::TestingResolverKind::kGPUPadding, "gpu_padding",
                         "Use iree_gpu.gpu_padding_resolver<>."),
-             clEnumValN(::mlir::iree_compiler::detail::TestingResolverKind::kNone, "none",
+             clEnumValN(detail::TestingResolverKind::kNone, "none",
                         "Ignore testing resolvers.")
       )}]>,
 
