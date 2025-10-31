@@ -430,17 +430,20 @@ struct IREELinalgExtSortTypePropagation
 };
 
 /// Pattern to legalize `linalg.reduce` operations.
-struct ReduceOpTypePropagation
-    : public TypePropagationPattern<linalg::ReduceOp> {
-  using TypePropagationPattern<linalg::ReduceOp>::TypePropagationPattern;
+struct ReduceOpTypePropagation final
+    : TypePropagationPattern<linalg::ReduceOp> {
+  using TypePropagationPattern::TypePropagationPattern;
 
   LogicalResult
   matchAndRewrite(linalg::ReduceOp reduceOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     bool needsConversion = false;
-    for (auto &operand : reduceOp->getOpOperands()) {
+    for (OpOperand &operand : reduceOp->getOpOperands()) {
       Type operandType = operand.get().getType();
       Type legalizedType = this->getTypeConverter()->convertType(operandType);
+      if (!legalizedType) {
+        return reduceOp.emitOpError("failed to get legalized type for operand");
+      }
       if (operandType != legalizedType) {
         needsConversion = true;
         break;
@@ -453,9 +456,12 @@ struct ReduceOpTypePropagation
     }
 
     SmallVector<Type> resultTypes;
-    for (auto init : reduceOp.getInits()) {
+    for (Value init : reduceOp.getInits()) {
       Type legalizedType =
           this->getTypeConverter()->convertType(init.getType());
+      if (!legalizedType) {
+        return reduceOp.emitOpError("failed to get legalized type for init");
+      }
       resultTypes.push_back(legalizedType);
     }
 
@@ -494,7 +500,7 @@ struct ReduceOpTypePropagation
       std::optional<Type> legalizedYieldType =
           legalizeStorageElementType(yieldType);
 
-      Value valueToYield = yieldValue; // Default to original value
+      Value valueToYield = yieldValue; // Default to original value.
       if (legalizedYieldType && legalizedYieldType.value() != yieldType) {
         valueToYield =
             convertElementType(rewriter, yieldOp->getLoc(),
