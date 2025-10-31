@@ -67,6 +67,26 @@ getStaticOrReifiedInputDims(OpBuilder &builder, Location loc, Value input,
   return success();
 }
 
+static int64_t getRank(OpOperand &opOperand) {
+  Type type = opOperand.get().getType();
+  if (type.isIntOrIndexOrFloat()) {
+    return 0;
+  }
+  return cast<RankedTensorType>(type).getRank();
+}
+
+/// Method similar to `LinalgOp`s that concatenates shapes of all operands.
+static SmallVector<OpFoldResult>
+createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
+  SmallVector<OpFoldResult> res;
+  for (OpOperand &opOperand : op->getOpOperands()) {
+    for (int64_t i = 0, e = getRank(opOperand); i < e; ++i) {
+      res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), i));
+    }
+  }
+  return res;
+}
+
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
@@ -1900,18 +1920,6 @@ SmallVector<utils::IteratorType> ExpReductionOp::getLoopIteratorTypes() {
     return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
   });
 }
-
-static SmallVector<OpFoldResult>
-createFlatListOfOperandDims(ExpReductionOp op, OpBuilder &b, Location loc) {
-  SmallVector<OpFoldResult> res;
-  for (OpOperand &opOperand : op->getOpOperands()) {
-    for (int64_t i = 0, e = op.getRank(&opOperand); i < e; ++i) {
-      res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), i));
-    }
-  }
-  return res;
-}
-
 SmallVector<utils::IteratorType> ExpReductionOp::getIteratorTypesArray() {
   return getLoopIteratorTypes();
 }
@@ -1922,7 +1930,7 @@ SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
   b.setInsertionPoint(op);
   Location loc = getLoc();
   SmallVector<OpFoldResult> allShapesSizes =
-      createFlatListOfOperandDims(op, b, loc);
+      createFlatListOfOperandDims(b, loc, op);
   AffineMap map = getShapesToLoopsMap();
 
   return llvm::map_to_vector(map.getResults(), [&](AffineExpr loopExpr) {
@@ -1941,7 +1949,6 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
   Location loc = getLoc();
 
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
-  auto oneAttr = b.getI64IntegerAttr(1);
 
   assert(linalg::allIndexingsAreProjectedPermutation(*this) &&
          "all indexing maps should be projected permutations");
@@ -3216,19 +3223,6 @@ SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
   return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
     return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
   });
-}
-
-/// Method similar to `LinalgOp`s that concatenates shapes of all operands.
-static SmallVector<OpFoldResult>
-createFlatListOfOperandDims(OpBuilder &builder, Location loc,
-                            CustomOp customOp) {
-  SmallVector<OpFoldResult> result;
-  for (Value operand : customOp->getOperands()) {
-    for (auto dim : llvm::seq<unsigned>(customOp.getRank(operand))) {
-      result.push_back(getDim(builder, loc, operand, dim));
-    }
-  }
-  return result;
 }
 
 SmallVector<Range> CustomOp::getIterationDomainForDimensions(
