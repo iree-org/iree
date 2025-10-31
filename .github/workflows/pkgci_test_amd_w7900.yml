@@ -19,7 +19,7 @@ on:
 
 jobs:
   test_w7900:
-    runs-on: nodai-amdgpu-w7900-x86-64
+    runs-on: iree-w7900x2
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
