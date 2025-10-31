@@ -2286,8 +2286,9 @@ LogicalResult ExpReductionOp::verify() {
     }
   }
 
-  if (!allIndexingsAreProjectedPermutation(*this))
+  if (!allIndexingsAreProjectedPermutation(*this)) {
     return op->emitOpError("all indexing maps must be projected permutations");
+  }
 
   return success();
 }

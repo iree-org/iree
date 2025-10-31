@@ -67,6 +67,7 @@ getStaticOrReifiedInputDims(OpBuilder &builder, Location loc, Value input,
   return success();
 }
 
+/// gets the rank of the opOperand's type
 static int64_t getRank(OpOperand &opOperand) {
   ShapedType type = dyn_cast<ShapedType>(opOperand.get().getType());
   if (!type) {
@@ -89,6 +90,8 @@ createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
   return res;
 }
 
+/// permutes the offset and size arrays by the result indexes of the provided
+/// affine map
 static SmallVector<Range> getPermutedRange(AffineMap permutation,
                                            ArrayRef<OpFoldResult> offsets,
                                            ArrayRef<OpFoldResult> sizes) {
@@ -1936,11 +1939,9 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
 //===----------------------------------------------------------------------===//
 
 SmallVector<utils::IteratorType> ExpReductionOp::getLoopIteratorTypes() {
-  SmallVector<utils::IteratorType> iteratorTypes(
-      getIteratorTypes()
-          .getAsValueRange<IREE::LinalgExt::IteratorTypeAttr,
-                           utils::IteratorType>());
-  return iteratorTypes;
+  return llvm::to_vector(getIteratorTypes()
+                             .getAsValueRange<IREE::LinalgExt::IteratorTypeAttr,
+                                              utils::IteratorType>());
 }
 
 SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
@@ -1970,7 +1971,6 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
 
   Location loc = getLoc();
   auto indexingMapOp = cast<IndexingMapOpInterface>(getOperation());
-  SmallVector<Value> valuesToTile = getOperands();
   SmallVector<Value> tiledOperands;
   SmallVector<Operation *> generatedSlices;
   for (OpOperand &opOperand : getOperation()->getOpOperands()) {
@@ -3213,11 +3213,9 @@ LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
 /// `getIterationDomain` of `LinalgOp`s.
 
 SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
-  SmallVector<utils::IteratorType> iteratorTypes(
-      getIteratorTypes()
-          .getAsValueRange<IREE::LinalgExt::IteratorTypeAttr,
-                           utils::IteratorType>());
-  return iteratorTypes;
+  return llvm::to_vector(getIteratorTypes()
+                             .getAsValueRange<IREE::LinalgExt::IteratorTypeAttr,
+                                              utils::IteratorType>());
 }
 
 SmallVector<Range> CustomOp::getIterationDomainForDimensions(
