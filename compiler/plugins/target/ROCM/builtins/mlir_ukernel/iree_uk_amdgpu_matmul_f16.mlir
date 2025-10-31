@@ -396,7 +396,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
         %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%iter) {
             indexing_maps = #contraction_accesses,
             iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+            semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
           } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
 
         %dot0_slice_0 = vector.extract_strided_slice %dot0
@@ -405,7 +406,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
         %dot1_0 = iree_codegen.inner_tiled ins(%lhs_vec_1_0, %rhs_vec_1) outs(%dot0_slice_0) {
             indexing_maps = #contraction_accesses,
             iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+            semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
           } : vector<2x1x1x4xf16>, vector<4x1x1x4xf16> into vector<2x4x1x4xf32>
 
         rocdl.sched.barrier 0
@@ -438,7 +440,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
          %dot1_1 = iree_codegen.inner_tiled ins(%lhs_vec_1_1, %rhs_vec_1) outs(%dot0_slice_1) {
             indexing_maps = #contraction_accesses,
             iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+            semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
           } : vector<2x1x1x4xf16>, vector<4x1x1x4xf16> into vector<2x4x1x4xf32>
 
 
@@ -455,13 +458,15 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
         %dot2 = iree_codegen.inner_tiled ins(%lhs_vec_2, %rhs_vec_2) outs(%concat) {
             indexing_maps = #contraction_accesses,
             iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+            kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+            semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
           } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
 
         %valu1 = iree_codegen.inner_tiled ins(%lhs_vec_3, %rhs_vec_3) outs(%dot2) {
           indexing_maps = #contraction_accesses,
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-          kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+          kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+          semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
         } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
 
         rocdl.sched.barrier 0
@@ -546,13 +551,15 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%iter) {
         indexing_maps = #contraction_accesses,
         iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
       } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
 
       %dot1 = iree_codegen.inner_tiled ins(%lhs_vec_1, %rhs_vec_1) outs(%dot0) {
         indexing_maps = #contraction_accesses,
         iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
       } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
 
       %dot1_slice_0 = vector.extract_strided_slice %dot1
@@ -561,7 +568,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       %dot2_0 = iree_codegen.inner_tiled ins(%lhs_vec_2_0, %rhs_vec_2) outs(%dot1_slice_0) {
         indexing_maps = #contraction_accesses,
         iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
       } : vector<2x1x1x4xf16>, vector<4x1x1x4xf16> into vector<2x4x1x4xf32>
 
       rocdl.sched.barrier 0
@@ -603,7 +611,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       %dot2_1 = iree_codegen.inner_tiled ins(%lhs_vec_2_1, %rhs_vec_2) outs(%dot1_slice_1) {
         indexing_maps = #contraction_accesses,
         iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
       } : vector<2x1x1x4xf16>, vector<4x1x1x4xf16> into vector<2x4x1x4xf32>
 
 
@@ -621,7 +630,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
       %valu1 = iree_codegen.inner_tiled ins(%lhs_vec_3, %rhs_vec_3) outs(%concat) {
         indexing_maps = #contraction_accesses,
         iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+        kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
       } : vector<4x1x1x4xf16>, vector<4x1x1x4xf16> into vector<4x4x1x4xf32>
 
       rocdl.sched.barrier 0
@@ -643,7 +653,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
     %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0_t, %rhs_vec_0_t) outs(%res) {
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+      semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
     } : vector<4x2x1x4xf16>, vector<4x2x1x4xf16> into vector<4x4x1x4xf32>
 
     %lhs_vec_2 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c2, %inner_id], %cst {in_bounds = [true, true, true, true]} : !mshared_exp, vector<4x1x2x4xf16>
@@ -654,7 +665,8 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
     %dot2 = iree_codegen.inner_tiled ins(%lhs_vec_2_t, %rhs_vec_2_t) outs(%dot0) {
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16, col_major = true>,
+      semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
     } : vector<4x2x1x4xf16>, vector<4x2x1x4xf16> into vector<4x4x1x4xf32>
 
     %tp = vector.transpose %dot2, [0, 2, 1, 3] : vector<4x4x1x4xf32> to vector<4x1x4x4xf32>
