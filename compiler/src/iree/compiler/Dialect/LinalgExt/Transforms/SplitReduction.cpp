@@ -657,13 +657,24 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         Value in = args[0];
         Value outVal = args[1];
         Value outIdx = args[2];
-        Value reductionIdx = linalg::IndexOp::create(b, loc, reductionDim + 1);
-        if (outIdx.getType() != reductionIdx.getType())
-          reductionIdx = arith::IndexCastOp::create(b, loc, outIdx.getType(),
-                                                    reductionIdx);
-        Value maxVal = arith::MaximumFOp::create(b, loc, in, outVal);
-        Value cmp = arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, in,
-                                          outVal);
+        Value reductionIdx = b.create<linalg::IndexOp>(loc, reductionDim + 1);
+        // Ensure outIdx and reductionIdx have the same type for subsequent operations.
+        if (outIdx.getType() != reductionIdx.getType()) {
+            reductionIdx =
+                b.create<arith::IndexCastOp>(loc, outIdx.getType(), reductionIdx);
+        }
+        Value inCast = in;
+        if (outVal.getType().getIntOrFloatBitWidth() >
+            in.getType().getIntOrFloatBitWidth()) {
+          inCast = b.create<arith::ExtFOp>(loc, outVal.getType(), in);
+        } else if (outVal.getType().getIntOrFloatBitWidth() <
+            in.getType().getIntOrFloatBitWidth()) {
+          inCast = b.create<arith::TruncFOp>(loc, outVal.getType(), in);
+        }
+
+        Value maxVal = b.create<arith::MaximumFOp>(loc, inCast, outVal);
+        Value cmp = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT,
+                                            inCast, outVal);
         Value selIdx =
             arith::SelectOp::create(b, loc, cmp, reductionIdx, outIdx);
         linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
