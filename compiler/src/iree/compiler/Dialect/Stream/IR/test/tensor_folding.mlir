@@ -174,6 +174,17 @@ util.func private @NarrowSplatPatternF32() -> !stream.resource<*> {
 
 // -----
 
+// CHECK-LABEL: @NoNarrowSplatPatternI1
+util.func private @NoNarrowSplatPatternI1() -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %pattern = arith.constant true
+  // CHECK: stream.tensor.splat %true : i1
+  %0 = stream.tensor.splat %pattern : i1 -> tensor<2x2xi1> in !stream.resource<*>{%c100}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldTensorCloneOp
 util.func private @FoldTensorCloneOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   // CHECK-NOT: stream.tensor.clone

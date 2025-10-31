@@ -134,6 +134,12 @@ static TypedAttr tryNarrowPatternBits(TypedAttr patternAttr) {
     return patternAttr;
   }
 
+  // Don't handle values <= 8 bits. We are narrowing to a minimum of 8-bits and
+  // we don't have signedness information to know how to extend them.
+  if (oldPattern.getBitWidth() <= 8) {
+    return patternAttr;
+  }
+
   // Try narrowing the pattern.
   auto newPattern = computeRequiredPatternBits(oldPattern);
   if (newPattern.getBitWidth() == oldPattern.getBitWidth())
