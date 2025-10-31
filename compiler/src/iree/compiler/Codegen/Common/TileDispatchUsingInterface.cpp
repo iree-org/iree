@@ -312,7 +312,9 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
         rewriter, loc, numTilesExprs,
         {range.offset, range.size, range.stride, tileSize});
     if (isOneInteger(numTiles)) {
-      continue;
+      if (iteratorType != utils::IteratorType::parallel) {
+        continue;
+      }
     }
 
     tilingResult.tiledLoops.set(index);
