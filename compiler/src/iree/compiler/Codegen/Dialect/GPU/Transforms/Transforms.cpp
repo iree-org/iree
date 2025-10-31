@@ -297,10 +297,12 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
 
     // Create the new CoalescedGatherDMAOp with a result outside the in_parallel
     rewriter.setInsertionPoint(terminator);
-    Value gatherResult = rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-        loc, coalescedGather.getInit().getType(), coalescedGather.getSource(),
-        coalescedGather.getIndices(), coalescedGather.getInit(),
-        coalescedGather.getDestIndices(), coalescedGather.getLane());
+    auto newGatherOp = IREE::GPU::CoalescedGatherDMAOp::create(
+        rewriter, loc, coalescedGather.getInit().getType(),
+        coalescedGather.getSource(), coalescedGather.getIndices(),
+        coalescedGather.getInit(), coalescedGather.getDestIndices(),
+        coalescedGather.getLane());
+    Value gatherResult = newGatherOp.getResult();
 
     // Use a tensor.insert_slice to insert the gather result back into the
     // shared memory destination at the location specified by dest_indices.
@@ -454,8 +456,8 @@ static void composeCoalescedGatherDMA(
       } else {
         // Materialize attribute as constant outside the in_parallel region
         auto attr = cast<IntegerAttr>(cast<Attribute>(offset));
-        newDestIndices.push_back(rewriter.create<arith::ConstantIndexOp>(
-            laneInsert.getLoc(), attr.getInt()));
+        newDestIndices.push_back(arith::ConstantIndexOp::create(
+            rewriter, laneInsert.getLoc(), attr.getInt()));
       }
     }
 
@@ -466,14 +468,15 @@ static void composeCoalescedGatherDMA(
     }
 
     rewriter.setInsertionPoint(warpInsert->getParentOp());
-    auto destSlice = rewriter.create<tensor::ExtractSliceOp>(
-        warpInsert.getLoc(), warpInsert.getDest(), offsets,
+    auto destSlice = tensor::ExtractSliceOp::create(
+        rewriter, warpInsert.getLoc(), warpInsert.getDest(), offsets,
         warpInsert.getMixedSizes(), warpInsert.getMixedStrides());
 
     rewriter.setInsertionPoint(warpInsert);
     // Create new CoalescedGatherDMAOp inside the in_parallel region
-    rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-        warpInsert.getLoc(), destSlice.getType(), laneInsert.getSource(),
+    // No result since it's in forall.in_parallel (in-place update)
+    IREE::GPU::CoalescedGatherDMAOp::create(
+        rewriter, warpInsert.getLoc(), Type(), laneInsert.getSource(),
         laneInsert.getIndices(), destSlice, newDestIndices,
         laneInsert.getLane());
     rewriter.eraseOp(warpInsert);

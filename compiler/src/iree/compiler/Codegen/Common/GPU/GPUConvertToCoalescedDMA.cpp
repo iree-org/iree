@@ -311,9 +311,10 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     indicesVec.push_back(indices);
   }
 
+  // When used in forall.in_parallel, the op doesn't return a result
+  // as it performs an in-place update to the shared_outs tensor
   rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-      loc, sharedOut.getType(), source, indicesVec, sharedOut, destIndices,
-      laneId);
+      loc, Type(), source, indicesVec, sharedOut, destIndices, laneId);
 
   // Erase the parallel_insert_slice ops and inner operation.
   for (auto insertOp : toErase) {

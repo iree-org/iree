@@ -351,11 +351,11 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     Index:$lane
   );
 
-  let results = (outs AnyRankedTensorOrMemRef:$result);
+  let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
   let assemblyFormat = [{
     $source (`[` $indices^ `]`)? `into` $init (`[` $dest_indices^ `]`)? `lane` `(` $lane `)`
-    attr-dict `:` type(operands) `->` type($result)
+    attr-dict `:` type(operands) ( `->` type($result)^ )?
   }];
 
   let hasVerifier = 1;

@@ -341,11 +341,14 @@ struct CoalescedGatherDMAOpBufferizationInterface
 
     SmallVector<Value> destIndices = gatherOp.getDestIndices();
 
+    // Create the bufferized coalesced_gather_dma op without result
+    // When operating on memrefs, the op modifies the init buffer in-place
     rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-        gatherOp.getLoc(), initBuffer->getType(), *sourceBuffer,
-        gatherOp.getIndices(), *initBuffer, destIndices, gatherOp.getLane());
+        gatherOp.getLoc(), Type(), *sourceBuffer, gatherOp.getIndices(),
+        *initBuffer, destIndices, gatherOp.getLane());
 
-    rewriter.replaceOp(op, *initBuffer);
+    // Replace the original op with the init buffer (which is modified in-place)
+    bufferization::replaceOpWithBufferizedValues(rewriter, op, {*initBuffer});
 
     return success();
   }
