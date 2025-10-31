@@ -3418,15 +3418,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-codegen-materialize-encoding-into-padding" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-codegen-materialize-encoding-into-padding
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-codegen-materialize-host-encoding" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-materialize-host-encoding
@@ -6458,15 +6449,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-codegen-materialize-encoding-into-padding" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-codegen-materialize-encoding-into-padding
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-codegen-materialize-host-encoding" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-materialize-host-encoding
@@ -7230,16 +7212,10 @@ operations.</p>
 <h3 id="-iree-codegen-materialize-device-encoding"><code>-iree-codegen-materialize-device-encoding</code><a class="headerlink" href="#-iree-codegen-materialize-device-encoding" title="Permanent link">link</a></h3>
 <p><em>Materialize the encoding for tensor as specified by the backend.</em></p>
 <h4 id="options_12">Options<a class="headerlink" href="#options_12" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-test-cl-gpu-target : Flag used for lit-testing GPU target only. Not for general usage
+<div class="highlight"><pre><span></span><code>-test-gpu-encoding-resolver : Flag used for lit-testing GPU target only. Not for general usage
 </code></pre></div>
 <h3 id="-iree-codegen-materialize-encoding-into-nop"><code>-iree-codegen-materialize-encoding-into-nop</code><a class="headerlink" href="#-iree-codegen-materialize-encoding-into-nop" title="Permanent link">link</a></h3>
 <p><em>Drop the encodings from tensor types with encodings.</em></p>
-<h3 id="-iree-codegen-materialize-encoding-into-padding"><code>-iree-codegen-materialize-encoding-into-padding</code><a class="headerlink" href="#-iree-codegen-materialize-encoding-into-padding" title="Permanent link">link</a></h3>
-<p><em>Materialize <code>#iree_encoding.padding</code> attributes.</em></p>
-<p>Handles padding introduced by <code>padding</code> encoding layouts, which
-requires <code>iree_tensor_ext.dispatch.tensor.load</code>/<code>.store</code> to be adjusted to account for
-padding regions.
-Materializes any other encoding layouts into nop.</p>
 <h3 id="-iree-codegen-materialize-host-encoding"><code>-iree-codegen-materialize-host-encoding</code><a class="headerlink" href="#-iree-codegen-materialize-host-encoding" title="Permanent link">link</a></h3>
 <p><em>Materialize the encoding for tensor as specified by the backend.</em></p>
 <h3 id="-iree-codegen-materialize-tuning-specs"><code>-iree-codegen-materialize-tuning-specs</code><a class="headerlink" href="#-iree-codegen-materialize-tuning-specs" title="Permanent link">link</a></h3>
