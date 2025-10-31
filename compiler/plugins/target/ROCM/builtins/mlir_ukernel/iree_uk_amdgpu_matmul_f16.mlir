@@ -420,16 +420,13 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
        vector.transfer_write %rhs_vec_local_2, %rhs_shared [%glb2, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !shared
        vector.transfer_write %rhs_vec_local_3, %rhs_shared [%glb3, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !shared
 
-     //FAKE
-      %cst_zero = arith.constant 0.124 : f16
-      // %first_elem = vector.extract_strided_slice %rhs_vec_local_0
-      %first_elem = vector.extract %rhs_vec_local_0[0,0] : f16 from vector<1x8xf16>
-      // {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]}: vector<1x8xf16> to vector<f16>
-      %is_zero = arith.cmpf oeq, %first_elem, %cst_zero : f16
-      scf.if %is_zero {
-        vector.transfer_write %rhs_vec_local_0, %lhs_shared [%glb0_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
-        // vector.transfer_write %rhs_vec_local_1,  %lhs_shared [%glb1_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
-      }
+        // Temp hack to avoid removal of lhs reads in the subgroup. See https://github.com/iree-org/iree/issues/22495
+        %cst_zero = arith.constant 0.124 : f16
+        %first_elem = vector.extract %rhs_vec_local_0[0,0] : f16 from vector<1x8xf16>
+        %is_zero = arith.cmpf oeq, %first_elem, %cst_zero : f16
+        scf.if %is_zero {
+          vector.transfer_write %rhs_vec_local_0, %lhs_shared [%glb0_lhs, %gko] {in_bounds = [true, true]} : vector<1x8xf16>, !mshared
+        }
 
         gpu.barrier
         rocdl.sched.barrier 0
