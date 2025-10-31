@@ -480,6 +480,9 @@ getFusableUses(MLIRContext *context, Operation *op,
     if (isa<tensor::DimOp>(user)) {
       continue;
     }
+    if (op->getBlock() != user->getBlock()) {
+      continue;
+    }
     fusableUses.insert(&use);
   }
 
