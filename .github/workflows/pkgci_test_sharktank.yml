@@ -171,7 +171,7 @@ jobs:
           - name: rocm_hip_w7900
             rocm-chip: gfx1100
             target: target_hip
-            runs-on: nodai-amdgpu-w7900-x86-64
+            runs-on: iree-w7900x2
     env:
       VENV_DIR: ${{ github.workspace }}/venv
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
