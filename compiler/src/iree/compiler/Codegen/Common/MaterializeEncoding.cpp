@@ -10,7 +10,9 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -36,8 +38,6 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_MATERIALIZEHOSTENCODINGPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-using namespace IREE::Encoding;
-
 namespace {
 
 static void
@@ -62,39 +62,40 @@ updateFuncSignature(FunctionOpInterface funcOp,
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr,
-                           bool testCLGPUTarget = false) {
+                           detail::TestingResolverKind resolverSource =
+                               detail::TestingResolverKind::kNone) {
   MLIRContext *ctx = funcOp.getContext();
   {
     RewritePatternSet patterns(ctx);
     DictionaryAttr targetConfig =
         targetAttr ? targetAttr.getConfiguration() : nullptr;
-    // Check if the encoding resolver is a GPUPaddingResolverAttr. For padding
-    // encoding materialization, we use a separate pass, so skip materialization
-    // here.
-    // TODO(#20160): Support GPUPaddingResolverAttr materialization through this
-    // pass, and remove the ad-hoc materialization pass for padding.
-    if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPaddingResolverAttr>(
-                            IREE::Encoding::kEncodingResolverAttrName)) {
-      LDBG()
-          << "Found GPUPaddingResolverAttr encoding resolver. Materialization "
-             "will be handled later.";
-      return success();
-    }
-
-    auto getTestTargetOrNopLayout =
+    auto getTestTargetResolverOrIdentityResolver =
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
-      if (testCLGPUTarget) {
-        LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
-                  "attribute. (testCLGPUTarget)";
-        SmallVector<NamedAttribute> configItems;
-        // Setting a nullptr to `target` below returns the target from command
-        // line.
-        IREE::GPU::TargetAttr targetAttr =
-            getGPUTargetAttr(ctx, /*target=*/nullptr);
+      SmallVector<NamedAttribute> configItems;
+      IREE::GPU::TargetAttr targetAttr =
+          getGPUTargetAttr(ctx, /*target=*/nullptr);
+      if (targetAttr) {
         addConfigGPUTarget(ctx, targetAttr, configItems);
-        return cast<IREE::Encoding::LayoutMaterializerAttr>(
-            IREE::GPU::GPUEncodingResolverAttr::get(
-                ctx, DictionaryAttr::get(ctx, configItems)));
+        switch (resolverSource) {
+        case detail::TestingResolverKind::kGPUDataTiling: {
+          LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
+                    "attribute. (kGPUDataTiling)";
+          return cast<IREE::Encoding::LayoutMaterializerAttr>(
+              IREE::GPU::GPUEncodingResolverAttr::get(
+                  ctx, DictionaryAttr::get(ctx, configItems)));
+        }
+        case detail::TestingResolverKind::kGPUPadding: {
+          LDBG() << "Select GPUPaddingResolverAttr attribute as the layout "
+                    "attribute. (kGPUPadding)";
+          std::optional<IREE::GPU::L1CacheInfo> cache =
+              IREE::GPU::getL1CacheInfo(targetAttr);
+          return cast<IREE::Encoding::LayoutMaterializerAttr>(
+              IREE::GPU::GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes,
+                                                     cache->cacheSets));
+        }
+        case detail::TestingResolverKind::kNone:
+          break;
+        }
       }
       LDBG() << "Select IdentityResolverAttr attribute as the layout "
                 "attribute (Encoding resolver unknown or unsupported).";
@@ -107,8 +108,9 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // so it can access the target info during materialization.
     //
     // If the layoutAttr was not found, or if it does not implement the layout
-    // resolver interface, fall back to the resolver for getCLGPUTarget. If
-    // there is also no test target set, fall back to the nop layout.
+    // resolver interface, fall back to the resolver for TestingResolverKind
+    // resolver. If there is also no test target set or it is kNone, fall back
+    // to the identity resolver.
     IREE::Encoding::LayoutMaterializerAttr layoutAttr =
         targetConfig
             ? targetConfig.getAs<IREE::Encoding::LayoutMaterializerAttr>(
@@ -121,7 +123,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
         layoutAttr && resolverAttr
             ? cast<IREE::Encoding::LayoutMaterializerAttr>(
                   resolverAttr.cloneWithSimplifiedConfig(targetConfig))
-            : getTestTargetOrNopLayout();
+            : getTestTargetResolverOrIdentityResolver();
 
     LDBG() << "Selected Encoding::LayoutMaterializerAttr with target "
               "configuration: "
@@ -296,7 +298,8 @@ struct MaterializeDeviceEncodingPass final
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    vector::VectorDialect, IREE::Codegen::IREECodegenDialect,
+                    vector::VectorDialect, IREE::Encoding::IREEEncodingDialect,
+                    IREE::Codegen::IREECodegenDialect,
                     IREE::CPU::IREECPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 
@@ -304,7 +307,7 @@ struct MaterializeDeviceEncodingPass final
     FunctionOpInterface funcOp = getOperation();
     auto executableTargetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     if (failed(materializeFuncOpEncodings(funcOp, executableTargetAttr,
-                                          testCLGPUTarget))) {
+                                          testGPUEncodingResolver))) {
       return signalPassFailure();
     }
   }
