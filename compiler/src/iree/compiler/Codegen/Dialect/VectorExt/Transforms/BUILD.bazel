@@ -37,6 +37,7 @@ iree_compiler_cc_library(
     srcs = [
         "BufferizationInterfaces.cpp",
         "Passes.cpp",
+        "SLPVectorizer.cpp",
         "VectorExtFoldUnitExtentDims.cpp",
         "VectorizeIREEVectorExtOps.cpp",
     ],
