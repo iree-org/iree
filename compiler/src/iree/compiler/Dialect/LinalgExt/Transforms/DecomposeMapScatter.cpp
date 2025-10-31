@@ -48,39 +48,50 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
     if (!subViewOp) {
       return failure();
     }
-    if (subViewOp.getSourceType().getRank() != subViewOp.getType().getRank()) {
-      return rewriter.notifyMatchFailure(subViewOp,
-                                         "subview op is rank reducing");
+    MemRefType subViewType = subViewOp.getType();
+    bool isRankReducing =
+        subViewOp.getSourceType().getRank() != subViewType.getRank();
+    std::optional<llvm::SmallDenseSet<unsigned int>> rankReductionMask =
+        computeRankReductionMask(subViewOp.getStaticSizes(),
+                                 subViewType.getShape());
+    if (isRankReducing && !rankReductionMask.has_value()) {
+      return rewriter.notifyMatchFailure(
+          subViewOp, "could not compute rank reduction mask");
     }
     SmallVector<OpFoldResult> strides = subViewOp.getMixedStrides();
     if (!areAllConstantIntValue(strides, 1)) {
       return rewriter.notifyMatchFailure(subViewOp,
                                          "subview op has non-unit strides");
     }
-    MemRefType subViewType = subViewOp.getType();
     SmallVector<ReassociationIndices> reassociations;
     reassociations.push_back(
         llvm::to_vector(llvm::seq<int64_t>(subViewType.getRank())));
-    if (memref::CollapseShapeOp::isGuaranteedCollapsible(subViewType,
+    if (subViewType.getStridesAndOffset().first.back() == 1 &&
+        memref::CollapseShapeOp::isGuaranteedCollapsible(subViewType,
                                                          reassociations)) {
-      return rewriter.notifyMatchFailure(subViewOp,
-                                         "subview op is collapsible");
+      return rewriter.notifyMatchFailure(
+          subViewOp, "subview op is non-strided and collapsible");
     }
     auto mapScatterBodyYield = cast<IREE::LinalgExt::YieldOp>(
         mapScatterOp.getTransformationRegion().front().getTerminator());
+    rewriter.setInsertionPoint(mapScatterBodyYield);
+    SmallVector<Value> newYieldedIndices;
+    for (OpFoldResult subViewOffset : subViewOp.getMixedOffsets()) {
+      newYieldedIndices.push_back(getValueOrCreateConstantIndexOp(
+          rewriter, subViewOp.getLoc(), subViewOffset));
+    }
     SmallVector<Value> yieldedIndices = mapScatterBodyYield.getOperands();
     Value yieldedMask = yieldedIndices.pop_back_val();
-    rewriter.setInsertionPoint(mapScatterBodyYield);
-    for (auto [yieldedIdx, subViewOffset] :
-         llvm::zip_equal(yieldedIndices, subViewOp.getMixedOffsets())) {
-      Value subViewOffsetVal = getValueOrCreateConstantIndexOp(
-          rewriter, subViewOp.getLoc(), subViewOffset);
-      Value yieldedIdxVal = getValueOrCreateConstantIndexOp(
-          rewriter, mapScatterBodyYield.getLoc(), yieldedIdx);
-      yieldedIdx = arith::AddIOp::create(rewriter, subViewOp.getLoc(),
-                                         yieldedIdxVal, subViewOffsetVal);
+    size_t rankReducedIdx = 0;
+    for (auto [idx, yieldedIdx] : llvm::enumerate(newYieldedIndices)) {
+      if (isRankReducing && rankReductionMask->contains(idx)) {
+        continue;
+      }
+      yieldedIdx =
+          arith::AddIOp::create(rewriter, subViewOp.getLoc(), yieldedIdx,
+                                yieldedIndices[rankReducedIdx++]);
     }
-    SmallVector<Value> newYieldedValues(yieldedIndices);
+    SmallVector<Value> newYieldedValues(newYieldedIndices);
     newYieldedValues.push_back(yieldedMask);
     rewriter.modifyOpInPlace(mapScatterBodyYield, [&]() {
       mapScatterBodyYield.getOperandsMutable().assign(newYieldedValues);

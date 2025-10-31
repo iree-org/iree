@@ -146,6 +146,39 @@ func.func @map_scatter_into_subview(
 
 // -----
 
+func.func @map_scatter_into_subview_rank_reducing(
+    %input: vector<4xf32>, %output: memref<8x32xf32>
+) {
+  %subview = memref.subview %output[2, 7][4, 1][1, 1] : memref<8x32xf32> to memref<4xf32, strided<[32], offset: 71>>
+  iree_linalg_ext.map_scatter %input into %subview {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : vector<4xf32> into memref<4xf32, strided<[32], offset: 71>>
+  return
+}
+// CHECK-LABEL: func.func @map_scatter_into_subview_rank_reducing(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//   CHECK-NOT:   memref.subview
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[FLAT_OUTPUT:.+]] = memref.collapse_shape %[[OUTPUT]] {{.*}} memref<8x32xf32> into memref<256xf32>
+//       CHECK:   vector.scatter %[[FLAT_OUTPUT]]{{.*}} memref<256xf32>, vector<4xindex>, vector<4xi1>, vector<4xf32>
+
+// PREPROCESSING-LABEL: func.func @map_scatter_into_subview_rank_reducing(
+//  PREPROCESSING-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  PREPROCESSING-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//   PREPROCESSING-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   PREPROCESSING-DAG:   %[[C7:.+]] = arith.constant 7 : index
+//   PREPROCESSING-NOT:   memref.subview
+//       PREPROCESSING:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       PREPROCESSING:     ^bb0(%[[IDX0:.+]]: index):
+//       PREPROCESSING:       %[[OUT_IDX0:.+]] = arith.addi %[[IDX0]], %[[C2]]
+//       PREPROCESSING:       iree_linalg_ext.yield %[[OUT_IDX0]], %[[C7]]
+//       PREPROCESSING:   } : vector<4xf32> into memref<8x32xf32>
+
+// -----
+
 func.func @map_scatter_into_collapsible_subview(
     %input: vector<4x16xf32>, %output: memref<8x32xf32>
 ) {
