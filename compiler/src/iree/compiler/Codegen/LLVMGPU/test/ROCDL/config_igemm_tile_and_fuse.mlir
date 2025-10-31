@@ -208,19 +208,26 @@ func.func @conv_chwn_chwf_unaligned_batch(%arg0: tensor<16x193x129x40xbf16>, %ar
 }
 
 // CHECK-LABEL: func.func @conv_chwn_chwf_unaligned_batch
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
-//  CHECK-SAME:     padding = [16, 1, 1, 16, 128]
-//  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 1, 1, 1, 0]
-//  CHECK-SAME:     workgroup = [16, 1, 1, 16, 0]
 
-// PAD-CONV-GFX942:     padding_conv =  [0, 0, 0, 16, 0, 0, 0]
+// GFX942-SAME:     padding = [64, 1, 1, 64, 128]
+// GFX942-SAME:     promote_operands = [0, 1]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+// GFX942-SAME:     subgroup = [2, 1, 1, 1, 0]
+// GFX942-SAME:     workgroup = [64, 1, 1, 64, 0]
+
+// MI300X-SAME:     padding = [32, 1, 1, 64, 128]
+// MI300X-SAME:     promote_operands = [0, 1]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+// MI300X-SAME:     workgroup = [32, 1, 1, 64, 0]
+
+// PAD-CONV-GFX942:     padding_conv =  [0, 0, 0, 64, 0, 0, 0]
 
 // -----
 
@@ -318,8 +325,8 @@ func.func @conv_chwn_chwf_aligned_batch(%arg0: tensor<2x192x128x48xbf16>, %arg1:
 }
 
 //         CHECK-LABEL:  func.func @conv_chwn_chwf_aligned_batch
-//     PAD-CONV-GFX942:     padding = [16, 1, 1, 16, 16]
-// PAD-CONV-GFX942-NOT:     padding_conv
+//     PAD-CONV-GFX942:     padding = [64, 1, 1, 64, 16]
+//     PAD-CONV-GFX942:     padding_conv = [0, 0, 0, 64, 0, 0, 0]
 
 // -----
 

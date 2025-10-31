@@ -646,13 +646,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
-  // TODO (nirvedhmeshram): We only voluntarily allow padded configurations
-  // for tranpose_b layouts as that's where we currently don't have any overhead
-  // for padding. Other layouts still can have overhead and once we fix the root
-  // causes for that we can relax this condition.
+  // We only disallow padded configurations for K-major layouts ([K,M] × [K,N])
+  // where transposedLhs=true and transposedRhs=false. Experiments have shown
+  // that allowing padding for other layout variants (NN, NT, TT) provides
+  // decent performance improvements. Once we fix the root causes for padding
+  // overhead in K-major layouts, we can allow padding for K-major layouts.
   GPUMatmulShapeType problem{
-      getDimBounds(mDims, transposedLhs || !transposedRhs),
-      getDimBounds(nDims, transposedLhs || !transposedRhs),
+      getDimBounds(mDims, transposedLhs && !transposedRhs),
+      getDimBounds(nDims, transposedLhs && !transposedRhs),
       getDimBoundsNoPad(kDims),
       getDimBoundsNoPad(batchDims),
       lhsElemType,
