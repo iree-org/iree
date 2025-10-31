@@ -1796,6 +1796,7 @@ std::array<int64_t, 3> TargetAttr::getMaximumWorkgroupCount() const {
 constexpr StringLiteral kWorkgroupLevelName = "workgroup";
 constexpr StringLiteral kPartialReductionLevelName = "partial_reduction";
 constexpr StringLiteral kReductionLevelName = "reduction";
+constexpr StringLiteral kSerialLevelName = "serial";
 constexpr StringLiteral kThreadLevelName = "thread";
 constexpr StringLiteral kSubgroupLevelName = "subgroup";
 constexpr StringLiteral kLaneLevelName = "lane";
@@ -1808,6 +1809,8 @@ StringRef getTilingLevelName(GPU::TilingLevel level) {
     return kPartialReductionLevelName;
   case GPU::TilingLevel::Reduction:
     return kReductionLevelName;
+  case GPU::TilingLevel::Serial:
+    return kSerialLevelName;
   case GPU::TilingLevel::Thread:
     return kThreadLevelName;
   case GPU::TilingLevel::Subgroup:
