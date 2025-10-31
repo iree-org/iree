@@ -276,41 +276,50 @@ populateOpToStageMap(LoopPrefetcher &prefetcher, scf::ForOp forOp,
     for (Operation *op : prefetcher.computeStage)
       assignOp(op, /*stage=*/2);
   }
-
-  LDBG() << "Pipelining schedule for loop:\n";
-  for (Operation &op : forOp.getBody()->without_terminator()) {
-    if (opToStage.count(&op)) {
-      LDBG() << "  stage " << opToStage[&op] << " : " << op;
-    }
-  }
 }
 
-// Builds the final schedule and creates the PipeliningOption with
-// getScheduleFn.
-static FailureOr<scf::PipeliningOption>
-buildPipeliningOption(LoopPrefetcher &prefetcher,
-                      const llvm::DenseMap<Operation *, unsigned> &opToStage) {
-  std::vector<std::pair<Operation *, unsigned>> finalSchedule;
-  finalSchedule.reserve(opToStage.size());
+// Populates cluster IDs for each operation in the schedule.
+// Each operation gets a unique cluster ID based on its position in the
+// schedule.
+static void populateOpToClusterMap(
+    LoopPrefetcher &prefetcher,
+    const llvm::DenseMap<Operation *, unsigned> &opToStage,
+    std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
+    llvm::DenseMap<Operation *, unsigned> &opToCluster) {
+
+  unsigned clusterID = 0;
 
   // Build the schedule in desired execution order: read -> compute -> write
+  // Each operation forms its own "cluster" (a position in the schedule)
   for (Operation *op : prefetcher.readStage) {
-    if (opToStage.count(op))
+    if (opToStage.count(op)) {
       finalSchedule.push_back({op, opToStage.lookup(op)});
+      opToCluster[op] = clusterID;
+    }
   }
+  ++clusterID;
+
   for (Operation *op : prefetcher.computeStage) {
-    if (opToStage.count(op))
+    if (opToStage.count(op)) {
       finalSchedule.push_back({op, opToStage.lookup(op)});
+      opToCluster[op] = clusterID;
+    }
   }
+  ++clusterID;
+
   for (Operation *op : prefetcher.writeStage) {
-    if (opToStage.count(op))
+    if (opToStage.count(op)) {
       finalSchedule.push_back({op, opToStage.lookup(op)});
+      opToCluster[op] = clusterID;
+    }
   }
 
-  if (finalSchedule.empty()) {
-    return failure();
-  }
+  LDBG() << "Built schedule with " << clusterID + 1 << " clusters";
+}
 
+// Builds the PipeliningOption with getScheduleFn.
+static scf::PipeliningOption buildPipeliningOption(
+    const std::vector<std::pair<Operation *, unsigned>> &finalSchedule) {
   scf::PipeliningOption options;
   options.getScheduleFn =
       [finalSchedule](scf::ForOp loop,
@@ -340,9 +349,9 @@ invokePipelineForLoop(scf::ForOp forOp, const scf::PipeliningOption &options) {
   return *newForOpOrFail;
 }
 
-// Post-processes the pipelined loop by inserting barriers.
-static void postprocessPipelinedLoop(RewriterBase &rewriter,
-                                     scf::ForOp newForOp) {
+// Inserts synchronization barriers in the pipelined loop.
+static void insertPipelineBarriers(RewriterBase &rewriter,
+                                   scf::ForOp newForOp) {
   // Helper to check for shared memory
   auto hasSharedMemory = [](Value val) -> bool {
     auto memrefType = dyn_cast<MemRefType>(val.getType());
@@ -409,6 +418,25 @@ static void postprocessPipelinedLoop(RewriterBase &rewriter,
   gpu::BarrierOp::create(rewriter, newForOp.getLoc());
 }
 
+// Dumps the planned schedule before pipelining for debugging purposes.
+static void
+dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
+             const llvm::DenseMap<Operation *, unsigned> &opToCluster) {
+  LDBG() << "\n=== Planned Pipeline Schedule (before pipelining) ===";
+  LDBG() << "Total operations in schedule: " << finalSchedule.size();
+
+  for (size_t i = 0; i < finalSchedule.size(); ++i) {
+    Operation *op = finalSchedule[i].first;
+    unsigned stage = finalSchedule[i].second;
+    unsigned cluster = opToCluster.lookup(op);
+
+    LDBG() << "  [" << i << "] cluster=" << cluster << " stage=" << stage
+           << " op: " << *op;
+  }
+
+  LDBG() << "=== End Planned Schedule ===\n";
+}
+
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp,
                                                unsigned numStages) {
@@ -420,17 +448,29 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   llvm::DenseMap<Operation *, unsigned> opToStage;
   populateOpToStageMap(prefetcher, forOp, numStages, opToStage);
 
-  FailureOr<scf::PipeliningOption> optionsOr =
-      buildPipeliningOption(prefetcher, opToStage);
-  if (failed(optionsOr))
-    return failure();
+  // Build the schedule and cluster mapping - major scheduling decision
+  std::vector<std::pair<Operation *, unsigned>> finalSchedule;
+  finalSchedule.reserve(opToStage.size());
+  llvm::DenseMap<Operation *, unsigned> opToCluster;
+  populateOpToClusterMap(prefetcher, opToStage, finalSchedule, opToCluster);
 
-  FailureOr<scf::ForOp> newForOpOr = invokePipelineForLoop(forOp, *optionsOr);
+  if (finalSchedule.empty()) {
+    return failure();
+  }
+
+  // Dump the planned schedule before pipelining (while ops are still valid)
+  dumpSchedule(finalSchedule, opToCluster);
+
+  scf::PipeliningOption options = buildPipeliningOption(finalSchedule);
+
+  FailureOr<scf::ForOp> newForOpOr = invokePipelineForLoop(forOp, options);
   if (failed(newForOpOr))
     return failure();
 
   scf::ForOp newForOp = *newForOpOr;
-  postprocessPipelinedLoop(rewriter, newForOp);
+
+  // Insert barriers in the pipelined loop
+  insertPipelineBarriers(rewriter, newForOp);
 
   return newForOp;
 }
