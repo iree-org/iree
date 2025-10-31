@@ -68,11 +68,13 @@ getStaticOrReifiedInputDims(OpBuilder &builder, Location loc, Value input,
 }
 
 static int64_t getRank(OpOperand &opOperand) {
-  Type type = opOperand.get().getType();
-  if (type.isIntOrIndexOrFloat()) {
+  ShapedType type = dyn_cast<ShapedType>(opOperand.get().getType());
+  if (!type) {
+    assert(opOperand.get().getType().isIntOrIndexOrFloat() &&
+           "unshaped type should be int or index or float");
     return 0;
   }
-  return cast<RankedTensorType>(type).getRank();
+  return type.getRank();
 }
 
 /// Method similar to `LinalgOp`s that concatenates shapes of all operands.
