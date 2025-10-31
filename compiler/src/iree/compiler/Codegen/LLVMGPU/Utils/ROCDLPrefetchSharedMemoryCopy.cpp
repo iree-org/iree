@@ -45,7 +45,6 @@ public:
     }
 
     LoopPrefetcher prefetcher;
-    prefetcher.mapping = SmallVector<IRMapping>(4);
     prefetcher.forOp = op;
     prefetcher.lb = prefetcher.ub = prefetcher.step = 0;
 
@@ -62,78 +61,6 @@ public:
     return prefetcher;
   }
 
-  // Emits the prologue before the main pipelined loop.
-  void emitPrologue(RewriterBase &rewriter) {
-    Location loc = forOp.getLoc();
-    Value zero = arith::ConstantIndexOp::create(rewriter, loc, lb);
-    // Directly write in the prologue and use the shared memory to communicate
-    // data instead of the loop carried values. Read (0)
-    emitRead(mapping[0], rewriter, zero);
-    // Write(0)
-    emitWrite(mapping[0], rewriter, zero);
-  }
-
-  /// Emits the main pipelined loop structure.
-  scf::ForOp createKernelLoop(RewriterBase &rewriter) {
-    Location loc = forOp.getLoc();
-    int64_t newUpperBound = ub - step;
-    auto newUb = arith::ConstantIndexOp::create(rewriter, loc, newUpperBound);
-
-    // Keep original iter args and then add some for what's being loaded to
-    // registers.
-    auto iterArgs = llvm::to_vector_of<Value>(forOp.getInitArgs());
-    auto newForOp = scf::ForOp::create(rewriter, loc, forOp.getLowerBound(),
-                                       newUb, forOp.getStep(), iterArgs);
-
-    // When there are no iter args, the loop body terminator will be created.
-    // Since we always create it below, remove the terminator if it was created.
-    if (!newForOp.getBody()->empty())
-      rewriter.eraseOp(newForOp.getBody()->getTerminator());
-
-    return newForOp;
-  }
-
-  /// Emits contents into the main pipelined loop structure.
-  void createKernel(RewriterBase &rewriter, scf::ForOp newForOp) {
-    rewriter.setInsertionPoint(newForOp.getBody(), newForOp.getBody()->begin());
-    Location loc = forOp.getLoc();
-    Value indVar = newForOp.getInductionVar();
-    Value increment = arith::ConstantIndexOp::create(rewriter, loc, step);
-    Value iPlusOne = arith::AddIOp::create(rewriter, loc, indVar, increment,
-                                           arith::IntegerOverflowFlags::nsw);
-
-    for (int i = 0; i < 3; ++i) {
-      for (auto [idx, arg] : llvm::enumerate(forOp.getRegionIterArgs())) {
-        mapping[i].map(arg, newForOp.getRegionIterArgs()[idx]);
-      }
-    }
-
-    emitRead(mapping[1], rewriter, iPlusOne);
-    emitBarrier(loc, rewriter);
-    emitCompute(mapping[0], rewriter, indVar);
-    emitBarrier(loc, rewriter);
-    emitSchedBarrier(loc, rewriter);
-    emitWrite(mapping[1], rewriter, iPlusOne);
-    updateYield(mapping[0], rewriter);
-    return;
-  }
-
-  // Emits the epilogue after the main pipelined loop and returns the final
-  // results to replace the original loop results main loop.
-  SmallVector<Value> emitEpilogue(RewriterBase &rewriter, scf::ForOp newForOp) {
-    rewriter.setInsertionPointAfter(newForOp);
-    Location loc = forOp.getLoc();
-    Value nMinusOne =
-        arith::ConstantIndexOp::create(rewriter, loc, ub - 1 * step);
-
-    // Map iter_args to results of newForOp.
-    for (unsigned i = 0, e = forOp->getNumResults(); i != e; ++i) {
-      mapping[0].map(forOp.getRegionIterArg(i), newForOp.getResult(i));
-    }
-
-    emitBarrier(loc, rewriter);
-    return emitCompute(mapping[0], rewriter, nMinusOne);
-  }
   // Ops in the original scf.for loop that belongs to different classes.
   SmallVector<Operation *> readStage;
   SmallVector<Operation *> writeStage;
@@ -307,76 +234,7 @@ private:
     return success();
   }
 
-  /// Creates all read stage ops for a loop iteration with |rewriter| and maps
-  /// the original loop induction variable to |iv| in |mapping|.
-  void emitRead(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), iv);
-
-    for (Operation *op : readStage) {
-      rewriter.clone(*op, mapping);
-    }
-  }
-
-  /// Creates all write stage ops for a loop iteration with |rewriter| and maps
-  /// the original loop induction variable to |iv| in |mapping|.
-  void emitWrite(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), iv);
-
-    for (Operation *op : writeStage) {
-      rewriter.clone(*op, mapping);
-    }
-  }
-
-  /// Creates a gpu.barrier op with |rewriter|.
-  void emitBarrier(Location loc, RewriterBase &rewriter) {
-    gpu::BarrierOp::create(rewriter, loc);
-  }
-
-  void emitSchedBarrier(Location loc, RewriterBase &rewriter) {
-    amdgpu::SchedBarrierOp::create(
-        rewriter, loc,
-        amdgpu::sched_barrier_opt_enumAttr::get(
-            rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
-  }
-
-  /// Creates all compute stage ops for a loop iteration with |rewriter| and
-  /// maps the original loop induction variable to |iv| in |mapping|.
-  SmallVector<Value> emitCompute(IRMapping &mapping, RewriterBase &rewriter,
-                                 Value indVar) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), indVar);
-
-    SmallVector<Value> results;
-    for (Operation *op : computeStage) {
-      if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
-        // On yield, return the operands of the yield converted.
-        results =
-            llvm::map_to_vector<4>(yieldOp.getOperands(), [&](Value operand) {
-              return mapping.lookup(operand);
-            });
-        break;
-      }
-
-      rewriter.clone(*op, mapping);
-    }
-
-    return results;
-  }
-
-  void updateYield(IRMapping &mapping, RewriterBase &rewriter) {
-    for (Operation *op : computeStage) {
-      if (auto yield = dyn_cast<scf::YieldOp>(op)) {
-        rewriter.clone(*op, mapping);
-        break;
-      }
-    }
-  }
-
 private:
-  // Mapping for each pipelined stage.
-  SmallVector<IRMapping, 4> mapping;
   // The original scf.for loop to prefetch shared memory copy from.
   scf::ForOp forOp;
   // Original static loop range and step.
