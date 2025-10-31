@@ -243,6 +243,21 @@ private:
 
 } // namespace
 
+// Removes all barrier operations from the loop body.
+// Original barriers are designed for the unpipelined loop structure and will
+// be replaced with barriers appropriate for the pipelined structure.
+static void removeBarriers(scf::ForOp forOp) {
+  SmallVector<Operation *> toErase;
+  forOp.getBody()->walk([&](Operation *op) {
+    if (isa<gpu::BarrierOp, amdgpu::SchedBarrierOp>(op)) {
+      toErase.push_back(op);
+    }
+  });
+  for (Operation *op : toErase) {
+    op->erase();
+  }
+}
+
 // Populates the opToStage map by assigning stages to operations based on
 // prefetcher groups and number of stages.
 static void
@@ -444,6 +459,12 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   if (failed(prefetcherOr))
     return failure();
   LoopPrefetcher &prefetcher = *prefetcherOr;
+
+  // For multi-stage pipelining, remove original barriers as they're designed
+  // for unpipelined structure. New barriers will be inserted appropriately.
+  if (numStages > 1) {
+    removeBarriers(forOp);
+  }
 
   llvm::DenseMap<Operation *, unsigned> opToStage;
   populateOpToStageMap(prefetcher, forOp, numStages, opToStage);
