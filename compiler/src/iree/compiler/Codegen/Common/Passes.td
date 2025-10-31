@@ -625,7 +625,7 @@ def MaterializeDeviceEncodingPass :
              clEnumValN(detail::TestingResolverKind::kGPUPadding, "gpu_padding",
                         "Use iree_gpu.gpu_padding_resolver<>."),
              clEnumValN(detail::TestingResolverKind::kNone, "none",
-                        "Ignore testing resolvers.")
+                        "Ignore testing resolvers and fall back to identity resolver.")
       )}]>,
 
   ];
