@@ -166,7 +166,7 @@ Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
 SmallVector<LoweringConfigLevelInfo>
 LoweringConfigAttr::getAvailableTilingInfo() {
   SmallVector<LoweringConfigLevelInfo> result;
-  for (auto i : IREE::CPU::getTilingLevelsAsInts()) {
+  for (int i : IREE::CPU::getTilingLevelsAsInts()) {
     if (!hasTilingLevel(i)) {
       continue;
     }
@@ -236,12 +236,12 @@ constexpr std::array vectorTilingLevels{TilingLevel::VectorCommonParallelTiles,
 
 std::optional<SmallVector<int64_t>> LoweringConfigAttr::getVectorSizes() const {
   SmallVector<int64_t> result;
-  for (auto level : vectorTilingLevels) {
-    if (!hasTilingLevel(static_cast<unsigned>(level))) {
+  for (TilingLevel level : vectorTilingLevels) {
+    if (!hasTilingLevel(llvm::to_underlying(level))) {
       continue;
     }
     auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getTilingLevelAttr(static_cast<unsigned>(level)));
+        getTilingLevelAttr(llvm::to_underlying(level)));
     if (result.empty()) {
       result.resize(attr.getSizes().size(), 0);
     }
@@ -260,12 +260,12 @@ std::optional<SmallVector<int64_t>> LoweringConfigAttr::getVectorSizes() const {
 
 SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
   SmallVector<bool> result;
-  for (auto level : vectorTilingLevels) {
-    if (!hasTilingLevel(static_cast<unsigned>(level))) {
+  for (TilingLevel level : vectorTilingLevels) {
+    if (!hasTilingLevel(llvm::to_underlying(level))) {
       continue;
     }
     auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getTilingLevelAttr(static_cast<unsigned>(level)));
+        getTilingLevelAttr(llvm::to_underlying(level)));
     ArrayRef<bool> scalableFlags = attr.getScalableFlags();
     if (result.empty() && !scalableFlags.empty()) {
       result.resize(attr.getSizes().size(), false);
