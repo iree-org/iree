@@ -103,7 +103,6 @@ static std::optional<ReshapeOps>
 blockDynamicDimensionsOfValue(RewriterBase &rewriter,
                               const TensorDivisibilityInfo &divisibilityInfo,
                               Value v) {
-  // Convert divisibility info to expansion map (int64_t factors)
   llvm::SmallDenseMap<unsigned, int64_t> expansionMap;
   for (auto [index, divisibility] : divisibilityInfo) {
     expansionMap[index] = static_cast<int64_t>(divisibility.sdiv());
