@@ -80,8 +80,8 @@ static SmallVector<OpFoldResult>
 createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
   SmallVector<OpFoldResult> res;
   for (OpOperand &opOperand : op->getOpOperands()) {
-    for (int64_t i = 0, e = getRank(opOperand); i < e; ++i) {
-      res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), i));
+    for (auto dim : llvm::seq(getRank(opOperand))) {
+      res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), dim));
     }
   }
   return res;
