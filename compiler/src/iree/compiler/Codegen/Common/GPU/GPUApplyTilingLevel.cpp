@@ -62,11 +62,12 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
 void GPUApplyTilingLevelPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
 
-  if (tilingLevel != IREE::GPU::TilingLevel::Reduction &&
-      tilingLevel != IREE::GPU::TilingLevel::Thread &&
-      tilingLevel != IREE::GPU::TilingLevel::Subgroup &&
-      tilingLevel != IREE::GPU::TilingLevel::PartialReduction &&
-      tilingLevel != IREE::GPU::TilingLevel::Serial) {
+  if (!llvm::is_contained({IREE::GPU::TilingLevel::Reduction,
+                           IREE::GPU::TilingLevel::Thread,
+                           IREE::GPU::TilingLevel::Subgroup,
+                           IREE::GPU::TilingLevel::PartialReduction,
+                           IREE::GPU::TilingLevel::Serial},
+                          tilingLevel)) {
     funcOp.emitError() << "unsupported tiling level: "
                        << IREE::GPU::stringifyEnum(tilingLevel) << "\n";
     return signalPassFailure();
