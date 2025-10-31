@@ -52,6 +52,17 @@ getEncodingContractionDims(EncodingAttr encoding);
 FailureOr<IREE::LinalgExt::ScaledContractionDimensions>
 getEncodingScaledContractionDims(EncodingAttr encoding);
 
+struct BxMxNxK {
+  int64_t batch = 1;
+  int64_t M = 1;
+  int64_t N = 1;
+  int64_t K = 1;
+};
+
+/// Returns the matmul size (batch, m, n, k) in a given encoding. Returns
+/// empty if failed.
+FailureOr<BxMxNxK> getMatmulSizes(EncodingAttr encoding);
+
 /// Returns the narrow dim in a given `encoding`, ceiled to a power of two. This
 /// works by inspecting the `iteration_sizes` array attribute in the `encoding`.
 /// If the `iteration_sizes` of one dimension (M or N) is smaller than the
