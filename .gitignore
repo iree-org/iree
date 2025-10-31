@@ -15,6 +15,9 @@
 *.user
 *.code-workspace
 
+# Cursor files
+.cursor/
+
 # macOS files
 .DS_Store
 
