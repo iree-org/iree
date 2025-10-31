@@ -98,6 +98,12 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
       dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
 }
 
+static bool allIndexingsAreProjectedPermutation(IndexingMapOpInterface op) {
+  return llvm::all_of(op.getIndexingMapsArray(), [](AffineMap m) {
+    return m.isProjectedPermutation(/*allowZeroInResults=*/true);
+  });
+}
+
 /// Emit an error and return failure when `seq` is invalid. It is only valid
 /// when it is a permutation of the sequence 0...length(seq) - 1.
 static LogicalResult
@@ -339,9 +345,7 @@ struct StaticizeLinalgExtOp : public OpRewritePattern<OpTy> {
       return failure();
     }
 
-    if (llvm::any_of(op.getIndexingMapsArray(), [](AffineMap map) {
-          return !map.isProjectedPermutation();
-        })) {
+    if (!allIndexingsAreProjectedPermutation(op)) {
       return failure();
     }
 
@@ -2265,14 +2269,6 @@ void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 // ExpReductionOp
 //===----------------------------------------------------------------------===//
 
-bool ExpReductionOp::hasIndexSemantics() {
-  return !this->getBody()->getOps<linalg::IndexOp>().empty();
-}
-
-std::string ExpReductionOp::getLibraryCallName() {
-  return linalg::generateLibraryCallName(getOperation());
-}
-
 LogicalResult ExpReductionOp::verify() {
   Operation *op = getOperation();
 
@@ -2302,7 +2298,7 @@ LogicalResult ExpReductionOp::verify() {
       return op->emitOpError("init must have a shaped type");
   }
 
-  if (!linalg::allIndexingsAreProjectedPermutation(*this))
+  if (!allIndexingsAreProjectedPermutation(*this))
     return op->emitOpError("all indexing maps must be projected permutations");
 
   return success();

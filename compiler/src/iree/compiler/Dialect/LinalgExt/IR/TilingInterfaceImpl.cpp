@@ -87,6 +87,24 @@ createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
   return res;
 }
 
+static SmallVector<Range> getPermutedRange(AffineMap permutation,
+                                           ArrayRef<OpFoldResult> offsets,
+                                           ArrayRef<OpFoldResult> sizes) {
+  auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
+  assert(permutation.isProjectedPermutation() &&
+         "Indexing map should be a projected permutation");
+  SmallVector<Range> output;
+  for (AffineExpr dimExpr : permutation.getResults()) {
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    Range dimRange;
+    dimRange.offset = offsets[dim];
+    dimRange.size = sizes[dim];
+    dimRange.stride = one;
+    output.push_back(dimRange);
+  }
+  return output;
+}
+
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
@@ -1922,9 +1940,6 @@ SmallVector<utils::IteratorType> ExpReductionOp::getLoopIteratorTypes() {
                            utils::IteratorType>());
   return iteratorTypes;
 }
-SmallVector<utils::IteratorType> ExpReductionOp::getIteratorTypesArray() {
-  return getLoopIteratorTypes();
-}
 
 SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
   ExpReductionOp op = *this;
@@ -1946,36 +1961,26 @@ FailureOr<TilingResult>
 ExpReductionOp::getTiledImplementation(OpBuilder &b,
                                        ArrayRef<OpFoldResult> offsets,
                                        ArrayRef<OpFoldResult> sizes) {
-  // Leave the `sizeBounds` value empty. That is only needed when the `sizes`
-  // specified could lead to out of bounds accesses.
   Location loc = getLoc();
+  auto indexingMapOp = cast<IndexingMapOpInterface>(getOperation());
+  SmallVector<Value> valuesToTile = getOperands();
+  SmallVector<Value> tiledOperands;
+  SmallVector<Operation *> generatedSlices;
+  for (OpOperand &opOperand : getOperation()->getOpOperands()) {
+    AffineMap map = indexingMapOp.getMatchingIndexingMap(&opOperand);
+    SmallVector<Range> slice = getPermutedRange(map, offsets, sizes);
+    Operation *sliceOp = getSlice(b, loc, opOperand.get(), slice);
+    tiledOperands.emplace_back(sliceOp->getResult(0));
+    generatedSlices.push_back(sliceOp);
+  }
 
-  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
-
-  assert(linalg::allIndexingsAreProjectedPermutation(*this) &&
-         "all indexing maps should be projected permutations");
-
-  SmallVector<Value> valuesToTile = linalgOp->getOperands();
-  SmallVector<Value> tiledOperands = linalg::makeTiledShapes(
-      b, loc, linalgOp, valuesToTile, offsets, sizes, {}, true);
-  SmallVector<Operation *> generatedSlices = llvm::map_to_vector(
-      llvm::make_filter_range(
-          tiledOperands,
-          [](Value v) -> bool {
-            return isa_and_nonnull<tensor::ExtractSliceOp, memref::SubViewOp>(
-                v.getDefiningOp());
-          }),
-      [](Value v) -> Operation * { return v.getDefiningOp(); });
   SmallVector<Type, 4> resultTensorTypes;
   if (getNumResults()) {
     resultTensorTypes = llvm::map_to_vector<4>(
         getResults(), [](Value v) { return v.getType(); });
   }
 
-  // Input
-
   Operation *tiledOp = mlir::clone(b, *this, resultTensorTypes, tiledOperands);
-  offsetIndices(b, cast<linalg::LinalgOp>(tiledOp), offsets);
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), generatedSlices};
 }
@@ -1985,9 +1990,8 @@ LogicalResult ExpReductionOp::getResultTilePosition(
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
   Location loc = getLoc();
-  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(getOperation());
-  // IndexingMapOpInterface indexingMapOp =
-  //     cast<IndexingMapOpInterface>(getOperation());
+  auto indexingMapOp = cast<IndexingMapOpInterface>(getOperation());
+
   AffineExpr d0;
   bindDims(b.getContext(), d0);
   SmallVector<OpFoldResult> subShapeSizes =
@@ -1995,12 +1999,10 @@ LogicalResult ExpReductionOp::getResultTilePosition(
         return affine::makeComposedFoldedAffineApply(b, loc, d0 - 1, ofr);
       });
 
-  assert(resultNumber < getNumDpsInits());
-
   OpOperand *outOperand = getDpsInitOperand(resultNumber);
   linalg::SliceParameters sliceParams = linalg::computeSliceParameters(
       b, loc, outOperand->get(), sizes,
-      linalgOp.getMatchingIndexingMap(outOperand), offsets,
+      indexingMapOp.getMatchingIndexingMap(outOperand), offsets,
       /*ubs*/ {}, subShapeSizes, true);
   resultOffsets = sliceParams.offsets;
   resultSizes = sliceParams.sizes;
@@ -2586,24 +2588,6 @@ getAttentionIteratorTypes(int64_t domainRank, AffineMap qMap, AffineMap kMap,
   }
 
   return iteratorTypes;
-}
-
-static SmallVector<Range> getPermutedRange(AffineMap permutation,
-                                           ArrayRef<OpFoldResult> offsets,
-                                           ArrayRef<OpFoldResult> sizes) {
-  auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
-  assert(permutation.isProjectedPermutation() &&
-         "Indexing map should be a projected permutation");
-  SmallVector<Range> output;
-  for (AffineExpr dimExpr : permutation.getResults()) {
-    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-    Range dimRange;
-    dimRange.offset = offsets[dim];
-    dimRange.size = sizes[dim];
-    dimRange.stride = one;
-    output.push_back(dimRange);
-  }
-  return output;
 }
 
 static Operation *getPermutedSlice(OpBuilder &b, Location loc, Value val,
