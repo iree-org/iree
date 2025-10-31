@@ -1961,6 +1961,11 @@ FailureOr<TilingResult>
 ExpReductionOp::getTiledImplementation(OpBuilder &b,
                                        ArrayRef<OpFoldResult> offsets,
                                        ArrayRef<OpFoldResult> sizes) {
+  if (!getBody()->getOps<linalg::IndexOp>().empty()) {
+    return getOperation()->emitOpError(
+        "tiling of operations using linalg.index is not supported for now");
+  }
+
   Location loc = getLoc();
   auto indexingMapOp = cast<IndexingMapOpInterface>(getOperation());
   SmallVector<Value> valuesToTile = getOperands();
