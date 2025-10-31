@@ -134,10 +134,10 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
     // Replace any unrealized conversions to tensor.cast ops if they come from
-    // block arguments. The function signature is updated to match the
-    // converted types after the partial conversion. This is used in testing,
-    // where function arguments have encodings to reduce the amount of IR, but
-    // we do not expect function arguments to have encodings in practice.
+    // block arguments. The function signature is updated to match the converted
+    // types after the partial conversion. This is used in testing, where
+    // function arguments have encodings to reduce the amount of IR, but we do
+    // not expect function arguments to have encodings in practice.
     auto castFnArguments = [](OpBuilder &builder, Type resultTy,
                               ValueRange inputs, Location loc) -> Value {
       if (inputs.size() != 1) {
