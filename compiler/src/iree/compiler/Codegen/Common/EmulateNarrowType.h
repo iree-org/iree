@@ -9,8 +9,6 @@
 #include "mlir/Dialect/Arith/Transforms/NarrowTypeEmulationConverter.h"
 #include "mlir/IR/PatternMatch.h"
 
-using namespace mlir;
-
 namespace mlir::iree_compiler {
 using NarrowTypeConversionPopulationFn =
     std::function<void(arith::NarrowTypeEmulationConverter &,
