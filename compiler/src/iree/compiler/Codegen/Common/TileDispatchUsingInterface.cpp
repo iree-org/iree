@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
@@ -48,13 +49,11 @@ fillInterchangeVector(ArrayRef<unsigned> interchangeVector,
 }
 
 /// Compute the procInfo for a single loop dimension
-static SmallVector<linalg::ProcInfo>
+static linalg::ProcInfo
 getLoopProcInfo(RewriterBase &rewriter, Location loc, const Range &range,
                 OpFoldResult tileSize,
                 linalg::LinalgLoopDistributionOptions *distribution) {
-  if (!distribution) {
-    return {};
-  }
+  assert(distribution && "distribution must be provided");
 
   SmallVector<Range> singleLoopRange;
   AffineExpr s0, s1;
@@ -64,7 +63,10 @@ getLoopProcInfo(RewriterBase &rewriter, Location loc, const Range &range,
   Range r = {range.offset, range.size, parallelLoopStep};
   singleLoopRange.push_back(r);
 
-  return distribution->procInfo(rewriter, loc, singleLoopRange);
+  SmallVector<linalg::ProcInfo> procInfos =
+      distribution->procInfo(rewriter, loc, singleLoopRange);
+  assert(!procInfos.empty() && "procInfo must return at least one element");
+  return procInfos[0];
 }
 
 /// Given the `lb` and `step` of a loop, return the lower bound and step to use
@@ -332,14 +334,16 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
         rewriter, loc, numTilesExprs,
         {range.offset, range.size, range.stride, tileSize});
     if (isOneInteger(numTiles)) {
-      // Check if the distribution method would be non-Cyclic
+      // Check if the procId would be a thread ID
       if (options.distribution) {
-        SmallVector<linalg::ProcInfo> singleLoopProcInfo = getLoopProcInfo(
+        linalg::ProcInfo singleLoopProcInfo = getLoopProcInfo(
             rewriter, loc, range, tileSize, &(*options.distribution));
 
-        if (!singleLoopProcInfo.empty() &&
-            singleLoopProcInfo[0].distributionMethod !=
-                linalg::DistributionMethod::Cyclic) {
+        // Check if procId is a gpu.thread_id - if not, skip this loop
+        if (!singleLoopProcInfo.procId ||
+            !singleLoopProcInfo.procId.getDefiningOp<gpu::ThreadIdOp>()) {
+          // llvm::errs() << "    -> Skipping loop " << index << " because
+          // procId is not a gpu.thread_id\n";
           continue;
         }
       }
