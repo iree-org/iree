@@ -20,6 +20,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -43,10 +44,14 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-form-dispatch-regions"
 
 namespace mlir::iree_compiler::DispatchCreation {
+
+// Maximum number of operands allowed for a dispatch region.
+constexpr int kIreeMaxOperandCount = 16;
 
 #define GEN_PASS_DEF_FORMDISPATCHREGIONSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
@@ -145,6 +150,45 @@ public:
   // Insert `op` into the fusion group.
   void insert(Operation *op);
 
+  // Check if adding `op` would exceed the operand limit.
+  bool wouldExceedOperandLimit(Operation *op) const;
+
+  bool hasTransitiveDependencyOnFusionGroup(Operation *op) const {
+    BackwardSliceOptions options;
+    DominanceInfo dominance(op);
+    options.inclusive = true;
+    options.omitUsesFromAbove = false;
+    options.omitBlockArguments = true;
+    options.filter = [&](Operation *sliceBoundaryOp) {
+      return !llvm::all_of(
+          loopMaps.getArrayRef(), [&](std::pair<Operation *, AffineMap> pair) {
+            return dominance.properlyDominates(sliceBoundaryOp, pair.first);
+          });
+    };
+
+    llvm::SetVector<Operation *> slice;
+    auto populateSlice = [&](OpOperand *operand) {
+      // It's okay if the consumer directly uses an operation in the fusion
+      // group.
+      if (loopMaps.contains(operand->get().getDefiningOp())) {
+        return;
+      }
+      LogicalResult result = getBackwardSlice(operand->get(), &slice, options);
+      assert(result.succeeded() && "expected a backward slice");
+      (void)result;
+    };
+
+    mlir::visitUsedValuesDefinedAbove(op->getRegions(), populateSlice);
+    for (OpOperand &operand : op->getOpOperands()) {
+      populateSlice(&operand);
+    }
+
+    return llvm::any_of(loopMaps.getArrayRef(),
+                        [&](std::pair<Operation *, AffineMap> pair) {
+                          return slice.contains(pair.first);
+                        });
+  }
+
 private:
   Operation *rootOp;
   // All operations to be fused with the root op. This does not include
@@ -171,6 +215,42 @@ void FusionGroup::insert(Operation *op) {
     map = inverseAndBroadcastProjectedPermutation(map);
     loopMaps.insert({op, map});
   }
+}
+
+bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
+  llvm::SmallSetVector<Operation *, kIreeMaxOperandCount> dispatchOperands;
+  int64_t numResults = 0;
+
+  auto visitOp = [&](Operation *op) {
+    auto visitOperand = [&](OpOperand *operand) {
+      if (!isa<RankedTensorType>(operand->get().getType())) {
+        return;
+      }
+      Operation *definingOp = operand->get().getDefiningOp();
+      if (llvm::isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(definingOp)) {
+        return;
+      }
+      if (definingOp && definingOp != newOp && !loopMaps.contains(definingOp)) {
+        dispatchOperands.insert(definingOp);
+      }
+    };
+    visitUsedValuesDefinedAbove(op->getRegions(), visitOperand);
+    llvm::for_each(llvm::make_pointer_range(op->getOpOperands()), visitOperand);
+
+    for (OpResult result : op->getResults()) {
+      if (llvm::any_of(result.getUsers(), [&](Operation *user) {
+            return user != newOp && !loopMaps.contains(user);
+          })) {
+        ++numResults;
+      }
+    }
+  };
+
+  visitOp(newOp);
+  for (auto [op, map] : this->loopMaps) {
+    visitOp(op);
+  }
+  return (dispatchOperands.size() + numResults) > kIreeMaxOperandCount;
 }
 
 FailureOr<AffineMap>
@@ -580,6 +660,11 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     return false;
   }
 
+  // Check operand limit before allowing fusion
+  if (tracker.getFusionGroup(producer).wouldExceedOperandLimit(consumer)) {
+    return false;
+  }
+
   // Check if the iteration spaces of the producer and consumer are same.
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
@@ -649,21 +734,15 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         continue;
       }
 
-      // For now prune the fusable uses due to codegen failures. Ideally we
-      // should just be taking the whole set of fusable uses.
-      if (IREE::LinalgExt::isBitTruncateOp(fusableUses.front()->getOwner())) {
-        fusableUses =
-            llvm::filter_to_vector(fusableUses, [](OpOperand *operand) {
-              return IREE::LinalgExt::isBitTruncateOp(operand->getOwner());
-            });
-      } else {
-        fusableUses.resize(1);
-      }
-
       // Analyse the use to see if it is fusable.
       for (OpOperand *fusableUse : fusableUses) {
         Operation *consumerOp = fusableUse->getOwner();
         if (tracker.isRootOp(consumerOp) || tracker.isFusedOp(consumerOp)) {
+          continue;
+        }
+
+        if (tracker.getFusionGroup(currRoot)
+                .hasTransitiveDependencyOnFusionGroup(fusableUse->getOwner())) {
           continue;
         }
 
@@ -743,6 +822,12 @@ static bool isFusableWithProducer(OpOperand &operand,
   if (!tracker.getFusionGroup(consumer).isFusable(producer)) {
     return false;
   }
+
+  // Check operand limit before allowing fusion
+  if (tracker.getFusionGroup(consumer).wouldExceedOperandLimit(producer)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -974,7 +1059,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       auto newRegionOp = IREE::Flow::moveFollowingOpIntoDispatchRegion(
           rewriter, consumer, regionOp);
       if (failed(newRegionOp)) {
-        continue;
+        return consumer->emitOpError("failed to move consumer into region");
       }
       regionOp = *newRegionOp;
     }
