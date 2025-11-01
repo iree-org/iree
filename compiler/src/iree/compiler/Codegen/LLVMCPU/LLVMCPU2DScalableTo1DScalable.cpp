@@ -105,7 +105,7 @@ static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
   using TilingLevel = IREE::CPU::TilingLevel;
   MLIRContext *ctx = loweringConfig.getContext();
   SmallVector<NamedAttribute> items;
-  for (auto i : IREE::CPU::getTilingLevelsAsInts()) {
+  for (int i : IREE::CPU::getTilingLevelsAsInts()) {
     if (!loweringConfig.hasTilingLevel(i)) {
       continue;
     }
