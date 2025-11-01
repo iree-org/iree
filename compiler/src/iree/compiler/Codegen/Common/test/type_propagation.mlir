@@ -544,3 +544,46 @@ func.func @branch_op() {
 // CHECK-LABEL: func @branch_op()
 //       CHECK:   cf.cond_br %{{.+}}, ^bb1(%{{.+}} : tensor<i8>), ^bb1(%{{.+}} : tensor<i8>)
 //       CHECK: ^bb1(%{{.+}}: tensor<i8>)
+
+// -----
+
+func.func @reduce_op() {
+  %true = arith.constant true
+  %c0 = arith.constant 0 : index
+  %c64 = arith.constant 64 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1xi8>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c64) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i8>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1xi8>> -> tensor<1x1xi8>
+  %3 = arith.trunci %2 : tensor<1x1xi8> to tensor<1x1xi1>
+  %4 = tensor.empty() : tensor<i1>
+  %5 = linalg.fill ins(%true : i1) outs(%4 : tensor<i1>) -> tensor<i1>
+  %reduced = linalg.reduce ins(%3 : tensor<1x1xi1>) outs(%5 : tensor<i1>) dimensions = [0, 1]
+    (%in: i1, %init: i1) {
+      %7 = arith.andi %in, %init : i1
+      linalg.yield %7 : i1
+    }
+  %6 = arith.extui %reduced : tensor<i1> to tensor<i8>
+  iree_tensor_ext.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = [] : tensor<i8> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i8>>
+  return
+}
+// CHECK-LABEL: func.func @reduce_op()
+//   CHECK-DAG:   %[[TRUE:.+]] = arith.constant true
+//   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan {{.*}} binding(0)
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1xi8>>
+//   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan {{.*}} binding(1)
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i8>>
+//   CHECK-DAG:   %[[INTENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN]]
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty() : tensor<i8>
+//   CHECK-DAG:   %[[TRUEEXT:.+]] = arith.extui %[[TRUE]] : i1 to i8
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[TRUEEXT]] : i8) outs(%[[INIT]] : tensor<i8>)
+//       CHECK:   %[[REDUCED:.+]] = linalg.reduce
+//  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<1x1xi8>)
+//  CHECK-SAME:       outs(%[[FILL]] : tensor<i8>)
+//  CHECK-SAME:       dimensions = [0, 1]
+//  CHECK-NEXT:     (%[[ARG0:[a-zA-Z0-9]+]]: i8, %[[ARG1:[a-zA-Z0-9]+]]: i8)
+//   CHECK-DAG:       %[[TRUNC0:.+]] = arith.trunci %[[ARG0]] : i8 to i1
+//   CHECK-DAG:       %[[TRUNC1:.+]] = arith.trunci %[[ARG1]] : i8 to i1
+//   CHECK-DAG:       %[[ANDI:.+]] = arith.andi %[[TRUNC0]], %[[TRUNC1]] : i1
+//   CHECK-DAG:       %[[EXTUI:.+]] = arith.extui %[[ANDI]] : i1 to i8
+//       CHECK:       linalg.yield %[[EXTUI]] : i8
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[REDUCED]], %[[OUT]]
