@@ -47,6 +47,26 @@ fillInterchangeVector(ArrayRef<unsigned> interchangeVector,
   return filledVector;
 }
 
+/// Compute the procInfo for a single loop dimension
+static SmallVector<linalg::ProcInfo>
+getLoopProcInfo(RewriterBase &rewriter, Location loc, const Range &range,
+                OpFoldResult tileSize,
+                linalg::LinalgLoopDistributionOptions *distribution) {
+  if (!distribution) {
+    return {};
+  }
+
+  SmallVector<Range> singleLoopRange;
+  AffineExpr s0, s1;
+  bindSymbols(rewriter.getContext(), s0, s1);
+  OpFoldResult parallelLoopStep = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, s0 * s1, {range.stride, tileSize});
+  Range r = {range.offset, range.size, parallelLoopStep};
+  singleLoopRange.push_back(r);
+
+  return distribution->procInfo(rewriter, loc, singleLoopRange);
+}
+
 /// Given the `lb` and `step` of a loop, return the lower bound and step to use
 /// for a distributed loop. Replace the iteration domain to
 /// - lb_partitioned = lb + procId * step
@@ -312,8 +332,16 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
         rewriter, loc, numTilesExprs,
         {range.offset, range.size, range.stride, tileSize});
     if (isOneInteger(numTiles)) {
-      if (iteratorType != utils::IteratorType::parallel) {
-        continue;
+      // Check if the distribution method would be non-Cyclic
+      if (options.distribution) {
+        SmallVector<linalg::ProcInfo> singleLoopProcInfo = getLoopProcInfo(
+            rewriter, loc, range, tileSize, &(*options.distribution));
+
+        if (!singleLoopProcInfo.empty() &&
+            singleLoopProcInfo[0].distributionMethod !=
+                linalg::DistributionMethod::Cyclic) {
+          continue;
+        }
       }
     }
 
