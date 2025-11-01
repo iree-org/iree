@@ -164,6 +164,7 @@ ValuePerAffinityHelper::getOrCreateGlobalForAffinity(
   // The cache was already populated in the constructor.
   Operation *insertionPoint =
       cachedInsertionPointForGlobal.lookup(globalOp.getOperation());
+  assert(insertionPoint && "failed to find insertion point for global");
 
   // Create the new global and initializer after the insertion point.
   Location loc = globalOp.getLoc();
@@ -223,8 +224,13 @@ Value ValuePerAffinityHelper::getOrCreateAffinityOpForAffinity(
       clone(builder, affinityOp, affinityOp->getResultTypes(), newOperands);
   newAffinityOp->setDiscardableAttrs(
       affinityOp->getDiscardableAttrDictionary());
-  cachedValuePerAffinity[key] =
-      newAffinityOp->getResult(opResult.getResultNumber());
+  // Cache all the results, so it won't create new operations when querying for
+  // other results that have the same affinity.
+  for (auto [oldResult, newResult] :
+       llvm::zip_equal(affinityOp->getResults(), newAffinityOp->getResults())) {
+    ValueAffinityPair resultKey = {oldResult, affinityAttr};
+    cachedValuePerAffinity[resultKey] = newResult;
+  }
   return cachedValuePerAffinity[key];
 }
 
@@ -516,6 +522,16 @@ void ReplicateGlobalsPerAffinityPass::runOnOperation() {
 
     IREE::Stream::AffinityAttr executionAffinityAttr = *affinityAttrs.begin();
     LDBG() << "updating operands with the affinity: " << executionAffinityAttr;
+
+    // Order matters here because it is wrong if an operand is already updated
+    // with a new value. E.g.,
+    //   %0 = flow.dispatch @dispatch0(%global)
+    //   %1 = flow.reshape %0 ...
+    // If we update %0 first, then when updating %1 we will see a new global
+    // from %0 which uses the new global, that is not cached in
+    // `globalPerAffinityHelper`.
+    // Thus, we collect all the updates first, then apply them.
+    SmallVector<std::pair<OpOperand *, Value>> updateList;
     for (auto [operand, maybeGlobalOp] : opToGlobalUseMap[affinityOp]) {
       if (maybeGlobalOp) {
         rewriter.setInsertionPoint(affinityOp);
@@ -525,11 +541,15 @@ void ReplicateGlobalsPerAffinityPass::runOnOperation() {
         auto newLoadOp = IREE::Util::GlobalLoadOp::create(
             rewriter, affinityOp.getLoc(), newGlobalOp);
         newLoadOp.setIsImmutable(true);
-        operand->assign(newLoadOp.getLoadedGlobalValue());
+        updateList.push_back({operand, newLoadOp.getLoadedGlobalValue()});
       } else {
-        operand->assign(globalPerAffinityHelper.getOrCreateValueForAffinity(
-            operand, executionAffinityAttr));
+        updateList.push_back(
+            {operand, globalPerAffinityHelper.getOrCreateValueForAffinity(
+                          operand, executionAffinityAttr)});
       }
+    }
+    for (auto [opOperand, newValue] : updateList) {
+      opOperand->assign(newValue);
     }
   }
 }
