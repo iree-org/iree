@@ -46,11 +46,11 @@ jobs:
           - name: amdgpu_hip_rdna3_O3
             numprocesses: 1
             config-file: onnx_ops_gpu_hip_rdna3_O3.json
-            runs-on: iree-w7900x2
+            runs-on: [Linux, X64, gfx1100]
           - name: amdgpu_vulkan_O0
             numprocesses: 4
             config-file: onnx_ops_gpu_vulkan_O0.json
-            runs-on: iree-w7900x2
+            runs-on: [Linux, X64, rdna3]
 
           # NVIDIA GPU
           # TODO(#18238): migrate to new runner cluster
@@ -153,10 +153,10 @@ jobs:
           # AMD GPU
           - name: amdgpu_hip_rdna3
             config-file: onnx_models_gpu_hip_rdna3.json
-            runs-on: iree-w7900x2
+            runs-on: [Linux, X64, gfx1100, persistent-cache]
           - name: amdgpu_vulkan
             config-file: onnx_models_gpu_vulkan.json
-            runs-on: iree-w7900x2
+            runs-on: [Linux, X64, rdna3, persistent-cache]
 
           # NVIDIA GPU
           # TODO(#18238): migrate to new runner cluster
