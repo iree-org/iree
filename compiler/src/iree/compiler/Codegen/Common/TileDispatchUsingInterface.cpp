@@ -292,40 +292,6 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
       getAsOpFoldResult(options.tileSizeComputationFunction(rewriter, op));
   tileSizes.resize(numLoops, rewriter.getIndexAttr(0));
 
-  // Assume all loops are going to be tiled, so try to get procInfo like line
-  // 370 for each dim here.
-  SmallVector<linalg::ProcInfo> shadowProcInfo;
-  SmallVector<int> shadowLoopIndexToProcInfoIndex(numLoops, -1);
-  if (options.distribution) {
-    SmallVector<Range> shadowParallelLoopRanges;
-
-    // Build ranges only for PARALLEL loops (to avoid GPU dimension assertion)
-    auto loopTypes = op.getLoopIteratorTypes();
-    int procInfoIdx = 0;
-    for (auto loopIdx : llvm::seq<unsigned>(0, numLoops)) {
-      // Only process parallel loops for distribution
-      if (loopTypes[loopIdx] != utils::IteratorType::parallel) {
-        continue;
-      }
-
-      AffineExpr s0, s1;
-      bindSymbols(rewriter.getContext(), s0, s1);
-      OpFoldResult parallelLoopStep = affine::makeComposedFoldedAffineApply(
-          rewriter, loc, s0 * s1,
-          {iterationDomain[loopIdx].stride, tileSizes[loopIdx]});
-      Range r = {iterationDomain[loopIdx].offset, iterationDomain[loopIdx].size,
-                 parallelLoopStep};
-      shadowParallelLoopRanges.emplace_back(std::move(r));
-
-      // Map loop index to procInfo index
-      shadowLoopIndexToProcInfoIndex[loopIdx] = procInfoIdx++;
-    }
-
-    // Call the distribution procInfo callback with parallel loops only
-    shadowProcInfo =
-        options.distribution->procInfo(rewriter, loc, shadowParallelLoopRanges);
-  }
-
   IREETilingResult tilingResult;
   tilingResult.tiledLoops.resize(numLoops, false);
   AffineExpr s0, s1, s2, s3; // lb, ub, step, tileSize
@@ -346,14 +312,8 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
         rewriter, loc, numTilesExprs,
         {range.offset, range.size, range.stride, tileSize});
     if (isOneInteger(numTiles)) {
-      // Check if this dimension would use non-Cyclic distribution
-      // Use the mapping since shadowProcInfo only contains parallel loops
-      if (options.distribution && shadowLoopIndexToProcInfoIndex[index] >= 0) {
-        int procInfoIdx = shadowLoopIndexToProcInfoIndex[index];
-        if (shadowProcInfo[procInfoIdx].distributionMethod !=
-            linalg::DistributionMethod::Cyclic) {
-          continue;
-        }
+      if (iteratorType != utils::IteratorType::parallel) {
+        continue;
       }
     }
 
