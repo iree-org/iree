@@ -26,6 +26,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -204,11 +205,58 @@ struct DropUnitDimsFromCollapseOfExpand
   }
 };
 
-} // namespace
+// Fold unit dims from `tensor.extract` ops.
+struct FoldUnitDimsFromExtractOp : OpRewritePattern<tensor::ExtractOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
+                                PatternRewriter &rewriter) const override {
+    RankedTensorType srcType = extractOp.getTensor().getType();
+    if (srcType.getShape().empty() ||
+        llvm::none_of(srcType.getShape(),
+                      [](int64_t size) { return size == 1; })) {
+      return failure();
+    }
+    SmallVector<Value> oldIndices = extractOp.getIndices();
 
-//===----------------------------------------------------------------------===//
-// Pass helpers
-//===----------------------------------------------------------------------===//
+    SmallVector<int64_t> newShape;
+    SmallVector<Value> newIndices;
+    SmallVector<ReassociationIndices> reassoc;
+    ReassociationIndices currReassoc;
+
+    // Build reassociation groups where each non-unit dimension forms one output
+    // dimension, and unit dimensions are grouped with adjacent non-unit dims.
+    for (auto [idx, size] : llvm::enumerate(srcType.getShape())) {
+      currReassoc.push_back(idx);
+
+      if (size != 1) {
+        // Non-unit dimension: this forms one output dimension
+        // Finish current group and start a new one
+        reassoc.push_back(std::move(currReassoc));
+        currReassoc.clear();
+        newShape.push_back(size);
+        newIndices.push_back(oldIndices[idx]);
+      }
+    }
+
+    // If we have trailing unit dims, merge them with the last group
+    if (!currReassoc.empty() && !reassoc.empty()) {
+      reassoc.back().append(currReassoc.begin(), currReassoc.end());
+    }
+
+    rewriter.setInsertionPointAfterValue(extractOp.getTensor());
+    auto collapseOp = tensor::CollapseShapeOp::create(
+        rewriter, extractOp.getLoc(), extractOp.getTensor(), reassoc);
+
+    rewriter.setInsertionPointAfter(extractOp);
+    auto newExtract = tensor::ExtractOp::create(
+        rewriter, extractOp.getLoc(), extractOp.getResult().getType(),
+        collapseOp.getResult(), newIndices);
+    rewriter.replaceOp(extractOp, newExtract);
+    return success();
+  }
+};
+
+} // namespace
 
 static void
 populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
@@ -230,8 +278,9 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
   IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
                                                       options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
-  foldUnitDimsPatterns.insert<DropUnitDimsFromCollapseOfExpand>(
-      foldUnitDimsPatterns.getContext());
+  foldUnitDimsPatterns
+      .insert<DropUnitDimsFromCollapseOfExpand, FoldUnitDimsFromExtractOp>(
+          foldUnitDimsPatterns.getContext());
 }
 
 static LogicalResult
