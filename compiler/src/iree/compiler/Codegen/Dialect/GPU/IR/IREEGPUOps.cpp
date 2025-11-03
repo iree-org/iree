@@ -14,8 +14,6 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/Interfaces/DestinationStyleOpInterface.h"
-#include "mlir/Interfaces/ParallelCombiningOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -207,7 +205,8 @@ Operation *CoalescedGatherDMAOp::getIteratingParent() {
 }
 
 LogicalResult CoalescedGatherDMAOp::verify() {
-  auto initType = getInit().getType();
+  TypedValue<ShapedType> init = getInit();
+  auto initType = init.getType();
 
   bool hasTensor = isa<RankedTensorType>(initType);
   bool hasMemRef = isa<MemRefType>(initType);
@@ -219,42 +218,27 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   auto initShape = cast<ShapedType>(initType).getShape();
   auto sourceType = cast<ShapedType>(getSource().getType());
 
-  auto checkSourceType = [&]() -> LogicalResult {
-    if (hasTensor && !isa<RankedTensorType>(sourceType)) {
-      return emitOpError("source must be tensor when init is tensor");
-    }
-    if (hasMemRef && !isa<MemRefType>(sourceType)) {
-      return emitOpError("source must be memref when init is memref");
-    }
-    return success();
-  };
+  if (hasTensor && !isa<RankedTensorType>(sourceType)) {
+    return emitOpError("source must be tensor when init is tensor");
+  }
+  if (hasMemRef && !isa<MemRefType>(sourceType)) {
+    return emitOpError("source must be memref when init is memref");
+  }
 
-  if (!getIndices().empty()) {
-    // Gather mode:
-    auto indicesValues = getIndices();
+  auto indices = getIndices();
+  auto sourceShape = sourceType.getShape();
 
-    if (failed(checkSourceType()))
-      return failure();
-
-    size_t numIndices = indicesValues.size();
-    if (numIndices > initShape.size()) {
-      return emitOpError(
-          "number of indices must not exceed the result/init rank");
-    }
-
-    if (numIndices > sourceType.getRank()) {
-      return emitOpError("number of indices (")
-             << numIndices << ") must not exceed the source rank ("
-             << sourceType.getRank() << ")";
-    }
-  } else {
-    // Copy mode:
-    if (failed(checkSourceType()))
-      return failure();
-
-    if (sourceType.getShape().size() != initShape.size()) {
-      return emitOpError("source and init must have the same rank when indices "
-                         "are not present");
+  for (auto [dim, size] : llvm::enumerate(initShape)) {
+    if (dim < indices.size()) {
+      auto indexShape = cast<ShapedType>(indices[dim].getType()).getShape();
+      if (indexShape.size() != 1 || indexShape[0] != size) {
+        return emitOpError("expected index ")
+               << dim << " to be a 1-D tensor of " << size << " elements";
+      }
+      if (sourceShape[dim] != size) {
+        return emitOpError("expected unindexed dimension ")
+               << dim << " to have same length in source and destination";
+      }
     }
   }
 
