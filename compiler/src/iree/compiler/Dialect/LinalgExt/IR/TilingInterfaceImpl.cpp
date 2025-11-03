@@ -1998,8 +1998,13 @@ LogicalResult ExpReductionOp::getResultTilePosition(
   OpOperand *outOperand = getDpsInitOperand(resultNumber);
   AffineMap indexingMap = indexingMapOp.getMatchingIndexingMap(outOperand);
   SmallVector<Range> range = getPermutedRange(indexingMap, offsets, sizes);
-  resultOffsets = llvm::map_to_vector(range, [](Range &r) { return r.offset; });
-  resultSizes = llvm::map_to_vector(range, [](Range &r) { return r.size; });
+
+  resultOffsets.resize(range.size());
+  resultSizes.resize(range.size());
+  for (auto [index, r] : llvm::enumerate(range)) {
+    resultOffsets[index] = r.offset;
+    resultSizes[index] = r.size;
+  }
   return success();
 }
 
