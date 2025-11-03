@@ -15,6 +15,7 @@ include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Dialect/Linalg/IR/LinalgBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/Properties.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/TilingInterface.td"
@@ -508,6 +509,61 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
   }];
 
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// HintWorkgroupCountOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_WorkgroupCountHintOp :
+    Op<IREECodegen_Dialect, "workgroup_count_hint", []> {
+  let summary = [{Hints at the workgroup count to set}];
+
+  let description = [{
+    Captures a set of values to use as the workgroup count. The backward slice
+    starting from this op's operands are cloned into the workgroup count region
+    of all transitive callers.
+
+    If `maxDim` is specified, the outer most sizes are linearized down to the
+    `maxDim`th count. `maxDim` is zero-indexed. If multiple hints inform the
+    same entry point, the maximum per dim is used as the count along that dim.
+    For example,
+
+    ```
+    hal.executable.export @entry_point
+    module {
+      func @entry_point() {
+        iree_codegen.workgroup_count_hint sizes(%a, %b) maxDim(0)
+        iree_codegen.workgroup_count_hint sizes(%c, %d, %e) maxDim(1)
+      }
+    }
+    ```
+
+    resolves to
+
+    ```
+    hal.executable.export @entry_point {
+      return max(%a * %b, %c), %d, %e
+    }
+    ```
+
+    `maxDim` must be ∈ {0, 1, 2} = {x, y, z}.
+  }];
+
+  let arguments = (ins
+    Variadic<Index>:$sizes,
+    DenseI64ArrayAttr:$static_sizes
+  );
+  let results = (outs);
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    /// Returns a vector with all the static and dynamic sizes.
+    SmallVector<OpFoldResult> getMixedSizes() {
+      OpBuilder builder(getContext());
+      return ::mlir::getMixedValues(getStaticSizes(), getSizes(), builder);
+    }
+  }];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS
