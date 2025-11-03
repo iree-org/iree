@@ -16,7 +16,6 @@ else()
   add_compile_options(-Wno-deprecated-declarations)
 endif()
 
-
 iree_cc_library(
   NAME
     defs
