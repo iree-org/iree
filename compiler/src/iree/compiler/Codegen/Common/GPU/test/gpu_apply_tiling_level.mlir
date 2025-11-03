@@ -679,3 +679,36 @@ module {
 // SERIAL: linalg.generic
 // SERIAL: scf.forall.in_parallel
 // SERIAL-NOT: mapping
+
+// -----
+
+#config = #iree_gpu.lowering_config<{serial = [0, 16]}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @serial_tiling_consumer_fusion(%3: tensor<4x256xf32>, %4: tensor<4x256xf32>, %5: tensor<4x256xf32>) -> tensor<4x256xf32> {
+    %6 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]
+      } ins(%3, %4 : tensor<4x256xf32>, tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %7 = arith.addf %in, %in_0 : f32
+      linalg.yield %7 : f32
+    } -> tensor<4x256xf32>
+    %out = linalg.generic {
+      indexing_maps = [#map, #map],
+      iterator_types = ["parallel", "parallel"]
+    } ins(%6 : tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %8 = arith.mulf %in, %in : f32
+      linalg.yield %8 : f32
+    }-> tensor<4x256xf32>
+    return %out : tensor<4x256xf32>
+  }
+}
+
+// SERIAL-LABEL: func.func @serial_tiling
+// SERIAL: scf.forall ({{.*}}) = (0) to (256) step (16)
+// SERIAL: linalg.generic
+// SERIAL: linalg.generic
+// SERIAL: scf.forall.in_parallel
+// SERIAL-NOT: mapping

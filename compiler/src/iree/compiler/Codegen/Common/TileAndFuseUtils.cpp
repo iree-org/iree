@@ -243,21 +243,27 @@ static llvm::SmallDenseSet<Operation *>
 collectTiledAndFusedOps(Operation *op,
                         llvm::SmallDenseSet<TilingInterface> exclude) {
   SmallVector<Operation *> worklist;
-  llvm::SmallDenseSet<Operation *> producers;
+  llvm::SmallDenseSet<Operation *> ops;
   worklist.push_back(op);
-  producers.insert(op);
+  ops.insert(op);
   while (!worklist.empty()) {
     Operation *current = worklist.pop_back_val();
     for (OpOperand &operand : current->getOpOperands()) {
       auto producer = operand.get().getDefiningOp<TilingInterface>();
-      if (!producer || producers.contains(producer) ||
-          exclude.contains(producer))
+      if (!producer || ops.contains(producer) || exclude.contains(producer))
         continue;
       worklist.push_back(producer);
-      producers.insert(producer);
+      ops.insert(producer);
+    }
+    for (auto user : current->getUsers()) {
+      auto consumer = dyn_cast<TilingInterface>(user);
+      if (!consumer || ops.contains(consumer) || exclude.contains(consumer))
+        continue;
+      worklist.push_back(consumer);
+      ops.insert(consumer);
     }
   }
-  return producers;
+  return ops;
 }
 
 LogicalResult applyTileAndFuseToEachRoot(
@@ -444,6 +450,25 @@ LogicalResult applyTileAndFuseToEachRoot(
 
       if (toReplace->use_empty()) {
         rewriter.eraseOp(toReplace);
+      }
+    }
+
+    // Consumer fusion for scf.forall ops.
+    if (tilingOptions.loopType == scf::SCFTilingOptions::LoopType::ForallOp) {
+      FailureOr<std::queue<Operation *>> newFusionOpportunities =
+          fuseConsumersIntoForall(
+              rewriter, tiledResults->tiledAndFusedOps.getArrayRef(),
+              tiledResults->loops, [&tiledAndFusedOps](Operation *op) {
+                return tiledAndFusedOps.contains(op);
+              });
+      // Allow failure here to continue the worklist.
+      if (!failed(newFusionOpportunities)) {
+        // Because we restrict to at most a single tilable consumer for yielding
+        // a replacement, no new fusion opportunities will yield a replacement,
+        // meaning there is no need to run consumer fusion again afterwards.
+        // TODO: run producer and consumer fusion in one worklist.
+        fuseProducersOfSlices(rewriter, *newFusionOpportunities,
+                              tileAndFuseOptions, tiledResults->loops);
       }
     }
   }
