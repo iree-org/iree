@@ -67,15 +67,13 @@ getStaticOrReifiedInputDims(OpBuilder &builder, Location loc, Value input,
   return success();
 }
 
-/// gets the rank of the opOperand's type
-static int64_t getRank(OpOperand &opOperand) {
-  ShapedType type = dyn_cast<ShapedType>(opOperand.get().getType());
-  if (!type) {
-    assert(opOperand.get().getType().isIntOrIndexOrFloat() &&
-           "unshaped type should be int or index or float");
-    return 0;
+/// Returns the rank of the Value's type, and 0 if it is not a ShapedType.
+static int64_t getRank(Value v) {
+  ShapedType type = dyn_cast<ShapedType>(v.getType());
+  if (type) {
+    return type.getRank();
   }
-  return type.getRank();
+  return 0;
 }
 
 /// Method similar to `LinalgOp`s that concatenates shapes of all operands.
@@ -83,21 +81,21 @@ static SmallVector<OpFoldResult>
 createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
   SmallVector<OpFoldResult> res;
   for (OpOperand &opOperand : op->getOpOperands()) {
-    for (auto dim : llvm::seq(getRank(opOperand))) {
+    for (auto dim : llvm::seq(getRank(opOperand.get()))) {
       res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), dim));
     }
   }
   return res;
 }
 
-/// permutes the offset and size arrays by the result indexes of the provided
+/// Permutes the offset and size arrays by the result indexes of the provided
 /// affine map
 static SmallVector<Range> getPermutedRange(AffineMap permutation,
                                            ArrayRef<OpFoldResult> offsets,
                                            ArrayRef<OpFoldResult> sizes) {
   auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
   assert(permutation.isProjectedPermutation() &&
-         "Indexing map should be a projected permutation");
+         "Affine map should be a projected permutation");
   SmallVector<Range> output;
   for (AffineExpr dimExpr : permutation.getResults()) {
     int dim = cast<AffineDimExpr>(dimExpr).getPosition();
@@ -1980,8 +1978,7 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
     resultTensorTypes = llvm::map_to_vector<4>(
         getDpsInitsMutable(), [&generatedSlices](OpOperand &opOperand) {
           return generatedSlices[opOperand.getOperandNumber()]
-              ->getResult(0)
-              .getType();
+              ->getResultTypes()[0];
         });
   }
 
@@ -1998,7 +1995,6 @@ LogicalResult ExpReductionOp::getResultTilePosition(
   OpOperand *outOperand = getDpsInitOperand(resultNumber);
   AffineMap indexingMap = indexingMapOp.getMatchingIndexingMap(outOperand);
   SmallVector<Range> range = getPermutedRange(indexingMap, offsets, sizes);
-
   resultOffsets.resize(range.size());
   resultSizes.resize(range.size());
   for (auto [index, r] : llvm::enumerate(range)) {
