@@ -38,6 +38,8 @@
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.cpp.inc"
 
+#define DEBUG_TYPE "iree-gpu-attrs"
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
