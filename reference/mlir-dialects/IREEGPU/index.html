@@ -6414,7 +6414,8 @@ Calculation breakdown:
   int64_t,   # subgroups_m
   int64_t,   # intrinsics_n
   int64_t,   # subgroups_n
-  int64_t   # intrinsics_k
+  int64_t,   # intrinsics_k
+  int64_t   # subgroups_k
 &gt;
 </code></pre></div>
 <p>This mma variant represents MMA ops with data-tiling details. The
@@ -6469,6 +6470,11 @@ swizzled shape.</p>
 <td style="text-align: center;"><code>int64_t</code></td>
 <td>Intrinsic count along the K dimension, with interleaved layout.</td>
 </tr>
+<tr>
+<td style="text-align: center;">subgroups_k</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Subgroup count along the K dimension.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="datatiledscaledmmaattr">DataTiledScaledMMAAttr<a class="headerlink" href="#datatiledscaledmmaattr" title="Permanent link">link</a></h3>
@@ -6482,7 +6488,8 @@ swizzled shape.</p>
   int64_t,   # subgroups_m
   int64_t,   # intrinsics_n
   int64_t,   # subgroups_n
-  int64_t   # intrinsics_k
+  int64_t,   # intrinsics_k
+  int64_t   # subgroups_k
 &gt;
 </code></pre></div>
 <p>This mma variant represents scaled MMA ops with data-tiling details. The
@@ -6555,6 +6562,11 @@ operands, the intrinsics_k dimension is not interleaved at all.</p>
 <td style="text-align: center;">intrinsics_k</td>
 <td style="text-align: center;"><code>int64_t</code></td>
 <td>Intrinsic count along the K dimension, with interleaved layout.</td>
+</tr>
+<tr>
+<td style="text-align: center;">subgroups_k</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Subgroup count along the K dimension.</td>
 </tr>
 </tbody>
 </table>
