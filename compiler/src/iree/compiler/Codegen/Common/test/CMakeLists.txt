@@ -107,6 +107,7 @@ iree_lit_test_suite(
     "repeated_matcher_use.mlir"
     "replace_slow_min_max_ops.mlir"
     "resolve_swizzle_hints.mlir"
+    "resolve_workgroup_count_hints.mlir"
     "specialize_exports.mlir"
     "strip_compilation_info.mlir"
     "test_partitionable_loops_interface.mlir"
