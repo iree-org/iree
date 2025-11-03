@@ -420,6 +420,32 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 
 // -----
 
+module {
+func.func @unaligned_matmul_nn_layout(%lhs : tensor<513x513xf16>, %rhs : tensor<513x513xf16>) -> tensor<513x513xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<513x513xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<513x513xf32>) -> tensor<513x513xf32>
+    %mm = linalg.matmul ins(%lhs, %rhs : tensor<513x513xf16>, tensor<513x513xf16>) outs(%fill : tensor<513x513xf32>) -> tensor<513x513xf32>
+    return %mm : tensor<513x513xf32>
+}
+}
+
+// This test verifies that NN layout (no transpose) GEMMs with unaligned dimensions
+// benefit from relaxed padding policy
+
+// CHECK-LABEL: func.func @unaligned_matmul_nn_layout
+// CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+// CHECK-SAME:      padding = [64, 128, 16]
+// CHECK-SAME:      promote_operands = [0, 1]
+// CHECK-SAME:      reduction = [0, 0, 1]
+// CHECK-SAME:      subgroup = [2, 4, 0]
+// CHECK-SAME:      workgroup = [64, 128, 0]
+
+// -----
+
 func.func @large_scatter(%arg0: tensor<3x2048x2048xf32>,
                    %arg1: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
   %cst = arith.constant 0.000000e+00 : f32

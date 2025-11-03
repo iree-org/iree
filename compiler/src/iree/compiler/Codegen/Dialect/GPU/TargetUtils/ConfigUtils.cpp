@@ -646,19 +646,21 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
-  // We only disallow padded configurations for K-major layouts ([K,M] × [K,N])
-  // where transposedLhs=true and transposedRhs=false. Experiments have shown
-  // that allowing padding for other layout variants (NN, NT, TT) provides
-  // decent performance improvements. Once we fix the root causes for padding
-  // overhead in K-major layouts, we can allow padding for K-major layouts.
-  GPUMatmulShapeType problem{
-      getDimBounds(mDims, transposedLhs && !transposedRhs),
-      getDimBounds(nDims, transposedLhs && !transposedRhs),
-      getDimBoundsNoPad(kDims),
-      getDimBoundsNoPad(batchDims),
-      lhsElemType,
-      rhsElemType,
-      initElemType};
+  // For GEMM: Only disallow padded configurations for K-major layouts
+  // ([K,M] × [K,N]) where transposedLhs=true and transposedRhs=false.
+  // Experiments have shown that allowing padding for other layout variants
+  // (NN, NT, TT) provides decent performance improvements.
+  //
+  // For convolutions: Keep conservative padding policy to avoid overhead.
+  bool disallowPadding = isGemm ? (transposedLhs && !transposedRhs)
+                                : (transposedLhs || !transposedRhs);
+  GPUMatmulShapeType problem{getDimBounds(mDims, disallowPadding),
+                             getDimBounds(nDims, disallowPadding),
+                             getDimBoundsNoPad(kDims),
+                             getDimBoundsNoPad(batchDims),
+                             lhsElemType,
+                             rhsElemType,
+                             initElemType};
 
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
