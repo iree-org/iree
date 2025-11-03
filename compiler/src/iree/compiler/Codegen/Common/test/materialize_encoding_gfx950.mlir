@@ -23,14 +23,14 @@ func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x64_I8(
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : i8)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [128, 64]
-// CHECK-SAME:      : tensor<255x513xi8> -> tensor<2x9x128x64xi8>
+// CHECK-SAME:      inner_tiles = [16, 64]
+// CHECK-SAME:      : tensor<255x513xi8> -> tensor<16x9x16x64xi8>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x9x128x64xi8> into tensor<2x9x2x4x16x4x16xi8>
+// CHECK-SAME       : tensor<16x9x16x64xi8> into tensor<16x9x16x4x16xi8>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x9x2x4x16x4x16xi8>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x9x2x4x4x16x16xi8>)
-// CHECK-SAME:       permutation = [0, 1, 2, 3, 5, 4, 6]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<16x9x16x4x16xi8>)
+// CHECK-SAME:       outs({{.*}} : tensor<16x9x4x16x16xi8>)
+// CHECK-SAME:       permutation = [0, 1, 3, 2, 4]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -50,14 +50,14 @@ func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x64_I8(
 // CHECK:         %[[PACK:.*]] = linalg.pack %[[ARG0]] padding_value(%{{.+}} : i8)
 // CHECK-SAME:      outer_dims_perm = [1, 0]
 // CHECK-SAME:      inner_dims_pos = [1, 0]
-// CHECK-SAME:      inner_tiles = [128, 64]
-// CHECK-SAME:      : tensor<255x513xi8> -> tensor<5x4x128x64xi8>
+// CHECK-SAME:      inner_tiles = [16, 64]
+// CHECK-SAME:      : tensor<255x513xi8> -> tensor<33x4x16x64xi8>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:      : tensor<5x4x128x64xi8> into tensor<5x4x2x4x16x4x16xi8>
+// CHECK-SAME:      : tensor<33x4x16x64xi8> into tensor<33x4x16x4x16xi8>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:      ins(%[[EXPAND]] : tensor<5x4x2x4x16x4x16xi8>)
-// CHECK-SAME:      outs({{.*}} : tensor<5x4x2x4x4x16x16xi8>)
-// CHECK-SAME:      permutation = [0, 1, 2, 3, 5, 4, 6]
+// CHECK-SAME:      ins(%[[EXPAND]] : tensor<33x4x16x4x16xi8>)
+// CHECK-SAME:      outs({{.*}} : tensor<33x4x4x16x16xi8>)
+// CHECK-SAME:      permutation = [0, 1, 3, 2, 4]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -77,14 +77,14 @@ func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8(
 // CHECK:         %[[PACK:.*]] = linalg.pack %[[ARG0]] padding_value(%{{.+}} : i32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [128, 128]
-// CHECK-SAME:      : tensor<255x513xi32> -> tensor<2x5x128x128xi32>
+// CHECK-SAME:      inner_tiles = [16, 16]
+// CHECK-SAME:      : tensor<255x513xi32> -> tensor<16x33x16x16xi32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:      : tensor<2x5x128x128xi32> into tensor<2x5x2x4x4x4x2x4x16xi32>
+// CHECK-SAME:      : tensor<16x33x16x16xi32> into tensor<16x33x4x4x16xi32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:      ins(%[[EXPAND]] : tensor<2x5x2x4x4x4x2x4x16xi32>)
-// CHECK-SAME:      outs({{.*}} : tensor<2x5x2x2x4x4x4x16x4xi32>)
-// CHECK-SAME:      permutation = [0, 1, 2, 6, 3, 7, 4, 8, 5]
+// CHECK-SAME:      ins(%[[EXPAND]] : tensor<16x33x4x4x16xi32>)
+// CHECK-SAME:      outs({{.*}} : tensor<16x33x4x16x4xi32>)
+// CHECK-SAME:      permutation = [0, 1, 2, 4, 3]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -102,16 +102,16 @@ func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8(
 // CHECK-LABEL: func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x64_I8
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[ARG0]] : tensor<2x5x2x2x4x4x4x16x4xi32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x2x4x4x4x2x4x16xi32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 4, 6, 8, 3, 5, 7]
+// CHECK-SAME:       ins(%[[ARG0]] : tensor<16x33x4x16x4xi32>)
+// CHECK-SAME:       outs({{.*}} : tensor<16x33x4x4x16xi32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 3]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK-SAME:      : tensor<2x5x2x4x4x4x2x4x16xi32> into tensor<2x5x128x128xi32>
+// CHECK-SAME:      : tensor<16x33x4x4x16xi32> into tensor<16x33x16x16xi32>
 // CHECK:         %[[UNPACK:.*]] = linalg.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [128, 128]
-// CHECK-SAME:      : tensor<2x5x128x128xi32> -> tensor<255x513xi32>
+// CHECK-SAME:      inner_tiles = [16, 16]
+// CHECK-SAME:      : tensor<16x33x16x16xi32> -> tensor<255x513xi32>
 // CHECK:         return %[[UNPACK]]
 
 // -----

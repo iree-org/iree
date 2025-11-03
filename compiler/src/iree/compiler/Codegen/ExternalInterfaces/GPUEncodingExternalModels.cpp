@@ -267,14 +267,14 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     int64_t tn =
         (*wgp.getVgprSpaceBits() - tm * intrinsicsK * intrinsicSizeBitsLHS) /
         (intrinsicsK * intrinsicSizeBitsRHS + tm * intrinsicSizeBitsACC);
-    // No feasible tn for this tm. Stop the enumeration.
-    if (tn <= 0) {
-      break;
-    }
     // Clamp tn to maxTotalUnrollN.
     tn = std::min(tn, maxTotalUnrollN);
     // Clamp tn to maxTotalUnrollMN / tm.
     tn = std::min(tn, maxTotalUnrollMN / tm);
+    // No feasible tn for this tm. Stop the enumeration.
+    if (tn <= 0) {
+      break;
+    }
     // Round tn down to nearest power of two.
     tn = 1 << (int64_t)std::floor(std::log2(tn));
     // Maximize arithmetic intensity (tm * tn) / (tm + tn).
