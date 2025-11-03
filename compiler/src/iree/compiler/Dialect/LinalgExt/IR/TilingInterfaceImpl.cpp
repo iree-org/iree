@@ -69,7 +69,7 @@ getStaticOrReifiedInputDims(OpBuilder &builder, Location loc, Value input,
 
 /// Returns the rank of the Value's type, and 0 if it is not a ShapedType.
 static int64_t getRank(Value v) {
-  ShapedType type = dyn_cast<ShapedType>(v.getType());
+  auto type = dyn_cast<ShapedType>(v.getType());
   if (type) {
     return type.getRank();
   }
