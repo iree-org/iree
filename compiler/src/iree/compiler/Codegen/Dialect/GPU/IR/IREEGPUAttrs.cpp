@@ -171,7 +171,7 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
     return {f8E5M2, f8E4M3FN, f32};
   case MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2_F8E4M3FN:
   case MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2_F8E4M3FN:
-    return {f8E5M2, f8E4M3FN, f32};
+    return {f8E5M2, f8E4M3FN, f16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FN:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN:
   case MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN:
@@ -182,7 +182,7 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
     return {f8E4M3FN, f8E4M3FN, f32};
   case MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN:
   case MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN:
-    return {f8E4M3FN, f8E4M3FN, f32};
+    return {f8E4M3FN, f8E4M3FN, f16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FN_F8E5M2:
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN_F8E5M2:
   case MMAIntrinsic::MFMA_F32_16x16x128_F8E4M3FN_F8E5M2:
@@ -193,7 +193,7 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
     return {f8E4M3FN, f8E5M2, f32};
   case MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN_F8E5M2:
   case MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN_F8E5M2:
-    return {f8E4M3FN, f8E5M2, f32};
+    return {f8E4M3FN, f8E5M2, f16};
   case MMAIntrinsic::MFMA_I32_16x16x16_I8:
   case MMAIntrinsic::MFMA_I32_32x32x8_I8:
   case MMAIntrinsic::MFMA_I32_16x16x32_I8:
