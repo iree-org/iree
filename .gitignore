@@ -25,6 +25,10 @@
 /build/
 /build-*/
 Testing/
+/compiler/build/
+/runtime/build/
+/integrations/tensorflow/python_projects/iree_tf/build/
+/integrations/tensorflow/python_projects/iree_tflite/build/
 
 # Bazel artifacts
 **/bazel-*
