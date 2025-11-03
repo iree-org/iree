@@ -368,14 +368,25 @@ def IREEGPU_DataTiledMMAAttr :
 
   let assemblyFormat = "`<` struct(params) `>`";
 
-  let parameters = (ins
-    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
-  );
+  let parameters = (ins EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Intrinsic count along the M dimension.">:$intrinsics_m,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the M dimension.">:$subgroups_m,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Intrinsic count along the N dimension.">:$intrinsics_n,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the N dimension.">:$subgroups_n,
+      DefaultValuedParameter<"int64_t", "1",
+                             "Intrinsic count along the K dimension, with "
+                             "interleaved layout.">:$intrinsics_k,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the K dimension.">:$subgroups_k);
 }
 
 def IREEGPU_DataTiledScaledMMAAttr :
@@ -414,17 +425,27 @@ def IREEGPU_DataTiledScaledMMAAttr :
 
   let assemblyFormat = "`<` struct(params) `>`";
 
-  let parameters = (ins
-    EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
-    "::mlir::Type":$lhs_elem_type,
-    "::mlir::Type":$rhs_elem_type,
-    "::mlir::Type":$acc_elem_type,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
-  );
+  let parameters = (ins EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
+      "::mlir::Type":$lhs_elem_type, "::mlir::Type":$rhs_elem_type,
+      "::mlir::Type":$acc_elem_type,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Intrinsic count along the M dimension.">:$intrinsics_m,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the M dimension.">:$subgroups_m,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Intrinsic count along the N dimension.">:$intrinsics_n,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the N dimension.">:$subgroups_n,
+      DefaultValuedParameter<"int64_t", "1",
+                             "Intrinsic count along the K dimension, with "
+                             "interleaved layout.">:$intrinsics_k,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the K dimension.">:$subgroups_k);
 }
 
 def IREEGPU_VirtualMMAIntrinsicAttr

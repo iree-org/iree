@@ -820,7 +820,8 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
 }
 
 int64_t DataTiledMMAAttr::getFlatWorkgroupSize() const {
-  return getSubgroupSize() * getSubgroupsM() * getSubgroupsN();
+  return getSubgroupSize() * getSubgroupsM() * getSubgroupsN() *
+         getSubgroupsK();
 }
 
 /// Increment the mutable vector `indices` to traverse the index space below
@@ -972,7 +973,7 @@ IREE::Codegen::TileMxNxKxKb DataTiledMMAAttr::getTileMNKKb() const {
       getMNKShapeFromIntrinsic(getIntrinsic());
   innerTile.M *= getIntrinsicsM() * getSubgroupsM();
   innerTile.N *= getIntrinsicsN() * getSubgroupsN();
-  innerTile.K *= getIntrinsicsK();
+  innerTile.K *= getIntrinsicsK() * getSubgroupsK();
   return innerTile;
 }
 
@@ -1584,7 +1585,7 @@ IREE::Codegen::TileMxNxKxKb DataTiledScaledMMAAttr::getTileMNKKb() const {
       getMNKKbShapeFromScaledIntrinsic(getIntrinsic());
   innerTile.M *= getIntrinsicsM() * getSubgroupsM();
   innerTile.N *= getIntrinsicsN() * getSubgroupsN();
-  innerTile.K *= getIntrinsicsK();
+  innerTile.K *= getIntrinsicsK() * getSubgroupsK();
   return innerTile;
 }
 
@@ -1741,7 +1742,8 @@ int64_t DataTiledScaledMMAAttr::getSubgroupSize() const {
 }
 
 int64_t DataTiledScaledMMAAttr::getFlatWorkgroupSize() const {
-  return getSubgroupSize() * getSubgroupsM() * getSubgroupsN();
+  return getSubgroupSize() * getSubgroupsM() * getSubgroupsN() *
+         getSubgroupsK();
 }
 
 LogicalResult
