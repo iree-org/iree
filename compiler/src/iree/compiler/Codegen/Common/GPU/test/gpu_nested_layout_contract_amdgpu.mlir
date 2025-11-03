@@ -694,7 +694,7 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides   = [1, 16]
 >
 
-// B: shape = 16x4, layout = layoutB
+// B: shape = 4x16, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
   subgroup_tile    = [1, 1],
   batch_tile       = [1, 1],
@@ -779,7 +779,7 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides   = [1, 16]
 >
 
-// B: shape = 16x32, layout = layoutB
+// B: shape = 32x16, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
   subgroup_tile    = [1, 1],
   batch_tile       = [1, 1],
@@ -864,7 +864,7 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides   = [1, 16]
 >
 
-// B: shape = 16x64, layout = layoutB
+// B: shape = 64x16, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
   subgroup_tile    = [1, 1],
   batch_tile       = [1, 1],
@@ -949,7 +949,7 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides   = [1, 16]
 >
 
-// B: shape = 16x128, layout = layoutB
+// B: shape = 128x16, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
   subgroup_tile    = [1, 1],
   batch_tile       = [1, 1],
