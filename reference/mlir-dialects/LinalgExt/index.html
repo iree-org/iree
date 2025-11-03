@@ -6010,6 +6010,7 @@ semantics.</p>
               `m_pos` `=` $m_pos
               `k_pos` `=` $k_pos
               `input_k_perm` `=` $input_k_perm
+              `output_perm` `=` $output_perm
               `ins` `(` $input `:` type($input) `)`
               `outs` `(` $output `:` type($output) `)`
               (`-&gt;` type($results)^)?
@@ -6034,6 +6035,7 @@ the following:
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
       m_offset = [0] * [1] k_offset = [0] * [1]
       batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
       ins(%in : tensor&lt;2x34x34x640xf32&gt;)
       outs(%out : tensor&lt;2x1024x5760xf32&gt;) -&gt; tensor&lt;2x1024x5760xf32&gt;
 </code></pre></div>
@@ -6078,6 +6080,10 @@ decomposition. The identity permutation (e.g., input_k_perm = [0, 1, 2])
 indicates that the input layout is already aligned with the filter layout
 in terms of reduction dimensions, so no transposition of indices is necessary
 before slice extraction.</p>
+<p>The <code>output_perm</code> attribute defines the layout of the result with respect to
+the canonical <code>BxMxK</code> layout. The layout of the result can be determined by
+applying the permutation to the <code>BxMxK</code> layout. For instance, an
+<code>output_perm = [2, 0, 1]</code> indicates the result is in a <code>KxMxB</code> layout.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
@@ -6094,6 +6100,7 @@ before slice extraction.</p>
 <tr><td><code>m_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>k_pos</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>input_k_perm</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+<tr><td><code>output_perm</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
 <h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
