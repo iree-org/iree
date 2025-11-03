@@ -240,6 +240,13 @@ def HAL_LifetimeAttr :
 }
 
 //===----------------------------------------------------------------------===//
+// HAL traits
+//===----------------------------------------------------------------------===//
+
+// Denotes that an operation is part of the executable interface.
+def HAL_ExecutableInterfaceOp : NativeOpTrait<"IREE::HAL::ExecutableInterfaceOp">;
+
+//===----------------------------------------------------------------------===//
 // Base HAL op classes
 //===----------------------------------------------------------------------===//
 
