@@ -224,41 +224,41 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   //     C-tile: tm * tn * intrinsicSizeBitsACC
   //     A-tile + B-tile + C-tile <= wgp.getVgprSpaceBits()
   //
-  // The goal is to maximize arithmetic intensity (tm * tn) while keeping tm and
-  // tn close (to balance LHS and RHS loads).
+  // The goal is to maximize arithmetic intensity (tm * tn) / (tm + tn).
   //
   // We also self-impose the constraint that tm and tn are powers of 2 to
   // avoid prematurely entering excessing fine-tuning of unrolling factors.
   int64_t totalUnrollM = 1;
   int64_t totalUnrollN = 1;
+  auto computeArithmeticIntensity = [&](int64_t tm, int64_t tn) -> double {
+    return double(tm * tn) / double(tm + tn);
+  };
+  double bestArithmeticIntensity =
+      computeArithmeticIntensity(totalUnrollM, totalUnrollN);
   // Upper bounds of tm and tn are decided by the matrix and intrinsic sizes.
   int64_t maxTotalUnrollM = INT64_MAX;
   int64_t maxTotalUnrollN = INT64_MAX;
+  // Upper bound of tm * tn are decided by the workgroup count of the chip and
+  // the intrinsic sizes.
+  int64_t maxTotalUnrollMN = INT64_MAX;
   FailureOr<IREE::Encoding::BxMxNxK> matmulSizes = getMatmulSizes(encoding);
   if (succeeded(matmulSizes)) {
-    auto getTotalUnrollMN = [&](const IREE::Encoding::BxMxNxK &sizes) {
-      if (!ShapedType::isDynamic(sizes.M)) {
-        if (sizes.M < intrinsicMSize) {
-          // M dimension is too small to benefit from increased unrolling.
-          maxTotalUnrollM = 1;
-          maxTotalUnrollN = 1;
-          return;
-        }
-        // Cap maxTotalUnrollM to avoid excessive padding.
-        maxTotalUnrollM = llvm::divideCeil(sizes.M, intrinsicMSize);
-      }
-      if (!ShapedType::isDynamic(sizes.N)) {
-        if (sizes.N < intrinsicNSize) {
-          // N dimension is too small to benefit from increased unrolling.
-          maxTotalUnrollN = 1;
-          maxTotalUnrollM = 1;
-          return;
-        }
-        // Cap maxTotalUnrollN to avoid excessive padding.
-        maxTotalUnrollN = llvm::divideCeil(sizes.N, intrinsicNSize);
-      }
-    };
-    getTotalUnrollMN(*matmulSizes);
+    if (!ShapedType::isDynamic(matmulSizes->M)) {
+      // Cap maxTotalUnrollM to avoid excessive padding.
+      maxTotalUnrollM = llvm::divideCeil(matmulSizes->M, intrinsicMSize);
+    }
+    if (!ShapedType::isDynamic(matmulSizes->N)) {
+      // Cap maxTotalUnrollN to avoid excessive padding.
+      maxTotalUnrollN = llvm::divideCeil(matmulSizes->N, intrinsicNSize);
+    }
+    IREE::GPU::TargetChipAttr chip = target.getChip();
+    if (chip && !ShapedType::isDynamic(matmulSizes->M) &&
+        !ShapedType::isDynamic(matmulSizes->N)) {
+      // Cap maxTotalUnrollMN to avoid underutilizing the workgroups available.
+      maxTotalUnrollMN = llvm::divideCeil(matmulSizes->M * matmulSizes->N,
+                                          chip.getWgpCount() * intrinsicMSize *
+                                              intrinsicNSize);
+    }
   }
   // Iterate over possible tm.
   for (int64_t tm = 1; tm <= maxTotalUnrollM; tm <<= 1) {
@@ -272,14 +272,16 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     }
     // Clamp tn to maxTotalUnrollN.
     tn = std::min(tn, maxTotalUnrollN);
+    // Clamp tn to maxTotalUnrollMN / tm.
+    tn = std::min(tn, maxTotalUnrollMN / tm);
     // Round tn down to nearest power of two.
     tn = 1 << (int64_t)std::floor(std::log2(tn));
-    // Maximize tm * tn while keeping them close.
-    if ((tm * tn > totalUnrollM * totalUnrollN) ||
-        ((tm * tn == totalUnrollM * totalUnrollN) &&
-         std::abs(tm - tn) < std::abs(totalUnrollM - totalUnrollN))) {
+    // Maximize arithmetic intensity (tm * tn) / (tm + tn).
+    double currentArithmeticIntensity = computeArithmeticIntensity(tm, tn);
+    if (currentArithmeticIntensity > bestArithmeticIntensity) {
       totalUnrollM = tm;
       totalUnrollN = tn;
+      bestArithmeticIntensity = currentArithmeticIntensity;
     }
   }
 
@@ -292,10 +294,15 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // the number of registers available to each subgroups. In other words, the
   // overall tile size determined above only needed to be concerned with the
   // overall number of registers, not with how they are split between subgroups.
+  //
+  // The goal is still to maximize arithmetic intensity, but now we need to
+  // optimize `intrinsicsM(N)` instead of `totalUnrollM(N)`.
   int64_t subgroupsM = 1;
   int64_t subgroupsN = 1;
   int64_t intrinsicsM = 1;
-  int64_t intrinsicsN = INT64_MAX;
+  int64_t intrinsicsN = 1;
+  bestArithmeticIntensity =
+      computeArithmeticIntensity(intrinsicsM, intrinsicsN);
   int64_t simdsPerWgp = *wgp.getSimdsPerWgp();
   // Enumerate possible unrolling-to-subgroups on M dimension.
   for (int64_t sm = 1; sm <= std::min(simdsPerWgp, totalUnrollM); sm <<= 1) {
@@ -305,15 +312,17 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     // Calculate the plain (intrinsic) unrolling factors on M and N dimensions.
     int64_t im = totalUnrollM / sm;
     int64_t in = totalUnrollN / sn;
-    // Minimize the difference between intrinsic unrolling factors.
-    if (std::abs(im - in) < std::abs(intrinsicsM - intrinsicsN)) {
+    // Maximize arithmetic intensity (im * in) / (im + in).
+    double currentArithmeticIntensity = computeArithmeticIntensity(im, in);
+    if (currentArithmeticIntensity > bestArithmeticIntensity) {
       subgroupsM = sm;
       subgroupsN = sn;
       intrinsicsM = im;
       intrinsicsN = in;
+      bestArithmeticIntensity = currentArithmeticIntensity;
     }
   }
-  assert(intrinsicsN != INT64_MAX);
+
   // We currently never generate subgroupsK != 1, as subgroupsK requires
   // specific partial-accumulator-reduction in the kernel, currently only done
   // in some microkernels that would provide their own DataTiledMMAAttr.
