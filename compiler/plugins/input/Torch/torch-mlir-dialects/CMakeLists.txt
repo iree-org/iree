@@ -7,6 +7,7 @@
 set(_TORCH_MLIR_DIALECTS_DIR "${TORCH_MLIR_ROOT_DIR}")
 list(APPEND IREE_COMPILER_TABLEGEN_INCLUDE_DIRS
     "${_TORCH_MLIR_DIALECTS_DIR}/include")
+add_compile_options(-Wno-deprecated-declarations)
 
 iree_cc_library(
   NAME
