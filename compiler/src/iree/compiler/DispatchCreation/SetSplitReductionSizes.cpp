@@ -213,11 +213,8 @@ private:
     auto getDimPositions = [&](ArrayRef<unsigned> dims, const AffineMap &map) {
       SmallVector<int64_t> positions;
       for (auto dim : dims) {
-        for (auto [idx, e] : llvm::enumerate(map.getResults())) {
-          if (e.isFunctionOfDim(dim)) {
-            positions.push_back(idx);
-          }
-        }
+        positions.push_back(
+            *map.getResultPosition(getAffineDimExpr(dim, map.getContext())));
       }
       llvm::sort(positions);
       return positions;
@@ -261,8 +258,10 @@ private:
     // empty, return 1.
     auto getSizeAt = [](ArrayRef<int64_t> shape, ArrayRef<int64_t> pos) {
       int64_t totalSize = 1;
-      for (unsigned i : pos)
+      for (unsigned i : pos) {
+        assert(!ShapedType::isDynamic(shape[i]));
         totalSize *= shape[i];
+      }
       return totalSize;
     };
 
