@@ -646,16 +646,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
-  // For GEMM: Only disallow padded configurations for K-major layouts
-  // ([K,M] × [K,N]) where transposedLhs=true and transposedRhs=false.
-  // Experiments have shown that allowing padding for other layout variants
-  // (NN, NT, TT) provides decent performance improvements.
-  //
-  // For convolutions: Keep conservative padding policy to avoid overhead.
-  bool disallowPadding = isGemm ? (transposedLhs && !transposedRhs)
-                                : (transposedLhs || !transposedRhs);
-  GPUMatmulShapeType problem{getDimBounds(mDims, disallowPadding),
-                             getDimBounds(nDims, disallowPadding),
+  // Intentionally padded GEMM proved to be beneficial for performance for
+  // the following layouts: 1) [M, K] x [K, N] 2) [M, K] x [N, K]
+  // Therefore we disallow padding only when LHS is transposed.
+  GPUMatmulShapeType problem{getDimBounds(mDims, transposedLhs),
+                             getDimBounds(nDims, transposedLhs),
                              getDimBoundsNoPad(kDims),
                              getDimBoundsNoPad(batchDims),
                              lhsElemType,
