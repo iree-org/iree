@@ -300,18 +300,17 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
     auto newGatherOp = IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, loc, coalescedGather.getInit().getType(),
         coalescedGather.getSource(), coalescedGather.getIndices(),
-        coalescedGather.getInit(), coalescedGather.getDestIndices(),
-        coalescedGather.getLane());
+        coalescedGather.getInit(), coalescedGather.getLane());
     Value gatherResult = newGatherOp.getResult();
 
     // Use a tensor.insert_slice to insert the gather result back into the
-    // shared memory destination at the location specified by dest_indices.
+    // shared memory destination at offset 0.
     SmallVector<OpFoldResult> destIndices;
-    for (Value idx : coalescedGather.getDestIndices()) {
-      destIndices.push_back(idx);
+    auto initType = cast<ShapedType>(coalescedGather.getInit().getType());
+    for (int64_t i = 0; i < initType.getRank(); ++i) {
+      destIndices.push_back(rewriter.getIndexAttr(0));
     }
 
-    auto initType = cast<ShapedType>(coalescedGather.getInit().getType());
     SmallVector<OpFoldResult> sizes;
     for (int64_t dim : initType.getShape()) {
       sizes.push_back(rewriter.getIndexAttr(dim));
@@ -417,68 +416,24 @@ static void composeCoalescedGatherDMA(
     SmallVector<std::pair<tensor::ParallelInsertSliceOp,
                           IREE::GPU::CoalescedGatherDMAOp>> &insertPairs) {
   for (auto [warpInsert, laneInsert] : insertPairs) {
-    // Compose offsets from warp and lane operations
-    SmallVector<OpFoldResult> composedOffsets;
-    SmallVector<OpFoldResult> laneDestIndices;
-    for (auto index : laneInsert.getDestIndices()) {
-      laneDestIndices.push_back(index);
-    }
-    for (auto [warpOffset, laneOffset] :
-         llvm::zip_equal(warpInsert.getMixedOffsets(), laneDestIndices)) {
-      SmallVector<Value> offsets;
-      if (auto warpOffsetVal = dyn_cast<Value>(warpOffset)) {
-        offsets.push_back(warpOffsetVal);
-      }
-      if (auto laneOffsetVal = dyn_cast<Value>(laneOffset)) {
-        offsets.push_back(laneOffsetVal);
-      }
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(warpInsert);
-      if (!offsets.empty()) {
-        (void)setInsertionPointAfterLastValue(rewriter, offsets);
-      }
-      composedOffsets.push_back(IREE::LinalgExt::addOfrs(
-          rewriter, laneInsert.getLoc(), warpOffset, laneOffset));
-    }
-
     // Create a new CoalescedGatherDMAOp with composed offsets
     OpBuilder::InsertionGuard g(rewriter);
 
     // Extract a slice from warpInsert's dest that matches warpInsert's
-    // insertion size and is located at the composed offsets (newDestIndices)
+    // insertion size and is located at warpInsert's offsets
     // This is done outside the in_parallel region
-
-    // Convert composedOffsets to Values for dest_indices
-    SmallVector<Value> newDestIndices;
-    for (auto offset : composedOffsets) {
-      if (auto val = dyn_cast<Value>(offset)) {
-        newDestIndices.push_back(val);
-      } else {
-        // Materialize attribute as constant outside the in_parallel region
-        auto attr = cast<IntegerAttr>(cast<Attribute>(offset));
-        newDestIndices.push_back(arith::ConstantIndexOp::create(
-            rewriter, laneInsert.getLoc(), attr.getInt()));
-      }
-    }
-
-    // Convert newDestIndices to OpFoldResult for ExtractSliceOp
-    SmallVector<OpFoldResult> offsets;
-    for (Value idx : newDestIndices) {
-      offsets.push_back(idx);
-    }
-
     rewriter.setInsertionPoint(warpInsert->getParentOp());
     auto destSlice = tensor::ExtractSliceOp::create(
-        rewriter, warpInsert.getLoc(), warpInsert.getDest(), offsets,
-        warpInsert.getMixedSizes(), warpInsert.getMixedStrides());
+        rewriter, warpInsert.getLoc(), warpInsert.getDest(),
+        warpInsert.getMixedOffsets(), warpInsert.getMixedSizes(),
+        warpInsert.getMixedStrides());
 
     rewriter.setInsertionPoint(warpInsert);
     // Create new CoalescedGatherDMAOp inside the in_parallel region
     // No result since it's in forall.in_parallel (in-place update)
     IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, warpInsert.getLoc(), Type(), laneInsert.getSource(),
-        laneInsert.getIndices(), destSlice, newDestIndices,
-        laneInsert.getLane());
+        laneInsert.getIndices(), destSlice, laneInsert.getLane());
     rewriter.eraseOp(warpInsert);
     rewriter.eraseOp(laneInsert);
   }

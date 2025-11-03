@@ -259,7 +259,6 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
-    AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
        ["getUpdatedDestinations", "getIteratingParent"]>]> {
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
@@ -317,8 +316,6 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * `$source`: Source tensor/memref containing the data to be gathered.
     * `$init`: Destination tensor/memref receiving the gathered data
       (destination-passing style).
-    * `$dest_indices`: Offsets into the destination tensor/memref where
-      the gathered data should be written.
     * `lane`: The lane that specifies the coalescing store's offset within the
       workgroup/shared memory.
 
@@ -331,15 +328,9 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
         %2 = %arg6 * 4
         %thread_slice = tensor.extract_slice %source_slice[0, %2] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
         scf.forall.in_parallel {
-          iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%c0, %c0] lane(%arg6) :  ...
+          iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice lane(%arg6) :  ...
         }
       } {mapping = [#gpu.lane_id<linear_dim_1>, #gpu.lane_id<linear_dim_0>]}
-    ```
-
-    ## Example using $dest_indices
-    ```mlir
-    iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%offset0, %offset1] lane(%lane_id)
-      : tensor<4x4xf32>, tensor<4x128xf32>, index, index, index
     ```
   }];
 
@@ -347,14 +338,13 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     AnyRankedTensorOrMemRef:$source,
     Variadic<AnyTypeOf<[RankedTensorOf<[Index]>, VectorOfAnyRankOf<[Index]>]>>:$indices,
     AnyRankedTensorOrMemRef:$init,
-    Variadic<Index>:$dest_indices,
     Index:$lane
   );
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
   let assemblyFormat = [{
-    $source (`[` $indices^ `]`)? `into` $init (`[` $dest_indices^ `]`)? `lane` `(` $lane `)`
+    $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
     attr-dict `:` type(operands) ( `->` type($result)^ )?
   }];
 
