@@ -180,6 +180,10 @@ struct IGEMMGenericConvDetails {
   SmallVector<ReassociationIndices> filterReassocIndices;
   /// The iterator type list for a convolution with IGEMM indexing. .
   SmallVector<utils::IteratorType> igemmLoopIterators;
+  /// The output permutation for the im2col tensor with respect to a layout of
+  /// BxMxK. The result of the permutation should match the order that the
+  /// output dims are represented in the input tensor.
+  SmallVector<int64_t> im2colOutputPerm;
   /// Indicates if the OutputChannel is before the OutputImage in the output.
   /// This determines our lhs/rhs ordering.
   bool isOutputChannelFirst;

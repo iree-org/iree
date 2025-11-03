@@ -199,6 +199,7 @@ public:
 
     // Batch dims for the im2col also include the depth/group dimensions of the
     // conv.
+    SmallVector<int64_t> outputPerm = igemmConvDetails.im2colOutputPerm;
     auto im2colBatchIterDims =
         llvm::to_vector(llvm::concat<unsigned>(convDims.depth, convDims.batch));
     SmallVector<int64_t> batchPos(im2colBatchIterDims.size());
@@ -210,7 +211,7 @@ public:
       int64_t igemmInputDim = igemmConvDetails.getIgemmInputImageMap()
                                   .getResultPosition(igemmDimExpr)
                                   .value();
-      batchPos[igemmInputDim] = im2colInputDim;
+      batchPos[outputPerm[igemmInputDim]] = im2colInputDim;
     }
 
     SmallVector<int64_t> mPos;
@@ -263,13 +264,15 @@ public:
     }
     colTensorShape.append(mShape);
     colTensorShape.append(kShape);
+
+    applyPermutationToVector(colTensorShape, outputPerm);
     Value colTensor = tensor::EmptyOp::create(rewriter, loc, colTensorShape,
                                               inputType.getElementType());
     Value img2ColTensor =
         IREE::LinalgExt::Im2colOp::create(
             rewriter, loc, input, /*output=*/colTensor, convDims.strides,
             convDims.dilations, kernelSizes, mOffset, mBasis, kOffset, kBasis,
-            batchPos, mPos, kPos, inputKPerm)
+            batchPos, mPos, kPos, inputKPerm, outputPerm)
             .getResult(0);
 
     Value reshapedFilter = tensor::CollapseShapeOp::create(

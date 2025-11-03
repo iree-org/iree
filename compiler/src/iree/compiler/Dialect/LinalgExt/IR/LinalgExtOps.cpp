@@ -2374,32 +2374,93 @@ void Im2colOp::setMixedMStrides(SmallVector<OpFoldResult> mStrides) {
 }
 
 SmallVector<int64_t> Im2colOp::getBatchOutputDims() {
-  return llvm::to_vector(llvm::seq<int64_t>(0, getBatchPos().size()));
+  SmallVector<int64_t> inverseOutPerm =
+      invertPermutationVector(getOutputPerm());
+  return llvm::map_to_vector(llvm::seq<int64_t>(0, getBatchPos().size()),
+                             [&](int64_t dim) { return inverseOutPerm[dim]; });
 }
 
 SmallVector<int64_t> Im2colOp::getMOutputDims() {
   int64_t begin = getBatchPos().size();
   int64_t end = begin + getMixedMOffset().size();
-  return llvm::to_vector(llvm::seq<int64_t>(begin, end));
+  SmallVector<int64_t> inverseOutPerm =
+      invertPermutationVector(getOutputPerm());
+  return llvm::map_to_vector(llvm::seq<int64_t>(begin, end),
+                             [&](int64_t dim) { return inverseOutPerm[dim]; });
 }
 
 SmallVector<int64_t> Im2colOp::getKOutputDims() {
   int64_t begin = getBatchPos().size() + getMixedMOffset().size();
   int64_t end = begin + getMixedKOffset().size();
-  return llvm::to_vector(llvm::seq<int64_t>(begin, end));
+  SmallVector<int64_t> inverseOutPerm =
+      invertPermutationVector(getOutputPerm());
+  return llvm::map_to_vector(llvm::seq<int64_t>(begin, end),
+                             [&](int64_t dim) { return inverseOutPerm[dim]; });
+}
+
+SmallVector<SmallVector<int64_t>>
+Im2colOp::getInputToOutputDimVectorizationMap() {
+  SetVector<int64_t> batchInputDims(llvm::from_range, getBatchPos());
+  SetVector<int64_t> mInputDims(llvm::from_range, getMPos());
+  SetVector<int64_t> kInputDims(llvm::from_range, getKPos());
+  SmallVector<SmallVector<int64_t>> vectorizationMap;
+  vectorizationMap.resize(getInputRank());
+  SmallVector<int64_t> batchOutputDims = getBatchOutputDims();
+  if (batchInputDims.size() == batchOutputDims.size()) {
+    for (auto [batchInputDim, batchOutputDim] :
+         llvm::zip_equal(batchInputDims, batchOutputDims)) {
+      vectorizationMap[batchInputDim] = {batchOutputDim};
+    }
+  } else {
+    vectorizationMap[batchInputDims.back()].push_back(batchOutputDims.back());
+  }
+  SmallVector<int64_t> mOutputDims = getMOutputDims();
+  if (mInputDims.size() == mOutputDims.size()) {
+    for (auto [mInputDim, mOutputDim] :
+         llvm::zip_equal(mInputDims, mOutputDims)) {
+      vectorizationMap[mInputDim] = {mOutputDim};
+    }
+  } else {
+    vectorizationMap[mInputDims.back()].push_back(mOutputDims.back());
+  }
+  SmallVector<int64_t> kOutputDims = getKOutputDims();
+  // Compute the input dimensions captured by the K output dimensions, in the
+  // order that they appear in kOutputDims. The canonical order for the input
+  // K dims is just the order that they appear in the input tensor. Get the
+  // dims in this order, and then apply the input_k_perm to get the dims in the
+  // order that they are represented in the output tensor.
+  SmallVector<int64_t> orderedKInputDims;
+  for (int64_t dim = 0; dim < getInputRank(); ++dim) {
+    if (batchInputDims.contains(dim)) {
+      continue;
+    }
+    if (kInputDims.contains(dim)) {
+      orderedKInputDims.push_back(dim);
+      continue;
+    }
+    orderedKInputDims.push_back(dim);
+  }
+  applyPermutationToVector(orderedKInputDims, getInputKPerm());
+  if (orderedKInputDims.size() == kOutputDims.size()) {
+    for (auto [kInputDim, kOutputDim] :
+         llvm::zip_equal(orderedKInputDims, kOutputDims)) {
+      vectorizationMap[kInputDim].push_back(kOutputDim);
+    }
+  } else {
+    vectorizationMap[orderedKInputDims.back()].push_back(kOutputDims.back());
+  }
+  return vectorizationMap;
 }
 
 /// Custom builder methods for im2col op.
-void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
-                     Value output, ArrayRef<int64_t> strides,
-                     ArrayRef<int64_t> dilations,
-                     ArrayRef<OpFoldResult> kernelSize,
-                     ArrayRef<OpFoldResult> mOffset,
-                     ArrayRef<OpFoldResult> mStrides,
-                     ArrayRef<OpFoldResult> kOffset,
-                     ArrayRef<OpFoldResult> kStrides,
-                     ArrayRef<int64_t> batchPos, ArrayRef<int64_t> mPos,
-                     ArrayRef<int64_t> kPos, ArrayRef<int64_t> inputKPerm) {
+void Im2colOp::build(
+    OpBuilder &builder, OperationState &state, Value input, Value output,
+    ArrayRef<int64_t> strides, ArrayRef<int64_t> dilations,
+    ArrayRef<OpFoldResult> kernelSize, ArrayRef<OpFoldResult> mOffset,
+    ArrayRef<OpFoldResult> mStrides, ArrayRef<OpFoldResult> kOffset,
+    ArrayRef<OpFoldResult> kStrides, ArrayRef<int64_t> batchPos,
+    ArrayRef<int64_t> mPos, ArrayRef<int64_t> kPos,
+    ArrayRef<int64_t> inputKPerm, ArrayRef<int64_t> outputPerm) {
   assert(strides.size() == kernelSize.size() &&
          dilations.size() == kernelSize.size() &&
          mPos.size() == kernelSize.size() &&
@@ -2428,7 +2489,8 @@ void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
         builder.getDenseI64ArrayAttr(staticKStrides),
         builder.getDenseI64ArrayAttr(batchPos),
         builder.getDenseI64ArrayAttr(mPos), builder.getDenseI64ArrayAttr(kPos),
-        builder.getDenseI64ArrayAttr(inputKPerm));
+        builder.getDenseI64ArrayAttr(inputKPerm),
+        builder.getDenseI64ArrayAttr(outputPerm));
 }
 
 LogicalResult Im2colOp::verify() {
@@ -2525,12 +2587,22 @@ LogicalResult Im2colOp::verify() {
   // Verify input and output shapes.
   ArrayRef<int64_t> inputShape = inputType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
+  ArrayRef<int64_t> outputPerm = getOutputPerm();
+  if (!isPermutationVector(outputPerm)) {
+    return op->emitOpError("expected output_perm to be a permutation");
+  }
+  if (outputPerm.size() != outputShape.size()) {
+    return op->emitOpError(
+        "expected output_perm to have the same rank as the result");
+  }
+
   // When the op is tiled, the m and k dimensions of the output are tiled, but
   // they are not tiled in the input, so we cannot verify the output size of
   // these dimensions. Only verify the shape of the batch dimensions.
   SmallVector<int64_t> expectedOutputShape(outputShape);
+  SmallVector<int64_t> inverseOutputPerm = invertPermutationVector(outputPerm);
   for (auto [idx, pos] : llvm::enumerate(batchPos)) {
-    expectedOutputShape[idx] = inputShape[pos];
+    expectedOutputShape[inverseOutputPerm[idx]] = inputShape[pos];
   }
   if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
     return op->emitOpError("incompatible output shape");

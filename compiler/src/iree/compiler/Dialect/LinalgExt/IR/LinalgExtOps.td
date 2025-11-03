@@ -1205,6 +1205,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
           strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
           m_offset = [0] * [1] k_offset = [0] * [1]
           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
           ins(%in : tensor<2x34x34x640xf32>)
           outs(%out : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
     ```
@@ -1253,6 +1254,11 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     indicates that the input layout is already aligned with the filter layout
     in terms of reduction dimensions, so no transposition of indices is necessary
     before slice extraction.
+
+    The `output_perm` attribute defines the layout of the result with respect to
+    the canonical `BxMxK` layout. The layout of the result can be determined by
+    applying the permutation to the `BxMxK` layout. For instance, an
+    `output_perm = [2, 0, 1]` indicates the result is in a `KxMxB` layout.
   }];
 
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -1271,7 +1277,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
                        DenseI64ArrayAttr:$batch_pos,
                        DenseI64ArrayAttr:$m_pos,
                        DenseI64ArrayAttr:$k_pos,
-                       DenseI64ArrayAttr:$input_k_perm);
+                       DenseI64ArrayAttr:$input_k_perm,
+                       DenseI64ArrayAttr:$output_perm);
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
@@ -1291,6 +1298,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     `m_pos` `=` $m_pos
     `k_pos` `=` $k_pos
     `input_k_perm` `=` $input_k_perm
+    `output_perm` `=` $output_perm
     `ins` `(` $input `:` type($input) `)`
     `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
@@ -1308,7 +1316,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       "ArrayRef<int64_t>":$batch_dimensions,
       "ArrayRef<int64_t>":$m_dimensions,
       "ArrayRef<int64_t>":$k_dimensions,
-      "ArrayRef<int64_t>":$input_k_perm)>
+      "ArrayRef<int64_t>":$input_k_perm,
+      "ArrayRef<int64_t>":$output_perm)>
   ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
@@ -1329,6 +1338,21 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     SmallVector<int64_t> getBatchOutputDims();
     SmallVector<int64_t> getMOutputDims();
     SmallVector<int64_t> getKOutputDims();
+
+    // Returns the mapping from input dimensions to the corresponding set of
+    // output dimensions that can vectorize along with them. A pair of input and
+    // output dims are vectorizable together if incrementing the output
+    // dimension by 1 will also increment the input dimension by exactly 1.
+    // Each input dim can have zero or more corresponding output dims. If an
+    // input dim maps to multiple output dims, then the input dim can vectorize
+    // with any one of the corresponding output dims.
+    //
+    // This method does not find vectorizable dims if output dims are partially
+    // collapsed. For example, it computes K dim mapping for standard conv_2d if
+    // the K dim is fully collapsed or fully expanded (inlcuding all input
+    // channel and filter loop dims), but otherwise omits mappings for the K
+    // dims.
+    SmallVector<SmallVector<int64_t>> getInputToOutputDimVectorizationMap();
 
     // Return op metadata.
     SmallVector<OpFoldResult> getMixedKernelSize();
