@@ -23,7 +23,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -35,12 +34,11 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 
-#define DEBUG_TYPE "iree-gpu-attrs"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.cpp.inc"
+
+#define DEBUG_TYPE "iree-gpu-attrs"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -272,7 +270,6 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   };
   const MMASingleSubgroupLayout gfx12WmmaAcc16x16 = gfx12WmmaKx16(16);
 
-  // clang-format off
   switch (intrinsic) {
   case MMAIntrinsic::MFMA_F32_16x16x4_F32:
     switch (operandIndex) {
@@ -283,7 +280,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
     case kMMAOperandAcc:
       return mfmaAcc16x16;
     }
-  // Note: the returned layout for f64 differs than for other MFMAs
+  // Note: the returned layout for f64 differs than for other MFMAs.
   case MMAIntrinsic::MFMA_F64_16x16x4_F64:
     switch (operandIndex) {
     case kMMAOperandLhs:
