@@ -1945,18 +1945,18 @@ SmallVector<utils::IteratorType> ExpReductionOp::getLoopIteratorTypes() {
 }
 
 SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
-  ExpReductionOp op = *this;
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(op);
   Location loc = getLoc();
   SmallVector<OpFoldResult> allShapesSizes =
-      createFlatListOfOperandDims(b, loc, op);
+      createFlatListOfOperandDims(b, loc, getOperation());
   AffineMap map = getShapesToLoopsMap();
+
+  OpFoldResult zero = b.getIndexAttr(0);
+  OpFoldResult one = b.getIndexAttr(1);
 
   return llvm::map_to_vector(map.getResults(), [&](AffineExpr loopExpr) {
     OpFoldResult ofr =
         affine::makeComposedFoldedAffineApply(b, loc, loopExpr, allShapesSizes);
-    return Range{b.getIndexAttr(0), ofr, b.getIndexAttr(1)};
+    return Range{zero, ofr, one};
   });
 }
 
