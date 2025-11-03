@@ -1995,23 +1995,12 @@ LogicalResult ExpReductionOp::getResultTilePosition(
     OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
-  Location loc = getLoc();
   auto indexingMapOp = cast<IndexingMapOpInterface>(getOperation());
-
-  AffineExpr d0;
-  bindDims(b.getContext(), d0);
-  SmallVector<OpFoldResult> subShapeSizes =
-      llvm::map_to_vector(sizes, [&](OpFoldResult ofr) {
-        return affine::makeComposedFoldedAffineApply(b, loc, d0 - 1, ofr);
-      });
-
   OpOperand *outOperand = getDpsInitOperand(resultNumber);
-  linalg::SliceParameters sliceParams = linalg::computeSliceParameters(
-      b, loc, outOperand->get(), sizes,
-      indexingMapOp.getMatchingIndexingMap(outOperand), offsets,
-      /*ubs*/ {}, subShapeSizes, true);
-  resultOffsets = sliceParams.offsets;
-  resultSizes = sliceParams.sizes;
+  AffineMap indexingMap = indexingMapOp.getMatchingIndexingMap(outOperand);
+  SmallVector<Range> range = getPermutedRange(indexingMap, offsets, sizes);
+  resultOffsets = llvm::map_to_vector(range, [](Range &r) { return r.offset; });
+  resultSizes = llvm::map_to_vector(range, [](Range &r) { return r.size; });
   return success();
 }
 
