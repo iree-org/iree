@@ -259,7 +259,6 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
-    DeclareOpInterfaceMethods<DestinationStyleOpInterface>,
     DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
        ["getUpdatedDestinations", "getIteratingParent"]>]> {
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
@@ -268,15 +267,12 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     This operation can exist in two forms: a tensor-based (value-semantic) form
     and a buffer-based (memref-semantic) form.
 
-    In both forms, it reads elements from a source operand based on the optional `indices` operand.
-    * When the source is a tensor, the operation produces a new result tensor
-      containing the gathered data.
-    * When the source is a memref, the operation writes the gathered data into
-      a destination out memref operand.
+    In both forms, it reads elements from a source operand based on the optional `indices` operand
+    and writes the gathered data into the destination `init` operand using destination-passing style.
 
     The `indices` operand is optional. The `source` represents the
-    data loaded by this thread, while `result`/`init` is the collective output for
-    all threads in the subgroup. Therefore, `source` and `result`/`init` may have
+    data loaded by this thread, while `init` is the collective output for
+    all threads in the subgroup. Therefore, `source` and `init` may have
     different shapes (typically source is smaller, representing one thread's portion).
 
     The operation is specifically designed for subgroup-level parallelism, where
@@ -320,23 +316,22 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * `$source`: Source tensor/memref containing the data to be gathered.
     * `$init`: Destination tensor/memref receiving the gathered data
       (destination-passing style).
-    * `$result`: Output tensor with gathered data (same type as `$init`). Only
-      present for tensor semantics; memref form does not have a result.
     * `lane`: The lane that specifies the coalescing store's offset within the
       workgroup/shared memory.
 
+
     ## Example of a single subgroup using coalesced_gather_dma in copy mode
        for transferring tensor<4x128xf32>, with an intended DMA width of 128 bits
-       (4 x f32):
+       (4 x f32), with subgroup size 32:
     ```mlir
-    %result = scf.forall (%arg5, %arg6) in (1, 32) ... -> (tensor<4x128xf32>) {
+    scf.forall (%arg6) in (32) ... {
         %2 = %arg6 * 4
-        %thread_slice = tensor.extract_slice %source_slice[0, %2] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
+        %thread_slice = ... : tensor<4x128xf32>
+        %dest_slice = ... : tensor<4x128xf32>
         scf.forall.in_parallel {
-          %3 = iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice lane(%arg6)
-            : tensor<4x4xf32>, tensor<4x128xf32>, index -> tensor<4x128xf32>
+          iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice lane(%arg6) :  ...
         }
-      } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+      } {mapping = [#gpu.lane_id<linear_dim_0>]}
     ```
   }];
 
@@ -347,20 +342,19 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     Index:$lane
   );
 
-  let results = (outs Optional<AnyRankedTensor>:$result);
+  let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
   let assemblyFormat = [{
-    $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)` attr-dict
-    `:` type(operands) (`->` type($result)^)?
+    $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
+    attr-dict `:` type(operands) ( `->` type($result)^ )?
   }];
 
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    // Get the rank of the init/result tensor/memref
+    // Get the rank of the init tensor/memref
     unsigned getResultRank() {
-      // For tensor semantics, use result; for memref semantics, use init
-      Type type = getResult() ? getResult().getType() : getInit().getType();
+      Type type = getInit().getType();
       if (auto tensorType = ::llvm::dyn_cast<RankedTensorType>(type))
         return tensorType.getRank();
       if (auto memrefType = ::llvm::dyn_cast<MemRefType>(type))
@@ -370,7 +364,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     }
 
     bool hasTensorSemantics() {
-      return getResult() != nullptr;
+      return ::llvm::isa<RankedTensorType>(getInit().getType());
     }
   }];
 }
