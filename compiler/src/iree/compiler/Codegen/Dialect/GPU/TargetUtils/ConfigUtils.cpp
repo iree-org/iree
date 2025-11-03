@@ -646,18 +646,16 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
-  // TODO (nirvedhmeshram): We only voluntarily allow padded configurations
-  // for tranpose_b layouts as that's where we currently don't have any overhead
-  // for padding. Other layouts still can have overhead and once we fix the root
-  // causes for that we can relax this condition.
-  GPUMatmulShapeType problem{
-      getDimBounds(mDims, transposedLhs || !transposedRhs),
-      getDimBounds(nDims, transposedLhs || !transposedRhs),
-      getDimBoundsNoPad(kDims),
-      getDimBoundsNoPad(batchDims),
-      lhsElemType,
-      rhsElemType,
-      initElemType};
+  // Intentionally padded GEMM proved to be beneficial for performance for
+  // the following layouts: 1) [M, K] x [K, N] 2) [M, K] x [N, K]
+  // Therefore we disallow padding only when LHS is transposed.
+  GPUMatmulShapeType problem{getDimBounds(mDims, transposedLhs),
+                             getDimBounds(nDims, transposedLhs),
+                             getDimBoundsNoPad(kDims),
+                             getDimBoundsNoPad(batchDims),
+                             lhsElemType,
+                             rhsElemType,
+                             initElemType};
 
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
