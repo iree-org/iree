@@ -61,6 +61,12 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
         "Enables horizontal fusion of contractions with one common operand"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clExperimentalMultiUseEncodingFusion(
+    "iree-dispatch-creation-experimental-multi-use-encoding-fusion",
+    llvm::cl::desc(
+        "Enable encoding op fusion if the producer has more than one use"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-dispatch-creation-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
@@ -285,7 +291,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass([&]() {
         FuseEncodingOpsIntoDispatchRegionsPassOptions passOptions;
         passOptions.enableAggressiveFusion =
-            options.enableMultiUseEncodingFusion;
+            clExperimentalMultiUseEncodingFusion;
         return DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass(
             passOptions);
       })

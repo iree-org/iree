@@ -30,13 +30,6 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable aggressive fusion for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
-  Option<bool> enableMultiUseEncodingFusion{
-      *this,
-      "multi-use-encoding-fusion",
-      llvm::cl::desc(
-          "Enable encoding ops' fusion if the producer has more than one uses"),
-      llvm::cl::init(false),
-  };
   Option<bool> enableFuseMultiUse{
       *this,
       "fuse-multi-use",

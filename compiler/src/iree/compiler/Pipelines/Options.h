@@ -229,7 +229,6 @@ struct DispatchCreationOptions {
   llvm::OptimizationLevel optLevel;
 
   bool enableAggressiveFusion = false;
-  bool enableMultiUseEncodingFusion = false;
   bool enableFuseMultiUse = true;
   bool enableSplitReduction = false;
 
