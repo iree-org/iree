@@ -3440,6 +3440,7 @@ let opDocGroup = OpGroupInterfaceOps in {
 
 class HAL_InterfaceWorkgroupOp<string mnemonic, list<Trait> traits = []>
   : HAL_PureOp<mnemonic, !listconcat(traits, [
+      HAL_ExecutableInterfaceOp,
       DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
       DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>])> {
   let arguments = (ins
@@ -3514,7 +3515,9 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_InterfaceWorkgroupOp<"interface.workgroup
   }];
 }
 
-def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
+def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load", [
+    HAL_ExecutableInterfaceOp,
+]> {
   let summary = [{Loads a constant value from the interface constant block.}];
   let description = [{
     Loads a scalar constant value from an executable IO push constant block.
@@ -3557,6 +3560,7 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
 def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+  HAL_ExecutableInterfaceOp,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{Returns an alias to a subspan of interface binding data.}];

@@ -109,6 +109,7 @@ iree_lit_test_suite(
             "remove_dead_allocs.mlir",
             "remove_single_iteration_loop.mlir",
             "resolve_swizzle_hints.mlir",
+            "resolve_workgroup_count_hints.mlir",
             "repeated_matcher_use.mlir",
             "replace_slow_min_max_ops.mlir",
             "specialize_exports.mlir",
