@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -458,9 +459,9 @@ private:
     Value current = accFlat;
 
     for (int64_t k = K - 1; k >= 0; --k) {
-      Value a = rewriter.create<vector::ExtractOp>(loc, lhs2D, k);
-      Value b = rewriter.create<vector::ExtractOp>(loc, rhs2D, k);
-      current = rewriter.create<math::FmaOp>(loc, a, b, current);
+      Value a = vector::ExtractOp::create(rewriter, loc, lhs2D, k);
+      Value b = vector::ExtractOp::create(rewriter, loc, rhs2D, k);
+      current = math::FmaOp::create(rewriter, loc, a, b, current);  
     }
     return current;
   }
