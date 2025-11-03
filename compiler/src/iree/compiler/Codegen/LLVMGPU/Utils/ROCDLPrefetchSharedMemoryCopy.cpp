@@ -293,43 +293,67 @@ populateOpToStageMap(LoopPrefetcher &prefetcher, scf::ForOp forOp,
   }
 }
 
-// Populates cluster IDs for each operation in the schedule.
-// Each operation gets a unique cluster ID based on its position in the
-// schedule.
-static void populateOpToClusterMap(
-    LoopPrefetcher &prefetcher,
-    const llvm::DenseMap<Operation *, unsigned> &opToStage,
-    std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
-    llvm::DenseMap<Operation *, unsigned> &opToCluster) {
+// Populates cluster IDs for each operation based on stage groupings.
+// Operations are assigned cluster IDs in execution order: read -> compute ->
+// write. Each stage group gets its own cluster ID.
+static void
+populateOpToClusterMap(LoopPrefetcher &prefetcher,
+                       llvm::DenseMap<Operation *, unsigned> &opToCluster) {
 
   unsigned clusterID = 0;
 
-  // Build the schedule in desired execution order: read -> compute -> write
-  // Each operation forms its own "cluster" (a position in the schedule)
+  // Assign cluster ID 0 to all read stage operations
   for (Operation *op : prefetcher.readStage) {
-    if (opToStage.count(op)) {
-      finalSchedule.push_back({op, opToStage.lookup(op)});
-      opToCluster[op] = clusterID;
-    }
+    opToCluster[op] = clusterID;
   }
   ++clusterID;
 
+  // Assign cluster ID 1 to all compute stage operations
   for (Operation *op : prefetcher.computeStage) {
-    if (opToStage.count(op)) {
-      finalSchedule.push_back({op, opToStage.lookup(op)});
-      opToCluster[op] = clusterID;
-    }
+    opToCluster[op] = clusterID;
   }
   ++clusterID;
 
+  // Assign cluster ID 2 to all write stage operations
   for (Operation *op : prefetcher.writeStage) {
+    opToCluster[op] = clusterID;
+  }
+
+  LDBG() << "Built opToCluster map with " << clusterID + 1 << " clusters";
+}
+
+// Builds the final schedule using opToCluster and opToStage mappings.
+// Sorts operations by cluster ID, maintaining original order within each
+// cluster.
+static void buildFinalSchedule(
+    LoopPrefetcher &prefetcher,
+    const llvm::DenseMap<Operation *, unsigned> &opToStage,
+    const llvm::DenseMap<Operation *, unsigned> &opToCluster,
+    std::vector<std::pair<Operation *, unsigned>> &finalSchedule) {
+
+  // Collect all operations from all stages with their cluster IDs
+  SmallVector<Operation *> allOps;
+  allOps.append(prefetcher.readStage.begin(), prefetcher.readStage.end());
+  allOps.append(prefetcher.computeStage.begin(), prefetcher.computeStage.end());
+  allOps.append(prefetcher.writeStage.begin(), prefetcher.writeStage.end());
+
+  // Sort by cluster ID, maintaining original order within each cluster
+  llvm::stable_sort(allOps, [&](Operation *a, Operation *b) {
+    unsigned clusterA = opToCluster.lookup(a);
+    unsigned clusterB = opToCluster.lookup(b);
+    return clusterA < clusterB;
+  });
+
+  // Build the final schedule from the sorted operations
+  for (Operation *op : allOps) {
     if (opToStage.count(op)) {
-      finalSchedule.push_back({op, opToStage.lookup(op)});
-      opToCluster[op] = clusterID;
+      unsigned stage = opToStage.lookup(op);
+      finalSchedule.push_back({op, stage});
     }
   }
 
-  LDBG() << "Built schedule with " << clusterID + 1 << " clusters";
+  LDBG() << "Built final schedule with " << finalSchedule.size()
+         << " operations";
 }
 
 // Builds the PipeliningOption with getScheduleFn.
@@ -469,11 +493,14 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   llvm::DenseMap<Operation *, unsigned> opToStage;
   populateOpToStageMap(prefetcher, forOp, numStages, opToStage);
 
-  // Build the schedule and cluster mapping - major scheduling decision
+  // Step 1: Populate standalone opToCluster map
+  llvm::DenseMap<Operation *, unsigned> opToCluster;
+  populateOpToClusterMap(prefetcher, opToCluster);
+
+  // Step 2: Use opToCluster + opToStage to build the final schedule
   std::vector<std::pair<Operation *, unsigned>> finalSchedule;
   finalSchedule.reserve(opToStage.size());
-  llvm::DenseMap<Operation *, unsigned> opToCluster;
-  populateOpToClusterMap(prefetcher, opToStage, finalSchedule, opToCluster);
+  buildFinalSchedule(prefetcher, opToStage, opToCluster, finalSchedule);
 
   if (finalSchedule.empty()) {
     return failure();
