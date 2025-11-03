@@ -251,13 +251,14 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
       // Cap maxTotalUnrollN to avoid excessive padding.
       maxTotalUnrollN = llvm::divideCeil(matmulSizes->N, intrinsicNSize);
     }
-    IREE::GPU::TargetChipAttr chip = target.getChip();
-    if (chip && !ShapedType::isDynamic(matmulSizes->M) &&
+    if (!ShapedType::isDynamic(matmulSizes->M) &&
         !ShapedType::isDynamic(matmulSizes->N)) {
       // Cap maxTotalUnrollMN to avoid underutilizing the workgroups available.
-      maxTotalUnrollMN = llvm::divideCeil(matmulSizes->M * matmulSizes->N,
-                                          chip.getWgpCount() * intrinsicMSize *
-                                              intrinsicNSize);
+      IREE::GPU::TargetChipAttr chip = target.getChip();
+      int64_t numWGPs = chip ? chip.getWgpCount() : 512;
+      maxTotalUnrollMN =
+          llvm::divideCeil(matmulSizes->M * matmulSizes->N,
+                           numWGPs * intrinsicMSize * intrinsicNSize);
     }
   }
   // Iterate over possible tm.
