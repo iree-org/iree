@@ -319,11 +319,11 @@ struct CoalescedGatherDMAOpBufferizationInterface
   getAliasingValues(Operation *op, OpOperand &opOperand,
                     const AnalysisState &state) const {
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
-    SmallVector<bufferization::AliasingValue> alist;
-    if (opOperand.get() == gatherOp.getInit() && gatherOp.getResult()) {
-      alist.push_back({gatherOp.getResult(), BufferRelation::Equivalent});
+    // The result aliases with the init operand
+    if (opOperand.get() == gatherOp.getInit()) {
+      return {{gatherOp.getResult(), BufferRelation::Equivalent}};
     }
-    return alist;
+    return {};
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -340,22 +340,18 @@ struct CoalescedGatherDMAOpBufferizationInterface
       return failure();
     }
 
-    // Check if we're inside an scf.forall.in_parallel block.
-    // If so, we need to move the op outside of it.
-    Operation *parentOp = gatherOp->getParentOp();
-    if (isa_and_nonnull<scf::InParallelOp>(parentOp)) {
-      // Get the forall op containing the in_parallel.
-      auto forallOp = parentOp->getParentOfType<scf::ForallOp>();
-      if (forallOp) {
-        rewriter.setInsertionPoint(parentOp);
-        rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-            gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
-            gatherOp.getIndices(), *initBuffer, gatherOp.getLane());
-        bufferization::replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
-        return success();
-      }
-    }
-    return failure();
+    // Replace in place
+    rewriter.setInsertionPoint(gatherOp);
+
+    // Create the bufferized version with no result (memref form)
+    IREE::GPU::CoalescedGatherDMAOp::create(
+        rewriter, gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
+        gatherOp.getIndices(), *initBuffer, gatherOp.getLane());
+
+    // Replace the op with the init buffer (result aliases with init)
+    replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
+
+    return success();
   }
 };
 
