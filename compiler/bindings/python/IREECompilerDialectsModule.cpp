@@ -553,6 +553,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
                    [](const ireeGPUTargetInfo &self) -> int64_t {
                      return self.maxWorkgroupMemoryBytes;
                    })
+      .def_prop_ro("workgroup_count",
+                   [](const ireeGPUTargetInfo &self) -> int64_t {
+                     return self.wgpCount;
+                   })
+      .def_prop_ro("simds_per_workgroup",
+                   [](const ireeGPUTargetInfo &self) -> int64_t {
+                     return self.simdsPerWgp;
+                   })
       .def_prop_ro(
           "mma_intrinsics", [](const ireeGPUTargetInfo &self) -> py::list {
             if (mlirAttributeIsNull(self.mmaIntrinsics) ||

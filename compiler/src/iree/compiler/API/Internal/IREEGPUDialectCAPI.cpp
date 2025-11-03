@@ -411,6 +411,11 @@ ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
       wgpAttr.getMaxThreadCountPerWorkgroup();
   targetInfo.maxWorkgroupMemoryBytes = wgpAttr.getMaxWorkgroupMemoryBytes();
 
+  mlir::iree_compiler::IREE::GPU::TargetChipAttr chipAttr = gpuTargetAttr.getChip();
+
+  targetInfo.wgpCount = chipAttr ? chipAttr.getWgpCount() : 0;
+  targetInfo.simdsPerWgp = wgpAttr.getSimdsPerWgp().value_or(0);
+
   targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr({}));
   mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr mmaOpsArray =
       wgpAttr.getMma();
