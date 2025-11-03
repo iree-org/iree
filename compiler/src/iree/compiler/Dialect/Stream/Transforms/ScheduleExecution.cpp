@@ -276,8 +276,10 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
     // Compute a set of partitions covering all of the streamable ops in the
     // block.
     auto partitionSet = partitionStreamableOps(configAttr, block);
-    if (partitionSet.empty())
+    if (partitionSet.empty()) {
       continue;
+    }
+
     if (failed(partitionSet.verify(loc))) {
       return failure();
     }

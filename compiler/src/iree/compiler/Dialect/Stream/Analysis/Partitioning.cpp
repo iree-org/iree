@@ -153,6 +153,14 @@ LogicalResult Partition::verify(Location loc) {
     collectConsumedValues(definingOp, inputConsumedValues);
 
     // Check if any consumed value comes from partition outputs.
+    //
+    // NOTE: We only check outputs, not all defValues. When operations are
+    // duplicated across partitions (e.g., clones with preferCloneToConsumers),
+    // the same operation may define values in multiple partitions. An input
+    // operation might consume a value that is defined in THIS partition's
+    // defValues, but if that value is not exported (not in outputs), the input
+    // operation must be using a copy from another partition that also defines
+    // it. Checking defValues would create false positives for such cases.
     for (auto consumedValue : inputConsumedValues) {
       if (outs.contains(consumedValue)) {
         return mlir::emitError(loc)
@@ -160,14 +168,6 @@ LogicalResult Partition::verify(Location loc) {
                << consumedValue
                << " - this indicates the operation should be inside the "
                   "partition";
-      }
-
-      // Also check against values defined by partition ops.
-      if (defValues.contains(consumedValue)) {
-        return mlir::emitError(loc)
-               << "circular dependency: input operation uses value defined by "
-                  "partition operation "
-               << consumedValue;
       }
     }
   }
