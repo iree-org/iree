@@ -421,6 +421,36 @@ func.func @concretize_WMMAR4_I32_16x16x16_I8(%lhs: tensor<16x16xi8>, %rhs: tenso
 // -----
 
 #contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @concretize_WMMA_F32_16x16x4_F32(%lhs: tensor<16x4xf32>, %rhs: tensor<4x16xf32>, %acc: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x4_F32>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
+  } : tensor<16x4xf32>, tensor<4x16xf32> into tensor<16x16xf32>
+  return %0 : tensor<16x16xf32>
+}
+
+// CHECK-LABEL:       func @concretize_WMMA_F32_16x16x4_F32
+// CHECK-SAME:          %[[LHS:[A-Za-z0-9]+]]: tensor<16x4xf32>
+// CHECK-SAME:          %[[RHS:[A-Za-z0-9]+]]: tensor<4x16xf32>
+// CHECK-SAME:          %[[ACC:[A-Za-z0-9]+]]: tensor<16x16xf32>
+
+// CHECK-INPUTS-NOT:    tensor.expand_shape
+// CHECK-INPUTS:        %[[MMA:.+]] = iree_codegen.inner_tiled
+// CHECK-INPUTS:        return %[[MMA]]
+
+// CHECK-OUTPUTS:        %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
+// CHECK-OUTPUTS-SAME:     : tensor<16x4xf32>, tensor<4x16xf32> into tensor<16x16xf32>
+// CHECK-OUTPUTS:        return %[[MMA]]
+
+// -----
+
+#contraction_accesses = [
  affine_map<(i, j, k, b) -> (i, k, b)>,
  affine_map<(i, j, k, b) -> (k, b, j)>,
  affine_map<(i, j, k, b) -> (i, k)>,

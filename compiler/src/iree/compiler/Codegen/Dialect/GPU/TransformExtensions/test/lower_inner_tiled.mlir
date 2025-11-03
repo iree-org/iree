@@ -215,6 +215,176 @@ module attributes { transform.with_named_sequence } {
  affine_map<() -> ()>,
  affine_map<() -> ()>
 ]
+func.func @lower_multi_mma_wmma_f32_16x16x4_f32(%lhs: vector<2xf32>, %rhs: vector<2xf32>, %acc: vector<8xf32>) -> vector<8xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x4_F32>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<2xf32>, vector<2xf32> into vector<8xf32>
+  return %0 : vector<8xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_multi_mma_wmma_f32_16x16x4_f32
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<2xf32>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<2xf32>
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<8xf32>
+//       CHECK:   amdgpu.wmma 16x16x4 %[[LHS]] * %[[RHS]] + %[[ACC]]
+//  CHECK-SAME:     : vector<2xf32>, vector<2xf32>, vector<8xf32>
+
+// -----
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_multi_mma_wmma_f32_16x16x32_f16(%lhs: vector<16xf16>, %rhs: vector<16xf16>, %acc: vector<8xf32>) -> vector<8xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x32_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<16xf16>, vector<16xf16> into vector<8xf32>
+  return %0 : vector<8xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_multi_mma_wmma_f32_16x16x32_f16
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<16xf16>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<16xf16>
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<8xf32>
+//       CHECK:   amdgpu.wmma 16x16x32 %[[LHS]] * %[[RHS]] + %[[ACC]]
+//  CHECK-SAME:     : vector<16xf16>, vector<16xf16>, vector<8xf32>
+
+// -----
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_multi_mma_wmma_f32_16x16x64_f8E4M3FN(%lhs: vector<32xf8E4M3FN>, %rhs: vector<32xf8E4M3FN>, %acc: vector<8xf32>) -> vector<8xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x64_F8E4M3FN>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<32xf8E4M3FN>, vector<32xf8E4M3FN> into vector<8xf32>
+  return %0 : vector<8xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_multi_mma_wmma_f32_16x16x64_f8E4M3FN
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<32xf8E4M3FN>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<32xf8E4M3FN>
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<8xf32>
+//       CHECK:   amdgpu.wmma 16x16x64 %[[LHS]] * %[[RHS]] + %[[ACC]]
+//  CHECK-SAME:     : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<8xf32>
+
+// -----
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_multi_mma_wmma_f32_16x16x128_f8E4M3FN(%lhs: vector<64xf8E4M3FN>, %rhs: vector<64xf8E4M3FN>, %acc: vector<8xf32>) -> vector<8xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x128_F8E4M3FN>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<64xf8E4M3FN>, vector<64xf8E4M3FN> into vector<8xf32>
+  return %0 : vector<8xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_multi_mma_wmma_f32_16x16x128_f8E4M3FN
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<64xf8E4M3FN>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<64xf8E4M3FN>
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<8xf32>
+//       CHECK:   amdgpu.wmma 16x16x128 %[[LHS]] * %[[RHS]] + %[[ACC]]
+//  CHECK-SAME:     : vector<64xf8E4M3FN>, vector<64xf8E4M3FN>, vector<8xf32>
+
+// -----
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_multi_mma_wmma_f16_16x16x128_f8E4M3FN(%lhs: vector<64xf8E4M3FN>, %rhs: vector<64xf8E4M3FN>, %acc: vector<8xf16>) -> vector<8xf16> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_F16_16x16x128_F8E4M3FN>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+  } : vector<64xf8E4M3FN>, vector<64xf8E4M3FN> into vector<8xf16>
+  return %0 : vector<8xf16>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_multi_mma_wmma_f16_16x16x128_f8E4M3FN
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<64xf8E4M3FN>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<64xf8E4M3FN>
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<8xf16>
+//       CHECK:   amdgpu.wmma 16x16x128 %[[LHS]] * %[[RHS]] + %[[ACC]]
+//  CHECK-SAME:     : vector<64xf8E4M3FN>, vector<64xf8E4M3FN>, vector<8xf16>
+
+// -----
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
 func.func @lower_multi_mma_mfma_shape_cast_16x16x16(%lhs: vector<1x4xf16>, %rhs: vector<4x1xf16>, %acc: vector<4x1xf32>) -> vector<4x1xf32> {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,

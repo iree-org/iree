@@ -473,6 +473,72 @@ module {
 // -----
 
 #contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @distribute_WMMA_F32_16x16x4_F32(%lhs: tensor<16x4xf32>, %rhs: tensor<4x16xf32>, %acc: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x4_F32>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
+  } : tensor<16x4xf32>, tensor<4x16xf32> into tensor<16x16xf32>
+  return %0 : tensor<16x16xf32>
+}
+
+// CHECK-LABEL: func @distribute_WMMA_F32_16x16x4_F32
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<16x4xf32>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<4x16xf32>
+//       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x16xf32>)
+//   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
+//   CHECK-DAG:     %[[IDX:.+]] = affine.linearize_index disjoint [%[[ID]]#1, %c0] by (2, 2)
+//   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[ID]]#2, %[[IDX]]] [1, 2]
+//   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][%[[IDX]], %[[ID]]#2] [2, 1]
+//   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ID]]#1, %c0] by (2, 8)
+//   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]][%[[IDY]], %[[ID]]#2] [8, 1]
+//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
+//  CHECK-SAME:       kind = #iree_gpu.mma_layout<WMMA_F32_16x16x4_F32>
+//  CHECK-SAME:       : tensor<1x2xf32>, tensor<2x1xf32> into tensor<8x1xf32>
+//       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC]][%[[IDY]], %[[ID]]#2] [8, 1]
+//       CHECK:   mapping = [#iree_gpu.lane_id<0>]
+
+// -----
+
+#contraction_accesses = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @distribute_WMMA_F32_16x16x128_F8E4M3FN(%lhs: tensor<16x128xf8E4M3FN>, %rhs: tensor<128x16xf8E4M3FN>, %acc: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.mma_layout<WMMA_F32_16x16x128_F8E4M3FN>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
+  } : tensor<16x128xf8E4M3FN>, tensor<128x16xf8E4M3FN> into tensor<16x16xf32>
+  return %0 : tensor<16x16xf32>
+}
+
+// CHECK-LABEL: func @distribute_WMMA_F32_16x16x128_F8E4M3FN
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<16x128xf8E4M3FN>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<128x16xf8E4M3FN>
+//       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x16xf32>)
+//   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
+//   CHECK-DAG:     %[[IDX:.+]] = affine.linearize_index disjoint [%[[ID]]#1, %c0] by (2, 64)
+//   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[ID]]#2, %[[IDX]]] [1, 64]
+//   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][%[[IDX]], %[[ID]]#2] [64, 1]
+//   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ID]]#1, %c0] by (2, 8)
+//   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]][%[[IDY]], %[[ID]]#2] [8, 1]
+//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
+//  CHECK-SAME:       kind = #iree_gpu.mma_layout<WMMA_F32_16x16x128_F8E4M3FN>
+//  CHECK-SAME:       : tensor<1x64xf8E4M3FN>, tensor<64x1xf8E4M3FN> into tensor<8x1xf32>
+//       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC]][%[[IDY]], %[[ID]]#2] [8, 1]
+//       CHECK:   mapping = [#iree_gpu.lane_id<0>]
+
+// -----
+
+#contraction_accesses = [
  affine_map<(i, j, k) -> (i, k)>,
  affine_map<(i, j, k) -> (k, j)>,
  affine_map<(i, j, k) -> (i, j)>
