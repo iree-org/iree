@@ -176,8 +176,10 @@ private:
       return std::nullopt;
     }
 
-    if (convDims->inputChannel.empty() || convDims->outputChannel.empty() ||
-        convDims->batch.empty() || convDims->filterLoop.empty()) {
+    // Require non-empty filter, output channel, and batch dimensions to derive
+    // heuristics. The input channel dimension may be empty.
+    if (convDims->outputChannel.empty() || convDims->batch.empty() ||
+        convDims->filterLoop.empty()) {
       LDBG() << "skipping op; missing convolution dimensions";
       return std::nullopt;
     }
@@ -208,27 +210,40 @@ private:
     AffineMap filterMap = linalgOp.getMatchingIndexingMap(filter);
     AffineMap outputMap = linalgOp.getMatchingIndexingMap(output);
 
-    std::optional<int64_t> batchLastDim = outputMap.getResultPosition(
-        getAffineDimExpr(convDims->batch.back(), outputMap.getContext()));
-    if (!batchLastDim || batchLastDim.value() != outputShape.size() - 1) {
+    auto getDimPositions = [&](ArrayRef<unsigned> dims, const AffineMap &map) {
+      SmallVector<int64_t> positions;
+      for (auto dim : dims) {
+        positions.push_back(
+            *map.getResultPosition(getAffineDimExpr(dim, map.getContext())));
+      }
+      llvm::sort(positions);
+      return positions;
+    };
+
+    SmallVector<int64_t> batchPos = getDimPositions(convDims->batch, outputMap);
+    SmallVector<int64_t> outputChannelPos =
+        getDimPositions(convDims->outputChannel, outputMap);
+    SmallVector<int64_t> outputImagePos =
+        getDimPositions(convDims->outputImage, outputMap);
+    SmallVector<int64_t> inputChannelPos =
+        getDimPositions(convDims->inputChannel, filterMap);
+    SmallVector<int64_t> filterPos =
+        getDimPositions(convDims->filterLoop, filterMap);
+    SmallVector<int64_t> depthPos = getDimPositions(convDims->depth, outputMap);
+
+    if (outputChannelPos.empty() || batchPos.empty() || filterPos.empty()) {
+      LDBG() << "skipping op; failed to get dim position from the map";
+      return std::nullopt;
+    }
+
+    if (batchPos.back() != outputShape.size() - 1) {
       LDBG() << "skipping op; not batch last layout";
       return std::nullopt;
     }
 
-    std::optional<int64_t> inputChannelDim = filterMap.getResultPosition(
-        getAffineDimExpr(convDims->inputChannel[0], filterMap.getContext()));
-    std::optional<int64_t> filterDim = filterMap.getResultPosition(
-        getAffineDimExpr(convDims->filterLoop[0], filterMap.getContext()));
-    if (!inputChannelDim || !filterDim ||
-        inputChannelDim.value() > filterDim.value()) {
+    if (!inputChannelPos.empty() &&
+        inputChannelPos.front() > filterPos.back()) {
       LDBG() << "skipping op; not channel first layout";
-      return std::nullopt;
-    }
-
-    std::optional<int64_t> outputChannelDim = outputMap.getResultPosition(
-        getAffineDimExpr(convDims->outputChannel[0], outputMap.getContext()));
-    if (!outputChannelDim) {
-      LDBG() << "skipping op; has no output channel dim";
       return std::nullopt;
     }
 
@@ -239,6 +254,22 @@ private:
       return std::nullopt;
     }
 
+    // Compute the product of the specified dimensions. If any dimension list is
+    // empty, return 1.
+    auto getSizeAt = [](ArrayRef<int64_t> shape, ArrayRef<int64_t> pos) {
+      int64_t totalSize = 1;
+      for (unsigned i : pos) {
+        assert(!ShapedType::isDynamic(shape[i]));
+        totalSize *= shape[i];
+      }
+      return totalSize;
+    };
+
+    int64_t outputChannelSize = getSizeAt(outputShape, outputChannelPos);
+    int64_t batchSize = getSizeAt(outputShape, batchPos);
+    int64_t imageSize = getSizeAt(outputShape, outputImagePos);
+    int64_t depthSize = getSizeAt(outputShape, depthPos);
+
     // The constants below are determined based on empirical data.
     const int64_t largeDimSize = 512;
     const int64_t mediumDimSize = 128;
@@ -247,8 +278,6 @@ private:
     // When the batch and output channel sizes are large, the workload tends
     // to distributed across many workgroups, making split reduction little to
     // no effect.
-    int64_t outputChannelSize = outputShape[outputChannelDim.value()];
-    int64_t batchSize = outputShape[batchLastDim.value()];
     if (outputChannelSize >= largeDimSize && batchSize >= largeDimSize) {
       LDBG() << "skipping op; large output channel or batch size";
       return std::nullopt;
@@ -267,15 +296,43 @@ private:
       }
     }
 
-    // Only split along the input channel dimension.
-    // TODO(vivian): split more reduction dimensions if needed.
-    int64_t cDim = inputChannelDim.value();
+    // Tile sizes are determined based on output (parallel dimension) sizes.
+    // For larger outputs, the workload tends to be distributed across more
+    // workgroups, thereby reducing the need for extensive splitting along the
+    // reduction dimensions.
     SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
-    if (tileSizes[cDim] == 1) {
-      LDBG() << "skipping op; input channel size equals to 1";
-      return std::nullopt;
+    int64_t outputSize = outputChannelSize * batchSize * imageSize * depthSize;
+    int64_t limitParallelLoops;
+    if (outputSize < 32 * 32) {
+      limitParallelLoops = 2048;
+    } else if (outputSize < 128 * 128) {
+      limitParallelLoops = 128;
+    } else if (outputSize < 256 * 256) {
+      limitParallelLoops = 64;
+    } else if (outputSize < 512 * 512) {
+      limitParallelLoops = 16;
+    } else {
+      limitParallelLoops = std::min<int64_t>(16, tileSizes[0]);
     }
-    tileSizes[cDim] = std::ceil(float(tileSizes[cDim]) / largeDimSize);
+
+    // Based on the limitParallelLoops, assign tile size from the outermost
+    // dimension to the innermost.
+    for (int64_t i = 0; i < tileSizes.size(); i++) {
+      int64_t lowerBound = llvm::divideCeil(tileSizes[i], limitParallelLoops);
+      std::optional<int64_t> maybeTileSize =
+          findSmallestFactorWithLowerBound(tileSizes[i], lowerBound);
+      if (!maybeTileSize) {
+        LDBG() << "skipping op; failed to find a split factor";
+        return std::nullopt;
+      }
+      limitParallelLoops /= (tileSizes[i] / maybeTileSize.value());
+      tileSizes[i] = maybeTileSize.value();
+      // If the outer tile size is larger than 1, inner dimensions cannot be
+      // split due to non-contiguous data.
+      if (tileSizes[i] > 1) {
+        break;
+      }
+    }
     return tileSizes;
   }
 
