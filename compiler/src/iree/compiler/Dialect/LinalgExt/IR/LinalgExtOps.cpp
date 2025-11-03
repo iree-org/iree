@@ -650,6 +650,28 @@ LogicalResult MapScatterOp::verify() {
   return success();
 }
 
+Value MapScatterOp::getInputIndex(int64_t position) {
+  Block &body = getTransformationRegion().front();
+  return body.getArguments()[position];
+}
+
+Value MapScatterOp::getOutputIndex(int64_t position) {
+  // It shouldn't be possible to return the mask, the last operand of the yield,
+  // through this function as that's not an index. Therefore, this assert here.
+  assert(position < getOutputRank() &&
+         "The output index position being requested should be smaller than the "
+         "output rank.");
+  Block &body = getTransformationRegion().front();
+  auto yield = cast<IREE::LinalgExt::YieldOp>(body.getTerminator());
+  return yield.getOperand(position);
+}
+
+Value MapScatterOp::getMask() {
+  Block &body = getTransformationRegion().front();
+  auto yield = cast<IREE::LinalgExt::YieldOp>(body.getTerminator());
+  return yield.getOperand(yield.getNumOperands() - 1);
+}
+
 void MapScatterOp::insertTransformationAtStart(
     OpBuilder &builder,
     function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
