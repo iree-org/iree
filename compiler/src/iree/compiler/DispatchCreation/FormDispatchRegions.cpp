@@ -1013,7 +1013,8 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       auto newRegionOp =
           movePrecedingOpsIntoDispatchRegion(rewriter, producer, regionOp);
       if (failed(newRegionOp)) {
-        return producer->emitOpError("failed to move producer into region");
+        producer->emitWarning("failed to move producer into region");
+        continue;
       }
       regionOp = *newRegionOp;
     }
