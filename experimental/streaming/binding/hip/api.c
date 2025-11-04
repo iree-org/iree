@@ -794,6 +794,20 @@ HIPAPI hipError_t hipGetDeviceProperties(hipDeviceProp_t* prop, int device) {
     // Fall back to empty name if device name query fails.
     prop->name[0] = '\0';
   }
+
+  iree_status_t arch_status = iree_hal_streaming_device_get_string_property(
+    (iree_hal_streaming_device_ordinal_t)device,
+    "hal.device",
+    "architecture",
+    prop->gcnArchName,
+    sizeof(prop->gcnArchName)
+  );
+  if (!iree_status_is_ok(arch_status)) {
+    iree_status_ignore(arch_status);
+    // Fall back to empty name if device name query fails.
+    prop->gcnArchName[0] = '\0';
+  }
+
   prop->totalGlobalMem = (size_t)total_memory;
   prop->sharedMemPerBlock = 65536;  // 64KB default
   prop->regsPerBlock = 65536;
@@ -9336,6 +9350,11 @@ HIPAPI hipError_t hipMallocAsync(void** ptr, size_t size, hipStream_t stream) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
   }
+  
+  // Resolve NULL stream to default stream.
+  if (!stream) {
+    stream = (hipStream_t)context->default_stream;
+  }
 
   iree_hal_streaming_deviceptr_t device_ptr = 0;
   iree_status_t status = iree_hal_streaming_memory_allocate_async(
@@ -9375,9 +9394,20 @@ HIPAPI hipError_t hipMallocFromPoolAsync(void** ptr, size_t size,
     HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
 
+  iree_hal_streaming_context_t* context = iree_hal_streaming_context_current();
+  if (!context) {
+    IREE_TRACE_ZONE_END(z0);
+        HIP_RETURN_ERROR(hipErrorNotInitialized);
+  }
+
+  // Resolve NULL stream to default stream.
+  if (!stream) {
+    stream = (hipStream_t)context->default_stream;
+  }
+
   iree_hal_streaming_deviceptr_t device_ptr = 0;
   iree_status_t status = iree_hal_streaming_memory_allocate_from_pool_async(
-      (iree_hal_streaming_mem_pool_t*)pool, size,
+      context, (iree_hal_streaming_mem_pool_t*)pool, size,
       (iree_hal_streaming_stream_t*)stream, &device_ptr);
 
   if (iree_status_is_ok(status)) {
@@ -9411,6 +9441,11 @@ HIPAPI hipError_t hipFreeAsync(void* ptr, hipStream_t stream) {
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
+  }
+  
+  // Resolve NULL stream to default stream.
+  if (!stream) {
+    stream = (hipStream_t)context->default_stream;
   }
 
   iree_status_t status = iree_hal_streaming_memory_free_async(

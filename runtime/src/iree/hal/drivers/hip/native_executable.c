@@ -41,6 +41,10 @@ typedef struct iree_hal_hip_native_executable_t {
 
   const iree_hal_hip_dynamic_symbols_t* symbols;
 
+  // Kernel info from fat binary (for FPIH format only)
+  iree_host_size_t kernel_count;
+  iree_hal_hip_kernel_info_t* kernels;
+
   iree_host_size_t num_devices;
   iree_hal_hip_native_executable_per_device_data_t* per_device_data[];
 } iree_hal_hip_native_executable_t;
@@ -289,6 +293,11 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
   char target_triple_str[256];
   snprintf(target_triple_str, sizeof(target_triple_str),
            "hipv4-amdgcn-amd-amdhsa--%s", props.gcnArchName);
+  char* col = strstr(target_triple_str, ":");
+  if (col) {
+    *col = '\0';
+  }
+
   iree_string_view_t target_triple = iree_make_cstring_view(target_triple_str);
 
   // Parse the fat binary to extract kernel information for this device
@@ -316,7 +325,8 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (!iree_status_is_ok(status)) {
-    iree_allocator_free(host_allocator, fat_binary_info.kernels);
+    iree_hal_hip_free_kernel_info(host_allocator, fat_binary_info.kernel_count,
+                                   fat_binary_info.kernels);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
@@ -325,6 +335,8 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
                                &executable->resource);
   executable->host_allocator = host_allocator;
   executable->symbols = symbols;
+  executable->kernel_count = fat_binary_info.kernel_count;
+  executable->kernels = fat_binary_info.kernels;
   executable->num_devices = topology.count;
   const iree_host_size_t per_device_data_size =
       topology.count * sizeof(executable->per_device_data[0]);
@@ -395,9 +407,9 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
       iree_string_view_t kernel_name = fat_binary_info.kernels[i].name;
 
       // Convert kernel name to null-terminated string
-      char kernel_name_cstr[256];
+      char kernel_name_cstr[1024];
       iree_host_size_t name_len =
-          kernel_name.size < 255 ? kernel_name.size : 255;
+          kernel_name.size < 1023 ? kernel_name.size : 1023;
       memcpy(kernel_name_cstr, kernel_name.data, name_len);
       kernel_name_cstr[name_len] = '\0';
 
@@ -508,14 +520,15 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
     status = IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL));
   }
 
-  // Clean up kernel info and parameter arrays
+  // Clean up temporary parameter arrays (kernel info ownership transferred to executable)
   for (iree_host_size_t i = 0; i < fat_binary_info.kernel_count; ++i) {
     if (fat_binary_info.kernels[i].parameters) {
       iree_allocator_free(host_allocator,
                           fat_binary_info.kernels[i].parameters);
     }
   }
-  iree_allocator_free(host_allocator, fat_binary_info.kernels);
+  // Note: kernel info (including allocated names) is now owned by the executable
+  // and will be freed in iree_hal_hip_native_executable_destroy
 
   if (iree_status_is_ok(status)) {
     *out_executable = (iree_hal_executable_t*)executable;
@@ -592,6 +605,8 @@ static iree_status_t iree_hal_hip_native_executable_create_flatbuffer(
                                &executable->resource);
   executable->host_allocator = host_allocator;
   executable->symbols = symbols;
+  executable->kernel_count = 0;
+  executable->kernels = NULL;
   executable->num_devices = topology.count;
   const iree_host_size_t per_device_data_size =
       topology.count * sizeof(executable->per_device_data[0]);
@@ -831,6 +846,10 @@ static void iree_hal_hip_native_executable_destroy(
       }
     }
   }
+
+  // Free kernel info (including allocated names) from fat binary
+  iree_hal_hip_free_kernel_info(host_allocator, executable->kernel_count,
+                                 executable->kernels);
 
   iree_allocator_free(host_allocator, executable);
 

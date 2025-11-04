@@ -14,11 +14,18 @@ if(NOT EXISTS "${HIP_API_HEADERS_ROOT}/hip/hip_version.h")
   message(SEND_ERROR "Could not find HIP headers at: ${HIP_API_HEADERS_ROOT}")
 endif()
 
+set(ADDITIONAL_HIP_LIBS)
+if (IREE_HAL_DRIVER_ENABLE_ZSTD)
+  set(ADDITIONAL_HIP_LIBS zstd)
+endif()
+
 iree_cc_library(
   NAME
     hip
   HDRS
     "api.h"
+  COPTS
+    ${IREE_HIP_DRIVER_COPTS}
   SRCS
     "api.h"
     "cleanup_thread.c"
@@ -82,6 +89,7 @@ iree_cc_library(
     iree::hal::drivers::hip::util::hip_util
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::hip_executable_def_c_fbs
+    ${ADDITIONAL_HIP_LIBS}
   PUBLIC
 )
 

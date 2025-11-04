@@ -810,6 +810,13 @@ iree_status_t iree_hal_streaming_device_name(
     iree_hal_streaming_device_ordinal_t ordinal, char* name,
     iree_host_size_t name_size);
 
+iree_status_t iree_hal_streaming_device_get_string_property(
+    iree_hal_streaming_device_ordinal_t ordinal,
+    char* category,
+    char* key,
+    char* name,
+    iree_host_size_t name_size);
+
 // Synchronization: none (queries current memory info).
 iree_status_t iree_hal_streaming_device_memory_info(
     iree_hal_streaming_device_ordinal_t ordinal,
@@ -1412,6 +1419,7 @@ iree_status_t iree_hal_streaming_memory_allocate_async(
 // Allocates memory asynchronously from a specific pool.
 // Synchronization: stream (async allocation on stream).
 iree_status_t iree_hal_streaming_memory_allocate_from_pool_async(
+    iree_hal_streaming_context_t* context, 
     iree_hal_streaming_mem_pool_t* pool, iree_device_size_t size,
     iree_hal_streaming_stream_t* stream,
     iree_hal_streaming_deviceptr_t* out_ptr);
