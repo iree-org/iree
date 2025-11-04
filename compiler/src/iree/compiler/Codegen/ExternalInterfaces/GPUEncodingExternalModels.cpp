@@ -218,13 +218,17 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   //
   // We need to find the optimal pair (totalUnrollM, totalUnrollN) by
   // enumerating feasible (tm, tn) candidates. For each candidate, the
-  // constraint is that the A, B and C tiles must fit in VGPR space.
-  //     A-tile: tm * intrinsicsK * intrinsicSizeBitsLHS
-  //     B-tile: tn * intrinsicsK * intrinsicSizeBitsRHS
-  //     C-tile: tm * tn * intrinsicSizeBitsACC
+  // following two constraints are enforced:
+  // 1. The A, B and C tiles must fit in VGPR space.
   //     A-tile + B-tile + C-tile <= wgp.getVgprSpaceBits()
+  // 2. The A, B tiles must fit in shared memory.
+  //     A-tile + B-tile <= wgp.getMaxWorkgroupMemoryBytes() * 8
+  // A-tile: tm * intrinsicsK * intrinsicSizeBitsLHS
+  // B-tile: tn * intrinsicsK * intrinsicSizeBitsRHS
+  // C-tile: tm * tn * intrinsicSizeBitsACC
   //
-  // The goal is to maximize arithmetic intensity (tm * tn) / (tm + tn).
+  // The optimization goal is to maximize arithmetic intensity (tm * tn) / (tm +
+  // tn).
   //
   // We also self-impose the constraint that tm and tn are powers of 2 to
   // avoid prematurely entering excessing fine-tuning of unrolling factors.
@@ -264,9 +268,13 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // Iterate over possible tm.
   for (int64_t tm = 1; tm <= maxTotalUnrollM; tm <<= 1) {
     // Compute the maximum feasible tn for this tm.
-    int64_t tn =
+    int64_t maxFeasibleTnVgpr =
         (*wgp.getVgprSpaceBits() - tm * intrinsicsK * intrinsicSizeBitsLHS) /
         (intrinsicsK * intrinsicSizeBitsRHS + tm * intrinsicSizeBitsACC);
+    int64_t maxFeasibleTnSharedMem = (wgp.getMaxWorkgroupMemoryBytes() * 8 -
+                                      tm * intrinsicsK * intrinsicSizeBitsLHS) /
+                                     (intrinsicsK * intrinsicSizeBitsRHS);
+    int64_t tn = std::min(maxFeasibleTnVgpr, maxFeasibleTnSharedMem);
     // Clamp tn to maxTotalUnrollN.
     tn = std::min(tn, maxTotalUnrollN);
     // Clamp tn to maxTotalUnrollMN / tm.
@@ -310,6 +318,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     // Calculate the unrolling-to-subgroups on N dimension, given the current
     // sm.
     int64_t sn = std::min(simdsPerWgp / sm, totalUnrollN);
+    // Round sn down to nearest power of two.
+    sn = 1 << (int64_t)std::floor(std::log2(sn));
     // Calculate the plain (intrinsic) unrolling factors on M and N dimensions.
     int64_t im = totalUnrollM / sm;
     int64_t in = totalUnrollN / sn;

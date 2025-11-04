@@ -52,6 +52,7 @@ getEncodingContractionDims(EncodingAttr encoding);
 FailureOr<IREE::LinalgExt::ScaledContractionDimensions>
 getEncodingScaledContractionDims(EncodingAttr encoding);
 
+/// The sizes for contraction ops with only one each of Batch, M, N, K dims.
 struct BxMxNxK {
   int64_t batch = 1;
   int64_t M = 1;
