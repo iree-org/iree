@@ -227,13 +227,14 @@ iree_status_t iree_hal_streaming_memory_allocate_async(
 
   // Allocate from the default pool.
   iree_status_t status = iree_hal_streaming_memory_allocate_from_pool_async(
-      default_pool, size, stream, out_ptr);
+      context, default_pool, size, stream, out_ptr);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 iree_status_t iree_hal_streaming_memory_allocate_from_pool_async(
+    iree_hal_streaming_context_t* context,
     iree_hal_streaming_mem_pool_t* pool, iree_device_size_t size,
     iree_hal_streaming_stream_t* stream,
     iree_hal_streaming_deviceptr_t* out_ptr) {
@@ -242,12 +243,18 @@ iree_status_t iree_hal_streaming_memory_allocate_from_pool_async(
   *out_ptr = 0;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): implement async memory allocation from pool.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_streaming_stream_synchronize(stream));
+
+  iree_hal_streaming_buffer_t* buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_streaming_memory_allocate_device(
+        context, size, 0, &buffer));
+  
+  *out_ptr = (iree_hal_streaming_deviceptr_t)buffer->device_ptr;
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "async memory allocation from pool not yet implemented");
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_streaming_memory_free_async(
@@ -256,9 +263,13 @@ iree_status_t iree_hal_streaming_memory_free_async(
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(benvanik): implement async memory free.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+    z0, iree_hal_streaming_stream_synchronize(stream));
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_streaming_memory_free_device(
+        context, ptr));
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "async memory free not yet implemented");
+  return iree_ok_status();
 }

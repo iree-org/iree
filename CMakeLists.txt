@@ -300,6 +300,7 @@ set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 # HIP support is disabled by default. Note: a HIP-compatible GPU with drivers is still
 # required to actually run HIP workloads.
 set(IREE_HAL_DRIVER_HIP_DEFAULT OFF)
+option(IREE_HAL_DRIVER_ENABLE_ZSTD "Enable zstd decompression for native hip binaries" OFF)
 
 # Metal support is enabled if it's one of the Apple platforms.
 set(IREE_HAL_DRIVER_METAL_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
@@ -1019,8 +1020,22 @@ if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
 endif()
 
+set(IREE_HIP_DRIVER_COPTS)
 if(IREE_HAL_DRIVER_HIP)
   add_subdirectory(build_tools/third_party/rccl EXCLUDE_FROM_ALL)
+  if (IREE_HAL_DRIVER_ENABLE_ZSTD)
+    message(STATUS "Using fetched zstd.*...")
+    include(FetchContent)
+    FetchContent_Declare(
+      zstd
+      GIT_REPOSITORY https://github.com/facebook/zstd.git
+      GIT_TAG        v1.5.7
+    )
+    FetchContent_MakeAvailable(zstd)
+    list(APPEND IREE_HIP_DRIVER_COPTS
+      -DIREE_HAL_HIP_ENABLE_ZSTD
+    )
+  endif()
 endif()
 
 if(IREE_HAL_DRIVER_VULKAN)
