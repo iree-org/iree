@@ -10,6 +10,42 @@
 
 #include "iree/base/api.h"
 
+#ifdef IREE_HAL_HIP_ENABLE_ZSTD
+  #include "zstd.h"
+#endif
+
+
+// CCOB (Compressed Clang Offload Bundle) header structure
+typedef struct iree_hal_hip_ccob_header_v1_t {
+  uint8_t magic[4];           // "CCOB"
+  uint16_t version;           // Version number
+  uint16_t method;            // Compression method (0=zlib, 1=zstd)
+  uint32_t uncompressed_size; // Size of uncompressed data
+  uint64_t hash;              // Hash of uncompressed data
+} iree_hal_hip_ccob_header_v1_t;
+
+typedef struct iree_hal_hip_ccob_header_v2_t {
+  uint8_t magic[4];           // "CCOB"
+  uint16_t version;           // Version number (2+)
+  uint16_t method;            // Compression method (0=zlib, 1=zstd)
+  uint32_t file_size;         // Total file size
+  uint32_t uncompressed_size; // Size of uncompressed data
+  uint64_t hash;              // Hash of uncompressed data
+} iree_hal_hip_ccob_header_v2_t;
+
+typedef struct iree_hal_hip_ccob_header_v3_t {
+  uint8_t magic[4];           // "CCOB"
+  uint16_t version;           // Version number (2+)
+  uint16_t method;            // Compression method (0=zlib, 1=zstd)
+  uint64_t file_size;         // Total file size
+  uint64_t uncompressed_size; // Size of uncompressed data
+  uint64_t hash;              // Hash of uncompressed data
+} iree_hal_hip_ccob_header_v3_t;
+
+// Compression method constants
+#define IREE_HAL_HIP_CCOB_METHOD_ZLIB 0
+#define IREE_HAL_HIP_CCOB_METHOD_ZSTD 1
+
 // Checks if the data starts with compressed offload bundle magic ("CCOB").
 // When unsafe_infer_size is true, assumes the buffer is at least large enough.
 static bool iree_hal_hip_is_code_object_compressed(iree_const_byte_span_t data,
@@ -115,6 +151,390 @@ static iree_status_t iree_hal_hip_validate_elf_header(
 
   if (out_elf_size) {
     *out_elf_size = elf_size;
+  }
+
+  return iree_ok_status();
+}
+
+// Validates CCOB (Compressed Clang Offload Bundle) header and calculates total
+// file size. Returns the total size of the CCOB file in |out_ccob_size|.
+static iree_status_t iree_hal_hip_validate_ccob_header(
+    iree_const_byte_span_t ccob_data, bool unsafe_infer_size,
+    iree_host_size_t* out_ccob_size) {
+  // Minimum size for v1 header
+  const iree_host_size_t v1_header_size =
+      sizeof(iree_hal_hip_ccob_header_v1_t);
+  const iree_host_size_t v2_header_size =
+      sizeof(iree_hal_hip_ccob_header_v2_t);
+  const iree_host_size_t v3_header_size =
+      sizeof(iree_hal_hip_ccob_header_v3_t);
+
+  if (!unsafe_infer_size && ccob_data.data_length < v1_header_size) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "CCOB data too small for header (expected at least "
+                            "%" PRIhsz " bytes, got %" PRIhsz " bytes)",
+                            v1_header_size, ccob_data.data_length);
+  }
+
+  // Validate magic bytes
+  if (memcmp(ccob_data.data, IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC,
+             IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC_SIZE) != 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid CCOB magic bytes");
+  }
+
+  // Read version to determine header structure
+  uint16_t version;
+  memcpy(&version, ccob_data.data + 4, sizeof(uint16_t));
+
+  if (version == 1) {
+    // V1: header size + compressed data size is inferred from file
+    // Since v1 doesn't have file_size field, we need to use data_length
+    if (!unsafe_infer_size) {
+      *out_ccob_size = ccob_data.data_length;
+    } else {
+      // When unsafe_infer_size is true, we cannot determine size for v1
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "CCOB v1 does not store total file size; cannot infer size safely");
+    }
+  } else if (version >= 2) {
+    if (!unsafe_infer_size && ccob_data.data_length < v2_header_size) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "CCOB v2+ data too small for header");
+    }
+
+    // V2+: file_size field contains the total size
+    iree_hal_hip_ccob_header_v2_t header;
+    memcpy(&header, ccob_data.data, sizeof(header));
+
+    // Validate that claimed file size is reasonable
+    if (!unsafe_infer_size && header.file_size > ccob_data.data_length) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "CCOB v2 claims file size of %" PRIu32
+                              " bytes but only %" PRIhsz " bytes available",
+                              header.file_size, ccob_data.data_length);
+    }
+
+    *out_ccob_size = (iree_host_size_t)header.file_size;
+  } else if (version >= 3) {
+    if (!unsafe_infer_size && ccob_data.data_length < v3_header_size) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "CCOB v2+ data too small for header");
+    }
+
+    // V2+: file_size field contains the total size
+    iree_hal_hip_ccob_header_v3_t header;
+    memcpy(&header, ccob_data.data, sizeof(header));
+
+    // Validate that claimed file size is reasonable
+    if (!unsafe_infer_size && header.file_size > ccob_data.data_length) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "CCOB v2 claims file size of %" PRIu64
+                              " bytes but only %" PRIhsz " bytes available",
+                              header.file_size, ccob_data.data_length);
+    }
+
+    *out_ccob_size = (iree_host_size_t)header.file_size;
+  } else {
+    return iree_make_status(IREE_STATUS_INCOMPATIBLE,
+                            "unsupported CCOB version %u", version);
+  }
+
+  return iree_ok_status();
+}
+
+// Parses a CCOB (Compressed Clang Offload Bundle) header and validates it.
+// Returns the decompressed size and compression method.
+static iree_status_t iree_hal_hip_parse_ccob_header(
+    iree_const_byte_span_t ccob_data, bool unsafe_infer_size,
+    uint16_t* out_version, uint16_t* out_method,
+    uint32_t* out_uncompressed_size, uint32_t* out_file_size,
+    iree_host_size_t* out_compressed_data_offset) {
+  // Minimum size for v1 header
+  const iree_host_size_t v1_header_size = sizeof(iree_hal_hip_ccob_header_v1_t);
+  const iree_host_size_t v2_header_size = sizeof(iree_hal_hip_ccob_header_v2_t);
+  const iree_host_size_t v3_header_size = sizeof(iree_hal_hip_ccob_header_v3_t);
+
+  if (!unsafe_infer_size && ccob_data.data_length < v1_header_size) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "CCOB data too small for header (expected at least "
+                            "%" PRIhsz " bytes, got %" PRIhsz " bytes)",
+                            v1_header_size, ccob_data.data_length);
+  }
+
+  // Read version first
+  uint16_t version;
+  memcpy(&version, ccob_data.data + 4, sizeof(uint16_t));
+  *out_version = version;
+
+  if (version == 1) {
+    iree_hal_hip_ccob_header_v1_t header;
+    memcpy(&header, ccob_data.data, sizeof(header));
+
+    *out_method = header.method;
+    *out_uncompressed_size = header.uncompressed_size;
+    *out_file_size = 0;  // Not available in v1
+    *out_compressed_data_offset = v1_header_size;
+  } else if (version >= 2) {
+    if (!unsafe_infer_size && ccob_data.data_length < v2_header_size) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "CCOB v2+ data too small for header");
+    }
+
+    iree_hal_hip_ccob_header_v2_t header;
+    memcpy(&header, ccob_data.data, sizeof(header));
+
+    *out_method = header.method;
+    *out_uncompressed_size = header.uncompressed_size;
+    *out_file_size = header.file_size;
+    *out_compressed_data_offset = v2_header_size;
+  } else if (version >= 3) {
+    if (!unsafe_infer_size && ccob_data.data_length < v3_header_size) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "CCOB v2+ data too small for header");
+    }
+
+    iree_hal_hip_ccob_header_v3_t header;
+    memcpy(&header, ccob_data.data, sizeof(header));
+
+    *out_method = header.method;
+    *out_uncompressed_size = header.uncompressed_size;
+    *out_file_size = header.file_size;
+    *out_compressed_data_offset = v3_header_size;
+  } else {
+    return iree_make_status(IREE_STATUS_INCOMPATIBLE,
+                            "unsupported CCOB version %u", version);
+  }
+
+  // Validate compression method
+  if (*out_method != IREE_HAL_HIP_CCOB_METHOD_ZLIB &&
+      *out_method != IREE_HAL_HIP_CCOB_METHOD_ZSTD) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unknown CCOB compression method %u", *out_method);
+  }
+
+  return iree_ok_status();
+}
+
+// Decompresses a CCOB (Compressed Clang Offload Bundle).
+// Supports zstd compression. zlib support would require additional dependencies.
+static iree_status_t iree_hal_hip_decompress_ccob(
+    iree_const_byte_span_t compressed_data, uint16_t method,
+    uint32_t uncompressed_size, iree_allocator_t allocator,
+    uint8_t** out_decompressed_data,
+    iree_host_size_t* out_decompressed_size) {
+  if (method == IREE_HAL_HIP_CCOB_METHOD_ZLIB) {
+    // zlib support not yet implemented
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "CCOB decompression with zlib is not yet implemented. "
+        "The bundle contains zlib-compressed data (%" PRIu32
+        " bytes uncompressed). "
+        "Please use zstd compression or an uncompressed bundle.",
+        uncompressed_size);
+  }
+
+  if (method != IREE_HAL_HIP_CCOB_METHOD_ZSTD) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unknown CCOB compression method %u", method);
+  }
+
+  // Allocate buffer for decompressed data
+  uint8_t* decompressed_data = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      allocator, (iree_host_size_t)uncompressed_size,
+      (void**)&decompressed_data));
+
+  // Decompress using zstd
+  size_t decompressed_size = ZSTD_decompress(
+      decompressed_data, (size_t)uncompressed_size, compressed_data.data,
+      compressed_data.data_length);
+
+  // Check for errors
+  if (ZSTD_isError(decompressed_size)) {
+    iree_allocator_free(allocator, decompressed_data);
+    return iree_make_status(IREE_STATUS_DATA_LOSS,
+                            "zstd decompression failed: %s",
+                            ZSTD_getErrorName(decompressed_size));
+  }
+
+  // Verify decompressed size matches expected size
+  if (decompressed_size != (size_t)uncompressed_size) {
+    iree_allocator_free(allocator, decompressed_data);
+    return iree_make_status(
+        IREE_STATUS_DATA_LOSS,
+        "zstd decompressed size mismatch: expected %" PRIu32
+        " bytes, got %zu bytes",
+        uncompressed_size, decompressed_size);
+  }
+
+  *out_decompressed_data = decompressed_data;
+  *out_decompressed_size = (iree_host_size_t)decompressed_size;
+  return iree_ok_status();
+}
+
+// Forward declaration
+static iree_status_t iree_hal_hip_parse_elf_kernels(
+    iree_const_byte_span_t elf_data, iree_allocator_t allocator,
+    bool copy_kernel_names, iree_host_size_t* kernel_count,
+    iree_hal_hip_kernel_info_t** out_kernels);
+
+// Parses an uncompressed offload bundle and extracts kernels from the ELF
+// matching the target triple.
+//
+// Bundle format:
+//   [Magic (24 bytes)][Number of bundles (8 bytes)]
+//   [Entry 0: offset, size, triple_size (24 bytes)][Triple string (variable)]
+//   [Entry 1: ...]
+//   [Binary data for entry 0]
+//   [Binary data for entry 1]
+//
+// If copy_kernel_names is true, kernel names will be copied (needed when
+// bundle_data is temporary, e.g., from decompression).
+//
+// Returns:
+//   - matched_kernel_count: Number of kernels found in the matching ELF
+//   - matched_kernels: Array of kernel info (caller must free)
+//   - bundle_size: Total size of the bundle
+static iree_status_t iree_hal_hip_parse_offload_bundle_kernels(
+    iree_const_byte_span_t bundle_data, iree_string_view_t target_triple,
+    iree_allocator_t allocator, bool copy_kernel_names,
+    iree_host_size_t* out_matched_kernel_count,
+    iree_hal_hip_kernel_info_t** out_matched_kernels,
+    iree_host_size_t* out_bundle_size) {
+  // Skip magic (already validated by caller).
+  const uint8_t* bundle_ptr =
+      bundle_data.data + IREE_HAL_HIP_OFFLOAD_BUNDLE_MAGIC_SIZE;
+  iree_host_size_t remaining =
+      bundle_data.data_length - IREE_HAL_HIP_OFFLOAD_BUNDLE_MAGIC_SIZE;
+
+  // Read number of bundles.
+  if (remaining < sizeof(uint64_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "offload bundle too small for bundle count");
+  }
+
+  uint64_t num_bundles;
+  memcpy(&num_bundles, bundle_ptr, sizeof(num_bundles));
+  bundle_ptr += sizeof(num_bundles);
+  remaining -= sizeof(num_bundles);
+
+  if (num_bundles == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "offload bundle contains no entries");
+  }
+
+  // Track the maximum extent of all ELF files to calculate total bundle size.
+  uint64_t max_elf_end = 0;
+  iree_hal_hip_kernel_info_t* matched_kernels = NULL;
+  iree_host_size_t matched_kernel_count = 0;
+  bool found_match = false;
+
+  // Process all bundle entries.
+  for (uint64_t i = 0; i < num_bundles; ++i) {
+    // Read bundle entry header.
+    if (remaining < sizeof(iree_hal_hip_bundle_entry_t)) {
+      iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
+                                     matched_kernels);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "offload bundle too small for entry header [%" PRIu64 "]", i);
+    }
+
+    iree_hal_hip_bundle_entry_t entry;
+    memcpy(&entry, bundle_ptr, sizeof(entry));
+    bundle_ptr += sizeof(entry);
+    remaining -= sizeof(entry);
+
+    // Skip the triple string.
+    if (remaining < entry.triple_size) {
+      iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
+                                     matched_kernels);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "offload bundle too small for triple string [%" PRIu64 "]", i);
+    }
+
+    // Read the triple for comparison
+    iree_string_view_t entry_triple =
+        iree_make_string_view((const char*)bundle_ptr, entry.triple_size);
+    bundle_ptr += entry.triple_size;
+    remaining -= entry.triple_size;
+
+    // The entry offset is from the start of the bundle data.
+    // Validate the offset and extract the ELF binary.
+    const uint8_t* entry_data = bundle_data.data + (iree_host_size_t)entry.offset;
+    iree_host_size_t entry_size = (iree_host_size_t)entry.size;
+
+    // Validate entry is within bundle_data bounds.
+    if (entry.offset >= bundle_data.data_length ||
+        entry.offset + entry_size > bundle_data.data_length) {
+      iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
+                                     matched_kernels);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "offload bundle entry [%" PRIu64
+                              "] offset %" PRIu64 " size %" PRIu64
+                              " is out of bounds",
+                              i, entry.offset, entry.size);
+    }
+
+    // Verify it's an ELF file.
+    iree_const_byte_span_t entry_span =
+        iree_make_const_byte_span(entry_data, entry_size);
+    if (!iree_hal_hip_is_code_object_elf(entry_span, true)) {
+      iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
+                                     matched_kernels);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "offload bundle entry [%" PRIu64
+                              "] does not contain an ELF binary",
+                              i);
+    }
+
+    // Validate and get the ELF size.
+    iree_host_size_t elf_size = 0;
+    iree_status_t elf_status =
+        iree_hal_hip_validate_elf_header(entry_span, true, &elf_size);
+    if (!iree_status_is_ok(elf_status)) {
+      iree_hal_hip_free_kernel_info(allocator, matched_kernel_count,
+                                     matched_kernels);
+      return elf_status;
+    }
+
+    // Update the maximum extent.
+    uint64_t elf_end = entry.offset + elf_size;
+    if (elf_end > max_elf_end) {
+      max_elf_end = elf_end;
+    }
+
+    // Check if this triple matches the target
+    if (iree_string_view_equal(entry_triple, target_triple)) {
+      found_match = true;
+
+      // Parse kernels from this ELF
+      entry_span.data_length = elf_size;
+      iree_status_t status = iree_hal_hip_parse_elf_kernels(
+          entry_span, allocator, copy_kernel_names, &matched_kernel_count,
+          &matched_kernels);
+      if (!iree_status_is_ok(status)) {
+        return status;
+      }
+    }
+  }
+
+  if (!found_match) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "no ELF found for target triple '%.*s' in offload "
+                            "bundle (searched %" PRIu64 " entries)",
+                            (int)target_triple.size, target_triple.data,
+                            num_bundles);
+  }
+
+  // Return results
+  *out_matched_kernel_count = matched_kernel_count;
+  *out_matched_kernels = matched_kernels;
+  if (out_bundle_size) {
+    *out_bundle_size = (iree_host_size_t)max_elf_end;
   }
 
   return iree_ok_status();
@@ -983,9 +1403,14 @@ static iree_status_t iree_hal_hip_read_string_from_table(
 
 // Parses an ELF file and extracts kernel function information from the symbol
 // table, including parameters from kernel descriptors.
+//
+// If copy_kernel_names is true, kernel names are copied into the allocation
+// (appended after the kernel_info array). This is necessary when the ELF data
+// is temporary (e.g., from decompression) and will be freed.
 static iree_status_t iree_hal_hip_parse_elf_kernels(
     iree_const_byte_span_t elf_data, iree_allocator_t allocator,
-    iree_host_size_t* kernel_count, iree_hal_hip_kernel_info_t** out_kernels) {
+    bool copy_kernel_names, iree_host_size_t* kernel_count,
+    iree_hal_hip_kernel_info_t** out_kernels) {
   const uint8_t* elf_base = elf_data.data;
 
   // Read ELF header
@@ -1054,7 +1479,7 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
   const uint8_t* string_table = elf_base + strtab_section->sh_offset;
   iree_host_size_t string_table_size = strtab_section->sh_size;
 
-  // First pass: count function symbols and find their kernel descriptors
+  // First pass: count function symbols
   iree_host_size_t num_symbols =
       symtab_section->sh_size / sizeof(iree_hal_hip_elf64_symbol_t);
   iree_host_size_t func_count = 0;
@@ -1082,11 +1507,11 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
     return iree_ok_status();
   }
 
-  // Allocate array for kernel information
+  // Allocate array for kernel information (no longer appending string storage)
+  iree_host_size_t alloc_size = func_count * sizeof(iree_hal_hip_kernel_info_t);
   iree_hal_hip_kernel_info_t* kernels = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, func_count * sizeof(iree_hal_hip_kernel_info_t),
-      (void**)&kernels));
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, alloc_size, (void**)&kernels));
   memset(kernels, 0, func_count * sizeof(iree_hal_hip_kernel_info_t));
 
   // Second pass: extract function names and kernel descriptors
@@ -1112,7 +1537,30 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
         continue;
       }
 
-      kernels[kernel_index].name = name;
+      // Copy or reference the kernel name
+      if (copy_kernel_names) {
+        // Allocate separate memory for this kernel's name
+        char* allocated_name = NULL;
+        iree_status_t alloc_status =
+            iree_allocator_malloc(allocator, name.size, (void**)&allocated_name);
+        if (!iree_status_is_ok(alloc_status)) {
+          // Clean up any previously allocated names
+          for (iree_host_size_t k = 0; k < kernel_index; ++k) {
+            if (kernels[k].allocated_name) {
+              iree_allocator_free(allocator, kernels[k].allocated_name);
+            }
+          }
+          iree_allocator_free(allocator, kernels);
+          return alloc_status;
+        }
+        memcpy(allocated_name, name.data, name.size);
+        kernels[kernel_index].name = iree_make_string_view(allocated_name, name.size);
+        kernels[kernel_index].allocated_name = allocated_name;
+      } else {
+        // Reference the name directly in the ELF string table
+        kernels[kernel_index].name = name;
+        kernels[kernel_index].allocated_name = NULL;
+      }
 
       // Look for the corresponding kernel descriptor (.kd suffix)
       // Search for a symbol with the same name + ".kd"
@@ -1159,7 +1607,7 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
       ++kernel_index;
     }
   }
-
+  
   // Find the .note section containing metadata
   const iree_hal_hip_elf64_section_header_t* note_section = NULL;
   const iree_hal_hip_elf64_section_header_t* shstrtab_section = NULL;
@@ -1283,7 +1731,29 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
 
   *kernel_count = kernel_index;
   *out_kernels = kernels;
+
+  for (iree_host_size_t i = 0; i < kernel_index; ++i) {
+    fprintf(stderr, "Adding kernel : %.*s\n", (int)kernels[i].name.size, kernels[i].name.data);
+  }
   return iree_ok_status();
+}
+
+void iree_hal_hip_free_kernel_info(iree_allocator_t allocator,
+                                    iree_host_size_t kernel_count,
+                                    iree_hal_hip_kernel_info_t* kernels) {
+  if (!kernels) {
+    return;
+  }
+
+  // Free any individually allocated kernel names
+  for (iree_host_size_t i = 0; i < kernel_count; ++i) {
+    if (kernels[i].allocated_name) {
+      iree_allocator_free(allocator, kernels[i].allocated_name);
+    }
+  }
+
+  // Free the kernel array itself
+  iree_allocator_free(allocator, kernels);
 }
 
 iree_status_t iree_hal_hip_parse_fat_binary_kernels(
@@ -1302,11 +1772,105 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
                             "executable data too small for fat binary header");
   }
 
+  // Check if this is a raw ELF file (no fat binary wrapper)
+  if (iree_hal_hip_is_code_object_elf(executable_data, false)) {
+    // It's a raw ELF binary - parse kernels directly
+    // No need to copy names - executable_data persists
+    iree_hal_hip_kernel_info_t* matched_kernels = NULL;
+    iree_host_size_t matched_kernel_count = 0;
+    iree_status_t status = iree_hal_hip_parse_elf_kernels(
+        executable_data, allocator, /*copy_kernel_names=*/false,
+        &matched_kernel_count, &matched_kernels);
+    if (!iree_status_is_ok(status)) {
+      return status;
+    }
+    // Fill output structure
+    out_info->bundle_data = executable_data.data;
+    out_info->bundle_size = executable_data.data_length;
+    out_info->kernel_count = matched_kernel_count;
+    out_info->kernels = matched_kernels;
+    return iree_ok_status();
+  }
+
+  // Check if this is a CCOB file (compressed bundle, no fat binary wrapper)
+  if (iree_hal_hip_is_code_object_compressed(executable_data, false)) {
+    // Parse CCOB header
+    uint16_t version, method;
+    uint32_t uncompressed_size, file_size;
+    iree_host_size_t compressed_data_offset;
+
+    IREE_RETURN_IF_ERROR(iree_hal_hip_parse_ccob_header(
+        executable_data, false, &version, &method, &uncompressed_size,
+        &file_size, &compressed_data_offset));
+
+    // Get the compressed data (after the header)
+    iree_const_byte_span_t compressed_data = iree_make_const_byte_span(
+        executable_data.data + compressed_data_offset,
+        executable_data.data_length - compressed_data_offset);
+
+    // Decompress the CCOB data
+    uint8_t* decompressed_data = NULL;
+    iree_host_size_t decompressed_size = 0;
+    iree_status_t decompress_status = iree_hal_hip_decompress_ccob(
+        compressed_data, method, uncompressed_size, allocator,
+        &decompressed_data, &decompressed_size);
+
+    if (!iree_status_is_ok(decompress_status)) {
+      return decompress_status;
+    }
+
+    // Parse the decompressed data as an offload bundle or ELF
+    iree_const_byte_span_t decompressed_span =
+        iree_make_const_byte_span(decompressed_data, decompressed_size);
+
+    // Check if decompressed data is an ELF or offload bundle
+    iree_hal_hip_kernel_info_t* matched_kernels = NULL;
+    iree_host_size_t matched_kernel_count = 0;
+    iree_host_size_t bundle_size = 0;
+    iree_status_t status;
+
+    if (iree_hal_hip_is_code_object_elf(decompressed_span, false)) {
+      // Parse as ELF directly
+      // MUST copy names - decompressed_data will be freed after this
+      status = iree_hal_hip_parse_elf_kernels(
+          decompressed_span, allocator, /*copy_kernel_names=*/true,
+          &matched_kernel_count, &matched_kernels);
+      bundle_size = decompressed_size;
+    } else if (iree_hal_hip_is_code_object_uncompressed(decompressed_span,
+                                                         false)) {
+      // Parse as offload bundle - extract the matching ELF
+      // MUST copy names - decompressed_data will be freed after this
+      status = iree_hal_hip_parse_offload_bundle_kernels(
+          decompressed_span, target_triple, allocator,
+          /*copy_kernel_names=*/true, &matched_kernel_count, &matched_kernels,
+          &bundle_size);
+    } else {
+      iree_allocator_free(allocator, decompressed_data);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "CCOB decompressed data is not a recognized format (not ELF or "
+          "offload bundle)");
+    }
+
+    // Free the decompressed data (it's been parsed into kernels)
+    iree_allocator_free(allocator, decompressed_data);
+
+    if (!iree_status_is_ok(status)) {
+      return status;
+    }
+
+    // Fill output structure
+    out_info->bundle_data = executable_data.data;
+    out_info->bundle_size = executable_data.data_length;
+    out_info->kernel_count = matched_kernel_count;
+    out_info->kernels = matched_kernels;
+    return iree_ok_status();
+  }
+
   // Read the fat binary header
   iree_hal_hip_fat_binary_header_t fat_header;
   memcpy(&fat_header, executable_data.data, sizeof(fat_header));
 
-  // Validate magic and version
   if (fat_header.magic != IREE_HAL_HIP_FAT_BINARY_MAGIC) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "invalid fat binary magic");
@@ -1322,10 +1886,37 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
       fat_header.binary,
       executable_data.data_length -
           ((uint8_t*)fat_header.binary - (uint8_t*)executable_data.data));
-
+  
+  bool is_compressed =
+      iree_hal_hip_is_code_object_compressed(binary_data, false);
   // Check if this is an uncompressed offload bundle
   bool is_uncompressed =
       iree_hal_hip_is_code_object_uncompressed(binary_data, false);
+
+  if (is_compressed) {
+    // Parse CCOB header to provide detailed error information
+    uint16_t version, method;
+    uint32_t uncompressed_size, file_size;
+    iree_host_size_t compressed_data_offset;
+
+    iree_status_t status = iree_hal_hip_parse_ccob_header(
+        binary_data, false, &version, &method,
+        &uncompressed_size, &file_size, &compressed_data_offset);
+
+    if (iree_status_is_ok(status)) {
+      const char* method_name = (method == IREE_HAL_HIP_CCOB_METHOD_ZLIB) ? "zlib" : "zstd";
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "compressed offload bundle (CCOB v%u) detected for kernel parsing. "
+          "Uses %s compression with uncompressed size of %" PRIu32 " bytes. "
+          "CCOB kernel parsing requires decompression support which is not yet implemented.",
+          version, method_name, uncompressed_size);
+    } else {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "compressed offload bundle detected but failed to parse CCOB header");
+    }
+  }
 
   if (!is_uncompressed) {
     return iree_make_status(
@@ -1333,109 +1924,18 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
         "only uncompressed offload bundles are supported for kernel parsing");
   }
 
-  // Parse the offload bundle structure
-  const uint8_t* bundle_ptr =
-      binary_data.data + IREE_HAL_HIP_OFFLOAD_BUNDLE_MAGIC_SIZE;
-  iree_host_size_t remaining =
-      binary_data.data_length - IREE_HAL_HIP_OFFLOAD_BUNDLE_MAGIC_SIZE;
-
-  // Read number of bundles
-  if (remaining < sizeof(uint64_t)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "offload bundle too small for bundle count");
-  }
-
-  uint64_t num_bundles;
-  memcpy(&num_bundles, bundle_ptr, sizeof(num_bundles));
-  bundle_ptr += sizeof(num_bundles);
-  remaining -= sizeof(num_bundles);
-
-  if (num_bundles == 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "offload bundle contains no entries");
-  }
-
-  // Find the matching ELF for the target triple and parse its kernels
+  // Parse the offload bundle and extract kernels for the target triple
+  // No need to copy names - binary_data is from fat binary and persists
   iree_hal_hip_kernel_info_t* matched_kernels = NULL;
   iree_host_size_t matched_kernel_count = 0;
-  uint64_t max_bundle_end = 0;
-  bool found_match = false;
-
-  for (uint64_t i = 0; i < num_bundles; ++i) {
-    if (remaining < sizeof(iree_hal_hip_bundle_entry_t)) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "offload bundle too small for entry [%" PRIu64 "]", i);
-    }
-
-    iree_hal_hip_bundle_entry_t entry;
-    memcpy(&entry, bundle_ptr, sizeof(entry));
-    bundle_ptr += sizeof(entry);
-    remaining -= sizeof(entry);
-
-    // Read the triple string
-    if (remaining < entry.triple_size) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "offload bundle too small for triple [%" PRIu64 "]", i);
-    }
-
-    // Compare triple with target
-    iree_string_view_t entry_triple =
-        iree_make_string_view((const char*)bundle_ptr, entry.triple_size);
-    bundle_ptr += entry.triple_size;
-    remaining -= entry.triple_size;
-
-    // Validate entry bounds
-    if (entry.offset + entry.size > binary_data.data_length) {
-      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "bundle entry [%" PRIu64 "] out of bounds", i);
-    }
-
-    // Get ELF data
-    const uint8_t* elf_data = binary_data.data + entry.offset;
-    iree_const_byte_span_t elf_span =
-        iree_make_const_byte_span(elf_data, entry.size);
-
-    // Validate ELF size
-    iree_host_size_t elf_size = 0;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_hip_validate_elf_header(elf_span, true, &elf_size));
-    elf_span.data_length = elf_size;
-
-    // Update max bundle end
-    uint64_t elf_end = entry.offset + elf_size;
-    if (elf_end > max_bundle_end) {
-      max_bundle_end = elf_end;
-    }
-
-    // Check if this triple matches the target
-    if (iree_string_view_equal(entry_triple, target_triple)) {
-      found_match = true;
-
-      // Parse kernels from this ELF
-      iree_status_t status = iree_hal_hip_parse_elf_kernels(
-          elf_span, allocator, &matched_kernel_count, &matched_kernels);
-      if (!iree_status_is_ok(status)) {
-        return status;
-      }
-
-      // Found our match, no need to continue
-      break;
-    }
-  }
-
-  if (!found_match) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "no ELF found for target triple '%.*s' in fat "
-                            "binary (searched %" PRIu64 " entries)",
-                            (int)target_triple.size, target_triple.data,
-                            num_bundles);
-  }
+  iree_host_size_t bundle_size = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_hip_parse_offload_bundle_kernels(
+      binary_data, target_triple, allocator, /*copy_kernel_names=*/false,
+      &matched_kernel_count, &matched_kernels, &bundle_size));
 
   // Fill output structure
   out_info->bundle_data = binary_data.data;
-  out_info->bundle_size = (iree_host_size_t)max_bundle_end;
+  out_info->bundle_size = bundle_size;
   out_info->kernel_count = matched_kernel_count;
   out_info->kernels = matched_kernels;
 
@@ -1463,6 +1963,24 @@ iree_status_t iree_hal_hip_read_native_header(
   // Check for fat binary wrapper magic.
   uint32_t magic;
   memcpy(&magic, executable_data.data, sizeof(magic));
+
+  if (magic == IREE_HAL_HIP_ELF_MAGIC) {
+    // It's a raw ELF binary. Validate the header and get the size.
+    iree_host_size_t elf_size = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_hip_validate_elf_header(
+        executable_data, unsafe_infer_size, &elf_size));
+    *out_elf_data = iree_make_const_byte_span(executable_data.data, elf_size);
+    return iree_ok_status();
+  }
+
+  if (magic == IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC_INT) {
+    // It's a raw ELF binary. Validate the header and get the size.
+    iree_host_size_t elf_size = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_hip_validate_ccob_header(
+        executable_data, unsafe_infer_size, &elf_size));
+    *out_elf_data = iree_make_const_byte_span(executable_data.data, elf_size);
+    return iree_ok_status();
+  }
 
   if (magic != IREE_HAL_HIP_FAT_BINARY_MAGIC) {
     return iree_make_status(
@@ -1525,11 +2043,27 @@ iree_status_t iree_hal_hip_read_native_header(
 
   if (is_compressed) {
     // Compressed offload bundle format (CCOB).
+    // Parse CCOB header to get compression details
+    uint16_t version, method;
+    uint32_t uncompressed_size, file_size;
+    iree_host_size_t compressed_data_offset;
+
+    IREE_RETURN_IF_ERROR(iree_hal_hip_parse_ccob_header(
+        binary_data, unsafe_infer_size, &version, &method,
+        &uncompressed_size, &file_size, &compressed_data_offset));
+
+    // For now, we don't support actual decompression, so return an error
+    // with details about the compressed bundle
+    const char* method_name = (method == IREE_HAL_HIP_CCOB_METHOD_ZLIB) ? "zlib" : "zstd";
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
-        "compressed offload bundle format (CCOB) is not yet supported; "
-        "decompression and bundle parsing needs to be implemented");
+        "compressed offload bundle format (CCOB v%u) detected using %s compression. "
+        "Uncompressed size: %" PRIu32 " bytes. "
+        "CCOB decompression is not yet fully implemented. "
+        "Please use an uncompressed bundle format instead.",
+        version, method_name, uncompressed_size);
   }
+
 
   if (is_uncompressed) {
     // Uncompressed offload bundle format (__CLANG_OFFLOAD_BUNDLE__).

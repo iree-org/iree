@@ -27,12 +27,14 @@ extern "C" {
 // Compressed bundle format.
 #define IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC "CCOB"
 #define IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC_SIZE 4
+#define IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC_INT 0x424f4343
 
 // ELF identification constants.
 #define IREE_HAL_HIP_ELF_MAGIC0 0x7f
 #define IREE_HAL_HIP_ELF_MAGIC1 'E'
 #define IREE_HAL_HIP_ELF_MAGIC2 'L'
 #define IREE_HAL_HIP_ELF_MAGIC3 'F'
+#define IREE_HAL_HIP_ELF_MAGIC 0x464c457f
 
 // ELF class (32/64 bit).
 #define IREE_HAL_HIP_ELFCLASS64 2
@@ -154,6 +156,10 @@ typedef struct iree_hal_hip_kernel_param_t {
 typedef struct iree_hal_hip_kernel_info_t {
   iree_string_view_t name;  // Kernel function name
 
+  // Pointer to allocated name storage (NULL if name is not owned/copied).
+  // When non-NULL, this memory must be freed when the kernel info is destroyed.
+  char* allocated_name;
+
   // Block dimensions (workgroup size hints from metadata).
   uint32_t block_dims[3];
 
@@ -189,7 +195,9 @@ typedef struct iree_hal_hip_fat_binary_info_t {
 //   [Fat Binary Header (24 bytes)][Binary Data (variable size)]
 //
 // The binary data can be in one of these formats:
-//   1. Compressed offload bundle (starts with "CCOB") - NOT YET IMPLEMENTED
+//   1. Compressed offload bundle (starts with "CCOB") - PARTIALLY IMPLEMENTED
+//      - CCOB header parsing is supported
+//      - Decompression requires linking with zlib/zstd (NOT YET IMPLEMENTED)
 //   2. Uncompressed offload bundle (starts with "__CLANG_OFFLOAD_BUNDLE__")
 //   3. Raw ELF binary (starts with ELF magic bytes)
 //
@@ -204,8 +212,8 @@ iree_status_t iree_hal_hip_read_native_header(
     iree_const_byte_span_t* out_elf_data);
 
 // Parses a fat binary and extracts kernel names from the ELF file matching
-// the specified triple. The caller must free the kernel array using the
-// provided allocator.
+// the specified triple. The caller must free the kernel array using
+// iree_hal_hip_free_kernel_info.
 //
 // |target_triple| specifies which ELF to extract kernels from (e.g.,
 // "hip-amdgcn-amd-amdhsa--gfx942"). Only the ELF matching this triple will be
@@ -215,10 +223,17 @@ iree_status_t iree_hal_hip_read_native_header(
 //   - bundle_data: Pointer to the bundle data within executable_data
 //   - bundle_size: Total size of the bundle
 //   - kernel_count: Number of kernels found in the matching ELF
-//   - kernels: Array of kernel info (must be freed by caller)
+//   - kernels: Array of kernel info (must be freed with iree_hal_hip_free_kernel_info)
 iree_status_t iree_hal_hip_parse_fat_binary_kernels(
     iree_const_byte_span_t executable_data, iree_string_view_t target_triple,
     iree_allocator_t allocator, iree_hal_hip_fat_binary_info_t* out_info);
+
+// Frees kernel info array and any allocated kernel names.
+// Walks through the kernel array and frees any individual allocated names
+// (where allocated_name is non-NULL), then frees the array itself.
+void iree_hal_hip_free_kernel_info(iree_allocator_t allocator,
+                                    iree_host_size_t kernel_count,
+                                    iree_hal_hip_kernel_info_t* kernels);
 
 #ifdef __cplusplus
 }  // extern "C"

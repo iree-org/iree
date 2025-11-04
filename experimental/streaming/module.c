@@ -401,6 +401,12 @@ iree_status_t iree_hal_streaming_module_symbol(
       break;
     }
   }
+  fprintf(stderr, "Could not find symbol: %.*s\n", (int)name_view.size, name_view.data);
+  fprintf(stderr, "    Found symbols:\n");
+
+  for (uint32_t i = 0; i < module->symbol_count; ++i) {
+    fprintf(stderr, "      %.*s\n", (int)module->symbols[i].name.size, module->symbols[i].name.data);
+  }
 
   return iree_make_status(IREE_STATUS_NOT_FOUND,
                           "symbol '%.*s' not found in module",
