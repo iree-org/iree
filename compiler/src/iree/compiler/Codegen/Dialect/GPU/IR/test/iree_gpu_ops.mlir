@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file | FileCheck %s
+// RUN: iree-opt %s --split-input-file --verify-diagnostics | FileCheck %s
 
 func.func @barrier_region(%init: tensor<6x6xf32>) -> tensor<3x2xf32> {
   %0 = iree_gpu.barrier_region ins(%init : tensor<6x6xf32>) {
