@@ -89,7 +89,7 @@ createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
 }
 
 /// Permutes the offset and size arrays by the result indexes of the provided
-/// affine map
+/// affine map.
 static SmallVector<Range> getPermutedRange(AffineMap permutation,
                                            ArrayRef<OpFoldResult> offsets,
                                            ArrayRef<OpFoldResult> sizes) {
@@ -99,11 +99,7 @@ static SmallVector<Range> getPermutedRange(AffineMap permutation,
   SmallVector<Range> output;
   for (AffineExpr dimExpr : permutation.getResults()) {
     int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-    Range dimRange;
-    dimRange.offset = offsets[dim];
-    dimRange.size = sizes[dim];
-    dimRange.stride = one;
-    output.push_back(dimRange);
+    output.push_back(Range{offsets[dim], sizes[dim], one});
   }
   return output;
 }
