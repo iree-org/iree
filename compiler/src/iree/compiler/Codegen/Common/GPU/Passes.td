@@ -86,8 +86,7 @@ def GPUConvertToCoalescedDMAPass :
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
-    "::mlir::tensor::TensorDialect",
-    "::mlir::vector::VectorDialect"
+    "::mlir::tensor::TensorDialect"
   ];
 }
 

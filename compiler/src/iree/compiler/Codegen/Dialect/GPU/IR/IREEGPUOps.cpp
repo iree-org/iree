@@ -215,8 +215,10 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     return emitOpError("init type must either be a tensor or a memref");
   }
 
-  auto initShape = cast<ShapedType>(initType).getShape();
+  auto initShapedType = cast<ShapedType>(initType);
   auto sourceType = cast<ShapedType>(getSource().getType());
+  auto initShape = initShapedType.getShape();
+  auto sourceShape = sourceType.getShape();
 
   if (hasTensor && !isa<RankedTensorType>(sourceType)) {
     return emitOpError("source must be tensor when init is tensor");
@@ -227,19 +229,51 @@ LogicalResult CoalescedGatherDMAOp::verify() {
 
   auto indices = getIndices();
 
+  if (indices.size() > initShape.size()) {
+    return emitOpError("number of indices (")
+           << indices.size() << ") cannot exceed destination rank ("
+           << initShape.size() << ")";
+  }
+
+  if (indices.size() > sourceShape.size()) {
+    return emitOpError("number of indices (")
+           << indices.size() << ") cannot exceed source rank ("
+           << sourceShape.size() << ")";
+  }
+
+  // Make sure indices have no dynamic shapes.
+  for (auto [i, indexVal] : llvm::enumerate(indices)) {
+    auto indexType = cast<ShapedType>(indexVal.getType());
+    for (auto dim : indexType.getShape()) {
+      if (ShapedType::isDynamic(dim)) {
+        return emitOpError("expected index ") << i << " to have static shape";
+      }
+    }
+  }
+
   for (auto [dim, size] : llvm::enumerate(initShape)) {
     if (dim < indices.size()) {
       auto indexShape = cast<ShapedType>(indices[dim].getType()).getShape();
-      if (indexShape.size() != 1 || indexShape[0] != size) {
+      if (indexShape.size() != 1) {
         return emitOpError("expected index ")
-               << dim << " to be a 1-D tensor of " << size << " elements";
+               << dim << " to be a 1-D tensor or vector";
+      }
+      if (indexShape.front() != size) {
+        return emitOpError("expected index ")
+               << dim << " to have length " << size
+               << " to match destination dimension " << dim;
       }
     } else {
-      auto sourceShape = sourceType.getShape();
-      // For unindexed dimensions, source and init must have the same size
-      if (dim < sourceShape.size() && sourceShape[dim] != size) {
+      if (dim > sourceShape.size()) {
+        return emitOpError("expected source to have at least ")
+               << (dim + 1) << " dimensions when destination has rank "
+               << initShape.size();
+      }
+      int64_t sourceDim = sourceShape[dim];
+      if (sourceDim != size) {
         return emitOpError("expected unindexed dimension ")
-               << dim << " to have same length in source and destination";
+               << dim << " to have same length in source (" << sourceDim
+               << ") and destination (" << size << ')';
       }
     }
   }
