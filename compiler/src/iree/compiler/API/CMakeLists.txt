@@ -82,7 +82,6 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
   obj.MLIRCAPITransformDialectTransforms
-  obj.MLIRTargetLLVMIRImport
   iree_compiler_API_Internal_CompilerDriver.objects
   iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
   iree_compiler_API_Internal_IREECodegenDialectCAPI.objects
@@ -187,6 +186,11 @@ target_sources(iree_compiler_API_SharedImpl PRIVATE
 # isolated boundary for C consumers.
 target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
   ${_EXPORT_OBJECT_DEPS}
+)
+
+# Link MLIRTargetLLVMIRImport directly since it is not exported as an object library.
+target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
+  MLIRTargetLLVMIRImport
 )
 
 # If not using sanitizers, ask linkers to error on undefined symbols.
