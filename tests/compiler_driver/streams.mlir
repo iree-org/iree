@@ -30,8 +30,8 @@
 module @e2e {
 // CHECK: vm.rodata private @executable_0_vmvx_bytecode_fb
 stream.executable private @executable_0 {
-  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -78,8 +78,8 @@ func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf3
 module @inplace {
 // CHECK: vm.rodata private @executable_1_vmvx_bytecode_fb
 stream.executable private @executable_1 {
-  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -127,8 +127,8 @@ func.func @simple_mul_inplace(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> ten
 module @dynamic {
 // CHECK: vm.rodata private @executable_2_vmvx_bytecode_fb
 stream.executable private @executable_2 {
-  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {
