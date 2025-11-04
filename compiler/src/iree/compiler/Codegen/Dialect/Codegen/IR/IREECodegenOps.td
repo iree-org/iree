@@ -119,8 +119,8 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     SameOperandsAndResultType, Pure]> {
   let summary = [{Hint to swizzle accesses according to an access pattern.}];
   let description = [{
-    Optimization hint to swizzle all accesses to a memref or tensor this takes a
-    view of. This only affects reads/writes immediately consuming this operation
+    Optimization hint to swizzle all accesses to the memref or tensor that this takes a
+    view of. This only affects reads/writes that immediately consume this operation
     and is best effort. If the desired swizzling is not apparently possible, this
     op will no-op. As a result, it should not be relied on for correctness.
 
