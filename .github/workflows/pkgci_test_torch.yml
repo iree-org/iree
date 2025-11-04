@@ -30,6 +30,7 @@ jobs:
       matrix:
         include:
           # CPU
+          # TODO(@amd-erick): Add GPUs
           - name: cpu_task
             markers: "cpu"
             config-file: pytorch_ops_cpu_llvm_sync.json
@@ -66,7 +67,7 @@ jobs:
         with:
           repository: iree-org/iree-test-suites
           # Hard coding it similar to models below.
-          ref: d91b25647e98acd1465d0cbbb63711c271ce9f8b
+          ref: 8792a283f79e659ff57d26143656f0a9116f27e9
           path: iree-test-suites
       - name: Install Torch ops test suite requirements
         run: |
