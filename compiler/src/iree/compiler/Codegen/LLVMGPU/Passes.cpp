@@ -490,6 +490,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Thread;
     options.normalizeLoops = pipelineOptions.useIgemmConvolution;
+    // TileAndFuse currently relies on no consumer fusion to order fusion.
+    // Disable consumer fusion to maintain this.
+    // TODO: Fix this by choosing which consumers to fuse to what.
+    options.fuseConsumers = false;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -497,6 +501,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Subgroup;
+    // TileAndFuse currently relies on no consumer fusion to order fusion.
+    // Disable consumer fusion to maintain this.
+    // TODO: Fix this by choosing which consumers to fuse to what.
+    options.fuseConsumers = false;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
   }
   funcPassManager.addPass(IREE::GPU::createDistributeInnerTiledToLanesPass());

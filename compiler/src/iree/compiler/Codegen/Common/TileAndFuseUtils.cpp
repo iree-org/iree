@@ -271,7 +271,8 @@ LogicalResult applyTileAndFuseToEachRoot(
     IREE::GPU::TilingLevel tilingLevel, bool allowZeroSlices,
     std::optional<
         llvm::SmallDenseMap<TilingInterface, SmallVector<OpFoldResult>>>
-        targetTileMap) {
+        targetTileMap,
+    bool fuseConsumers) {
   MLIRContext *context = rewriter.getContext();
   for (TilingInterface tilingInterfaceOp : payloadOps) {
     mlir::DominanceInfo dominanceInfo(tilingInterfaceOp);
@@ -454,7 +455,8 @@ LogicalResult applyTileAndFuseToEachRoot(
     }
 
     // Consumer fusion for scf.forall ops.
-    if (tilingOptions.loopType == scf::SCFTilingOptions::LoopType::ForallOp) {
+    if (fuseConsumers &&
+        tilingOptions.loopType == scf::SCFTilingOptions::LoopType::ForallOp) {
       FailureOr<std::queue<Operation *>> newFusionOpportunities =
           fuseConsumersIntoForall(
               rewriter, tiledResults->tiledAndFusedOps.getArrayRef(),
