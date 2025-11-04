@@ -388,12 +388,10 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   });
 
   if (workgroupForAllOps.empty()) {
-    // If there are no workgroup distribution loops, set the default
-    // number of workgroups to {1, 1, 1}. Note: that this only kicks
-    // in if the export op region has
-    // `iree_tensor_ext.dispatch.workgroup_count_from_slice
-    return lowerWorkgroupCountFromSliceOp(rewriter, funcOp,
-                                          ArrayRef<OpFoldResult>{});
+    // If there are no workgroup distribution loops, nothing to do.
+    // if the export op region has `workgroup_count_from_slice` it will be
+    // resolved to {1, 1, 1} when resolving hints.
+    return success();
   }
 
   if (!llvm::hasSingleElement(body)) {
@@ -435,9 +433,10 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
               .getResult();
     }
   }
-  if (failed(lowerWorkgroupCountFromSliceOp(
-          rewriter, funcOp, maxNumWorkgroups,
-          llvm::to_underlying(deLinearizeFrom) + 1))) {
+
+  if (failed(createWorkgroupCountHint(rewriter, loc, maxNumWorkgroups,
+                                      llvm::to_underlying(deLinearizeFrom) + 1,
+                                      /*reverse=*/true))) {
     return failure();
   }
   return success();
@@ -845,22 +844,12 @@ void ReconcileTranslationInfoPass::runOnOperation() {
 
   // Erase all the lowering configs and translation infos after we have finished
   // processing all exported functions.
-  SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinalOps;
-  innerModuleOp->walk([&ordinalOps](Operation *op) {
+  innerModuleOp->walk([](Operation *op) {
     if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
       eraseTranslationInfo(funcOp);
     }
     eraseLoweringConfig(op);
-    if (auto ordinalOp =
-            dyn_cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op)) {
-      ordinalOps.push_back(ordinalOp);
-    }
   });
-
-  // Discard all ordinal ops.
-  for (auto ordinalOp : ordinalOps) {
-    rewriter.replaceOp(ordinalOp, ordinalOp.getOperand());
-  }
 }
 
 } // namespace mlir::iree_compiler

@@ -976,7 +976,8 @@ void ResolveWorkgroupCountHintsPass::runOnOperation() {
     auto sliceIt = slices.find(rootFuncOp);
     bool hasSlice = sliceIt != slices.end();
     IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fromSliceOp;
-    if (!exportOp.getWorkgroupCountBody()
+    if (!exportOp.getWorkgroupCountBody() ||
+        !exportOp.getWorkgroupCountBody()
              ->walk([&](Operation *op) -> WalkResult {
                fromSliceOp =
                    dyn_cast<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
@@ -985,18 +986,23 @@ void ResolveWorkgroupCountHintsPass::runOnOperation() {
                                   : WalkResult::advance();
              })
              .wasInterrupted()) {
-      if (hasSlice && sliceIt->second.required) {
-        exportOp->emitOpError("exporting function with a workgroup count hint "
-                              "yet `workgroup_count_from_slice` not found.");
-        return signalPassFailure();
-      }
+      // If the workgroup count was already materialized pass through.
       continue;
     }
 
     if (!hasSlice || !sliceIt->second.required || !sliceIt->second.valid) {
-      exportOp->emitOpError(
-          "exporting function with `workgroup_count_from_slice` yet no "
-          "`workgroup_count_hint` found.");
+      // If there is an unresolved `workgroup_count_from_slice` op. The default
+      // behavior is to convert this to {1, 1, 1}.
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(fromSliceOp);
+      auto one =
+          arith::ConstantIndexOp::create(rewriter, fromSliceOp.getLoc(), 1);
+      rewriter.replaceOp(fromSliceOp, {one, one, one});
+      continue;
+    }
+
+    if (hasSlice && !sliceIt->second.valid) {
+      // Something went wrong. Should have been caught on processing.
       return signalPassFailure();
     }
 
