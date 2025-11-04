@@ -11,8 +11,8 @@
 ]>
 hal.executable @ext_fp8_dispatch {
   hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @ext_fp8_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
+    hal.executable.export public @ext_fp8_dispatch layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -49,5 +49,3 @@ hal.executable @ext_fp8_dispatch {
 // CDNA3-COUNT-8:     rocdl.cvt.pk.f32.bf8 %{{.*}} : vector<2xf32>
 //         CDNA3:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
 //         CDNA3:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<7>
-
-// -----

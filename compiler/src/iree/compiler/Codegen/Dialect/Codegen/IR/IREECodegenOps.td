@@ -541,6 +541,10 @@ def IREECodegen_WorkgroupCountHintOp :
   let results = (outs);
   let hasCustomAssemblyFormat = 1;
 
+  let builders = [
+    OpBuilder<(ins "ArrayRef<OpFoldResult>":$sizes)>
+  ];
+
   let extraClassDeclaration = [{
     /// Returns a vector with all the static and dynamic sizes.
     SmallVector<OpFoldResult> getMixedSizes() {
