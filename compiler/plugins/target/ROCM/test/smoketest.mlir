@@ -9,8 +9,8 @@ module attributes {
 } {
 
 stream.executable public @add_dispatch_executable {
-  stream.executable.export @add_dispatch workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export @add_dispatch workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module  {
@@ -34,8 +34,8 @@ stream.executable public @add_dispatch_executable {
 }
 
 stream.executable public @mul_dispatch_executable {
-  stream.executable.export @mul_dispatch workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export @mul_dispatch workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module  {
@@ -79,8 +79,8 @@ module attributes {
 } {
 
 stream.executable public @executable {
-  stream.executable.export @export workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export @export workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   } loc(#loc)
   builtin.module  {
