@@ -152,9 +152,10 @@ public:
   /// the fusion group) itself uses an operation in the fusion group. This is
   /// required for fusion because it must be legal to take a program slice that
   /// contains only the ops in the fusion group.
-  bool hasTransitiveDependencyOnFusionGroup(Operation *consumerOp) const {
+  bool
+  hasTransitiveDependencyOnFusionGroup(Operation *consumerOp,
+                                       DominanceInfo const &dominance) const {
     BackwardSliceOptions options;
-    DominanceInfo dominance(consumerOp);
     options.inclusive = true;
     options.omitUsesFromAbove = false;
     options.omitBlockArguments = true;
@@ -717,7 +718,8 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
 
         // Ensure that fusing the consumer would not cause use-def violations.
         if (tracker.getFusionGroup(currRoot)
-                .hasTransitiveDependencyOnFusionGroup(fusableUse->getOwner())) {
+                .hasTransitiveDependencyOnFusionGroup(fusableUse->getOwner(),
+                                                      dominanceInfo)) {
           continue;
         }
 
