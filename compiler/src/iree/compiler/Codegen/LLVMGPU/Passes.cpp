@@ -770,6 +770,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
 
+  funcPassManager.addPass(createGPUExpandDimensionsPass());
+
   // Tile to reduction loops.
   {
     GPUApplyTilingLevelPassOptions options;
@@ -1115,6 +1117,9 @@ static void buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createMaterializeDeviceEncodingPass);
+    // TODO(#20160): Combine the EncodingToPaddingPasses with the
+    // MaterializeDeviceEncodingPass.
+    addEncodingToPaddingPasses(funcPassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
