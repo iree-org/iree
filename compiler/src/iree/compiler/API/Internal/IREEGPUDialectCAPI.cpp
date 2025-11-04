@@ -320,26 +320,24 @@ MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
 }
 
 ireeGPUMMASingleSubgroupLayout
-ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
+ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t operandIndex) {
   assert((ireeAttributeIsAGPUMMAIntrinsicAttr(attr) ||
           ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(attr)) &&
          "Expected MMA or VirtualMMA Intrinsic");
 
   mlir::Attribute baseAttr = unwrap(attr);
   mlir::iree_compiler::IREE::GPU::MMASingleSubgroupLayout layout;
-  mlir::iree_compiler::IREE::GPU::MMAFragment frag =
-      static_cast<mlir::iree_compiler::IREE::GPU::MMAFragment>(fragment);
 
   if (auto intrinsicAttr =
           llvm::dyn_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(
               baseAttr)) {
     layout = mlir::iree_compiler::IREE::GPU::getSingleSubgroupLayout(
-        intrinsicAttr.getValue(), frag);
+        intrinsicAttr.getValue(), operandIndex);
   } else if (auto virtualIntrinsicAttr = llvm::dyn_cast<
                  mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr>(
                  baseAttr)) {
     layout = mlir::iree_compiler::IREE::GPU::getSingleSubgroupLayout(
-        virtualIntrinsicAttr.getValue(), frag);
+        virtualIntrinsicAttr.getValue(), operandIndex);
   } else {
     assert(false &&
            "Unreachable: attribute must be MMA or VirtualMMA intrinsic");

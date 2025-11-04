@@ -45,15 +45,11 @@ struct VectorizeStaticMapScatterOpPattern final
     // shouldn't depend on the inner index for this.
     if (bitWidth < 8) {
       // First check that the mask is not the forward slice of the inner index.
-      Block &transformBody = mapScatterOp.getTransformationRegion().front();
-      SmallVector<Value> args(transformBody.getArguments());
-      Value innermostInputIdx = args[args.size() - 1];
+      Value innermostInputIdx =
+          mapScatterOp.getInputIndex(mapScatterOp.getInputRank() - 1);
       SetVector<Operation *> slice;
       getForwardSlice(innermostInputIdx, &slice);
-      auto bodyYield =
-          cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
-      Operation *maskOp =
-          bodyYield.getOperand(bodyYield.getNumOperands() - 1).getDefiningOp();
+      Operation *maskOp = mapScatterOp.getMask().getDefiningOp();
       if (maskOp && slice.contains(maskOp)) {
         return rewriter.notifyMatchFailure(
             mapScatterOp, "map_scatter on sub-byte type with potentially non "
@@ -62,7 +58,7 @@ struct VectorizeStaticMapScatterOpPattern final
       // Next check that the inner index of the yield is a unit function of
       // the inner input index.
       Value innermostOutputIdx =
-          bodyYield.getOperand(bodyYield.getNumOperands() - 2);
+          mapScatterOp.getOutputIndex(mapScatterOp.getOutputRank() - 1);
       if (!isUnitFunctionOf(innermostOutputIdx, innermostInputIdx)) {
         return rewriter.notifyMatchFailure(
             mapScatterOp, "map_scatter on sub-byte type with potentially non "

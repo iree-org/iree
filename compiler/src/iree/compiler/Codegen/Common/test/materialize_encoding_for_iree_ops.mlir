@@ -496,6 +496,62 @@ func.func @matmul_lowering_f32f32f32_gfx942() attributes {
 
 // -----
 
+// This tests that the padding resolver can handle partial loads/stores. The
+// offsets, sizes and strides are arbitrarily chosen in the test.
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {
+    abi = "hip",
+    iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>,
+    iree_codegen.target_info = #iree_gpu.target<arch = "gfx942",
+                                       features = "",
+                                       wgp = <compute = fp32,
+                                              storage =  b32,
+                                              subgroup =  none,
+                                              mma = [<MFMA_F32_16x16x4_F32>],
+                                              subgroup_size_choices = [64],
+                                              max_workgroup_sizes = [1024, 1024, 1024],
+                                              max_thread_count_per_workgroup = 1024,
+                                              max_workgroup_memory_bytes = 65536,
+                                              max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+                                              max_load_instruction_bits = 128,
+                                              simds_per_wgp = 4,
+                                              vgpr_space_bits = 16384>>
+  }>
+
+#binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
+#binding = #hal.pipeline.binding<storage_buffer, Indirect>
+#encoding_mmt = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16]>
+#pad_encoding = #iree_encoding.layout<[#iree_encoding.padding<[0, 64]>]>
+func.func @set_pad_encoding_and_partial_load_store()  attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
+  %1 = arith.index_castui %0 : i32 to index
+  %3 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(0) alignment(64) offset(%1) flags("ReadOnly|Indirect")
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>>
+  %4 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect)
+    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2048xf16, #pad_encoding>>
+  %5 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [1024, 1024], strides = [2, 2]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<1024x1024xf16>
+  %6 = iree_encoding.set_encoding %5 : tensor<1024x1024xf16> -> tensor<1024x1024xf16, #encoding_mmt>
+  iree_tensor_ext.dispatch.tensor.store %6, %4, offsets = [0, 0], sizes = [1024, 1024], strides = [2, 2]
+    : tensor<1024x1024xf16, #encoding_mmt> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2048xf16, #pad_encoding>>
+  return
+}
+// CHECK-LABEL: @set_pad_encoding_and_partial_load_store
+// CHECK:         %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+// CHECK-SAME:                  !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>>
+// CHECK:         %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+// CHECK-SAME:                  !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
+// CHECK:         %[[LD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[A]], offsets = [0, 0], sizes = [1024, 1024], strides = [2, 2]
+// CHECK-SAME:                  !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<1024x1024xf16>
+// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[LD]], %[[B]], offsets = [0, 0], sizes = [1024, 1024], strides = [2, 2]
+// CHECK-SAME:                  tensor<1024x1024xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
+
+// -----
+
 //----------------------------------------------------------------------------//
 // Test suite for encodings with resolved layouts.
 // All the implementations use interfaces, so we only check with CPU encoding

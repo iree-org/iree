@@ -1,7 +1,5 @@
-// `TilingLevel=0` indicates DistributionTiles in IREE::CPU::LoweringConfigAttr.
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile{tiling-level=0}))" --split-input-file %s | FileCheck %s
-// `TilingLevel=4` indicates VectorCommonParallelTiles in IREE::CPU::LoweringConfigAttr.
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile{tiling-level=3 skip-root-op=true}))" --split-input-file %s | FileCheck %s --check-prefix=SKIP-ROOT
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile{tiling-level=distribution}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile{tiling-level=vector_common_parallel skip-root-op=true}))" --split-input-file %s | FileCheck %s --check-prefix=SKIP-ROOT
 
 #config0 = #iree_cpu.lowering_config<distribution = [10, 20]>
 #config1 = #iree_cpu.lowering_config<distribution = [10, 20, 30]>

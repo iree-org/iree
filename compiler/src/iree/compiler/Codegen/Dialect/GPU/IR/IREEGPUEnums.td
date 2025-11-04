@@ -318,17 +318,6 @@ def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
       VMFMA_F32_32x32x16_F8E4M3FNUZ,
     ]>;
 
-def MMA_LHS : I32EnumAttrCase<"Lhs", 0>;
-def MMA_RHS : I32EnumAttrCase<"Rhs", 1>;
-def MMA_ACC : I32EnumAttrCase<"Acc", 2>;
-
-def IREEGPU_MMAFragment : IREEGPU_I32EnumAttr<"MMAFragment",
-    "Descriptor for a particular fragment of an MMA operation", [
-      MMA_LHS,
-      MMA_RHS,
-      MMA_ACC
-    ]>;
-
 // Enum for scaled mma intrinsic, loosely matching the MMAIntrinsic enum above
 // but not including the input types.
 //
@@ -367,9 +356,10 @@ def IREEGPU_ScaledMMAIntrinsic : IREEGPU_I32Enum<"ScaledMMAIntrinsic",
 def Workgroup : I32EnumAttrCase<"Workgroup", 0>;
 def Reduction : I32EnumAttrCase<"Reduction", 1>;
 def PartialReduction : I32EnumAttrCase<"PartialReduction", 2>;
-def Thread : I32EnumAttrCase<"Thread", 3>;
-def Subgroup : I32EnumAttrCase<"Subgroup", 4>;
-def Lane : I32EnumAttrCase<"Lane", 5>;
+def Serial : I32EnumAttrCase<"Serial", 3>;
+def Thread : I32EnumAttrCase<"Thread", 4>;
+def Subgroup : I32EnumAttrCase<"Subgroup", 5>;
+def Lane : I32EnumAttrCase<"Lane", 6>;
 
 /// Enum descriptor for the set of tiling levels for GPU pass pipelines.
 /// Note that `Thread` tiling is mutually exclusive with `Subgroup` and
@@ -380,6 +370,7 @@ def IREEGPU_TilingLevel : IREEGPU_I32EnumAttr<"TilingLevel",
       Workgroup,
       Reduction,
       PartialReduction,
+      Serial,
       Thread,
       Subgroup,
       Lane

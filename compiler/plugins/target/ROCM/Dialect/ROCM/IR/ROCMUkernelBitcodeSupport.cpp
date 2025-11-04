@@ -81,7 +81,7 @@ getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
   }
   auto mma = cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
   IREE::Codegen::TileSwizzle accSwizzle =
-      getSwizzle(mma, IREE::GPU::MMAFragment::Acc);
+      getSwizzle(mma, IREE::GPU::kMMAOperandAcc);
   SmallVector<IREE::Codegen::TileSwizzle::Dim> swizzleDims;
   for (IREE::Codegen::TileSwizzle::ExpandShapeDimVectorType group :
        accSwizzle.expandShape) {

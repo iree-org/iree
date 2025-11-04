@@ -1409,3 +1409,142 @@ builtin.module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:       %[[DISTRIBUTED_IDX1:.+]] = arith.addi %[[IDX1]], %[[C8]]
 //       CHECK:       iree_linalg_ext.yield %[[DISTRIBUTED_IDX0]], %[[DISTRIBUTED_IDX1]]
 //       CHECK:     : vector<1x8xf16> into memref<64x64xf16>
+
+// -----
+
+// Check that only the first lane of the first subgroup writes when the threads
+// are completely undistributed (all threads write to same address).
+// CHECK-LABEL: @undistributed_write
+func.func @undistributed_write(%out: memref<f32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<f32>) {
+  //  CHECK-DAG: %[[ZERO:.*]] = arith.constant 0 : index
+  //  CHECK-DAG: %[[TID:.*]] = gpu.thread_id  x
+  //  CHECK-DAG: %[[COND:.+]] = arith.cmpi eq, %[[TID]], %[[ZERO]] : index
+  // CHECK-NEXT: scf.if %[[COND]] {
+  //      CHECK:   vector.transfer_write
+  // CHECK-NEXT: }
+  vector.transfer_write %v, %out[] : vector<f32>, memref<f32, #amdgpu.address_space<fat_raw_buffer>>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#layout_row_major = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [4, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 8],
+  element_tile     = [1, 2],
+  subgroup_strides = [1, 1],
+  thread_strides   = [32, 1]
+>
+
+// subgroup_size = 64 (default for the transform test_gpu_vector_distribution)
+// A possible thread basis for this distribution would be:
+// thread_basis = [2, 4, 8] and the dimension with size "4" has data broadcasted
+// across all threads (note the thread strides). This test checks if we account
+// for such broadcasts when generating conditional writes.
+// CHECK-LABEL: @partially_distributed_write
+//   CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
+//   CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:    %[[DELIN:.*]]:5 = affine.delinearize_index %[[TID:.+]] into (4, 2, 4, 8)
+//   CHECK-DAG:    %[[SUBGROUP_COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[C0]] : index
+//   CHECK-DAG:    %[[LANE_COND:.+]] = arith.cmpi eq, %[[DELIN]]#3, %[[C0]] : index
+//       CHECK:    %[[COND:.+]] = arith.andi %[[SUBGROUP_COND]], %[[LANE_COND]]
+//       CHECK:    scf.if %[[COND]] {
+//       CHECK:        vector.transfer_write
+func.func @partially_distributed_write(%out: memref<100x100xf32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<8x16xf32>) {
+  %w = iree_vector_ext.to_layout %v to layout(#layout_row_major) : vector<8x16xf32>
+  %c0 = arith.constant 0 : index
+  vector.transfer_write %w, %out[%c0, %c0]
+          {in_bounds = [true, true]}
+  : vector<8x16xf32>, memref<100x100xf32, #amdgpu.address_space<fat_raw_buffer>>
+  func.return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+// In this example, threads with the same lane write to the same address. We check that only the first subgroup writes.
+// i.e. threads in [0, 64) will write, threads in [64, 256) will not write.
+#layout_row_major = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [1, 64],
+  element_tile     = [64, 1],
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 1]
+>
+
+// CHECK-LABEL: @lanes_fully_distributed
+//   CHECK-DAG:    %[[TID:.+]] = gpu.thread_id
+//   CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:    %[[DELIN:.*]]:2 = affine.delinearize_index %[[TID:.+]] into (4, 64)
+//       CHECK:    %[[COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[C0]] : index
+//       CHECK:    scf.if %[[COND]] {
+//       CHECK:        vector.transfer_write
+func.func @lanes_fully_distributed(%out: memref<100x100xf32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<64x64xf32>) {
+  %w = iree_vector_ext.to_layout %v to layout(#layout_row_major) : vector<64x64xf32>
+  %c0 = arith.constant 0 : index
+  vector.transfer_write %w, %out[%c0, %c0]
+          {in_bounds = [true, true]}
+  : vector<64x64xf32>, memref<100x100xf32, #amdgpu.address_space<fat_raw_buffer>>
+  func.return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func {workgroup_size = array<i64: 256, 1, 1>} : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+// This example is similar to the above, but now the workgroup only contains 64 threads, so no condition is needed. Confirm there is no condition.
+#layout_row_major = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [1, 64],
+  element_tile     = [64, 1],
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 1]
+>
+
+// CHECK-LABEL: @threads_fully_distributed
+//       CHECK-NOT: scf.if
+//       CHECK: transfer_write
+//       CHECK: return
+func.func @threads_fully_distributed(%out: memref<100x100xf32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<64x64xf32>) {
+  %w = iree_vector_ext.to_layout %v to layout(#layout_row_major) : vector<64x64xf32>
+  %c0 = arith.constant 0 : index
+  vector.transfer_write %w, %out[%c0, %c0]
+          {in_bounds = [true, true]}
+  : vector<64x64xf32>, memref<100x100xf32, #amdgpu.address_space<fat_raw_buffer>>
+  func.return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func {workgroup_size = array<i64: 64, 1, 1>} : !transform.any_op
+    transform.yield
+  }
+}

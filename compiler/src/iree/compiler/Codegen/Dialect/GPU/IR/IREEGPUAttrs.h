@@ -222,23 +222,64 @@ int64_t getKSize(MMAIntrinsic intrinsic);
 /// Returns the subgroup size used by the given MMA intrinsic.
 int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic);
 
-MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
-                                                MMAFragment fragment);
+constexpr int kMMAOperandLhs = 0;
+constexpr int kMMAOperandRhs = 1;
+constexpr int kMMAOperandAcc = 2;
+constexpr int kScaledMMAOperandLhs = 0;
+constexpr int kScaledMMAOperandRhs = 1;
+constexpr int kScaledMMAOperandLhsScale = 2;
+constexpr int kScaledMMAOperandRhsScale = 3;
+constexpr int kScaledMMAOperandAcc = 4;
+
+template <typename MMAIntrinsicType>
+int isIntrinsicLhs(int operandIndex) {
+  return operandIndex == (std::is_same_v<MMAIntrinsicType, ScaledMMAIntrinsic>
+                              ? kScaledMMAOperandLhs
+                              : kMMAOperandLhs);
+}
+template <typename MMAIntrinsicType>
+int isIntrinsicRhs(int operandIndex) {
+  return operandIndex == (std::is_same_v<MMAIntrinsicType, ScaledMMAIntrinsic>
+                              ? kScaledMMAOperandRhs
+                              : kMMAOperandRhs);
+}
+template <typename MMAIntrinsicType>
+int isIntrinsicAcc(int operandIndex) {
+  return operandIndex == (std::is_same_v<MMAIntrinsicType, ScaledMMAIntrinsic>
+                              ? kScaledMMAOperandAcc
+                              : kMMAOperandAcc);
+}
+
+template <typename MMAIntrinsicType>
+int isIntrinsicLhsScale(int operandIndex) {
+  return std::is_same_v<MMAIntrinsicType, ScaledMMAIntrinsic>
+             ? (operandIndex == kScaledMMAOperandLhsScale)
+             : false;
+}
+template <typename MMAIntrinsicType>
+int isIntrinsicRhsScale(int operandIndex) {
+  return std::is_same_v<MMAIntrinsicType, ScaledMMAIntrinsic>
+             ? (operandIndex == kScaledMMAOperandRhsScale)
+             : false;
+}
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
-                                                MMAFragment fragment,
+                                                int operandIndex);
+
+MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
+                                                int operandIndex,
                                                 bool colMajor);
 
 MMASingleSubgroupLayout
-getSingleSubgroupLayout(VirtualMMAIntrinsic virtualIntrinsic,
-                        MMAFragment fragment, bool colMajor);
+getSingleSubgroupLayout(VirtualMMAIntrinsic virtualIntrinsic, int operandIndex,
+                        bool colMajor);
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
-                                                MMAFragment fragment);
+                                                int operandIndex);
 
 MMASingleSubgroupLayout
 getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
-                        MMAFragment fragment);
+                        int operandIndex);
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
                                                 int64_t operandIndex);

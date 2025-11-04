@@ -1,6 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN: --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_common_parallel anchor-on-root-op=false},iree-llvmcpu-tile{tiling-level=4},iree-codegen-generic-vectorization{enable-vector-masking}))" %s | FileCheck %s
-// `tiling-level=4` indicates VectorReductionTiles. See IREECPUTypes.h for more details.
+// RUN: --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_common_parallel anchor-on-root-op=false},iree-llvmcpu-tile{tiling-level=vector_reduction},iree-codegen-generic-vectorization{enable-vector-masking}))" %s | FileCheck %s
 
 /// This test checks we successfully tile the matmul and invoke the linalg vectorizer,
 /// and produce scalable vector ops.

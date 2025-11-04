@@ -55,19 +55,19 @@ def generate_function_mx(
     mx_block_size: int,
     shape: TestShape,
     transpose_rhs: bool,
-    dynamicity: Dynamicity,
+    dynamicities: tuple[Dynamicity, Dynamicity, Dynamicity],
     compilation_info: Optional[CompilationInfo] = None,
 ):
     if not transpose_rhs:
         raise ValueError("MX tests require transpose_rhs")
-    if dynamicity != Dynamicity.STATIC:
+    if dynamicities != (Dynamicity.STATIC, Dynamicity.STATIC, Dynamicity.STATIC):
         raise ValueError("MX tests require static shape")
     if shape.k % mx_block_size:
         raise ValueError(
             f"MX tests require that shape.k ({shape.k}) be a multiple of mx_block_size ({mx_block_size})"
         )
 
-    shapes = generate_shapes(shape, transpose_rhs, dynamicity)
+    shapes = generate_shapes(shape, transpose_rhs, dynamicities)
     func_name = generate_function_name_mx(
         lhs_rhs_type=lhs_rhs_type,
         acc_type=acc_type,

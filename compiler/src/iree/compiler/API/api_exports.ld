@@ -106,6 +106,7 @@ VER_0 {
     ireeGPUTargetInfoGet;
     ireeGPUTargetInfoGetMMAIntrinsics;
     ireeHALExecutableTargetAttrGetGPUTargetInfo;
+    ireeLinkRunMain;
     ireeMlirLspServerRunMain;
     ireeOptRunMain;
     ireeReduceRunMain;

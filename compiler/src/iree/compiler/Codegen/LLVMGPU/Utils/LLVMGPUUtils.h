@@ -28,7 +28,8 @@ class VectorContractOpInfo;
 class ContractionVectorLayoutOptions : public VectorLayoutOptions {
 public:
   ContractionVectorLayoutOptions(Operation *root, Value laneId,
-                                 int64_t subgroupSize);
+                                 int64_t subgroupSize,
+                                 ArrayRef<int64_t> workgroupSize);
   RewritePatternSet &getPatterns();
   VectorLayoutInterface getDefaultLayout(VectorType type) const override;
 

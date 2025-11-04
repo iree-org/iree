@@ -25,32 +25,11 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
   addConversion([](FloatType floatType) { return floatType; });
   addConversion([](MemRefType memrefType) { return memrefType; });
   addConversion([=](RankedTensorType type) {
-    // TODO(jornt): The isa<IREE::Encoding::PaddingAttr> check is
-    // needed because PaddingAttr is a serializable attribute, but it
-    // relies on its own type conversion for now. Once PaddingAttr
-    // implements `convertType`, this can be removed.
-    if (!isa<IREE::Encoding::PaddingAttr>(getLayoutAttr())) {
-      return cast<RankedTensorType>(getLayoutAttr().convertType(type));
-    }
-    return type.dropEncoding();
+    return cast<RankedTensorType>(getLayoutAttr().convertType(type));
   });
   addConversion([&](IREE::TensorExt::DispatchTensorType dispatchTensorType) {
-    auto boundType =
-        dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-    if (!boundType || !boundType.getEncoding()) {
-      return dispatchTensorType;
-    }
-    // TODO(jornt): The isa<IREE::Encoding::PaddingAttr> check is
-    // needed because PaddingAttr is a serializable attribute, but it
-    // relies on its own type conversion for now. Once PaddingAttr
-    // implements `convertType`, this can be removed.
-    if (!isa<IREE::Encoding::PaddingAttr>(getLayoutAttr())) {
-      return cast<IREE::TensorExt::DispatchTensorType>(
-          getLayoutAttr().convertType(dispatchTensorType));
-    }
-    Type convertedBoundType = convertType(boundType);
-    return IREE::TensorExt::DispatchTensorType::get(
-        dispatchTensorType.getAccess(), convertedBoundType);
+    return cast<IREE::TensorExt::DispatchTensorType>(
+        getLayoutAttr().convertType(dispatchTensorType));
   });
 }
 

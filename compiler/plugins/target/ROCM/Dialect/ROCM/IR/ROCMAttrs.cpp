@@ -81,12 +81,21 @@ static bool checkIterationSizeConstraints(ArrayRef<int64_t> iterationSizes,
     if (indexVal < 0 || indexVal >= iterationSizes.size()) {
       return false;
     }
+    // For now, assume a dynamic dimension is very large and any division
+    // constraint is satisfied to keep the performance state on current models
+    // (llama) as is.
+    // TODO(#22370): This is not ideal and can be improved once we support value
+    // bounds on dynamic dimensions for encodings.
     if (IntegerAttr sizeMin = constraint.getSizeMin()) {
-      if (iterationSizes[indexVal] < sizeMin.getInt()) {
+      if (ShapedType::isStatic(iterationSizes[indexVal]) &&
+          iterationSizes[indexVal] < sizeMin.getInt()) {
         return false;
       }
     }
     if (IntegerAttr sizeMax = constraint.getSizeMax()) {
+      if (ShapedType::isDynamic(iterationSizes[indexVal])) {
+        return false;
+      }
       if (iterationSizes[indexVal] > sizeMax.getInt()) {
         return false;
       }
@@ -94,6 +103,9 @@ static bool checkIterationSizeConstraints(ArrayRef<int64_t> iterationSizes,
     if (IntegerAttr sizeDiv = constraint.getSizeDiv()) {
       if (sizeDiv.getInt() <= 0) {
         return false;
+      }
+      if (ShapedType::isDynamic(iterationSizes[indexVal])) {
+        return true;
       }
       if (iterationSizes[indexVal] % sizeDiv.getInt()) {
         return false;

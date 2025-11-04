@@ -102,21 +102,20 @@ module attributes { transform.with_named_sequence } {
 // 2 x 32).
 #contraction_accesses = [
  affine_map<(i, j, k, b) -> (i, k, b)>,
- affine_map<(i, j, k, b) -> (i, k)>,
  affine_map<(i, j, k, b) -> (k, b, j)>,
+ affine_map<(i, j, k, b) -> (i, k)>,
  affine_map<(i, j, k, b) -> (k, j)>,
  affine_map<(i, j, k, b) -> (i, j)>
 ]
-func.func @unroll_scaled_multi_mma(%lhs: vector<1x2x2x32xf4E2M1FN>, %lhsScale: vector<1x2x1xf8E8M0FNU>,
-    %rhs: vector<2x2x1x32xf8E4M3FN>, %rhsScale: vector<2x1x1xf8E8M0FNU>,
+func.func @unroll_scaled_multi_mma(%lhs: vector<1x2x2x32xf4E2M1FN>, %rhs: vector<2x2x1x32xf8E4M3FN>, %lhsScale: vector<1x2x1xf8E8M0FNU>, %rhsScale: vector<2x1x1xf8E8M0FNU>,
     %acc: vector<1x1x4xf32>) -> vector<1x1x4xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %lhsScale, %rhs, %rhsScale) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhsScale, %rhsScale) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32,
       lhs_elem_type = f4E2M1FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>,
     semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-  } : vector<1x2x2x32xf4E2M1FN>, vector<1x2x1xf8E8M0FNU>, vector<2x2x1x32xf8E4M3FN>, vector<2x1x1xf8E8M0FNU> into vector<1x1x4xf32>
+  } : vector<1x2x2x32xf4E2M1FN>, vector<2x2x1x32xf8E4M3FN>, vector<1x2x1xf8E8M0FNU>, vector<2x1x1xf8E8M0FNU> into vector<1x1x4xf32>
   return %0 : vector<1x1x4xf32>
 }
 

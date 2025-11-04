@@ -78,7 +78,7 @@ class Trailer(str, enum.Enum):
 # This is to help prevent typos. For now we hard error on any trailer that
 # starts with this prefix but isn't in our list. We can add known commonly used
 # trailers to our list or we might consider relaxing this.
-RESERVED_TRAILER_PREFIXES = ["ci-", "bewnchmark-", "skip-"]
+RESERVED_TRAILER_PREFIXES = ["ci-", "benchmark-", "skip-"]
 ALL_KEY = "all"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore

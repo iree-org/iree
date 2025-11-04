@@ -46,7 +46,7 @@ static Operation *getRootOp(ArrayRef<Operation *> computeOps,
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
     if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel() &&
-        loweringConfig.hasTilingLevel(level)) {
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       if (rootOp) {
         return nullptr;
       }
@@ -63,7 +63,8 @@ static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
   for (Operation *op : llvm::reverse(computeOps)) {
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
-    if (loweringConfig && loweringConfig.hasTilingLevel(level)) {
+    if (loweringConfig &&
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       return op;
     }
   }
@@ -77,7 +78,7 @@ static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
 /// operands.
 static FailureOr<Operation *>
 tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
-                                int64_t tilingLevel,
+                                IREE::CPU::TilingLevel tilingLevel,
                                 bool onlyFuseProducerInputOperands) {
   auto *context = rewriter.getContext();
   mlir::DominanceInfo dominanceInfo(rootOp);
@@ -107,7 +108,8 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   int64_t numLoops = rootOp.getLoopIteratorTypes().size();
   auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-      getLoweringConfig(rootOp).getTilingLevelAttr(tilingLevel));
+      getLoweringConfig(rootOp).getTilingLevelAttr(
+          static_cast<unsigned>(tilingLevel)));
   SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
   SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
   tileSizes.resize(numLoops, 0);

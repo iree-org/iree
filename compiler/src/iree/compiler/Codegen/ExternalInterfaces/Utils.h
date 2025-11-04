@@ -65,7 +65,7 @@ public:
   Type convertType(Attribute attr, Type type) const {
     EncodingLayoutAttr layoutAttr = cast<EncodingLayoutAttr>(attr);
     return TypeSwitch<Type, Type>(type)
-        .template Case<RankedTensorType>([&](auto type) {
+        .Case([&](RankedTensorType type) {
           // For a given tensor type with an encoding, return the materialized
           // type to use for it. If no encoding is set, then return the tensor
           // type itself.
@@ -108,16 +108,15 @@ public:
           newShape.append(swizzledTileShape);
           return RankedTensorType::get(newShape, packedType.getElementType());
         })
-        .template Case<IREE::TensorExt::DispatchTensorType>(
-            [&](auto dispatchTensorType) {
-              Type boundType = dispatchTensorType.getBoundType();
-              Type convertedBoundType = convertType(attr, boundType);
-              if (convertedBoundType == boundType) {
-                return dispatchTensorType;
-              }
-              return IREE::TensorExt::DispatchTensorType::get(
-                  dispatchTensorType.getAccess(), convertedBoundType);
-            })
+        .Case([&](IREE::TensorExt::DispatchTensorType dispatchTensorType) {
+          Type boundType = dispatchTensorType.getBoundType();
+          Type convertedBoundType = convertType(attr, boundType);
+          if (convertedBoundType == boundType) {
+            return dispatchTensorType;
+          }
+          return IREE::TensorExt::DispatchTensorType::get(
+              dispatchTensorType.getAccess(), convertedBoundType);
+        })
         .Default([&](auto concreteType) { return concreteType; });
   }
 

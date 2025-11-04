@@ -16,7 +16,6 @@ iree_lit_test_suite(
   SRCS
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
-    "propagate_target_attrs.mlir"
     "smoketest_embedded.mlir"
     "smoketest_system.mlir"
   TOOLS

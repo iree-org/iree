@@ -11,8 +11,6 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/PatternMatch.h"
 
-using namespace mlir;
-
 namespace mlir::iree_compiler {
 
 /// Rewrite a store/load-like op so that all its indices are zeros.

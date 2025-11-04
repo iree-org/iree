@@ -12,6 +12,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LLVM.h"
 
@@ -68,7 +69,9 @@ std::string guessModuleName(mlir::ModuleOp moduleOp, StringRef defaultName) {
 // |moduleOp| and |symbolTable|.
 static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
                                         SymbolTable &symbolTable0,
-                                        SymbolTable &symbolTable1) {
+                                        SymbolTable &symbolTable1,
+                                        SymbolTableCollection &symbolTables,
+                                        SymbolUserMap &symbolUsers) {
   StringRef originalName = SymbolTable::getSymbolName(op).getValue();
 
   // This could stand to be rewritten noting that nested symbol refs exist.
@@ -83,25 +86,65 @@ static void renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
   } while (symbolTable0.lookup(disambiguatedName) ||
            symbolTable1.lookup(disambiguatedName));
 
-  // HORRENDOUS: this needs to be rewritten; we're walking the entire module
-  // each time to do this!
-  SymbolTableCollection symbolTables;
-  SymbolUserMap symbolUsers(symbolTables, moduleOp);
   mlir::StringAttr nameAttr =
       mlir::StringAttr::get(op->getContext(), disambiguatedName);
   symbolUsers.replaceAllUsesWith(op, nameAttr);
   SymbolTable::setSymbolName(op, disambiguatedName);
 }
 
+// Returns true if there are any non-terminator regions in the given |op|.
+static bool isOperationEmpty(Operation *op) {
+  if (op->getNumRegions() == 0) {
+    return true;
+  }
+  for (auto &region : op->getRegions()) {
+    if (!region.empty() && llvm::any_of(region.getOps(), [](Operation &op) {
+          return !op.hasTrait<OpTrait::IsTerminator>();
+        })) {
+      return false;
+    }
+  }
+  return true;
+}
+
 LogicalResult mergeModuleInto(Operation *sourceModuleOp,
                               Operation *targetModuleOp,
                               OpBuilder &targetBuilder) {
+  // If the source has no ops then we are a no-op.
+  if (isOperationEmpty(sourceModuleOp)) {
+    return success();
+  }
+
+  // Collect operations we'll be moving (so we can mutate the source).
+  Block &sourceBlock = sourceModuleOp->getRegion(0).front();
+  SmallVector<Operation *> sourceOps(llvm::make_pointer_range(sourceBlock));
+
+  // Fast path: if target is empty just move operations without conflict
+  // checks.
+  if (isOperationEmpty(targetModuleOp)) {
+    for (auto &sourceOp : sourceOps) {
+      if (sourceOp->hasTrait<OpTrait::IsTerminator>()) {
+        continue;
+      }
+      // Use moveBefore which works with block->end() (insertion point from
+      // setInsertionPointToEnd), then update insertion point for next op.
+      sourceOp->moveBefore(targetBuilder.getInsertionBlock(),
+                           targetBuilder.getInsertionPoint());
+      targetBuilder.setInsertionPointAfter(sourceOp);
+    }
+    return success();
+  }
+
   // Capture source information we need prior to destructively merging.
   SymbolTable sourceSymbolTable(sourceModuleOp);
   SymbolTable targetSymbolTable(targetModuleOp);
-  auto &sourceBlock = sourceModuleOp->getRegion(0).front();
-  auto sourceOps =
-      llvm::map_to_vector<8>(sourceBlock, [&](Operation &op) { return &op; });
+
+  // Build symbol maps once to avoid O(module_size * rename_count) performance.
+  // Note that we do mutate the modules but these stay valid for us so long as
+  // we don't erase anything.
+  SymbolTableCollection symbolTables;
+  SymbolUserMap sourceSymbolUsers(symbolTables, sourceModuleOp);
+  SymbolUserMap targetSymbolUsers(symbolTables, targetModuleOp);
 
   // Resolve conflicts and move the op.
   for (auto &sourceOp : sourceOps) {
@@ -112,7 +155,12 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
 
       // Resolve symbol name conflicts.
       if (auto targetOp = targetSymbolTable.lookup(symbolName)) {
-        if (OperationEquivalence::isEquivalentTo(
+        // Only deduplicate stateless functions; initializers and globals have
+        // state and side effects so they must be kept separate even if they
+        // appear structurally equivalent.
+        auto funcOp = dyn_cast<FunctionOpInterface>(sourceOp);
+        if (funcOp && !funcOp.getNameAttr().empty() &&
+            OperationEquivalence::isEquivalentTo(
                 targetOp, sourceOp, OperationEquivalence::exactValueMatch,
                 /*markEquivalent=*/nullptr,
                 OperationEquivalence::Flags::IgnoreLocations)) {
@@ -124,7 +172,8 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
           // Since the source symbol is private we can rename it as all uses
           // are known to be local to the source module.
           renameWithDisambiguatedName(sourceOp, sourceModuleOp,
-                                      sourceSymbolTable, targetSymbolTable);
+                                      sourceSymbolTable, targetSymbolTable,
+                                      symbolTables, sourceSymbolUsers);
         } else {
           // The source symbol has 'nested' or 'public' visibility.
           if (SymbolTable::getSymbolVisibility(targetOp) !=
@@ -137,18 +186,19 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
           } else {
             // Keep the original name for our new op, rename the target op.
             renameWithDisambiguatedName(targetOp, targetModuleOp,
-                                        sourceSymbolTable, targetSymbolTable);
+                                        sourceSymbolTable, targetSymbolTable,
+                                        symbolTables, targetSymbolUsers);
           }
         }
       }
-      sourceOp->moveAfter(targetBuilder.getInsertionBlock(),
-                          targetBuilder.getInsertionPoint());
+      sourceOp->moveBefore(targetBuilder.getInsertionBlock(),
+                           targetBuilder.getInsertionPoint());
       targetSymbolTable.insert(sourceOp);
-      targetBuilder.setInsertionPoint(sourceOp);
+      targetBuilder.setInsertionPointAfter(sourceOp);
     } else {
-      sourceOp->moveAfter(targetBuilder.getInsertionBlock(),
-                          targetBuilder.getInsertionPoint());
-      targetBuilder.setInsertionPoint(sourceOp);
+      sourceOp->moveBefore(targetBuilder.getInsertionBlock(),
+                           targetBuilder.getInsertionPoint());
+      targetBuilder.setInsertionPointAfter(sourceOp);
     }
   }
 

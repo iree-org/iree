@@ -3085,8 +3085,8 @@ std::pair<unsigned, unsigned> AsyncExecuteOp::getTiedResultsIndexAndLength() {
 }
 
 OperandRange
-AsyncExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
-  assert(point.getRegionOrNull() == &getBody() && "invalid region index");
+AsyncExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+  assert(successor.getSuccessor() == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
@@ -3096,7 +3096,7 @@ void AsyncExecuteOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor(getResults()));
+    regions.push_back(RegionSuccessor(getOperation(), getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
@@ -3240,8 +3240,8 @@ LogicalResult AsyncConcurrentOp::verify() {
 }
 
 OperandRange
-AsyncConcurrentOp::getEntrySuccessorOperands(RegionBranchPoint point) {
-  assert(point == &getBody() && "invalid region index");
+AsyncConcurrentOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+  assert(successor.getSuccessor() == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
@@ -3251,7 +3251,7 @@ void AsyncConcurrentOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor(getResults()));
+    regions.push_back(RegionSuccessor(getOperation(), getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
@@ -4049,8 +4049,9 @@ LogicalResult CmdExecuteOp::verify() {
   return success();
 }
 
-OperandRange CmdExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
-  assert(point == &getBody() && "invalid region index");
+OperandRange
+CmdExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+  assert(successor.getSuccessor() == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
@@ -4060,7 +4061,8 @@ void CmdExecuteOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor({}));
+    regions.push_back(
+        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
@@ -4130,7 +4132,8 @@ void CmdSerialOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor({}));
+    regions.push_back(
+        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
   }
@@ -4155,7 +4158,8 @@ void CmdConcurrentOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor({}));
+    regions.push_back(
+        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
   }
@@ -4426,7 +4430,7 @@ LogicalResult DispatchWorkgroupSizeOp::verify() {
 //===----------------------------------------------------------------------===//
 
 MutableOperandRange
-YieldOp::getMutableSuccessorOperands(RegionBranchPoint point) {
+YieldOp::getMutableSuccessorOperands(RegionSuccessor successor) {
   return getResourceOperandsMutable();
 }
 

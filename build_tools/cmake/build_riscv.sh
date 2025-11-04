@@ -47,8 +47,6 @@ args=(
   "-DIREE_BUILD_SAMPLES=ON"
   "-DIREE_BUILD_COMPILER=OFF"
   "-DIREE_BUILD_ALL_CHECK_TEST_MODULES=OFF"
-  # CPU info doesn't work on RISCV
-  "-DIREE_ENABLE_CPUINFO=OFF"
 )
 
 if [[ "${RISCV_PLATFORM}" == "linux" ]]; then

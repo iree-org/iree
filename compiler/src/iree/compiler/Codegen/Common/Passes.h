@@ -13,6 +13,7 @@
 #define IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
 
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
+#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -48,9 +49,6 @@ void addIREEComprehensiveBufferizePasses(
 
 /// Populate Encoding to Nop pass and canonicalizer pass to the pipeline.
 void addEncodingToNopPasses(FunctionLikeNest &passManager);
-
-/// Populate Encoding to padding pass and canonicalizer pass to the pipeline.
-void addEncodingToPaddingPasses(FunctionLikeNest &passManager);
 
 /// Links nested transform dialect tuning specs named sequences into a single
 /// entry point. Returns the new named sequence op (inserted into the `module`)

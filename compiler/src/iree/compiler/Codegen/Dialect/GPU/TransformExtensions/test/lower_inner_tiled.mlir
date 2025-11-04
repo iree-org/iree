@@ -256,16 +256,15 @@ module attributes { transform.with_named_sequence } {
  affine_map<() -> ()>
 ]
 func.func @lower_inner_tiled_mfma_scale_f32_16x16x128_b32(
-      %lhs: vector<32xf4E2M1FN>, %lhsScale: vector<1xf8E8M0FNU>,
-      %rhs: vector<32xf8E4M3FN>, %rhsScale: vector<1xf8E8M0FNU>,
+      %lhs: vector<32xf4E2M1FN>, %rhs: vector<32xf8E4M3FN>, %lhsScale: vector<1xf8E8M0FNU>, %rhsScale: vector<1xf8E8M0FNU>,
       %acc: vector<4xf32>) -> vector<4xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %lhsScale, %rhs, %rhsScale) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhsScale, %rhsScale) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32,
       lhs_elem_type = f4E2M1FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>,
     semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-  } : vector<32xf4E2M1FN>, vector<1xf8E8M0FNU>, vector<32xf8E4M3FN>, vector<1xf8E8M0FNU> into vector<4xf32>
+  } : vector<32xf4E2M1FN>, vector<32xf8E4M3FN>, vector<1xf8E8M0FNU>, vector<1xf8E8M0FNU> into vector<4xf32>
   return %0 : vector<4xf32>
 }
 
@@ -281,8 +280,8 @@ module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @lower_inner_tiled_mfma_scale_f32_16x16x128_b32
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<32xf4E2M1FN>
-//  CHECK-SAME:   %[[LHS_SCALE:[A-Za-z0-9]+]]: vector<1xf8E8M0FNU>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<32xf8E4M3FN>
+//  CHECK-SAME:   %[[LHS_SCALE:[A-Za-z0-9]+]]: vector<1xf8E8M0FNU>
 //  CHECK-SAME:   %[[RHS_SCALE:[A-Za-z0-9]+]]: vector<1xf8E8M0FNU>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<4xf32>
 //  CHECK: %[[CST:.+]] = arith.constant dense<5.877470e-39> : vector<4xf8E8M0FNU>
@@ -303,16 +302,15 @@ module attributes { transform.with_named_sequence } {
  affine_map<() -> ()>
 ]
 func.func @lower_inner_tiled_mfma_scale_f32_32x32x64_b32(
-      %lhs: vector<32xf4E2M1FN>, %lhsScale: vector<1xf8E8M0FNU>,
-      %rhs: vector<32xf8E4M3FN>, %rhsScale: vector<1xf8E8M0FNU>,
+      %lhs: vector<32xf4E2M1FN>, %rhs: vector<32xf8E4M3FN>, %lhsScale: vector<1xf8E8M0FNU>, %rhsScale: vector<1xf8E8M0FNU>,
       %acc: vector<16xf32>) -> vector<16xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %lhsScale, %rhs, %rhsScale) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhsScale, %rhsScale) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32,
       lhs_elem_type = f4E2M1FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>,
     semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-  } : vector<32xf4E2M1FN>, vector<1xf8E8M0FNU>, vector<32xf8E4M3FN>, vector<1xf8E8M0FNU> into vector<16xf32>
+  } : vector<32xf4E2M1FN>, vector<32xf8E4M3FN>, vector<1xf8E8M0FNU>, vector<1xf8E8M0FNU> into vector<16xf32>
   return %0 : vector<16xf32>
 }
 
@@ -328,8 +326,8 @@ module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @lower_inner_tiled_mfma_scale_f32_32x32x64_b32
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<32xf4E2M1FN>
-//  CHECK-SAME:   %[[LHS_SCALE:[A-Za-z0-9]+]]: vector<1xf8E8M0FNU>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<32xf8E4M3FN>
+//  CHECK-SAME:   %[[LHS_SCALE:[A-Za-z0-9]+]]: vector<1xf8E8M0FNU>
 //  CHECK-SAME:   %[[RHS_SCALE:[A-Za-z0-9]+]]: vector<1xf8E8M0FNU>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<16xf32>
 //  CHECK: %[[CST:.+]] = arith.constant dense<5.877470e-39> : vector<4xf8E8M0FNU>
