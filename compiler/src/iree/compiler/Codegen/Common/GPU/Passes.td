@@ -356,7 +356,9 @@ def GPUApplyTilingLevelPass :
            /*default=*/"true",
            "Allow pad fusion to generate zero size slices">,
     Option<"normalizeLoops", "normalize-loops", "bool", "false",
-           "Enable normalization for scf loops">
+           "Enable normalization for scf loops">,
+    Option<"fuseConsumers", "fuse-consumers", "bool", /*default=*/"true",
+           "Enable fusing consumers into scf.forall during tiling">
   ];
 }
 
