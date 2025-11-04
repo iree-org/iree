@@ -235,8 +235,8 @@ struct StoreToBufferOpInterface
   }
 };
 
-struct SwizzleHintOpInterface
-    : public BufferizableOpInterface::ExternalModel<
+struct SwizzleHintOpInterface final
+    : BufferizableOpInterface::ExternalModel<
           SwizzleHintOpInterface, IREE::Codegen::SwizzleHintOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
