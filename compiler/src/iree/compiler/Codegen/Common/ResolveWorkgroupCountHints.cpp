@@ -75,9 +75,10 @@ static SmallVector<Value, 3> maxValueVectors(RewriterBase &rewriter,
 }
 
 using OperandWalkFn = std::function<LogicalResult(OpOperand &)>;
-static LogicalResult walkOperandsAndCaptures(Operation *root, Operation *curr,
-                                             DominanceInfo &dominance,
-                                             OperandWalkFn callback) {
+static LogicalResult walkOperandsAndCapturesImpl(Operation *root,
+                                                 Operation *curr,
+                                                 DominanceInfo &dominance,
+                                                 OperandWalkFn callback) {
   for (OpOperand &operand : curr->getOpOperands()) {
     if (dominance.properlyDominates(operand.get(), root)) {
       if (failed(callback(operand))) {
@@ -89,7 +90,8 @@ static LogicalResult walkOperandsAndCaptures(Operation *root, Operation *curr,
   for (Region &region : root->getRegions()) {
     for (Block &body : region.getBlocks()) {
       for (Operation &op : body.getOperations()) {
-        if (failed(walkOperandsAndCaptures(root, &op, dominance, callback))) {
+        if (failed(
+                walkOperandsAndCapturesImpl(root, &op, dominance, callback))) {
           return failure();
         }
       }
@@ -122,7 +124,8 @@ static LogicalResult walkOperandsAndCaptures(Operation *root,
   for (Region &region : root->getRegions()) {
     for (Block &body : region.getBlocks()) {
       for (Operation &op : body.getOperations()) {
-        if (failed(walkOperandsAndCaptures(root, &op, dominance, callback))) {
+        if (failed(
+                walkOperandsAndCapturesImpl(root, &op, dominance, callback))) {
           return failure();
         }
       }
@@ -131,7 +134,7 @@ static LogicalResult walkOperandsAndCaptures(Operation *root,
   return success();
 }
 
-static LogicalResult getBackwardOrdinalSlice(
+static LogicalResult getBackwardOrdinalSliceImpl(
     Operation *op, DenseSet<Operation *> &visited,
     SetVector<Operation *> *backwardSlice,
     SetVector<BlockArgument> &funcArgLeaves,
@@ -155,8 +158,8 @@ static LogicalResult getBackwardOrdinalSlice(
             definingOp->hasTrait<OpTrait::IREE::HAL::ExecutableInterfaceOp>()) {
           return failure();
         }
-        return getBackwardOrdinalSlice(definingOp, visited, backwardSlice,
-                                       funcArgLeaves, ordinalLeaves);
+        return getBackwardOrdinalSliceImpl(definingOp, visited, backwardSlice,
+                                           funcArgLeaves, ordinalLeaves);
       }
 
       visited.erase(definingOp);
@@ -203,8 +206,8 @@ static LogicalResult getBackwardOrdinalSlice(
     bool skipCaptures = true, bool inclusive = false) {
   DenseSet<Operation *> visited;
   LogicalResult res =
-      getBackwardOrdinalSlice(op, visited, &backwardSlice, funcArgLeaves,
-                              ordinalLeaves, skipCaptures, inclusive);
+      getBackwardOrdinalSliceImpl(op, visited, &backwardSlice, funcArgLeaves,
+                                  ordinalLeaves, skipCaptures, inclusive);
   if (succeeded(res)) {
     // Topological sort for cloning later. On failure the slice is not used
     // so no need.
@@ -217,6 +220,55 @@ static LogicalResult getBackwardOrdinalSlice(
 // State + Processing
 //===---------------------------------------------------------------------===//
 
+/// All the state and processing functions needed to materialize workgroup
+/// counts are defined in this section. A structure for the state as well as
+/// as well as processing functions that populate that state are provided for
+/// the following IR constructs:
+///
+///  - `scf.if`
+///  - `iree_codegen.workgroup_count_hint`
+///  - `OpOperand`
+///  - `CallOpInterface`
+///  - `FunctionOpInterface`
+
+/// ================
+/// *** `scf.if` ***
+/// ================
+///   - ConditionSlice
+///   - processCondition
+///
+/// Processes + holds state for `scf.if` ops wrapping `workgroup_count_hint`
+/// ops. This allows optimizing the workgroup count for cases where the count
+/// is switched on kernel uniform values. For example:
+///
+/// ```
+/// %cond = hal.interface.constant.load ordinal(0) : i1
+/// scf.if %cond {
+///   iree_codegen.workgroup_count_hint(1, 2, 3)
+/// } else {
+///   iree_codegen.workgroup_count_hint(4, 5, 6)
+/// }
+/// ```
+///
+/// This will generate (effectively):
+///
+/// ```
+/// hal.executable.export count(%cond: i1)
+///   %x, %y, %z = scf.if %cond {
+///     scf.yield %c1, %c2, %c3
+///   } else {
+///     scf.yield %c4, %c5, %c6
+///   }
+///   hal.return %x, %y, %z
+/// ```
+///
+/// As opposed to the more pessimistic:
+///
+/// ```
+/// hal.executable.export count(%cond: i1)
+///   %x, %y, %z = max(1, 4), max(2, 5), max(3, 6) = 4, 5, 6
+///   hal.return %x, %y, %z
+/// ```
 struct ConditionSlice {
   // The condition on which to predicate.
   Value cond;
@@ -264,8 +316,20 @@ static void processConditionsFromBase(Operation *base,
   }
 }
 
-// Descriptor of a program slice for a `workgroup_count_hint` op in terms of
-// workload ordinals and the parent function.
+/// ===========================================
+/// *** `iree_codegen.workgroup_count_hint` ***
+/// ===========================================
+///   - HintSlice
+///   - processHint
+///
+/// Processes + holds state for `workgroup_count_hint` ops. Hints are processed
+/// individually and only hold the state needed to resolve it in the context of
+/// the function it is contained within. This populates:
+///
+///  - The backward program slice of the operands to the hint op.
+///  - All operands of the enclosing function the backward slice depends on.
+///  - All `iree_tensor_ext.dispatch.workload.ordinal` ops the slice depends on.
+///  - The ConditionSlices of all `scf.if` ops that are ancestors of the hint.
 struct HintSlice {
   IREE::Codegen::WorkgroupCountHintOp hintOp;
   // The program slice that produces the operands to the hint op.
@@ -290,7 +354,13 @@ static LogicalResult processHint(IREE::Codegen::WorkgroupCountHintOp hintOp,
   return success();
 }
 
-// Descriptor of a program slice for the producers of an individual operand.
+/// ===================
+/// *** `OpOperand` ***
+/// ===================
+///   - OperandSlice
+///   - processOperand
+
+/// Descriptor of a program slice for the producers of an individual operand.
 struct OperandSlice {
   OpOperand *operand;
   // The program slice that produces this operand.
@@ -333,13 +403,19 @@ static LogicalResult processOperand(OpOperand &operand,
   return res;
 }
 
-// Descriptor of a program slice for a function call in terms of workload
-// ordinals and the parent function. Backward slices are stored per operand
-// in case when materializing a function, one of the optional operands wasn't
-// resolvable in terms of workload ordinals and legal ops. This allows us to
-// skip dependent conditionals per callsite rather than globally pessimizing.
-// The per operand approach potentially introduces repeat IR, however CSE should
-// be able to clean it up as only pure ops are legal.
+/// =========================
+/// *** `CallOpInterface` ***
+/// =========================
+///   - CallSlice
+///   - processCall
+
+/// Descriptor of a program slice for a function call in terms of workload
+/// ordinals and the parent function. Backward slices are stored per operand
+/// in case when materializing a function, one of the optional operands wasn't
+/// resolvable in terms of workload ordinals and legal ops. This allows us to
+/// skip dependent conditionals per callsite rather than globally pessimizing.
+/// The per operand approach potentially introduces repeat IR, however CSE
+/// should be able to clean it up as only pure ops are legal.
 struct CallSlice {
   // Cache the callee to avoid repeat symbol table lookups.
   FunctionOpInterface callee;
@@ -351,6 +427,11 @@ struct CallSlice {
   std::vector<ConditionSlice> conditions;
 };
 
+/// =============================
+/// *** `FunctionOpInterface` ***
+/// =============================
+///   - FuncSlice
+///   - processFunc
 struct FunctionSlice {
   // List of operands that may optionally resolve in terms of workload ordinals.
   // These are operands that are only used as arguments to conditions.
@@ -366,6 +447,10 @@ struct FunctionSlice {
   bool required = true;
 };
 
+/// Implementation of call processing. Assumes the call transitively calls a
+/// `workgroup_count_hint` op and returns failure if the call can't be resolved
+/// in terms of valid operands the same way a hint op is (function args and
+/// ordinal ops).
 static LogicalResult processCall(CallOpInterface callOp,
                                  FunctionOpInterface callee, CallSlice &slice,
                                  FunctionSlice &funcSlice) {
@@ -395,6 +480,11 @@ static LogicalResult processCall(CallOpInterface callOp,
   return success();
 }
 
+/// Recursive walk of the callgraph, populating the state of each function along
+/// the way. A function is required to materialize if it directly or
+/// transitively calls a `workgroup_count_hint` op. Calls that don't call
+/// functions that may reach a `workgroup_count_hint` aren't added to the list
+/// of calls in the FunctionSlice created for |func|.
 static LogicalResult
 processFunction(FunctionOpInterface func, SymbolTableCollection &symbolTables,
                 llvm::DenseMap<FunctionOpInterface, FunctionSlice> &slices) {
@@ -499,6 +589,9 @@ processFunction(FunctionOpInterface func, SymbolTableCollection &symbolTables,
 // Workgroup Count Materialization
 //===---------------------------------------------------------------------===//
 
+/// Materializes a program slice. All |ordinals| are remapped to corresponding
+/// values in |workloadVals|. All dependent function arguments should already
+/// have been remapped and can be queried directly from |map|.
 static LogicalResult materializeSlice(
     RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
     SetVector<Operation *> &slice,
@@ -531,6 +624,9 @@ static LogicalResult materializeSlice(
   return success();
 }
 
+/// Materializes a single combined `scf.if` based on the list of
+/// ConditionSlices. If no slices successfully materialize, this produces no
+/// new IR.
 static FailureOr<Operation *>
 materializeConditions(RewriterBase &rewriter, IRMapping &map, Location loc,
                       ValueRange workloadVals,
@@ -586,11 +682,27 @@ materializeConditions(RewriterBase &rewriter, IRMapping &map, Location loc,
   return maybePlaceholder;
 }
 
+/// Materializes the IR for the provided HintSlice using the given mapping at
+/// the current insertion point. This amounts to cloning all of the IR cached
+/// in `hintSlice.slice` and remapping function args and ordinals based on the
+/// provided |map| + |workloadVals|.
 static FailureOr<SmallVector<Value, 3>> materializeHint(RewriterBase &rewriter,
                                                         IRMapping &map,
                                                         ValueRange workloadVals,
                                                         HintSlice &hintSlice) {
   Location loc = hintSlice.hintOp.getLoc();
+  // If an scf.if wrapping the cloned hint producers is generated, a placeholder
+  // `unrealized_conversion_cast` op is generated as a placeholder for the
+  // values returned by the cloned backwards slice described in |hintSlice|.
+  // The IR would look something like:
+  //
+  // scf.if %cond {
+  //   %x, %y, %z = builtin.unrealized_conversion_cast // no operands
+  //   scf.yield %x, %y, %z
+  // } else {
+  //   %c0 = arith.constant 0 : index
+  //   scf.yield %c0, %c0, %c0
+  // }
   FailureOr<Operation *> maybePlaceholder = materializeConditions(
       rewriter, map, loc, workloadVals, hintSlice.conditions);
   if (failed(maybePlaceholder)) {
@@ -627,6 +739,7 @@ static FailureOr<SmallVector<Value, 3>> materializeHint(RewriterBase &rewriter,
     SmallVector<Value, 3> newSizes = parent->getResults();
     rewriter.replaceOp(placeholder, sizes);
     sizes = newSizes;
+    // Put the insertion point back to immediately after the enclosing `scf.if`.
     rewriter.setInsertionPointAfter(parent);
   }
 
@@ -639,6 +752,13 @@ materializeFunc(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
                 FunctionSlice &funcSlice,
                 llvm::DenseMap<FunctionOpInterface, FunctionSlice> sliceMap);
 
+/// Materializes the IR for the provided CallSlice using the given mapping at
+/// the current insertion point. This amounts to cloning all of the IR cached
+/// in `operandSlice.slice` for each required and optional operand.
+/// If one of the optional operands is not resolvable in terms of clonable ops
+/// (e.g. hal.interface.* ops or memory effecting ops that can't live on the
+/// host), then the conditional op(s) that depend on that optional operands
+/// aren't generated.
 static FailureOr<SmallVector<Value, 3>>
 materializeCall(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
                 CallSlice &callSlice,
@@ -723,6 +843,31 @@ materializeCall(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
   return *sizes;
 }
 
+/// Materializes the IR for all contained hint and required call ops at the
+/// current insertion point and then takes the maximum values of each
+/// elementwise. For example:
+///
+/// ```
+/// func.func @entry_point() {
+///   iree_codegen.workgroup_count_hint %x, %y, %z
+///   iree_codegen.workgroup_count_hint %a, %b, %c
+///   func.call @constant_hint()
+/// }
+/// func.func @constant_hint() {
+///   iree_codegen.workgroup_count_hint 1, 2, 3
+/// }
+/// ```
+///
+/// This would resolve to:
+///
+/// ```
+/// hal.executable.export @entry_point count(%x, %y, %z, %a, %b, %c) {
+///   %wx = max(%x, %a, 1)
+///   %wy = max(%y, %b, 2)
+///   %wz = max(%z, %c, 3)
+///   hal.return %wx, %wy, %wz
+/// }
+/// ```
 static FailureOr<SmallVector<Value, 3>>
 materializeFunc(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
                 FunctionSlice &funcSlice,
@@ -766,6 +911,8 @@ materializeFunc(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
   return results;
 }
 
+/// Replaces the given `workgroup_count_from_slice` op with the program slice
+/// described by the FunctionSlice |root|.
 static LogicalResult replaceFromSliceOpWithFunctionSlice(
     RewriterBase &rewriter,
     IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fromSliceOp,
@@ -792,8 +939,11 @@ void ResolveWorkgroupCountHintsPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp innerModuleOp = variantOp.getInnerModule();
 
+  // Run the analysis. If a function that contains a `workgroup_count_hint`
+  // fails processing, this results in a pass failure. Diagnostic information
+  // is emitted by the root cause of the failure so no failure message is
+  // needed here.
   llvm::DenseMap<FunctionOpInterface, FunctionSlice> slices;
-
   SymbolTableCollection symbolTables;
   if (innerModuleOp
           .walk([&](FunctionOpInterface func) -> WalkResult {
@@ -811,6 +961,8 @@ void ResolveWorkgroupCountHintsPass::runOnOperation() {
     return signalPassFailure();
   }
 
+  // Rewrite all `workgroup_count_from_slice` ops based on the result of the
+  // analysis.
   IRRewriter rewriter(variantOp);
   for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
     auto rootFuncOp = llvm::dyn_cast_if_present<FunctionOpInterface>(
