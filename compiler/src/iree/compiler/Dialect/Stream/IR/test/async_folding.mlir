@@ -212,10 +212,10 @@ util.func private @FlattenFullFillToSplat(%arg0: index, %arg1: i32) -> !stream.r
 // The target is tied and we cannot avoid the fill.
 
 // CHECK-LABEL: @FlattenFullFillToSplatUnsafe
-util.func private @FlattenFullFillToSplatUnsafe(%arg0: index, %arg1: i32, %arg2: !hal.buffer_view) -> !stream.resource<*> {
+util.func private @FlattenFullFillToSplatUnsafe(%arg0: index, %arg1: i32, %arg2: !util.buffer) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   // CHECK: stream.tensor.import
-  %target = stream.tensor.import %arg2 : !hal.buffer_view -> tensor<8xi32> in !stream.resource<*>{%arg0}
+  %target = stream.tensor.import %arg2 : !util.buffer -> tensor<8xi32> in !stream.resource<*>{%arg0}
   // CHECK: stream.async.fill
   %0 = stream.async.fill %arg1, %target[%c0 to %arg0 for %arg0] : i32 -> %target as !stream.resource<*>{%arg0}
   util.return %0 : !stream.resource<*>
@@ -429,6 +429,7 @@ util.func private @AsyncCopyFullSourceToUpdate(%arg0: !stream.resource<*>, %arg1
 // CHECK-LABEL: @FoldAsyncTransferOp
 util.func private @FoldAsyncTransferOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.resource<transient> {
   // CHECK-NOT: stream.async.transfer
+  // CHECK-NOT: stream.async.clone
   %0 = stream.async.transfer %arg0 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg1}
   %1 = stream.async.transfer %0 : !stream.resource<staging>{%arg1} -> !stream.resource<transient>{%arg1}
   util.return %1 : !stream.resource<transient>
@@ -436,23 +437,14 @@ util.func private @FoldAsyncTransferOp(%arg0: !stream.resource<transient>, %arg1
 
 // -----
 
-// CHECK-LABEL: @RedundantTransferElision
-util.func private @RedundantTransferElision(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.resource<transient> {
-  // CHECK-NOT: stream.async.transfer
-  %0 = stream.async.transfer %arg0 : !stream.resource<transient>{%arg1} -> !stream.resource<transient>{%arg1}
-  util.return %0 : !stream.resource<transient>
-}
-
-// -----
-
 // CHECK-LABEL: @IntermediateTransferElision
 // CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
 util.func private @IntermediateTransferElision(%source: !stream.resource<constant>, %size: index) -> !stream.resource<external> {
-  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
   %transfer0 = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size}
   // CHECK-NOT: stream.async.transfer
   %transfer1 = stream.async.transfer %transfer0 : !stream.resource<staging>{%size} -> !stream.resource<external>{%size}
-  // CHECK-NEXT: util.return %[[TRANSFER]]
+  // CHECK-NEXT: util.return %[[CLONE]]
   util.return %transfer1 : !stream.resource<external>
 }
 

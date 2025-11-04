@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/EmulateNarrowType.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -573,9 +574,10 @@ private:
 struct EmulateNarrowTypePass final
     : impl::EmulateNarrowTypePassBase<EmulateNarrowTypePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, func::FuncDialect,
-                    memref::MemRefDialect, vector::VectorDialect,
-                    affine::AffineDialect, IREE::HAL::HALDialect>();
+    registry
+        .insert<arith::ArithDialect, func::FuncDialect, memref::MemRefDialect,
+                vector::VectorDialect, affine::AffineDialect,
+                IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect>();
   }
 
   void runOnOperation() override {
