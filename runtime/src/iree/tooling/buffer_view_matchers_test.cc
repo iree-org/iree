@@ -166,6 +166,7 @@ static const iree_hal_buffer_equality_t kApproximateAbsoluteEquality = ([]() {
   equality.f16_threshold = 0.001f;
   equality.f32_threshold = 0.0001f;
   equality.f64_threshold = 0.0001;
+  equality.bf16_threshold = 0.0001f;
   return equality;
 })();
 
@@ -175,6 +176,7 @@ static const iree_hal_buffer_equality_t kApproximateRelativeEquality = ([]() {
   equality.f16_threshold = 0.001f;
   equality.f32_threshold = 0.0001f;
   equality.f64_threshold = 0.0001;
+  equality.bf16_threshold = 0.0001f;
   return equality;
 })();
 
@@ -401,6 +403,64 @@ TEST_F(BufferViewMatchersTest, CompareBroadcastF64NERelative) {
   EXPECT_EQ(index, 1);
 }
 
+TEST_F(BufferViewMatchersTest, CompareBroadcastBF16EQ) {
+  const float lhs = 1.0f;
+  const uint16_t rhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(1.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_bf16(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastBF16EQRelative) {
+  const float lhs = 1.0f;
+  const uint16_t rhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(1.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateRelativeEquality, iree_hal_make_buffer_element_bf16(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastBF16NE) {
+  const float lhs = 1.0f;
+  const uint16_t rhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(3.0f),
+      iree_math_f32_to_bf16(4.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateAbsoluteEquality, iree_hal_make_buffer_element_bf16(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+  EXPECT_EQ(index, 1);
+}
+
+TEST_F(BufferViewMatchersTest, CompareBroadcastBF16NERelative) {
+  const float lhs = 1.0f;
+  const uint16_t rhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(3.0f),
+      iree_math_f32_to_bf16(4.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_FALSE(iree_hal_compare_buffer_elements_broadcast(
+      kApproximateRelativeEquality, iree_hal_make_buffer_element_bf16(lhs),
+      IREE_ARRAYSIZE(rhs), iree_make_const_byte_span(rhs, sizeof(rhs)),
+      &index));
+  EXPECT_EQ(index, 1);
+}
+
 TEST_F(BufferViewMatchersTest, CompareElementwiseF16EQ) {
   const uint16_t lhs[] = {
       iree_math_f32_to_f16(1.0f),
@@ -515,6 +575,83 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF64NE) {
   iree_host_size_t index = 0;
   EXPECT_FALSE(iree_hal_compare_buffer_elements_elementwise(
       kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_64,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+  EXPECT_EQ(index, 1);
+}
+
+TEST_F(BufferViewMatchersTest, CompareElementwiseBF16EQ) {
+  const uint16_t lhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(2.0f),
+      iree_math_f32_to_bf16(3.0f),
+  };
+  const uint16_t rhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(2.0f),
+      iree_math_f32_to_bf16(3.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_BFLOAT_16,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareElementwiseBF16NearEQ) {
+  const uint16_t lhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(1.99999f),
+      iree_math_f32_to_bf16(0.00001f),
+      iree_math_f32_to_bf16(4.0f),
+  };
+  const uint16_t rhs[] = {
+      iree_math_f32_to_bf16(1.00001f),
+      iree_math_f32_to_bf16(2.0f),
+      iree_math_f32_to_bf16(0.0f),
+      iree_math_f32_to_bf16(4.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_BFLOAT_16,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareElementwiseBF16NearEQRelative) {
+  const uint16_t lhs[] = {
+      iree_math_f32_to_bf16(100.0f),
+      iree_math_f32_to_bf16(19.99f),
+      iree_math_f32_to_bf16(1.00001f),
+      iree_math_f32_to_bf16(4.0f),
+  };
+  const uint16_t rhs[] = {
+      iree_math_f32_to_bf16(100.01f),
+      iree_math_f32_to_bf16(20.00f),
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(4.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateRelativeEquality, IREE_HAL_ELEMENT_TYPE_BFLOAT_16,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareElementwiseBF16NE) {
+  const uint16_t lhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(2.0f),
+      iree_math_f32_to_bf16(4.0f),
+  };
+  const uint16_t rhs[] = {
+      iree_math_f32_to_bf16(1.0f),
+      iree_math_f32_to_bf16(3.0f),
+      iree_math_f32_to_bf16(4.0f),
+  };
+  iree_host_size_t index = 0;
+  EXPECT_FALSE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_BFLOAT_16,
       IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
   EXPECT_EQ(index, 1);
@@ -796,6 +933,42 @@ TEST_F(BufferViewMatchersTest, MismatchContentsF16) {
   IREE_ASSERT_OK_AND_ASSIGN(
       auto rhs,
       CreateBufferView(shape, IREE_HAL_ELEMENT_TYPE_FLOAT_16, rhs_contents));
+  auto sb = StringBuilder::MakeSystem();
+  bool match = false;
+  IREE_ASSERT_OK(
+      iree_hal_buffer_view_match_equal(kExactEquality, lhs, rhs, sb, &match));
+  EXPECT_FALSE(match);
+  EXPECT_THAT(sb.ToString(), HasSubstr("element at index 0"));
+}
+
+TEST_F(BufferViewMatchersTest, MatchContentsBF16) {
+  const uint16_t lhs_contents[] = {iree_math_f32_to_bf16(2.0f)};
+  const uint16_t rhs_contents[] = {iree_math_f32_to_bf16(2.0f)};
+  iree_hal_dim_t shape[] = {1};
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto lhs,
+      CreateBufferView(shape, IREE_HAL_ELEMENT_TYPE_BFLOAT_16, lhs_contents));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto rhs,
+      CreateBufferView(shape, IREE_HAL_ELEMENT_TYPE_BFLOAT_16, rhs_contents));
+  auto sb = StringBuilder::MakeSystem();
+  bool match = false;
+  IREE_ASSERT_OK(
+      iree_hal_buffer_view_match_equal(kExactEquality, lhs, rhs, sb, &match));
+  EXPECT_TRUE(match);
+  EXPECT_TRUE(sb.ToString().empty());
+}
+
+TEST_F(BufferViewMatchersTest, MismatchContentsBF16) {
+  const uint16_t lhs_contents[] = {iree_math_f32_to_bf16(1.0f)};
+  const uint16_t rhs_contents[] = {iree_math_f32_to_bf16(2.0f)};
+  const iree_hal_dim_t shape[] = {1};
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto lhs,
+      CreateBufferView(shape, IREE_HAL_ELEMENT_TYPE_BFLOAT_16, lhs_contents));
+  IREE_ASSERT_OK_AND_ASSIGN(
+      auto rhs,
+      CreateBufferView(shape, IREE_HAL_ELEMENT_TYPE_BFLOAT_16, rhs_contents));
   auto sb = StringBuilder::MakeSystem();
   bool match = false;
   IREE_ASSERT_OK(
