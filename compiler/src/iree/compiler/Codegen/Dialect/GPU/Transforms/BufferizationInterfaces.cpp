@@ -319,7 +319,6 @@ struct CoalescedGatherDMAOpBufferizationInterface
   getAliasingValues(Operation *op, OpOperand &opOperand,
                     const AnalysisState &state) const {
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
-    // The result aliases with the init operand
     if (opOperand.get() == gatherOp.getInit()) {
       return {{gatherOp.getResult(), BufferRelation::Equivalent}};
     }
@@ -340,15 +339,12 @@ struct CoalescedGatherDMAOpBufferizationInterface
       return failure();
     }
 
-    // Replace in place
     rewriter.setInsertionPoint(gatherOp);
 
-    // Create the bufferized version with no result (memref form)
     IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
         gatherOp.getIndices(), *initBuffer, gatherOp.getLane());
 
-    // Replace the op with the init buffer (result aliases with init)
     replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
 
     return success();
