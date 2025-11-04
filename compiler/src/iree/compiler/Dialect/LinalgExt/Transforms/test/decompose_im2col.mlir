@@ -292,7 +292,7 @@ module {
 //       CHECK:   %[[MLOOP:.+]] = scf.for %[[M:.+]] = %[[C0]] to %[[C2]] step %[[C1]] iter_args(%[[OUT1:.+]] = %[[OUT_TILE]]) -> (tensor<1x2x4xf32>)
 //       CHECK:     %[[KLOOP:.+]] = scf.for %[[K:.+]] = %[[C0]] to %[[C4]] step %[[C1]] iter_args(%[[OUT2:.+]] = %[[OUT1]]) -> (tensor<1x2x4xf32>)
 //   CHECK-DAG:       %[[kParts:.+]]:2 = affine.delinearize_index %[[K]] into (2, 2) : index, index
-//   CHECK-DAG:       %[[hIdx:.+]] = affine.apply #[[$MAP]](%[[M]], %[[kParts]]#1)
+//   CHECK-DAG:       %[[hIdx:.+]] = affine.apply #[[$MAP]](%[[kParts]]#1, %[[M]])
 //       CHECK:       %[[IN_SLICE:.+]] = tensor.extract_slice %[[ARG0]][0, %[[hIdx]], %[[kParts]]#0] [1, 1, 1] [1, 1, 1] : tensor<1x3x2xf32> to tensor<1x1x1xf32>
 //       CHECK:       %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUT2]][0, %[[M]], %[[K]]] [1, 1, 1] [1, 1, 1] : tensor<1x2x4xf32> to tensor<1x1x1xf32>
 //       CHECK:       %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]] : tensor<1x1x1xf32>) outs(%[[OUT_SLICE]] : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
