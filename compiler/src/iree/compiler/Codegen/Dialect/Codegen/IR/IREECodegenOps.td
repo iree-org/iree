@@ -124,7 +124,7 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     and is best effort. If the desired swizzling is not apparently possible, this
     op will no-op. As a result, it should not be relied on for correctness.
 
-    Any subviews on this operation will cause swizzle application to fail. The
+    Any subviews on this operation will cause the swizzle application to fail. The
     expectation is for all view like operations to fold into the accessing ops
     (loads/stores) before this op takes effect.
 
