@@ -70,7 +70,7 @@ func.func @matmul_tensors(%0: index, %1: index, %2: index, %7: tensor<?x?xf32>, 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 #map2 = affine_map<(d0, d1) -> (d1)>
-func.func @matmul_with_fill(%0: i32, %1: i32, %2: i32, %3: i32, %4: i32, %5: index, %6: index, %7: index, %8: index, %9: index, %15: tensor<1024x256xi8>, %16: tensor<256x256xi8>, %17: tensor<1024xf32>, %18: tensor<256xf32>) -> tensor<1024x256xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+func.func @matmul_with_fill(%15: tensor<1024x256xi8>, %16: tensor<256x256xi8>, %17: tensor<1024xf32>, %18: tensor<256xf32>) -> tensor<1024x256xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
   %c0_i32 = arith.constant 0 : i32
   %19 = tensor.empty() : tensor<1024x256xf32>
   %20 = tensor.empty() : tensor<1024x256xi32>

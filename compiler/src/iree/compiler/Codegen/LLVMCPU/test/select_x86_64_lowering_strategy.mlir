@@ -27,8 +27,7 @@ func.func @matvec_static(%3: tensor<128x384xf32>, %4: tensor<384xf32>) -> tensor
 // -----
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
-func.func @matvec_dynamic(%0: i32, %1: i32, %2: i32, %3: index, %4: index, %5: index, %9: i32, %10: index, %11: tensor<?xf32>, %12: tensor<?x?xf32>, %13: tensor<?xf32>) -> tensor<?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %c0 = arith.constant 0 : index
+func.func @matvec_dynamic(%11: tensor<?xf32>, %12: tensor<?x?xf32>, %13: tensor<?xf32>) -> tensor<?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %cst = arith.constant 0.000000e+00 : f32
   %14 = linalg.fill ins(%cst : f32) outs(%11 : tensor<?xf32>) -> tensor<?xf32>
   %15 = linalg.matvec ins(%12, %13 : tensor<?x?xf32>, tensor<?xf32>) outs(%14 : tensor<?xf32>) -> tensor<?xf32>
@@ -63,7 +62,6 @@ func.func @dot_static(%3: tensor<384xf32>, %4: tensor<384xf32>) -> tensor<f32> a
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
 func.func @dot_dynamic(%0: i32, %1: i32, %2: index, %3: index, %5: tensor<f32>, %8: tensor<?xf32>, %9: tensor<?xf32>) -> tensor<f32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %10 = linalg.fill ins(%cst : f32) outs(%5 : tensor<f32>) -> tensor<f32>
   %11 = linalg.dot ins(%8, %9 : tensor<?xf32>, tensor<?xf32>) outs(%10 : tensor<f32>) -> tensor<f32>
@@ -82,7 +80,6 @@ func.func @dot_dynamic(%0: i32, %1: i32, %2: index, %3: index, %5: tensor<f32>, 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1)>
 func.func @dynamic_add(%0: index, %1: index, %5: tensor<?x?xf32>, %6: tensor<?xf32>) -> tensor<?x?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %c0 = arith.constant 0 : index
   %7 = tensor.empty(%0, %1) : tensor<?x?xf32>
   %8 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel"]} ins(%5, %6 : tensor<?x?xf32>, tensor<?xf32>) outs(%7 : tensor<?x?xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
