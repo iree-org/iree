@@ -380,7 +380,6 @@ util.func public @multi_use_producer_fusion(%arg0: tensor<2x11008x128xf32>) -> (
 // CHECK:       %[[ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH0]]
 // CHECK:       util.return %[[DISPATCH0]], %[[ENCODING:.+]] : tensor<2x11008x128xf32>, tensor<2x11008x128xf32, #[[$ENCODING]]>
 
-
 // MULTI-USE-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
 // MULTI-USE-LABEL: @multi_use_producer_fusion
 // MULTI-USE:       %[[DISPATCH:.+]]:2 = flow.dispatch.region -> (tensor<2x11008x128xf32>, tensor<2x11008x128xf32, #[[$ENCODING]]>)
