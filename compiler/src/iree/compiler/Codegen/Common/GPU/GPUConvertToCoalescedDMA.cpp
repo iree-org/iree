@@ -287,15 +287,15 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
       auto indicesType = cast<RankedTensorType>(indices.getType());
       VectorType vectorType =
           VectorType::get(indicesType.getShape(), rewriter.getIndexType());
-      Value zeroPad = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      Value zeroPad = arith::ConstantIndexOp::create(rewriter, loc, 0);
 
       SmallVector<Value> readIndices(indicesType.getRank());
       for (int64_t i = 0; i < indicesType.getRank(); ++i) {
-        readIndices[i] = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+        readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
       }
 
-      indices = rewriter.create<vector::TransferReadOp>(
-          loc, vectorType, indices, readIndices, zeroPad);
+      indices = vector::TransferReadOp::create(rewriter, loc, vectorType,
+                                               indices, readIndices, zeroPad);
     }
   }
 
