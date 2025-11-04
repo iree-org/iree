@@ -437,3 +437,12 @@ void WorkgroupCountHintOp::print(OpAsmPrinter &printer) {
   printer.printOptionalAttrDict((*this)->getAttrs(),
                                 /*elidedAttrs=*/{"static_sizes"});
 }
+
+void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
+                                 ArrayRef<OpFoldResult> sizes) {
+  SmallVector<int64_t> staticSizes;
+  SmallVector<Value> dynamicSizes;
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  build(builder, state, dynamicSizes,
+        builder.getDenseI64ArrayAttr(staticSizes));
+}

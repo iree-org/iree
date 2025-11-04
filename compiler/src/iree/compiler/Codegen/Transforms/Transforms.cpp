@@ -503,6 +503,36 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
                                         maxWorkgroupParallelDims);
 }
 
+LogicalResult createWorkgroupCountHint(RewriterBase &rewriter, Location loc,
+                                       ArrayRef<OpFoldResult> workgroupCount,
+                                       int maxWorkgroupParallelDims,
+                                       bool reverse) {
+  SmallVector<OpFoldResult> results(reverse ? llvm::reverse(workgroupCount)
+                                            : workgroupCount);
+  if (results.size() > maxWorkgroupParallelDims) {
+    MutableArrayRef<OpFoldResult> resultsRef =
+        llvm::MutableArrayRef<OpFoldResult>(results);
+    assert(maxWorkgroupParallelDims != 0 &&
+           "unexpected max parallel dimensions being 0");
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    AffineMap foldMap = AffineMap::get(0, 2, s0 * s1);
+    for (auto [index, foldedResult] : llvm::enumerate(
+             resultsRef.take_back(results.size() - maxWorkgroupParallelDims))) {
+      resultsRef[maxWorkgroupParallelDims - 1] =
+          affine::makeComposedFoldedAffineApply(
+              rewriter, loc, foldMap,
+              {resultsRef[maxWorkgroupParallelDims - 1],
+               resultsRef[maxWorkgroupParallelDims + index]});
+    }
+    results.resize(maxWorkgroupParallelDims);
+  }
+
+  // Hint resolution pads the list of counts with 1s, no need to do this here.
+  IREE::Codegen::WorkgroupCountHintOp::create(rewriter, loc, results);
+  return success();
+}
+
 /// Pattern to fold `scf.forall` created from split reduction with an
 /// `scf.forall` created by workgroup distribution
 namespace {
