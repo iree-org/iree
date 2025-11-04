@@ -461,7 +461,7 @@ private:
     for (int64_t k = K - 1; k >= 0; --k) {
       Value a = vector::ExtractOp::create(rewriter, loc, lhs2D, k);
       Value b = vector::ExtractOp::create(rewriter, loc, rhs2D, k);
-      current = math::FmaOp::create(rewriter, loc, a, b, current);  
+      current = math::FmaOp::create(rewriter, loc, a, b, current);
     }
     return current;
   }
