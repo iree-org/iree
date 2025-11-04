@@ -243,7 +243,7 @@ struct ConvertGatherOpToCoalescedDMA
     SmallVector<Value> threadIVs(innerBody->getArguments().begin(),
                                  innerBody->getArguments().begin() + rank);
     Value laneId = affine::AffineLinearizeIndexOp::create(
-        rewriter, loc, threadIVs, *staticThreadTileSizes);
+        rewriter, loc, threadIVs, *staticThreadTileSizes, /*disjoint=*/true);
 
     Value innerSharedOut = innerBody->getArguments()[rank];
     auto innerInParallelOp =
