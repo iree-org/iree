@@ -1,0 +1,14 @@
+{
+  "config_name": "gpu_vulkan",
+  "iree_compile_flags": [
+    "--iree-hal-target-device=vulkan",
+    "--iree-opt-level=O0"
+  ],
+  "iree_run_module_flags": [
+    "--device=vulkan"
+  ],
+  "skip_compile_tests": [],
+  "skip_run_tests": [],
+  "expected_compile_failures": [],
+  "expected_run_failures": []
+}
