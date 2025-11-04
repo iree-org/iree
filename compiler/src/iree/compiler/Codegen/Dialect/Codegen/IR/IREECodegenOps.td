@@ -119,13 +119,13 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     SameOperandsAndResultType, Pure]> {
   let summary = [{Hint to swizzle accesses according to an access pattern.}];
   let description = [{
-    Optimization hint to swizzle all accesses to the memref this takes a view
-    of. This only affects reads/writes immediately consuming this operation and
-    is best effort. If the desired swizzling is not apparently possible, this
+    Optimization hint to swizzle all accesses to a memref or tensor this takes a
+    view of. This only affects reads/writes immediately consuming this operation
+    and is best effort. If the desired swizzling is not apparently possible, this
     op will no-op. As a result, it should not be relied on for correctness.
 
-    Any subviews on this operation will cause swizzling to fail. The expectation
-    is for all view like operations to fold into the accessing ops
+    Any subviews on this operation will cause swizzle application to fail. The
+    expectation is for all view like operations to fold into the accessing ops
     (loads/stores) before this op takes effect.
 
     Note that this only rewrites direct users. If there are any aliased loads
@@ -156,9 +156,9 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     is otherwise perfectly legal.
   }];
 
-  let arguments = (ins MemRefRankOf<[AnyType], [1]>:$operand,
+  let arguments = (ins RankedTensorOrMemRefOf<[AnyType], [1]>:$operand,
                        IREECodegen_AnySwizzleAttr:$swizzle);
-  let results = (outs MemRefRankOf<[AnyType], [1]>:$result);
+  let results = (outs RankedTensorOrMemRefOf<[AnyType], [1]>:$result);
 
   let assemblyFormat = [{
     $operand `[` $swizzle attr-dict `]` `:` type($result)

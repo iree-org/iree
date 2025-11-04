@@ -3126,6 +3126,51 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @swizzle_hint() {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c64 = arith.constant 63 : index
+  %c512 = arith.constant 512 : index
+  %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xf32>>
+  %arg1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024xf32>>
+  %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[1024], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xf32>> -> tensor<1024xf32>
+  %temp = bufferization.alloc_tensor() : tensor<512xf32>
+  %swizzled.temp = iree_codegen.swizzle_hint %temp[#iree_codegen.rotate_rows<256, 4>] : tensor<512xf32>
+  %1 = scf.forall (%arg2) in (64) shared_outs(%arg3 = %swizzled.temp) -> tensor<512xf32> {
+    %off = arith.muli %arg2, %c4 : index
+    %slice = tensor.extract_slice %0[%off] [4] [1] : tensor<1024xf32> to tensor<4xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %slice into %arg3[%off] [4] [1] : tensor<4xf32> into tensor<512xf32>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  // Somewhat convoluted swap-things-around "kernel" to provide a minimal example
+  // showing that swizzle hints persist on a tensor.
+  scf.forall (%arg2) in (64) {
+    %arg2.reversed = arith.subi %c64, %arg2 : index
+    %off.rev = arith.muli %arg2.reversed, %c4 : index
+    %off = arith.muli %arg2, %c4 : index
+    %slice = tensor.extract_slice %1[%off.rev] [4] [1] : tensor<512xf32> to tensor<4xf32>
+    iree_tensor_ext.dispatch.tensor.store %slice, %arg1, offsets=[%off], sizes=[4], strides=[1]
+      : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024xf32>>
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+
+  return
+}
+
+// CHECK-LABEL: func.func @swizzle_hint
+// CHECK: %[[SHARED:.+]] = memref.alloc() : memref<512xf32>
+// CHECK: %[[SWIZZLED:.+]] = iree_codegen.swizzle_hint %[[SHARED]][{{.*}}] : memref<512xf32>
+// CHECK-COUNT-2: memref.subview %[[SWIZZLED]]
+
+// -----
+
 func.func @convert_to_buffer() -> memref<6xf32> {
   %alloc = bufferization.alloc_tensor() : tensor<6xf32>
   %memref = bufferization.to_buffer %alloc : tensor<6xf32> to memref<6xf32>
