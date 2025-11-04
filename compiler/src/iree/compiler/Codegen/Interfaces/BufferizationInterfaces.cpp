@@ -267,10 +267,8 @@ struct SwizzleHintOpInterface
         getBuffer(rewriter, hintOp.getOperand(), options, state);
     if (failed(maybeBuffer))
       return failure();
-    Value operandMemref = *maybeBuffer;
-
     replaceOpWithNewBufferizedOp<IREE::Codegen::SwizzleHintOp>(
-        rewriter, op, operandMemref, hintOp.getSwizzle());
+        rewriter, op, *maybeBuffer, hintOp.getSwizzle());
     return success();
   }
 };
