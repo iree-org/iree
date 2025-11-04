@@ -155,8 +155,6 @@ void buildGlobalOptimizationPassPipeline(
       });
 
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
-  mainPassManager.addPass(
-      GlobalOptimization::createConvertStridedContractionToContractionPass());
   FunctionLikeNest(mainPassManager)
       .addPass([&]() {
         return createDemoteContractionInputsToBF16Pass(
@@ -185,6 +183,8 @@ void buildGlobalOptimizationPassPipeline(
                          })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
+  mainPassManager.addPass(
+      GlobalOptimization::createConvertStridedContractionToContractionPass());
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.dataTiling) {
