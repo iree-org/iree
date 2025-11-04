@@ -32,7 +32,7 @@ jobs:
             pjrt_platform: cpu
           - runner: ubuntu-24.04
             pjrt_platform: cuda
-          - runner: nodai-amdgpu-w7900-x86-64
+          - runner: [Linux, X64, gfx1100]
             rocm-chip: gfx1100
             pjrt_platform: rocm
           # TODO: enable this AMD runner

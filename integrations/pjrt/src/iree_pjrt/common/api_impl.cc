@@ -463,7 +463,7 @@ iree_status_t BufferInstance::Delete() {
 
 iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
                                          EventInstance** out_done_event) {
-  // Return immediately if the buffer has zero size
+  // Return immediately if the buffer has zero size.
   if (dst_size == 0) {
     *out_done_event = new EventInstance(/*fence=*/nullptr);
     return iree_ok_status();
