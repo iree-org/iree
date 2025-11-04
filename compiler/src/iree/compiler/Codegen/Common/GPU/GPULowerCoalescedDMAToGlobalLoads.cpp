@@ -195,10 +195,18 @@ struct LowerCoalescedGatherDMAPattern
     LDBG() << "  Source innermost dimension size: " << innermostDimSize;
     LDBG() << "  Transfer size in bits: " << transferSizeBits;
 
+    std::optional<int64_t> subgroupSize =
+        getSubgroupSize(dmaOp->getParentOfType<FunctionOpInterface>());
+    if (!subgroupSize.has_value()) {
+      return rewriter.notifyMatchFailure(
+          dmaOp, "unable to determine subgroup size from forall");
+    }
+
     // Check that transfer size matches one of the target DMA sizes (if
     // specified) Note: dma_sizes are in bits
     if (!targetDmaSizes.empty() &&
-        !matchesTargetDmaSize(transferSizeBits, targetDmaSizes)) {
+        !matchesTargetDmaSize(transferSizeBits / *subgroupSize,
+                              targetDmaSizes)) {
       return rewriter.notifyMatchFailure(
           dmaOp, "transfer size does not match any target DMA size");
     }
@@ -206,7 +214,6 @@ struct LowerCoalescedGatherDMAPattern
     // TODO: Handle indices properly - for now we skip the explicit indices
     // check The lane parameter is always present but we handle it differently
 
-    // Get the second innermost dimension size from SOURCE
     ArrayRef<int64_t> sourceShape = sourceType.getShape();
     if (sourceShape.size() < 2) {
       return rewriter.notifyMatchFailure(
@@ -217,27 +224,29 @@ struct LowerCoalescedGatherDMAPattern
     LDBG() << "  Source second innermost dimension size: "
            << secondInnermostDimSize;
 
-    // TODO: Continue implementation
+    int64_t elementsPerTransfer = innermostDimSize / *subgroupSize;
 
-    auto transferType = VectorType::get({innermostDimSize}, elementType);
+    auto transferType = VectorType::get({elementsPerTransfer}, elementType);
 
     rewriter.setInsertionPoint(dmaOp);
 
+    auto laneId = dmaOp.getLane();
+
+    auto laneOffset = arith::MulIOp::create(
+        rewriter, loc, laneId,
+        arith::ConstantIndexOp::create(rewriter, loc, elementsPerTransfer));
+
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (int64_t i = 0; i < secondInnermostDimSize; ++i) {
-      // assume we have a memref<Yx4xf32>, we want to generate
-      // amdgpu.gather_to_lds: amdgpu.gather_to_lds %source[i, 0], %dest[i, 0],
-      // transfer_type
+      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, i);
 
-      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-
-      // Build source indices [i, 0]
+      // Build source indices [i, %lane]
       SmallVector<Value> srcIndices;
       for (int64_t dim = 0; dim < sourceType.getRank() - 2; ++dim) {
         srcIndices.push_back(zero);
       }
       srcIndices.push_back(iVal);
-      srcIndices.push_back(zero);
+      srcIndices.push_back(laneOffset);
 
       // Build dest indices [i, 0]
       SmallVector<Value> dstIndices;
@@ -247,9 +256,8 @@ struct LowerCoalescedGatherDMAPattern
       dstIndices.push_back(iVal);
       dstIndices.push_back(zero);
 
-      rewriter.create<amdgpu::GatherToLDSOp>(loc, source, srcIndices, dest,
-                                             dstIndices,
-                                             TypeAttr::get(transferType));
+      amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
+                                    dstIndices, TypeAttr::get(transferType));
     }
 
     rewriter.eraseOp(dmaOp);
