@@ -2,7 +2,6 @@
 
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @transpose_f32(%2: tensor<32x32xf32>) -> tensor<32x32xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
-  %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<32x32xf32>
   %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<32x32xf32>) outs(%3 : tensor<32x32xf32>) {
   ^bb0(%in: f32, %out: f32):
@@ -21,7 +20,6 @@ func.func @transpose_f32(%2: tensor<32x32xf32>) -> tensor<32x32xf32> attributes 
 
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @transpose_output_indexing_map_f32(%2: tensor<32x32xf32>) -> tensor<32x32xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
-  %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<32x32xf32>
   %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<32x32xf32>) outs(%3 : tensor<32x32xf32>) {
   ^bb0(%in: f32, %out: f32):
@@ -40,7 +38,6 @@ func.func @transpose_output_indexing_map_f32(%2: tensor<32x32xf32>) -> tensor<32
 
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @transpose_f64(%2: tensor<32x32xf64>) -> tensor<32x32xf64> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
-  %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<32x32xf64>
   %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<32x32xf64>) outs(%3 : tensor<32x32xf64>) {
   ^bb0(%in: f64, %out: f64):
@@ -59,7 +56,6 @@ func.func @transpose_f64(%2: tensor<32x32xf64>) -> tensor<32x32xf64> attributes 
 
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @transpose_unsupported_not_rank_2(%2: tensor<2x4x8xf32>) -> tensor<2x8x4xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
-  %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<2x8x4xf32>
   %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%2 : tensor<2x4x8xf32>) outs(%3 : tensor<2x8x4xf32>) {
   ^bb0(%in: f32, %out: f32):
@@ -78,7 +74,6 @@ func.func @transpose_unsupported_not_rank_2(%2: tensor<2x4x8xf32>) -> tensor<2x8
 
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @transpose_unsupported_not_simple_transpose(%2: tensor<32x32xf32>) -> tensor<32x32xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
-  %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<32x32xf32>
   %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<32x32xf32>) outs(%3 : tensor<32x32xf32>) {
   ^bb0(%in: f32, %out: f32):

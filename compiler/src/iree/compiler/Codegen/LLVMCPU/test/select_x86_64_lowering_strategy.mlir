@@ -345,7 +345,6 @@ func.func @thin_depthwise_conv_static(%3: tensor<1x57x57x72xf32>, %4: tensor<3x3
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "cascadelake", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vnni,+adx,+clflushopt,+clwb,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+pku,+prfchw,+rdrnd,+rdseed,+sahf,+x87,+xsave,+xsavec,+xsaveopt,+xsaves", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 32 : index, target_triple = "x86_64-none-elf", ukernels = false}>
 func.func @pooling_nchw_max(%2: tensor<1x64x114x114xf32>) -> tensor<1x64x56x56xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %c3846080 = arith.constant 3846080 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant -3.40282347E+38 : f32
   %3 = tensor.empty() : tensor<1x64x56x56xf32>
@@ -624,8 +623,6 @@ func.func @transpose_16x16(%2: tensor<512x1024xf32>, %3: tensor<1024x512xf32>) -
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @multi_root(%3: tensor<12x128x128xf32>, %4: tensor<12x128xf32>) -> tensor<12x128xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
-  %c6144 = arith.constant 6144 : index
-  %c792576 = arith.constant 792576 : index
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<12x128xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<12x128xf32>) -> tensor<12x128xf32>
@@ -773,8 +770,6 @@ func.func @elem_pack(%2: tensor<128x384xf32>) -> tensor<16x384x8x1xf32> attribut
 #map = affine_map<(d0, d1) -> (d1, d0)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 func.func @transpose_pack(%2: tensor<30522x768xf32>) -> tensor<1908x768x16x1xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %c1579008 = arith.constant 1579008 : index
-  %c3147776 = arith.constant 3147776 : index
   %cst = arith.constant 0.000000e+00 : f32
   %3 = tensor.empty() : tensor<768x30522xf32>
   %4 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<30522x768xf32>) outs(%3 : tensor<768x30522xf32>) {
@@ -887,7 +882,6 @@ func.func @reduction_pack(%3: tensor<384x1024x32xf32>, %4: tensor<384x1024xf32>)
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 func.func @unpack_static(%2: tensor<64x256x16x16xf32>) -> tensor<1024x4096xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %c41943040 = arith.constant 41943040 : index
   %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<1024x4096xf32>
   %unpack = linalg.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %3 : tensor<64x256x16x16xf32> -> tensor<1024x4096xf32>
@@ -934,7 +928,6 @@ func.func @quant_model(%4: tensor<2304x24xi8>, %5: tensor<24x144xi8>, %6: tensor
   %c0 = arith.constant 0 : index
   %c12_i32 = arith.constant 12 : i32
   %c-128_i32 = arith.constant -128 : i32
-  %c127_i32 = arith.constant 127 : i32
   %c0_i32 = arith.constant 0 : i32
   %7 = tensor.empty() : tensor<2304x144xi8>
   %8 = tensor.empty() : tensor<2304x144xi32>
@@ -1153,26 +1146,8 @@ func.func @attention(%4: tensor<20x4096x64xf16>, %5: tensor<20x4096x64xf16>, %6:
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
-func.func @attention_transpose_distribute_4d(%0: i32, %1: i32, %2: i32, %3: i32, %4: i32, %5: i32, %6: i32, %7: i32, %8: i32, %13: index, %18: index, %23: index, %28: index, %29: index, %37: tensor<4x4x?x128xf16>, %38: tensor<4x4x?x1x1x128xf16>, %39: tensor<4x4x?x1x1x128xf16>, %40: tensor<4x4x?x?x1x1xf16>) -> tensor<4x?x4x128xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %c32_i64 = arith.constant 32 : i64
+func.func @attention_transpose_distribute_4d(%29: index, %37: tensor<4x4x?x128xf16>, %38: tensor<4x4x?x1x1x128xf16>, %39: tensor<4x4x?x1x1x128xf16>, %40: tensor<4x4x?x?x1x1xf16>) -> tensor<4x?x4x128xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %cst = arith.constant 8.837890e-02 : f16
-  %c0 = arith.constant 0 : index
-  %9 = arith.extui %0 : i32 to i64
-  %10 = arith.extui %1 : i32 to i64
-  %11 = arith.shli %10, %c32_i64 : i64
-  %12 = arith.ori %9, %11 : i64
-  %14 = arith.extui %2 : i32 to i64
-  %15 = arith.extui %3 : i32 to i64
-  %16 = arith.shli %15, %c32_i64 : i64
-  %17 = arith.ori %14, %16 : i64
-  %19 = arith.extui %4 : i32 to i64
-  %20 = arith.extui %5 : i32 to i64
-  %21 = arith.shli %20, %c32_i64 : i64
-  %22 = arith.ori %19, %21 : i64
-  %24 = arith.extui %6 : i32 to i64
-  %25 = arith.extui %7 : i32 to i64
-  %26 = arith.shli %25, %c32_i64 : i64
-  %27 = arith.ori %24, %26 : i64
   %30 = util.assume.int %29<umin = 16, umax = 131056, udiv = 16> : index
   %31 = iree_tensor_ext.dispatch.workload.ordinal %30, 0 : index
   %41 = tensor.empty(%31) : tensor<4x?x4x128xf16>
