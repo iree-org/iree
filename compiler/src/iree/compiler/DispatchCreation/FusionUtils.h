@@ -33,6 +33,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
 /// dispatch. Returns std::nullopt if the dispatch can not be found in the
 /// chain or any op in the chain is not a reshape-like op.
 std::optional<std::pair<OpResult, SmallVector<Operation *>>>
-getProducerDispatchValueAndOpChain(Value operand);
+getProducerDispatchValueAndOpChain(Value operand,
+                                   bool enableAggressiveFusion = false);
 
 } // namespace mlir::iree_compiler::DispatchCreation

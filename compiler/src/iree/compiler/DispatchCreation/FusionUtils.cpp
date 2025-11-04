@@ -126,7 +126,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
 }
 
 std::optional<std::pair<OpResult, SmallVector<Operation *>>>
-getProducerDispatchValueAndOpChain(Value operand) {
+getProducerDispatchValueAndOpChain(Value operand, bool enableAggressiveFusion) {
   auto operandType = dyn_cast<RankedTensorType>(operand.getType());
   if (!operandType || operandType.getRank() == 0) {
     return std::nullopt;
@@ -163,7 +163,8 @@ getProducerDispatchValueAndOpChain(Value operand) {
       !llvm::hasSingleElement(producerDispatch.getBody())) {
     return std::nullopt;
   }
-  if (!llvm::hasSingleElement(producerValue.getUses())) {
+  if (!enableAggressiveFusion &&
+      !llvm::hasSingleElement(producerValue.getUses())) {
     return std::nullopt;
   }
   return std::make_pair(producerValue, opChain);
