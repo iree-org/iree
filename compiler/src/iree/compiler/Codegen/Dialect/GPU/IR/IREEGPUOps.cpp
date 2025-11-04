@@ -252,6 +252,13 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   for (auto [dim, size] : llvm::enumerate(initShape)) {
+    if (dim > sourceShape.size()) {
+      return emitOpError("expected source to have at least ")
+             << (dim + 1) << " dimensions when destination has rank "
+             << initShape.size();
+    }
+
+    // Check the indices is the same shape of init.
     if (dim < indices.size()) {
       auto indexShape = cast<ShapedType>(indices[dim].getType()).getShape();
       if (indexShape.size() != 1) {
@@ -263,18 +270,16 @@ LogicalResult CoalescedGatherDMAOp::verify() {
                << dim << " to have length " << size
                << " to match destination dimension " << dim;
       }
-    } else {
-      if (dim > sourceShape.size()) {
-        return emitOpError("expected source to have at least ")
-               << (dim + 1) << " dimensions when destination has rank "
-               << initShape.size();
-      }
-      int64_t sourceDim = sourceShape[dim];
-      if (sourceDim != size) {
-        return emitOpError("expected unindexed dimension ")
-               << dim << " to have same length in source (" << sourceDim
-               << ") and destination (" << size << ')';
-      }
+      continue;
+    }
+
+    // Check the suffix (hidden) gathering dimensions are the same in `source`
+    // and `init`.
+    int64_t sourceDim = sourceShape[dim];
+    if (sourceDim != size) {
+      return emitOpError("expected unindexed dimension ")
+             << dim << " to have same length in source (" << sourceDim
+             << ") and destination (" << size << ')';
     }
   }
 

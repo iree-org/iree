@@ -264,54 +264,61 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
   let description = [{
     Performs a coalesced gather operation.
-    This operation can exist in two forms: a tensor-based (value-semantic) form
-    and a buffer-based (memref-semantic) form.
+    This operation can exist in two forms: a tensor-based
+    (value-semantic) form and a buffer-based (memref-semantic) form.
 
-    In both forms, it reads elements from a source operand based on the optional `indices` operand
-    and writes the gathered data into the destination `init` operand using destination-passing style.
+    In both forms, it reads elements from a source operand based on the
+    optional `indices` operand and writes the gathered data into the
+    destination `init` operand using destination-passing style.
 
-    The `indices` operand is optional. The `source` represents the
-    data loaded by this thread, while `init` is the collective output for
-    all threads in the subgroup. Therefore, `source` and `init` may have
-    different shapes (typically source is smaller, representing one thread's portion).
+    The `indices` operand is optional. The `source` represents the data
+    loaded by this thread, while `init` is the collective output for all
+    threads in the subgroup. Therefore, `source` and `init` may have
+    different shapes (typically source is smaller, representing one
+    thread's portion).
 
-    The operation is specifically designed for subgroup-level parallelism, where
-    threads within a subgroup cooperatively gather data with coalesced memory
-    accesses. It implements ParallelCombiningOpInterface and must live inside an
-    op implementing `InParallelOpInterface`, such as `scf.forall.in_parallel`.
+    The operation is specifically designed for subgroup-level
+    parallelism, where threads within a subgroup cooperatively gather
+    data with coalesced memory accesses. It implements
+    ParallelCombiningOpInterface and must live inside an op implementing
+    `InParallelOpInterface`, such as `scf.forall.in_parallel`.
 
     ## Lowering Paths
 
     Two lowering strategies are supported:
-    1. Lowers to `amdgpu.gather_to_lds` operations when lowering requirements
-       are met.
+    1. Lowers to `amdgpu.gather_to_lds` operations when lowering
+       requirements are met.
     2. Default lowering using `vector.gather` operations.
 
     ## Operands and Results
 
-    * `$indices`: The variadic `indices` operand is an optional tensor or vector of indices
-      to gather from `source`. If the indices are present, their shape must be a prefix of
-      the `init`/`result` type. Each `index` must be a 1D tensor or vector whose length matches
+    * `$indices`: The variadic `indices` operand is an optional tensor
+      or vector of indices to gather from `source`. If the indices are
+      present, their shape must be a prefix of the `init`/`result` type.
+      Each `index` must be a 1D tensor or vector whose length matches
       the length of the corresponding dimension of `source`.
 
       The values in `indices` form indices into the memref starting at
-      `source` from which a given thread will gather data, and each tensor/vector component in `indices`
-      corresponds to one index dimension in `source`.
-      Any component that is not specified is implicitly assumed to be `[0, 1, ..., len - 1]`
-      where `len` is the length of the corresponding dimension of source. That is, gather all the
+      `source` from which a given thread will gather data, and each
+      tensor/vector component in `indices` corresponds to one index
+      dimension in `source`.
+      Any component that is not specified is implicitly assumed to be
+      `[0, 1, ..., len - 1]` where `len` is the length of the
+      corresponding dimension of source. That is, gather all the
       elements along that dimension.
 
       This operation will gather data into its result as by setting:
       ```
-      forall (i0, i1, ... iN) in (dim(source, 0), dim(source, 1), ... dim(source, N)):
+      forall (i0, i1, ... iN) in (dim(source, 0), dim(source, 1), ...
+          dim(source, N)):
         result[i0, i1, ... iN-1, iN + lane_id * dim(init, N)] =
             source[indices[0][i0], indices[1][i1], ..., indices[N][iN]]
       ```
       where `lane_id` is the ID of the thread within its subgroup.
 
-      Note that, in order to enable efficient gathers, the trailing dimension of `source`
-      must have unspecified indices and the dim's size must be a supported
-      DMA width for your target.
+      Note that, in order to enable efficient gathers, the trailing
+      dimension of `source` must have unspecified indices and the dim's
+      size must be a supported DMA width for your target.
 
     * `$source`: Source tensor/memref containing the data to be gathered.
     * `$init`: Destination tensor/memref receiving the gathered data
