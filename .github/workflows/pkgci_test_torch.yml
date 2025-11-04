@@ -67,7 +67,7 @@ jobs:
         with:
           repository: iree-org/iree-test-suites
           # Hard coding it similar to models below.
-          ref: 8792a283f79e659ff57d26143656f0a9116f27e9
+          ref: b43fc53cb9a23212d213a4208ca30654df0f5858
           path: iree-test-suites
       - name: Install Torch ops test suite requirements
         run: |
