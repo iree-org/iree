@@ -304,7 +304,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
       This operation will gather data into its result as by setting:
       ```
       forall (i0, i1, ... iN) in (dim(source, 0), dim(source, 1), ... dim(source, N)):
-        result[i0, i1, ... iN-1, iN + lane_id * dim(source, N)] =
+        result[i0, i1, ... iN-1, iN + lane_id * dim(init, N)] =
             source[indices[0][i0], indices[1][i1], ..., indices[N][iN]]
       ```
       where `lane_id` is the ID of the thread within its subgroup.
