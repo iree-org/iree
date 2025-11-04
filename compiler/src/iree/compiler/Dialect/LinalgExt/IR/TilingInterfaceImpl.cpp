@@ -3201,9 +3201,9 @@ LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
 /// `getIterationDomain` of `LinalgOp`s.
 
 SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
-  return llvm::to_vector(getIteratorTypes()
-                             .getAsValueRange<IREE::LinalgExt::IteratorTypeAttr,
-                                              utils::IteratorType>());
+  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
+    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
+  });
 }
 
 SmallVector<Range> CustomOp::getIterationDomainForDimensions(
