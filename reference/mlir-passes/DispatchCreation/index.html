@@ -2844,21 +2844,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#options_6" class="md-nav__link">
-    <span class="md-ellipsis">
-      Options
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -2872,7 +2857,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_7" class="md-nav__link">
+  <a href="#options_6" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -2905,7 +2890,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_8" class="md-nav__link">
+  <a href="#options_7" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -2974,7 +2959,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_9" class="md-nav__link">
+  <a href="#options_8" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -2998,7 +2983,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_10" class="md-nav__link">
+  <a href="#options_9" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -3040,7 +3025,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_11" class="md-nav__link">
+  <a href="#options_10" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5336,21 +5321,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#options_6" class="md-nav__link">
-    <span class="md-ellipsis">
-      Options
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -5364,7 +5334,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_7" class="md-nav__link">
+  <a href="#options_6" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5397,7 +5367,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_8" class="md-nav__link">
+  <a href="#options_7" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5466,7 +5436,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_9" class="md-nav__link">
+  <a href="#options_8" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5490,7 +5460,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_10" class="md-nav__link">
+  <a href="#options_9" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5532,7 +5502,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_11" class="md-nav__link">
+  <a href="#options_10" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5659,9 +5629,6 @@ into the dispatch region, allowing producers to be outside.</p>
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass"><code>-iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass</code><a class="headerlink" href="#-iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass" title="Permanent link">link</a></h3>
 <p><em>Fuses set_encoding ops into producer dispatch regions, or forms new dispatches around them.</em></p>
-<h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-enable-aggressive-fusion : Enable encoding op fusion if the producer has more than one use
-</code></pre></div>
 <h3 id="-iree-dispatch-creation-fuse-horizontal-contractions"><code>-iree-dispatch-creation-fuse-horizontal-contractions</code><a class="headerlink" href="#-iree-dispatch-creation-fuse-horizontal-contractions" title="Permanent link">link</a></h3>
 <p><em>Fuses horizontal contraction ops</em></p>
 <p>For cases where multiple contractions
@@ -5683,7 +5650,7 @@ operation with
 - the lhs operands
 - all the rhs operands
 - multiple results representing the individual matmuls</p>
-<h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
+<h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-fusion-limit : Maximum number of contractions fused into one
 </code></pre></div>
 <h4 id="statistics_2">Statistics<a class="headerlink" href="#statistics_2" title="Permanent link">link</a></h4>
@@ -5693,7 +5660,7 @@ num-size-3-groups : Number of fusion groups of size 3
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-fuse-multi-use-elementwise-producer"><code>-iree-dispatch-creation-fuse-multi-use-elementwise-producer</code><a class="headerlink" href="#-iree-dispatch-creation-fuse-multi-use-elementwise-producer" title="Permanent link">link</a></h3>
 <p><em>Fuse elementwise linalg operations on tensors when producers have multiple uses.</em></p>
-<h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
+<h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-intra-dispatch : Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)
 -num-iterations : Number of iterations to fuse multiuse ops
 </code></pre></div>
@@ -5712,12 +5679,12 @@ num-size-3-groups : Number of fusion groups of size 3
 <p><em>Introduces tensor encoding for flow dispatch regions.</em></p>
 <p>Sets the encoding for compute operations to allow execution of the
 operations in tiled/padded layouts.</p>
-<h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
+<h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-encoding-option : Select the type of encoding options to add.
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-set-split-reduction-sizes"><code>-iree-dispatch-creation-set-split-reduction-sizes</code><a class="headerlink" href="#-iree-dispatch-creation-set-split-reduction-sizes" title="Permanent link">link</a></h3>
 <p><em>Set 'iree_linalg_ext.split_reduction' attribute on ops</em></p>
-<h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
+<h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-split-reduction-target-size : Target tile size for split reduction. Inner reduction dimensions are tiled first, with the tile size rounded up until it evenly divides the iteration domain.
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-sink-reshapes"><code>-iree-dispatch-creation-sink-reshapes</code><a class="headerlink" href="#-iree-dispatch-creation-sink-reshapes" title="Permanent link">link</a></h3>
@@ -5726,7 +5693,7 @@ operations in tiled/padded layouts.</p>
 <p><em>Split reduction dimension to increase parallelism.</em></p>
 <h3 id="-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice"><code>-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice</code><a class="headerlink" href="#-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice" title="Permanent link">link</a></h3>
 <p><em>Convert tensor.pad into linalg.fill + tensor.insert_slice.</em></p>
-<h4 id="options_11">Options<a class="headerlink" href="#options_11" title="Permanent link">link</a></h4>
+<h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-skip-one-linalg-use-case : Skip the op that has only one use which is usedby a Linalg op
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-transpose-generic-ops"><code>-iree-dispatch-creation-transpose-generic-ops</code><a class="headerlink" href="#-iree-dispatch-creation-transpose-generic-ops" title="Permanent link">link</a></h3>
