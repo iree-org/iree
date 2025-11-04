@@ -352,3 +352,129 @@ util.func public @cloneSameLifetimePreserved() -> !stream.resource<*> {
 
   util.return %fill : !stream.resource<*>
 }
+
+// -----
+
+// Tests that constant->constant clones are always elided because constants
+// are immutable and can be safely aliased even with multiple users.
+// This is the key optimization for reducing copies of constant parameters.
+
+// CHECK-LABEL: @constantCloneSingleUse
+util.func public @constantCloneSingleUse(%size: index) -> !stream.resource<constant> {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+
+  // CHECK: %[[CONST:.+]] = stream.async.constant
+  %const = stream.async.constant : !stream.resource<constant>{%size} = dense<123> : tensor<128xi32>
+
+  // Constant->constant clone with single use should be elided.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %const : !stream.resource<constant>{%size} -> !stream.resource<constant>{%size}
+
+  // CHECK: util.return %[[CONST]]
+  util.return %clone : !stream.resource<constant>
+}
+
+// -----
+
+stream.executable private @constantDispatch {
+  stream.executable.export public @entry workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+  builtin.module {
+    func.func @entry() {
+      return
+    }
+  }
+}
+
+// Tests that constant->constant clones with multiple uses are elided.
+// Constants are immutable so aliasing is always safe regardless of use count.
+// This pattern appears when constants are used in both initializers and
+// model functions.
+
+// CHECK-LABEL: @constantCloneMultiUse
+util.func public @constantCloneMultiUse(%size: index) -> (!stream.resource<constant>, !stream.resource<constant>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+
+  // CHECK: %[[CONST:.+]] = stream.async.constant
+  %const = stream.async.constant : !stream.resource<constant>{%size} = dense<1.0> : tensor<256xf32>
+
+  // First clone - even though const has multiple users, this should be elided
+  // because constants are immutable.
+  // CHECK-NOT: stream.async.clone
+  %clone0 = stream.async.clone %const : !stream.resource<constant>{%size} -> !stream.resource<constant>{%size}
+
+  // Second clone - also should be elided.
+  // CHECK-NOT: stream.async.clone
+  %clone1 = stream.async.clone %const : !stream.resource<constant>{%size} -> !stream.resource<constant>{%size}
+
+  // Both dispatches read from the same constant (no mutation).
+  // CSE will deduplicate these identical dispatches into one.
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @constantDispatch::@entry
+  // CHECK-SAME: %[[CONST]]
+  %result0 = stream.async.dispatch @constantDispatch::@entry(%clone0[%c0 to %size for %size]) :
+      (!stream.resource<constant>{%size}) -> !stream.resource<constant>{%size}
+
+  %result1 = stream.async.dispatch @constantDispatch::@entry(%clone1[%c0 to %size for %size]) :
+      (!stream.resource<constant>{%size}) -> !stream.resource<constant>{%size}
+
+  // CHECK: util.return %[[RESULT]], %[[RESULT]]
+  util.return %result0, %result1 : !stream.resource<constant>, !stream.resource<constant>
+}
+
+// -----
+
+// Tests that constant->* clones are still preserved (lifetime conversion).
+// This ensures our constant->constant optimization doesn't break the
+// existing lifetime conversion logic.
+
+// CHECK-LABEL: @constantToGenericPreserved
+util.func public @constantToGenericPreserved(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c123_i32 = arith.constant 123 : i32
+
+  // CHECK: %[[CONST:.+]] = stream.async.constant
+  %const = stream.async.constant : !stream.resource<constant>{%c4} = dense<123> : tensor<1xi32>
+
+  // Clone from constant to generic lifetime must be preserved.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[CONST]]
+  // CHECK-SAME: !stream.resource<constant>{%c4} -> !stream.resource<*>{%c4}
+  %clone = stream.async.clone %const : !stream.resource<constant>{%c4} -> !stream.resource<*>{%c4}
+
+  // CHECK: stream.async.fill %c123_i32, %[[CLONE]]
+  %fill = stream.async.fill %c123_i32, %clone[%c0 to %c4 for %c4] : i32 -> %0 as !stream.resource<*>{%c4}
+
+  util.return %fill : !stream.resource<*>
+}
+
+// -----
+
+// Tests that constant->constant clones are preserved when the result is tied
+// (mutated). This is critical for correctness during initialization where
+// constants may be mutated to produce their final values.
+
+// CHECK-LABEL: @constantCloneTiedMutation
+util.func public @constantCloneTiedMutation(%size: index) -> !stream.resource<constant> {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c456_i32 = arith.constant 456 : i32
+
+  // CHECK: %[[CONST:.+]] = stream.async.constant
+  %const = stream.async.constant : !stream.resource<constant>{%size} = dense<123> : tensor<128xi32>
+
+  // Clone before mutation - this clone MUST be preserved because the result
+  // is tied to an operation (will be mutated).
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[CONST]]
+  %clone = stream.async.clone %const : !stream.resource<constant>{%size} -> !stream.resource<constant>{%size}
+
+  // Fill operation that mutates the clone (tied operand).
+  // CHECK: %[[FILLED:.+]] = stream.async.fill %c456_i32, %[[CLONE]]
+  %filled = stream.async.fill %c456_i32, %clone[%c0 to %c128 for %c128] : i32 -> %clone as !stream.resource<constant>{%size}
+
+  // CHECK: util.return %[[FILLED]]
+  util.return %filled : !stream.resource<constant>
+}
