@@ -986,11 +986,7 @@ void ResolveWorkgroupCountHintsPass::runOnOperation() {
                                   : WalkResult::advance();
              })
              .wasInterrupted()) {
-      if (hasSlice && sliceIt->second.required) {
-        exportOp->emitOpError("exporting function with a workgroup count hint "
-                              "yet `workgroup_count_from_slice` not found.");
-        return signalPassFailure();
-      }
+      // If the workgroup count was already materialized pass through.
       continue;
     }
 
