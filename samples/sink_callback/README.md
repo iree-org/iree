@@ -7,7 +7,7 @@ divergences. It contains 2 examples:
 
 A simple multi-dispatch example showing how to log statistics of
 all dispatch inputs and outputs. When a model is compiled with
---iree-flow-trace-dispatch-tensors, IREE inserts trace points
+`--iree-flow-trace-dispatch-tensors`, IREE inserts trace points
 before and after each dispatch function.
 
 When iree-run-module executes a model with trace points, the
