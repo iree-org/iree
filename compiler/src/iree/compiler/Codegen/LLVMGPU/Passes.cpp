@@ -485,6 +485,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
+
   // Step 4. Tile and fuse tileable ops to subgroups/threads.
   {
     GPUApplyTilingLevelPassOptions options;
@@ -553,6 +555,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 7. Bufferize.
   addGPUBufferizePasses(funcPassManager);
+
+  funcPassManager.addPass(createGPULowerCoalescedDMAToGlobalLoadsPass());
 
   // Step 8. Resolve remaining parallel loops.
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeMapScatterPass());
@@ -804,6 +808,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCSEPass());
   }
 
+  funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
   // Tile to serial loops.
   {
     GPUApplyTilingLevelPassOptions options;
@@ -864,6 +869,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Tensor -> Memref
   addVectorBufferizePasses(funcPassManager);
+
+  funcPassManager.addPass(createGPULowerCoalescedDMAToGlobalLoadsPass());
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
