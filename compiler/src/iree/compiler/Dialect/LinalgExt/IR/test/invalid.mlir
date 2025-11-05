@@ -1029,7 +1029,7 @@ func.func @unpack_mismatch_inner_tile_size_and_output_shape(
 
 // -----
 
-func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+func.func @exp_reduction_non_zero(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
 
@@ -1057,7 +1057,7 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
 
 // -----
 
-func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+func.func @exp_reduction_index_check(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
 
@@ -1079,6 +1079,117 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   ^bb0(%s: f32, %m: f32, %o: f32):
     %add = arith.addf %s, %o: f32
     linalg.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
+func.func @exp_reduction_shaped_input(%S: f32) -> tensor<2xf32> {
+  %M = tensor.empty() : tensor<2xf32>
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{operand #0 must be variadic of ranked tensor of any type values, but got 'f32'}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->()>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: f32)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    iree_linalg_ext.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
+func.func @exp_reduction_shaped_init(%S: tensor<2x3xf32>, %M : f32) -> tensor<2xf32> {
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{operand #1 must be variadic of ranked tensor of any type values, but got 'f32'}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->(M,N)>,
+      affine_map<(M,N)->()>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: f32, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    iree_linalg_ext.yield %m, %add: f32, f32
+  } -> f32, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
+func.func @exp_reduction_projected(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+  %M = tensor.empty() : tensor<2xf32>
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{all indexing maps must be projected permutations}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)[s0]->(M,N)>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    iree_linalg_ext.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
+func.func @exp_reduction_index(%S: tensor<2x3xf32>, %M : tensor<2xf32>) -> tensor<2xf32> {
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{linalg.index is not supported in body}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->(M,N)>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    %v = linalg.index 0: index
+    iree_linalg_ext.yield %m, %add: f32, f32
   } -> tensor<2xf32>, tensor<2xf32>
   return %sum : tensor<2xf32>
 }
