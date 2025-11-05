@@ -31,7 +31,7 @@ struct DecomposeExpReductionPass final
   void runOnOperation() override;
 };
 
-static LogicalResult captureUsedOperationsAndBlockArguements(
+static LogicalResult captureUsedOperationsAndBlockArguments(
     linalg::GenericOp linalgOp, SetVector<int64_t> &usedInputs,
     SetVector<Operation *> &usedOperations, int64_t resultNumber) {
   BackwardSliceOptions options;
@@ -92,7 +92,7 @@ struct DecomposeMultipleResults : OpRewritePattern<linalg::GenericOp> {
       // Get all operations required to produce this result.
       SetVector<Operation *> usedOperations;
       SetVector<int64_t> usedInputs;
-      if (failed(captureUsedOperationsAndBlockArguements(
+      if (failed(captureUsedOperationsAndBlockArguments(
               linalgOp, usedInputs, usedOperations, resultNumber))) {
         return failure();
       }
@@ -155,12 +155,21 @@ struct DecomposeMultipleResults : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+struct DecomposeExpReduction : OpRewritePattern<ExpReductionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ExpReductionOp expReductionOp,
+                                PatternRewriter &rewriter) const override {
+    return success(expReductionOp.decomposeOperation(rewriter));
+  }
+};
+
 } // namespace
 
 void DecomposeExpReductionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  patterns.add<DecomposeMultipleResults>(context);
+  patterns.add<DecomposeExpReduction, DecomposeMultipleResults>(context);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     getOperation()->emitOpError("Failed to apply patterns");
     return signalPassFailure();

@@ -1047,9 +1047,11 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
 // ExpReductionOp
 //===----------------------------------------------------------------------===//
 
-FailureOr<SmallVector<Value>>
-ExpReductionOp::decomposeOperation(OpBuilder &builder) {
+FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
+  IRRewriter rewriter(b);
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(*this);
 
   // Split the op into:
   // curr_max = max(s, old_max)
@@ -1069,14 +1071,14 @@ ExpReductionOp::decomposeOperation(OpBuilder &builder) {
   AffineMap prevMaxMap = getMatchingIndexingMap(prevMax);
 
   Value currMax = reduce<arith::MaximumFOp>(
-      builder, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
+      rewriter, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
 
   // ex = e^{sValue - curr_max}
-  Value ex = computeSubAndExp2(builder, loc, prevMaxMap, normValMap, currMax,
+  Value ex = computeSubAndExp2(rewriter, loc, prevMaxMap, normValMap, currMax,
                                sValue->get());
 
   // norm = e^(old_max - curr_max)
-  Value norm = computeSubAndExp2(builder, loc, prevMaxMap, prevMaxMap, currMax,
+  Value norm = computeSubAndExp2(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
                                  prevMax->get());
 
   inputs[reducingOpIndex] = ex;
@@ -1086,21 +1088,23 @@ ExpReductionOp::decomposeOperation(OpBuilder &builder) {
     OpOperand *oldOut = getDpsInitOperand(oldIndex);
     AffineMap oldOutMap = getMatchingIndexingMap(oldOut);
     Value normOut = elementwiseValueInPlace<arith::MulFOp>(
-        builder, loc, oldOutMap, prevMaxMap, oldOut->get(), norm);
+        rewriter, loc, oldOutMap, prevMaxMap, oldOut->get(), norm);
     normOuts[oldIndex] = normOut;
   }
 
   auto expRedGeneric = linalg::GenericOp::create(
-      builder, loc, TypeRange(normOuts), inputs, normOuts,
+      rewriter, loc, TypeRange(normOuts), inputs, normOuts,
       getIndexingMapsArray(), getLoopIteratorTypes());
-
+  rewriter.inlineRegionBefore(getRegion(), expRedGeneric.getRegion(),
+                              expRedGeneric.getRegion().begin());
+  rewriter.setInsertionPointAfter(expRedGeneric.getBody()->getTerminator());
+  auto yieldOp =
+      cast<IREE::LinalgExt::YieldOp>(expRedGeneric.getBody()->getTerminator());
+  rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp, yieldOp.getOperands());
   expRedGeneric->setDiscardableAttrs(
       getOperation()->getDiscardableAttrDictionary());
-  SmallVector<Value> argReplacements;
-  for (auto value : expRedGeneric->getResults()) {
-    argReplacements.emplace_back(value);
-  }
-  return argReplacements;
+  rewriter.replaceOp(getOperation(), expRedGeneric);
+  return SmallVector<Value>(expRedGeneric->getResults());
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
