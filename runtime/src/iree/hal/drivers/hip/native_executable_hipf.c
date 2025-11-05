@@ -1732,9 +1732,6 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
   *kernel_count = kernel_index;
   *out_kernels = kernels;
 
-  for (iree_host_size_t i = 0; i < kernel_index; ++i) {
-    fprintf(stderr, "Adding kernel : %.*s\n", (int)kernels[i].name.size, kernels[i].name.data);
-  }
   return iree_ok_status();
 }
 
