@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -265,9 +266,10 @@ static LogicalResult replaceAllStoresWithTiledVersion(
   return success();
 }
 
-FailureOr<IREETilingResult>
-tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
-                          linalg::LinalgTilingOptions options) {
+FailureOr<IREETilingResult> tileDispatchUsingSCFForOp(
+    RewriterBase &rewriter, TilingInterface op,
+    linalg::LinalgTilingOptions options,
+    const std::optional<llvm::SmallBitVector> &skipTiledLoops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(op);
 
@@ -312,7 +314,10 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
         rewriter, loc, numTilesExprs,
         {range.offset, range.size, range.stride, tileSize});
     if (isOneInteger(numTiles)) {
-      continue;
+      if (!skipTiledLoops || skipTiledLoops->empty() ||
+          !skipTiledLoops->test(index)) {
+        continue;
+      }
     }
 
     tilingResult.tiledLoops.set(index);

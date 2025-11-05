@@ -16,7 +16,9 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/JSON.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -29,6 +31,7 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -43,10 +46,51 @@ namespace mlir::iree_compiler {
 // Invocation tiling utils
 //===----------------------------------------------------------------------===//
 
+/// Return the workgroup sizes from the export op.
+static SmallVector<int64_t>
+getWorkgroupSizes(mlir::FunctionOpInterface funcOp) {
+  SmallVector<int64_t> workgroupSize;
+  std::optional<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (!exportOp)
+    return workgroupSize;
+
+  std::optional<ArrayAttr> workgroupSizeAttr = exportOp->getWorkgroupSize();
+  if (!workgroupSizeAttr)
+    return workgroupSize;
+
+  for (auto attr : workgroupSizeAttr.value()) {
+    workgroupSize.push_back(cast<IntegerAttr>(attr).getInt());
+  }
+  return workgroupSize;
+}
+
+static llvm::SmallBitVector
+computeSkipTileLoops(TilingInterface op, ArrayRef<int64_t> configTileSizes,
+                     ArrayRef<int64_t> workgroupSize) {
+  size_t numLoops = op.getLoopIteratorTypes().size();
+  llvm::SmallBitVector notTiledLoops(numLoops, false);
+
+  for (size_t index = 0; index < numLoops; ++index) {
+    if (index >= workgroupSize.size())
+      continue;
+    int64_t tileSizeVal =
+        index < configTileSizes.size() ? configTileSizes[index] : 0;
+    if (tileSizeVal == 0)
+      continue;
+    // workgroupSize and tileSizes are in opposite order.
+    if (tileSizeVal < workgroupSize[workgroupSize.size() - index - 1])
+      notTiledLoops.set(index);
+  }
+  return notTiledLoops;
+}
+
 /// Tiles LinalgOp to target invocations.
 static LogicalResult
 tileToInvocation(mlir::FunctionOpInterface funcOp,
+                 ArrayRef<int64_t> configTileSizes,
                  const linalg::TileSizeComputationFunction &computeFn) {
+  SmallVector<int64_t> workgroupSize = getWorkgroupSizes(funcOp);
+
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -69,8 +113,13 @@ tileToInvocation(mlir::FunctionOpInterface funcOp,
   funcOp.walk([&](TilingInterface op) { candidates.push_back(op); });
 
   for (auto op : candidates) {
+    llvm::SmallBitVector skipTileLoops;
+    if (tilingOptions.tileSizeComputationFunction && !workgroupSize.empty()) {
+      skipTileLoops = computeSkipTileLoops(op, configTileSizes, workgroupSize);
+    }
+
     FailureOr<IREETilingResult> res =
-        tileDispatchUsingSCFForOp(rewriter, op, tilingOptions);
+        tileDispatchUsingSCFForOp(rewriter, op, tilingOptions, skipTileLoops);
     if (failed(res)) {
       return failure();
     }
@@ -130,6 +179,9 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   if (!isEntryPoint(funcOp))
     return;
 
+  auto threadTileSizes = getSPIRVTileSize(funcOp, 1);
+  if (failed(threadTileSizes))
+    return signalPassFailure();
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
   if (failed(threadTileComputeFn))
     return signalPassFailure();
@@ -138,7 +190,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     return signalPassFailure();
 
   { // Tile and distribute to invocations.
-    if (failed(tileToInvocation(funcOp, *threadTileComputeFn))) {
+    if (failed(
+            tileToInvocation(funcOp, *threadTileSizes, *threadTileComputeFn))) {
       funcOp.emitOpError() << "failed to tile to invocations";
       return signalPassFailure();
     }

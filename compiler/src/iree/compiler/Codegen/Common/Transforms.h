@@ -7,9 +7,11 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
 
+#include <optional>
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 
 namespace mlir::bufferization {
@@ -73,9 +75,10 @@ struct IREETilingResult {
   SmallVector<OpFoldResult> tileOffsets;
   SmallVector<OpFoldResult> tileSizes;
 };
-FailureOr<IREETilingResult>
-tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
-                          linalg::LinalgTilingOptions options);
+FailureOr<IREETilingResult> tileDispatchUsingSCFForOp(
+    RewriterBase &rewriter, TilingInterface op,
+    linalg::LinalgTilingOptions options,
+    const std::optional<llvm::SmallBitVector> &skipTileLoops = std::nullopt);
 
 namespace IREE::VectorExt {
 class VectorLayoutInterface;
