@@ -1,3 +1,51 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-convert-to-coalesced-dma))" %s --split-input-file | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-convert-to-coalesced-dma,canonicalize))" %s --split-input-file | FileCheck %s
 
-// CHECK-LABEL: module
+#gpu_target_copy = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [32],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_copy = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_copy}>
+#translation_copy = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 64, 64] subgroup_size = 32>
+
+// CHECK-LABEL: func.func @copy
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x1024xf32>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x1024xf32>
+func.func @copy(%source: tensor<64x1024xf32>, %init: tensor<64x1024xf32>) -> tensor<64x1024xf32>
+  attributes {hal.executable.target = #exec_target_copy, translation_info = #translation_copy} {
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma<subgroup = [4, 128]>}
+    ins(%source : tensor<64x1024xf32>)
+    outs(%init : tensor<64x1024xf32>) -> tensor<64x1024xf32>
+
+  // Warp-level forall:
+  // CHECK: %[[WARP_RESULT:.+]] = scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (64, 1024) step (4, 128)
+  // CHECK-SAME: shared_outs(%[[INIT_TILE:.+]] = %[[INIT]]) -> (tensor<64x1024xf32>) {
+  // CHECK:   %[[SLICE_SRC:.+]] = tensor.extract_slice %[[SRC]][%[[IV0]], %[[IV1]]] [4, 128] [1, 1]
+  // CHECK-SAME:   : tensor<64x1024xf32> to tensor<4x128xf32>
+  // CHECK:   %[[SLICE_DST:.+]] = tensor.extract_slice %[[INIT_TILE]][%[[IV0]], %[[IV1]]] [4, 128] [1, 1]
+  // CHECK-SAME:   : tensor<64x1024xf32> to tensor<4x128xf32>
+
+  // Thread-level forall:
+  // CHECK:   %[[THREAD_RESULT:.+]] = scf.forall (%[[LANE:.+]]) in (128)
+  // CHECK-SAME:   shared_outs(%[[THREAD_INIT:.+]] = %[[SLICE_DST]]) -> (tensor<4x128xf32>) {
+  // CHECK:     scf.forall.in_parallel {
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[SLICE_SRC]] into %[[THREAD_INIT]] lane(%[[LANE]])
+  // CHECK-SAME:       : tensor<4x128xf32>, tensor<4x128xf32>, index
+  // CHECK:     }
+
+  // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
+
+  // CHECK:   scf.forall.in_parallel {
+  // CHECK:     tensor.parallel_insert_slice %[[THREAD_RESULT]] into %[[INIT_TILE]][%[[IV0]], %[[IV1]]] [4, 128] [1, 1]
+  // CHECK-SAME:     : tensor<4x128xf32> into tensor<64x1024xf32>
+  // CHECK:   }
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+
+  // CHECK: return %[[WARP_RESULT]]
+  // CHECK-NOT: linalg.copy
+
+  return %result : tensor<64x1024xf32>
+}

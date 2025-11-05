@@ -40,8 +40,8 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v,
   auto copy = linalg::CopyOp::create(builder, loc, v, empty);
 
   if (useDirectLoad) {
-    setLoweringConfig(
-        copy, IREE::GPU::UseGlobalLoadDMAAttr::get(builder.getContext()));
+    setLoweringConfig(copy, IREE::GPU::UseGlobalLoadDMAAttr::get(
+                                builder.getContext(), nullptr));
   } else {
     setLoweringConfig(
         copy, IREE::GPU::DerivedThreadConfigAttr::get(builder.getContext()));
