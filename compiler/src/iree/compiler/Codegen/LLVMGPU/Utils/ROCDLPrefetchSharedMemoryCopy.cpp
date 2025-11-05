@@ -26,8 +26,6 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-#include "mlir/Dialect/SCF/Transforms/Transforms.h"
-
 #define DEBUG_TYPE "iree-codegen-llvmgpu-prefetch-shared-memory-copy"
 
 namespace mlir::iree_compiler {
@@ -270,12 +268,7 @@ populateOpToStageMap(LoopPrefetcher &prefetcher, scf::ForOp forOp,
     opToStage[op] = stage;
   };
 
-  if (numStages == 1) {
-    // Single-stage pipelining: all ops in stage 0.
-    for (Operation &op : forOp.getBody()->without_terminator()) {
-      assignOp(&op, /*stage=*/0);
-    }
-  } else if (numStages == 2) {
+  if (numStages == 2) {
     // Two-stage pipelining: readStage in stage 0, compute+write in stage 1.
     for (Operation *op : prefetcher.readStage)
       assignOp(op, /*stage=*/0);
@@ -367,6 +360,9 @@ static scf::PipeliningOption buildPipeliningOption(
       };
 
   options.peelEpilogue = true;
+  // TODO: Enable dynamic trip count support. We'll want to run in-range
+  // analysis to restrict to cases where we know K is large enough to benefit
+  // from pipelining.
   options.supportDynamicLoops = false;
   options.predicateFn = nullptr;
 
@@ -401,7 +397,7 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
     return addrSpace && addrSpace.getValue() == gpu::AddressSpace::Workgroup;
   };
 
-  // Helper to check if operation or its nested ops have shared memory reads
+  // Helper to check if operation or its nested ops have shared memory reads.
   auto hasNestedSharedRead = [hasSharedMemory](Operation *op) -> bool {
     bool found = false;
     op->walk([&](vector::TransferReadOp readOp) {
@@ -414,7 +410,7 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
     return found;
   };
 
-  // Helper to check if operation or its nested ops have shared memory writes
+  // Helper to check if operation or its nested ops have shared memory writes.
   auto hasNestedSharedWrite = [hasSharedMemory](Operation *op) -> bool {
     bool found = false;
     op->walk([&](vector::TransferWriteOp writeOp) {
@@ -479,16 +475,20 @@ dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp,
                                                unsigned numStages) {
+  // No prefetching needed for single-stage pipelining.
+  if (numStages <= 1) {
+    return forOp;
+  }
+
   auto prefetcherOr = LoopPrefetcher::get(forOp);
-  if (failed(prefetcherOr))
+  if (failed(prefetcherOr)) {
     return failure();
+  }
   LoopPrefetcher &prefetcher = *prefetcherOr;
 
   // For multi-stage pipelining, remove original barriers as they're designed
   // for unpipelined structure. New barriers will be inserted appropriately.
-  if (numStages > 1) {
-    removeBarriers(forOp);
-  }
+  removeBarriers(forOp);
 
   llvm::DenseMap<Operation *, unsigned> opToStage;
   populateOpToStageMap(prefetcher, forOp, numStages, opToStage);
@@ -507,13 +507,14 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   }
 
   // Dump the planned schedule before pipelining (while ops are still valid)
-  dumpSchedule(finalSchedule, opToCluster);
+  LLVM_DEBUG(dumpSchedule(finalSchedule, opToCluster));
 
   scf::PipeliningOption options = buildPipeliningOption(finalSchedule);
 
   FailureOr<scf::ForOp> newForOpOr = invokePipelineForLoop(forOp, options);
-  if (failed(newForOpOr))
+  if (failed(newForOpOr)) {
     return failure();
+  }
 
   scf::ForOp newForOp = *newForOpOr;
 
