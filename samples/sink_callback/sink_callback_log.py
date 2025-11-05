@@ -57,14 +57,13 @@ def main():
     ), "2 dispatches. mm:2->1, sm:1->1. Expected 5 tensors."
 
     # A
-    # Example:
-    # ['main_dispatch_0::main_dispatch_0_matmul_Dx16x16_f32 inputs',
-    #                                                             0,
-    #                                                          16.0]
-    assert callback_results[0][0].startswith("main_dispatch_0")
-    assert callback_results[0][0].endswith("inputs")
-    assert callback_results[0][1] == 0
-    assert callback_results[0][2] == 16.0
+    dispatch_name = callback_results[0][0]
+    tensor_index = callback_results[0][1]
+    tensor_sum = callback_results[0][2]
+    assert dispatch_name.startswith("main_dispatch_0")
+    assert dispatch_name.endswith("inputs")
+    assert tensor_index == 0
+    assert tensor_sum == 16.0
 
     # B
     assert callback_results[1][0].startswith("main_dispatch_0")
@@ -91,7 +90,6 @@ def main():
     assert callback_results[4][0].endswith("outputs")
     assert callback_results[4][1] == 0
     assert callback_results[4][2] == 4.0
-
 
 if __name__ == "__main__":
     main()
