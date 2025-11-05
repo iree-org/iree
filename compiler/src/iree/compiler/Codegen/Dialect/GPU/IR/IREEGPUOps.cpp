@@ -217,8 +217,8 @@ LogicalResult CoalescedGatherDMAOp::verify() {
 
   auto initShapedType = cast<ShapedType>(initType);
   auto sourceType = cast<ShapedType>(getSource().getType());
-  auto initShape = initShapedType.getShape();
-  auto sourceShape = sourceType.getShape();
+  ArrayRef<int64_t> initShape = initShapedType.getShape();
+  ArrayRef<int64_t> sourceShape = sourceType.getShape();
 
   if (hasTensor && !isa<RankedTensorType>(sourceType)) {
     return emitOpError("source must be tensor when init is tensor");

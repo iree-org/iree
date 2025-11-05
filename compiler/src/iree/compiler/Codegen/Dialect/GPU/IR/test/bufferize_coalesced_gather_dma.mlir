@@ -16,7 +16,7 @@ func.func @bufferize_coalesced_gather_dma_no_indices(%source: tensor<4x32xf32>,
 
 // -----
 
-// Test bufferization with indices
+// Test bufferization with vector indices
 func.func @bufferize_coalesced_gather_dma_with_indices(%idx0: vector<4xindex>,
                                                          %source: tensor<4x64xf32>,
                                                          %dest: tensor<4x64xf32>,

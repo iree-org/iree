@@ -306,6 +306,11 @@ struct CoalescedGatherDMAOpBufferizationInterface
     if (opOperand.get() == gatherOp.getSource()) {
       return true;
     }
+    for (Value index : gatherOp.getIndices()) {
+      if (opOperand.get() == index && isa<TensorType>(index.getType())) {
+        return true;
+      }
+    }
     return false;
   }
 
