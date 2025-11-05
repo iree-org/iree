@@ -36,10 +36,9 @@ static LogicalResult captureUsedOperationsAndBlockArguments(
     SetVector<Operation *> &usedOperations, int64_t resultNumber) {
   BackwardSliceOptions options;
   options.inclusive = true;
-  options.filter = [&](Operation *op) -> bool {
+  options.filter = [&linalgOp](Operation *op) -> bool {
     return op->getBlock() == linalgOp.getBody();
   };
-
   auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
   Value result = yieldOp.getOperand(resultNumber);
 
@@ -54,13 +53,11 @@ static LogicalResult captureUsedOperationsAndBlockArguments(
         if (blockArg.getOwner() != linalgOp.getBlock()) {
           continue;
         }
-
         int64_t argNumber = blockArg.getArgNumber();
         if (argNumber >= linalgOp.getNumDpsInputs() &&
             argNumber - linalgOp.getNumDpsInputs() != resultNumber) {
           return failure();
         }
-
         if (argNumber < linalgOp.getNumDpsInputs()) {
           usedInputs.insert(argNumber);
         }
@@ -79,16 +76,13 @@ struct DecomposeMultipleResults : OpRewritePattern<linalg::GenericOp> {
     if (linalgOp.getNumResults() <= 2) {
       return failure();
     }
-
     // Create num_results linalg.generics, each producing a single result (and
     // relying on canonicalizations to simplify).
     for (int64_t resultNumber : llvm::seq<int64_t>(linalgOp.getNumResults())) {
       rewriter.setInsertionPoint(linalgOp);
-
       auto yieldOp =
           cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
       Value result = yieldOp.getOperand(resultNumber);
-
       // Get all operations required to produce this result.
       SetVector<Operation *> usedOperations;
       SetVector<int64_t> usedInputs;
@@ -96,7 +90,6 @@ struct DecomposeMultipleResults : OpRewritePattern<linalg::GenericOp> {
               linalgOp, usedInputs, usedOperations, resultNumber))) {
         return failure();
       }
-
       // Create a new linalg.generic operation for this result.
       SmallVector<Value> inputs =
           llvm::map_to_vector(usedInputs, [&](int64_t x) {
@@ -113,40 +106,32 @@ struct DecomposeMultipleResults : OpRewritePattern<linalg::GenericOp> {
           linalgOp->getOpResult(resultNumber)));
       llvm::SmallBitVector unusedDims = getUnusedDimsBitVector(indexingMaps);
       indexingMaps = compressUnusedDims(indexingMaps);
-
       SmallVector<utils::IteratorType> iteratorTypes;
       for (int64_t i : llvm::seq<int64_t>(linalgOp.getNumLoops())) {
         if (!unusedDims.test(i)) {
           iteratorTypes.push_back(linalgOp.getIteratorTypesArray()[i]);
         }
       }
-
       auto newOp = linalg::GenericOp::create(
           rewriter, linalgOp.getLoc(), TypeRange(inits), inputs, inits,
           indexingMaps, iteratorTypes,
           [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
             Block *oldBody = linalgOp.getBody();
             usedInputs.insert(resultNumber + linalgOp.getNumDpsInputs());
-
             IRMapping regionMapping;
-
             for (auto [oldBlockArgNum, newBlockArg] :
                  llvm::zip_equal(usedInputs, blockArgs)) {
               regionMapping.map(oldBody->getArgument(oldBlockArgNum),
                                 newBlockArg);
             }
-
             for (Operation *usedOperation : usedOperations) {
               b.clone(*usedOperation, regionMapping);
             }
-
             linalg::YieldOp::create(b, loc, regionMapping.lookup(result));
           });
-
       if (unusedDims.none()) {
         newOp->setDiscardableAttrs(linalgOp->getDiscardableAttrDictionary());
       }
-
       rewriter.replaceAllUsesWith(linalgOp.getResult(resultNumber),
                                   newOp.getResult(0));
     }
@@ -160,7 +145,12 @@ struct DecomposeExpReduction : OpRewritePattern<ExpReductionOp> {
 
   LogicalResult matchAndRewrite(ExpReductionOp expReductionOp,
                                 PatternRewriter &rewriter) const override {
-    return success(expReductionOp.decomposeOperation(rewriter));
+    auto decomposeResults = expReductionOp.decomposeOperation(rewriter);
+    if (failed(decomposeResults))
+      return failure();
+    rewriter.replaceOp(expReductionOp,
+                       decomposeResults->begin()->getDefiningOp());
+    return success();
   }
 };
 

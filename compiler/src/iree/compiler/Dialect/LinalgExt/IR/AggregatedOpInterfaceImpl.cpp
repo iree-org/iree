@@ -1103,7 +1103,6 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp, yieldOp.getOperands());
   expRedGeneric->setDiscardableAttrs(
       getOperation()->getDiscardableAttrDictionary());
-  rewriter.replaceOp(getOperation(), expRedGeneric);
   return SmallVector<Value>(expRedGeneric->getResults());
 }
 
