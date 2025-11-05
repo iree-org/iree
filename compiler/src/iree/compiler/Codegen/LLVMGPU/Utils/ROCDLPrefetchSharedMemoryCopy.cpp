@@ -529,6 +529,24 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
   Block *parentBlock = newForOp->getBlock();
   Location loc = newForOp.getLoc();
 
+  // Handle prologue barriers: if the prologue writes to shared memory,
+  // we need a barrier before the first write to separate it from any
+  // prior shared memory accesses in the parent block.
+  Block::iterator prologueEnd = newForOp->getIterator();
+  Operation *firstPrologueWrite = nullptr;
+  for (Operation &op : llvm::make_range(parentBlock->begin(), prologueEnd)) {
+    if (hasNestedSharedWrite(&op)) {
+      firstPrologueWrite = &op;
+      break;
+    }
+  }
+
+  if (firstPrologueWrite) {
+    LDBG() << "Inserting barrier before first shared write in prologue";
+    rewriter.setInsertionPoint(firstPrologueWrite);
+    gpu::BarrierOp::create(rewriter, loc);
+  }
+
   // Insert barriers in the kernel loop body
   bool insertedComputeBarrier = false;
   bool insertedWriteBarrier = false;
