@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <mlir/IR/BuiltinAttributes.h>
 #include <cstdint>
 #include <numeric>
 
@@ -162,15 +163,24 @@ struct AttentionOpConversion
     // have support for batch dims using more general indexing maps, we should
     // change this and rely on more general mechanisms.
 
-    // Compute scale = rsqrt(head_dim) in f32.
-    int64_t queryRank = op.getQueryType().getRank();
-    Value dimIdx =
-        rewriter.createOrFold<tensor::DimOp>(loc, query, queryRank - 1);
-    Value dimInt = rewriter.createOrFold<arith::IndexCastOp>(
-        loc, rewriter.getI64Type(), dimIdx);
-    Value dimFloat = rewriter.createOrFold<arith::SIToFPOp>(
-        loc, rewriter.getF32Type(), dimInt);
-    Value scale = rewriter.createOrFold<math::RsqrtOp>(loc, dimFloat);
+    Value scale;
+    auto scaleAttr = op.getScaleAttr();
+    if (scaleAttr) {
+      auto targetType = cast<FloatType>(op.getQueryType().getElementType());
+      scale = arith::ConstantOp::create(
+          rewriter, loc, targetType,
+          rewriter.getFloatAttr(targetType, scaleAttr.getValueAsDouble()));
+    } else {
+      // Compute scale = rsqrt(head_dim) in f32.
+      int64_t queryRank = op.getQueryType().getRank();
+      Value dimIdx =
+          rewriter.createOrFold<tensor::DimOp>(loc, query, queryRank - 1);
+      Value dimInt = rewriter.createOrFold<arith::IndexCastOp>(
+          loc, rewriter.getI64Type(), dimIdx);
+      Value dimFloat = rewriter.createOrFold<arith::SIToFPOp>(
+          loc, rewriter.getF32Type(), dimInt);
+      scale = rewriter.createOrFold<math::RsqrtOp>(loc, dimFloat);
+    }
 
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =
