@@ -46,22 +46,21 @@ namespace mlir::iree_compiler {
 // Invocation tiling utils
 //===----------------------------------------------------------------------===//
 
-/// Return the workgroup sizes from the export op.
+/// Returns the workgroup sizes from the export op. Returns empty list if it can
+/// not be found.
 static SmallVector<int64_t>
 getWorkgroupSizes(mlir::FunctionOpInterface funcOp) {
-  SmallVector<int64_t> workgroupSize;
   std::optional<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (!exportOp)
-    return workgroupSize;
-
-  std::optional<ArrayAttr> workgroupSizeAttr = exportOp->getWorkgroupSize();
-  if (!workgroupSizeAttr)
-    return workgroupSize;
-
-  for (auto attr : workgroupSizeAttr.value()) {
-    workgroupSize.push_back(cast<IntegerAttr>(attr).getInt());
+  if (!exportOp) {
+    return {};
   }
-  return workgroupSize;
+  std::optional<ArrayAttr> workgroupSizeAttr = exportOp->getWorkgroupSize();
+  if (!workgroupSizeAttr) {
+    return {};
+  }
+  return llvm::map_to_vector(workgroupSizeAttr.value(), [](Attribute attr) {
+    return cast<IntegerAttr>(attr).getInt();
+  });
 }
 
 static llvm::SmallBitVector
@@ -69,15 +68,15 @@ computeSkipTileLoops(TilingInterface op, ArrayRef<int64_t> configTileSizes,
                      ArrayRef<int64_t> workgroupSize) {
   size_t numLoops = op.getLoopIteratorTypes().size();
   llvm::SmallBitVector notTiledLoops(numLoops, false);
-
   for (size_t index = 0; index < numLoops; ++index) {
-    if (index >= workgroupSize.size())
+    if (index >= workgroupSize.size()) {
       continue;
+    }
     int64_t tileSizeVal =
         index < configTileSizes.size() ? configTileSizes[index] : 0;
     if (tileSizeVal == 0)
       continue;
-    // workgroupSize and tileSizes are in opposite order.
+    // `workgroupSize` and `tileSizeVal` are in opposite order.
     if (tileSizeVal < workgroupSize[workgroupSize.size() - index - 1])
       notTiledLoops.set(index);
   }
@@ -89,8 +88,6 @@ static LogicalResult
 tileToInvocation(mlir::FunctionOpInterface funcOp,
                  ArrayRef<int64_t> configTileSizes,
                  const linalg::TileSizeComputationFunction &computeFn) {
-  SmallVector<int64_t> workgroupSize = getWorkgroupSizes(funcOp);
-
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -111,7 +108,7 @@ tileToInvocation(mlir::FunctionOpInterface funcOp,
 
   SmallVector<TilingInterface> candidates;
   funcOp.walk([&](TilingInterface op) { candidates.push_back(op); });
-
+  SmallVector<int64_t> workgroupSize = getWorkgroupSizes(funcOp);
   for (auto op : candidates) {
     llvm::SmallBitVector skipTileLoops;
     if (tilingOptions.tileSizeComputationFunction && !workgroupSize.empty()) {
