@@ -2,7 +2,7 @@
   "config_name": "gpu_vulkan",
   "iree_compile_flags": [
     "--iree-hal-target-device=vulkan",
-    "--iree-opt-level=O0"
+    "--iree-opt-level=O3"
   ],
   "iree_run_module_flags": [
     "--device=vulkan"
