@@ -1057,12 +1057,12 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   // curr_max = max(s, old_max)
   // ex = e^{x - curr_max}
   // norm = e^{curr_max - old_max}
-  // norm_outs = outs * norm (for each outs in exp_reduction)
+  // for each outs in exp_reduction:
+  //     norm_outs = outs * norm
   // linalg.generic ins(ex, ...) outs(norm_outs)
 
   SmallVector<Value> inputs = getDpsInputs();
-  SmallVector<Value> normOuts;
-  normOuts.resize(getNumDpsInits());
+  SmallVector<Value> normOuts(getNumDpsInits());
 
   const int reducingOpIndex = 0;
   OpOperand *sValue = getDpsInputOperand(reducingOpIndex);
@@ -1070,14 +1070,13 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   AffineMap normValMap = getMatchingIndexingMap(sValue);
   AffineMap prevMaxMap = getMatchingIndexingMap(prevMax);
 
+  // curr_max =  max(sValue, prev_max)
   Value currMax = reduce<arith::MaximumFOp>(
       rewriter, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
-
   // ex = e^{sValue - curr_max}
   Value ex = computeSubAndExp2(rewriter, loc, prevMaxMap, normValMap, currMax,
                                sValue->get());
-
-  // norm = e^(old_max - curr_max)
+  // norm = e^(prev_max - curr_max)
   Value norm = computeSubAndExp2(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
                                  prevMax->get());
 
