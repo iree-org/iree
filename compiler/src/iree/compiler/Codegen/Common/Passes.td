@@ -429,6 +429,21 @@ def FoldTensorExtractOpPass :
   }];
 }
 
+def FuseTensorToBufferConvertersPass :
+  Pass<"iree-codegen-fuse-tensor-to-buffer-converters", ""> {
+  let summary = "Fuse tensor to buffer converter ops into PCF ops";
+  let description = [{
+    Fuses iree_codegen.store_to_buffer and iree_tensor_ext.dispatch.tensor.store
+    operations into producer pcf.loop and pcf.generic ops by moving the writes
+    directly into the PCF region.
+  }];
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::memref::MemRefDialect"
+  ];
+}
+
 def ForallToForPass :
   InterfacePass<"iree-codegen-forall-to-for", "mlir::FunctionOpInterface"> {
   let summary = "Convert scf.forall to nested scf.for loops";

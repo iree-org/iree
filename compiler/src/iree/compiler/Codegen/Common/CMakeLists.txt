@@ -105,6 +105,7 @@ iree_cc_library(
     "ForOpCanonicalizationPass.cpp"
     "ForallToFor.cpp"
     "FuseTensorPadWithConsumer.cpp"
+    "FuseTensorToBufferConverters.cpp"
     "GenericVectorization.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "HoistUnrolledVectorExtractInsertSlice.cpp"
