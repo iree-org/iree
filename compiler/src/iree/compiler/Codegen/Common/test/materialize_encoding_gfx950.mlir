@@ -405,6 +405,61 @@ func.func @set_encoding_ACC_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<255x513x
 #map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map, #map1, #map2, #map3, #map4], iteration_sizes = [1024, 2048, 128, 32]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map, #map1, #map2, #map3, #map4], iteration_sizes = [1024, 2048, 128, 32]>
+#encoding_lhs_scales = #iree_encoding.encoding<operand_index = 2 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map, #map1, #map2, #map3, #map4], iteration_sizes = [1024, 2048, 128, 32]>
+#encoding_rhs_scales = #iree_encoding.encoding<operand_index = 3 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map, #map1, #map2, #map3, #map4], iteration_sizes = [1024, 2048, 128, 32]>
+#encoding_result = #iree_encoding.encoding<operand_index = 4 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map, #map1, #map2, #map3, #map4], iteration_sizes = [1024, 2048, 128, 32]>
+
+func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
+    %arg0: tensor<1024x128x32xf4E2M1FN, #encoding_lhs>,
+    %arg1: tensor<2048x128x32xf4E2M1FN, #encoding_rhs>,
+    %arg2: tensor<1024x128xf8E8M0FNU, #encoding_lhs_scales>,
+    %arg3: tensor<2048x128xf8E8M0FNU, #encoding_rhs_scales>,
+    %arg4: tensor<1024x2048xf32, #encoding_result>
+) -> tensor<1024x2048xf32, #encoding_result> {
+  %0 = linalg.generic {
+      indexing_maps = [#map, #map1, #map2, #map3, #map4],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
+      ins(%arg0, %arg1, %arg2, %arg3
+           : tensor<1024x128x32xf4E2M1FN, #encoding_lhs>, tensor<2048x128x32xf4E2M1FN, #encoding_rhs>,
+             tensor<1024x128xf8E8M0FNU, #encoding_lhs_scales>, tensor<2048x128xf8E8M0FNU, #encoding_rhs_scales>)
+      outs(%arg4 : tensor<1024x2048xf32, #encoding_result>) {
+  ^bb0(%in: f4E2M1FN, %in_0: f4E2M1FN, %in_1: f8E8M0FNU, %in_2: f8E8M0FNU, %out: f32):
+    %11 = arith.scaling_extf %in, %in_1 : f4E2M1FN, f8E8M0FNU to f32
+    %12 = arith.scaling_extf %in_0, %in_2 : f4E2M1FN, f8E8M0FNU to f32
+    %13 = arith.mulf %11, %12 : f32
+    %14 = arith.addf %out, %13 : f32
+    linalg.yield %14 : f32
+  } -> tensor<1024x2048xf32, #encoding_result>
+  return %0 : tensor<1024x2048xf32, #encoding_result>
+}
+
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+// CHECK:     func.func @scaled_matmul_lowering_large_f4_f4_f8_f8_f32(
+// CHECK-SAME:  %[[LHS:.+]]: tensor<16x8x1x2x2x4x4x16x32xf4E2M1FN>, %[[RHS:.+]]: tensor<32x8x1x2x2x4x4x16x32xf4E2M1FN>
+// CHECK-SAME:  %[[LHS_SCALES:.+]]: tensor<16x8x2x2x4x16x4xf8E8M0FNU>, %[[RHS_SCALES:.+]]: tensor<32x8x2x2x4x16x4xf8E8M0FNU>
+// CHECK-SAME:  %[[RESULT:.+]]: tensor<16x32x2x2x2x2x4x16x4xf32>
+// CHECK:       %[[SCALED_MATMUL:.+]] = iree_codegen.inner_tiled
+// CHECK-SAME:    ins(%[[LHS]], %[[RHS]], %[[LHS_SCALES]], %[[RHS_SCALES]])
+// CHECK-SAME:    outs(%[[RESULT]])
+// CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
+// CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 4>
+
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map, #map1, #map2, #map3, #map4], iteration_sizes = [?, ?, ?, 32]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map, #map1, #map2, #map3, #map4], iteration_sizes = [?, ?, ?, 32]>
 #encoding_lhs_scales = #iree_encoding.encoding<operand_index = 2 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map, #map1, #map2, #map3, #map4], iteration_sizes = [?, ?, ?, 32]>
