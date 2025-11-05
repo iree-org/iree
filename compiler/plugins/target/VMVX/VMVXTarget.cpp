@@ -106,10 +106,11 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        IREE::Encoding::IREEEncodingDialect, IREE::Codegen::IREECodegenDialect,
-        IREE::CPU::IREECPUDialect, IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
-        IREE::LinalgExt::IREELinalgExtDialect>();
+    registry
+        .insert<IREE::CPU::IREECPUDialect, IREE::Codegen::IREECodegenDialect,
+                IREE::Encoding::IREEEncodingDialect,
+                IREE::LinalgExt::IREELinalgExtDialect, IREE::VM::VMDialect,
+                IREE::VMVX::VMVXDialect>();
   }
 
   IREE::VM::TargetOptions
