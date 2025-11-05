@@ -64,6 +64,9 @@ public:
   void emitPrologue(RewriterBase &rewriter) {
     Location loc = forOp.getLoc();
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, lb);
+    // Barrier before starting the prologue in case the prefetching is happening
+    // inside a nested loop.
+    emitBarrier(loc, rewriter);
     // Directly write in the prologue and use the shared memory to communicate
     // data instead of the loop carried values. Read (0)
     emitRead(mapping[0], rewriter, zero);

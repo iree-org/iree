@@ -14,6 +14,7 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
   %c0 = arith.constant 0 : index
   // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK-DAG: gpu.barrier
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
@@ -57,6 +58,7 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
   %c0 = arith.constant 0 : index
   // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK-DAG: gpu.barrier
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]]:2 = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]], %[[ARG1:.*]] = %[[CST]])
