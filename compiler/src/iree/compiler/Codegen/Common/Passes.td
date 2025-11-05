@@ -123,6 +123,14 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def ConvertWorkgroupForallToPCFPass
+    : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
+  let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
+  let dependentDialects = [
+    "iree_compiler::IREE::PCF::PCFDialect"
+  ];
+}
+
 def CombineLayoutTransformationPass :
     InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
@@ -307,6 +315,11 @@ def ReconcileTranslationInfoPass
   ];
 }
 
+def ResolveWorkgroupCountHintsPass
+    : Pass<"iree-codegen-resolve-workgroup-count-hints", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Materialize workgroup count hints in the workgroup count region per export.";
+}
+
 def ReplaceSlowMinMaxOpsPass
     : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
   let summary =
@@ -414,6 +427,21 @@ def FoldTensorExtractOpPass :
     folded to use a load of the created memref object that holds the constant
     values.
   }];
+}
+
+def FuseTensorToBufferConvertersPass :
+  Pass<"iree-codegen-fuse-tensor-to-buffer-converters", ""> {
+  let summary = "Fuse tensor to buffer converter ops into PCF ops";
+  let description = [{
+    Fuses iree_codegen.store_to_buffer and iree_tensor_ext.dispatch.tensor.store
+    operations into producer pcf.loop and pcf.generic ops by moving the writes
+    directly into the PCF region.
+  }];
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::memref::MemRefDialect"
+  ];
 }
 
 def ForallToForPass :
