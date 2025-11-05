@@ -250,15 +250,15 @@ func.func @set_encoding_LHS_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<255x127x
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f4E2M1FN)
 // CHECK-SAME:      outer_dims_perm = [0, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [0, 1, 2]
-// CHECK-SAME:      inner_tiles = [64, 16, 32]
-// CHECK-SAME:      : tensor<255x127x32xf4E2M1FN> -> tensor<4x8x1x64x16x32xf4E2M1FN>
+// CHECK-SAME:      inner_tiles = [16, 16, 32]
+// CHECK-SAME:      : tensor<255x127x32xf4E2M1FN> -> tensor<16x8x1x16x16x32xf4E2M1FN>
 // CHECK:         %[[EXPANDED:.+]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<4x8x1x64x16x32xf4E2M1FN> into tensor<4x8x1x4x16x4x4x32xf4E2M1FN>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<4x8x1x4x4x4x16x32xf4E2M1FN>
+// CHECK-SAME:       : tensor<16x8x1x16x16x32xf4E2M1FN> into tensor<16x8x1x16x4x4x32xf4E2M1FN>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<16x8x1x4x4x16x32xf4E2M1FN>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<4x8x1x4x16x4x4x32xf4E2M1FN>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<4x8x1x4x4x4x16x32xf4E2M1FN>)
-// CHECK-SAME:       permutation = [0, 1, 2, 3, 5, 6, 4, 7]
+// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<16x8x1x16x4x4x32xf4E2M1FN>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x8x1x4x4x16x32xf4E2M1FN>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 5, 3, 6]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -284,15 +284,15 @@ func.func @set_encoding_RHS_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<513x127x
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f4E2M1FN)
 // CHECK-SAME:      outer_dims_perm = [0, 1, 2]
 // CHECK-SAME:      inner_dims_pos = [0, 1, 2]
-// CHECK-SAME:      inner_tiles = [128, 16, 32]
-// CHECK-SAME:      : tensor<513x127x32xf4E2M1FN> -> tensor<5x8x1x128x16x32xf4E2M1FN>
+// CHECK-SAME:      inner_tiles = [16, 16, 32]
+// CHECK-SAME:      : tensor<513x127x32xf4E2M1FN> -> tensor<33x8x1x16x16x32xf4E2M1FN>
 // CHECK:         %[[EXPANDED:.+]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<5x8x1x128x16x32xf4E2M1FN> into tensor<5x8x1x4x2x16x4x4x32xf4E2M1FN>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<5x8x1x4x2x4x4x16x32xf4E2M1FN>
+// CHECK-SAME:       : tensor<33x8x1x16x16x32xf4E2M1FN> into tensor<33x8x1x16x4x4x32xf4E2M1FN>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<33x8x1x4x4x16x32xf4E2M1FN>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<5x8x1x4x2x16x4x4x32xf4E2M1FN>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<5x8x1x4x2x4x4x16x32xf4E2M1FN>)
-// CHECK-SAME:       permutation = [0, 1, 2, 3, 4, 6, 7, 5, 8]
+// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<33x8x1x16x4x4x32xf4E2M1FN>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<33x8x1x4x4x16x32xf4E2M1FN>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 5, 3, 6]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -318,15 +318,15 @@ func.func @set_encoding_LHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<2
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f8E8M0FNU)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [64, 16]
-// CHECK-SAME:      : tensor<255x127xf8E8M0FNU> -> tensor<4x8x64x16xf8E8M0FNU>
+// CHECK-SAME:      inner_tiles = [16, 16]
+// CHECK-SAME:      : tensor<255x127xf8E8M0FNU> -> tensor<16x8x16x16xf8E8M0FNU>
 // CHECK:         %[[EXPANDED:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<4x8x64x16xf8E8M0FNU> into tensor<4x8x4x16x4x4xf8E8M0FNU>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<4x8x4x4x16x4xf8E8M0FNU>
+// CHECK-SAME:       : tensor<16x8x16x16xf8E8M0FNU> into tensor<16x8x16x4x4xf8E8M0FNU>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<16x8x4x16x4xf8E8M0FNU>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<4x8x4x16x4x4xf8E8M0FNU>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<4x8x4x4x16x4xf8E8M0FNU>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 4]
+// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<16x8x16x4x4xf8E8M0FNU>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x8x4x16x4xf8E8M0FNU>)
+// CHECK-SAME:       permutation = [0, 1, 4, 2, 3]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -352,15 +352,15 @@ func.func @set_encoding_RHS_SCALES_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<5
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f8E8M0FNU)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [128, 16]
-// CHECK-SAME:      : tensor<513x127xf8E8M0FNU> -> tensor<5x8x128x16xf8E8M0FNU>
+// CHECK-SAME:      inner_tiles = [16, 16]
+// CHECK-SAME:      : tensor<513x127xf8E8M0FNU> -> tensor<33x8x16x16xf8E8M0FNU>
 // CHECK:         %[[EXPANDED:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<5x8x128x16xf8E8M0FNU> into tensor<5x8x4x2x16x4x4xf8E8M0FNU>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<5x8x4x2x4x16x4xf8E8M0FNU>
+// CHECK-SAME:       : tensor<33x8x16x16xf8E8M0FNU> into tensor<33x8x16x4x4xf8E8M0FNU>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<33x8x4x16x4xf8E8M0FNU>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<5x8x4x2x16x4x4xf8E8M0FNU>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<5x8x4x2x4x16x4xf8E8M0FNU>)
-// CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5]
+// CHECK-SAME:       ins(%[[EXPANDED]] : tensor<33x8x16x4x4xf8E8M0FNU>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<33x8x4x16x4xf8E8M0FNU>)
+// CHECK-SAME:       permutation = [0, 1, 4, 2, 3]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -386,15 +386,15 @@ func.func @set_encoding_ACC_scaled_matmul_f4_f4_f8_f8_f32(%arg0: tensor<255x513x
 // CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [64, 128]
-// CHECK-SAME:      : tensor<255x513xf32> -> tensor<4x5x64x128xf32>
+// CHECK-SAME:      inner_tiles = [16, 16]
+// CHECK-SAME:      : tensor<255x513xf32> -> tensor<16x33x16x16xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME:       : tensor<4x5x64x128xf32> into tensor<4x5x4x4x4x4x2x16xf32>
-// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<4x5x4x4x2x4x16x4xf32>
+// CHECK-SAME:       : tensor<16x33x16x16xf32> into tensor<16x33x4x4x16xf32>
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<16x33x4x16x4xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<4x5x4x4x4x4x2x16xf32>)
-// CHECK-SAME:       outs(%[[EMPTY]] : tensor<4x5x4x4x2x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 5, 2, 6, 3, 7, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<16x33x4x4x16xf32>)
+// CHECK-SAME:       outs(%[[EMPTY]] : tensor<16x33x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 3]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----

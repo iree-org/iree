@@ -245,7 +245,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // Upper bound of tm * tn are decided by the workgroup count of the chip and
   // the intrinsic sizes.
   int64_t maxTotalUnrollMN = INT64_MAX;
-  FailureOr<IREE::Encoding::BxMxNxK> matmulSizes = getMatmulSizes(encoding);
+  FailureOr<IREE::Encoding::BxMxNxKxKb> matmulSizes =
+      getEncodingContractionLikeSizes(encoding);
   if (succeeded(matmulSizes)) {
     if (!ShapedType::isDynamic(matmulSizes->M)) {
       // Cap maxTotalUnrollM to avoid excessive padding.
