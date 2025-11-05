@@ -3,28 +3,12 @@
 builtin.module {
   func.func @attention(
     %S: tensor<20x4096x4096xf32>,
-    %V: tensor<20x4096x64xf32>
+    %V: tensor<20x4096x64xf32>,
+    %max_init: tensor<20x4096xf32>,
+    %sum_init: tensor<20x4096xf32>,
+    %acc_init: tensor<20x4096x64xf32>
   ) -> tensor<20x4096x64xf32> 
   {
-
-  %red_empty = tensor.empty() : tensor<20x4096x64xf32>
-  %max_empty = tensor.empty() : tensor<20x4096xf32>
-
-  %max_el = arith.constant -3.40282347E+38 : f32
-  %max_init = linalg.fill ins(%max_el : f32)
-                          outs(%max_empty : tensor<20x4096xf32>)
-                          -> tensor<20x4096xf32>
-
-  %sum_empty = tensor.empty() : tensor<20x4096xf32>
-  %sum_el = arith.constant 0.000000e+00 : f32
-  %sum_init = linalg.fill ins(%sum_el : f32)
-                          outs(%sum_empty : tensor<20x4096xf32>)
-                          -> tensor<20x4096xf32>
-  %acc_init = linalg.fill ins(%sum_el : f32)
-                          outs(%red_empty : tensor<20x4096x64xf32>)
-                          -> tensor<20x4096x64xf32>
-
-
   %MAX, %SUM, %PV = iree_linalg_ext.exp_reduction {
     indexing_maps = [
       affine_map<(B, M, N, K2) -> (B, M, K2)>,
@@ -56,13 +40,15 @@ builtin.module {
 }
 
 // CHECK-LABEL: @attention
-// CHECK-SAME: %[[S:[a-zA-Z0-9_]+]]: tensor<20x4096x4096xf32>, %[[V:[a-zA-Z0-9_]+]]: tensor<20x4096x64xf32>
-// CHECK-DAG: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK-DAG: %[[NEG_INF:.+]] = arith.constant -3.40282347E+38 : f32
-// CHECK-DAG: %[[MAX_FILL:.+]] = linalg.fill ins(%[[NEG_INF]]
-// CHECK-DAG: %[[SUM_FILL:.+]] = linalg.fill ins(%[[ZERO]]
+// CHECK-SAME:     %[[S:[a-zA-Z0-9_]+]]: tensor<20x4096x4096xf32>
+// CHECK-SAME:     %[[V:[a-zA-Z0-9_]+]]: tensor<20x4096x64xf32>
+// CHECK-SAME:     %[[MAX_FILL:[a-zA-Z0-9_]+]]: tensor<20x4096xf32>
+// CHECK-SAME:     %[[SUM_FILL:[a-zA-Z0-9_]+]]: tensor<20x4096xf32>
+// CHECK-SAME:     %[[ACC_FILL:[a-zA-Z0-9_]+]]: tensor<20x4096x64xf32>
 // CHECK: %[[MAX:.+]] = linalg.generic
-// CHECK:    arith.maximumf
+// CHECK-SAME:     ins(%[[S]]
+// CHECK-SAME:     outs(%[[MAX_FILL]]
+// CHECK:        arith.maximumf
 // CHECK: %[[NORM:.+]] = linalg.generic
 // CHECK-SAME:     ins(%[[MAX]]
 // CHECK-SAME:     outs(%[[S]]
@@ -75,7 +61,7 @@ builtin.module {
 // CHECK:        math.exp2
 // CHECK: %[[NORM_MUL:.+]] = linalg.generic
 // CHECK-SAME:    ins(%[[ALPHA]]
-// CHECK-SAME:    outs(%[[SUM_FILL]]
+// CHECK-SAME:    outs(%[[ACC_FILL]]
 // CHECK:        arith.mulf
 // CHECK: %[[EXP:.+]] = linalg.generic
 // CHECK-SAME:    ins(%[[NORM]], %[[V]]
