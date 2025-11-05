@@ -446,7 +446,7 @@ def gpu_target_info_attribute_parsing():
 
     arch = gpu_target_info.arch
     assert arch == "gfx942", f"Expected arch 'gfx942', got '{arch}'"
-    
+
     workgroup_count = gpu_target_info.workgroup_count
     simds_per_workgroup = gpu_target_info.simds_per_workgroup
     assert (
