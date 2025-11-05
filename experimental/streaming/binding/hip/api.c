@@ -6069,6 +6069,47 @@ HIPAPI hipError_t hipLaunchKernel(const void* function_address, dim3 numBlocks,
   return result;
 }
 
+// Launches a kernel with specified configuration.
+//
+// Parameters:
+//  - function_address: [IN] Host function pointer (registered kernel stub).
+//  - numBlocks: [IN] Grid dimensions in blocks.
+//  - dimBlocks: [IN] Block dimensions in threads.
+//  - args: [IN] Array of kernel arguments.
+//  - sharedMemBytes: [IN] Dynamic shared memory size.
+//  - stream: [IN] Stream for kernel execution.
+//  - startEvent: [IN] Event to record start time.
+//  - stopEvent: [IN] Event to record stop time.
+//  - flags: AdditionalFlags
+//       - hipExtAnyOrderLaunch: Allow kernels to launch in any order.
+//                               currently does nothing.
+// Returns:
+//  - hipSuccess: Kernel launched successfully.
+//  - hipErrorInvalidValue: Invalid parameters.
+//  - hipErrorInvalidDeviceFunction: Unregistered kernel function.
+//  - hipErrorLaunchFailure: Kernel launch failed.
+//
+// Behavior:
+// - This function is typically called from compiler-generated kernel stubs
+//   after they pop the configuration from __hipPopCallConfiguration.
+// - It does NOT read the thread-local configuration directly.
+// - The function_address should be registered via __hipRegisterFunction.
+//
+// Stream behavior:
+// - Kernel execution is enqueued in the specified stream.
+// - If stream is NULL, uses the default stream.
+// - Kernel executes after all previously enqueued operations in the stream.
+// - Graph capture: Supported. Creates kernel node when capturing.
+//
+// Thread safety: Thread-safe.
+HIPAPI hipError_t hipExtLaunchKernel(const void* function_address,
+                                  dim3 numBlocks, dim3 dimBlocks, void** args,
+                                  size_t sharedMemBytes, hipStream_t stream,
+                                  hipEvent_t startEvent, hipEvent_t stopEvent, int flags) {
+  // TODO: handle start and end events.
+  return hipLaunchKernel(function_address, dimBlocks, dimBlocks, args, sharedMemBytes, stream);
+}
+
 // Launches a kernel function with specified dimensions and parameters.
 //
 // Parameters:
@@ -6178,6 +6219,79 @@ HIPAPI hipError_t hipModuleLaunchKernel(
   hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
   return result;
+}
+
+// Launches a kernel function with specified dimensions and parameters.
+//
+// Parameters:
+//  - f: [IN] Kernel function handle obtained from hipModuleGetFunction().
+//  - gridDimX: [IN] Grid X dimension in blocks.
+//  - gridDimY: [IN] Grid Y dimension in blocks.
+//  - gridDimZ: [IN] Grid Z dimension in blocks.
+//  - blockDimX: [IN] Block X dimension in threads.
+//  - blockDimY: [IN] Block Y dimension in threads.
+//  - blockDimZ: [IN] Block Z dimension in threads.
+//  - sharedMemBytes: [IN] Dynamic shared memory size per block in bytes.
+//  - stream: [IN] Stream for kernel execution (NULL = default stream).
+//  - kernelParams: [IN] Array of kernel parameters, NULL-terminated.
+//  - extra: [IN] Extra options (currently unused, should be NULL).
+//  - startEvent: [IN] Event to record start time.
+//  - stopEvent: [IN] Event to record stop time.
+//  - flags: AdditionalFlags
+//       - hipExtAnyOrderLaunch: Allow kernels to launch in any order.
+//                               currently does nothing.
+//
+// Returns:
+//  - hipSuccess: Kernel launched successfully.
+//  - hipErrorInvalidValue: Invalid function handle or dimensions.
+//  - hipErrorInvalidConfiguration: Invalid launch configuration.
+//  - hipErrorInvalidContext: No active HIP context.
+//  - hipErrorInvalidResourceHandle: Invalid stream handle.
+//  - hipErrorSharedObjectInitFailed: Shared memory allocation failed.
+//  - hipErrorLaunchOutOfResources: Insufficient resources for launch.
+//  - hipErrorLaunchTimeOut: Previous kernel execution timed out.
+//  - hipErrorNotInitialized: HIP runtime not initialized.
+//  - hipErrorUnknown: Internal error during launch.
+//
+// Synchronization: This operation is asynchronous.
+//
+// Stream behavior:
+// - Kernel execution is enqueued in the specified stream.
+// - If stream is NULL, uses the default stream.
+// - Kernel executes after all previously enqueued operations in the stream.
+// - Use hipStreamSynchronize() to wait for kernel completion.
+// - Use hipEventRecord() after launch to mark completion point.
+// - Graph capture: Supported. Creates kernel node when capturing.
+//
+// Launch configuration:
+// - Total threads = gridDim * blockDim.
+// - Grid dimensions must be > 0 and within device limits.
+// - Block dimensions must be > 0 and within device limits.
+// - Total threads per block must not exceed device maximum.
+// - Shared memory size must not exceed device maximum.
+//
+// Kernel parameters:
+// - kernelParams is an array of void* pointers to actual arguments.
+// - Array must be NULL-terminated.
+// - Each pointer points to the argument value (not a pointer to pointer).
+// - Arguments are passed by value to the kernel.
+//
+// Multi-GPU: Kernel executes on the device associated with the current
+// context.
+//
+// WARNING: Ensure all kernel arguments remain valid until kernel completes.
+// Do not modify or free argument memory while kernel is executing.
+//
+// Note: Check device properties with hipDeviceGetAttribute() to determine
+// maximum grid/block dimensions and shared memory limits.
+HIPAPI hipError_t hipExtModuleLaunchKernel(
+    hipFunction_t f, unsigned int gridDimX, unsigned int gridDimY,
+    unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
+    unsigned int blockDimZ, unsigned int sharedMemBytes, hipStream_t stream,
+    void** kernelParams, void** extra, hipEvent_t startEvent,
+    hipEvent_t stopEvent, int flags) {
+  return hipModuleLaunchKernel(f, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY,
+    blockDimZ, sharedMemBytes, stream, kernelParams, extra);
 }
 
 // Launches a cooperative kernel with grid-wide synchronization support.
