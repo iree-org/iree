@@ -236,26 +236,25 @@ struct StoreToBufferOpInterface
 };
 
 struct SwizzleHintOpInterface final
-    : BufferizableOpInterface::ExternalModel<
-          SwizzleHintOpInterface, IREE::Codegen::SwizzleHintOp> {
-  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                              const AnalysisState &state) const {
+    : BufferizableOpInterface::ExternalModel<SwizzleHintOpInterface,
+                                             IREE::Codegen::SwizzleHintOp> {
+  bool bufferizesToMemoryRead(Operation *, OpOperand &,
+                              const AnalysisState &) const {
     return false;
   }
 
-  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                               const AnalysisState &state) const {
+  bool bufferizesToMemoryWrite(Operation *, OpOperand &,
+                               const AnalysisState &) const {
     return false;
   }
 
-  bool mustBufferizeInPlace(Operation *op, OpOperand &opOperand,
-                            const AnalysisState &state) const {
+  bool mustBufferizeInPlace(Operation *, OpOperand &,
+                            const AnalysisState &) const {
     return true;
   }
 
   bufferization::AliasingValueList
-  getAliasingValues(Operation *op, OpOperand &opOperand,
-                    const AnalysisState &state) const {
+  getAliasingValues(Operation *op, OpOperand &, const AnalysisState &) const {
     return {{op->getResult(0), BufferRelation::Equivalent, /*definite=*/true}};
   }
 
