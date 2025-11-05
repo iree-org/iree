@@ -246,11 +246,13 @@ private:
 // be replaced with barriers appropriate for the pipelined structure.
 static void removeBarriers(scf::ForOp forOp) {
   SmallVector<Operation *> toErase;
-  forOp.getBody()->walk([&](Operation *op) {
-    if (isa<gpu::BarrierOp, amdgpu::SchedBarrierOp>(op)) {
-      toErase.push_back(op);
+  // Only remove barriers from the direct loop body, not from nested regions.
+  // Nested loops might not be pipelined and should keep their barriers.
+  for (Operation &op : forOp.getBody()->without_terminator()) {
+    if (isa<gpu::BarrierOp>(op)) {
+      toErase.push_back(&op);
     }
-  });
+  }
   for (Operation *op : toErase) {
     op->erase();
   }
@@ -384,47 +386,50 @@ invokePipelineForLoop(scf::ForOp forOp, const scf::PipeliningOption &options) {
   return *newForOpOrFail;
 }
 
+// Helper to check for shared memory.
+static bool hasSharedMemory(Value val) {
+  auto memrefType = dyn_cast<MemRefType>(val.getType());
+  if (!memrefType)
+    return false;
+  auto addrSpace =
+      dyn_cast_or_null<gpu::AddressSpaceAttr>(memrefType.getMemorySpace());
+  return addrSpace && addrSpace.getValue() == gpu::AddressSpace::Workgroup;
+}
+
+// Helper to check if operation or its nested ops have shared memory reads.
+static bool hasNestedSharedRead(Operation *op) {
+  bool found = false;
+  op->walk([&](vector::TransferReadOp readOp) {
+    if (hasSharedMemory(readOp.getBase())) {
+      found = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return found;
+}
+
+// Helper to check if operation or its nested ops have shared memory writes.
+static bool hasNestedSharedWrite(Operation *op) {
+  bool found = false;
+  op->walk([&](vector::TransferWriteOp writeOp) {
+    if (hasSharedMemory(writeOp.getBase())) {
+      found = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return found;
+}
+
 // Inserts synchronization barriers in the pipelined loop.
+// Barriers separate stages: read -> compute (with shared read) -> write.
 static void insertPipelineBarriers(RewriterBase &rewriter,
                                    scf::ForOp newForOp) {
-  // Helper to check for shared memory
-  auto hasSharedMemory = [](Value val) -> bool {
-    auto memrefType = dyn_cast<MemRefType>(val.getType());
-    if (!memrefType)
-      return false;
-    auto addrSpace =
-        dyn_cast_or_null<gpu::AddressSpaceAttr>(memrefType.getMemorySpace());
-    return addrSpace && addrSpace.getValue() == gpu::AddressSpace::Workgroup;
-  };
+  Block *parentBlock = newForOp->getBlock();
+  Location loc = newForOp.getLoc();
 
-  // Helper to check if operation or its nested ops have shared memory reads.
-  auto hasNestedSharedRead = [hasSharedMemory](Operation *op) -> bool {
-    bool found = false;
-    op->walk([&](vector::TransferReadOp readOp) {
-      if (hasSharedMemory(readOp.getBase())) {
-        found = true;
-        return WalkResult::interrupt();
-      }
-      return WalkResult::advance();
-    });
-    return found;
-  };
-
-  // Helper to check if operation or its nested ops have shared memory writes.
-  auto hasNestedSharedWrite = [hasSharedMemory](Operation *op) -> bool {
-    bool found = false;
-    op->walk([&](vector::TransferWriteOp writeOp) {
-      if (hasSharedMemory(writeOp.getBase())) {
-        found = true;
-        return WalkResult::interrupt();
-      }
-      return WalkResult::advance();
-    });
-    return found;
-  };
-
-  // Insert barriers in the kernel loop
-  rewriter.setInsertionPointToStart(newForOp.getBody());
+  // Insert barriers in the kernel loop body
   bool insertedComputeBarrier = false;
   bool insertedWriteBarrier = false;
 
@@ -433,24 +438,34 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
     // Insert barrier before first shared memory read (compute stage)
     if (!insertedComputeBarrier && hasNestedSharedRead(&op)) {
       rewriter.setInsertionPoint(&op);
-      gpu::BarrierOp::create(rewriter, newForOp.getLoc());
+      gpu::BarrierOp::create(rewriter, loc);
       insertedComputeBarrier = true;
     }
     // Insert barriers before first shared memory write (write stage)
     if (!insertedWriteBarrier && hasNestedSharedWrite(&op)) {
       rewriter.setInsertionPoint(&op);
-      gpu::BarrierOp::create(rewriter, newForOp.getLoc());
+      gpu::BarrierOp::create(rewriter, loc);
       amdgpu::SchedBarrierOp::create(
-          rewriter, newForOp.getLoc(),
+          rewriter, loc,
           amdgpu::sched_barrier_opt_enumAttr::get(
               rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
       insertedWriteBarrier = true;
     }
   }
 
-  // Insert barrier before epilogue (after the new loop)
-  rewriter.setInsertionPointAfter(newForOp);
-  gpu::BarrierOp::create(rewriter, newForOp.getLoc());
+  // Check if epilogue needs a barrier at the start
+  // (if epilogue reads from shared memory written by the loop)
+  Block::iterator epilogueStart = std::next(newForOp->getIterator());
+  Block::iterator epilogueEnd = parentBlock->end();
+  if (epilogueStart != epilogueEnd) {
+    for (Block::iterator it = epilogueStart; it != epilogueEnd; ++it) {
+      if (hasNestedSharedRead(&*it)) {
+        rewriter.setInsertionPoint(&*epilogueStart);
+        gpu::BarrierOp::create(rewriter, loc);
+        break;
+      }
+    }
+  }
 }
 
 // Dumps the planned schedule before pipelining for debugging purposes.
