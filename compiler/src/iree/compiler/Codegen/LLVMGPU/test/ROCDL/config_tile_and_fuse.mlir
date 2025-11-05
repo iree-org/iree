@@ -142,6 +142,40 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 
 // -----
 
+// This test is to verify the `bestMNTileCountPerSubgroup` seed is not decreased with split reduction loops.
+#map = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d0)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @mfma_gemm_with_split_k(%arg0: tensor<9216x480xbf16>, %arg1: tensor<9216x384xbf16>, %arg2: tensor<384x480x16x1x1xf32>, %arg3: index) -> tensor<384x480x16x1x1xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = scf.forall (%arg4, %arg5, %arg6) = (0, 0, 0) to (128, 24, 48) step (8, 24, 48) shared_outs(%arg7 = %arg2) -> (tensor<384x480x16x1x1xf32>) {
+    %extracted_slice = tensor.extract_slice %arg7[0, 0, %arg3, 0, 0] [384, 480, 1, 1, 1] [1, 1, 1, 1, 1] : tensor<384x480x16x1x1xf32> to tensor<384x480xf32>
+    %1 = linalg.fill ins(%cst : f32) outs(%extracted_slice : tensor<384x480xf32>) -> tensor<384x480xf32>
+    %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<9216x480xbf16>, tensor<9216x384xbf16>) outs(%1 : tensor<384x480xf32>) {
+    ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+      %3 = arith.extf %in : bf16 to f32
+      %4 = arith.extf %in_0 : bf16 to f32
+      %5 = arith.mulf %3, %4 : f32
+      %6 = arith.addf %out, %5 : f32
+      linalg.yield %6 : f32
+    } -> tensor<384x480xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %2 into %arg7[0, 0, %arg3, 0, 0] [384, 480, 1, 1, 1] [1, 1, 1, 1, 1] : tensor<384x480xf32> into tensor<384x480x16x1x1xf32>
+    }
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<2>, #iree_linalg_ext.split_reduction_mapping<1>, #iree_linalg_ext.split_reduction_mapping<0>]}
+  return %0 : tensor<384x480x16x1x1xf32>
+}
+
+// CHECK-LABEL: func.func @mfma_gemm_with_split_k
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
+//  CHECK-SAME:     promote_operands = [0, 1]
+//  CHECK-SAME:     reduction = [0, 0, 8]
+//  CHECK-SAME:     subgroup = [2, 1, 0]
+//  CHECK-SAME:     workgroup = [64, 32, 0]
+
+// -----
+
 // This tests the mfma lowering intrinsic K alignment. Since gemmK = 360, and will
 // be aligned to 8 but not 16, we expect the 32x32x8xf16 intrinsic to be used.
 func.func @mfma_matmul_k_aligned_intrinsic(%lhs: tensor<1024x360xf16>, %rhs: tensor<360x1024xf16>) -> tensor<1024x1024xf32> {
