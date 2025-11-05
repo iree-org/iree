@@ -1043,4 +1043,64 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
   return customOpReplacements;
 }
 
+//===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+FailureOr<SmallVector<Value>>
+ExpReductionOp::decomposeOperation(OpBuilder &builder) {
+  Location loc = getLoc();
+
+  // Split the op into:
+  // curr_max = max(s, old_max)
+  // ex = e^{x - curr_max}
+  // norm = e^{curr_max - old_max}
+  // norm_outs = outs * norm (for each outs in exp_reduction)
+  // linalg.generic ins(ex, ...) outs(norm_outs)
+
+  SmallVector<Value> inputs = getDpsInputs();
+  SmallVector<Value> normOuts;
+  normOuts.resize(getNumDpsInits());
+
+  const int reducingOpIndex = 0;
+  OpOperand *sValue = getDpsInputOperand(reducingOpIndex);
+  OpOperand *prevMax = getDpsInitOperand(reducingOpIndex);
+  AffineMap normValMap = getMatchingIndexingMap(sValue);
+  AffineMap prevMaxMap = getMatchingIndexingMap(prevMax);
+
+  Value currMax = reduce<arith::MaximumFOp>(
+      builder, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
+
+  // ex = e^{sValue - curr_max}
+  Value ex = computeSubAndExp2(builder, loc, prevMaxMap, normValMap, currMax,
+                               sValue->get());
+
+  // norm = e^(old_max - curr_max)
+  Value norm = computeSubAndExp2(builder, loc, prevMaxMap, prevMaxMap, currMax,
+                                 prevMax->get());
+
+  inputs[reducingOpIndex] = ex;
+  normOuts[reducingOpIndex] = currMax;
+
+  for (int64_t oldIndex : getExpReducedOperands()) {
+    OpOperand *oldOut = getDpsInitOperand(oldIndex);
+    AffineMap oldOutMap = getMatchingIndexingMap(oldOut);
+    Value normOut = elementwiseValueInPlace<arith::MulFOp>(
+        builder, loc, oldOutMap, prevMaxMap, oldOut->get(), norm);
+    normOuts[oldIndex] = normOut;
+  }
+
+  auto expRedGeneric = linalg::GenericOp::create(
+      builder, loc, TypeRange(normOuts), inputs, normOuts,
+      getIndexingMapsArray(), getLoopIteratorTypes());
+
+  expRedGeneric->setDiscardableAttrs(
+      getOperation()->getDiscardableAttrDictionary());
+  SmallVector<Value> argReplacements;
+  for (auto value : expRedGeneric->getResults()) {
+    argReplacements.emplace_back(value);
+  }
+  return argReplacements;
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt

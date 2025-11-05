@@ -477,6 +477,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
       IREE::CPU::TilingLevel::VectorReductionTiles));
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeExpReductionPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(iree_compiler::createForallToForPass());
 
