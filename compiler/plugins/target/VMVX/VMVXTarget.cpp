@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -105,10 +106,10 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Codegen::IREECodegenDialect, IREE::CPU::IREECPUDialect,
-                IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
-                IREE::LinalgExt::IREELinalgExtDialect>();
+    registry.insert<
+        IREE::Encoding::IREEEncodingDialect, IREE::Codegen::IREECodegenDialect,
+        IREE::CPU::IREECPUDialect, IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
+        IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
   IREE::VM::TargetOptions
