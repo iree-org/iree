@@ -20,6 +20,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -43,6 +44,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-form-dispatch-regions"
 
@@ -144,6 +146,50 @@ public:
 
   // Insert `op` into the fusion group.
   void insert(Operation *op);
+
+  /// Returns true if `consumerOp` has a transitive dependency on the fusion
+  /// group. This means that some transitive dependency of `consumerOp` (not in
+  /// the fusion group) itself uses an operation in the fusion group. This is
+  /// required for fusion because it must be legal to take a program slice that
+  /// contains only the ops in the fusion group.
+  bool
+  hasTransitiveDependencyOnFusionGroup(Operation *consumerOp,
+                                       DominanceInfo const &dominance) const {
+    BackwardSliceOptions options;
+    options.inclusive = true;
+    options.omitUsesFromAbove = false;
+    options.omitBlockArguments = true;
+    options.filter = [&](Operation *sliceBoundaryOp) {
+      return !llvm::all_of(
+          loopMaps.getArrayRef(), [&](std::pair<Operation *, AffineMap> pair) {
+            return dominance.properlyDominates(sliceBoundaryOp, pair.first);
+          });
+    };
+
+    llvm::SetVector<Operation *> slice;
+    auto populateSlice = [&](OpOperand *operand) {
+      // It's okay if the consumer directly uses an operation in the fusion
+      // group.
+      if (loopMaps.contains(operand->get().getDefiningOp())) {
+        return;
+      }
+      LogicalResult result = getBackwardSlice(operand->get(), &slice, options);
+      assert(result.succeeded() && "expected a backward slice");
+      (void)result;
+    };
+
+    // Search all of the operands op `consumerOp` as well as all the values used
+    // in its regions.
+    mlir::visitUsedValuesDefinedAbove(consumerOp->getRegions(), populateSlice);
+    for (OpOperand &operand : consumerOp->getOpOperands()) {
+      populateSlice(&operand);
+    }
+
+    return llvm::any_of(loopMaps.getArrayRef(),
+                        [&](std::pair<Operation *, AffineMap> pair) {
+                          return slice.contains(pair.first);
+                        });
+  }
 
 private:
   Operation *rootOp;
@@ -435,6 +481,9 @@ getFusableUses(MLIRContext *context, Operation *op,
     if (isa<tensor::DimOp>(user)) {
       continue;
     }
+    if (op->getBlock() != user->getBlock()) {
+      continue;
+    }
     fusableUses.insert(&use);
   }
 
@@ -664,6 +713,13 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
       for (OpOperand *fusableUse : fusableUses) {
         Operation *consumerOp = fusableUse->getOwner();
         if (tracker.isRootOp(consumerOp) || tracker.isFusedOp(consumerOp)) {
+          continue;
+        }
+
+        // Ensure that fusing the consumer would not cause use-def violations.
+        if (tracker.getFusionGroup(currRoot)
+                .hasTransitiveDependencyOnFusionGroup(fusableUse->getOwner(),
+                                                      dominanceInfo)) {
           continue;
         }
 
@@ -957,7 +1013,8 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       auto newRegionOp =
           movePrecedingOpsIntoDispatchRegion(rewriter, producer, regionOp);
       if (failed(newRegionOp)) {
-        return producer->emitOpError("failed to move producer into region");
+        producer->emitWarning("failed to move producer into region");
+        continue;
       }
       regionOp = *newRegionOp;
     }
@@ -974,7 +1031,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       auto newRegionOp = IREE::Flow::moveFollowingOpIntoDispatchRegion(
           rewriter, consumer, regionOp);
       if (failed(newRegionOp)) {
-        continue;
+        return consumer->emitOpError("failed to move consumer into region");
       }
       regionOp = *newRegionOp;
     }
