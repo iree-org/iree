@@ -61,8 +61,8 @@ def run_model(
     executor: Callable[[rt.VmModule], None],
     weights: rt.ParameterProvider,
 ):
-    model_module = rt.VmModule.from_buffer(config.vm_instance, model_vmfb)
-    driver_module = rt.VmModule.from_buffer(config.vm_instance, driver_vmfb)
+    model_module = rt.VmModule.copy_buffer(config.vm_instance, model_vmfb)
+    driver_module = rt.VmModule.copy_buffer(config.vm_instance, driver_vmfb)
     io_module = rt.create_io_parameters_module(config.vm_instance, weights)
 
     hal_module = rt.create_hal_module(
@@ -80,17 +80,14 @@ def main():
     base_dir = os.path.dirname(__file__)
 
     # --- Compile both models (Model B differs only by a constant) ---
-    model_a_path = os.path.join(base_dir, "model_for_async.mlir")
     vmfb_a = compiler.compile_file(
-        model_a_path,
+        os.path.join(base_dir, "model_a.mlir"),
         target_backends=["vmvx"],
         extra_args=["--iree-flow-trace-dispatch-tensors"],
     )
 
-    with open(model_a_path) as f:
-        model_b_mlir = f.read().replace("3.1415", "2.7182")
-    vmfb_b = compiler.compile_str(
-        model_b_mlir,
+    vmfb_b = compiler.compile_file(
+        os.path.join(base_dir, "model_b.mlir"),
         target_backends=["vmvx"],
         extra_args=["--iree-flow-trace-dispatch-tensors"],
     )

@@ -14,7 +14,7 @@ def main():
     #
     # GPU debug hint: use iree-compile with all the flags to reproduce the
     # numerical error, plus `--iree-flow-trace-dispatch-tensors` for
-    # trace points. Then use rt.VmModule.from_buffer(config.vm_instance, .)
+    # trace points. Then use rt.VmModule.copy_buffer(config.vm_instance, .)
     # to load the vmfb.
     vmfb_contents = compiler.compile_file(
         os.path.join(os.path.dirname(__file__), "model.mlir"),
@@ -43,7 +43,7 @@ def main():
         debug_sink=rt.HalModuleDebugSink(callback),
     )
 
-    module = rt.VmModule.from_flatbuffer(config.vm_instance, vmfb_contents)
+    module = rt.VmModule.copy_buffer(config.vm_instance, vmfb_contents)
     vm_modules = rt.load_vm_modules(hal_module, module, config=config)
 
     # Perform softmax(matmul(A, B)):

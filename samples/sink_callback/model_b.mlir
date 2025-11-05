@@ -13,7 +13,7 @@ module @foo {
     %4 = linalg.softmax dimension(1) ins(%3 : tensor<?x18xf32>) outs(%1 : tensor<?x18xf32>) -> tensor<?x18xf32>
     %5 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<?x18xf32>) outs(%0 : tensor<?x18xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %cst_0 = arith.constant 3.1415e+00 : f32
+      %cst_0 = arith.constant 2.7182e+00 : f32  // <--- diferrent constant to model a
       %6 = arith.addf %in, %cst_0 : f32
       linalg.yield %6 : f32
     } -> tensor<?x18xf32>
