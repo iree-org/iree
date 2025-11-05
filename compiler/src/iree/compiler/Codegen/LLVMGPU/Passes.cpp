@@ -267,7 +267,6 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
                                       bool foldIdentitySlices = false) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
-  funcPassManager.addPass(IREE::LinalgExt::createDecomposeExpReductionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(
