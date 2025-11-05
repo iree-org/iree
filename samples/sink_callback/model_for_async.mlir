@@ -1,4 +1,3 @@
-
 // softmax(matmul(arg0,weights)) + pi
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module @foo {
