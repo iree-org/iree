@@ -46,6 +46,39 @@ def BubbleUpExpandShapesPass :
   ];
 }
 
+def InsertTensorBarriersPass :
+    InterfacePass<"iree-dispatch-creation-insert-tensor-barriers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Insert tensor barrier markers around computation regions.";
+  let description = [{
+    Walks from function boundaries and inserts iree_tensor_ext.barrier.start
+    and iree_tensor_ext.barrier.end operations at the boundaries of
+    computation regions (tensor/linalg/linalgext ops). These barriers allow
+    controlling where certain transformations like reshape propagation can occur.
+
+    The pass identifies compute operations and wraps tensor values flowing
+    into and out of the compute region with the barrier operations.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
+}
+
+def RemoveTensorBarriersPass :
+    InterfacePass<"iree-dispatch-creation-remove-tensor-barriers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Remove tensor barrier markers from the program.";
+  let description = [{
+    Removes iree_tensor_ext.barrier.start and iree_tensor_ext.barrier.end
+    operations from the program. These are identity operations that simply
+    pass through their operands, so they can be safely removed by replacing
+    all uses of their results with their operands.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
+}
+
 def ElementwiseOpFusionPass :
     Pass<"iree-dispatch-creation-elementwise-op-fusion", ""> {
   let summary = "Fuse elementwise operations.";
@@ -63,6 +96,21 @@ def ElementwiseOpFusionPass :
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
+  ];
+}
+
+def FoldReshapesIntoTensorBarriersPass :
+    InterfacePass<"iree-dispatch-creation-fold-reshapes-into-tensor-barriers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Fold reshape operations into tensor barriers.";
+  let description = [{
+    Moves tensor.expand_shape and tensor.collapse_shape operations through
+    iree_tensor_ext.barrier.start and iree_tensor_ext.barrier.end operations.
+    This blocks reshapes on the edge of the program from being propagated.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
+    "mlir::tensor::TensorDialect",
   ];
 }
 

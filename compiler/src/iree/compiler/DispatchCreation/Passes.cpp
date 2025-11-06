@@ -131,6 +131,7 @@ static void addDispatchRegionCreationPreprocessingPasses(
       // 2. Bubble up expand_shape ops (or sink collapse_shape ops) to get
       //    elementwise operation into higher dimensions for more fusion
       //    opportunities.
+      .addPass(DispatchCreation::createFoldReshapesIntoTensorBarriersPass)
       .addPass(DispatchCreation::createBubbleUpExpandShapesPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -151,6 +152,11 @@ static void addDispatchRegionCreationPreprocessingPasses(
       // 4. After elementwise operation fusion sink reshapes that block
       //    producer-consumer fusion.
       .addPass(DispatchCreation::createSinkReshapesPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
+      .addPass(mlir::createCSEPass)
+
+      // 5. Remove tensor barriers after the preprocessing passes.
+      .addPass(DispatchCreation::createRemoveTensorBarriersPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
