@@ -91,6 +91,7 @@ use_repo(
     "hsa_runtime_headers",
     "iree_amdgpu_device_toolchain",
     "iree_cuda",
+    "iree_external_hal_drivers",
     "llvm-raw",
     "nccl",
     "rccl",
