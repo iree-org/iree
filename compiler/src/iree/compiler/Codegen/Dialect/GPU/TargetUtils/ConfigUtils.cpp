@@ -855,12 +855,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       {"subgroup", b.getI64ArrayAttr(subgroupTileSizes)},
       {"mma_kind", kind}};
 
-  // Calculate subgroup sizes for global load DMA if target info is available
-  DenseI64ArrayAttr subgroupSizes = calculateSubgroupSizesForDMA(
-      target, targetSubgroupSize, lhs.getType(), b);
-
-  Attribute useGlobalDma =
-      IREE::GPU::UseGlobalLoadDMAAttr::get(context, subgroupSizes);
+  // Use global load DMA attribute (subgroup sizes will be derived from
+  // translation_info)
+  Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
   SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
