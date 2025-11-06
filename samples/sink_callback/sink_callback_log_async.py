@@ -82,22 +82,31 @@ def main():
     # --- Compile both models (Model B differs only by a constant) ---
     vmfb_a = compiler.compile_file(
         os.path.join(base_dir, "model_a.mlir"),
-        target_backends=["vmvx"],
-        extra_args=["--iree-flow-trace-dispatch-tensors"],
+        target_backends=["llvm-cpu"],
+        extra_args=[
+            "--iree-flow-trace-dispatch-tensors",
+            "--iree-llvmcpu-target-cpu=host",
+        ],
     )
 
     vmfb_b = compiler.compile_file(
         os.path.join(base_dir, "model_b.mlir"),
-        target_backends=["vmvx"],
-        extra_args=["--iree-flow-trace-dispatch-tensors"],
+        target_backends=["llvm-cpu"],
+        extra_args=[
+            "--iree-flow-trace-dispatch-tensors",
+            "--iree-llvmcpu-target-cpu=host",
+        ],
     )
 
     # --- Compile driver ---
     driver_path = os.path.join(base_dir, "driver_for_async.mlir")
     vmfb_driver = compiler.compile_file(
         driver_path,
-        target_backends=["vmvx"],
-        extra_args=["--iree-flow-trace-dispatch-tensors"],
+        target_backends=["llvm-cpu"],
+        extra_args=[
+            "--iree-flow-trace-dispatch-tensors",
+            "--iree-llvmcpu-target-cpu=host",
+        ],
     )
 
     # --- Provide weights ---

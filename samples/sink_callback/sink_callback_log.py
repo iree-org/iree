@@ -10,7 +10,7 @@ import os
 
 
 def main():
-    # Create a vmfb for the vmvx backend.
+    # Create a vmfb for the llvm-cpu backend.
     #
     # GPU debug hint: use iree-compile with all the flags to reproduce the
     # numerical error, plus `--iree-flow-trace-dispatch-tensors` for
@@ -18,9 +18,10 @@ def main():
     # to load the vmfb.
     vmfb_contents = compiler.compile_file(
         os.path.join(os.path.dirname(__file__), "model.mlir"),
-        target_backends=["vmvx"],
+        target_backends=["llvm-cpu"],
         extra_args=[
             "--iree-flow-trace-dispatch-tensors",
+            "--iree-llvmcpu-target-cpu=host",
         ],
     )
 
