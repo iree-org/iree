@@ -52,6 +52,7 @@ struct WorkgroupScopeAttr final
         counts[i] = one;
       }
       counts.front() = linearizedCount;
+      counts.resize(numIds > 3 ? 3 : numIds);
     }
 
     // Pad the outer most sizes with 1.
