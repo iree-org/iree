@@ -338,15 +338,13 @@ static inline void iree_unaligned_store_le_u8(uint8_t* ptr, uint8_t value) {
 #if IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_16
 
 static inline uint16_t iree_unaligned_load_le_u16(const uint16_t* ptr) {
-  const uint8_t* p = (const uint8_t*)ptr;
-  uint16_t value = 0;
-  memcpy(&value, p, sizeof(value));
+  uint16_t value;
+  memcpy(&value, ptr, sizeof(value));
   return value;
 }
 
 static inline void iree_unaligned_store_le_u16(uint16_t* ptr, uint16_t value) {
-  uint8_t* p = (uint8_t*)ptr;
-  memcpy(p, &value, sizeof(value));
+  memcpy(ptr, &value, sizeof(value));
 }
 
 #else
@@ -368,25 +366,21 @@ static inline void iree_unaligned_store_le_u16(uint16_t* ptr, uint16_t value) {
 #if IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_32
 
 static inline uint32_t iree_unaligned_load_le_u32(const uint32_t* ptr) {
-  const uint8_t* p = (const uint8_t*)ptr;
-  uint32_t value = 0;
-  memcpy(&value, p, sizeof(value));
+  uint32_t value;
+  memcpy(&value, ptr, sizeof(value));
   return value;
 }
 static inline float iree_unaligned_load_le_f32(const float* ptr) {
-  uint8_t* p = (uint8_t*)ptr;
   float value;
-  memcpy(&value, p, sizeof(value));
+  memcpy(&value, ptr, sizeof(value));
   return value;
 }
 
 static inline void iree_unaligned_store_le_u32(uint32_t* ptr, uint32_t value) {
-  uint8_t* p = (uint8_t*)ptr;
-  memcpy(p, &value, sizeof(value));
+  memcpy(ptr, &value, sizeof(value));
 }
 static inline void iree_unaligned_store_le_f32(float* ptr, float value) {
-  uint8_t* p = (uint8_t*)ptr;
-  memcpy(p, &value, sizeof(value));
+  memcpy(ptr, &value, sizeof(value));
 }
 
 #else
@@ -411,7 +405,7 @@ static inline void iree_unaligned_store_le_f32(float* ptr, float value) {
 
 static inline uint64_t iree_unaligned_load_le_u64(const uint64_t* ptr) {
   const uint8_t* p = (const uint8_t*)ptr;
-  uint64_t value = 0;
+  uint64_t value;
   memcpy(&value, p, sizeof(value));
   return value;
 }
