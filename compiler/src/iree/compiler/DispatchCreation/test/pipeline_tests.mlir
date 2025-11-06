@@ -468,3 +468,44 @@ util.func @split_reduction_2d_by_tiling(%arg0 : tensor<?x2048x128xf32>) -> tenso
 //       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[FORALL]]
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups[%[[D0]]](%[[DISPATCH0]], %[[D0]])
 //       CHECK:   return %[[DISPATCH1]]
+
+// -----
+
+util.func @broadcast_consumer(%arg0 : tensor<4xf32>)
+    -> tensor<4x64xf32> {
+  %init_vec = tensor.empty() : tensor<4xf32>
+  %vec4 = linalg.generic
+      { indexing_maps = [affine_map<(d0) -> (d0)>,
+                          affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"] }
+      ins(%arg0 : tensor<4xf32>) outs(%init_vec : tensor<4xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %cst2 = arith.constant 2.0 : f32
+      %cst05 = arith.constant 5.000000e-01 : f32
+      %mul = arith.mulf %in, %cst2 : f32
+      %add = arith.addf %mul, %cst05 : f32
+      linalg.yield %add : f32
+  } -> tensor<4xf32>
+
+  %init_mat = tensor.empty() : tensor<4x64xf32>
+  %broadcast = linalg.generic
+      { indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                          affine_map<(d0, d1) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel"] }
+      ins(%vec4 : tensor<4xf32>) outs(%init_mat : tensor<4x64xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  } -> tensor<4x64xf32>
+
+  util.return %broadcast : tensor<4x64xf32>
+}
+
+// Check that broadcast consumer gets fused into a single dispatch
+// CHECK-LABEL: @broadcast_consumer
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<4xf32>
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//       CHECK:       %[[MUL:.*]] = arith.mulf
+//       CHECK:       %[[ADD:.*]] = arith.addf
+//   CHECK-NOT:     flow.dispatch.workgroups
+//     CHECK:   util.return %[[DISPATCH0]] : tensor<4x64xf32>

@@ -139,10 +139,20 @@ static void addDispatchRegionCreationPreprocessingPasses(
                 /*fuseTruncateOps=*/clEnableEarlyTruncFusion,
                 /*fuseBroadcastOps=*/false});
       })
+      // 4. Perform elementwise operation fusion again. This is to fuse
+      // broadcast consumer ops that could not be fused earlier.
+      .addPass([]() {
+        return DispatchCreation::createElementwiseOpFusionPass(
+            ElementwiseOpFusionPassOptions{
+                /*intraDispatch=*/false,
+                /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion,
+                /*fuseBroadcastOps=*/true});
+      })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
-      // 4. After elementwise operation fusion sink reshapes that block
+      // 5. After elementwise operation fusion sink reshapes that block
       //    producer-consumer fusion.
       .addPass(DispatchCreation::createSinkReshapesPass)
       .addPass(IREE::Flow::createCanonicalizePass)
