@@ -40,6 +40,7 @@ iree_lit_test_suite(
             "iree-run-module-multi.mlir",
             "iree-run-module-outputs.mlir",
             "iree-run-module.mlir",
+            "iree-tblgen-json.td",
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "null_values.mlir",
@@ -50,6 +51,7 @@ iree_lit_test_suite(
         ],
         include = [
             "*.mlir",
+            "*.td",
             "*.txt",
         ],
         exclude = [
@@ -74,6 +76,9 @@ iree_lit_test_suite(
         "iree-link-module-c.mlir",
         "parameters_a.safetensors",
         "parameters_b.safetensors",
+        # For iree-tblgen tests:
+        "//compiler/src/iree/compiler/Utils:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
     tags = [
         "driver=local-task",
@@ -89,6 +94,7 @@ iree_lit_test_suite(
         "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "//tools:iree-run-module",
+        "//tools:iree-tblgen",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
         "@llvm-project//llvm:not",
