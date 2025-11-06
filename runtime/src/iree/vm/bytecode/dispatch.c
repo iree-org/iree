@@ -126,6 +126,7 @@ static iree_status_t iree_vm_bytecode_function_enter(
       iree_host_align(ref_register_count * sizeof(iree_vm_ref_t), 16);
   iree_host_size_t frame_size =
       header_size + i32_register_size + ref_register_size;
+  IREE_ASSERT_ALIGNED(frame_size, 16);
 
   // Enter function and allocate stack frame storage.
   IREE_RETURN_IF_ERROR(iree_vm_stack_function_enter(

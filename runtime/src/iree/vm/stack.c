@@ -208,11 +208,14 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
   stack->state_resolver = state_resolver;
   stack->allocator = allocator;
 
-  iree_host_size_t storage_offset =
-      iree_host_align(sizeof(iree_vm_stack_t), 16);
+  // Ensure frame_storage has 16-byte alignment for frame pointers.
+  uintptr_t storage_base = (uintptr_t)storage.data;
+  uintptr_t frame_storage_start =
+      iree_host_align(storage_base + sizeof(iree_vm_stack_t), 16);
+  iree_host_size_t storage_offset = frame_storage_start - storage_base;
   stack->frame_storage_capacity = storage.data_length - storage_offset;
   stack->frame_storage_size = 0;
-  stack->frame_storage = storage.data + storage_offset;
+  stack->frame_storage = (void*)frame_storage_start;
 
   stack->top = NULL;
 
@@ -435,9 +438,13 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
       16);
 
   // Allocate stack space and grow stack, if required.
+  // Align the total frame size to 16 bytes to ensure subsequent frames maintain
+  // 16-byte alignment.
   iree_host_size_t header_size = sizeof(iree_vm_stack_frame_header_t);
-  iree_host_size_t new_top =
-      stack->frame_storage_size + header_size + frame_size;
+  iree_host_size_t total_frame_size =
+      iree_host_align(header_size + frame_size, 16);
+  iree_host_size_t new_top = stack->frame_storage_size + total_frame_size;
+  IREE_ASSERT_ALIGNED(new_top, 16);
   if (IREE_UNLIKELY(new_top > stack->frame_storage_capacity)) {
     IREE_RETURN_IF_ERROR(iree_vm_stack_grow(stack, new_top));
   }
@@ -452,9 +459,9 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
   iree_vm_stack_frame_header_t* frame_header =
       (iree_vm_stack_frame_header_t*)((uintptr_t)stack->frame_storage +
                                       stack->frame_storage_size);
-  memset(frame_header, 0, header_size + frame_size);
+  memset(frame_header, 0, total_frame_size);
 
-  frame_header->frame_size = header_size + frame_size;
+  frame_header->frame_size = total_frame_size;
   frame_header->parent = stack->top;
   frame_header->data_size = frame_size;
   // TODO(benvanik): allow a custom cleanup function so callers can be notified
@@ -543,10 +550,17 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame) {
   if (out_callee_frame) *out_callee_frame = NULL;
 
+  IREE_ASSERT_ALIGNED(frame_size, 16);
   // Allocate stack space and grow stack, if required.
+  // Align the total frame size to 16 bytes to ensure subsequent frames maintain
+  // 16-byte alignment (required for ref register alignment in bytecode frames).
   iree_host_size_t header_size = sizeof(iree_vm_stack_frame_header_t);
-  iree_host_size_t new_top =
-      stack->frame_storage_size + header_size + frame_size;
+  // The frame storage will be aligned separately in
+  // iree_vm_stack_frame_storage().
+  iree_host_size_t total_frame_size =
+      iree_host_align(header_size + frame_size, 16);
+  iree_host_size_t new_top = stack->frame_storage_size + total_frame_size;
+  IREE_ASSERT_ALIGNED(new_top, 16);
   if (IREE_UNLIKELY(new_top > stack->frame_storage_capacity)) {
     IREE_RETURN_IF_ERROR(iree_vm_stack_grow(stack, new_top));
   }
@@ -568,9 +582,9 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
   iree_vm_stack_frame_header_t* frame_header =
       (iree_vm_stack_frame_header_t*)((uintptr_t)stack->frame_storage +
                                       stack->frame_storage_size);
-  memset(frame_header, 0, header_size + frame_size);
+  memset(frame_header, 0, total_frame_size);
 
-  frame_header->frame_size = header_size + frame_size;
+  frame_header->frame_size = total_frame_size;
   frame_header->parent = stack->top;
   frame_header->data_size = frame_size;
   frame_header->frame_cleanup_fn = frame_cleanup_fn;
