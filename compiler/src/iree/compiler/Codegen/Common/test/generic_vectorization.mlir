@@ -111,6 +111,42 @@ func.func @single_static_pack_infer_vector_size(%arg0: tensor<101x201xi8>, %arg1
 // CHECK-MASK:             %[[WRITE_MASK:.+]] = vector.create_mask %[[WRITE_SZ0]], %[[WRITE_SZ1]], {{.+}} : vector<2x4x16x2xi1>
 // CHECK-MASK:             vector.transfer_write %[[TRANSP]], %[[W_SLICE]][{{.+}}, %[[WRITE_MASK]]
 
+// -----
+
+#config = #iree_cpu.lowering_config<vector_common_parallel = [2, 4]>
+func.func @pack_with_configured_vector(%src: tensor<?x?xi8>, %dest: tensor<?x?x16x2xi8>) -> tensor<?x?x16x2xi8> {
+  %c0_i8 = arith.constant 0 : i8
+  %pack = linalg.pack %src padding_value(%c0_i8 : i8) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 2] into %dest {lowering_config = #config} : tensor<?x?xi8> -> tensor<?x?x16x2xi8>
+  return %pack : tensor<?x?x16x2xi8>
+}
+// CHECK-MASK-LABEL: func.func @pack_with_configured_vector(
+// CHECK-MASK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-MASK-SAME:    %[[DEST:[a-zA-Z0-9]+]]
+// CHECK-MASK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-MASK-DAG:     %[[C16:.+]] = arith.constant 16 : index
+// CHECK-MASK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-MASK-DAG:     %[[C0_I8:.+]] = arith.constant 0 : i8
+// CHECK-MASK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+
+// Compute mask for xfer_read:
+// CHECK-MASK:         %[[DIM0:.+]] = tensor.dim %[[SRC]], %[[C0]] : tensor<?x?xi8>
+// CHECK-MASK:         %[[DIM1:.+]] = tensor.dim %[[SRC]], %[[C1]] : tensor<?x?xi8>
+// CHECK-MASK:         %[[READ_MASK:.+]] = vector.create_mask %[[DIM0]], %[[DIM1]] : vector<8x32xi1>
+
+// --= read =---
+// CHECK-MASK:         %[[READ_VEC:.+]] = vector.transfer_read %[[SRC]][%[[C0]], %[[C0]]], %[[C0_I8]], %[[READ_MASK]]
+
+// --= shape_cast and transpose =---
+// CHECK-MASK:         %[[CAST_VEC:.+]] = vector.shape_cast %[[READ_VEC]] : vector<8x32xi8> to vector<4x2x2x16xi8>
+// CHECK-MASK:         %[[TRANSP_VEC:.+]] = vector.transpose %[[CAST_VEC]], [2, 0, 3, 1]
+
+// Compute mask for xfer_write:
+// CHECK-MASK:         %[[W_DIM0:.+]] = tensor.dim %[[DEST]], %[[C0]] : tensor<?x?x16x2xi8>
+// CHECK-MASK:         %[[W_DIM1:.+]] = tensor.dim %[[DEST]], %[[C1]] : tensor<?x?x16x2xi8>
+// CHECK-MASK:         %[[WRITE_MASK:.+]] = vector.create_mask %[[W_DIM0]], %[[W_DIM1]], %[[C16]], %[[C2]] : vector<2x4x16x2xi1>
+
+// --= write =---
+// CHECK-MASK:         vector.transfer_write %[[TRANSP_VEC]], %[[DEST]][%[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[WRITE_MASK]]
 
 // -----
 
@@ -270,6 +306,19 @@ func.func @generic_pack_infer_vector_size(%arg0: tensor<?x32x128xf32>) -> tensor
 // CHECK-MASK:           %[[PACK_TRANSP:.+]] = vector.transpose %[[SHAPE_CAST]], [0, 3, 1, 4, 2]
 // CHECK-MASK:           %[[PACK_WRITE_MASK:.+]] = vector.create_mask %[[C2]], %[[DEST_SZ1]], %[[DEST_SZ2]], %[[C16]], %[[C2]] : vector<2x4x6x16x2xi1>
 // CHECK-MASK:           vector.transfer_write %[[PACK_TRANSP]], %[[W_SLICE]]{{.+}}, %[[PACK_WRITE_MASK]]
+
+// -----
+
+#config = #iree_cpu.lowering_config<vector_common_parallel = [4, [16]], vector_reduction = [0, 0]>
+func.func @vectorize_dynamic_shapes_pack_scalable_vec_and_tile_size(%src: tensor<?x?xf32>, %dest: tensor<?x?x?x2xf32>) -> tensor<?x?x?x2xf32> {
+  %vs = vector.vscale
+  %c16 = arith.constant 16 : index
+  %tile_size = arith.muli %vs, %c16 : index
+  %packed = linalg.pack %src inner_dims_pos = [1, 0] inner_tiles = [%tile_size, 2] into %dest {lowering_config = #config} : tensor<?x?xf32> -> tensor<?x?x?x2xf32>
+  return %packed : tensor<?x?x?x2xf32>
+}
+// CHECK-MASK-LABEL: func.func @vectorize_dynamic_shapes_pack_scalable_vec_and_tile_size
+// CHECK-MASK:         linalg.pack
 
 // -----
 
