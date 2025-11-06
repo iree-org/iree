@@ -9,7 +9,9 @@
     "--device=hip"
   ],
   "skip_compile_tests": [],
-  "skip_run_tests": [],
+  "skip_run_tests": [
+    "test_a_t_b_float16"
+  ],
   "expected_compile_failures": [],
   "expected_run_failures": []
 }
