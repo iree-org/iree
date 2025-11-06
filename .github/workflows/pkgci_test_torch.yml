@@ -79,11 +79,11 @@ jobs:
       - name: Install Torch ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r iree-test-suites/pytorch_ops/requirements.txt
+          python -m pip install -r iree-test-suites/torch_ops/requirements.txt
       - name: Run Torch ops test suite
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest iree-test-suites/pytorch_ops/ \
+          pytest iree-test-suites/torch_ops/ \
               -rpfE \
               --timeout=30 \
               --durations=20 \
