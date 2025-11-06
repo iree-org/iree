@@ -289,7 +289,9 @@ void HoistEncodingOpsPass::runOnOperation() {
   }
 
   const auto &constExprs = getAnalysis<IREE::Util::ConstExprAnalysis>();
-  IREE::Util::ConstExprHoistingPolicy policy(constExprs, /*threshold=*/0);
+  DataLayout dataLayout = DataLayout::closest(moduleOp);
+  IREE::Util::ConstExprHoistingPolicy policy(constExprs, /*threshold=*/0,
+                                             dataLayout);
   policy.initialize();
 
   // Each element indicates ops that are expected to be hoisted. It is valid to

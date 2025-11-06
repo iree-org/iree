@@ -17,6 +17,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Iterators.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/DataLayoutInterfaces.h"
 
 #define DEBUG_TYPE "iree-constexpr"
 
@@ -80,9 +81,11 @@ public:
   }
 
   void runOnOperation() override {
+    DataLayout dataLayout = DataLayout::closest(getOperation());
     SymbolTable moduleSymbols(getOperation());
     const auto &constExprs = getAnalysis<ConstExprAnalysis>();
-    ConstExprHoistingPolicy policy(constExprs, this->maxSizeIncreaseThreshold);
+    ConstExprHoistingPolicy policy(constExprs, this->maxSizeIncreaseThreshold,
+                                   dataLayout);
     policy.initialize();
 
     // Print analysis dot graph if requested.
@@ -136,7 +139,7 @@ public:
             continue;
           }
           if (failed(hoistConstExpr(constExprResult, hoistedMap, moduleSymbols,
-                                    constExprs, opOrder))) {
+                                    constExprs, opOrder, dataLayout))) {
             return WalkResult::interrupt();
           }
         }
@@ -198,7 +201,8 @@ public:
   hoistConstExpr(Value originalValue, HoistedValueMap &hoistedMap,
                  SymbolTable &moduleSymbols,
                  const ConstExprAnalysis &constExprs,
-                 const llvm::DenseMap<Operation *, unsigned> &opOrder) {
+                 const llvm::DenseMap<Operation *, unsigned> &opOrder,
+                 const DataLayout &dataLayout) {
     IREE::Util::GlobalOp existingGlobal = hoistedMap.lookup(originalValue);
     if (existingGlobal) {
       return success();
@@ -221,7 +225,7 @@ public:
     if (failed(cloneConstExprInto(initializerOp.getLoc(), moduleBuilder,
                                   initializerBuilder, originalValue,
                                   dialectAttrs, hoistedMap, moduleSymbols,
-                                  constExprs, opOrder))) {
+                                  constExprs, opOrder, dataLayout))) {
       return failure();
     }
 
@@ -238,7 +242,8 @@ public:
                         const ConstExprAnalysis::ConstValueInfo *producerInfo,
                         HoistedValueMap &hoistedMap, IRMapping &cloneMapping,
                         const ConstExprAnalysis &constExprs,
-                        const llvm::DenseMap<Operation *, unsigned> &opOrder) {
+                        const llvm::DenseMap<Operation *, unsigned> &opOrder,
+                        const DataLayout &dataLayout) {
     if (cloneMapping.contains(producerInfo->constValue)) {
       return;
     }
@@ -276,7 +281,7 @@ public:
                });
     for (ConstExprAnalysis::ConstValueInfo *prodInfo : sortedProducers) {
       cloneProducerTreeInto(initializerBuilder, prodInfo, hoistedMap,
-                            cloneMapping, constExprs, opOrder);
+                            cloneMapping, constExprs, opOrder, dataLayout);
     }
 
     // And clone the requested op.
@@ -300,7 +305,8 @@ public:
                      NamedAttrList dialectAttrs, HoistedValueMap &hoistedMap,
                      SymbolTable &moduleSymbols,
                      const ConstExprAnalysis &constExprs,
-                     const llvm::DenseMap<Operation *, unsigned> &opOrder) {
+                     const llvm::DenseMap<Operation *, unsigned> &opOrder,
+                     const DataLayout &dataLayout) {
     // Do a depth first traversal of the producers, emitting them in a valid
     // def-use order.
     Operation *rootOp = constExprValue.getDefiningOp();
@@ -311,7 +317,7 @@ public:
     // Clone the whole tree as needed.
     IRMapping cloneMapping;
     cloneProducerTreeInto(initializerBuilder, rootInfo, hoistedMap,
-                          cloneMapping, constExprs, opOrder);
+                          cloneMapping, constExprs, opOrder, dataLayout);
 
     // And for each result, create a global and store into it.
     for (Value origResult : rootOp->getResults()) {
@@ -323,7 +329,7 @@ public:
           dyn_cast<IREE::Util::HoistableTypeInterface>(globalType);
       if (hoistableType) {
         // Allow the storage type of the global to differ from the local type.
-        globalType = hoistableType.getPreferredStorageType();
+        globalType = hoistableType.getPreferredStorageType(dataLayout);
       }
       auto globalOp = IREE::Util::GlobalOp::create(
           moduleBuilder, loc, getHoistedName(globalType), false, globalType);

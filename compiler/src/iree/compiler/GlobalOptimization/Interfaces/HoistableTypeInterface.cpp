@@ -12,6 +12,8 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/DataLayoutInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -29,24 +31,29 @@ static Value bitcastToStaticTypeImpl(OpBuilder &b, Location loc,
                                             ValueRange(), ValueRange());
 }
 
+static inline unsigned int
+getDataTypeStorageBitWidth(Type type, const DataLayout &dataLayout) {
+  Type elementType = getElementTypeOrSelf(type);
+  if (elementType.isIndex()) {
+    return *dataLayout.getTypeIndexBitwidth(elementType);
+  }
+  return IREE::Util::getTypeBitWidth(elementType);
+}
+
 struct HoistableTensorTypeInterface
     : public IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableTensorTypeInterface, RankedTensorType> {
-  bool isHoistableType(Type type) const {
-    auto tensorType = cast<RankedTensorType>(type);
-    unsigned bitWidth =
-        IREE::Util::getTypeBitWidth(tensorType.getElementType());
+  bool isHoistableType(Type type, const DataLayout &dataLayout) const {
+    unsigned bitWidth = getDataTypeStorageBitWidth(type, dataLayout);
     return llvm::isPowerOf2_32(bitWidth) && bitWidth <= 64;
   }
-  bool isHoistableLeafType(Type type) const {
-    auto tensorType = cast<RankedTensorType>(type);
-    unsigned bitWidth =
-        IREE::Util::getTypeBitWidth(tensorType.getElementType());
+  bool isHoistableLeafType(Type type, const DataLayout &dataLayout) const {
+    unsigned bitWidth = getDataTypeStorageBitWidth(type, dataLayout);
     // Never hoist boolean values; IREE still does implicit extension of
     // booleans to a byte width so we avoid packing them.
     return bitWidth != 1;
   }
-  Type getPreferredStorageType(Type type) const {
+  Type getPreferredStorageType(Type type, const DataLayout &dataLayout) const {
     auto tensorType = cast<RankedTensorType>(type);
     // Constant data should be statically shaped.
     if (!tensorType.hasStaticShape()) {
@@ -54,7 +61,7 @@ struct HoistableTensorTypeInterface
     }
 
     unsigned elementBitWidth =
-        IREE::Util::getTypeBitWidth(tensorType.getElementType());
+        getDataTypeStorageBitWidth(tensorType, dataLayout);
     // Bools get special treatment - don't pack them.
     if (elementBitWidth == 1) {
       return type;
@@ -114,12 +121,16 @@ struct HoistableTensorTypeInterface
 struct HoistableIndexTypeInterface
     : public IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableIndexTypeInterface, IndexType> {
-  bool isHoistableType(Type type) const { return true; }
-  bool isHoistableLeafType(Type type) const { return true; }
-  Type getPreferredStorageType(Type type) const {
-    // Conservatively enforce 64 bit indices for
-    // (potentially constant evaluated) hoisted globals.
-    return IntegerType::get(type.getContext(), 64);
+  bool isHoistableType(Type type, const DataLayout &dataLayout) const {
+    return true;
+  }
+  bool isHoistableLeafType(Type type, const DataLayout &dataLayout) const {
+    return true;
+  }
+
+  Type getPreferredStorageType(Type type, const DataLayout &dataLayout) const {
+    return IntegerType::get(type.getContext(),
+                            getDataTypeStorageBitWidth(type, dataLayout));
   }
   static Value encodeStorageType(OpBuilder &builder, Location loc,
                                  Type storageType, Value init) {
