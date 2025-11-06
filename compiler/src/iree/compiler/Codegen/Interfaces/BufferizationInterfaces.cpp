@@ -17,7 +17,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
-#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/DstBufferizableOpInterfaceImpl.h"
@@ -27,7 +26,6 @@
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
@@ -233,6 +231,44 @@ struct StoreToBufferOpInterface
       return failure();
 
     rewriter.eraseOp(storeOp);
+    return success();
+  }
+};
+
+struct SwizzleHintOpInterface final
+    : BufferizableOpInterface::ExternalModel<SwizzleHintOpInterface,
+                                             IREE::Codegen::SwizzleHintOp> {
+  bool bufferizesToMemoryRead(Operation *, OpOperand &,
+                              const AnalysisState &) const {
+    return false;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *, OpOperand &,
+                               const AnalysisState &) const {
+    return false;
+  }
+
+  bool mustBufferizeInPlace(Operation *, OpOperand &,
+                            const AnalysisState &) const {
+    return true;
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &, const AnalysisState &) const {
+    return {{op->getResult(0), BufferRelation::Equivalent, /*definite=*/true}};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
+    auto hintOp = cast<IREE::Codegen::SwizzleHintOp>(op);
+    FailureOr<Value> maybeBuffer =
+        getBuffer(rewriter, hintOp.getOperand(), options, state);
+    if (failed(maybeBuffer)) {
+      return failure();
+    }
+    replaceOpWithNewBufferizedOp<IREE::Codegen::SwizzleHintOp>(
+        rewriter, op, *maybeBuffer, hintOp.getSwizzle());
     return success();
   }
 };
@@ -687,14 +723,15 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         IREE::TensorExt::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpSubsetInsertionInterface>(*ctx);
       });
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
-        IREE::Codegen::LoadFromBufferOp::attachInterface<
-            LoadFromBufferOpInterface, LoadFromBufferOpSubsetInterface>(*ctx);
-        IREE::Codegen::StoreToBufferOp::attachInterface<
-            StoreToBufferOpInterface, StoreToBufferOpSubsetInterface,
-            StoreToBufferOpSubsetInsertionInterface>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::Codegen::IREECodegenDialect *dialect) {
+    IREE::Codegen::LoadFromBufferOp::attachInterface<
+        LoadFromBufferOpInterface, LoadFromBufferOpSubsetInterface>(*ctx);
+    IREE::Codegen::StoreToBufferOp::attachInterface<
+        StoreToBufferOpInterface, StoreToBufferOpSubsetInterface,
+        StoreToBufferOpSubsetInsertionInterface>(*ctx);
+    IREE::Codegen::SwizzleHintOp::attachInterface<SwizzleHintOpInterface>(*ctx);
+  });
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
         LinalgExtOpInterfaceHelper<

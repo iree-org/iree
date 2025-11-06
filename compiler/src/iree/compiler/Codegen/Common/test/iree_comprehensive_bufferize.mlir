@@ -3126,6 +3126,43 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 
 // -----
 
+func.func @swizzle_hint(%arg0: tensor<1024xf32>) -> tensor<1024xf32> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c64 = arith.constant 63 : index
+  %c512 = arith.constant 512 : index
+  %temp = bufferization.alloc_tensor() : tensor<512xf32>
+  %swizzled.temp = iree_codegen.swizzle_hint %temp[#iree_codegen.rotate_rows<256, 4>] : tensor<512xf32>
+  %1 = scf.forall (%arg2) in (64) shared_outs(%arg3 = %swizzled.temp) -> tensor<512xf32> {
+    %off = arith.muli %arg2, %c4 : index
+    %slice = tensor.extract_slice %arg0[%off] [4] [1] : tensor<1024xf32> to tensor<4xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %slice into %arg3[%off] [4] [1] : tensor<4xf32> into tensor<512xf32>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  // Somewhat convoluted swap-things-around "kernel" to provide a minimal example
+  // showing that swizzle hints persist on a tensor.
+  %ret.init = tensor.empty() : tensor<1024xf32>
+  %ret = scf.forall (%arg2) in (64) shared_outs(%arg3 = %ret.init) -> tensor<1024xf32> {
+    %arg2.reversed = arith.subi %c64, %arg2 : index
+    %off.rev = arith.muli %arg2.reversed, %c4 : index
+    %off = arith.muli %arg2, %c4 : index
+    %slice = tensor.extract_slice %1[%off.rev] [4] [1] : tensor<512xf32> to tensor<4xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %slice into %arg3[%off] [4] [1] : tensor<4xf32> into tensor<1024xf32>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+
+  return %ret : tensor<1024xf32>
+}
+
+// CHECK-LABEL: func.func @swizzle_hint
+// CHECK: %[[SHARED:.+]] = memref.alloc() : memref<512xf32>
+// CHECK: %[[SWIZZLED:.+]] = iree_codegen.swizzle_hint %[[SHARED]][{{.*}}] : memref<512xf32>
+// CHECK-COUNT-2: memref.subview %[[SWIZZLED]]
+
+// -----
+
 func.func @convert_to_buffer() -> memref<6xf32> {
   %alloc = bufferization.alloc_tensor() : tensor<6xf32>
   %memref = bufferization.to_buffer %alloc : tensor<6xf32> to memref<6xf32>
