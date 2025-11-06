@@ -1814,7 +1814,7 @@ getVectorInputSizesFromUnpackedDomain(linalg::PackOp op,
                                       ArrayRef<int64_t> readVectorSizes,
                                       ArrayRef<bool> scalableFlags) {
   assert(readVectorSizes.size() == op.getSourceRank());
-  if (llvm::any_of(scalableFlags, [](bool val) { return val == true; })) {
+  if (llvm::any_of(scalableFlags, [](bool val) { return val; })) {
     return std::nullopt;
   }
   // TODO: Infer scalable sizes.
@@ -1824,13 +1824,12 @@ getVectorInputSizesFromUnpackedDomain(linalg::PackOp op,
 
   SmallVector<int64_t> writeSizes(readVectorSizes);
   SmallVector<bool> writeScalableFlags(scalableFlags);
-  for (auto innerTileSize : op.getStaticInnerTiles()) {
+  for (int64_t innerTileSize : op.getStaticInnerTiles()) {
     writeSizes.push_back(innerTileSize);
     writeScalableFlags.push_back(false);
   }
 
-  SizesAndScalableFlags result = {writeSizes, writeScalableFlags};
-  return result;
+  return SizesAndScalableFlags{writeSizes, writeScalableFlags};
 }
 
 std::optional<SizesAndScalableFlags>

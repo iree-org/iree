@@ -310,7 +310,6 @@ func.func @generic_pack_infer_vector_size(%arg0: tensor<?x32x128xf32>) -> tensor
 // -----
 
 #config = #iree_cpu.lowering_config<vector_common_parallel = [4, [16]], vector_reduction = [0, 0]>
-
 func.func @vectorize_dynamic_shapes_pack_scalable_vec_and_tile_size(%src: tensor<?x?xf32>, %dest: tensor<?x?x?x2xf32>) -> tensor<?x?x?x2xf32> {
   %vs = vector.vscale
   %c16 = arith.constant 16 : index
