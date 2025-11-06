@@ -404,25 +404,21 @@ static inline void iree_unaligned_store_le_f32(float* ptr, float value) {
 #if IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64
 
 static inline uint64_t iree_unaligned_load_le_u64(const uint64_t* ptr) {
-  const uint8_t* p = (const uint8_t*)ptr;
   uint64_t value;
-  memcpy(&value, p, sizeof(value));
+  memcpy(&value, ptr, sizeof(value));
   return value;
 }
 static inline double iree_unaligned_load_le_f64(const double* ptr) {
-  uint8_t* p = (uint8_t*)ptr;
   double value;
-  memcpy(&value, p, sizeof(value));
+  memcpy(&value, ptr, sizeof(value));
   return value;
 }
 
 static inline void iree_unaligned_store_le_u64(uint64_t* ptr, uint64_t value) {
-  uint8_t* p = (uint8_t*)ptr;
-  memcpy(p, &value, sizeof(value));
+  memcpy(ptr, &value, sizeof(value));
 }
 static inline void iree_unaligned_store_le_f64(double* ptr, double value) {
-  uint8_t* p = (uint8_t*)ptr;
-  memcpy(&value, p, sizeof(value));
+  memcpy(&value, ptr, sizeof(value));
 }
 
 #else
