@@ -142,32 +142,11 @@ enum iree_arch_enum_e {
 
 #if !defined(IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED)
 
-#if defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64)
-
-// Armv6‑M and Armv8-M (w/o the main extension) do not support unaligned access.
-// The -munaligned-access and -mno-unaligned-access flags control this.
-// https://www.keil.com/support/man/docs/armclang_ref/armclang_ref_sam1444138667173.htm
-#if !defined(__ARM_FEATURE_UNALIGNED)
-#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 1
-#else
-#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 0
-#endif  // !__ARM_FEATURE_UNALIGNED
-
-// Unaligned support is only available for singles on Armv7-M.
-// Therefore, aligned memory access is enforced for 64-bit data types.
-#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64 1
-
-#elif defined(IREE_ARCH_RISCV_32) || defined(IREE_ARCH_RISCV_64)
-
-// Though unaligned access is part of the base spec it is allowed to be
-// implemented with trap handlers. Bare-metal systems likely won't have these
-// handlers and even on systems that do (linux) we don't want to be trapping for
-// every load/store.
+// Unless disabled by the user, require all memory access to be aligned. This is
+// because unaligned accesses are considered Undefined Behavior (UB) by the
+// C/C++ standards, even if the hardware supports them.
 #define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 1
 
-#else
-#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 0
-#endif  // IREE_ARCH_*
 #endif  // !IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED
 
 // Set IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_* to the value of
