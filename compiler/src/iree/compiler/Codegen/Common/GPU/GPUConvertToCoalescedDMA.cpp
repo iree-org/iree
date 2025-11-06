@@ -93,34 +93,35 @@ static std::optional<int64_t> getElementsPerThread(linalg::CopyOp copyOp) {
   return elementsPerThread;
 }
 
-/// Helper to compute thread number of threads based on operation type.
-/// For copy ops: uses dma_sizes to determine how many elements per thread.
-/// For gather ops: currently limits to 1 element per thread (32-bit).
+/// Helper to compute thread number of threads based on translation_info.
+/// Uses the subgroup_size from translation_info for thread-level tiling.
 template <typename OpTy>
 static SmallVector<OpFoldResult>
 computeThreadNumThreadsImpl(OpBuilder &builder, OpTy op,
                             RankedTensorType outputType) {
-  // Get the subgroup tile sizes from the lowering config.
+  // Check that this operation has the use_global_load_dma config.
   auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
   if (!dmaConfig) {
     return {};
   }
 
-  ArrayRef<int64_t> subgroupTileSizes = dmaConfig.getSubgroup();
-  if (subgroupTileSizes.empty()) {
+  // Get the function containing this operation.
+  auto funcOp = op->template getParentOfType<FunctionOpInterface>();
+  if (!funcOp) {
     return {};
   }
 
-  int64_t rank = outputType.getRank();
-  if (subgroupTileSizes.size() != rank) {
+  // Get subgroup size from translation_info.
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (!subgroupSize) {
     return {};
   }
 
   // Only tile over the innermost dimension.
-  // Return a 1-element array with the innermost subgroup tile size.
+  // Return a 1-element array with the subgroup size.
   // SCF tiling will tile the last (innermost) dimension.
   SmallVector<OpFoldResult> numThreads;
-  numThreads.push_back(builder.getIndexAttr(subgroupTileSizes[rank - 1]));
+  numThreads.push_back(builder.getIndexAttr(*subgroupSize));
   return numThreads;
 }
 
@@ -282,17 +283,39 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     if (indices) {
       rewriter.setInsertionPoint(inParallelOp);
       auto indicesType = cast<RankedTensorType>(indices.getType());
-      VectorType vectorType =
-          VectorType::get(indicesType.getShape(), rewriter.getIndexType());
-      Value zeroPad = arith::ConstantIndexOp::create(rewriter, loc, 0);
+      Type elementType = indicesType.getElementType();
+
+      // First, read the indices tensor as a vector with the original element
+      // type
+      VectorType vectorTypeOriginal =
+          VectorType::get(indicesType.getShape(), elementType);
 
       SmallVector<Value> readIndices(indicesType.getRank());
       for (int64_t i = 0; i < indicesType.getRank(); ++i) {
         readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
       }
 
-      indices = vector::TransferReadOp::create(rewriter, loc, vectorType,
-                                               indices, readIndices, zeroPad);
+      // Create padding value - use i32 for index type
+      Type paddingType = elementType;
+      if (elementType.isIndex()) {
+        paddingType = rewriter.getI32Type();
+      }
+      TypedAttr zeroPadAttr = rewriter.getIntegerAttr(paddingType, 0);
+      Value zeroPad = arith::ConstantOp::create(rewriter, loc, zeroPadAttr);
+
+      Value indicesVec = vector::TransferReadOp::create(
+          rewriter, loc, vectorTypeOriginal, indices, readIndices, zeroPad);
+
+      // Convert to i32 type if needed
+      Type i32Type = rewriter.getI32Type();
+      if (elementType != i32Type) {
+        VectorType i32VectorType =
+            VectorType::get(indicesType.getShape(), i32Type);
+        indices = arith::IndexCastOp::create(rewriter, loc, i32VectorType,
+                                             indicesVec);
+      } else {
+        indices = indicesVec;
+      }
     }
   }
 
@@ -364,17 +387,137 @@ protected:
 };
 
 struct ConvertGatherToCoalescedDMA
-    : public ConvertToCoalescedDMABase<IREE::LinalgExt::GatherOp> {
-  using ConvertToCoalescedDMABase<
-      IREE::LinalgExt::GatherOp>::ConvertToCoalescedDMABase;
+    : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
+  using OpRewritePattern<IREE::LinalgExt::GatherOp>::OpRewritePattern;
 
-protected:
-  SmallVector<OpFoldResult>
-  computeThreadNumThreads(OpBuilder &builder,
-                          IREE::LinalgExt::GatherOp gatherOp) const override {
-    auto outputType =
-        cast<RankedTensorType>(gatherOp.getOutputs()[0].getType());
-    return computeThreadNumThreadsImpl(builder, gatherOp, outputType);
+  LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
+                                PatternRewriter &rewriter) const override {
+    auto forallOp = gatherOp->getParentOfType<scf::ForallOp>();
+    if (!hasWarpMapping(forallOp)) {
+      return failure();
+    }
+
+    // For gather ops, tile only the innermost dimension to distribute across
+    // threads
+    auto dmaConfig =
+        getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(gatherOp);
+    if (!dmaConfig) {
+      return failure();
+    }
+
+    // Get the function containing this operation.
+    auto funcOp = gatherOp->getParentOfType<FunctionOpInterface>();
+    if (!funcOp) {
+      return failure();
+    }
+
+    // Get subgroup size from translation_info.
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (!subgroupSize) {
+      return failure();
+    }
+
+    SmallVector<OpFoldResult> threadNumThreads;
+    threadNumThreads.push_back(rewriter.getIndexAttr(*subgroupSize));
+
+    scf::ForallOp threadForallOp =
+        tileToThreadLevel(gatherOp, rewriter, threadNumThreads);
+    if (!threadForallOp) {
+      return failure();
+    }
+
+    // Create DMA ops directly without relying on the template version
+    // Find the tiled gather op
+    IREE::LinalgExt::GatherOp tiledGatherOp = nullptr;
+    threadForallOp->walk([&](IREE::LinalgExt::GatherOp foundOp) {
+      tiledGatherOp = foundOp;
+      return WalkResult::interrupt();
+    });
+
+    if (!tiledGatherOp) {
+      return failure();
+    }
+
+    Block *forallBody = threadForallOp.getBody();
+    Value sharedOut = forallBody->getArguments().back();
+    size_t numIVs = forallBody->getNumArguments() - 1;
+    Value laneId = forallBody->getArgument(numIVs - 1);
+
+    auto inParallelOp = cast<scf::InParallelOp>(forallBody->getTerminator());
+    Block &inParallelBlock = inParallelOp.getRegion().front();
+
+    Location loc = tiledGatherOp.getLoc();
+
+    // Get source - need to find the source from before thread-level tiling
+    // The tiledGatherOp.getSource() is already sliced by thread-level tiling
+    // We need to trace back to get the original warp-level source
+    Value source = tiledGatherOp.getSource();
+
+    // If source comes from an extract_slice, get its source (from warp-level)
+    if (auto extractOp = source.getDefiningOp<tensor::ExtractSliceOp>()) {
+      source = extractOp.getSource();
+    }
+
+    Value indices = tiledGatherOp.getIndices();
+
+    // Convert indices tensor to vector
+    if (indices) {
+      rewriter.setInsertionPoint(inParallelOp);
+      auto indicesType = cast<RankedTensorType>(indices.getType());
+      Type elementType = indicesType.getElementType();
+
+      VectorType vectorTypeOriginal =
+          VectorType::get(indicesType.getShape(), elementType);
+
+      SmallVector<Value> readIndices(indicesType.getRank());
+      for (int64_t i = 0; i < indicesType.getRank(); ++i) {
+        readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
+      }
+
+      Type paddingType = elementType;
+      if (elementType.isIndex()) {
+        paddingType = rewriter.getI32Type();
+      }
+      TypedAttr zeroPadAttr = rewriter.getIntegerAttr(paddingType, 0);
+      Value zeroPad = arith::ConstantOp::create(rewriter, loc, zeroPadAttr);
+
+      Value indicesVec = vector::TransferReadOp::create(
+          rewriter, loc, vectorTypeOriginal, indices, readIndices, zeroPad);
+
+      Type i32Type = rewriter.getI32Type();
+      if (elementType != i32Type) {
+        VectorType i32VectorType =
+            VectorType::get(indicesType.getShape(), i32Type);
+        indices = arith::IndexCastOp::create(rewriter, loc, i32VectorType,
+                                             indicesVec);
+      } else {
+        indices = indicesVec;
+      }
+    }
+
+    // Create the DMA op
+    rewriter.setInsertionPointToStart(&inParallelBlock);
+    SmallVector<Value> indicesVec;
+    if (indices) {
+      indicesVec.push_back(indices);
+    }
+
+    IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, Type(), source,
+                                            indicesVec, sharedOut, laneId);
+
+    // Erase parallel_insert_slice ops and gather op
+    SmallVector<tensor::ParallelInsertSliceOp> toErase;
+    for (auto &op : inParallelBlock) {
+      if (auto insertOp = dyn_cast<tensor::ParallelInsertSliceOp>(&op)) {
+        toErase.push_back(insertOp);
+      }
+    }
+    for (auto insertOp : toErase) {
+      rewriter.eraseOp(insertOp);
+    }
+    rewriter.eraseOp(tiledGatherOp);
+
+    return success();
   }
 };
 
@@ -399,7 +542,8 @@ struct GPUConvertToCoalescedDMAPass final
   }
 
 private:
-  /// Tile operation at subgroup level using GPU lowering config.
+  /// Tile operation at subgroup level using workgroup_size and subgroup_size
+  /// from translation_info.
   template <typename OpTy>
   FailureOr<scf::SCFTilingResult> tileAtSubgroupLevel(IRRewriter &rewriter,
                                                       OpTy op) {
@@ -408,18 +552,61 @@ private:
     if (!dmaConfig)
       return failure();
 
-    SmallVector<OpFoldResult> tileSizes = dmaConfig.getTilingLevelSizes(
-        rewriter, llvm::to_underlying(IREE::GPU::TilingLevel::Subgroup), op);
+    // Get the function containing this operation.
+    auto funcOp = op->template getParentOfType<FunctionOpInterface>();
+    if (!funcOp)
+      return failure();
 
-    if (tileSizes.empty())
+    // Get workgroup size and subgroup size from translation_info.
+    std::optional<SmallVector<int64_t>> workgroupSize =
+        getWorkgroupSize(funcOp);
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (!workgroupSize || !subgroupSize)
+      return failure();
+
+    // Calculate number of subgroups per dimension.
+    // workgroupSize is [X, Y, Z], and we divide by subgroupSize to get warps.
+    SmallVector<int64_t> numWarps;
+    for (int64_t wgSize : *workgroupSize) {
+      if (wgSize > 0 && *subgroupSize > 0) {
+        numWarps.push_back(wgSize / *subgroupSize);
+      } else {
+        numWarps.push_back(1);
+      }
+    }
+
+    // Get the output type to determine rank and shape.
+    auto outputType = cast<RankedTensorType>(op.getOutputs()[0].getType());
+    int64_t rank = outputType.getRank();
+    ArrayRef<int64_t> shape = outputType.getShape();
+
+    // Compute tile sizes: divide the shape by number of warps.
+    // This distributes the work across warps in each dimension.
+    SmallVector<OpFoldResult> tileSizes;
+    int64_t numTiledDims = 0;
+    for (int64_t i = 0; i < rank; ++i) {
+      // Map dimensions: innermost dims map to innermost workgroup dims.
+      // For 2D: dim 0 (rows) -> wgSize[1], dim 1 (cols) -> wgSize[0].
+      int64_t warpDim =
+          (rank - 1 - i) < numWarps.size() ? numWarps[rank - 1 - i] : 1;
+      if (warpDim > 1 && shape[i] != ShapedType::kDynamic) {
+        int64_t tileSize = (shape[i] + warpDim - 1) / warpDim;
+        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+        numTiledDims++;
+      } else {
+        tileSizes.push_back(rewriter.getIndexAttr(0));
+      }
+    }
+
+    // Check if we have any non-zero tile sizes.
+    if (numTiledDims == 0)
       return failure();
 
     scf::SCFTilingOptions tilingOptions;
     tilingOptions.setTileSizes(tileSizes);
     tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
-
-    auto rank = cast<RankedTensorType>(op.getOutputs()[0].getType()).getRank();
-    tilingOptions.setMapping(getWarpMapping(context, rank));
+    // Only create mapping for the dimensions that are actually tiled.
+    tilingOptions.setMapping(getWarpMapping(context, numTiledDims));
 
     rewriter.setInsertionPoint(op);
     FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
