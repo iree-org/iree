@@ -264,8 +264,9 @@ struct SwizzleHintOpInterface final
     auto hintOp = cast<IREE::Codegen::SwizzleHintOp>(op);
     FailureOr<Value> maybeBuffer =
         getBuffer(rewriter, hintOp.getOperand(), options, state);
-    if (failed(maybeBuffer))
+    if (failed(maybeBuffer)) {
       return failure();
+    }
     replaceOpWithNewBufferizedOp<IREE::Codegen::SwizzleHintOp>(
         rewriter, op, *maybeBuffer, hintOp.getSwizzle());
     return success();
