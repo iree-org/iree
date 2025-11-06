@@ -192,9 +192,9 @@ module {
 
 module {
   func.func @test_use_global_load_dma_with_subgroup() attributes {
-      lowering_config = #iree_gpu.use_global_load_dma<subgroup = [4, 128]>} {
+      lowering_config = #iree_gpu.use_global_load_dma} {
     return
   }
 }
 // CHECK-LABEL: func @test_use_global_load_dma_with_subgroup
-//  CHECK-SAME:   lowering_config = #iree_gpu.use_global_load_dma<subgroup = [4, 128]>
+//  CHECK-SAME:   lowering_config = #iree_gpu.use_global_load_dma

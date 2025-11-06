@@ -464,6 +464,11 @@ struct ConvertGatherToCoalescedDMA
     if (indices) {
       rewriter.setInsertionPoint(inParallelOp);
       auto indicesType = cast<RankedTensorType>(indices.getType());
+
+      // TODO: Support multi-dimensional indices in the future.
+      // Currently only 1D indices are supported for gather operations.
+      assert(indicesType.getRank() <= 1 &&
+             "Only 1D indices are currently supported for gather operations");
       Type elementType = indicesType.getElementType();
 
       VectorType vectorTypeOriginal =
