@@ -11,6 +11,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/TypeUtilities.h"
 
 namespace mlir::iree_compiler {
 
@@ -28,19 +29,24 @@ static Value bitcastToStaticTypeImpl(OpBuilder &b, Location loc,
                                             ValueRange(), ValueRange());
 }
 
+static inline unsigned int getDataTypeStorageBitWidth(Type type) {
+  Type elementType = getElementTypeOrSelf(type);
+  // Conservatively enforce 64 bit indices for (potentially constant evaluated)
+  // hoisted globals.
+  if (elementType.isIndex())
+    return 64;
+  return IREE::Util::getTypeBitWidth(elementType);
+}
+
 struct HoistableTensorTypeInterface
     : public IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableTensorTypeInterface, RankedTensorType> {
   bool isHoistableType(Type type) const {
-    auto tensorType = cast<RankedTensorType>(type);
-    unsigned bitWidth =
-        IREE::Util::getTypeBitWidth(tensorType.getElementType());
+    unsigned bitWidth = getDataTypeStorageBitWidth(type);
     return llvm::isPowerOf2_32(bitWidth) && bitWidth <= 64;
   }
   bool isHoistableLeafType(Type type) const {
-    auto tensorType = cast<RankedTensorType>(type);
-    unsigned bitWidth =
-        IREE::Util::getTypeBitWidth(tensorType.getElementType());
+    unsigned bitWidth = getDataTypeStorageBitWidth(type);
     // Never hoist boolean values; IREE still does implicit extension of
     // booleans to a byte width so we avoid packing them.
     return bitWidth != 1;
@@ -51,8 +57,7 @@ struct HoistableTensorTypeInterface
     if (!tensorType.hasStaticShape()) {
       return type;
     }
-    unsigned elementBitWidth =
-        IREE::Util::getTypeBitWidth(tensorType.getElementType());
+    unsigned elementBitWidth = getDataTypeStorageBitWidth(tensorType);
     // Bit cast sub-byte and non-byte aligned tensor types as MLIR cannot store
     // them packed at the moment. Also bools continue getting special treatment.
     if (elementBitWidth == 1 ||
@@ -92,9 +97,8 @@ struct HoistableIndexTypeInterface
   bool isHoistableType(Type type) const { return true; }
   bool isHoistableLeafType(Type type) const { return true; }
   Type getPreferredStorageType(Type type) const {
-    // Conservatively enforce 64 bit indices for
-    // (potentially constant evaluated) hoisted globals.
-    return IntegerType::get(type.getContext(), 64);
+    return IntegerType::get(type.getContext(),
+                            getDataTypeStorageBitWidth(type));
   }
   static Value encodeStorageType(OpBuilder &builder, Location loc,
                                  Type storageType, Value init) {
