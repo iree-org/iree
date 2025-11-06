@@ -6319,12 +6319,12 @@ type.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.swizzle_hint` $operand `[` $swizzle attr-dict `]` `:` type($result)
 </code></pre></div>
-<p>Optimization hint to swizzle all accesses to the memref this takes a view
-of. This only affects reads/writes immediately consuming this operation and
-is best effort. If the desired swizzling is not apparently possible, this
+<p>Optimization hint to swizzle all accesses to the memref or tensor that this takes a
+view of. This only affects reads/writes that immediately consume this operation
+and is best effort. If the desired swizzling is not apparently possible, this
 op will no-op. As a result, it should not be relied on for correctness.</p>
-<p>Any subviews on this operation will cause swizzling to fail. The expectation
-is for all view like operations to fold into the accessing ops
+<p>Any subviews on this operation will cause the swizzle application to fail. The
+expectation is for all view like operations to fold into the accessing ops
 (loads/stores) before this op takes effect.</p>
 <p>Note that this only rewrites direct users. If there are any aliased loads
 or stores of the data from/to the |src| memref of a hintOp, those accesses
@@ -6369,7 +6369,7 @@ is otherwise perfectly legal.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operand</code></td>
-<td>1D memref of any type values</td>
+<td>tensor or memref of any type values and rank 1</td>
 </tr>
 </tbody>
 </table>
@@ -6384,7 +6384,7 @@ is otherwise perfectly legal.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>1D memref of any type values</td>
+<td>tensor or memref of any type values and rank 1</td>
 </tr>
 </tbody>
 </table>
