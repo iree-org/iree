@@ -24,18 +24,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 //===----------------------------------------------------------------------===//
-// Op types
-//===----------------------------------------------------------------------===//
-
-class Util_Op<string mnemonic, list<Trait> traits = []> :
-    Op<Util_Dialect, mnemonic, traits> {
-  let hasCustomAssemblyFormat = 1;
-}
-
-class Util_PureOp<string mnemonic, list<Trait> traits = []> :
-    Util_Op<mnemonic, !listconcat(traits, [Pure])>;
-
-//===----------------------------------------------------------------------===//
 // Type manipulation
 //===----------------------------------------------------------------------===//
 

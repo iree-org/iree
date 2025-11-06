@@ -50,22 +50,13 @@ def IOParameters_Dialect : Dialect {
 }
 
 //===----------------------------------------------------------------------===//
-// IOParameters enums
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// IOParameters types
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// IOParameters op traits
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
 // Base IOParameters op classes
 //===----------------------------------------------------------------------===//
 
 class IOParameters_Op<string mnemonic, list<Trait> traits = []> :
     Op<IOParameters_Dialect, mnemonic, !listconcat(traits, [])> {}
+
+class IOParameters_PureOp<string mnemonic, list<Trait> traits = []> :
+    IOParameters_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 #endif  // IREE_DIALECT_MODULES_IO_PARAMETERS_BASE

@@ -19,19 +19,6 @@ include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
-// Trial ops do not have any memory effects but may invoke Undefine Behavior on
-// some inputs. This makes them conditionally speculatable/hoistable.
-class VM_TrivialOp<string mnemonic, list<Trait> traits = []> :
-      VM_Op<mnemonic, !listconcat(traits, [NoMemoryEffect])>;
-
-// Pure ops do not have any memory effects, do not invoke Undefined Behavior,
-// and are always safe to speculate/hoist.
-//
-// TODO(https://github.com/iree-org/iree/issues/11179): More VM ops should be
-// made pure.
-class VM_PureOp<string mnemonic, list<Trait> traits = []> :
-      VM_TrivialOp<mnemonic, !listconcat(traits, [AlwaysSpeculatable])>;
-
 //===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//

@@ -189,11 +189,17 @@ iree_gentbl_cc_library(
             "IREECodegenAttrs.cpp.inc",
         ),
         (
-            ["--gen-enum-decls"],
+            [
+                "--gen-enum-decls",
+                "--dialect=iree_codegen",
+            ],
             "IREECodegenEnums.h.inc",
         ),
         (
-            ["--gen-enum-defs"],
+            [
+                "--gen-enum-defs",
+                "--dialect=iree_codegen",
+            ],
             "IREECodegenEnums.cpp.inc",
         ),
     ],

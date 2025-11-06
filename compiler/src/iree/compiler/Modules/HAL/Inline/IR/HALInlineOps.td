@@ -8,14 +8,12 @@
 #define IREE_DIALECT_MODULES_HAL_INLINE_OPS
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
+include "iree/compiler/Dialect/HAL/IR/HALTypes.td"
 include "iree/compiler/Modules/HAL/Inline/IR/HALInlineBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-
-class HALInline_PureOp<string mnemonic, list<Trait> traits = []> :
-    HALInline_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // !hal.buffer / iree_hal_buffer_t
