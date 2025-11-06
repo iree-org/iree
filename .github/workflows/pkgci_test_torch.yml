@@ -32,20 +32,23 @@ jobs:
           # CPU
           - name: cpu_task
             markers: "cpu"
-            config-file: pytorch_ops_cpu_llvm_sync.json
+            config-file: torch_ops_cpu_llvm_sync.json
             runs-on: ubuntu-24.04
-          - name: amdgpu_hip_rdna3_O3
+          - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
-          - name: amdgpu_vulkan_O0
+          - name: amdgpu_vulkan_O3
             config-file: torch_ops_gpu_vulkan_O3.json
             runs-on: [Linux, X64, rdna3]
+          - name: amdgpu_rocm_mi300_gfx942_O3
+            config-file: torch_ops_gpu_hip_gfx942_O3.json
+            runs-on: linux-mi325-1gpu-ossci-iree-org
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
       VENV_DIR: ${{ github.workspace }}/venv
       GH_TOKEN: ${{ github.token }}
-      CONFIG_FILE_PATH: tests/external/iree-test-suites/pytorch_ops/${{ matrix.config-file }}
+      CONFIG_FILE_PATH: tests/external/iree-test-suites/torch_ops/${{ matrix.config-file }}
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -76,11 +79,11 @@ jobs:
       - name: Install Torch ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          python -m pip install -r iree-test-suites/pytorch_ops/requirements.txt
+          python -m pip install -r iree-test-suites/torch_ops/requirements.txt
       - name: Run Torch ops test suite
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest iree-test-suites/pytorch_ops/ \
+          pytest iree-test-suites/torch_ops/ \
               -rpfE \
               --timeout=30 \
               --durations=20 \
