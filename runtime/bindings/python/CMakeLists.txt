@@ -342,10 +342,21 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
     iree-create-parameters
     iree-dump-module
     iree-dump-parameters
-    iree-flatcc-cli
     iree-run-module
     ${_EXTRA_INSTALL_TOOL_TARGETS}
   DESTINATION \"${_INSTALL_DIR}/iree/_runtime_libs\"
+  COMPONENT \"${_INSTALL_COMPONENT}\"
+)
+")
+
+# iree-flatcc-cli is an alias of the flatcc_cli target defined in flatcc. Use a
+# variant of the install command that supports renaming.
+cmake_language(EVAL CODE "
+cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
+  CALL install
+  PROGRAMS \$<TARGET_FILE:flatcc_cli>
+  DESTINATION \"${_INSTALL_DIR}/iree/_runtime_libs\"
+  RENAME iree-flatcc-cli
   COMPONENT \"${_INSTALL_COMPONENT}\"
 )
 ")
