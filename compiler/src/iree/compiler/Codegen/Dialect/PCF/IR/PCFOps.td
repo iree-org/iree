@@ -592,6 +592,200 @@ def PCF_WriteSliceOp : PCF_Op<"write_slice", [
 } // OpGroupWriteOps
 
 //===----------------------------------------------------------------------===//
+// ReadOps
+//===----------------------------------------------------------------------===//
+
+def OpGroupReadOps : OpDocGroup {
+  let summary = "Read ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupReadOps in {
+
+//===----------------------------------------------------------------------===//
+// ReadSliceOp
+//===----------------------------------------------------------------------===//
+
+def PCF_ReadSliceOp : PCF_Op<"read_slice", [
+       AttrSizedOperandSegments,
+       OffsetSizeAndStrideOpInterface,
+       AllRanksMatch<["source", "result"]>,
+       AllElementTypesMatch<["source", "result"]>,
+  ]> {
+  let summary = [{
+    Read a tensor or vector from a `pcf.sref` based on the provided slice
+    parameters.
+  }];
+  let description = [{
+    Read a slice from a `pcf.sref`. If this is reading a vector, the sizes
+    may be smaller than the return vector type. In this case out of bounds
+    elements have undefined value.
+
+    The `pcf.read_slice` operation supports the following arguments:
+    * source: the shaped value that is written.
+    * dest: the shaped_ref into which the source is written.
+    * offsets: shaped-rank number of offsets into the `dest` into which
+               the slice is inserted.
+    * sizes: shaped-rank number of sizes which specify the sizes of the source
+             tensor type.
+    * strides: shaped-rank number of strides that specify subsampling in each
+               dimension.
+  }];
+
+  let arguments = (ins
+    PCF_AnyShapedRef:$source,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides,
+    DenseI64ArrayAttr:$static_offsets,
+    DenseI64ArrayAttr:$static_sizes,
+    DenseI64ArrayAttr:$static_strides
+  );
+
+  let results = (outs AnyTypeOf<[AnyRankedTensor, AnyVectorOfAnyRank]>:$result);
+
+  let assemblyFormat = [{
+    $source ``
+    custom<DynamicIndexList>($offsets, $static_offsets)
+    custom<DynamicIndexList>($sizes, $static_sizes)
+    custom<DynamicIndexList>($strides, $static_strides)
+    attr-dict `:` type($source) `to` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    PCF::ShapedRefType getSourceType() {
+      return ::llvm::cast<PCF::ShapedRefType>(getSource().getType());
+    }
+
+    ShapedType getResultType() {
+      return ::llvm::cast<ShapedType>(getResult().getType());
+    }
+
+    /// Return the expected rank of each of the `static_offsets`, `static_sizes`
+    /// and `static_strides` attributes.
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
+      unsigned rank = getSourceType().getRank();
+      return {rank, rank, rank};
+    }
+
+    /// Return the number of leading operands before `offsets`, `sizes` and
+    /// `strides` operands.
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 1; }
+  }];
+
+  let builders = [
+    // Build a ReadSliceOp with mixed static and dynamic entries.
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+      "ArrayRef<OpFoldResult>":$offsets, "ArrayRef<OpFoldResult>":$sizes,
+      "ArrayRef<OpFoldResult>":$strides,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    // Build a ReadSliceOp with mixed static and dynamic entries
+    // packed into a Range vector.
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+      "ArrayRef<Range>":$ranges,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    // Build a ReadSliceOp with dynamic entries.
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+      "ValueRange":$offsets, "ValueRange":$sizes, "ValueRange":$strides,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// GetMemrefOp
+//===----------------------------------------------------------------------===//
+
+def PCF_GetMemrefOp : PCF_Op<"get_memref", [
+       AttrSizedOperandSegments,
+       OffsetSizeAndStrideOpInterface,
+       AllRanksMatch<["source", "result"]>,
+       AllElementTypesMatch<["source", "result"]>,
+  ]> {
+  let summary = [{
+    Extract a memref view from a slice of a `pcf.shaped_ref`.
+  }];
+  let description = [{
+    The `pcf.get_memref` operation extracts a memref view from a slice of a
+    shaped_ref, breaking the synchronization guarantees of the source.
+
+    The returned memref must have a maximally dynamic layout (all strides and
+    offset dynamic) and no memory space. Layout and memory space information
+    is determined by the ConvertSRefToMemRef analysis pass.
+
+    The operation supports the following arguments:
+    * source: the shaped_ref from which to extract a view.
+    * offsets: shaped-rank number of offsets into the `source` from which
+               the slice begins.
+    * sizes: shaped-rank number of sizes which specify the sizes of the result
+             memref type.
+    * strides: shaped-rank number of strides that specify subsampling in each
+               dimension.
+  }];
+
+  let arguments = (ins
+    PCF_AnyShapedRef:$source,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides,
+    DenseI64ArrayAttr:$static_offsets,
+    DenseI64ArrayAttr:$static_sizes,
+    DenseI64ArrayAttr:$static_strides
+  );
+
+  let results = (outs AnyMemRef:$result);
+
+  let assemblyFormat = [{
+    $source ``
+    custom<DynamicIndexList>($offsets, $static_offsets)
+    custom<DynamicIndexList>($sizes, $static_sizes)
+    custom<DynamicIndexList>($strides, $static_strides)
+    attr-dict `:` type($source) `to` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    PCF::ShapedRefType getSourceType() {
+      return ::llvm::cast<PCF::ShapedRefType>(getSource().getType());
+    }
+
+    MemRefType getResultType() {
+      return ::llvm::cast<MemRefType>(getResult().getType());
+    }
+
+    /// Return the expected rank of each of the `static_offsets`, `static_sizes`
+    /// and `static_strides` attributes.
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
+      unsigned rank = getSourceType().getRank();
+      return {rank, rank, rank};
+    }
+
+    /// Return the number of leading operands before `offsets`, `sizes` and
+    /// `strides` operands.
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 1; }
+  }];
+
+  let builders = [
+    // Build a GetMemrefOp with mixed static and dynamic entries.
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+      "ArrayRef<OpFoldResult>":$offsets, "ArrayRef<OpFoldResult>":$sizes,
+      "ArrayRef<OpFoldResult>":$strides,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    // Build a GetMemrefOp with mixed static and dynamic entries
+    // packed into a Range vector.
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+      "ArrayRef<Range>":$ranges,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+    // Build a GetMemrefOp with dynamic entries.
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+      "ValueRange":$offsets, "ValueRange":$sizes, "ValueRange":$strides,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+  ];
+
+  let hasVerifier = 1;
+}
+
+} // OpGroupReadOps
+
+//===----------------------------------------------------------------------===//
 // Misc
 //===----------------------------------------------------------------------===//
 

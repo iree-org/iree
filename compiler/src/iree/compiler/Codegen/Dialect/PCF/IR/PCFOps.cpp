@@ -669,6 +669,120 @@ void WriteSliceOp::build(OpBuilder &b, OperationState &result, Value source,
 }
 
 //===----------------------------------------------------------------------===//
+// ReadSliceOp
+//===----------------------------------------------------------------------===//
+
+void ReadSliceOp::build(OpBuilder &b, OperationState &result, Type resultType,
+                        Value source, ArrayRef<OpFoldResult> offsets,
+                        ArrayRef<OpFoldResult> sizes,
+                        ArrayRef<OpFoldResult> strides,
+                        ArrayRef<NamedAttribute> attrs) {
+  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+  SmallVector<Value> dynamicOffsets, dynamicSizes, dynamicStrides;
+  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
+  result.addAttributes(attrs);
+  build(b, result, resultType, source, dynamicOffsets, dynamicSizes,
+        dynamicStrides, b.getDenseI64ArrayAttr(staticOffsets),
+        b.getDenseI64ArrayAttr(staticSizes),
+        b.getDenseI64ArrayAttr(staticStrides));
+}
+
+void ReadSliceOp::build(OpBuilder &b, OperationState &result, Type resultType,
+                        Value source, ArrayRef<Range> ranges,
+                        ArrayRef<NamedAttribute> attrs) {
+  auto [offsets, sizes, strides] = getOffsetsSizesAndStrides(ranges);
+  build(b, result, resultType, source, offsets, sizes, strides, attrs);
+}
+
+void ReadSliceOp::build(OpBuilder &b, OperationState &result, Type resultType,
+                        Value source, ValueRange offsets, ValueRange sizes,
+                        ValueRange strides, ArrayRef<NamedAttribute> attrs) {
+  SmallVector<OpFoldResult> offsetValues = llvm::to_vector<4>(
+      llvm::map_range(offsets, [](Value v) -> OpFoldResult { return v; }));
+  SmallVector<OpFoldResult> sizeValues = llvm::to_vector<4>(
+      llvm::map_range(sizes, [](Value v) -> OpFoldResult { return v; }));
+  SmallVector<OpFoldResult> strideValues = llvm::to_vector<4>(
+      llvm::map_range(strides, [](Value v) -> OpFoldResult { return v; }));
+  build(b, result, resultType, source, offsetValues, sizeValues, strideValues);
+}
+
+//===----------------------------------------------------------------------===//
+// GetMemrefOp
+//===----------------------------------------------------------------------===//
+
+void GetMemrefOp::build(OpBuilder &b, OperationState &result, Type resultType,
+                        Value source, ArrayRef<OpFoldResult> offsets,
+                        ArrayRef<OpFoldResult> sizes,
+                        ArrayRef<OpFoldResult> strides,
+                        ArrayRef<NamedAttribute> attrs) {
+  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+  SmallVector<Value> dynamicOffsets, dynamicSizes, dynamicStrides;
+  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
+  result.addAttributes(attrs);
+  build(b, result, resultType, source, dynamicOffsets, dynamicSizes,
+        dynamicStrides, b.getDenseI64ArrayAttr(staticOffsets),
+        b.getDenseI64ArrayAttr(staticSizes),
+        b.getDenseI64ArrayAttr(staticStrides));
+}
+
+void GetMemrefOp::build(OpBuilder &b, OperationState &result, Type resultType,
+                        Value source, ArrayRef<Range> ranges,
+                        ArrayRef<NamedAttribute> attrs) {
+  auto [offsets, sizes, strides] = getOffsetsSizesAndStrides(ranges);
+  build(b, result, resultType, source, offsets, sizes, strides, attrs);
+}
+
+void GetMemrefOp::build(OpBuilder &b, OperationState &result, Type resultType,
+                        Value source, ValueRange offsets, ValueRange sizes,
+                        ValueRange strides, ArrayRef<NamedAttribute> attrs) {
+  SmallVector<OpFoldResult> offsetValues = llvm::to_vector<4>(
+      llvm::map_range(offsets, [](Value v) -> OpFoldResult { return v; }));
+  SmallVector<OpFoldResult> sizeValues = llvm::to_vector<4>(
+      llvm::map_range(sizes, [](Value v) -> OpFoldResult { return v; }));
+  SmallVector<OpFoldResult> strideValues = llvm::to_vector<4>(
+      llvm::map_range(strides, [](Value v) -> OpFoldResult { return v; }));
+  build(b, result, resultType, source, offsetValues, sizeValues, strideValues);
+}
+
+LogicalResult GetMemrefOp::verify() {
+  auto resultType = getResultType();
+
+  // Check that the result has no memory space.
+  if (resultType.getMemorySpace()) {
+    return emitOpError("result memref must have no memory space, got ")
+           << resultType;
+  }
+
+  // Check that the result has a strided layout.
+  auto layout = dyn_cast_or_null<StridedLayoutAttr>(resultType.getLayout());
+  if (!layout) {
+    return emitOpError(
+               "result memref must have a strided layout attribute, got ")
+           << resultType;
+  }
+
+  // Check that all strides and offset are dynamic>
+  if (layout.getOffset() != ShapedType::kDynamic) {
+    return emitOpError("result memref layout must have dynamic offset, got ")
+           << resultType;
+  }
+
+  for (auto stride : layout.getStrides()) {
+    if (stride != ShapedType::kDynamic) {
+      return emitOpError(
+                 "result memref layout must have all dynamic strides, got ")
+             << resultType;
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Dialect registration
 //===----------------------------------------------------------------------===//
 

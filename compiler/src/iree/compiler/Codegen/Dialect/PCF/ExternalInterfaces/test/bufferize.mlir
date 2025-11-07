@@ -183,3 +183,19 @@ util.func private @replay_write_tensor_bufferize(%src: memref<2xi32>, %dst: !pcf
 
 // CHECK-LABEL: @replay_write_tensor_bufferize
 //  CHECK-NEXT:   pcf.write_slice %{{.*}} into %{{.*}}[1] [2] [1] : memref<2xi32> into !pcf.sref<?xi32, #pcf.dummy_scope>
+
+// -----
+
+util.func private @read_tensor(%src: !pcf.sref<?x?xi32, #pcf.dummy_scope>, %s0: index, %s1: index) -> tensor<?x?xi32> {
+  %result = pcf.read_slice %src[0, 1] [%s0, %s1] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to tensor<?x?xi32>
+  util.return %result : tensor<?x?xi32>
+}
+
+// CHECK-LABEL: @read_tensor
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: !pcf.sref<?x?xi32, #pcf.dummy_scope>
+//  CHECK-SAME:   %[[S0:[A-Za-z0-9]+]]: index
+//  CHECK-SAME:   %[[S1:[A-Za-z0-9]+]]: index
+//  CHECK-NEXT:   %[[MEMREF:.+]] = pcf.get_memref %[[SRC]][0, 1] [%[[S0]], %[[S1]]] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+//  CHECK-NEXT:   %[[RESULT:.+]] = bufferization.to_tensor %[[MEMREF]] : memref<?x?xi32, strided<[?, ?], offset: ?>> to tensor<?x?xi32>
+//  CHECK-NEXT:   util.return %[[RESULT]] : tensor<?x?xi32>
+

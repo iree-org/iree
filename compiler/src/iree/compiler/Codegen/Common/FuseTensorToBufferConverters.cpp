@@ -42,10 +42,13 @@ getProducerSlices(PCFOpTy pcfOp, OpResult result) {
     return failure();
   }
 
-  // Collect all WriteSliceOps that use this argument. Fail if there are any
-  // non write_slice users.
+  // Collect all WriteSliceOps that use this argument. Skip ReadSliceOps but
+  // fail if there are any other users.
   SmallVector<IREE::PCF::WriteSliceOp> writeSlices;
   for (Operation *user : tiedArg.getUsers()) {
+    if (isa<IREE::PCF::ReadSliceOp>(user)) {
+      continue;
+    }
     auto writeSlice = dyn_cast<IREE::PCF::WriteSliceOp>(user);
     if (!writeSlice) {
       return failure();

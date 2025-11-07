@@ -71,4 +71,19 @@ def FuseConsumersPass :
   ];
 }
 
+def FusePCFWritesPass :
+    Pass<"iree-pcf-fuse-pcf-writes", ""> {
+  let summary = "Fuses pcf.write_slice with tensor.parallel_insert_slice from scf.forall";
+  let description = [{
+    Primarily test pass for composing pcf.write_slice operations where the
+    source is produced by an scf.forall with tensor.parallel_insert_slice
+    in its terminator. Composes the insert_slice with the write_slice.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::PCF::PCFDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect"
+  ];
+}
+
 #endif // IREE_CODEGEN_DIALECT_PCF_TRANSFORMS_PASSES

@@ -120,6 +120,10 @@ lookupProducerSlices(OpResult result,
     return failure();
   }
   for (auto user : tiedArg.getUsers()) {
+    // We can ignore memory reads.
+    if (isa<PCF::ReadSliceOp>(user)) {
+      continue;
+    }
     auto sliceOp = dyn_cast<PCF::WriteSliceOp>(user);
     // TODO: Support vector operands.
     if (!sliceOp || !isa<RankedTensorType>(sliceOp.getSourceType()) ||

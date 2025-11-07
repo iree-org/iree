@@ -735,6 +735,82 @@ struct ConvertWriteSliceOp : public OpConversionPattern<PCF::WriteSliceOp> {
   }
 };
 
+struct ConvertReadSliceOp : public OpConversionPattern<PCF::ReadSliceOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(PCF::ReadSliceOp readOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value sourceSlice = memref::SubViewOp::create(
+        rewriter, readOp.getLoc(), adaptor.getSource(),
+        readOp.getMixedOffsets(), readOp.getMixedSizes(),
+        readOp.getMixedStrides());
+    return llvm::TypeSwitch<Type, LogicalResult>(readOp.getResultType())
+        .Case<RankedTensorType>([&](RankedTensorType tensor) {
+          rewriter.replaceOpWithNewOp<IREE::Codegen::LoadFromBufferOp>(
+              readOp, tensor, sourceSlice);
+          return success();
+        })
+        .Case<VectorType>([&](VectorType vector) {
+          SmallVector<bool> inBounds(vector.getRank(), true);
+          for (auto [inBound, vecSize, loadSize] : llvm::zip_equal(
+                   inBounds, vector.getShape(), readOp.getStaticSizes())) {
+            // Since vectors must be statically sized we can just check for
+            // equality here.
+            inBound = vecSize == loadSize;
+          }
+          SmallVector<Value> offsets(
+              vector.getRank(),
+              arith::ConstantIndexOp::create(rewriter, readOp.getLoc(), 0));
+          // Use zero padding value.
+          Value zeroPadding = arith::ConstantOp::create(
+              rewriter, readOp.getLoc(), vector.getElementType(),
+              rewriter.getZeroAttr(vector.getElementType()));
+          rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+              readOp, vector, sourceSlice, offsets, zeroPadding, inBounds);
+          return success();
+        })
+        .Default([](Type) { return failure(); });
+  }
+};
+
+struct ConvertGetMemrefOp : public OpConversionPattern<PCF::GetMemrefOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(PCF::GetMemrefOp getMemrefOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // The source has been converted to memref with refined layout and memory
+    // space. We need to cast it to match the maximally dynamic layout and no
+    // memory space of the GetMemrefOp result type.
+    Value source = adaptor.getSource();
+    auto sourceType = cast<MemRefType>(source.getType());
+    auto resultType = getMemrefOp.getResultType();
+
+    // Cast away memory space if present.
+    if (sourceType.getMemorySpace()) {
+      auto noMemSpaceType =
+          MemRefType::get(sourceType.getShape(), sourceType.getElementType(),
+                          sourceType.getLayout(), nullptr);
+      source = memref::MemorySpaceCastOp::create(rewriter, getMemrefOp.getLoc(),
+                                                 noMemSpaceType, source);
+      sourceType = noMemSpaceType;
+    }
+
+    // Cast to maximally dynamic layout to match the return type.
+    if (sourceType.getLayout() != resultType.getLayout()) {
+      source = memref::CastOp::create(rewriter, getMemrefOp.getLoc(),
+                                      resultType, source);
+    }
+
+    // Create subview using the slice params.
+    rewriter.replaceOpWithNewOp<memref::SubViewOp>(
+        getMemrefOp, source, getMemrefOp.getMixedOffsets(),
+        getMemrefOp.getMixedSizes(), getMemrefOp.getMixedStrides());
+    return success();
+  }
+};
+
 struct ConvertAllocOp : public OpConversionPattern<PCF::AllocOp> {
   using Base::Base;
 
@@ -1025,8 +1101,8 @@ void ConvertSRefToMemRefPass::runOnOperation() {
   config.allowPatternRollback = false;
 
   patterns.insert<ConvertGenericOp, ConvertLoopOp, ConvertWriteSliceOp,
-                  ConvertAllocOp, ConvertOptimizationBarrier>(typeConverter,
-                                                              context);
+                  ConvertReadSliceOp, ConvertGetMemrefOp, ConvertAllocOp,
+                  ConvertOptimizationBarrier>(typeConverter, context);
 
   // Function related conversion patterns need the analysis to lookup function
   // type conversions.

@@ -87,6 +87,12 @@ void fuseTilableConsumer(RewriterBase &rewriter, PCF::LoopOp loopOp,
 // a canonicalization pattern.
 void populatePCFDropUnusedResultPatterns(RewritePatternSet &patterns);
 
+// Compose a pcf.write_slice with a tensor.parallel_insert_slice from an
+// scf.forall terminator. Returns the new write_slice on success.
+FailureOr<PCF::WriteSliceOp>
+composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
+                                    PCF::WriteSliceOp writeSliceOp);
+
 } // namespace mlir::iree_compiler::IREE::PCF
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_PCF_TRANSFORMS_TRANSFORMS_H_

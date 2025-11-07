@@ -298,3 +298,176 @@ func.func @invalid_workgroup_alloc(%d0: index) -> !pcf.sref<?x5xi32, #iree_codeg
   %0 = pcf.alloc(%d0) : !pcf.sref<?x5xi32, #iree_codegen.workgroup>
   return %0 : !pcf.sref<?x5xi32, #iree_codegen.workgroup>
 }
+
+// -----
+
+util.func private @convert_get_memref(%arg0: memref<?x?xi32, strided<[?, 1]>, 3>, %s0: index, %s1: index) {
+  pcf.generic scope(#pcf.dummy_scope)
+    execute(%ref = %arg0)[%id: index, %n: index]
+         : (!pcf.sref<?x?xi32, #pcf.dummy_scope>)
+        -> (memref<?x?xi32, strided<[?, 1]>, 3>) {
+    %view = pcf.get_memref %ref[0, 1] [%s0, %s1] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+    util.optimization_barrier %view : memref<?x?xi32, strided<[?, ?], offset: ?>>
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @convert_get_memref
+//  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: memref<?x?xi32, strided<[?, 1]>, 3>
+//  CHECK-SAME:     %[[S0:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:     %[[S1:[A-Za-z0-9_]+]]: index
+//       CHECK:   pcf.generic
+//  CHECK-NEXT:     execute[{{.*}}] {
+//   CHECK-DAG:     %[[CAST:.+]] = memref.memory_space_cast %[[ARG0]] : memref<?x?xi32, strided<[?, 1]>, 3> to memref<?x?xi32, strided<[?, 1]>>
+//   CHECK-DAG:     %[[CAST2:.+]] = memref.cast %[[CAST]] : memref<?x?xi32, strided<[?, 1]>> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+//   CHECK-DAG:     %[[SV:.+]] = memref.subview %[[CAST2]][0, 1] [%[[S0]], %[[S1]]] [1, 1] : memref<?x?xi32, strided<[?, ?], offset: ?>> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+//       CHECK:     util.optimization_barrier %[[SV]]
+//       CHECK:     pcf.return
+
+// -----
+
+util.func private @convert_get_memref_no_space(%arg0: memref<?x?xi32, strided<[?, 1]>>, %s0: index, %s1: index) {
+  pcf.generic scope(#pcf.dummy_scope)
+    execute(%ref = %arg0)[%id: index, %n: index]
+         : (!pcf.sref<?x?xi32, #pcf.dummy_scope>)
+        -> (memref<?x?xi32, strided<[?, 1]>>) {
+    %view = pcf.get_memref %ref[0, 1] [%s0, %s1] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+    util.optimization_barrier %view : memref<?x?xi32, strided<[?, ?], offset: ?>>
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @convert_get_memref_no_space
+//  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: memref<?x?xi32, strided<[?, 1]>>
+//  CHECK-SAME:     %[[S0:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:     %[[S1:[A-Za-z0-9_]+]]: index
+//       CHECK:   pcf.generic
+//  CHECK-NEXT:     execute[{{.*}}] {
+//   CHECK-DAG:     %[[CAST:.+]] = memref.cast %[[ARG0]] : memref<?x?xi32, strided<[?, 1]>> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+//   CHECK-DAG:     %[[SV:.+]] = memref.subview %[[CAST]][0, 1] [%[[S0]], %[[S1]]] [1, 1] : memref<?x?xi32, strided<[?, ?], offset: ?>> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+//       CHECK:     util.optimization_barrier %[[SV]]
+//       CHECK:     pcf.return
+
+// -----
+
+util.func private @convert_tensor_read_slice(%arg0: memref<?x?xi32>) {
+  pcf.generic scope(#pcf.dummy_scope)
+    execute(%ref = %arg0)[%id: index, %n: index]
+         : (!pcf.sref<?x?xi32, #pcf.dummy_scope>)
+        -> (memref<?x?xi32>) {
+    %dst = pcf.read_slice %ref[1, 2] [3, 4] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to tensor<3x4xi32>
+    util.optimization_barrier %dst : tensor<3x4xi32>
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @convert_tensor_read_slice
+//  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: memref<?x?xi32>
+//       CHECK:   pcf.generic
+//  CHECK-NEXT:     execute[{{.*}}] {
+//   CHECK-DAG:     %[[SV:.+]] = memref.subview %[[ARG0]][1, 2] [3, 4] [1, 1] : memref<?x?xi32> to memref<3x4xi32, strided<[?, 1], offset: ?>>
+//   CHECK-DAG:     %[[DST:.+]] = iree_codegen.load_from_buffer %[[SV]] : memref<3x4xi32, strided<[?, 1], offset: ?>> -> tensor<3x4xi32>
+//       CHECK:     util.optimization_barrier %[[DST]]
+//       CHECK:     pcf.return
+
+// -----
+
+util.func private @convert_vector_read_slice(%arg0: memref<?x?xi32>) {
+  pcf.generic scope(#pcf.dummy_scope)
+    execute(%ref = %arg0)[%id: index, %n: index]
+         : (!pcf.sref<?x?xi32, #pcf.dummy_scope>)
+        -> (memref<?x?xi32>) {
+    %dst = pcf.read_slice %ref[1, 2] [3, 3] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to vector<3x4xi32>
+    util.optimization_barrier %dst : vector<3x4xi32>
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @convert_vector_read_slice
+//  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: memref<?x?xi32>
+//       CHECK:   pcf.generic
+//  CHECK-NEXT:     execute[{{.*}}] {
+//   CHECK-DAG:     %[[SV:.+]] = memref.subview %[[ARG0]][1, 2] [3, 3] [1, 1] : memref<?x?xi32> to memref<3x3xi32, strided<[?, 1], offset: ?>>
+//   CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0 : i32
+//       CHECK:     %[[DST:.+]] = vector.transfer_read %[[SV]][%c0, %c0], %[[ZERO]] {in_bounds = [true, false]}
+//       CHECK:     util.optimization_barrier %[[DST]]
+//       CHECK:     pcf.return
+
+// -----
+
+util.func private @convert_tensor_read_slice_no_tied_init(%dim_0: index, %dim_1: index) {
+  pcf.generic scope(#pcf.dummy_scope)
+    execute(%ref)[%id: index, %n: index]
+         : (!pcf.sref<?x?xi32, #pcf.dummy_scope>)
+        -> (memref<?x?xi32>{%dim_0, %dim_1}) {
+    %dst = pcf.read_slice %ref[1, 2] [3, 4] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to tensor<3x4xi32>
+    util.optimization_barrier %dst : tensor<3x4xi32>
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @convert_tensor_read_slice_no_tied_init
+//  CHECK-SAME:     %[[DIM0:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:     %[[DIM1:[A-Za-z0-9_]+]]: index
+//   CHECK-DAG:     %[[ALLOC:.+]] = memref.alloc(%[[DIM0]], %[[DIM1]]) {alignment = 16 : i64} : memref<?x?xi32>
+//       CHECK:   pcf.generic
+//  CHECK-NEXT:     execute[{{.*}}] {
+//   CHECK-DAG:     %[[SV:.+]] = memref.subview %[[ALLOC]][1, 2] [3, 4] [1, 1] : memref<?x?xi32> to memref<3x4xi32, strided<[?, 1], offset: ?>>
+//   CHECK-DAG:     %[[DST:.+]] = iree_codegen.load_from_buffer %[[SV]] : memref<3x4xi32, strided<[?, 1], offset: ?>> -> tensor<3x4xi32>
+//       CHECK:     util.optimization_barrier %[[DST]]
+//       CHECK:     pcf.return
+
+// -----
+
+util.func private @convert_vector_read_slice_dynamic_out_of_bounds(%arg0: memref<?x?xi32>, %sz: index) {
+  pcf.generic scope(#pcf.dummy_scope)
+    execute(%ref = %arg0)[%id: index, %n: index]
+         : (!pcf.sref<?x?xi32, #pcf.dummy_scope>)
+        -> (memref<?x?xi32>) {
+    %dst = pcf.read_slice %ref[1, 2] [3, %sz] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to vector<3x4xi32>
+    util.optimization_barrier %dst : vector<3x4xi32>
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @convert_vector_read_slice_dynamic_out_of_bounds
+//  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: memref<?x?xi32>
+//  CHECK-SAME:     %[[SZ:[A-Za-z0-9_]+]]: index
+//       CHECK:   pcf.generic
+//  CHECK-NEXT:     execute[{{.*}}] {
+//   CHECK-DAG:     %[[SV:.+]] = memref.subview %[[ARG0]][1, 2] [3, %[[SZ]]] [1, 1] : memref<?x?xi32> to memref<3x?xi32, strided<[?, 1], offset: ?>>
+//   CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0 : i32
+//       CHECK:     %[[DST:.+]] = vector.transfer_read %[[SV]][%c0, %c0], %[[ZERO]] {in_bounds = [true, false]}
+//       CHECK:     util.optimization_barrier %[[DST]]
+//       CHECK:     pcf.return
+
+// -----
+
+util.func private @convert_get_memref_dynamic_layout(%arg0: memref<?x?xi32, strided<[?, ?], offset: ?>>) {
+  pcf.generic scope(#pcf.dummy_scope)
+    execute(%ref = %arg0)[%id: index, %n: index]
+         : (!pcf.sref<?x?xi32, #pcf.dummy_scope>)
+        -> (memref<?x?xi32, strided<[?, ?], offset: ?>>) {
+    %c0 = arith.constant 0 : index
+    %c8 = arith.constant 8 : index
+    %c16 = arith.constant 16 : index
+    %view = pcf.get_memref %ref[%c0, %c0] [%c8, %c16] [1, 1] : !pcf.sref<?x?xi32, #pcf.dummy_scope> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+    util.optimization_barrier %view : memref<?x?xi32, strided<[?, ?], offset: ?>>
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @convert_get_memref_dynamic_layout
+//  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: memref<?x?xi32, strided<[?, ?], offset: ?>>
+//       CHECK:   pcf.generic
+//  CHECK-NEXT:     execute[{{.*}}] {
+//       CHECK:     %[[SV:.+]] = memref.subview %[[ARG0]][%{{.*}}, %{{.*}}] [%{{.*}}, %{{.*}}] [1, 1] : memref<?x?xi32, strided<[?, ?], offset: ?>> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+//       CHECK:     util.optimization_barrier %[[SV]]
+//       CHECK:     pcf.return

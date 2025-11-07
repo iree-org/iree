@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFAttrs.h"
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFOps.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCFTypes.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -263,12 +264,63 @@ struct WriteSliceOpInterface
   }
 };
 
+struct ReadSliceOpInterface
+    : public BufferizableOpInterface::ExternalModel<ReadSliceOpInterface,
+                                                    PCF::ReadSliceOp> {
+  static MemRefType
+  getMaximallyDynamicBufferType(MLIRContext *context,
+                                PCF::ShapedRefType sourceType) {
+    // Create result type with maximally dynamic layout and no memory space.
+    // Layout and memory space aren't known until resolving sref types, after
+    // which we will propagate both to this operation's users.
+    SmallVector<int64_t> strides(sourceType.getRank(), ShapedType::kDynamic);
+    auto layout =
+        StridedLayoutAttr::get(context, ShapedType::kDynamic, strides);
+    return MemRefType::get(sourceType.getShape(), sourceType.getElementType(),
+                           layout,
+                           /*memorySpace=*/nullptr);
+  }
+  FailureOr<BaseMemRefType>
+  getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                const BufferizationState &state,
+                SmallVector<Value> &invocationStack) const {
+    auto readOp = cast<PCF::ReadSliceOp>(op);
+    return getMaximallyDynamicBufferType(op->getContext(),
+                                         readOp.getSourceType());
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options,
+                          BufferizationState &state) const {
+    auto readOp = cast<PCF::ReadSliceOp>(op);
+
+    // Skip vector results.
+    if (!isa<RankedTensorType>(readOp.getResultType())) {
+      return success();
+    }
+
+    // Create result type with maximally dynamic layout and no memory space.
+    auto resultType =
+        getMaximallyDynamicBufferType(op->getContext(), readOp.getSourceType());
+
+    // GetMemrefOp lets us get a memref out of a read_slice. Accesses to srefs
+    // are allowed to ignore accesses to this memref.
+    auto getMemrefOp = PCF::GetMemrefOp::create(
+        rewriter, readOp.getLoc(), resultType, readOp.getSource(),
+        readOp.getMixedOffsets(), readOp.getMixedSizes(),
+        readOp.getMixedStrides());
+    replaceOpWithBufferizedValues(rewriter, op, getMemrefOp.getResult());
+    return success();
+  }
+};
+
 } // namespace
 
 void registerBufferizationExternalModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, PCF::PCFDialect *dialect) {
     GenericOp::attachInterface<GenericOpInterface>(*ctx);
     LoopOp::attachInterface<LoopOpInterface>(*ctx);
+    ReadSliceOp::attachInterface<ReadSliceOpInterface>(*ctx);
     WriteSliceOp::attachInterface<WriteSliceOpInterface>(*ctx);
   });
 }

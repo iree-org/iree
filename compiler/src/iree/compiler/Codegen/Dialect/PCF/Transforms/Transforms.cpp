@@ -8,6 +8,8 @@
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFOps.h"
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFTypes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 #define DEBUG_TYPE "iree-codegen-pcf-transforms"
 
@@ -19,22 +21,120 @@ namespace mlir::iree_compiler::IREE::PCF {
 
 namespace {
 
-static bool isBlockArgDroppable(Value v, SetVector<Operation *> &slice) {
+static bool isBlockArgDroppable(Value v, SetVector<Operation *> &opsToErase,
+                                SetVector<Operation *> &opsToReplace) {
   if (!cast<PCF::ShapedRefType>(v.getType()).isParentScopeOnlySync()) {
     return false;
   }
   bool droppable = true;
+  SetVector<Operation *> slice;
   ForwardSliceOptions options;
   options.filter = [&](Operation *op) {
     // TODO: Support more operations here.
-    if (!isa<PCF::WriteSliceOp>(op)) {
+    if (isa<PCF::WriteSliceOp, PCF::ReadSliceOp>(op)) {
+      return true;
+    } else {
       droppable = false;
       return false;
     }
-    return true;
   };
   getForwardSlice(v, &slice, options);
+
+  // Separate operations into sets for erasure and replacement.
+  // Since WriteSliceOp doesn't return anything we can just erase it, but
+  // we need to replace the value of the ReadSliceOp with the tied init.
+  for (Operation *op : slice) {
+    if (isa<PCF::WriteSliceOp>(op)) {
+      opsToErase.insert(op);
+    } else if (isa<PCF::ReadSliceOp>(op)) {
+      opsToReplace.insert(op);
+    }
+  }
+
   return droppable;
+}
+
+/// Replace ReadSliceOp uses when dropping unused results. If the sref argument
+/// has a tied init, extract from it. Otherwise, create an empty tensor and
+/// extract from that.
+template <typename OpTy>
+static LogicalResult replaceReadSliceOps(RewriterBase &rewriter, OpTy op,
+                                         BlockArgument regionArg,
+                                         SetVector<Operation *> &opsToReplace) {
+  OpOperand *tiedInit =
+      op.getTiedInit(regionArg.getArgNumber() -
+                     op.getRegion().getNumArguments() + op->getNumResults());
+
+  for (Operation *opToReplace : opsToReplace) {
+    auto readOp = cast<PCF::ReadSliceOp>(opToReplace);
+    if (readOp.getSource() != regionArg) {
+      continue;
+    }
+
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(readOp);
+
+    // Either read from a tied init if it exists or from an empty init based
+    // on the result sizes.
+    Value srcToReadFrom;
+    if (tiedInit) {
+      srcToReadFrom = tiedInit->get();
+    } else {
+      auto tensorType = cast<RankedTensorType>(readOp.getResultType());
+
+      // Collect dynamic sizes from the read op's sizes
+      SmallVector<Value> dynamicSizes;
+      for (auto [idx, size] : llvm::enumerate(readOp.getMixedSizes())) {
+        if (tensorType.isDynamicDim(idx)) {
+          if (auto attr = dyn_cast<Attribute>(size)) {
+            dynamicSizes.push_back(arith::ConstantIndexOp::create(
+                rewriter, readOp.getLoc(), cast<IntegerAttr>(attr).getInt()));
+          } else {
+            dynamicSizes.push_back(cast<Value>(size));
+          }
+        }
+      }
+
+      srcToReadFrom = tensor::EmptyOp::create(
+          rewriter, readOp.getLoc(), tensorType.getShape(),
+          tensorType.getElementType(), dynamicSizes);
+    }
+
+    if (isa<VectorType>(readOp.getResultType())) {
+      SmallVector<Value> indices;
+      for (OpFoldResult offset : readOp.getMixedOffsets()) {
+        if (auto attr = dyn_cast<Attribute>(offset)) {
+          indices.push_back(arith::ConstantIndexOp::create(
+              rewriter, readOp.getLoc(), cast<IntegerAttr>(attr).getInt()));
+        } else {
+          indices.push_back(cast<Value>(offset));
+        }
+      }
+      auto vectorType = cast<VectorType>(readOp.getResultType());
+      SmallVector<bool> inBounds(vectorType.getRank(), true);
+      for (auto [inBound, vecSize, size] : llvm::zip_equal(
+               inBounds, vectorType.getShape(), readOp.getMixedSizes())) {
+        // If the size is dynamic or doesn't match the vector dimension, it's
+        // out of bounds.
+        if (auto attr = dyn_cast<Attribute>(size)) {
+          inBound = vecSize == cast<IntegerAttr>(attr).getInt();
+        } else {
+          inBound = false;
+        }
+      }
+      Value transferRead = vector::TransferReadOp::create(
+          rewriter, readOp.getLoc(), vectorType, srcToReadFrom, indices,
+          /*padding=*/std::nullopt, inBounds);
+      rewriter.replaceOp(readOp, transferRead);
+    } else {
+      auto extractSlice = tensor::ExtractSliceOp::create(
+          rewriter, readOp.getLoc(), srcToReadFrom, readOp.getMixedOffsets(),
+          readOp.getMixedSizes(), readOp.getMixedStrides());
+      rewriter.replaceOp(readOp, extractSlice.getResult());
+    }
+  }
+
+  return success();
 }
 
 PCF::GenericOp cloneWithNewResultTypes(RewriterBase &rewriter,
@@ -85,8 +185,9 @@ static LogicalResult dropUnusedResults(RewriterBase &rewriter, OpTy op) {
     BlockArgument regionArg = op.getRegionRefArgs()[resultNum];
     // First verify that the result is droppable.
     SetVector<Operation *> opsToErase;
+    SetVector<Operation *> opsToReplace;
     if (!result.use_empty() || !isa<RankedTensorType>(result.getType()) ||
-        !isBlockArgDroppable(regionArg, opsToErase)) {
+        !isBlockArgDroppable(regionArg, opsToErase, opsToReplace)) {
       resultsToKeep.push_back(result);
       newResultTypes.push_back(result.getType());
       newIsTied.push_back(isTied);
@@ -103,6 +204,12 @@ static LogicalResult dropUnusedResults(RewriterBase &rewriter, OpTy op) {
         currSizesIndex += numDynamicDims;
       }
       continue;
+    }
+
+    // Replace all reads with direct reads from either the tied init or an empty
+    // initial value.
+    if (failed(replaceReadSliceOps(rewriter, op, regionArg, opsToReplace))) {
+      return failure();
     }
 
     // Iterate the ops to erase in reverse to make sure ops without users are
