@@ -500,11 +500,12 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
   // map/capture them right now, even if slow as it's a host operation).
   // Dynamic indirect arguments and parameters require patching or some other
   // magic that may require recompiling dispatches.
-  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "direct/indirect arguments are not supported in CUDA streams");
-  } else if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+
+  // For now custom direct arguments is a no-op. If everything comes in
+  // in the constant buffer we just treat it normally.
+  // TODO: We avoid all of the normal passing stuff, and just pass in the 
+  //       arguments directly.
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
         "indirect parameters are not supported in CUDA streams");
@@ -600,7 +601,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
                  IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT) {
         memcpy(payload_ptr + param->buffer_offset,
                (const uint8_t*)constants.data + constant_offset,
-               sizeof(uint32_t));
+               param->export.size);
         constant_offset += param->export.size;
         params_ptr[i] = payload_ptr + param->buffer_offset;
       }
