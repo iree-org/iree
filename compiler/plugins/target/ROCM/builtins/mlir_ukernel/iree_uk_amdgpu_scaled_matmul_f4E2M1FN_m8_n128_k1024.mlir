@@ -97,8 +97,8 @@
 
 #contraction_accesses = [
   affine_map<(i, j, k, d) -> (i, d, k)>,
-  affine_map<(i, j, k, d) -> (i, d, k)>,
   affine_map<(i, j, k, d) -> (j, d, k)>,
+  affine_map<(i, j, k, d) -> (i, d, k)>,
   affine_map<(i, j, k, d) -> (j, d, k)>,
   affine_map<(i, j, k, d) -> (i, j)>
 ]
@@ -119,7 +119,7 @@
 
 #result_reassoc = [[0, 1], [2, 3]]
 
-util.func @mmt_8x128_f4f4f32(
+util.func @scaled_matmul_f4f4f32_m8_n128_k1024(
     %lhs_base: !lhs_ty,
     %rhs_base: !rhs_ty,
     %lhs_scale_base: !lhs_scale_ty,
@@ -305,11 +305,12 @@ util.func @mmt_8x128_f4f4f32(
         %cst_scale {in_bounds = [true, true, true, true]} : !rhs_scale_shared_expand_ty, !rhs_scale_byte_vec_ty
       %rhs_scale_vec_1 = vector.bitcast %rhs_scale_byte_vec_1 : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
 
-      %dot0 = iree_codegen.inner_tiled ins(%lhs_vec, %lhs_scale_vec, %rhs_vec_0, %rhs_scale_vec_0) outs(%iter0) {
+      %dot0 = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec_0, %lhs_scale_vec, %rhs_scale_vec_0) outs(%iter0) {
         indexing_maps = #contraction_accesses,
         iterator_types = #iterator_types,
-        kind = #mfma_type
-      } : !lhs_vec_ty, !lhs_scale_vec_ty, !rhs_vec_ty, !rhs_scale_vec_ty into !acc_ty
+        kind = #mfma_type,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+      } : !lhs_vec_ty, !rhs_vec_ty, !lhs_scale_vec_ty, !rhs_scale_vec_ty into !acc_ty
 
       // Wait till second half is available.
       amdgpu.lds_barrier
@@ -318,11 +319,12 @@ util.func @mmt_8x128_f4f4f32(
         %cst_rhs {in_bounds = [true, true, true, true]} : !rhs_shared_expand_ty, !rhs_byte_vec_ty
       %rhs_vec_1 = vector.bitcast %rhs_byte_vec_1 : !rhs_byte_vec_ty to !rhs_vec_ty
 
-      %dot1 = iree_codegen.inner_tiled ins(%lhs_vec, %lhs_scale_vec, %rhs_vec_1, %rhs_scale_vec_1) outs(%iter1) {
+      %dot1 = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec_1, %lhs_scale_vec, %rhs_scale_vec_1) outs(%iter1) {
         indexing_maps = #contraction_accesses,
         iterator_types = #iterator_types,
-        kind = #mfma_type
-      } : !lhs_vec_ty, !lhs_scale_vec_ty, !rhs_vec_ty, !rhs_scale_vec_ty into !acc_ty
+        kind = #mfma_type,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+      } : !lhs_vec_ty, !rhs_vec_ty, !lhs_scale_vec_ty, !rhs_scale_vec_ty into !acc_ty
 
       scf.yield %dot0, %dot1 : !acc_ty, !acc_ty
     }

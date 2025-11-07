@@ -88,8 +88,8 @@
 
 #contraction_accesses = [
   affine_map<(i, j, k, d) -> (i, d, k)>,
-  affine_map<(i, j, k, d) -> (i, d, k)>,
   affine_map<(i, j, k, d) -> (j, d, k)>,
+  affine_map<(i, j, k, d) -> (i, d, k)>,
   affine_map<(i, j, k, d) -> (j, d, k)>,
   affine_map<(i, j, k, d) -> (i, j, k)>
 ]
@@ -109,7 +109,7 @@
 
 #result_reassoc = [[0, 1], [2, 3]]
 
-util.func @mmt_64x256_f4f4f32(
+util.func @scaled_matmul_f4f4f32_m64_n64_k1024(
     %lhs_base: !lhs_ty,
     %rhs_base: !rhs_ty,
     %lhs_scale_base: !lhs_scale_ty,
@@ -262,11 +262,12 @@ util.func @mmt_64x256_f4f4f32(
         %cst_scale {in_bounds = [true, true, true, true]} : !rhs_scale_shared_expand_ty, !rhs_scale_byte_vec_ty
       %rhs_scale_vec = vector.bitcast %rhs_scale_byte_vec : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
 
-      %dot = iree_codegen.inner_tiled ins(%lhs_vec, %lhs_scale_vec, %rhs_vec, %rhs_scale_vec) outs(%iter) {
+      %dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%iter) {
         indexing_maps = #contraction_accesses,
         iterator_types = #iterator_types,
-        kind = #mfma_type
-      } : !lhs_vec_ty, !lhs_scale_vec_ty, !rhs_vec_ty, !rhs_scale_vec_ty into !acc_ty
+        kind = #mfma_type,
+        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+      } : !lhs_vec_ty, !rhs_vec_ty, !lhs_scale_vec_ty, !rhs_scale_vec_ty into !acc_ty
 
       rocdl.s.setprio 0
       amdgpu.lds_barrier
@@ -302,11 +303,12 @@ util.func @mmt_64x256_f4f4f32(
       %cst_scale {in_bounds = [true, true, true, true]} : !rhs_scale_shared_expand_ty, !rhs_scale_byte_vec_ty
     %rhs_scale_vec = vector.bitcast %rhs_scale_byte_vec : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
 
-    %epilogue_dot = iree_codegen.inner_tiled ins(%lhs_vec, %lhs_scale_vec, %rhs_vec, %rhs_scale_vec) outs(%loop) {
+    %epilogue_dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%loop) {
       indexing_maps = #contraction_accesses,
       iterator_types = #iterator_types,
-      kind = #mfma_type
-    } : !lhs_vec_ty, !lhs_scale_vec_ty, !rhs_vec_ty, !rhs_scale_vec_ty into !acc_ty
+      kind = #mfma_type,
+      semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+    } : !lhs_vec_ty, !rhs_vec_ty, !lhs_scale_vec_ty, !rhs_scale_vec_ty into !acc_ty
 
     %reduce_init = arith.constant dense<0.0> : !reduce_ty
     %reduce = vector.multi_reduction <add>, %epilogue_dot, %reduce_init [2] :

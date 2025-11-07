@@ -697,7 +697,7 @@ pdl.pattern @annotate_matmul_like_bf16_large_expanded : benefit(2) {
   }
 }
 
-pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m64_n64_k256 : benefit(1) {
+pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m64_n64_k1024 : benefit(2) {
   %elemtypes = pdl.attribute = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]
   %imaps = pdl.attribute = [
     affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
@@ -750,7 +750,7 @@ pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m64_n64_k256 : benefit(1) {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
     // This modifies the operation in-place.
 
-    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"mmt_64x256_f4f4f32", tensor>
+    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"scaled_matmul_f4f4f32_m64_n64_k1024", tensor>
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %attr_name, %annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %config_name = pdl.attribute = "compilation_info"
@@ -774,7 +774,7 @@ pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m64_n64_k256 : benefit(1) {
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %config_name, %config : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %builtin_attr = pdl.attribute = "rocm.builtin_name"
-    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_scaled_matmul_f4E2M1FN_m64_n64_k256.mlir"
+    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_scaled_matmul_f4E2M1FN_m64_n64_k1024.mlir"
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %builtin_attr, %builtin_annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
   }
 }
@@ -833,7 +833,7 @@ pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m8_n128_k1024 : benefit(1) {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
     // This modifies the operation in-place.
 
-    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"mmt_8x128_f4f4f32", tensor>
+    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"scaled_matmul_f4f4f32_m8_n128_k1024", tensor>
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %attr_name, %annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %config_name = pdl.attribute = "compilation_info"
@@ -915,7 +915,7 @@ pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(1) {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
     // This modifies the operation in-place.
 
-    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"mmt_8x64_f4f4f32", tensor>
+    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"scaled_matmul_f4f4f32_m8_n64_k2048", tensor>
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %attr_name, %annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %config_name = pdl.attribute = "compilation_info"
@@ -944,22 +944,12 @@ pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(1) {
   }
 }
 
-pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(2) {
-  %elemtypes = pdl.attribute = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]
-  %imaps = pdl.attribute = [
-    affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
-    affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
-    affine_map<(d0, d1, d2, d3) -> (d0, d2)>,
-    affine_map<(d0, d1, d2, d3) -> (d1, d2)>,
-    affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-  ]
-
+pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m64_n64_k1024 : benefit(1) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %lhs_scale_type = pdl.type
   %rhs_scale_type = pdl.type
   %out_type = pdl.type
-  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
@@ -967,43 +957,32 @@ pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(2) {
   %rhs_scale = pdl.operand : %rhs_scale_type
   %out_init = pdl.operand : %out_type
 
-  %zero_val = pdl.attribute = 0. : f32
-  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
-  %zero = pdl.result 0 of %zero_op
-  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
-  %fill = pdl.result 0 of %fill_op
-
-  // Match the a matmul-like generic with above indexing maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %lhs_scale, %rhs_scale, %fill : !pdl.value, !pdl.value, !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
-  pdl.apply_native_constraint "matchContraction"(
-        %generic_op, %elemtypes, %imaps
-        : !pdl.operation, !pdl.attribute, !pdl.attribute)
+  // Match the a inner_tiled with specific data layouts.
+  %inner_tiled_op = pdl.operation "iree_codegen.inner_tiled" (%lhs, %rhs, %lhs_scale, %rhs_scale, %out_init : !pdl.value, !pdl.value, !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%inner_tiled_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
-  %empty = pdl.attribute = {}
-  %c0 = pdl.attribute = 0
-  %c1 = pdl.attribute = 1
-  %c8 = pdl.attribute = 8
-  %c64 = pdl.attribute = 64
-
-  pdl.apply_native_constraint "dimIsMultipleOf"(%lhs, %c0, %c8 : !pdl.value, !pdl.attribute, !pdl.attribute)
-  pdl.apply_native_constraint "dimIsMultipleOf"(%lhs, %c1, %c64 : !pdl.value, !pdl.attribute, !pdl.attribute)
-  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c0, %c64 : !pdl.value, !pdl.attribute, !pdl.attribute)
-  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c1, %c64 : !pdl.value, !pdl.attribute, !pdl.attribute)
+  %lhs_cast_type = pdl.type : tensor<?x?x1x2x2x8x4x16x32xf4E2M1FN>
+  pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
+  %rhs_cast_type = pdl.type : tensor<?x?x1x4x8x4x16x32xf4E2M1FN>
+  pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
+  %lhs_scale_cast_type = pdl.type : tensor<?x?x2x2x4x16x8xf8E8M0FNU>
+  pdl.apply_native_constraint "matchCastCompatibleType"(%lhs_scale, %lhs_scale_cast_type : !pdl.value, !pdl.type)
+  %rhs_scale_cast_type = pdl.type : tensor<?x?x4x4x16x8xf8E8M0FNU>
+  pdl.apply_native_constraint "matchCastCompatibleType"(%rhs_scale, %rhs_scale_cast_type : !pdl.value, !pdl.type)
 
   pdl.rewrite {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
     // This modifies the operation in-place.
 
-    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"dt_mmt_8x64_f4f4f32", tensor>
-    pdl.apply_native_rewrite "annotateOperation"(%generic_op, %attr_name, %annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
+    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"dt_scaled_matmul_f4f4f32_m64_n64_k1024", tensor>
+    pdl.apply_native_rewrite "annotateOperation"(%inner_tiled_op, %attr_name, %annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %config_name = pdl.attribute = "compilation_info"
     %config = pdl.attribute = #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{
-        workgroup = [8, 64, 0]
+        workgroup = [1, 1, 0]
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
@@ -1018,10 +997,10 @@ pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(2) {
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
     >
-    pdl.apply_native_rewrite "annotateOperation"(%generic_op, %config_name, %config : !pdl.operation, !pdl.attribute, !pdl.attribute)
+    pdl.apply_native_rewrite "annotateOperation"(%inner_tiled_op, %config_name, %config : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %builtin_attr = pdl.attribute = "rocm.builtin_name"
-    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN_m8_n64_k2048.mlir"
-    pdl.apply_native_rewrite "annotateOperation"(%generic_op, %builtin_attr, %builtin_annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
+    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN_m64_n64_k1024.mlir"
+    pdl.apply_native_rewrite "annotateOperation"(%inner_tiled_op, %builtin_attr, %builtin_annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
   }
 }
