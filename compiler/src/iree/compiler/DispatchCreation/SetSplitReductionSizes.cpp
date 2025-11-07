@@ -286,8 +286,7 @@ private:
     // When the reduction size is small relative to the output sizes, split
     // reduction often has no effect or even degrades performance.
     SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
-    int64_t reductionSize = std::accumulate(tileSizes.begin(), tileSizes.end(),
-                                            1, std::multiplies<>());
+    int64_t reductionSize = llvm::product_of(tileSizes);
     int64_t ratio = reductionSize / std::sqrt(outputChannelSize * batchSize);
     if (ratio <= ratioThreshold && reductionSize < largeReductionSize) {
       LDBG() << "skipping op; small reduction size";
