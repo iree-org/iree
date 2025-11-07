@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECTS_IREE_GPU_H
 #define IREE_COMPILER_DIALECTS_IREE_GPU_H
 
+#include <cstdint>
 #include "mlir-c/IR.h"
 #include "mlir-c/Support.h"
 
@@ -170,6 +171,7 @@ MLIR_CAPI_EXPORTED ireeGPUTargetInfo ireeGPUTargetInfoGet(
     MlirContext mlirCtx, const char *arch, const int32_t *subgroupChoices,
     size_t numSubgroupChoices, const int32_t *workgroupSizes,
     size_t numWorkgroupSizes, int32_t threadCount, int32_t memoryBytes,
+    uint32_t wgpCount, int32_t simdsPerWgp,
     const mma_intrinsic_enum_t *mmaIntrinsics, size_t numMmaIntrinsics);
 
 // Extracts MMA intrinsic values and their virtual status from an ArrayAttr.

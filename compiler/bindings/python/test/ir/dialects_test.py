@@ -498,6 +498,8 @@ def gpu_target_info_constructor():
         max_workgroup_sizes=[256, 512, 1024],
         max_thread_count_per_workgroup=1024,
         max_workgroup_memory_bytes=65536,
+        workgroup_count = 304,
+        simds_per_workgroup = 4,
         mma_intrinsics=[
             iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
             iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
@@ -523,6 +525,12 @@ def gpu_target_info_constructor():
     assert (
         target_info.max_workgroup_memory_bytes == 65536
     ), f"Expected max_workgroup_memory_bytes 65536, got {target_info.max_workgroup_memory_bytes}"
+    assert (
+        target_info.workgroup_count == 304
+    ), f"Expected workgroup_count 304, got {target_info.workgroup_count}"
+    assert (
+        target_info.simds_per_workgroup == 4
+    ), f"Expected simds_per_workgroup 4, got {target_info.simds_per_workgroup}"
     mma_intrinsics = target_info.mma_intrinsics
     assert mma_intrinsics == [
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
@@ -547,6 +555,8 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536,
+            workgroup_count = 304,
+            simds_per_workgroup = 4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong arch type"
@@ -561,6 +571,8 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536,
+            workgroup_count = 304,
+            simds_per_workgroup = 4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong subgroup_size_choices type"
@@ -575,6 +587,8 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256.0, 512, 1024],  # should be list of int.
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536,
+            workgroup_count = 304,
+            simds_per_workgroup = 4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong max_workgroup_sizes type"
@@ -589,6 +603,8 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024.0,  # should be int.
             max_workgroup_memory_bytes=65536,
+            workgroup_count = 304,
+            simds_per_workgroup = 4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong max_thread_count_per_workgroup type"
@@ -603,12 +619,62 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536.0,  # should be int.
+            workgroup_count = 304,
+            simds_per_workgroup = 4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong max_workgroup_memory_bytes type"
     except TypeError:
         pass
 
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            workgroup_count = 304.0,  # should be int.
+            simds_per_workgroup = 4,
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong workgroup_count type"
+    except TypeError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            workgroup_count = -304,  # should be non-negative.
+            simds_per_workgroup = 4,
+            mma_intrinsics=[],
+        )
+        assert False, "Expected ValueError for negative workgroup_count"
+    except ValueError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            workgroup_count = 304,
+            simds_per_workgroup = 4.0,  # should be int.
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong simds_per_workgroup type"
+    except TypeError:
+        pass
+    
     try:
         iree_gpu.TargetInfo(
             context=context,
