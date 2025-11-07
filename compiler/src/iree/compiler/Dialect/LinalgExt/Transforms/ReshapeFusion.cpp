@@ -554,35 +554,18 @@ struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
 };
 
 FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
-                                   int64_t startDim, int64_t numDims,
-                                   Value operand, ShapedType ty,
+                                   ArrayRef<bool> droppedDims, Value operand,
+                                   ShapedType ty,
                                    const linalg::ControlDropUnitDims &options) {
-  if (numDims == 0) {
-    return failure();
-  }
-  // Find list of dims to drop and the target shape.
   ArrayRef<int64_t> shape = ty.getShape();
-  SmallVector<bool> unitDims(shape.size(), false);
-  for (auto [isUnitDim, size] : llvm::zip_equal(unitDims, shape)) {
-    if (size == 1) {
-      isUnitDim = true;
-    }
-  }
-  // Because gather/scatter like to define special behavior to allow eliding
-  // the coordinate dimension, we have to make sure we don't generate a 0-D
-  // tensor.
-  auto slice = MutableArrayRef(unitDims).slice(startDim, numDims);
-  if (llvm::all_of(slice, [](bool x) { return x; })) {
-    slice.back() = false;
-  }
+  assert(shape.size() == droppedDims.size());
   SmallVector<int64_t> targetShape;
-  targetShape.append(shape.begin(), shape.begin() + startDim);
-  for (int i = startDim; i < numDims + startDim; ++i) {
-    if (!unitDims[i]) {
-      targetShape.push_back(shape[i]);
+  for (auto [isDropped, size] : llvm::zip_equal(droppedDims, shape)) {
+    assert(!isDropped || size == 1);
+    if (!isDropped) {
+      targetShape.push_back(size);
     }
   }
-  targetShape.append(shape.begin() + startDim + numDims, shape.end());
   assert(targetShape.size() <= shape.size());
   // No unit dims dropped.
   if (targetShape.size() == shape.size()) {
@@ -596,9 +579,11 @@ FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
                                                    targetShape);
     assert(succeeded(rankReducingExtract) && "not a unit-extent collapse");
     return rankReducingExtract.value();
-  } else if (options.rankReductionStrategy ==
-             linalg::ControlDropUnitDims::RankReductionStrategy::
-                 ReassociativeReshape) {
+  }
+  // Drop unit dims using collapse_shape.
+  if (options.rankReductionStrategy ==
+      linalg::ControlDropUnitDims::RankReductionStrategy::
+          ReassociativeReshape) {
     std::optional<SmallVector<ReassociationIndices>> reassoc =
         getReassociationIndicesForCollapse(shape, targetShape);
     assert(reassoc.has_value());
@@ -607,6 +592,23 @@ FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
         .getResult();
   }
   llvm_unreachable("unhandled rank reduction strategy");
+  return failure();
+}
+
+FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
+                                   int64_t startDim, int64_t numDims,
+                                   Value operand, ShapedType ty,
+                                   const linalg::ControlDropUnitDims &options) {
+  if (numDims == 0) {
+    return failure();
+  }
+  // Find list of dims to drop and the target shape.
+  ArrayRef<int64_t> shape = ty.getShape();
+  SmallVector<bool> droppedDims =
+      llvm::map_to_vector(shape, [](int64_t size) { return size == 1; });
+  std::fill(droppedDims.begin(), droppedDims.begin() + startDim, false);
+  std::fill(droppedDims.begin() + startDim + numDims, droppedDims.end(), false);
+  return rankReduceOperand(rewriter, loc, droppedDims, operand, ty, options);
 };
 
 // Expands the rank of `val` to match `destVal` (by adding unit dimensions)
@@ -1171,11 +1173,55 @@ private:
   linalg::ControlDropUnitDims options;
 };
 
+struct DropUnmaskUnitDims final : OpRewritePattern<IREE::LinalgExt::UnMaskOp> {
+  DropUnmaskUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
+                     PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit), options(std::move(options)) {}
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::UnMaskOp unMaskOp,
+                                PatternRewriter &rewriter) const override {
+    // Only drop unit dims if unit dims in both source and destination match.
+    RankedTensorType srcType = unMaskOp.getSrc().getType();
+    RankedTensorType destType = unMaskOp.getDest().getType();
+    SmallVector<bool> droppedDims(srcType.getRank(), false);
+    for (auto [isDropped, srcDim, destDim] : llvm::zip_equal(
+             droppedDims, srcType.getShape(), destType.getShape())) {
+      if (srcDim == 1 && destDim == 1) {
+        isDropped = true;
+      }
+    }
+    FailureOr<Value> newSrc =
+        rankReduceOperand(rewriter, unMaskOp.getLoc(), droppedDims,
+                          unMaskOp.getSrc(), srcType, options);
+    FailureOr<Value> newDest =
+        rankReduceOperand(rewriter, unMaskOp.getLoc(), droppedDims,
+                          unMaskOp.getDest(), destType, options);
+    if (failed(newSrc) || failed(newDest)) {
+      return failure();
+    }
+
+    auto newUnMaskOp = IREE::LinalgExt::UnMaskOp::create(
+        rewriter, unMaskOp.getLoc(), newDest->getType(), newSrc.value(),
+        newDest.value());
+
+    Value expandedResult =
+        rankExpandValue(rewriter, unMaskOp.getLoc(), unMaskOp.getDest(),
+                        newUnMaskOp.getResult(), options);
+    rewriter.replaceOp(unMaskOp, expandedResult);
+
+    return success();
+  }
+
+private:
+  linalg::ControlDropUnitDims options;
+};
+
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
   patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
   patterns.add<DropGatherUnitDims, DropScatterUnitDims, DropAttentionUnitDims,
-               DropMapScatterUnitDims>(patterns.getContext(), options);
+               DropMapScatterUnitDims, DropUnmaskUnitDims>(
+      patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
