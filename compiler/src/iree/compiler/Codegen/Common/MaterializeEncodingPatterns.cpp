@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -326,12 +327,18 @@ struct DecomposeMismatchEncodingTensorLoadOp
       return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
     }
 
+    IREE::TensorExt::DispatchTensorType srcType = loadOp.getSourceType();
+    auto boundTensorType = dyn_cast<RankedTensorType>(srcType.getBoundType());
+    if (!boundTensorType) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "source bound type is not a RankedTensorType");
+    }
+
     // We have to check the bound type from converted DispatchTensorType because
     // it is what we'll see in encoding materialization. E.g.,
     // GPUPaddingResolver converts RankedTensorType into the same type, but it
     // creates different IREE::TensorExt::DispatchTensorType that may have
     // larger tensor shape for bound type.
-    IREE::TensorExt::DispatchTensorType srcType = loadOp.getSourceType();
     auto convertedSrcType =
         typeConverter.convertType<IREE::TensorExt::DispatchTensorType>(srcType);
     RankedTensorType destType = loadOp.getResult().getType();
@@ -341,8 +348,9 @@ struct DecomposeMismatchEncodingTensorLoadOp
           loadOp, "the source type and the result type match after conversion");
     }
 
+    LDBG() << "Performance warning: decomposing mismatched encoding load op: "
+           << loadOp;
     Location loc = loadOp.getLoc();
-    auto boundTensorType = cast<RankedTensorType>(srcType.getBoundType());
     Value result = IREE::TensorExt::DispatchTensorLoadOp::create(
         rewriter, loc, boundTensorType, loadOp.getSource(),
         loadOp.getSourceDims(), loadOp.getMixedOffsets(),
@@ -383,9 +391,16 @@ struct DecomposeMismatchEncodingTensorStoreOp
       return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
     }
 
+    IREE::TensorExt::DispatchTensorType targetType = storeOp.getTargetType();
+    auto boundTensorType =
+        dyn_cast<RankedTensorType>(targetType.getBoundType());
+    if (!boundTensorType) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "target bound type is not a RankedTensorType");
+    }
+
     // Similar to DecomposeMismatchEncodingTensorLoadOp, we have to check with
     // the bound type from converted DispatchTensorType.
-    IREE::TensorExt::DispatchTensorType targetType = storeOp.getTargetType();
     auto convertedTargetType =
         typeConverter.convertType<IREE::TensorExt::DispatchTensorType>(
             targetType);
@@ -396,6 +411,8 @@ struct DecomposeMismatchEncodingTensorStoreOp
           storeOp, "the value type and the target type match");
     }
 
+    LDBG() << "Performance warning: decomposing mismatched encoding store op: "
+           << storeOp;
     Location loc = storeOp.getLoc();
     Value valueToStore = storeOp.getValue();
     SmallVector<Value> dynamicDims;
@@ -405,7 +422,6 @@ struct DecomposeMismatchEncodingTensorStoreOp
       }
       dynamicDims.push_back(cast<Value>(value));
     }
-    auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
     valueToStore = generateEncodingTransferOps(rewriter, valueToStore,
                                                dynamicDims, boundTensorType);
     IREE::TensorExt::DispatchTensorStoreOp::create(

@@ -930,3 +930,15 @@ func.func @store_with_layout_transfer_partial_dynamic(%src: tensor<1024x?xf32, #
 //       CHECK:   %[[PACK:.+]] = linalg.pack %[[UNPACK]]
 //  CHECK-SAME:       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 16]
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[BINDING]]
+
+// -----
+
+func.func @do_not_crash_on_non_ranked_tensor_type() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(0) alignment(32) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:f32>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>) binding(1) alignment(32) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:f32>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:f32> -> tensor<f32>
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [], sizes = [], strides = [] : tensor<f32> -> !iree_tensor_ext.dispatch.tensor<writeonly:f32>
+  return
+}
+// CHECK-LABEL: func.func @do_not_crash_on_non_ranked_tensor_type
