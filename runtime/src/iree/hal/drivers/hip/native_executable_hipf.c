@@ -1013,6 +1013,335 @@ typedef struct {
   iree_hal_hip_arg_value_kind_t value_kind;
 } iree_hal_hip_parsed_arg_t;
 
+// Print a generic msgpack value to stderr for debugging purposes.
+// This function recursively prints the msgpack structure in a readable format.
+// Returns the number of bytes consumed, or 0 on error.
+static iree_host_size_t iree_hal_hip_msgpack_debug_print(
+    const uint8_t* data, iree_host_size_t size, iree_host_size_t offset,
+    int indent_level) {
+  if (offset >= size) {
+    fprintf(stderr, "<offset out of bounds>");
+    return 0;
+  }
+
+  // Helper macro for indentation
+  #define PRINT_INDENT() \
+    for (int i = 0; i < indent_level * 2; i++) fprintf(stderr, " ")
+
+  uint8_t type = data[offset];
+  iree_host_size_t consumed = 1;
+
+  // Positive fixint (0x00 - 0x7f)
+  if (type <= 0x7f) {
+    fprintf(stderr, "%u", type);
+    return consumed;
+  }
+
+  // Negative fixint (0xe0 - 0xff)
+  if (type >= 0xe0) {
+    fprintf(stderr, "%d", (int8_t)type);
+    return consumed;
+  }
+
+  // Fixmap (0x80 - 0x8f)
+  if ((type & 0xf0) == 0x80) {
+    uint32_t count = type & 0x0f;
+    fprintf(stderr, "{\n");
+    for (uint32_t i = 0; i < count; ++i) {
+      PRINT_INDENT();
+      fprintf(stderr, "  ");
+      iree_host_size_t key_size =
+          iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                           indent_level + 1);
+      if (key_size == 0) return 0;
+      consumed += key_size;
+      fprintf(stderr, ": ");
+      iree_host_size_t val_size =
+          iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                           indent_level + 1);
+      if (val_size == 0) return 0;
+      consumed += val_size;
+      fprintf(stderr, "\n");
+    }
+    PRINT_INDENT();
+    fprintf(stderr, "}");
+    return consumed;
+  }
+
+  // Fixarray (0x90 - 0x9f)
+  if ((type & 0xf0) == 0x90) {
+    uint32_t count = type & 0x0f;
+    fprintf(stderr, "[");
+    for (uint32_t i = 0; i < count; ++i) {
+      if (i > 0) fprintf(stderr, ", ");
+      iree_host_size_t elem_size =
+          iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                           indent_level);
+      if (elem_size == 0) return 0;
+      consumed += elem_size;
+    }
+    fprintf(stderr, "]");
+    return consumed;
+  }
+
+  // Fixstr (0xa0 - 0xbf)
+  if ((type & 0xe0) == 0xa0) {
+    uint32_t len = type & 0x1f;
+    if (offset + consumed + len > size) {
+      fprintf(stderr, "<string out of bounds>");
+      return 0;
+    }
+    fprintf(stderr, "\"");
+    for (uint32_t i = 0; i < len; ++i) {
+      char c = data[offset + consumed + i];
+      if (c >= 32 && c < 127) {
+        fprintf(stderr, "%c", c);
+      } else {
+        fprintf(stderr, "\\x%02x", (unsigned char)c);
+      }
+    }
+    fprintf(stderr, "\"");
+    return consumed + len;
+  }
+
+  // Other types
+  switch (type) {
+    case MSGPACK_NIL:
+      fprintf(stderr, "nil");
+      return consumed;
+
+    case MSGPACK_FALSE:
+      fprintf(stderr, "false");
+      return consumed;
+
+    case MSGPACK_TRUE:
+      fprintf(stderr, "true");
+      return consumed;
+
+    case MSGPACK_UINT8:
+      if (offset + 1 >= size) {
+        fprintf(stderr, "<truncated uint8>");
+        return 0;
+      }
+      fprintf(stderr, "%u", data[offset + 1]);
+      return consumed + 1;
+
+    case MSGPACK_UINT16:
+      if (offset + 2 >= size) {
+        fprintf(stderr, "<truncated uint16>");
+        return 0;
+      }
+      fprintf(stderr, "%u",
+              (uint16_t)((data[offset + 1] << 8) + data[offset + 2]));
+      return consumed + 2;
+
+    case MSGPACK_UINT32:
+      if (offset + 4 >= size) {
+        fprintf(stderr, "<truncated uint32>");
+        return 0;
+      }
+      fprintf(stderr, "%u",
+              (uint32_t)((data[offset + 1] << 24) + (data[offset + 2] << 16) +
+                         (data[offset + 3] << 8) + data[offset + 4]));
+      return consumed + 4;
+
+    case MSGPACK_UINT64:
+      if (offset + 8 >= size) {
+        fprintf(stderr, "<truncated uint64>");
+        return 0;
+      }
+      fprintf(stderr, "%llu",
+              (unsigned long long)(((uint64_t)data[offset + 1] << 56) +
+                                   ((uint64_t)data[offset + 2] << 48) +
+                                   ((uint64_t)data[offset + 3] << 40) +
+                                   ((uint64_t)data[offset + 4] << 32) +
+                                   ((uint64_t)data[offset + 5] << 24) +
+                                   ((uint64_t)data[offset + 6] << 16) +
+                                   ((uint64_t)data[offset + 7] << 8) +
+                                   data[offset + 8]));
+      return consumed + 8;
+
+    case MSGPACK_STR8: {
+      if (offset + 1 >= size) {
+        fprintf(stderr, "<truncated str8>");
+        return 0;
+      }
+      uint32_t len = data[offset + 1];
+      consumed += 1;
+      if (offset + consumed + len > size) {
+        fprintf(stderr, "<string out of bounds>");
+        return 0;
+      }
+      fprintf(stderr, "\"");
+      for (uint32_t i = 0; i < len; ++i) {
+        char c = data[offset + consumed + i];
+        if (c >= 32 && c < 127) {
+          fprintf(stderr, "%c", c);
+        } else {
+          fprintf(stderr, "\\x%02x", (unsigned char)c);
+        }
+      }
+      fprintf(stderr, "\"");
+      return consumed + len;
+    }
+
+    case MSGPACK_STR16: {
+      if (offset + 2 >= size) {
+        fprintf(stderr, "<truncated str16>");
+        return 0;
+      }
+      uint32_t len = (data[offset + 1] << 8) + data[offset + 2];
+      consumed += 2;
+      if (offset + consumed + len > size) {
+        fprintf(stderr, "<string out of bounds>");
+        return 0;
+      }
+      fprintf(stderr, "\"");
+      for (uint32_t i = 0; i < len; ++i) {
+        char c = data[offset + consumed + i];
+        if (c >= 32 && c < 127) {
+          fprintf(stderr, "%c", c);
+        } else {
+          fprintf(stderr, "\\x%02x", (unsigned char)c);
+        }
+      }
+      fprintf(stderr, "\"");
+      return consumed + len;
+    }
+
+    case MSGPACK_STR32: {
+      if (offset + 4 >= size) {
+        fprintf(stderr, "<truncated str32>");
+        return 0;
+      }
+      uint32_t len = (data[offset + 1] << 24) + (data[offset + 2] << 16) +
+                     (data[offset + 3] << 8) + data[offset + 4];
+      consumed += 4;
+      if (offset + consumed + len > size) {
+        fprintf(stderr, "<string out of bounds>");
+        return 0;
+      }
+      fprintf(stderr, "\"");
+      for (uint32_t i = 0; i < len; ++i) {
+        char c = data[offset + consumed + i];
+        if (c >= 32 && c < 127) {
+          fprintf(stderr, "%c", c);
+        } else {
+          fprintf(stderr, "\\x%02x", (unsigned char)c);
+        }
+      }
+      fprintf(stderr, "\"");
+      return consumed + len;
+    }
+
+    case MSGPACK_ARRAY16: {
+      if (offset + 2 >= size) {
+        fprintf(stderr, "<truncated array16>");
+        return 0;
+      }
+      uint32_t count = (data[offset + 1] << 8) + data[offset + 2];
+      consumed += 2;
+      fprintf(stderr, "[");
+      for (uint32_t i = 0; i < count; ++i) {
+        if (i > 0) fprintf(stderr, ", ");
+        iree_host_size_t elem_size =
+            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                             indent_level);
+        if (elem_size == 0) return 0;
+        consumed += elem_size;
+      }
+      fprintf(stderr, "]");
+      return consumed;
+    }
+
+    case MSGPACK_ARRAY32: {
+      if (offset + 4 >= size) {
+        fprintf(stderr, "<truncated array32>");
+        return 0;
+      }
+      uint32_t count = (data[offset + 1] << 24) + (data[offset + 2] << 16) +
+                       (data[offset + 3] << 8) + data[offset + 4];
+      consumed += 4;
+      fprintf(stderr, "[");
+      for (uint32_t i = 0; i < count; ++i) {
+        if (i > 0) fprintf(stderr, ", ");
+        iree_host_size_t elem_size =
+            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                             indent_level);
+        if (elem_size == 0) return 0;
+        consumed += elem_size;
+      }
+      fprintf(stderr, "]");
+      return consumed;
+    }
+
+    case MSGPACK_MAP16: {
+      if (offset + 2 >= size) {
+        fprintf(stderr, "<truncated map16>");
+        return 0;
+      }
+      uint32_t count = (data[offset + 1] << 8) + data[offset + 2];
+      consumed += 2;
+      fprintf(stderr, "{\n");
+      for (uint32_t i = 0; i < count; ++i) {
+        PRINT_INDENT();
+        fprintf(stderr, "  ");
+        iree_host_size_t key_size =
+            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                             indent_level + 1);
+        if (key_size == 0) return 0;
+        consumed += key_size;
+        fprintf(stderr, ": ");
+        iree_host_size_t val_size =
+            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                             indent_level + 1);
+        if (val_size == 0) return 0;
+        consumed += val_size;
+        fprintf(stderr, "\n");
+      }
+      PRINT_INDENT();
+      fprintf(stderr, "}");
+      return consumed;
+    }
+
+    case MSGPACK_MAP32: {
+      if (offset + 4 >= size) {
+        fprintf(stderr, "<truncated map32>");
+        return 0;
+      }
+      uint32_t count = (data[offset + 1] << 24) + (data[offset + 2] << 16) +
+                       (data[offset + 3] << 8) + data[offset + 4];
+      consumed += 4;
+      fprintf(stderr, "{\n");
+      for (uint32_t i = 0; i < count; ++i) {
+        PRINT_INDENT();
+        fprintf(stderr, "  ");
+        iree_host_size_t key_size =
+            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                             indent_level + 1);
+        if (key_size == 0) return 0;
+        consumed += key_size;
+        fprintf(stderr, ": ");
+        iree_host_size_t val_size =
+            iree_hal_hip_msgpack_debug_print(data, size, offset + consumed,
+                                             indent_level + 1);
+        if (val_size == 0) return 0;
+        consumed += val_size;
+        fprintf(stderr, "\n");
+      }
+      PRINT_INDENT();
+      fprintf(stderr, "}");
+      return consumed;
+    }
+
+    default:
+      fprintf(stderr, "<unknown type 0x%02x>", type);
+      return consumed;
+  }
+
+  #undef PRINT_INDENT
+}
+
 // Parse AMD kernel metadata for a specific kernel from the .note section
 // Extracts .args array and .reqd_workgroup_size
 //
@@ -1034,338 +1363,356 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
   *out_arg_count = 0;
   *out_args = NULL;
 
-  // Parse ELF note header to find where msgpack data starts
-  // Format: namesz (4), descsz (4), type (4), name (namesz padded to 4)
-  if (note_size < 12) {
-    return iree_ok_status();  // Too small, skip silently
-  }
+  // The .notes section contains a series of ELF notes, each with:
+  // Format: namesz (4), descsz (4), type (4), name (namesz padded to 4), desc (descsz padded to 4)
+  // We need to iterate through all notes to find msgpack messages containing our kernel
 
-  uint32_t namesz;
-  memcpy(&namesz, note_data, sizeof(namesz));
+  iree_host_size_t current_note_offset = 0;
 
-  // Name is padded to 4-byte alignment
-  iree_host_size_t name_padded = (namesz + 3) & ~3;
-  iree_host_size_t msgpack_offset = 12 + name_padded;
+  while (current_note_offset + 12 <= note_size) {
+    // Parse ELF note header
+    uint32_t namesz, descsz, type;
+    memcpy(&namesz, note_data + current_note_offset, sizeof(namesz));
+    memcpy(&descsz, note_data + current_note_offset + 4, sizeof(descsz));
+    memcpy(&type, note_data + current_note_offset + 8, sizeof(type));
 
-  if (msgpack_offset >= note_size) {
-    return iree_ok_status();  // Invalid offset, skip silently
-  }
+    // Name is padded to 4-byte alignment
+    iree_host_size_t name_padded = (namesz + 3) & ~3;
+    // Desc is also padded to 4-byte alignment
+    iree_host_size_t desc_padded = (descsz + 3) & ~3;
 
-  // AMD metadata is msgpack encoded starting at msgpack_offset
-  // Top level is typically a map with keys like:
-  // "amdhsa.kernels" -> array of kernel maps
-  // Each kernel map has:
-  //   ".name" -> kernel name string
-  //   ".args" -> array of arg maps
-  //   ".reqd_workgroup_size" -> array [x, y, z]
-  //
-  // We need to:
-  // 1. Find the top-level map
-  // 2. Find "amdhsa.kernels" key
-  // 3. Iterate through kernels array to find matching name
-  // 4. Extract .args and .reqd_workgroup_size from that kernel
+    iree_host_size_t msgpack_offset = current_note_offset + 12 + name_padded;
+    iree_host_size_t next_note_offset = current_note_offset + 12 + name_padded + desc_padded;
 
-  iree_host_size_t offset = msgpack_offset;
+    // Validate this note is within bounds
+    if (msgpack_offset >= note_size || descsz == 0) {
+      // Move to next note
+      if (next_note_offset >= note_size) break;
+      current_note_offset = next_note_offset;
+      continue;
+    }
 
-  // Read top-level map
-  uint32_t top_map_size = 0;
-  iree_host_size_t consumed = 0;
-  iree_status_t status = iree_hal_hip_msgpack_read_map_size(
-      note_data, note_size, offset, &top_map_size, &consumed);
-  if (!iree_status_is_ok(status)) {
-    return status;  // Not fatal - metadata might not be present
-  }
-  offset += consumed;
+    // AMD metadata is msgpack encoded in the desc section
+    // Top level is typically a map with keys like:
+    // "amdhsa.kernels" -> array of kernel maps
+    // Each kernel map has:
+    //   ".name" -> kernel name string
+    //   ".args" -> array of arg maps
+    //   ".reqd_workgroup_size" -> array [x, y, z]
+    //
+    // We need to:
+    // 1. Find the top-level map
+    // 2. Find "amdhsa.kernels" key
+    // 3. Iterate through kernels array to find matching name
+    // 4. Extract .args and .reqd_workgroup_size from that kernel
 
-  // Look for "amdhsa.kernels" key in top-level map
-  for (uint32_t i = 0; i < top_map_size; ++i) {
-    // Read key
-    iree_string_view_t key;
-    status = iree_hal_hip_msgpack_read_string(note_data, note_size, offset,
-                                              &key, &consumed);
+    iree_host_size_t offset = msgpack_offset;
+
+    // Read top-level map
+    uint32_t top_map_size = 0;
+    iree_host_size_t consumed = 0;
+    iree_status_t status = iree_hal_hip_msgpack_read_map_size(
+        note_data, note_size, offset, &top_map_size, &consumed);
     if (!iree_status_is_ok(status)) {
-      // Skip this key-value pair
-      iree_host_size_t skip =
-          iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-      if (skip == 0) break;
-      offset += skip;
-      skip = iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-      if (skip == 0) break;
-      offset += skip;
+      // This note doesn't contain valid msgpack, try next note
+      current_note_offset = next_note_offset;
       continue;
     }
     offset += consumed;
 
-    // Check if this is "amdhsa.kernels"
-    if (iree_string_view_equal(key, iree_make_cstring_view("amdhsa.kernels"))) {
-      // Read the kernels array
-      uint32_t kernels_count = 0;
-      status = iree_hal_hip_msgpack_read_array_size(
-          note_data, note_size, offset, &kernels_count, &consumed);
-      if (!iree_status_is_ok(status)) break;
+    // Look for "amdhsa.kernels" key in top-level map
+      for (uint32_t i = 0; i < top_map_size; ++i) {
+      // Read key
+      iree_string_view_t key;
+      status = iree_hal_hip_msgpack_read_string(note_data, note_size, offset,
+                                                &key, &consumed);
+      if (!iree_status_is_ok(status)) {
+        // Skip this key-value pair
+        iree_host_size_t skip =
+            iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
+        if (skip == 0) break;
+        offset += skip;
+        skip = iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
+        if (skip == 0) break;
+        offset += skip;
+        continue;
+      }
       offset += consumed;
 
-      // Iterate through kernels to find matching name
-      for (uint32_t k = 0; k < kernels_count; ++k) {
-        // Each kernel is a map
-        uint32_t kernel_map_size = 0;
-        status = iree_hal_hip_msgpack_read_map_size(
-            note_data, note_size, offset, &kernel_map_size, &consumed);
-        if (!iree_status_is_ok(status)) {
-          // Skip this kernel
-          iree_host_size_t skip =
-              iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-          if (skip == 0) return iree_ok_status();
-          offset += skip;
-          continue;
-        }
+      // Check if this is "amdhsa.kernels"
+      if (iree_string_view_equal(key, iree_make_cstring_view("amdhsa.kernels"))) {
+        // Read the kernels array
+        uint32_t kernels_count = 0;
+        status = iree_hal_hip_msgpack_read_array_size(
+            note_data, note_size, offset, &kernels_count, &consumed);
+        if (!iree_status_is_ok(status)) break;
         offset += consumed;
 
-        // Look for ".name" key in kernel map
-        bool name_matches = false;
-        iree_host_size_t args_offset = 0;
-        iree_host_size_t wgs_offset = 0;
-
-        for (uint32_t j = 0; j < kernel_map_size; ++j) {
-          // Read key
-          iree_string_view_t kernel_key;
-          status = iree_hal_hip_msgpack_read_string(
-              note_data, note_size, offset, &kernel_key, &consumed);
+        // Iterate through kernels to find matching name
+        for (uint32_t k = 0; k < kernels_count; ++k) {
+          // Each kernel is a map
+          uint32_t kernel_map_size = 0;
+          status = iree_hal_hip_msgpack_read_map_size(
+              note_data, note_size, offset, &kernel_map_size, &consumed);
           if (!iree_status_is_ok(status)) {
-            // Skip key and value
+            // Skip this kernel
             iree_host_size_t skip =
                 iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-            if (skip == 0) break;
-            offset += skip;
-            skip =
-                iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-            if (skip == 0) break;
+            if (skip == 0) return iree_ok_status();
             offset += skip;
             continue;
           }
           offset += consumed;
 
-          // Check key type
-          if (iree_string_view_equal(kernel_key,
-                                     iree_make_cstring_view(".name"))) {
-            // Read name value
-            iree_string_view_t name_value;
+          // Look for ".name" key in kernel map
+          bool name_matches = false;
+          iree_host_size_t args_offset = 0;
+          iree_host_size_t wgs_offset = 0;
+
+          for (uint32_t j = 0; j < kernel_map_size; ++j) {
+            // Read key
+            iree_string_view_t kernel_key;
             status = iree_hal_hip_msgpack_read_string(
-                note_data, note_size, offset, &name_value, &consumed);
-            if (iree_status_is_ok(status) &&
-                iree_string_view_equal(name_value, kernel_name)) {
-              name_matches = true;
+                note_data, note_size, offset, &kernel_key, &consumed);
+            if (!iree_status_is_ok(status)) {
+              // Skip key and value
+              iree_host_size_t skip =
+                  iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
+              if (skip == 0) break;
+              offset += skip;
+              skip =
+                  iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
+              if (skip == 0) break;
+              offset += skip;
+              continue;
             }
             offset += consumed;
-          } else if (iree_string_view_equal(kernel_key,
-                                            iree_make_cstring_view(".args"))) {
-            // Remember args offset for later parsing
-            args_offset = offset;
-            // Skip for now
-            iree_host_size_t skip =
-                iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-            if (skip == 0) break;
-            offset += skip;
-          } else if (iree_string_view_equal(
-                         kernel_key,
-                         iree_make_cstring_view(".reqd_workgroup_size"))) {
-            // Remember workgroup size offset
-            wgs_offset = offset;
-            // Skip for now
-            iree_host_size_t skip =
-                iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-            if (skip == 0) break;
-            offset += skip;
-          } else {
-            // Skip unknown key's value
-            iree_host_size_t skip =
-                iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-            if (skip == 0) break;
-            offset += skip;
-          }
-        }
 
-        // If name matches, parse .args and .reqd_workgroup_size
-        if (name_matches) {
-          // Parse .reqd_workgroup_size if present
-          if (wgs_offset > 0) {
-            uint32_t wgs_array_size = 0;
-            status = iree_hal_hip_msgpack_read_array_size(
-                note_data, note_size, wgs_offset, &wgs_array_size, &consumed);
-            if (iree_status_is_ok(status) && wgs_array_size >= 3) {
-              iree_host_size_t wgs_off = wgs_offset + consumed;
-              uint64_t val;
-              // X
-              status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
-                                                      wgs_off, &val, &consumed);
-              if (iree_status_is_ok(status)) {
-                *out_workgroup_size_x = (uint32_t)val;
-                wgs_off += consumed;
+            // Check key type
+            if (iree_string_view_equal(kernel_key,
+                                      iree_make_cstring_view(".name"))) {
+              // Read name value
+              iree_string_view_t name_value;
+              status = iree_hal_hip_msgpack_read_string(
+                  note_data, note_size, offset, &name_value, &consumed);
+              if (iree_status_is_ok(status) &&
+                  iree_string_view_equal(name_value, kernel_name)) {
+                name_matches = true;
               }
-              // Y
-              status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
-                                                      wgs_off, &val, &consumed);
-              if (iree_status_is_ok(status)) {
-                *out_workgroup_size_y = (uint32_t)val;
-                wgs_off += consumed;
-              }
-              // Z
-              status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
-                                                      wgs_off, &val, &consumed);
-              if (iree_status_is_ok(status)) {
-                *out_workgroup_size_z = (uint32_t)val;
-              }
+              offset += consumed;
+            } else if (iree_string_view_equal(kernel_key,
+                                              iree_make_cstring_view(".args"))) {
+              // Remember args offset for later parsing
+              args_offset = offset;
+              // Skip for now
+              iree_host_size_t skip =
+                  iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
+              if (skip == 0) break;
+              offset += skip;
+            } else if (iree_string_view_equal(
+                          kernel_key,
+                          iree_make_cstring_view(".reqd_workgroup_size"))) {
+              // Remember workgroup size offset
+              wgs_offset = offset;
+              // Skip for now
+              iree_host_size_t skip =
+                  iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
+              if (skip == 0) break;
+              offset += skip;
+            } else {
+              // Skip unknown key's value
+              iree_host_size_t skip =
+                  iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
+              if (skip == 0) break;
+              offset += skip;
             }
           }
 
-          // Parse .args array
-          if (args_offset > 0) {
-            uint32_t args_array_size = 0;
-            status = iree_hal_hip_msgpack_read_array_size(
-                note_data, note_size, args_offset, &args_array_size, &consumed);
-            if (!iree_status_is_ok(status)) {
-              return iree_ok_status();  // Found kernel but no args
+          // If name matches, parse .args and .reqd_workgroup_size
+          if (name_matches) {
+            // Parse .reqd_workgroup_size if present
+            if (wgs_offset > 0) {
+              uint32_t wgs_array_size = 0;
+              status = iree_hal_hip_msgpack_read_array_size(
+                  note_data, note_size, wgs_offset, &wgs_array_size, &consumed);
+              if (iree_status_is_ok(status) && wgs_array_size >= 3) {
+                iree_host_size_t wgs_off = wgs_offset + consumed;
+                uint64_t val;
+                // X
+                status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
+                                                        wgs_off, &val, &consumed);
+                if (iree_status_is_ok(status)) {
+                  *out_workgroup_size_x = (uint32_t)val;
+                  wgs_off += consumed;
+                }
+                // Y
+                status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
+                                                        wgs_off, &val, &consumed);
+                if (iree_status_is_ok(status)) {
+                  *out_workgroup_size_y = (uint32_t)val;
+                  wgs_off += consumed;
+                }
+                // Z
+                status = iree_hal_hip_msgpack_read_uint(note_data, note_size,
+                                                        wgs_off, &val, &consumed);
+                if (iree_status_is_ok(status)) {
+                  *out_workgroup_size_z = (uint32_t)val;
+                }
+              }
             }
 
-            // Allocate args array
-            iree_hal_hip_parsed_arg_t* args = NULL;
-            IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-                allocator, args_array_size * sizeof(iree_hal_hip_parsed_arg_t),
-                (void**)&args));
-            memset(args, 0,
-                   args_array_size * sizeof(iree_hal_hip_parsed_arg_t));
-
-            iree_host_size_t arg_offset = args_offset + consumed;
-            iree_host_size_t explicit_count = 0;
-
-            // Parse each argument
-            for (uint32_t a = 0; a < args_array_size; ++a) {
-              // Each arg is a map
-              uint32_t arg_map_size = 0;
-              status = iree_hal_hip_msgpack_read_map_size(
-                  note_data, note_size, arg_offset, &arg_map_size, &consumed);
+            // Parse .args array
+            if (args_offset > 0) {
+              uint32_t args_array_size = 0;
+              status = iree_hal_hip_msgpack_read_array_size(
+                  note_data, note_size, args_offset, &args_array_size, &consumed);
               if (!iree_status_is_ok(status)) {
-                iree_host_size_t skip = iree_hal_hip_msgpack_skip_value(
-                    note_data, note_size, arg_offset);
-                if (skip == 0) break;
-                arg_offset += skip;
-                continue;
+                return iree_ok_status();  // Found kernel but no args
               }
-              arg_offset += consumed;
 
-              bool is_hidden = false;
-              uint32_t arg_offset_val = 0;
-              uint32_t arg_size_val = 0;
-              iree_hal_hip_arg_value_kind_t value_kind =
-                  IREE_HAL_HIP_ARG_KIND_UNKNOWN;
+              // Allocate args array
+              iree_hal_hip_parsed_arg_t* args = NULL;
+              IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+                  allocator, args_array_size * sizeof(iree_hal_hip_parsed_arg_t),
+                  (void**)&args));
+              memset(args, 0,
+                    args_array_size * sizeof(iree_hal_hip_parsed_arg_t));
 
-              // Parse arg map fields
-              for (uint32_t f = 0; f < arg_map_size; ++f) {
-                iree_string_view_t field_key;
-                status = iree_hal_hip_msgpack_read_string(
-                    note_data, note_size, arg_offset, &field_key, &consumed);
+              iree_host_size_t arg_offset = args_offset + consumed;
+              iree_host_size_t explicit_count = 0;
+
+              // Parse each argument
+              for (uint32_t a = 0; a < args_array_size; ++a) {
+                // Each arg is a map
+                uint32_t arg_map_size = 0;
+                status = iree_hal_hip_msgpack_read_map_size(
+                    note_data, note_size, arg_offset, &arg_map_size, &consumed);
                 if (!iree_status_is_ok(status)) {
-                  // Skip
                   iree_host_size_t skip = iree_hal_hip_msgpack_skip_value(
                       note_data, note_size, arg_offset);
-                  if (skip == 0) break;
-                  arg_offset += skip;
-                  skip = iree_hal_hip_msgpack_skip_value(note_data, note_size,
-                                                         arg_offset);
                   if (skip == 0) break;
                   arg_offset += skip;
                   continue;
                 }
                 arg_offset += consumed;
 
-                if (iree_string_view_equal(field_key,
-                                           iree_make_cstring_view(".offset"))) {
-                  uint64_t val;
-                  status = iree_hal_hip_msgpack_read_uint(
-                      note_data, note_size, arg_offset, &val, &consumed);
-                  if (iree_status_is_ok(status)) {
-                    arg_offset_val = (uint32_t)val;
-                  }
-                  arg_offset += consumed;
-                } else if (iree_string_view_equal(
-                               field_key, iree_make_cstring_view(".size"))) {
-                  uint64_t val;
-                  status = iree_hal_hip_msgpack_read_uint(
-                      note_data, note_size, arg_offset, &val, &consumed);
-                  if (iree_status_is_ok(status)) {
-                    arg_size_val = (uint32_t)val;
-                  }
-                  arg_offset += consumed;
-                } else if (iree_string_view_equal(
-                               field_key,
-                               iree_make_cstring_view(".value_kind"))) {
-                  iree_string_view_t vk_str;
+                bool is_hidden = false;
+                uint32_t arg_offset_val = 0;
+                uint32_t arg_size_val = 0;
+                iree_hal_hip_arg_value_kind_t value_kind =
+                    IREE_HAL_HIP_ARG_KIND_UNKNOWN;
+
+                // Parse arg map fields
+                for (uint32_t f = 0; f < arg_map_size; ++f) {
+                  iree_string_view_t field_key;
                   status = iree_hal_hip_msgpack_read_string(
-                      note_data, note_size, arg_offset, &vk_str, &consumed);
-                  if (iree_status_is_ok(status)) {
-                    if (iree_string_view_equal(
-                            vk_str, iree_make_cstring_view("global_buffer"))) {
-                      value_kind = IREE_HAL_HIP_ARG_KIND_GLOBAL_BUFFER;
-                    } else if (iree_string_view_equal(
-                                   vk_str,
-                                   iree_make_cstring_view("by_value"))) {
-                      value_kind = IREE_HAL_HIP_ARG_KIND_BY_VALUE;
-                    } else if (iree_string_view_starts_with(
-                                   vk_str, iree_make_cstring_view("hidden_"))) {
-                      is_hidden = true;
-                      value_kind = IREE_HAL_HIP_ARG_KIND_HIDDEN;
+                      note_data, note_size, arg_offset, &field_key, &consumed);
+                  if (!iree_status_is_ok(status)) {
+                    // Skip
+                    iree_host_size_t skip = iree_hal_hip_msgpack_skip_value(
+                        note_data, note_size, arg_offset);
+                    if (skip == 0) break;
+                    arg_offset += skip;
+                    skip = iree_hal_hip_msgpack_skip_value(note_data, note_size,
+                                                          arg_offset);
+                    if (skip == 0) break;
+                    arg_offset += skip;
+                    continue;
+                  }
+                  arg_offset += consumed;
+
+                  if (iree_string_view_equal(field_key,
+                                            iree_make_cstring_view(".offset"))) {
+                    uint64_t val;
+                    status = iree_hal_hip_msgpack_read_uint(
+                        note_data, note_size, arg_offset, &val, &consumed);
+                    if (iree_status_is_ok(status)) {
+                      arg_offset_val = (uint32_t)val;
                     }
+                    arg_offset += consumed;
+                  } else if (iree_string_view_equal(
+                                field_key, iree_make_cstring_view(".size"))) {
+                    uint64_t val;
+                    status = iree_hal_hip_msgpack_read_uint(
+                        note_data, note_size, arg_offset, &val, &consumed);
+                    if (iree_status_is_ok(status)) {
+                      arg_size_val = (uint32_t)val;
+                    }
+                    arg_offset += consumed;
+                  } else if (iree_string_view_equal(
+                                field_key,
+                                iree_make_cstring_view(".value_kind"))) {
+                    iree_string_view_t vk_str;
+                    status = iree_hal_hip_msgpack_read_string(
+                        note_data, note_size, arg_offset, &vk_str, &consumed);
+                    if (iree_status_is_ok(status)) {
+                      if (iree_string_view_equal(
+                              vk_str, iree_make_cstring_view("global_buffer"))) {
+                        value_kind = IREE_HAL_HIP_ARG_KIND_GLOBAL_BUFFER;
+                      } else if (iree_string_view_equal(
+                                    vk_str,
+                                    iree_make_cstring_view("by_value"))) {
+                        value_kind = IREE_HAL_HIP_ARG_KIND_BY_VALUE;
+                      } else if (iree_string_view_starts_with(
+                                    vk_str, iree_make_cstring_view("hidden_"))) {
+                        is_hidden = true;
+                        value_kind = IREE_HAL_HIP_ARG_KIND_HIDDEN;
+                      }
+                    }
+                    arg_offset += consumed;
+                  } else if (iree_string_view_equal(
+                                field_key, iree_make_cstring_view(".name"))) {
+                    // Check if name starts with "hidden_"
+                    iree_string_view_t name_str;
+                    status = iree_hal_hip_msgpack_read_string(
+                        note_data, note_size, arg_offset, &name_str, &consumed);
+                    if (iree_status_is_ok(status) &&
+                        iree_string_view_starts_with(
+                            name_str, iree_make_cstring_view("hidden_"))) {
+                      is_hidden = true;
+                    }
+                    arg_offset += consumed;
+                  } else {
+                    // Skip unknown field
+                    iree_host_size_t skip = iree_hal_hip_msgpack_skip_value(
+                        note_data, note_size, arg_offset);
+                    if (skip == 0) break;
+                    arg_offset += skip;
                   }
-                  arg_offset += consumed;
-                } else if (iree_string_view_equal(
-                               field_key, iree_make_cstring_view(".name"))) {
-                  // Check if name starts with "hidden_"
-                  iree_string_view_t name_str;
-                  status = iree_hal_hip_msgpack_read_string(
-                      note_data, note_size, arg_offset, &name_str, &consumed);
-                  if (iree_status_is_ok(status) &&
-                      iree_string_view_starts_with(
-                          name_str, iree_make_cstring_view("hidden_"))) {
-                    is_hidden = true;
-                  }
-                  arg_offset += consumed;
-                } else {
-                  // Skip unknown field
-                  iree_host_size_t skip = iree_hal_hip_msgpack_skip_value(
-                      note_data, note_size, arg_offset);
-                  if (skip == 0) break;
-                  arg_offset += skip;
+                }
+
+                // Only store explicit (non-hidden) arguments
+                if (!is_hidden && value_kind != IREE_HAL_HIP_ARG_KIND_UNKNOWN) {
+                  args[explicit_count].offset = arg_offset_val;
+                  args[explicit_count].size = arg_size_val;
+                  args[explicit_count].value_kind = value_kind;
+                  explicit_count++;
                 }
               }
 
-              // Only store explicit (non-hidden) arguments
-              if (!is_hidden && value_kind != IREE_HAL_HIP_ARG_KIND_UNKNOWN) {
-                args[explicit_count].offset = arg_offset_val;
-                args[explicit_count].size = arg_size_val;
-                args[explicit_count].value_kind = value_kind;
-                explicit_count++;
-              }
+              *out_arg_count = explicit_count;
+              *out_args = args;
             }
 
-            *out_arg_count = explicit_count;
-            *out_args = args;
+            return iree_ok_status();  // Found and parsed our kernel
           }
 
-          return iree_ok_status();  // Found and parsed our kernel
+          // Name didn't match, skip to next kernel
+          // (offset already advanced through kernel map)
         }
 
-        // Name didn't match, skip to next kernel
-        // (offset already advanced through kernel map)
+        break;  // Processed amdhsa.kernels, no need to continue this note
+      } else {
+        // Skip this value
+        iree_host_size_t skip =
+            iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
+        if (skip == 0) break;
+        offset += skip;
       }
-
-      break;  // Processed amdhsa.kernels, no need to continue
-    } else {
-      // Skip this value
-      iree_host_size_t skip =
-          iree_hal_hip_msgpack_skip_value(note_data, note_size, offset);
-      if (skip == 0) break;
-      offset += skip;
     }
+
+    // Move to next note in the section
+    current_note_offset = next_note_offset;
   }
 
   return iree_ok_status();  // Not found, but not an error
@@ -1412,7 +1759,6 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
     bool copy_kernel_names, iree_host_size_t* kernel_count,
     iree_hal_hip_kernel_info_t** out_kernels) {
   const uint8_t* elf_base = elf_data.data;
-
   // Read ELF header
   if (elf_data.data_length < sizeof(iree_hal_hip_elf64_header_t)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
