@@ -58,41 +58,6 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx,
   return mapping;
 }
 
-static std::optional<int64_t> getElementsPerThread(linalg::CopyOp copyOp) {
-  // Get the GPU target attributes.
-  IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(copyOp);
-  if (!targetAttr) {
-    return std::nullopt;
-  }
-
-  IREE::GPU::TargetWgpAttr wgp = targetAttr.getWgp();
-  if (!wgp) {
-    return std::nullopt;
-  }
-
-  DenseI64ArrayAttr dmaSizesAttr = wgp.getDmaSizes();
-  if (!dmaSizesAttr || dmaSizesAttr.empty()) {
-    return std::nullopt;
-  }
-
-  auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
-  Type elementType = outputType.getElementType();
-
-  unsigned elementBitWidth = elementType.getIntOrFloatBitWidth();
-  if (elementBitWidth == 0) {
-    return std::nullopt;
-  }
-
-  int64_t maxDmaSize = *std::max_element(dmaSizesAttr.asArrayRef().begin(),
-                                         dmaSizesAttr.asArrayRef().end());
-  int64_t elementsPerThread = maxDmaSize / elementBitWidth;
-  if (elementsPerThread <= 0) {
-    return std::nullopt;
-  }
-
-  return elementsPerThread;
-}
-
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 template <typename OpTy>
@@ -139,22 +104,6 @@ static bool hasWarpMapping(scf::ForallOp forallOp) {
   return llvm::any_of(mapping.value(), [](Attribute attr) {
     return isa<gpu::GPUWarpMappingAttr>(attr);
   });
-}
-
-/// Helper to count non-zero thread counts for mapping.
-static int64_t
-countNonZeroThreads(const SmallVector<OpFoldResult> &threadNumThreads) {
-  int64_t numLoops = 0;
-  for (const auto &numThread : threadNumThreads) {
-    if (auto intAttr = dyn_cast<IntegerAttr>(numThread.dyn_cast<Attribute>())) {
-      if (intAttr.getInt() != 0) {
-        numLoops++;
-      }
-    } else {
-      numLoops++;
-    }
-  }
-  return numLoops;
 }
 
 template <typename OpTy>
@@ -273,7 +222,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     if (auto extractSlice = input.getDefiningOp<tensor::ExtractSliceOp>()) {
       source = extractSlice.getSource();
     } else {
-      llvm_unreachable("unreachable");
+      return failure();
     }
   } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
     source = innerOp.getSource();
@@ -467,8 +416,11 @@ struct ConvertGatherToCoalescedDMA
 
       // TODO: Support multi-dimensional indices in the future.
       // Currently only 1D indices are supported for gather operations.
-      assert(indicesType.getRank() <= 1 &&
-             "Only 1D indices are currently supported for gather operations");
+      if (indicesType.getRank() > 1) {
+        return rewriter.notifyMatchFailure(
+            tiledGatherOp,
+            "Only 1D indices are currently supported for gather operations");
+      }
       Type elementType = indicesType.getElementType();
 
       VectorType vectorTypeOriginal =
