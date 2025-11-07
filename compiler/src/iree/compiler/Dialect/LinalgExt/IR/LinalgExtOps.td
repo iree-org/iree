@@ -1392,7 +1392,14 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
 def IREELinalgExt_UnMaskOp : IREELinalgExt_PureOp<"unmask", [
   AllTypesMatch<["dest", "result"]>,
   Pure,
-  DestinationStyleOpInterface
+  DestinationStyleOpInterface,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["getIterationDomain",
+     "getLoopIteratorTypes",
+     "getResultTilePosition",
+     "getTiledImplementation",
+     "getIterationDomainTileFromOperandTiles",
+     "getTiledImplementationFromOperandTiles"]>,
   ]> {
   let summary = "";
   let description = [{}];
