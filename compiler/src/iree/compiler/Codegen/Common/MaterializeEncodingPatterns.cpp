@@ -355,13 +355,7 @@ struct DecomposeMismatchEncodingTensorLoadOp
         rewriter, loc, boundTensorType, loadOp.getSource(),
         loadOp.getSourceDims(), loadOp.getMixedOffsets(),
         loadOp.getMixedSizes(), loadOp.getMixedStrides());
-    SmallVector<Value> dynamicDims;
-    for (OpFoldResult value : loadOp.getMixedSizes()) {
-      if (isa<Attribute>(value)) {
-        continue;
-      }
-      dynamicDims.push_back(cast<Value>(value));
-    }
+    SmallVector<Value> dynamicDims = llvm::to_vector(loadOp.getSizes());
     result =
         generateEncodingTransferOps(rewriter, result, dynamicDims, destType);
     rewriter.replaceOp(loadOp, result);
@@ -415,13 +409,7 @@ struct DecomposeMismatchEncodingTensorStoreOp
            << storeOp;
     Location loc = storeOp.getLoc();
     Value valueToStore = storeOp.getValue();
-    SmallVector<Value> dynamicDims;
-    for (OpFoldResult value : storeOp.getMixedSizes()) {
-      if (isa<Attribute>(value)) {
-        continue;
-      }
-      dynamicDims.push_back(cast<Value>(value));
-    }
+    SmallVector<Value> dynamicDims = llvm::to_vector(storeOp.getSizes());
     valueToStore = generateEncodingTransferOps(rewriter, valueToStore,
                                                dynamicDims, boundTensorType);
     IREE::TensorExt::DispatchTensorStoreOp::create(
@@ -435,8 +423,6 @@ struct DecomposeMismatchEncodingTensorStoreOp
 private:
   MaterializeEncodingTypeConverter &typeConverter;
 };
-
-
 
 //===---------------------------------------------------------------------===//
 // Patterns to lower ops with encodings. These are written as
