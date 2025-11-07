@@ -69,6 +69,8 @@ static iree_status_t iree_hal_streaming_module_extract_metadata(
                                    (void**)&parameters);
   }
 
+  iree_host_size_t constants_size =  0;
+
   // Analyze each export to determine operation counts.
   // We count the total operations per symbol with copy coalescing.
   iree_host_size_t total_ops = 0;
@@ -101,6 +103,15 @@ static iree_status_t iree_hal_streaming_module_extract_metadata(
         //  New copy operation needed.
         ++symbol_op_counts[i].copy_count;
         ++total_ops;
+        
+        if (parameters[parameter_base + j].offset + 
+          parameters[parameter_base + j].size > constants_size) {
+            // This is also not quite right, we may end up allocating
+            // more data than necessary for constants, but it should
+            // enable us to just pack all of the parameters in the 
+            // constants buffer if we want in the future.
+            constants_size += parameters[parameter_base + j].size;
+        }
         //}
         // src_offset += parameter->size;
         // last_constant_end = src_offset;
@@ -145,8 +156,7 @@ static iree_status_t iree_hal_streaming_module_extract_metadata(
 
     // Initialize parameter info.
     iree_hal_streaming_parameter_info_t* parameter_info = &symbol->parameters;
-    parameter_info->constant_bytes =
-        export_infos[i].constant_count * sizeof(uint32_t);
+    parameter_info->constant_bytes = constants_size;
     parameter_info->binding_count = export_infos[i].binding_count;
     parameter_info->copy_count = symbol_op_counts[i].copy_count;
     parameter_info->ops = current_ops;
@@ -401,13 +411,6 @@ iree_status_t iree_hal_streaming_module_symbol(
       break;
     }
   }
-  fprintf(stderr, "Could not find symbol: %.*s\n", (int)name_view.size, name_view.data);
-  fprintf(stderr, "    Found symbols:\n");
-
-  for (uint32_t i = 0; i < module->symbol_count; ++i) {
-    fprintf(stderr, "      %.*s\n", (int)module->symbols[i].name.size, module->symbols[i].name.data);
-  }
-
   return iree_make_status(IREE_STATUS_NOT_FOUND,
                           "symbol '%.*s' not found in module",
                           (int)name_view.size, name_view.data);

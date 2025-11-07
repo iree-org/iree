@@ -289,7 +289,7 @@ static hipError_t iree_status_to_hip_result(iree_status_t status) {
   }
 
   // DO NOT SUBMIT
-  iree_status_fprint(stderr, status);
+  //iree_status_fprint(stderr, status);
 
   // Map IREE status codes to HIP error codes.
   iree_status_code_t code = iree_status_code(status);
@@ -6196,7 +6196,7 @@ HIPAPI hipError_t hipModuleLaunchKernel(
     //   HIP_LAUNCH_PARAM_END,
     // }
     if (extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER) {
-      params_ptr = *(void**)extra[1];
+      params_ptr = extra[1];
     }
   } else if (kernelParams) {
     // kernelParams is an array of pointers to the actual parameters.
