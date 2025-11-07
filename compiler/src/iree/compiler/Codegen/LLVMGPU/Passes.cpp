@@ -414,9 +414,10 @@ LogicalResult isAtBoundary(Operation *op) {
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                    const GPUPipelineOptions &pipelineOptions,
                                    bool forROCDL) {
-  funcPassManager.addPass(createGPUPadConvsPass());
   if (pipelineOptions.useIgemmConvolution) {
-    funcPassManager.addPass(createConvolutionToIGEMMPass());
+    GPUApplyPaddingLevelPassOptions options;
+    options.paddingLevel = IREE::GPU::PaddingLevel::Initial;
+    funcPassManager.addPass(createGPUApplyPaddingLevelPass(options));
   }
   // TODO (nirvedhmeshram) : Can remove this pass after
   // https://github.com/iree-org/iree/issues/19546 is fixed.
@@ -436,7 +437,11 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Step 1. Promote matmul operands and pack to intrinsic shapes.
-  funcPassManager.addPass(createGPUPadOperandsPass());
+  {
+    GPUApplyPaddingLevelPassOptions options;
+    options.paddingLevel = IREE::GPU::PaddingLevel::PartialReduction;
+    funcPassManager.addPass(createGPUApplyPaddingLevelPass(options));
+  }
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
   funcPassManager.addPass(createGPUTileAndConvertConvToMatmulPass());
   funcPassManager.addPass(createGPUPackToIntrinsicsPass());
@@ -784,7 +789,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // Tile to reduction loops.
   {
     GPUApplyPaddingLevelPassOptions padOptions;
-    padOptions.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;
+    padOptions.paddingLevel = IREE::GPU::PaddingLevel::PartialReduction;
     funcPassManager.addPass(createGPUApplyPaddingLevelPass(padOptions));
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;

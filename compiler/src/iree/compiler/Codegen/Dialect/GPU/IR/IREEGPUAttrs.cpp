@@ -1790,7 +1790,7 @@ std::array<int64_t, 3> TargetAttr::getMaximumWorkgroupCount() const {
 }
 
 //===----------------------------------------------------------------------===//
-// Lowering Config Attributes
+// Lowering Config Attributes - Padding
 //===----------------------------------------------------------------------===//
 
 constexpr StringLiteral kWorkgroupLevelName = "workgroup";
@@ -1872,6 +1872,50 @@ bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
 bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
   return !getWorkgroupTileSizes().empty();
 }
+
+//===----------------------------------------------------------------------===//
+// Lowering Config Attributes - Padding
+//===----------------------------------------------------------------------===//
+
+constexpr StringLiteral kInitialPaddingLevelName = "padding_initial";
+constexpr StringLiteral kPartialReductionPaddingLevelName = 
+    "padding_partial_reduction";
+
+StringRef getPaddingLevelName(GPU::PaddingLevel level) {
+  switch (level) {
+  case GPU::PaddingLevel::Initial:
+    return kInitialPaddingLevelName;
+  case GPU::PaddingLevel::PartialReduction:
+    return kPartialReductionPaddingLevelName;
+  }
+  assert(false && "Unknown padding level");
+  return StringRef();
+}
+
+static SmallVector<int64_t> getPaddingSizes(DictionaryAttr config,
+                                            GPU::PaddingLevel level) {
+  return getIntegerVector(config.getAs<ArrayAttr>(getPaddingLevelName(level)));
+}
+
+SmallVector<int64_t> LoweringConfigAttr::getInitialPaddingSizes() const {
+  return getPaddingSizes(getAttributes(), GPU::PaddingLevel::Initial);
+}
+
+SmallVector<int64_t>
+LoweringConfigAttr::getStaticPaddingLevelSizes(unsigned level) const {
+  if (level > llvm::to_underlying(GPU::PaddingLevel::PartialReduction)) {
+    return {};
+  }
+  return getPaddingSizes(getAttributes(), static_cast<GPU::PaddingLevel>(level));
+}
+
+bool LoweringConfigAttr::hasPaddingLevel(GPU::PaddingLevel level) const {
+  return !getPaddingSizes(getAttributes(), level).empty();
+}
+
+//===----------------------------------------------------------------------===//
+// Lowering Config Attributes - Strategy
+//===----------------------------------------------------------------------===//
 
 constexpr StringLiteral kLoweringStrategyName = "lowering_strategy";
 
