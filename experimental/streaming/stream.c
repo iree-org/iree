@@ -252,8 +252,9 @@ iree_status_t iree_hal_streaming_stream_wait_event(
     // Event wait during graph capture is not yet implemented.
     // TODO(#graph-capture): Add wait node to graph.
     IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "event wait during graph capture not yet implemented");
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "event wait during graph capture not yet implemented");
   }
 
   // Flush the stream to ensure all prior operations are submitted.
@@ -338,6 +339,60 @@ iree_status_t iree_hal_streaming_unpack_parameters(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_streaming_unpack_parameter_list(
+    iree_hal_streaming_context_t* context,
+    const iree_hal_streaming_parameter_info_t* parameters,
+    void** parameter_list, void* out_constants,
+    iree_hal_buffer_ref_list_t* out_bindings) {
+  IREE_ASSERT_ARGUMENT(context);
+  IREE_ASSERT_ARGUMENT(parameters);
+  if (parameters->buffer_size == 0) {
+    return iree_ok_status();
+  }
+  IREE_ASSERT_ARGUMENT(parameter_list);
+  IREE_ASSERT_ARGUMENT(out_bindings);
+
+  // When parameters are provided as an array of pointers, each element in the
+  // array points to the actual parameter value. We need to dereference each
+  // pointer and handle buffer translation.
+
+  // Copy constant data spans.
+  // For each copy operation, we read from the parameter list at the source
+  // offset to get the pointer to the actual data, then copy from there.
+  uint8_t* constants = (uint8_t*)out_constants;
+  const iree_hal_streaming_parameter_op_t* op = &parameters->ops[0];
+  for (uint32_t i = 0; i < parameters->copy_count; ++i, ++op) {
+    const iree_hal_streaming_parameter_copy_op_t copy_op = op->copy;
+    // In pointer array mode, src_offset is an index into the parameter_list
+    // array. Each parameter_list[index] is a pointer to the actual value.
+    // We need to dereference it to get the value.
+    void* param_ptr = parameter_list[copy_op.src_ordinal];
+    memcpy(constants + copy_op.dst_offset, param_ptr, copy_op.size);
+  }
+
+  // Resolve bindings, if any.
+  // For bindings, each parameter in the list is a pointer to a device pointer.
+  iree_hal_buffer_ref_t* bindings =
+      (iree_hal_buffer_ref_t*)out_bindings->values;
+  for (uint32_t i = 0; i < parameters->binding_count; ++i, ++op) {
+    const iree_hal_streaming_parameter_resolve_op_t resolve_op = op->resolve;
+    // In pointer array mode, src_offset is an index into the parameter_list.
+    void* param_ptr = parameter_list[resolve_op.src_ordinal];
+    // The parameter points to a device pointer (void*)
+    void* device_ptr = *(void**)param_ptr;
+    // TODO(benvanik): possibly calculate proper range here? We could easily
+    // (at only the cost of a cache miss) get the total buffer size and then
+    // subtract the offset to get the remaining size.
+    iree_hal_streaming_buffer_ref_t stream_ref;
+    IREE_RETURN_IF_ERROR(iree_hal_streaming_memory_lookup(
+        context, (iree_hal_streaming_deviceptr_t)device_ptr, &stream_ref));
+    bindings[resolve_op.dst_ordinal] = iree_hal_make_buffer_ref(
+        stream_ref.buffer->buffer, stream_ref.offset, IREE_HAL_WHOLE_BUFFER);
+  }
+
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_streaming_launch_kernel(
     iree_hal_streaming_symbol_t* symbol,
     const iree_hal_streaming_dispatch_params_t* params,
@@ -403,11 +458,19 @@ iree_status_t iree_hal_streaming_launch_kernel(
                     : NULL,
   };
 
-  // Unpack parameters.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_streaming_unpack_parameters(
-              stream->context, &symbol->parameters, params->buffer, constants,
-              &binding_list));
+  if (params->flags & IREE_HAL_STREAMING_DISPATCH_FLAG_ARGS_ARRAY) {
+    // Unpack parameters from array of pointers (void**).
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_streaming_unpack_parameter_list(
+                stream->context, &symbol->parameters, (void**)params->buffer,
+                constants, &binding_list));
+  } else {
+    // Unpack parameters from packed buffer.
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_streaming_unpack_parameters(
+                stream->context, &symbol->parameters, params->buffer, constants,
+                &binding_list));
+  }
 
   // Create IREE dispatch config.
   const iree_hal_dispatch_config_t config = {

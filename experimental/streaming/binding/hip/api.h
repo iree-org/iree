@@ -758,6 +758,9 @@ typedef enum hipGraphInstantiate_flags {
 #define hipStreamAddCaptureDependencies 0x1
 #define hipStreamSetCaptureDependencies 0x2
 
+/** AnyOrderLaunch of kernels.*/
+#define hipExtAnyOrderLaunch 0x01
+
 //===----------------------------------------------------------------------===//
 // Graph node parameter structures
 //===----------------------------------------------------------------------===//
@@ -992,6 +995,16 @@ HIPAPI hipError_t hipModuleLaunchCooperativeKernel(
     unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
     unsigned int blockDimZ, unsigned int sharedMemBytes, hipStream_t hStream,
     void** kernelParams);
+HIPAPI hipError_t hipExtLaunchKernel(const void* function_address,
+                                  dim3 numBlocks, dim3 dimBlocks, void** args,
+                                  size_t sharedMemBytes, hipStream_t stream,
+                                  hipEvent_t startEvent, hipEvent_t stopEvent, int flags);
+HIPAPI hipError_t hipExtModuleLaunchKernel(
+    hipFunction_t f, unsigned int gridDimX, unsigned int gridDimY,
+    unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
+    unsigned int blockDimZ, unsigned int sharedMemBytes, hipStream_t hStream,
+    void** kernelParams, void** extra, hipEvent_t startEvent,
+    hipEvent_t stopEvent, int flags);
 HIPAPI hipError_t hipLaunchHostFunc(hipStream_t hStream, hipHostFn_t fn,
                                     void* userData);
 

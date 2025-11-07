@@ -453,6 +453,8 @@ typedef struct iree_hal_streaming_parameter_copy_op_t {
   uint16_t reserved;
   // Source offset in parameters buffer, in bytes.
   uint16_t src_offset;
+  // Source binding ordinal (for parameter arrays);
+  uint16_t src_ordinal;
   // Destination offset in constants, in bytes.
   uint16_t dst_offset;
 } iree_hal_streaming_parameter_copy_op_t;
@@ -462,6 +464,8 @@ typedef struct iree_hal_streaming_parameter_resolve_op_t {
   uint32_t reserved;
   // Source offset in parameters buffer, in bytes.
   uint16_t src_offset;
+  // Source binding ordinal (for parameter arrays);
+  uint16_t src_ordinal;
   // Destination binding ordinal.
   uint16_t dst_ordinal;
 } iree_hal_streaming_parameter_resolve_op_t;
@@ -664,6 +668,8 @@ typedef enum iree_hal_streaming_dispatch_flag_bits_e {
   IREE_HAL_STREAMING_DISPATCH_FLAG_NONE = 0ull,
   // Cooperative kernel launch.
   IREE_HAL_STREAMING_DISPATCH_FLAG_COOPERATIVE = 1ull << 0,
+  // The parameters are an array of pointers to values.
+  IREE_HAL_STREAMING_DISPATCH_FLAG_ARGS_ARRAY = 1ull << 1,
 } iree_hal_streaming_dispatch_flags_t;
 
 // Dispatch parameters for kernel launches.
@@ -802,6 +808,13 @@ iree_hal_streaming_device_t* iree_hal_streaming_device_entry(
 // Synchronization: none (queries device properties).
 iree_status_t iree_hal_streaming_device_name(
     iree_hal_streaming_device_ordinal_t ordinal, char* name,
+    iree_host_size_t name_size);
+
+iree_status_t iree_hal_streaming_device_get_string_property(
+    iree_hal_streaming_device_ordinal_t ordinal,
+    char* category,
+    char* key,
+    char* name,
     iree_host_size_t name_size);
 
 // Synchronization: none (queries current memory info).
@@ -1080,6 +1093,20 @@ iree_status_t iree_hal_streaming_unpack_parameters(
     iree_hal_streaming_context_t* context,
     const iree_hal_streaming_parameter_info_t* parameters,
     const void* parameter_buffer, void* out_constants,
+    iree_hal_buffer_ref_list_t* out_bindings);
+
+// Unpacks parameters from an array of pointers (void**) into a constant
+// buffer and binding list. This variant is used when parameters are passed
+// as an array of pointers to argument values rather than a packed buffer.
+// Each element in |parameter_list| is a pointer to the actual parameter value.
+// For bindings (device pointers), the parameter is a pointer to a pointer.
+// Callers must ensure sufficient storage in |out_constants| and |out_bindings|
+// based on the symbol constant size and binding count.
+// Synchronization: none (data packing utility).
+iree_status_t iree_hal_streaming_unpack_parameter_list(
+    iree_hal_streaming_context_t* context,
+    const iree_hal_streaming_parameter_info_t* parameters,
+    void** parameter_list, void* out_constants,
     iree_hal_buffer_ref_list_t* out_bindings);
 
 // Synchronization: none (enqueues kernel launch, non-blocking).
@@ -1392,6 +1419,7 @@ iree_status_t iree_hal_streaming_memory_allocate_async(
 // Allocates memory asynchronously from a specific pool.
 // Synchronization: stream (async allocation on stream).
 iree_status_t iree_hal_streaming_memory_allocate_from_pool_async(
+    iree_hal_streaming_context_t* context, 
     iree_hal_streaming_mem_pool_t* pool, iree_device_size_t size,
     iree_hal_streaming_stream_t* stream,
     iree_hal_streaming_deviceptr_t* out_ptr);

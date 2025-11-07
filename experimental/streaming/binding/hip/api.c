@@ -245,9 +245,9 @@ static hipError_t iree_hip_thread_error_peek(void) {
 // Supports two forms:
 // - HIP_RETURN_STATUS(status)
 // - HIP_RETURN_STATUS(status, hipError_t) - fixed error
-#define HIP_RETURN_STATUS(...)                       \
-  _GET_ARG_COUNT_2(__VA_ARGS__, HIP_RETURN_STATUS_2, \
-                   HIP_RETURN_STATUS_1)(__VA_ARGS__)
+#define HIP_RETURN_STATUS(...)                                            \
+  _GET_ARG_COUNT_2(__VA_ARGS__, HIP_RETURN_STATUS_2, HIP_RETURN_STATUS_1) \
+  (__VA_ARGS__)
 
 #define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2(zone, status) \
   do {                                                          \
@@ -276,7 +276,8 @@ static hipError_t iree_hip_thread_error_peek(void) {
 // - HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(zone, status, hipError_t)
 #define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(...)                       \
   _GET_ARG_COUNT_3(__VA_ARGS__, HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_3, \
-                   HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2)(__VA_ARGS__)
+                   HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2)              \
+  (__VA_ARGS__)
 
 //===----------------------------------------------------------------------===//
 // Status conversion
@@ -288,7 +289,7 @@ static hipError_t iree_status_to_hip_result(iree_status_t status) {
   }
 
   // DO NOT SUBMIT
-  iree_status_fprint(stderr, status);
+  //iree_status_fprint(stderr, status);
 
   // Map IREE status codes to HIP error codes.
   iree_status_code_t code = iree_status_code(status);
@@ -793,6 +794,20 @@ HIPAPI hipError_t hipGetDeviceProperties(hipDeviceProp_t* prop, int device) {
     // Fall back to empty name if device name query fails.
     prop->name[0] = '\0';
   }
+
+  iree_status_t arch_status = iree_hal_streaming_device_get_string_property(
+    (iree_hal_streaming_device_ordinal_t)device,
+    "hal.device",
+    "architecture",
+    prop->gcnArchName,
+    sizeof(prop->gcnArchName)
+  );
+  if (!iree_status_is_ok(arch_status)) {
+    iree_status_ignore(arch_status);
+    // Fall back to empty name if device name query fails.
+    prop->gcnArchName[0] = '\0';
+  }
+
   prop->totalGlobalMem = (size_t)total_memory;
   prop->sharedMemPerBlock = 65536;  // 64KB default
   prop->regsPerBlock = 65536;
@@ -3492,14 +3507,17 @@ HIPAPI hipError_t hipMemcpy(void* dst, const void* src, size_t sizeBytes,
   iree_status_t status = iree_ok_status();
   switch (kind) {
     case hipMemcpyHostToDevice:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_host_to_device(
           context, (iree_hal_streaming_deviceptr_t)dst, src, sizeBytes, NULL);
       break;
     case hipMemcpyDeviceToHost:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_device_to_host(
           context, dst, (iree_hal_streaming_deviceptr_t)src, sizeBytes, NULL);
       break;
     case hipMemcpyDeviceToDevice:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_device_to_device(
           context, (iree_hal_streaming_deviceptr_t)dst,
           (iree_hal_streaming_deviceptr_t)src, sizeBytes, NULL);
@@ -6041,7 +6059,7 @@ HIPAPI hipError_t hipLaunchKernel(const void* function_address, dim3 numBlocks,
       .block_dim = {dimBlocks.x, dimBlocks.y, dimBlocks.z},
       .shared_memory_bytes = sharedMemBytes,
       .buffer = args,  // args is already the kernelParams array
-      .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_NONE,
+      .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_ARGS_ARRAY,
   };
   iree_status_t status = iree_hal_streaming_launch_kernel(
       symbol, &params, (iree_hal_streaming_stream_t*)stream);
@@ -6049,6 +6067,47 @@ HIPAPI hipError_t hipLaunchKernel(const void* function_address, dim3 numBlocks,
   hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
   return result;
+}
+
+// Launches a kernel with specified configuration.
+//
+// Parameters:
+//  - function_address: [IN] Host function pointer (registered kernel stub).
+//  - numBlocks: [IN] Grid dimensions in blocks.
+//  - dimBlocks: [IN] Block dimensions in threads.
+//  - args: [IN] Array of kernel arguments.
+//  - sharedMemBytes: [IN] Dynamic shared memory size.
+//  - stream: [IN] Stream for kernel execution.
+//  - startEvent: [IN] Event to record start time.
+//  - stopEvent: [IN] Event to record stop time.
+//  - flags: AdditionalFlags
+//       - hipExtAnyOrderLaunch: Allow kernels to launch in any order.
+//                               currently does nothing.
+// Returns:
+//  - hipSuccess: Kernel launched successfully.
+//  - hipErrorInvalidValue: Invalid parameters.
+//  - hipErrorInvalidDeviceFunction: Unregistered kernel function.
+//  - hipErrorLaunchFailure: Kernel launch failed.
+//
+// Behavior:
+// - This function is typically called from compiler-generated kernel stubs
+//   after they pop the configuration from __hipPopCallConfiguration.
+// - It does NOT read the thread-local configuration directly.
+// - The function_address should be registered via __hipRegisterFunction.
+//
+// Stream behavior:
+// - Kernel execution is enqueued in the specified stream.
+// - If stream is NULL, uses the default stream.
+// - Kernel executes after all previously enqueued operations in the stream.
+// - Graph capture: Supported. Creates kernel node when capturing.
+//
+// Thread safety: Thread-safe.
+HIPAPI hipError_t hipExtLaunchKernel(const void* function_address,
+                                  dim3 numBlocks, dim3 dimBlocks, void** args,
+                                  size_t sharedMemBytes, hipStream_t stream,
+                                  hipEvent_t startEvent, hipEvent_t stopEvent, int flags) {
+  // TODO: handle start and end events.
+  return hipLaunchKernel(function_address, dimBlocks, dimBlocks, args, sharedMemBytes, stream);
 }
 
 // Launches a kernel function with specified dimensions and parameters.
@@ -6137,7 +6196,7 @@ HIPAPI hipError_t hipModuleLaunchKernel(
     //   HIP_LAUNCH_PARAM_END,
     // }
     if (extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER) {
-      params_ptr = *(void**)extra[1];
+      params_ptr = extra[1];
     }
   } else if (kernelParams) {
     // kernelParams is an array of pointers to the actual parameters.
@@ -6160,6 +6219,79 @@ HIPAPI hipError_t hipModuleLaunchKernel(
   hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
   return result;
+}
+
+// Launches a kernel function with specified dimensions and parameters.
+//
+// Parameters:
+//  - f: [IN] Kernel function handle obtained from hipModuleGetFunction().
+//  - gridDimX: [IN] Grid X dimension in blocks.
+//  - gridDimY: [IN] Grid Y dimension in blocks.
+//  - gridDimZ: [IN] Grid Z dimension in blocks.
+//  - blockDimX: [IN] Block X dimension in threads.
+//  - blockDimY: [IN] Block Y dimension in threads.
+//  - blockDimZ: [IN] Block Z dimension in threads.
+//  - sharedMemBytes: [IN] Dynamic shared memory size per block in bytes.
+//  - stream: [IN] Stream for kernel execution (NULL = default stream).
+//  - kernelParams: [IN] Array of kernel parameters, NULL-terminated.
+//  - extra: [IN] Extra options (currently unused, should be NULL).
+//  - startEvent: [IN] Event to record start time.
+//  - stopEvent: [IN] Event to record stop time.
+//  - flags: AdditionalFlags
+//       - hipExtAnyOrderLaunch: Allow kernels to launch in any order.
+//                               currently does nothing.
+//
+// Returns:
+//  - hipSuccess: Kernel launched successfully.
+//  - hipErrorInvalidValue: Invalid function handle or dimensions.
+//  - hipErrorInvalidConfiguration: Invalid launch configuration.
+//  - hipErrorInvalidContext: No active HIP context.
+//  - hipErrorInvalidResourceHandle: Invalid stream handle.
+//  - hipErrorSharedObjectInitFailed: Shared memory allocation failed.
+//  - hipErrorLaunchOutOfResources: Insufficient resources for launch.
+//  - hipErrorLaunchTimeOut: Previous kernel execution timed out.
+//  - hipErrorNotInitialized: HIP runtime not initialized.
+//  - hipErrorUnknown: Internal error during launch.
+//
+// Synchronization: This operation is asynchronous.
+//
+// Stream behavior:
+// - Kernel execution is enqueued in the specified stream.
+// - If stream is NULL, uses the default stream.
+// - Kernel executes after all previously enqueued operations in the stream.
+// - Use hipStreamSynchronize() to wait for kernel completion.
+// - Use hipEventRecord() after launch to mark completion point.
+// - Graph capture: Supported. Creates kernel node when capturing.
+//
+// Launch configuration:
+// - Total threads = gridDim * blockDim.
+// - Grid dimensions must be > 0 and within device limits.
+// - Block dimensions must be > 0 and within device limits.
+// - Total threads per block must not exceed device maximum.
+// - Shared memory size must not exceed device maximum.
+//
+// Kernel parameters:
+// - kernelParams is an array of void* pointers to actual arguments.
+// - Array must be NULL-terminated.
+// - Each pointer points to the argument value (not a pointer to pointer).
+// - Arguments are passed by value to the kernel.
+//
+// Multi-GPU: Kernel executes on the device associated with the current
+// context.
+//
+// WARNING: Ensure all kernel arguments remain valid until kernel completes.
+// Do not modify or free argument memory while kernel is executing.
+//
+// Note: Check device properties with hipDeviceGetAttribute() to determine
+// maximum grid/block dimensions and shared memory limits.
+HIPAPI hipError_t hipExtModuleLaunchKernel(
+    hipFunction_t f, unsigned int gridDimX, unsigned int gridDimY,
+    unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
+    unsigned int blockDimZ, unsigned int sharedMemBytes, hipStream_t stream,
+    void** kernelParams, void** extra, hipEvent_t startEvent,
+    hipEvent_t stopEvent, int flags) {
+  return hipModuleLaunchKernel(f, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY,
+    blockDimZ, sharedMemBytes, stream, kernelParams, extra);
 }
 
 // Launches a cooperative kernel with grid-wide synchronization support.
@@ -9332,6 +9464,11 @@ HIPAPI hipError_t hipMallocAsync(void** ptr, size_t size, hipStream_t stream) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
   }
+  
+  // Resolve NULL stream to default stream.
+  if (!stream) {
+    stream = (hipStream_t)context->default_stream;
+  }
 
   iree_hal_streaming_deviceptr_t device_ptr = 0;
   iree_status_t status = iree_hal_streaming_memory_allocate_async(
@@ -9371,9 +9508,20 @@ HIPAPI hipError_t hipMallocFromPoolAsync(void** ptr, size_t size,
     HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
 
+  iree_hal_streaming_context_t* context = iree_hal_streaming_context_current();
+  if (!context) {
+    IREE_TRACE_ZONE_END(z0);
+        HIP_RETURN_ERROR(hipErrorNotInitialized);
+  }
+
+  // Resolve NULL stream to default stream.
+  if (!stream) {
+    stream = (hipStream_t)context->default_stream;
+  }
+
   iree_hal_streaming_deviceptr_t device_ptr = 0;
   iree_status_t status = iree_hal_streaming_memory_allocate_from_pool_async(
-      (iree_hal_streaming_mem_pool_t*)pool, size,
+      context, (iree_hal_streaming_mem_pool_t*)pool, size,
       (iree_hal_streaming_stream_t*)stream, &device_ptr);
 
   if (iree_status_is_ok(status)) {
@@ -9407,6 +9555,11 @@ HIPAPI hipError_t hipFreeAsync(void* ptr, hipStream_t stream) {
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
+  }
+  
+  // Resolve NULL stream to default stream.
+  if (!stream) {
+    stream = (hipStream_t)context->default_stream;
   }
 
   iree_status_t status = iree_hal_streaming_memory_free_async(
