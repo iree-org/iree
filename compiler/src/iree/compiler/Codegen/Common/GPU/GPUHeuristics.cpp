@@ -613,17 +613,17 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
         bestMNTileCountPerSubgroup * intrinsic.mSizes[0] * intrinsic.nSizes[0];
     int64_t workgroupSize =
         mnTileSizePerSubgroup * bestSubgroupCountPerWorkgroup;
-    return mSize * nSize / workgroupSize;
+    int64_t numWorkgroups = mSize * nSize / workgroupSize;
+    // Account for split reduction distribution to avoid decreasing
+    // `bestMNTileCountPerSubgroup` when parallelism is sufficient.
+    if (splitReductionTripCnt > 1) {
+      numWorkgroups *= splitReductionTripCnt;
+    }
+    return numWorkgroups;
   };
   int64_t numWorkgroups = computeWorkgroupCount();
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
          << ", WGP count: " << wgpCount;
-
-  if (splitReductionTripCnt != 0) {
-    numWorkgroups *= splitReductionTripCnt;
-    LDBG() << "Updated number of workgroups after split reduction: "
-           << numWorkgroups;
-  }
 
   while (numWorkgroups < wgpCount) {
     if (bestMNTileCountPerSubgroup <= 1) {

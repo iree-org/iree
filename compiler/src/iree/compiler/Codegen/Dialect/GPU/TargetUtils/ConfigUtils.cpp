@@ -478,7 +478,7 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
 /// non-constant.
 static int64_t
 getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
-  scf::ForallOp splitReductionForallOp = nullptr;
+  scf::ForallOp splitReductionForallOp;
   entryPoint.walk([&](scf::ForallOp forallOp) {
     if (forallOpHasMappingType<IREE::LinalgExt::SplitReductionMappingAttr>(
             forallOp)) {
@@ -856,7 +856,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
     return failure();
   }
 
-  int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
+  const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
 
   LDBG() << "IGEMM TileAndFuse Config";
   FailureOr<LinalgExt::IGEMMGenericConvDetails> igemmGenericConvDetails =
@@ -954,7 +954,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
   SmallVector<Value> operands(linalgOp->getOperands());
 
-  int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
+  const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
 
   LDBG() << "Matmul TileAndFuse Config";
 
@@ -1601,7 +1601,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
-  int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
+  const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
 
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
