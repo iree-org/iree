@@ -1,0 +1,18 @@
+{
+  "config_name": "gpu_hip_gfx1100",
+  "iree_compile_flags": [
+    "--iree-hal-target-device=hip",
+    "--iree-hip-target=gfx1100",
+    "--iree-opt-level=O3"
+  ],
+  "iree_run_module_flags": [
+    "--device=hip"
+  ],
+  "skip_compile_tests": [],
+  "skip_run_tests": [
+    "generated/test_a_b_plus_c_float16",
+    "generated/test_a_t_b_float16"
+  ],
+  "expected_compile_failures": [],
+  "expected_run_failures": []
+}
