@@ -4735,14 +4735,17 @@
 
 <h1 id="integration-test-debugging">Integration test debugging<a class="headerlink" href="#integration-test-debugging" title="Permanent link">link</a></h1>
 <p>This document includes tips for triaging integration test correctness issues.
-Feel free to reach out to <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/hanhanW" title="GitHub User: hanhanW">@hanhanW</a> or ask questions on Discord for more help.</p>
+Feel free to reach out to <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/hanhanW" title="GitHub User: hanhanW">@hanhanW</a> or <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/newling" title="GitHub User: newling">@newling</a>, or ask questions on Discord
+for more help.</p>
 <h2 id="general-tips">General tips<a class="headerlink" href="#general-tips" title="Permanent link">link</a></h2>
 <h3 id="narrow-down-reproducers">Narrow down reproducers<a class="headerlink" href="#narrow-down-reproducers" title="Permanent link">link</a></h3>
 <ul>
 <li>Models themselves can be large, and IREE breaks models into dispatches/kernels
 and then launches those individually. Program outputs could diverge starting
 from any individual launch. To get a smaller reproducer, you can use
-<a href="../../general/developer-overview/#-iree-flow-trace-dispatch-tensors">--iree-flow-trace-dispatch-tensors</a>.</li>
+<a href="../../general/developer-overview/#-iree-flow-trace-dispatch-tensors">--iree-flow-trace-dispatch-tensors</a>,
+especially powerful when combined with debug sink callbacks, as described
+<a href="https://github.com/iree-org/iree/blob/main/samples/sink_callback/README.md">here</a>.</li>
 <li>You can compare the logs between builds/backends to get an idea about which
 dispatch results in wrong outputs. The dumped inputs can be reused in a
 flagfile.</li>
