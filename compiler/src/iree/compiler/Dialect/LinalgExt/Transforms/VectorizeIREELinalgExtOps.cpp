@@ -83,12 +83,52 @@ struct VectorizeStaticMapScatterOpPattern final
   }
 };
 
+struct VectorizeUnMaskOp final : OpRewritePattern<IREE::LinalgExt::UnMaskOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::UnMaskOp unMaskOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = unMaskOp.getLoc();
+    RankedTensorType srcType = unMaskOp.getSrc().getType();
+    if (!srcType.hasStaticShape()) {
+      return failure();
+    }
+
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    auto srcVecType =
+        VectorType::get(srcType.getShape(), srcType.getElementType());
+    Value readVec = vector::TransferReadOp::create(
+        rewriter, unMaskOp.getLoc(),
+        /*type=*/srcVecType,
+        /*source=*/unMaskOp.getSrc(),
+        /*indices=*/ValueRange{SmallVector<Value>(srcType.getRank(), zero)},
+        /*padding=*/std::nullopt);
+
+    auto maskType = VectorType::get(srcType.getShape(), rewriter.getI1Type());
+    Value mask = vector::CreateMaskOp::create(
+        rewriter, loc, maskType,
+        tensor::getMixedSizes(rewriter, loc, unMaskOp.getDest()));
+
+    auto identityMap = rewriter.getMultiDimIdentityMap(srcType.getRank());
+    auto inBounds =
+        rewriter.getBoolArrayAttr(SmallVector<bool>(srcType.getRank(), true));
+    auto maskedWrite = vector::TransferWriteOp::create(
+        rewriter, loc, readVec, unMaskOp.getDest(),
+        ValueRange{SmallVector<Value>(srcType.getRank(), zero)},
+        AffineMapAttr::get(identityMap), mask, inBounds);
+
+    rewriter.replaceOp(unMaskOp, maskedWrite);
+
+    return success();
+  }
+};
+
 struct VectorizeIREELinalgExtOpsPass final
     : impl::VectorizeIREELinalgExtOpsPassBase<VectorizeIREELinalgExtOpsPass> {
   void runOnOperation() {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<VectorizeStaticMapScatterOpPattern>(context);
+    patterns.add<VectorizeStaticMapScatterOpPattern, VectorizeUnMaskOp>(
+        context);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
