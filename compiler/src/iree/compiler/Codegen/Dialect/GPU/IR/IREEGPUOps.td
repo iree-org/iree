@@ -295,8 +295,8 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * `$indices`: The variadic `indices` operand is an optional tensor
       or vector of indices to gather from `source`. If the indices are
       present, their shape must be a prefix of the `init`/`result` type.
-      Each `index` must be a 1D tensor or vector whose length matches
-      the length of the corresponding dimension of `source`.
+      Each element of `indices` must be a 1D tensor or vector whose
+      length matches the length of the corresponding dimension of `source`.
 
       The values in `indices` form indices into the memref starting at
       `source` from which a given thread will gather data, and each
@@ -366,8 +366,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
         return tensorType.getRank();
       if (auto memrefType = ::llvm::dyn_cast<MemRefType>(type))
         return memrefType.getRank();
-      assert(false && "expected ranked tensor or memref type");
-      return 0;
+      llvm_unreachable("expected ranked tensor or memref type");
     }
 
     bool hasTensorSemantics() {
