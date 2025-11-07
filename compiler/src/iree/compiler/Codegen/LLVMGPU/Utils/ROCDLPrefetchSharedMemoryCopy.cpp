@@ -495,6 +495,13 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     return forOp;
   }
 
+  // Multi-stage pipelining (numStages > 2) is not yet implemented.
+  if (numStages > 2) {
+    LDBG()
+        << "Multi-stage pipelining with numStages > 2 is not yet implemented";
+    return failure();
+  }
+
   auto prefetcherOr = LoopPrefetcher::get(forOp);
   if (failed(prefetcherOr)) {
     return failure();
