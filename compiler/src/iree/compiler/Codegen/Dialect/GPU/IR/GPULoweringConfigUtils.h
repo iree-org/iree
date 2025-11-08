@@ -47,6 +47,9 @@ struct Basis {
 // - Original d2 is split such that: d2_outer = d2 / 8, d2_inner = 8.
 // - The product (1 * 8 = 8) determines the split factor of the iteration space
 // corresponding to partial_reduction[d2].
+//
+// Currently, Dimension Expansion is only expected to expand dimensions to
+// exactly 2 dimensions.
 using DimensionExpansion = SmallVector<ReassociationIndices>;
 FailureOr<DimensionExpansion>
 getDimensionExpansion(IREE::GPU::LoweringConfigAttr config);
