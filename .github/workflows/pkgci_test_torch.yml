@@ -33,7 +33,7 @@ jobs:
           - name: cpu_task
             markers: "cpu"
             config-file: torch_ops_cpu_llvm_sync.json
-            runs-on: [ubuntu-24.04, threadripper]
+            runs-on: ubuntu-24.04
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
@@ -107,6 +107,7 @@ jobs:
               - persistent-cache
               - Linux
               - X64
+              - threadripper
           # MI325
           - name: amdgpu_mi325_gfx942
             markers: "gfx942 or mi325"
