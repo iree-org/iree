@@ -307,6 +307,11 @@ def ReconcileTranslationInfoPass
   ];
 }
 
+def ResolveWorkgroupCountHintsPass
+    : Pass<"iree-codegen-resolve-workgroup-count-hints", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Materialize workgroup count hints in the workgroup count region per export.";
+}
+
 def ReplaceSlowMinMaxOpsPass
     : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
   let summary =
