@@ -13,12 +13,14 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/AffineMap.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -243,4 +245,72 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
 bool ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op) {
   return llvm::isa<mlir::iree_compiler::IREE::LinalgExt::AttentionOp>(
       unwrap(op));
+}
+
+ireeCodegenIGEMMGenericConvDetails
+ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
+  mlir::Operation *operation = unwrap(op);
+  auto linalgOp = llvm::dyn_cast<mlir::linalg::LinalgOp>(operation);
+
+  if (!linalgOp) {
+    return ireeCodegenIGEMMGenericConvDetails{
+        /*igemmLoopBounds=*/wrap(mlir::Attribute()),
+        /*convDimsBatch=*/wrap(mlir::Attribute()),
+        /*convDimsOutputImage=*/wrap(mlir::Attribute()),
+        /*convDimsOutputChannel=*/wrap(mlir::Attribute()),
+        /*convDimsFilterLoop=*/wrap(mlir::Attribute()),
+        /*convDimsInputChannel=*/wrap(mlir::Attribute()),
+        /*convDimsDepth=*/wrap(mlir::Attribute()),
+        /*isOutputChannelFirst=*/false,
+        /*isValid=*/false};
+  }
+
+  llvm::FailureOr<mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails>
+      maybeDetails =
+          mlir::iree_compiler::IREE::LinalgExt::getIGEMMGenericConvDetails(
+              linalgOp);
+
+  if (failed(maybeDetails)) {
+    return ireeCodegenIGEMMGenericConvDetails{
+        /*igemmLoopBounds=*/wrap(mlir::Attribute()),
+        /*convDimsBatch=*/wrap(mlir::Attribute()),
+        /*convDimsOutputImage=*/wrap(mlir::Attribute()),
+        /*convDimsOutputChannel=*/wrap(mlir::Attribute()),
+        /*convDimsFilterLoop=*/wrap(mlir::Attribute()),
+        /*convDimsInputChannel=*/wrap(mlir::Attribute()),
+        /*convDimsDepth=*/wrap(mlir::Attribute()),
+        /*isOutputChannelFirst=*/false,
+        /*isValid=*/false};
+  }
+
+  const mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails &details =
+      *maybeDetails;
+
+  mlir::Builder builder(linalgOp.getContext());
+
+  // Helper to convert unsigned to int64_t.
+  auto toInt64 = [](const llvm::SmallVector<unsigned, 2> &vec) {
+    return llvm::map_to_vector(
+        vec, [](unsigned val) { return static_cast<int64_t>(val); });
+  };
+
+  ireeCodegenIGEMMGenericConvDetails result;
+  result.igemmLoopBounds =
+      wrap(builder.getI64ArrayAttr(details.igemmLoopBounds));
+  result.convDimsBatch =
+      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.batch)));
+  result.convDimsOutputImage =
+      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.outputImage)));
+  result.convDimsOutputChannel =
+      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.outputChannel)));
+  result.convDimsFilterLoop =
+      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.filterLoop)));
+  result.convDimsInputChannel =
+      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.inputChannel)));
+  result.convDimsDepth =
+      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.depth)));
+  result.isOutputChannelFirst = details.isOutputChannelFirst;
+  result.isValid = true;
+
+  return result;
 }

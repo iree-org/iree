@@ -21,6 +21,7 @@ EXPORTS
   ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
   ireeCodegenMlirOperationIsACodegenAttentionOp
+  ireeCodegenGetIGEMMGenericConvDetails
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
   ireeCodegenTranslationInfoAttrGetTypeID

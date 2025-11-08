@@ -91,6 +91,21 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
 MLIR_CAPI_EXPORTED bool
 ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op);
 
+struct ireeCodegenIGEMMGenericConvDetails {
+  MlirAttribute igemmLoopBounds;
+  MlirAttribute convDimsBatch;
+  MlirAttribute convDimsOutputImage;
+  MlirAttribute convDimsOutputChannel;
+  MlirAttribute convDimsFilterLoop;
+  MlirAttribute convDimsInputChannel;
+  MlirAttribute convDimsDepth;
+  bool isOutputChannelFirst;
+  bool isValid;
+};
+
+MLIR_CAPI_EXPORTED ireeCodegenIGEMMGenericConvDetails
+ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op);
+
 #ifdef __cplusplus
 }
 #endif

@@ -135,6 +135,7 @@ iree_cc_library(
     IREELLVMIncludeSetup
     MLIRCAPIIR
     MLIRIR
+    MLIRLinalgDialect
     MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Utils

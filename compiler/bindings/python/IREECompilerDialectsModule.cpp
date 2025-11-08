@@ -693,4 +693,51 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "isa_attention_op", &ireeCodegenMlirOperationIsACodegenAttentionOp,
       "Checks if the given operation is an IREE LinalgExt attention op.",
       py::arg("op"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenGetIGEMMGenericConvDetails
+  //===-------------------------------------------------------------------===//
+  py::class_<ireeCodegenIGEMMGenericConvDetails>(iree_codegen_module,
+                                                 "IGEMMGenericConvDetails")
+      .def_prop_ro("igemm_loop_bounds",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.igemmLoopBounds);
+                   })
+      .def_prop_ro("conv_dims_batch",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.convDimsBatch);
+                   })
+      .def_prop_ro("conv_dims_output_image",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.convDimsOutputImage);
+                   })
+      .def_prop_ro("conv_dims_output_channel",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.convDimsOutputChannel);
+                   })
+      .def_prop_ro("conv_dims_filter_loop",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.convDimsFilterLoop);
+                   })
+      .def_prop_ro("conv_dims_input_channel",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.convDimsInputChannel);
+                   })
+      .def_prop_ro("conv_dims_depth",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.convDimsDepth);
+                   })
+      .def_prop_ro("is_output_channel_first",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return self.isOutputChannelFirst;
+                   })
+      .def_prop_ro("is_valid",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return self.isValid;
+                   });
+
+  iree_codegen_module.def(
+      "get_igemm_generic_conv_details", &ireeCodegenGetIGEMMGenericConvDetails,
+      "Gets IGEMM details for a generic convolution linalg operation.",
+      py::arg("linalg_op"));
 }
