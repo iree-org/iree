@@ -47,6 +47,9 @@
         "--iree-scheduling-dump-statistics-file=compilation_info.json",
         "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)"
     ],
+    "threshold_args": [
+        "--expected_f16_threshold=0.2f"
+    ],
     "run_function": "main",
     "compile_chip_expecting_to_fail": ["gfx90a"],
     "tuner_file": {
