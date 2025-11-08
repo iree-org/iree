@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
@@ -239,7 +240,8 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
     bool transposedLhs, bool transposedRhs, bool isGemm,
-    bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false) {
+    bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false,
+    int64_t splitReductionTripCnt = 0) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {
@@ -364,7 +366,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       wgpCount, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned=*/mustBeAligned, doCPromotion);
+      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt);
   return schedule;
 }
 
@@ -471,6 +473,49 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
   return failure();
 }
 
+/// Returns the trip count created by split reduction. Returns 0 if no loop with
+/// split reduction attribute is presented or if the loop bounds or steps are
+/// non-constant.
+static int64_t
+getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
+  scf::ForallOp splitReductionForallOp;
+  entryPoint.walk([&](scf::ForallOp forallOp) {
+    if (forallOpHasMappingType<IREE::LinalgExt::SplitReductionMappingAttr>(
+            forallOp)) {
+      splitReductionForallOp = forallOp;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+
+  if (!splitReductionForallOp) {
+    return 0;
+  }
+
+  std::optional<SmallVector<OpFoldResult>> maybeLowerBounds =
+      splitReductionForallOp.getLoopLowerBounds();
+  std::optional<SmallVector<OpFoldResult>> maybeUpperBounds =
+      splitReductionForallOp.getLoopUpperBounds();
+  std::optional<SmallVector<OpFoldResult>> maybeSteps =
+      splitReductionForallOp.getLoopSteps();
+  if (!maybeLowerBounds || !maybeUpperBounds || !maybeSteps) {
+    return 0;
+  }
+
+  int64_t splitReductionTripCnt = 1;
+  for (auto [lb, ub, step] :
+       llvm::zip_equal(*maybeLowerBounds, *maybeUpperBounds, *maybeSteps)) {
+    auto maybeUb = getConstantIntValue(ub);
+    auto maybeLb = getConstantIntValue(lb);
+    auto maybeStep = getConstantIntValue(step);
+    if (maybeUb && maybeLb && maybeStep) {
+      int64_t cnt = llvm::divideCeil(*maybeUb - *maybeLb, *maybeStep);
+      splitReductionTripCnt *= cnt;
+    }
+  }
+  return splitReductionTripCnt;
+}
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -482,7 +527,7 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
-    bool isGemm, bool scaled,
+    bool isGemm, bool scaled, int64_t splitReductionTripCnt,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -661,7 +706,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs, isGemm,
       /*mustBeAligned=*/true,
-      /*doCPromotion=*/false, scaled);
+      /*doCPromotion=*/false, scaled, splitReductionTripCnt);
 
   // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
   // the GEMM is accumulating (i.e., doesn't have a zero fill dpsInit) as that
@@ -672,7 +717,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     mustBeAligned = false;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
-        /*doCPromotion=*/false, scaled);
+        /*doCPromotion=*/false, scaled, splitReductionTripCnt);
   }
 
   if (!schedule) {
@@ -811,6 +856,8 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
     return failure();
   }
 
+  const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
+
   LDBG() << "IGEMM TileAndFuse Config";
   FailureOr<LinalgExt::IGEMMGenericConvDetails> igemmGenericConvDetails =
       LinalgExt::getIGEMMGenericConvDetails(linalgOp);
@@ -867,7 +914,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
           useDirectLoad, /*isGemm=*/false,
-          /*scaled=*/false, convToIgemmInfo);
+          /*scaled=*/false, splitReductionTripCnt, convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -907,12 +954,14 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
   SmallVector<Value> operands(linalgOp->getOperands());
 
+  const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
+
   LDBG() << "Matmul TileAndFuse Config";
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-          /*scaled=*/false);
+          /*scaled=*/false, splitReductionTripCnt);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -922,7 +971,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     useDirectLoad = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-        /*scaled=*/true);
+        /*scaled=*/true, splitReductionTripCnt);
   }
 
   if (failed(configAndWgSize)) {
@@ -1552,6 +1601,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+  const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
 
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
@@ -1636,14 +1686,16 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs, /*isGemm=*/false,
-      mustBeAligned);
+      mustBeAligned, /*doCPromotion=*/false, /*scaled=*/false,
+      splitReductionTripCnt);
 
   if (!schedule) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
     mustBeAligned = false;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, transposedLhs, transposedRhs, /*isGemm=*/false,
-        mustBeAligned);
+        mustBeAligned, /*doCPromotion=*/false, /*scaled=*/false,
+        splitReductionTripCnt);
   }
   if (!schedule) {
     LDBG() << "Failed to deduce TileAndFuse MMA schedule";

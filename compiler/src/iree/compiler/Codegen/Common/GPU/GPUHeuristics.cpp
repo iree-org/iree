@@ -588,7 +588,8 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
                                       const GPUIntrinsicType &intrinsic,
                                       std::optional<int64_t> wgpCount,
                                       int64_t bestSubgroupCountPerWorkgroup,
-                                      int64_t bestMNTileCountPerSubgroup) {
+                                      int64_t bestMNTileCountPerSubgroup,
+                                      int64_t splitReductionTripCnt) {
   if (!wgpCount.has_value()) {
     LDBG() << "WGP count is not available,"
            << "Skipping adjustment of seeds for workgroup count.";
@@ -612,7 +613,13 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
         bestMNTileCountPerSubgroup * intrinsic.mSizes[0] * intrinsic.nSizes[0];
     int64_t workgroupSize =
         mnTileSizePerSubgroup * bestSubgroupCountPerWorkgroup;
-    return mSize * nSize / workgroupSize;
+    int64_t numWorkgroups = mSize * nSize / workgroupSize;
+    // Account for split reduction distribution to avoid decreasing
+    // `bestMNTileCountPerSubgroup` when parallelism is sufficient.
+    if (splitReductionTripCnt > 1) {
+      numWorkgroups *= splitReductionTripCnt;
+    }
+    return numWorkgroups;
   };
   int64_t numWorkgroups = computeWorkgroupCount();
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
@@ -637,7 +644,7 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> wgpCount, bool transposedLhs,
     bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
-    bool doCPromotion) {
+    bool doCPromotion, int64_t splitReductionTripCnt) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -654,7 +661,7 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     GPUMMAHeuristicSeeds localSeeds = seeds;
     localSeeds.bestMNTileCountPerSubgroup = adjustSeedsForWgpCount(
         problem, intrinsic, wgpCount, seeds.bestSubgroupCountPerWorkgroup,
-        seeds.bestMNTileCountPerSubgroup);
+        seeds.bestMNTileCountPerSubgroup, splitReductionTripCnt);
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
