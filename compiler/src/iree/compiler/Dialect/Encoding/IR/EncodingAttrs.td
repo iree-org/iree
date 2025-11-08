@@ -16,9 +16,6 @@ include "mlir/IR/EnumAttr.td"
 // Data layout encoding attributes
 //===---------------------------------------------------------------------===//
 
-class IREEEncoding_Attr<string name, list<Trait> traits = []>
-  : AttrDef<IREEEncoding_Dialect, name, traits>;
-
 class IREEEncoding_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
     : I32EnumAttr<name, summary, cases> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
@@ -48,7 +45,7 @@ def EncodingOpTypeAttr:
 //===---------------------------------------------------------------------===//
 
 def LayoutAttr :
-    IREEEncoding_Attr<"Layout", [
+    IREEEncoding_AttrDef<"Layout", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "isIdentityLayout",
@@ -85,7 +82,7 @@ def LayoutAttr :
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
 
-def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
+def PackedStorageAttr : IREEEncoding_AttrDef<"PackedStorage"> {
   let mnemonic = "packed_storage";
   let summary = [{Indicates packed storage data type.}];
   let description = [{
@@ -100,7 +97,7 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 //===---------------------------------------------------------------------===//
 
 def EncodingAttr :
-    IREEEncoding_Attr<"Encoding", [
+    IREEEncoding_AttrDef<"Encoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
@@ -190,7 +187,7 @@ def EncodingAttr :
 // iree_encoding.padding
 //===---------------------------------------------------------------------===//
 
-def PaddingAttr : IREEEncoding_Attr<"Padding", [
+def PaddingAttr : IREEEncoding_AttrDef<"Padding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "calculateStorageSizeInBytes",
         "cloneWithLayouts",
@@ -242,7 +239,7 @@ def PaddingAttr : IREEEncoding_Attr<"Padding", [
 // iree_encoding.identity
 //===---------------------------------------------------------------------===//
 
-def IdentityAttr : IREEEncoding_Attr<"Identity", [
+def IdentityAttr : IREEEncoding_AttrDef<"Identity", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "calculateStorageSizeInBytes",
         "isIdentityLayout",
@@ -265,7 +262,7 @@ def IdentityAttr : IREEEncoding_Attr<"Identity", [
 //===---------------------------------------------------------------------===//
 
 def IdentityResolverAttr :
-    IREEEncoding_Attr<"IdentityResolver", [
+    IREEEncoding_AttrDef<"IdentityResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
@@ -291,7 +288,7 @@ def IdentityResolverAttr :
 //===---------------------------------------------------------------------===//
 
 def UnsupportedResolverAttr :
-    IREEEncoding_Attr<"UnsupportedResolver", [
+    IREEEncoding_AttrDef<"UnsupportedResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
@@ -313,7 +310,7 @@ def UnsupportedResolverAttr :
 //===---------------------------------------------------------------------===//
 
 def TestingAttr :
-    IREEEncoding_Attr<"Testing", [
+    IREEEncoding_AttrDef<"Testing", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
@@ -336,7 +333,7 @@ def TestingAttr :
   let genVerifyDecl = 0;
 }
 
-def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
+def UnknownAttr : IREEEncoding_AttrDef<"Unknown"> {
   let mnemonic = "unknown";
   let summary = [{A pure encoding attribute for testing purpose.}];
 
@@ -348,7 +345,7 @@ def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
 }
 
 def SpecializationResolverAttr :
-    IREEEncoding_Attr<"SpecializationResolver", [
+    IREEEncoding_AttrDef<"SpecializationResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
@@ -376,7 +373,7 @@ def SpecializationResolverAttr :
 }
 
 def SpecializedAttr :
-    IREEEncoding_Attr<"Specialized", [
+    IREEEncoding_AttrDef<"Specialized", [
       IREEEncoding_SerializableAttr
     ]> {
   let mnemonic = "specialized";

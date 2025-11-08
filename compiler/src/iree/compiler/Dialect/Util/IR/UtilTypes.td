@@ -14,7 +14,7 @@ include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 // !util.buffer
 //===----------------------------------------------------------------------===//
 
-def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
+def Util_BufferType : Util_TypeDef<"Buffer", [
   Util_ReferenceType,
   Util_SizeAwareType,
   DeclareTypeInterfaceMethods<Util_GlobalType, [
@@ -45,7 +45,7 @@ def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
 // !util.list<T>
 //===----------------------------------------------------------------------===//
 
-def Util_ListType : TypeDef<Util_Dialect, "List"> {
+def Util_ListType : Util_TypeDef<"List"> {
   let mnemonic = "list";
 
   let summary = [{Dense list container type.}];
@@ -96,7 +96,7 @@ class Util_ListOf<Type type> :
 // !util.ptr<T>
 //===----------------------------------------------------------------------===//
 
-def Util_PtrType : TypeDef<Util_Dialect, "Ptr"> {
+def Util_PtrType : Util_TypeDef<"Ptr"> {
   let mnemonic = "ptr";
 
   let summary = [{A pointer-like reference.}];
@@ -162,7 +162,7 @@ class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtrType> {
 // !util.object
 //===----------------------------------------------------------------------===//
 
-def Util_ObjectType : TypeDef<Util_Dialect, "Object"> {
+def Util_ObjectType : Util_TypeDef<"Object"> {
   let mnemonic = "object";
 
   let summary = [{A placeholder for an unspecified object type.}];
@@ -187,7 +187,7 @@ def Util_ObjectType : TypeDef<Util_Dialect, "Object"> {
 // !util.unused
 //===----------------------------------------------------------------------===//
 
-def Util_UnusedType : TypeDef<Util_Dialect, "Unused"> {
+def Util_UnusedType : Util_TypeDef<"Unused"> {
   let mnemonic = "unused";
 
   let summary = [{A placeholder for unused types.}];
@@ -207,7 +207,7 @@ def Util_UnusedType : TypeDef<Util_Dialect, "Unused"> {
 // !util.variant
 //===----------------------------------------------------------------------===//
 
-def Util_VariantType : TypeDef<Util_Dialect, "Variant"> {
+def Util_VariantType : Util_TypeDef<"Variant"> {
   let mnemonic = "variant";
 
   let summary = [{A placeholder for a variant type (`?`).}];

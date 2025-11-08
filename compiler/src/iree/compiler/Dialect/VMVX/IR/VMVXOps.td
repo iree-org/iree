@@ -14,9 +14,6 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-class VMVX_PureOp<string mnemonic, list<Trait> traits = []> :
-    VMVX_Op<mnemonic, !listconcat(traits, [Pure])>;
-
 //===----------------------------------------------------------------------===//
 // Utility ops
 //===----------------------------------------------------------------------===//

@@ -97,8 +97,8 @@ iree_tablegen_library(
   TD_FILE
     "IREEGPUEnums.td"
   OUTS
-    --gen-enum-decls IREEGPUEnums.h.inc
-    --gen-enum-defs IREEGPUEnums.cpp.inc
+    --gen-enum-decls --dialect=iree_gpu IREEGPUEnums.h.inc
+    --gen-enum-defs --dialect=iree_gpu IREEGPUEnums.cpp.inc
 )
 
 iree_tablegen_library(

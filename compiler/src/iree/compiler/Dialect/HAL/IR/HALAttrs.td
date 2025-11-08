@@ -37,6 +37,39 @@ class HAL_I64BitEnumAttr<string name, string summary, list<BitEnumAttrCaseBase> 
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
+//===----------------------------------------------------------------------===//
+// Lifetime enum
+//===----------------------------------------------------------------------===//
+
+// Note: This is a copy from the Stream dialect.
+// Indicates a value whose lifetime is not yet analyzed.
+def HAL_Lifetime_Unknown : I32EnumAttrCase<"Unknown", 0, "*">;
+// An externally managed value.
+def HAL_Lifetime_External : I32EnumAttrCase<"External", 1, "external">;
+// A staging buffer for uploads/downloads.
+def HAL_Lifetime_Staging : I32EnumAttrCase<"Staging", 2, "staging">;
+// A short-lived value that is used across streams.
+def HAL_Lifetime_Transient : I32EnumAttrCase<"Transient", 3, "transient">;
+// A long-lived value that persists across streams.
+def HAL_Lifetime_Variable : I32EnumAttrCase<"Variable", 4, "variable">;
+// An immutable value that persist for the duration of the program.
+def HAL_Lifetime_Constant : I32EnumAttrCase<"Constant", 5, "constant">;
+def HAL_LifetimeAttr :
+    I32EnumAttr<"Lifetime", "IREE HAL value lifetime", [
+      HAL_Lifetime_Unknown,
+      HAL_Lifetime_External,
+      HAL_Lifetime_Staging,
+      HAL_Lifetime_Transient,
+      HAL_Lifetime_Variable,
+      HAL_Lifetime_Constant,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
+//===----------------------------------------------------------------------===//
+// Access scope and memory enums
+//===----------------------------------------------------------------------===//
+
 def HAL_AccessScope_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_AccessScope_IndirectCommandRead : I32BitEnumAttrCase<"IndirectCommandRead", 0x0001>;
 def HAL_AccessScope_ConstantRead : I32BitEnumAttrCase<"ConstantRead", 0x0002>;
@@ -400,7 +433,7 @@ def HAL_CollectiveReductionOpAttr :
       HAL_CollectiveReductionOp_ReductionMaximum,
       HAL_CollectiveReductionOp_ReductionAverage,
     ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
 def HAL_CollectiveElementType_Sint8 : I32EnumAttrCase<"Sint8", 0, "si8">;
@@ -442,8 +475,7 @@ def HAL_CollectiveElementTypeAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_CollectiveAttr :
-    AttrDef<HAL_Dialect, "Collective", []> {
+def HAL_CollectiveAttr : HAL_AttrDef<"Collective"> {
   let mnemonic = "collective";
   let summary = [{Collective operation and specification.}];
   let description = [{
@@ -467,8 +499,7 @@ def HAL_CollectiveAttr :
 // hal.pipeline.binding<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_PipelineBindingAttr :
-    AttrDef<HAL_Dialect, "PipelineBinding", []> {
+def HAL_PipelineBindingAttr : HAL_AttrDef<"PipelineBinding"> {
   let mnemonic = "pipeline.binding";
   let summary = [{Pipeline binding specification.}];
   let description = [{
@@ -487,8 +518,7 @@ def HAL_PipelineBindingAttr :
 // hal.pipeline.layout<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_PipelineLayoutAttr :
-    AttrDef<HAL_Dialect, "PipelineLayout", []> {
+def HAL_PipelineLayoutAttr : HAL_AttrDef<"PipelineLayout"> {
   let mnemonic = "pipeline.layout";
   let summary = [{Executable entry point layout specification.}];
   let description = [{
@@ -520,8 +550,7 @@ def HAL_PipelineLayoutAttr :
 // #hal.executable.target<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_ExecutableTargetAttr :
-    AttrDef<HAL_Dialect, "ExecutableTarget"> {
+def HAL_ExecutableTargetAttr : HAL_AttrDef<"ExecutableTarget"> {
   let mnemonic = "executable.target";
   let summary = [{Generic executable target specification.}];
   let description = [{
@@ -590,7 +619,7 @@ def HAL_ExecutableTargetAttr :
 // #hal.executable.object<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
+def HAL_ExecutableObjectAttr : HAL_AttrDef<"ExecutableObject"> {
   let mnemonic = "executable.object";
   let summary = [{Object file reference.}];
   let description = [{
@@ -653,7 +682,7 @@ def HAL_ExecutableObjectArrayAttr :
 // #hal.executable.objects<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_ExecutableObjectsAttr : AttrDef<HAL_Dialect, "ExecutableObjects"> {
+def HAL_ExecutableObjectsAttr : HAL_AttrDef<"ExecutableObjects"> {
   let mnemonic = "executable.objects";
   let summary = [{Target-specific object file references.}];
   let description = [{
@@ -700,7 +729,7 @@ def HAL_ExecutableObjectsAttr : AttrDef<HAL_Dialect, "ExecutableObjects"> {
 // #hal.device.alias<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DeviceAliasAttr : AttrDef<HAL_Dialect, "DeviceAlias", [
+def HAL_DeviceAliasAttr : HAL_AttrDef<"DeviceAlias", [
   TypedAttrInterface,
 ]> {
   let mnemonic = "device.alias";
@@ -751,7 +780,7 @@ def HAL_DeviceAliasAttr : AttrDef<HAL_Dialect, "DeviceAlias", [
 // #hal.device.target<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
+def HAL_DeviceTargetAttr : HAL_AttrDef<"DeviceTarget", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.target";
@@ -827,7 +856,7 @@ def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
 // #hal.device.ordinal<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DeviceOrdinalAttr : AttrDef<HAL_Dialect, "DeviceOrdinal", [
+def HAL_DeviceOrdinalAttr : HAL_AttrDef<"DeviceOrdinal", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.ordinal";
@@ -852,7 +881,7 @@ def HAL_DeviceOrdinalAttr : AttrDef<HAL_Dialect, "DeviceOrdinal", [
 // #hal.device.fallback<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DeviceFallbackAttr : AttrDef<HAL_Dialect, "DeviceFallback", [
+def HAL_DeviceFallbackAttr : HAL_AttrDef<"DeviceFallback", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.fallback";
@@ -877,7 +906,7 @@ def HAL_DeviceFallbackAttr : AttrDef<HAL_Dialect, "DeviceFallback", [
 // #hal.device.select<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DeviceSelectAttr : AttrDef<HAL_Dialect, "DeviceSelect", [
+def HAL_DeviceSelectAttr : HAL_AttrDef<"DeviceSelect", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.select";
@@ -932,7 +961,7 @@ def HAL_DeviceSelectAttr : AttrDef<HAL_Dialect, "DeviceSelect", [
 // #hal.device.affinity<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
+def HAL_DeviceAffinityAttr : HAL_AttrDef<"DeviceAffinity", [
   DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
     "isExecutableWith",
     "joinOR",
@@ -972,7 +1001,7 @@ def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
 // #hal.device.promise<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
+def HAL_DevicePromiseAttr : HAL_AttrDef<"DevicePromise", [
   DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
     "isExecutableWith",
     "joinOR",
@@ -1018,7 +1047,7 @@ def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
 // #hal.device.optimal<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_DeviceOptimalAttr : AttrDef<HAL_Dialect, "DeviceOptimal", [
+def HAL_DeviceOptimalAttr : HAL_AttrDef<"DeviceOptimal", [
   DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
     "isExecutableWith",
     "joinOR",
@@ -1062,7 +1091,7 @@ def HAL_DeviceOptimalAttr : AttrDef<HAL_Dialect, "DeviceOptimal", [
 // #hal.device.topology<...>
 //===----------------------------------------------------------------------===//
 
-def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
+def HAL_DeviceTopologyAttr : HAL_AttrDef<"DeviceTopology", [
   DeclareAttrInterfaceMethods<Stream_AffinityTopologyAttr, [
     "hasTransparentAccess",
     "hasUnifiedMemory",
@@ -1101,7 +1130,7 @@ def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
   }];
 }
 
-def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
+def HAL_DeviceLinkAttr : HAL_AttrDef<"DeviceLink"> {
   let mnemonic = "device.link";
   let summary = [{Connection between devices.}];
   let description = [{
