@@ -294,9 +294,8 @@ getVectorDistributeReductionConfig(
   int subgroup = partialReductionSize / subgroupStride;
   int64_t subgroupBasis = (subgroup == 0) ? 1 : subgroup;
   SmallVector<Attribute> expandDimFactors = llvm::to_vector(llvm::map_range(
-      llvm::seq<int64_t>(0, op.getNumLoops()), [&](int64_t i) -> Attribute {
-        return b.getI64ArrayAttr({});
-      }));
+      llvm::seq<int64_t>(0, op.getNumLoops()),
+      [&](int64_t i) -> Attribute { return b.getI64ArrayAttr({}); }));
 
   if (ShapedType::isStaticShape(bounds) && threadLoads > 1) {
     workgroupTileSizes.push_back(0);
