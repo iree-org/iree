@@ -41,14 +41,12 @@ struct Basis {
 // - The second dimension remains unchanged (empty array).
 // - The third dimension is split into two dimensions with tile sizes 1 and 8.
 //
-// The expansion factors directly specify the tile sizes for the split dimensions.
-// The iteration space of the original dimension is split by the product of the
-// expansion factors. For the above example:
+// The expansion factors directly specify the tile sizes for the split
+// dimensions. The iteration space of the original dimension is split by the
+// product of the expansion factors. For the above example:
 // - Original d2 is split such that: d2_outer = d2 / 8, d2_inner = 8.
-// - The product (1 * 8 = 8) determines the split factor.
-//
-// This replaces the previous approach of storing dimension indices and looking
-// up thread tile sizes.
+// - The product (1 * 8 = 8) determines the split factor of the iteration space
+// corresponding to partial_reduction[d2].
 using DimensionExpansion = SmallVector<ReassociationIndices>;
 FailureOr<DimensionExpansion>
 getDimensionExpansion(IREE::GPU::LoweringConfigAttr config);
