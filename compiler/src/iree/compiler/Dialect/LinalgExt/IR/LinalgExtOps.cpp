@@ -2041,8 +2041,23 @@ LogicalResult AttentionOp::verify() {
 
   auto &block = getRegion().front();
   auto blockTys = block.getArgumentTypes();
+  if (blockTys.size() != 1 && blockTys.size() != 5) {
+    return attnOp->emitOpError(
+        "expects either 1 block argument (score) or 5 block arguments "
+        "(score, b, h, m, n)");
+  }
+
   if (!isa<FloatType>(blockTys[0]))
     return attnOp->emitOpError("block argument 0 should be float");
+
+  // If 5 arguments, verify the indices are of index type
+  if (blockTys.size() == 5) {
+    for (unsigned i = 1; i < 5; ++i) {
+      if (!blockTys[i].isIndex()) {
+        return attnOp->emitOpError("block arguments 1-4 should be index type");
+      }
+    }
+  }
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
   if (!yieldOp) {
@@ -2220,12 +2235,23 @@ LogicalResult OnlineAttentionOp::verify() {
 
   Block &block = attnOp.getRegion().front();
   auto blockTys = block.getArgumentTypes();
-  if (blockTys.size() != 1) {
-    return attnOp->emitOpError("expects single block argument for score");
+  if (blockTys.size() != 1 && blockTys.size() != 5) {
+    return attnOp->emitOpError(
+        "expects either 1 block argument (score) or 5 block arguments "
+        "(score, b, h, m, n)");
   }
 
   if (!isa<FloatType>(blockTys[0])) {
     return attnOp->emitOpError("block argument 0 should be float");
+  }
+
+  // If 5 arguments, verify the indices are of index type
+  if (blockTys.size() == 5) {
+    for (unsigned i = 1; i < 5; ++i) {
+      if (!blockTys[i].isIndex()) {
+        return attnOp->emitOpError("block arguments 1-4 should be index type");
+      }
+    }
   }
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
@@ -2703,7 +2729,7 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
 
 LogicalResult IREE::LinalgExt::IndexOp::verify() {
   Operation *parentOp = getOperation()->getParentOp();
-  
+
   // Check if parent is CustomOp
   if (auto customOp = dyn_cast<CustomOp>(parentOp)) {
     if (customOp.getNumLoops() <= getDim()) {
@@ -2713,7 +2739,7 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
     }
     return success();
   }
-  
+
   // Check if parent is OnlineAttentionOp
   if (auto onlineAttnOp = dyn_cast<OnlineAttentionOp>(parentOp)) {
     int64_t iterationDomainRank = onlineAttnOp.getIterationDomainRank();
@@ -2724,7 +2750,7 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
     }
     return success();
   }
-  
+
   // Check if parent is AttentionOp
   if (auto attnOp = dyn_cast<AttentionOp>(parentOp)) {
     int64_t iterationDomainRank = attnOp.getIterationDomainRank();
@@ -2735,9 +2761,10 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
     }
     return success();
   }
-  
-  return emitOpError("expected parent op to be one of: `iree_linalg_ext.custom_op`, "
-                     "`iree_linalg_ext.online_attention`, or `iree_linalg_ext.attention`");
+
+  return emitOpError(
+      "expected parent op to be one of: `iree_linalg_ext.custom_op`, "
+      "`iree_linalg_ext.online_attention`, or `iree_linalg_ext.attention`");
 }
 
 //===---------------------------------------------------------------------===//

@@ -191,18 +191,51 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
   SmallVector<AffineMap> indexingMaps{identityMap};
   SmallVector<utils::IteratorType> iteratorTypes(rank,
                                                  utils::IteratorType::parallel);
-  auto genericOp =
-      linalg::GenericOp::create(builder, loc, value.getType(), ValueRange{},
-                                value, indexingMaps, iteratorTypes);
-  auto &dstRegion = genericOp.getRegion();
-  builder.cloneRegionBefore(region, dstRegion, dstRegion.end());
-  {
-    OpBuilder::InsertionGuard withinRegion(builder);
-    builder.setInsertionPoint(dstRegion.back().getTerminator());
-    linalg::YieldOp::create(builder, loc,
-                            dstRegion.back().getTerminator()->getOperands());
-    dstRegion.back().getTerminator()->erase();
-  }
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, value.getType(), ValueRange{}, value, indexingMaps,
+      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        // Get iteration indices (b, h, m, n) for 4D tensor
+        // The score value is the first block argument
+        Value score = args[0];
+
+        // If the region is empty (no score modification), just yield the score
+        if (region.empty() || region.front().empty()) {
+          linalg::YieldOp::create(b, loc, score);
+          return;
+        }
+
+        // Build index arguments if region expects them
+        SmallVector<Value> regionArgs;
+        regionArgs.push_back(score);
+
+        // Check if the region expects index arguments (5 args total: score + 4
+        // indices) For a 4D tensor (batch, heads, seq_q, seq_kv), we pass
+        // indices for all dimensions
+        if (region.front().getNumArguments() == 5) {
+          for (unsigned i = 0; i < 4; ++i) {
+            Value idx = b.create<linalg::IndexOp>(loc, i);
+            regionArgs.push_back(idx);
+          }
+        }
+
+        // Clone the region body inline
+        IRMapping mapping;
+        for (auto [arg, regionArg] :
+             llvm::zip_equal(regionArgs, region.front().getArguments())) {
+          mapping.map(regionArg, arg);
+        }
+
+        for (Operation &op : region.front().without_terminator()) {
+          b.clone(op, mapping);
+        }
+
+        // Get the yield operand and yield it
+        auto yieldOp =
+            cast<IREE::LinalgExt::YieldOp>(region.front().getTerminator());
+        Value result = mapping.lookup(yieldOp.getOperand(0));
+        linalg::YieldOp::create(b, loc, result);
+      });
+
   return genericOp.getResult(0);
 }
 
