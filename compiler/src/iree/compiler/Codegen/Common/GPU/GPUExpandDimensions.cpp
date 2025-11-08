@@ -93,9 +93,6 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
   SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
 
   for (OpOperand &operand : op->getOpOperands()) {
-    if (operand.get().getDefiningOp<tensor::CollapseShapeOp>()) {
-      continue;
-    }
     if (!isa<RankedTensorType>(operand.get().getType())) {
       continue;
     }
@@ -120,48 +117,6 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     if (reshapes) {
       rewriter.modifyOpInPlace(
           op, [&]() { operand.set(reshapes->collapseShapeOp); });
-    }
-  }
-
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPointAfter(op);
-
-  for (OpResult result : op->getResults()) {
-    if (!isa<RankedTensorType>(result.getType())) {
-      continue;
-    }
-
-    unsigned resultMapIndex = op.getNumDpsInputs() + result.getResultNumber();
-    AffineMap indexingMap = indexingMaps[resultMapIndex];
-    DimensionExpansionInfo tensorExpansionInfo;
-
-    for (auto [iterDim, factor] : expansionInfo) {
-      AffineExpr iterExpr = getAffineDimExpr(iterDim, op.getContext());
-      if (std::optional<unsigned> tensorDim =
-              indexingMap.getResultPosition(iterExpr)) {
-        tensorExpansionInfo[tensorDim.value()] = factor;
-      }
-    }
-
-    if (tensorExpansionInfo.empty()) {
-      continue;
-    }
-
-    std::optional<ReshapeOps> reshapes =
-        createDimensionExpansionOps(rewriter, tensorExpansionInfo, result);
-    if (reshapes) {
-      auto replaceIf = [&](OpOperand &use) {
-        Operation *user = use.getOwner();
-        if (user == reshapes->expandShapeOp) {
-          return false;
-        }
-        if (isa<tensor::DimOp>(user)) {
-          return false;
-        }
-        return true;
-      };
-      rewriter.replaceUsesWithIf(result, reshapes->collapseShapeOp.getResult(),
-                                 replaceIf);
     }
   }
 
