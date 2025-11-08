@@ -12,7 +12,7 @@
 
 hal.executable.source public @executable {
   hal.executable.export public @abs ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root()
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
