@@ -100,7 +100,6 @@ struct ireeCodegenIGEMMGenericConvDetails {
   MlirAttribute convDimsInputChannel;
   MlirAttribute convDimsDepth;
   bool isOutputChannelFirst;
-  bool isValid;
 };
 
 MLIR_CAPI_EXPORTED ireeCodegenIGEMMGenericConvDetails

@@ -168,8 +168,34 @@ def test_igemm_conv_details():
     root_op_list = iree_codegen.get_tuner_root_ops(input_module)
 
     details = iree_codegen.get_igemm_generic_conv_details(root_op_list[0])
-    assert details.is_valid, "IGEMM details should be valid for NHWC_HWCF conv"
-    assert len(details.igemm_loop_bounds) > 0, "NHWC_HWCF should have loop bounds"
+    assert details is not None, "IGEMM details should be valid for NHWC_HWCF conv"
+    assert details.igemm_loop_bounds == [
+        1,
+        14,
+        14,
+        16,
+        36,
+    ], f"Expected [1,14,14,16,36], got {details.igemm_loop_bounds}"
+    assert details.conv_dims_batch == [
+        0
+    ], f"Expected batch=[0], got {details.conv_dims_batch}"
+    assert details.conv_dims_output_image == [
+        1,
+        2,
+    ], f"Expected output_image=[1,2], got {details.conv_dims_output_image}"
+    assert details.conv_dims_output_channel == [
+        3
+    ], f"Expected output_channel=[3], got {details.conv_dims_output_channel}"
+    assert details.conv_dims_filter_loop == [
+        4,
+        5,
+    ], f"Expected filter_loop=[4,5], got {details.conv_dims_filter_loop}"
+    assert details.conv_dims_input_channel == [
+        6
+    ], f"Expected input_channel=[6], got {details.conv_dims_input_channel}"
+    assert (
+        details.is_output_channel_first == False
+    ), f"Expected is_output_channel_first=False, got {details.is_output_channel_first}"
 
     # Test 2: conv_2d_nhwc_fhwc.
     module_str = """
@@ -186,8 +212,27 @@ def test_igemm_conv_details():
     root_op_list = iree_codegen.get_tuner_root_ops(input_module)
 
     details = iree_codegen.get_igemm_generic_conv_details(root_op_list[0])
-    assert details.is_valid, "IGEMM details should be valid for NHWC_FHWC conv"
-    assert len(details.igemm_loop_bounds) > 0, "NHWC_FHWC should have loop bounds"
+    assert details is not None, "IGEMM details should be valid for NHWC_FHWC conv"
+    assert details.igemm_loop_bounds == [
+        1,
+        14,
+        14,
+        16,
+        36,
+    ], f"Expected [1,14,14,16,36], got {details.igemm_loop_bounds}"
+    assert details.conv_dims_batch == [
+        0
+    ], f"Expected batch=[0], got {details.conv_dims_batch}"
+    assert details.conv_dims_output_image == [
+        1,
+        2,
+    ], f"Expected output_image=[1,2], got {details.conv_dims_output_image}"
+    assert details.conv_dims_output_channel == [
+        3
+    ], f"Expected output_channel=[3], got {details.conv_dims_output_channel}"
+    assert isinstance(
+        details.is_output_channel_first, bool
+    ), "Should have is_output_channel_first flag"
 
     # Test 3: conv_2d_nchw_fchw.
     module_str = """
@@ -204,8 +249,25 @@ def test_igemm_conv_details():
     root_op_list = iree_codegen.get_tuner_root_ops(input_module)
 
     details = iree_codegen.get_igemm_generic_conv_details(root_op_list[0])
-    assert details.is_valid, "IGEMM details should be valid for NCHW conv"
-    assert len(details.igemm_loop_bounds) > 0, "NCHW should have loop bounds"
+    assert details is not None, "IGEMM details should be valid for NCHW conv"
+    assert details.igemm_loop_bounds == [
+        1,
+        16,
+        14,
+        14,
+        36,
+    ], f"Expected [1,16,14,14,36], got {details.igemm_loop_bounds}"
+    assert details.conv_dims_batch == [
+        0
+    ], f"Expected batch=[0], got {details.conv_dims_batch}"
+    assert details.conv_dims_output_image == [
+        2,
+        3,
+    ], f"Expected output_image=[2,3], got {details.conv_dims_output_image}"
+    assert details.conv_dims_filter_loop == [
+        5,
+        6,
+    ], f"Expected filter_loop=[5,6], got {details.conv_dims_filter_loop}"
 
     # Test 4: linalg.generic with convolution pattern (weight backward).
     module_str = """
@@ -233,11 +295,22 @@ def test_igemm_conv_details():
 
     details = iree_codegen.get_igemm_generic_conv_details(root_op_list[0])
     assert (
-        details.is_valid
+        details is not None
     ), "IGEMM details should be valid for generic 1D conv weight backward"
-    assert len(details.igemm_loop_bounds) > 0, "Generic 1D conv should have loop bounds"
+    assert details.igemm_loop_bounds == [
+        96,
+        3,
+        96,
+        98304,
+    ], f"Expected [96,3,96,98304], got {details.igemm_loop_bounds}"
+    assert details.conv_dims_output_image == [
+        1
+    ], f"Expected output_image=[1], got {details.conv_dims_output_image}"
+    assert details.conv_dims_filter_loop == [
+        4
+    ], f"Expected filter_loop=[4], got {details.conv_dims_filter_loop}"
 
-    # Test with a non-conv operation (should return invalid).
+    # Test with a non-conv operation.
     module_str = """
         module {
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
@@ -254,6 +327,4 @@ def test_igemm_conv_details():
     matmul_op = root_op_list[0]
 
     details = iree_codegen.get_igemm_generic_conv_details(matmul_op)
-    assert (
-        not details.is_valid
-    ), "IGEMM details should be invalid for non-conv operation"
+    assert details is None, "IGEMM details should be None for non-conv operation"

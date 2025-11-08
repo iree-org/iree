@@ -249,38 +249,18 @@ bool ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op) {
 
 ireeCodegenIGEMMGenericConvDetails
 ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
-  mlir::Operation *operation = unwrap(op);
-  auto linalgOp = llvm::dyn_cast<mlir::linalg::LinalgOp>(operation);
-
+  ireeCodegenIGEMMGenericConvDetails result{};
+  auto linalgOp = llvm::dyn_cast<mlir::linalg::LinalgOp>(unwrap(op));
   if (!linalgOp) {
-    return ireeCodegenIGEMMGenericConvDetails{
-        /*igemmLoopBounds=*/wrap(mlir::Attribute()),
-        /*convDimsBatch=*/wrap(mlir::Attribute()),
-        /*convDimsOutputImage=*/wrap(mlir::Attribute()),
-        /*convDimsOutputChannel=*/wrap(mlir::Attribute()),
-        /*convDimsFilterLoop=*/wrap(mlir::Attribute()),
-        /*convDimsInputChannel=*/wrap(mlir::Attribute()),
-        /*convDimsDepth=*/wrap(mlir::Attribute()),
-        /*isOutputChannelFirst=*/false,
-        /*isValid=*/false};
+    return result;
   }
 
   llvm::FailureOr<mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails>
       maybeDetails =
           mlir::iree_compiler::IREE::LinalgExt::getIGEMMGenericConvDetails(
               linalgOp);
-
   if (failed(maybeDetails)) {
-    return ireeCodegenIGEMMGenericConvDetails{
-        /*igemmLoopBounds=*/wrap(mlir::Attribute()),
-        /*convDimsBatch=*/wrap(mlir::Attribute()),
-        /*convDimsOutputImage=*/wrap(mlir::Attribute()),
-        /*convDimsOutputChannel=*/wrap(mlir::Attribute()),
-        /*convDimsFilterLoop=*/wrap(mlir::Attribute()),
-        /*convDimsInputChannel=*/wrap(mlir::Attribute()),
-        /*convDimsDepth=*/wrap(mlir::Attribute()),
-        /*isOutputChannelFirst=*/false,
-        /*isValid=*/false};
+    return result;
   }
 
   const mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails &details =
@@ -294,7 +274,6 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
         vec, [](unsigned val) { return static_cast<int64_t>(val); });
   };
 
-  ireeCodegenIGEMMGenericConvDetails result;
   result.igemmLoopBounds =
       wrap(builder.getI64ArrayAttr(details.igemmLoopBounds));
   result.convDimsBatch =
@@ -310,7 +289,6 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
   result.convDimsDepth =
       wrap(builder.getI64ArrayAttr(toInt64(details.convDims.depth)));
   result.isOutputChannelFirst = details.isOutputChannelFirst;
-  result.isValid = true;
 
   return result;
 }
