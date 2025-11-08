@@ -175,27 +175,25 @@ def test_igemm_conv_details():
         14,
         16,
         36,
-    ], f"Expected [1,14,14,16,36], got {details.igemm_loop_bounds}"
-    assert details.conv_dims_batch == [
-        0
-    ], f"Expected batch=[0], got {details.conv_dims_batch}"
+    ], f"got {details.igemm_loop_bounds}"
+    assert details.conv_dims_batch == [0], f"got {details.conv_dims_batch}"
     assert details.conv_dims_output_image == [
         1,
         2,
-    ], f"Expected output_image=[1,2], got {details.conv_dims_output_image}"
+    ], f"got {details.conv_dims_output_image}"
     assert details.conv_dims_output_channel == [
         3
-    ], f"Expected output_channel=[3], got {details.conv_dims_output_channel}"
+    ], f"got {details.conv_dims_output_channel}"
     assert details.conv_dims_filter_loop == [
         4,
         5,
-    ], f"Expected filter_loop=[4,5], got {details.conv_dims_filter_loop}"
+    ], f"got {details.conv_dims_filter_loop}"
     assert details.conv_dims_input_channel == [
         6
-    ], f"Expected input_channel=[6], got {details.conv_dims_input_channel}"
+    ], f"got {details.conv_dims_input_channel}"
     assert (
         details.is_output_channel_first == False
-    ), f"Expected is_output_channel_first=False, got {details.is_output_channel_first}"
+    ), f"got {details.is_output_channel_first}"
 
     # Test 2: conv_2d_nhwc_fhwc.
     module_str = """
@@ -219,20 +217,18 @@ def test_igemm_conv_details():
         14,
         16,
         36,
-    ], f"Expected [1,14,14,16,36], got {details.igemm_loop_bounds}"
-    assert details.conv_dims_batch == [
-        0
-    ], f"Expected batch=[0], got {details.conv_dims_batch}"
+    ], f"got {details.igemm_loop_bounds}"
+    assert details.conv_dims_batch == [0], f"got {details.conv_dims_batch}"
     assert details.conv_dims_output_image == [
         1,
         2,
-    ], f"Expected output_image=[1,2], got {details.conv_dims_output_image}"
+    ], f"got {details.conv_dims_output_image}"
     assert details.conv_dims_output_channel == [
         3
-    ], f"Expected output_channel=[3], got {details.conv_dims_output_channel}"
+    ], f"got {details.conv_dims_output_channel}"
     assert isinstance(
         details.is_output_channel_first, bool
-    ), "Should have is_output_channel_first flag"
+    ), f"got {type(details.is_output_channel_first)}"
 
     # Test 3: conv_2d_nchw_fchw.
     module_str = """
@@ -256,18 +252,16 @@ def test_igemm_conv_details():
         14,
         14,
         36,
-    ], f"Expected [1,16,14,14,36], got {details.igemm_loop_bounds}"
-    assert details.conv_dims_batch == [
-        0
-    ], f"Expected batch=[0], got {details.conv_dims_batch}"
+    ], f"got {details.igemm_loop_bounds}"
+    assert details.conv_dims_batch == [0], f"got {details.conv_dims_batch}"
     assert details.conv_dims_output_image == [
         2,
         3,
-    ], f"Expected output_image=[2,3], got {details.conv_dims_output_image}"
+    ], f"got {details.conv_dims_output_image}"
     assert details.conv_dims_filter_loop == [
         5,
         6,
-    ], f"Expected filter_loop=[5,6], got {details.conv_dims_filter_loop}"
+    ], f"got {details.conv_dims_filter_loop}"
 
     # Test 4: linalg.generic with convolution pattern (weight backward).
     module_str = """
@@ -302,13 +296,11 @@ def test_igemm_conv_details():
         3,
         96,
         98304,
-    ], f"Expected [96,3,96,98304], got {details.igemm_loop_bounds}"
+    ], f"got {details.igemm_loop_bounds}"
     assert details.conv_dims_output_image == [
         1
-    ], f"Expected output_image=[1], got {details.conv_dims_output_image}"
-    assert details.conv_dims_filter_loop == [
-        4
-    ], f"Expected filter_loop=[4], got {details.conv_dims_filter_loop}"
+    ], f"got {details.conv_dims_output_image}"
+    assert details.conv_dims_filter_loop == [4], f"got {details.conv_dims_filter_loop}"
 
     # Test with a non-conv operation.
     module_str = """

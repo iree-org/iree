@@ -247,21 +247,30 @@ bool ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op) {
       unwrap(op));
 }
 
-ireeCodegenIGEMMGenericConvDetails
-ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
-  ireeCodegenIGEMMGenericConvDetails result{};
+bool ireeCodegenHasIGEMMGenericConvDetails(MlirOperation op) {
   auto linalgOp = llvm::dyn_cast<mlir::linalg::LinalgOp>(unwrap(op));
   if (!linalgOp) {
-    return result;
+    return false;
   }
 
   llvm::FailureOr<mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails>
       maybeDetails =
           mlir::iree_compiler::IREE::LinalgExt::getIGEMMGenericConvDetails(
               linalgOp);
-  if (failed(maybeDetails)) {
-    return result;
-  }
+  return succeeded(maybeDetails);
+}
+
+ireeCodegenIGEMMGenericConvDetails
+ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
+  auto linalgOp = llvm::cast<mlir::linalg::LinalgOp>(unwrap(op));
+
+  llvm::FailureOr<mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails>
+      maybeDetails =
+          mlir::iree_compiler::IREE::LinalgExt::getIGEMMGenericConvDetails(
+              linalgOp);
+  assert(succeeded(maybeDetails) &&
+         "Failed to get IGEMM details; must check with "
+         "ireeCodegenCanGetIGEMMGenericConvDetails first");
 
   const mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails &details =
       *maybeDetails;
@@ -274,6 +283,7 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
         vec, [](unsigned val) { return static_cast<int64_t>(val); });
   };
 
+  ireeCodegenIGEMMGenericConvDetails result;
   result.igemmLoopBounds =
       wrap(builder.getI64ArrayAttr(details.igemmLoopBounds));
   result.convDimsBatch =

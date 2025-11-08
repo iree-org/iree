@@ -102,6 +102,11 @@ struct ireeCodegenIGEMMGenericConvDetails {
   bool isOutputChannelFirst;
 };
 
+// Checks if IGEMM generic convolution details can be queried for the given
+// operation.
+MLIR_CAPI_EXPORTED bool ireeCodegenHasIGEMMGenericConvDetails(MlirOperation op);
+
+// Gets IGEMM generic convolution details for the given operation.
 MLIR_CAPI_EXPORTED ireeCodegenIGEMMGenericConvDetails
 ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op);
 

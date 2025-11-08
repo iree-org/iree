@@ -29,9 +29,6 @@ namespace py = nanobind;
 using namespace nanobind::literals;
 using namespace mlir::python::nanobind_adaptors;
 
-using ireeCodegenIGEMMGenericConvDetails =
-    struct ireeCodegenIGEMMGenericConvDetails;
-
 static std::vector<MlirOperation>
 ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
   size_t numOps = 0;
@@ -65,27 +62,6 @@ static std::vector<int64_t> getIntArrayAttrValues(MlirAttribute attr) {
     result.push_back(val);
   }
   return result;
-}
-
-static std::optional<ireeCodegenIGEMMGenericConvDetails>
-GetIGEMMGenericConvDetails(MlirOperation op) {
-  ireeCodegenIGEMMGenericConvDetails details =
-      ireeCodegenGetIGEMMGenericConvDetails(op);
-
-  // Detect "empty" result. This occurs when `op` is not a linalg op,
-  // or when `getIGEMMGenericConvDetails` fails.
-  if (mlirAttributeIsNull(details.igemmLoopBounds) &&
-      mlirAttributeIsNull(details.convDimsBatch) &&
-      mlirAttributeIsNull(details.convDimsOutputImage) &&
-      mlirAttributeIsNull(details.convDimsOutputChannel) &&
-      mlirAttributeIsNull(details.convDimsFilterLoop) &&
-      mlirAttributeIsNull(details.convDimsInputChannel) &&
-      mlirAttributeIsNull(details.convDimsDepth) &&
-      !details.isOutputChannelFirst) {
-    return std::nullopt;
-  }
-
-  return details;
 }
 
 NB_MODULE(_ireeCompilerDialects, m) {
@@ -757,7 +733,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
                    });
 
   iree_codegen_module.def(
-      "get_igemm_generic_conv_details", &GetIGEMMGenericConvDetails,
+      "get_igemm_generic_conv_details",
+      [](MlirOperation op)
+          -> std::optional<ireeCodegenIGEMMGenericConvDetails> {
+        if (!ireeCodegenHasIGEMMGenericConvDetails(op)) {
+          return std::nullopt;
+        }
+        return ireeCodegenGetIGEMMGenericConvDetails(op);
+      },
       "Gets IGEMM details for a linalg operation. "
       "Returns None if failed to infer IGEMM convolution details.",
       py::arg("linalg_op"));
