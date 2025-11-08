@@ -93,10 +93,12 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
   SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
 
   for (OpOperand &operand : op->getOpOperands()) {
-    if (operand.get().getDefiningOp<tensor::CollapseShapeOp>())
+    if (operand.get().getDefiningOp<tensor::CollapseShapeOp>()) {
       continue;
-    if (!isa<RankedTensorType>(operand.get().getType()))
+    }
+    if (!isa<RankedTensorType>(operand.get().getType())) {
       continue;
+    }
 
     AffineMap indexingMap = indexingMaps[operand.getOperandNumber()];
     DimensionExpansionInfo tensorExpansionInfo;
