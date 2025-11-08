@@ -107,6 +107,7 @@ jobs:
               - persistent-cache
               - Linux
               - X64
+              - threadripper
           # MI325
           - name: amdgpu_mi325_gfx942
             markers: "gfx942 or mi325"
