@@ -14,7 +14,7 @@ func.func @expand_matvec(%a: tensor<4x16384xf16>, %b: tensor<1x16384xf16>) -> te
     ins(%a, %b : tensor<4x16384xf16>, tensor<1x16384xf16>)
     outs(%fill : tensor<4x1xf32>)
     attrs = {lowering_config = #iree_gpu.lowering_config<{
-      expand_dims = [[0], [1], [2, 3]],
+      expand_dims = [[], [], [1, 8]],
       lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]],
       partial_reduction = [0, 0, 64, 0],
       subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]],

@@ -295,7 +295,7 @@ getVectorDistributeReductionConfig(
   int64_t subgroupBasis = (subgroup == 0) ? 1 : subgroup;
   SmallVector<Attribute> expandDimFactors = llvm::to_vector(llvm::map_range(
       llvm::seq<int64_t>(0, op.getNumLoops()), [&](int64_t i) -> Attribute {
-        return b.getI64ArrayAttr({i + (i > lastReductionDim)});
+        return b.getI64ArrayAttr({});
       }));
 
   if (ShapedType::isStaticShape(bounds) && threadLoads > 1) {
@@ -309,7 +309,7 @@ getVectorDistributeReductionConfig(
     int64_t outer = lastReductionDim;
     int64_t inner = lastReductionDim + 1;
 
-    expandDimFactors[lastReductionDim] = b.getI64ArrayAttr({outer, inner});
+    expandDimFactors[lastReductionDim] = b.getI64ArrayAttr({1, threadLoads});
     partialReductionTileSizes[outer] = partialReductionSize / threadLoads;
     threadTileSizes[inner] = threadLoads;
     threadCounts[outer] = threadBasis;

@@ -42,20 +42,15 @@ static DimensionExpansionInfo
 getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
   IREE::GPU::DimensionExpansion expansionFactors =
       IREE::GPU::getDimensionExpansion(config).value();
-  SmallVector<int64_t> threadSizes = config.getStaticTilingLevelSizes(
-      llvm::to_underlying(IREE::GPU::TilingLevel::Thread), nullptr);
 
   DimensionExpansionInfo expansionInfo;
 
-  for (auto [origDimIdx, newDimIndices] : llvm::enumerate(expansionFactors)) {
-    if (newDimIndices.size() > 1) {
+  for (auto [origDimIdx, factors] : llvm::enumerate(expansionFactors)) {
+    if (!factors.empty()) {
       int64_t expansionFactor = 1;
-      for (unsigned newDimIdx : newDimIndices) {
-        if (newDimIdx < threadSizes.size()) {
-          int64_t factor = threadSizes[newDimIdx];
-          if (factor > 1) {
-            expansionFactor *= factor;
-          }
+      for (int64_t factor : factors) {
+        if (factor > 1) {
+          expansionFactor *= factor;
         }
       }
       if (expansionFactor > 1) {
