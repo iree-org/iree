@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -210,10 +211,10 @@ struct FlexAttentionOpConversion
     // Check enable_gqa flag
     bool enableGqa = false;
     if (!matchPattern(enableGqaValue,
-                      torch::Torch::m_TorchConstantBool(&enableGqa)))
+                      torch::Torch::m_TorchConstantBool(&enableGqa))) {
       return rewriter.notifyMatchFailure(op,
                                          "expected constant enable_gqa value");
-
+    }
     // TODO: GQA (Grouped Query Attention) support is not yet implemented
     if (enableGqa) {
       return rewriter.notifyMatchFailure(
@@ -345,9 +346,9 @@ struct FlexAttentionOpConversion
             }
 
             // Call mask_mod_fn(b, h, q_idx, kv_idx)
-            auto callOp =
-                b.create<func::CallOp>(loc, TypeRange{torchBoolScalarType},
-                                       maskModSymbol, ValueRange(torchIndices));
+            auto callOp = b.create<func::CallOp>(
+                loc, TypeRange{torchBoolScalarType}, *maskModSymbol,
+                ValueRange(torchIndices));
             Value torchMaskResult = callOp.getResult(0);
 
             // Convert result back to builtin tensor
@@ -382,8 +383,18 @@ struct FlexAttentionOpConversion
       }
     }
 
-    Value outputTensor = rewriter.create<tensor::EmptyOp>(
+    Value outputTensorEmpty = rewriter.create<tensor::EmptyOp>(
         loc, outputShape, floatType, outputDynSizes);
+
+    // Initialize output tensor with identity value (0.0 for addition)
+    Value outputInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
+                                               floatType, rewriter, loc,
+                                               /*useOnlyFiniteValue=*/true);
+    Value outputTensor =
+        rewriter
+            .create<linalg::FillOp>(loc, ValueRange{outputInit},
+                                    ValueRange{outputTensorEmpty})
+            .getResult(0);
 
     // Create max and sum tensors [B, H, M]
     SmallVector<int64_t> maxSumShape = {batch, numHeads, seqLenQ};
@@ -396,10 +407,28 @@ struct FlexAttentionOpConversion
       }
     }
 
-    Value maxTensor = rewriter.create<tensor::EmptyOp>(
+    Value maxTensorEmpty = rewriter.create<tensor::EmptyOp>(
         loc, maxSumShape, floatType, maxSumDynSizes);
-    Value sumTensor = rewriter.create<tensor::EmptyOp>(
+    Value sumTensorEmpty = rewriter.create<tensor::EmptyOp>(
         loc, maxSumShape, floatType, maxSumDynSizes);
+
+    // Initialize max and sum tensors with identity values for reductions
+    // Max reduction identity: -inf
+    Value maxInit = arith::getIdentityValue(arith::AtomicRMWKind::maximumf,
+                                            floatType, rewriter, loc,
+                                            /*useOnlyFiniteValue=*/true);
+    // Sum reduction identity: 0.0
+    Value sumInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
+                                            floatType, rewriter, loc);
+
+    Value maxTensor = rewriter
+                          .create<linalg::FillOp>(loc, ValueRange{maxInit},
+                                                  ValueRange{maxTensorEmpty})
+                          .getResult(0);
+    Value sumTensor = rewriter
+                          .create<linalg::FillOp>(loc, ValueRange{sumInit},
+                                                  ValueRange{sumTensorEmpty})
+                          .getResult(0);
 
     // Build indexing maps for online_attention
     // Standard maps: Q, K, V, scale, [mask], output, max, sum
@@ -480,7 +509,7 @@ struct FlexAttentionOpConversion
 
         // Call score_mod_fn(score, b, h, q_idx, kv_idx)
         auto callOp = rewriter.create<func::CallOp>(
-            loc, TypeRange{torchScalarType}, scoreModeSymbol,
+            loc, TypeRange{torchScalarType}, *scoreModeSymbol,
             ValueRange(callArgs));
         Value torchResult = callOp.getResult(0);
 
