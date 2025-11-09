@@ -1459,3 +1459,67 @@ func.func @generic_with_0d_tensor(
 //  CHECK-SAME:     ins(%[[INPUT]], %[[INPUT_0D]]
 //  CHECK-SAME:     outs(%[[FILL]]
 //       CHECK:   return %[[GENERIC]]
+
+// -----
+
+// Narrow-N matmul (N=1, M=16) with mmt4d ukernel enabled - should transpose (swap LHS and RHS)
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 1, 16]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 1, 16]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 1, 16]>
+func.func @matmul_narrow_N_with_ukernel_x86_64(
+    %lhs: tensor<16x16xf32, #encoding_lhs>,
+    %rhs: tensor<16x1xf32, #encoding_rhs>,
+    %result: tensor<16x1xf32, #encoding_result>
+) -> tensor<16x1xf32, #encoding_result> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", ukernels = "mmt4d", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.matmul
+      ins(%lhs, %rhs : tensor<16x16xf32, #encoding_lhs>, tensor<16x1xf32, #encoding_rhs>)
+      outs(%result : tensor<16x1xf32, #encoding_result>)
+      -> tensor<16x1xf32, #encoding_result>
+  return %0 : tensor<16x1xf32, #encoding_result>
+}
+// Operands should be swapped due to narrow-N transposition with mmt4d ukernel
+//      CHECK: func @matmul_narrow_N_with_ukernel_x86_64(
+// CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<1x1x16x16xf32>
+// CHECK-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<1x1x1x16xf32>
+// CHECK-SAME:     %[[OUTS:[a-zA-Z0-9]+]]: tensor<1x1x1x16xf32>
+//      CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:       ins(%[[RHS]], %[[LHS]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   return %[[MMT4D]]
+
+// -----
+
+// Narrow-N matmul (N=1, M=16) without ukernels - should NOT transpose
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 1, 16]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 1, 16]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 1, 16]>
+func.func @matmul_narrow_N_without_ukernel_x86_64(
+    %lhs: tensor<16x16xf32, #encoding_lhs>,
+    %rhs: tensor<16x1xf32, #encoding_rhs>,
+    %result: tensor<16x1xf32, #encoding_result>
+) -> tensor<16x1xf32, #encoding_result> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", ukernels = "none", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.matmul
+      ins(%lhs, %rhs : tensor<16x16xf32, #encoding_lhs>, tensor<16x1xf32, #encoding_rhs>)
+      outs(%result : tensor<16x1xf32, #encoding_result>)
+      -> tensor<16x1xf32, #encoding_result>
+  return %0 : tensor<16x1xf32, #encoding_result>
+}
+// Operands should NOT be swapped when mmt4d ukernel is disabled
+//      CHECK: func @matmul_narrow_N_without_ukernel_x86_64(
+// CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<1x1x16x16xf32>
+// CHECK-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<1x1x16x1xf32>
+// CHECK-SAME:     %[[OUTS:[a-zA-Z0-9]+]]: tensor<1x1x16x1xf32>
+//      CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   return %[[MMT4D]]

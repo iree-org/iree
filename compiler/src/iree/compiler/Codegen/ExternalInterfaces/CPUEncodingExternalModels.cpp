@@ -285,7 +285,7 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
 
 Operation *lowerContractionOpWithEncoding(
     OpBuilder &builder, linalg::LinalgOp linalgOp, ValueRange operands,
-    IREE::Encoding::LayoutMaterializerAttr layoutAttr) {
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr, bool hasUkernelMmt4d) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return nullptr;
   }
@@ -323,7 +323,8 @@ Operation *lowerContractionOpWithEncoding(
                                   operands.drop_front(inputs.size()));
   }
 
-  bool transpose = isNarrowNResult(resultEncoding);
+  // Transposition should only happen when mmt4d ukernel is enabled and N is narrow.
+  bool transpose = hasUkernelMmt4d && isNarrowNResult(resultEncoding);
   SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
   SmallVector<ReassociationIndices> ri;
   Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder, ri,
@@ -717,7 +718,9 @@ struct CPUEncodingPackedLayoutMaterializerAttr
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    if (IREE::Encoding::isNarrowNResult(encoding)) {
+    // Only transpose when mmt4d ukernel is enabled and N is narrow.
+    if (IREE::Encoding::isNarrowNResult(encoding) &&
+        hasUkernel(layoutAttr.getConfiguration(), "mmt4d")) {
       transposeInPlace(info);
     }
     FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
@@ -746,9 +749,11 @@ struct CPUEncodingResolverMaterializerAttr final
                                             convertedOperands);
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
+      bool hasUkernelMmt4d = hasUkernel(layoutAttr.getConfiguration(), "mmt4d");
       return lowerContractionOpWithEncoding(
           b, linalgOp, convertedOperands,
-          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr),
+          hasUkernelMmt4d);
     }
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       return lowerGenericOpWithResolvedLayouts(
@@ -876,7 +881,9 @@ struct VMVXEncodingPackedLayoutMaterializerAttr final
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    if (IREE::Encoding::isNarrowNResult(encoding)) {
+    // Only transpose when mmt4d ukernel is enabled and N is narrow.
+    if (IREE::Encoding::isNarrowNResult(encoding) &&
+        hasUkernel(layoutAttr.getConfiguration(), "mmt4d")) {
       transposeInPlace(info);
     }
     return info;
@@ -900,9 +907,11 @@ struct VMVXEncodingResolverMaterializerAttr final
                                             convertedOperands);
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
+      bool hasUkernelMmt4d = hasUkernel(layoutAttr.getConfiguration(), "mmt4d");
       return lowerContractionOpWithEncoding(
           b, linalgOp, convertedOperands,
-          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr),
+          hasUkernelMmt4d);
     }
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       return lowerGenericOpWithResolvedLayouts(
