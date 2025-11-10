@@ -180,21 +180,3 @@ module {
 }
 // CHECK-LABEL: func @test_cache_swizzle_promotion
 //  CHECK-SAME:   promotion_types = [#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>]
-
-module {
-  func.func @test_use_global_load_dma_no_subgroup() attributes {
-      lowering_config = #iree_gpu.use_global_load_dma} {
-    return
-  }
-}
-// CHECK-LABEL: func @test_use_global_load_dma_no_subgroup
-//  CHECK-SAME:   lowering_config = #iree_gpu.use_global_load_dma
-
-module {
-  func.func @test_use_global_load_dma_with_subgroup() attributes {
-      lowering_config = #iree_gpu.use_global_load_dma} {
-    return
-  }
-}
-// CHECK-LABEL: func @test_use_global_load_dma_with_subgroup
-//  CHECK-SAME:   lowering_config = #iree_gpu.use_global_load_dma
