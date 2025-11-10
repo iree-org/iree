@@ -20,13 +20,15 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-static void prefetchSharedMemory(FunctionOpInterface funcOp) {
+static void prefetchSharedMemory(FunctionOpInterface funcOp,
+                                 unsigned numStages) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<scf::ForOp> loops;
   funcOp.walk([&loops](scf::ForOp forOp) { loops.push_back(forOp); });
 
   for (scf::ForOp forOp : loops) {
-    FailureOr<scf::ForOp> newLoop = prefetchSharedMemoryCopy(rewriter, forOp);
+    FailureOr<scf::ForOp> newLoop =
+        prefetchSharedMemoryCopy(rewriter, forOp, numStages);
     // The only possible failure is the analysis failure, which does not cause
     // the pass to fail. Therefore we discard any failures at this point.
     (void)newLoop;
@@ -36,9 +38,11 @@ static void prefetchSharedMemory(FunctionOpInterface funcOp) {
 
 struct ROCDLPrefetchSharedMemoryPass final
     : impl::ROCDLPrefetchSharedMemoryPassBase<ROCDLPrefetchSharedMemoryPass> {
+  using Base::Base;
+
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
-    prefetchSharedMemory(funcOp);
+    prefetchSharedMemory(funcOp, numStages);
   }
 };
 
