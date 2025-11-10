@@ -72,7 +72,7 @@ static iree_status_t iree_vm_bytecode_module_strip_zip_header(
   // Compute the starting offset of the file.
   // Note that we still don't know (or care) if it's the file we want; actual
   // FlatBuffer verification happens later on.
-  uint32_t offset =
+  const uint32_t offset =
       sizeof(*header) + header->file_name_length + header->extra_field_length;
   if (offset > contents.data_length) {
     // Is a ZIP but doesn't have enough data; error out with something more
@@ -113,7 +113,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_archive_parse_header(
 
   // Verify the length prefix is within bounds (always <= the remaining module
   // bytes).
-  size_t length_remaining =
+  const size_t length_remaining =
       module_contents.data_length - sizeof(flatbuffers_uoffset_t);
   if (length_prefix > length_remaining) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -131,11 +131,65 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_archive_parse_header(
   }
   if (out_rodata_offset) {
     // rodata begins immediately following the FlatBuffer in memory.
-    iree_host_size_t rodata_offset = iree_host_align(
+    const iree_host_size_t rodata_offset = iree_host_align(
         (iree_host_size_t)(flatbuffer_contents.data - archive_contents.data) +
             length_prefix,
         IREE_VM_ARCHIVE_SEGMENT_ALIGNMENT);
     *out_rodata_offset = rodata_offset;
   }
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t
+iree_vm_bytecode_archive_infer_size(iree_const_byte_span_t archive_contents,
+                                    iree_host_size_t* out_inferred_size) {
+  IREE_ASSERT_ARGUMENT(out_inferred_size);
+  *out_inferred_size = 0;
+
+  // Handle the case where size is unknown (unsafe inference).
+  const bool unsafe_infer_size = (archive_contents.data_length == 0);
+  if (unsafe_infer_size) {
+    archive_contents.data_length = IREE_HOST_SIZE_MAX;
+  }
+
+  // Parse header to find the relative offset we need for calculating the
+  // extents.
+  iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
+  iree_host_size_t rodata_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_archive_parse_header(
+      archive_contents, &flatbuffer_contents, &rodata_offset));
+
+  // Parse the BytecodeModuleDef to find rodata segments.
+  iree_vm_BytecodeModuleDef_table_t module_def =
+      iree_vm_BytecodeModuleDef_as_root(flatbuffer_contents.data);
+  if (!module_def) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to parse BytecodeModuleDef");
+  }
+
+  // Find the maximum extent of all rodata segments.
+  iree_vm_RodataSegmentDef_vec_t rodata_segments =
+      iree_vm_BytecodeModuleDef_rodata_segments(module_def);
+  iree_host_size_t rodata_length = 0;
+  for (size_t i = 0; i < iree_vm_RodataSegmentDef_vec_len(rodata_segments);
+       ++i) {
+    iree_vm_RodataSegmentDef_table_t segment =
+        iree_vm_RodataSegmentDef_vec_at(rodata_segments, i);
+    if (segment &&
+        iree_vm_RodataSegmentDef_external_data_length_is_present(segment)) {
+      const uint64_t offset =
+          iree_vm_RodataSegmentDef_external_data_offset(segment);
+      const uint64_t length =
+          iree_vm_RodataSegmentDef_external_data_length(segment);
+      const uint64_t segment_end = offset + length;
+      if (segment_end > rodata_length) {
+        rodata_length = segment_end;  // bump extent
+      }
+    }
+  }
+
+  // Total size is rodata_offset + rodata_length.
+  // There may be ZIP headers behind this but we don't currently care.
+  *out_inferred_size = rodata_offset + rodata_length;
   return iree_ok_status();
 }

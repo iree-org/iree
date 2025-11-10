@@ -14,6 +14,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/modules/vmvx/module.h"
+#include "iree/vm/bytecode/archive.h"
 #include "iree/vm/bytecode/module.h"
 
 #define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
@@ -747,6 +748,29 @@ static void iree_hal_vmvx_module_loader_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t iree_hal_vmvx_module_loader_infer_format(
+    iree_hal_executable_loader_t* base_executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Infer the total size of the bytecode archive, if needed.
+  if (executable_data.data_length == 0) {
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_archive_infer_size(
+        executable_data, out_inferred_size));
+  }
+
+  // Write the format string.
+  iree_string_view_t format = IREE_SV("vmvx-bytecode-fb");
+  if (format.size >= executable_format_capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable format buffer too small");
+  }
+  memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
+
+  return iree_ok_status();
+}
+
 static bool iree_hal_vmvx_module_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -822,6 +846,7 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
 static const iree_hal_executable_loader_vtable_t
     iree_hal_vmvx_module_loader_vtable = {
         .destroy = iree_hal_vmvx_module_loader_destroy,
+        .infer_format = iree_hal_vmvx_module_loader_infer_format,
         .query_support = iree_hal_vmvx_module_loader_query_support,
         .try_load = iree_hal_vmvx_module_loader_try_load,
 };

@@ -70,6 +70,28 @@ static void iree_hal_null_executable_cache_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t iree_hal_null_executable_cache_infer_format(
+    iree_hal_executable_cache_t* base_executable_cache,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  iree_hal_null_executable_cache_t* executable_cache =
+      iree_hal_null_executable_cache_cast(base_executable_cache);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // TODO(null): try to guess what the format in executable_data is. Note that
+  // the data_length may be 0 indicating the caller doesn't know how much data
+  // after the base pointer is involved. **THIS IS UNSAFE** but required for
+  // compatibility with CUDA/HIP.
+  iree_status_t status = iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED, "{null} size inference not yet implemented");
+  (void)executable_cache;
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static bool iree_hal_null_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* base_executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -100,6 +122,7 @@ static iree_status_t iree_hal_null_executable_cache_prepare_executable(
 static const iree_hal_executable_cache_vtable_t
     iree_hal_null_executable_cache_vtable = {
         .destroy = iree_hal_null_executable_cache_destroy,
+        .infer_format = iree_hal_null_executable_cache_infer_format,
         .can_prepare_format = iree_hal_null_executable_cache_can_prepare_format,
         .prepare_executable = iree_hal_null_executable_cache_prepare_executable,
 };

@@ -12,6 +12,7 @@
 
 #include "iree/hal/api.h"
 #include "iree/hal/local/elf/elf_module.h"
+#include "iree/hal/local/executable_format.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/executable_library_util.h"
 #include "iree/hal/local/executable_plugin_manager.h"
@@ -315,6 +316,20 @@ static void iree_hal_embedded_elf_loader_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t iree_hal_embedded_elf_loader_infer_format(
+    iree_hal_executable_loader_t* base_executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_hal_executable_infer_elf_format(
+      executable_data, executable_format_capacity, executable_format,
+      out_inferred_size);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static bool iree_hal_embedded_elf_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -343,6 +358,7 @@ static iree_status_t iree_hal_embedded_elf_loader_try_load(
 static const iree_hal_executable_loader_vtable_t
     iree_hal_embedded_elf_loader_vtable = {
         .destroy = iree_hal_embedded_elf_loader_destroy,
+        .infer_format = iree_hal_embedded_elf_loader_infer_format,
         .query_support = iree_hal_embedded_elf_loader_query_support,
         .try_load = iree_hal_embedded_elf_loader_try_load,
 };
