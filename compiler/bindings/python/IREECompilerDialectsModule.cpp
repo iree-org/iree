@@ -501,7 +501,8 @@ NB_MODULE(_ireeCompilerDialects, m) {
              const std::string &arch,
              const std::vector<int32_t> &subgroupChoices,
              const std::vector<int32_t> &workgroupSizes, int32_t threadCount,
-             int32_t memoryBytes, const py::list &mmaIntrinsicObjs) {
+             int32_t memoryBytes, int32_t wgpCount, int32_t simdsPerWgp,
+             const py::list &mmaIntrinsicObjs) {
             std::vector<mma_intrinsic_enum_t> mmaIntrinsicVals;
             py::module_ gpuModule = py::module_::import_(kGpuModuleImportPath);
             py::object mmaIntrinsicClass =
@@ -518,15 +519,20 @@ NB_MODULE(_ireeCompilerDialects, m) {
                   py::cast<mma_intrinsic_enum_t>(item.attr("value")));
             }
 
+            if (wgpCount < 0) {
+              throw py::value_error("workgroup_count must be non-negative");
+            }
+
             *self = ireeGPUTargetInfoGet(
                 context, arch.c_str(), subgroupChoices.data(),
                 subgroupChoices.size(), workgroupSizes.data(),
-                workgroupSizes.size(), threadCount, memoryBytes,
-                mmaIntrinsicVals.data(), mmaIntrinsicVals.size());
+                workgroupSizes.size(), threadCount, memoryBytes, wgpCount,
+                simdsPerWgp, mmaIntrinsicVals.data(), mmaIntrinsicVals.size());
           },
           "context"_a, "arch"_a, "subgroup_size_choices"_a,
           "max_workgroup_sizes"_a, "max_thread_count_per_workgroup"_a,
-          "max_workgroup_memory_bytes"_a, "mma_intrinsics"_a = py::list{},
+          "max_workgroup_memory_bytes"_a, "workgroup_count"_a,
+          "simds_per_workgroup"_a, "mma_intrinsics"_a = py::list{},
           "Create a GPUTargetInfo with the given parameters")
       .def_static(
           "get_gpu_target_info", &ireeHALExecutableTargetAttrGetGPUTargetInfo,

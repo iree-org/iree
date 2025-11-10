@@ -447,6 +447,7 @@ ireeGPUTargetInfo ireeGPUTargetInfoGet(
     MlirContext mlirCtx, const char *arch, const int32_t *subgroupChoices,
     size_t numSubgroupChoices, const int32_t *workgroupSizes,
     size_t numWorkgroupSizes, int32_t threadCount, int32_t memoryBytes,
+    uint32_t wgpCount, int32_t simdsPerWgp,
     const mma_intrinsic_enum_t *mmaIntrinsics, size_t numMmaIntrinsics) {
   assert(!mlirContextIsNull(mlirCtx) && "mlirCtx cannot be null");
   assert(arch && "arch cannot be null");
@@ -468,6 +469,8 @@ ireeGPUTargetInfo ireeGPUTargetInfoGet(
 
   targetInfo.maxThreadCountPerWorkgroup = threadCount;
   targetInfo.maxWorkgroupMemoryBytes = memoryBytes;
+  targetInfo.wgpCount = wgpCount;
+  targetInfo.simdsPerWgp = simdsPerWgp;
 
   std::vector<mlir::Attribute> mmaIntrinsicAttrs;
   mmaIntrinsicAttrs.reserve(numMmaIntrinsics);
