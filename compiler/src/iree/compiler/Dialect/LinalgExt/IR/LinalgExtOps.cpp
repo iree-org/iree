@@ -2728,43 +2728,16 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
 //===---------------------------------------------------------------------===//
 
 LogicalResult IREE::LinalgExt::IndexOp::verify() {
-  Operation *parentOp = getOperation()->getParentOp();
-
-  // Check if parent is CustomOp
-  if (auto customOp = dyn_cast<CustomOp>(parentOp)) {
-    if (customOp.getNumLoops() <= getDim()) {
-      return emitOpError("expected dim (")
-             << getDim() << ") to be lower than the number of loops ("
-             << customOp.getNumLoops() << ") of the enclosing CustomOp";
-    }
-    return success();
+  auto customOp = dyn_cast<CustomOp>(getOperation()->getParentOp());
+  if (!customOp) {
+    return emitOpError("expected parent op to be `iree_linalg_ext.custom_op`");
   }
-
-  // Check if parent is OnlineAttentionOp
-  if (auto onlineAttnOp = dyn_cast<OnlineAttentionOp>(parentOp)) {
-    int64_t iterationDomainRank = onlineAttnOp.getIterationDomainRank();
-    if (iterationDomainRank <= static_cast<int64_t>(getDim())) {
-      return emitOpError("expected dim (")
-             << getDim() << ") to be lower than the iteration domain rank ("
-             << iterationDomainRank << ") of the enclosing OnlineAttentionOp";
-    }
-    return success();
+  if (customOp.getNumLoops() <= getDim()) {
+    return emitOpError("expected dim (")
+           << getDim() << ") to be lower than the number of loops ("
+           << customOp.getNumLoops() << ") of the enclosing CustomOp";
   }
-
-  // Check if parent is AttentionOp
-  if (auto attnOp = dyn_cast<AttentionOp>(parentOp)) {
-    int64_t iterationDomainRank = attnOp.getIterationDomainRank();
-    if (iterationDomainRank <= static_cast<int64_t>(getDim())) {
-      return emitOpError("expected dim (")
-             << getDim() << ") to be lower than the iteration domain rank ("
-             << iterationDomainRank << ") of the enclosing AttentionOp";
-    }
-    return success();
-  }
-
-  return emitOpError(
-      "expected parent op to be one of: `iree_linalg_ext.custom_op`, "
-      "`iree_linalg_ext.online_attention`, or `iree_linalg_ext.attention`");
+  return success();
 }
 
 //===---------------------------------------------------------------------===//
