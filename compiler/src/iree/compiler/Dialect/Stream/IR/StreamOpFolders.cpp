@@ -1050,197 +1050,6 @@ void ResourceSubviewOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
-// stream.parameter.load
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct FoldParameterLoadTargetSubviews
-    : public OpRewritePattern<ParameterLoadOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(ParameterLoadOp op,
-                                PatternRewriter &rewriter) const override {
-    auto ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPoint(op);
-    bool needsUpdate = false;
-
-    SmallVector<Value> newSourceOffsets;
-    SmallVector<Value> newResultSizes;
-    size_t resultCount = op.getResults().size();
-    newSourceOffsets.reserve(resultCount);
-    newResultSizes.reserve(resultCount);
-
-    for (auto [loadResult, newSourceOffset, newResultSize] : llvm::zip_equal(
-             op.getResults(), op.getSourceOffsets(), op.getResultSizes())) {
-      if (loadResult.hasOneUse()) {
-        Operation *user = *loadResult.getUsers().begin();
-        if (auto subviewOp = dyn_cast<IREE::Stream::ResourceSubviewOp>(user)) {
-          auto viewSourceOffset = subviewOp.getSourceOffset();
-          auto viewResultSize = subviewOp.getResultSize();
-          if (IREE::Util::tryMoveProducerBefore(viewSourceOffset, op) &&
-              IREE::Util::tryMoveProducerBefore(viewResultSize, op)) {
-            newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-                subviewOp.getLoc(), newSourceOffset,
-                rewriter.createOrFold<mlir::arith::IndexCastOp>(
-                    subviewOp.getLoc(), rewriter.getI64Type(),
-                    viewSourceOffset));
-            newResultSize = viewResultSize;
-            rewriter.replaceAllUsesWith(subviewOp.getResult(), loadResult);
-            needsUpdate = true;
-          }
-        }
-      }
-      newSourceOffsets.push_back(newSourceOffset);
-      newResultSizes.push_back(newResultSize);
-    }
-
-    rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
-      return failure();
-    rewriter.modifyOpInPlace(op, [&]() {
-      op.getSourceOffsetsMutable().assign(newSourceOffsets);
-      op.getResultSizesMutable().assign(newResultSizes);
-    });
-    return success();
-  }
-};
-
-} // namespace
-
-void ParameterLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {
-  results.insert<ElideUnusedOp<ParameterLoadOp>>(context);
-  results.insert<FoldParameterLoadTargetSubviews>(context);
-  results.insert<ElideImmediateTimepointWait<ParameterLoadOp>>(context);
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.read
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct FoldParameterReadTargetSubview
-    : public OpRewritePattern<ParameterReadOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(ParameterReadOp op,
-                                PatternRewriter &rewriter) const override {
-    auto ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPoint(op);
-    bool needsUpdate = false;
-    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
-    auto newTargetResource = op.getTarget();
-    auto newTargetSize = op.getTargetSize();
-    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
-    if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
-            newTargetResource.getDefiningOp())) {
-      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subviewOp.getLoc(), newSourceOffset,
-          rewriter.createOrFold<mlir::arith::IndexCastOp>(
-              subviewOp.getLoc(), rewriter.getI64Type(),
-              subviewOp.getSourceOffset()));
-      newTargetResource = subviewOp.getSource();
-      newTargetSize = subviewOp.getSourceSize();
-      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subviewOp.getLoc(), subviewOp.getSourceOffset(), newTargetOffset);
-      needsUpdate = true;
-    }
-    rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
-      return failure();
-    rewriter.modifyOpInPlace(op, [&]() {
-      op.getSourceOffsetMutable().assign(newSourceOffset);
-      op.getTargetMutable().assign(newTargetResource);
-      op.getTargetSizeMutable().assign(newTargetSize);
-      op.getTargetOffsetMutable().assign(newTargetOffset);
-    });
-    return success();
-  }
-};
-
-} // namespace
-
-void ParameterReadOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {
-  results.insert<ElideUnusedOp<ParameterReadOp>>(context);
-  results.insert<FoldParameterReadTargetSubview>(context);
-  results.insert<ElideImmediateTimepointWait<ParameterReadOp>>(context);
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.write
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct FoldParameterWriteSourceSubview
-    : public OpRewritePattern<ParameterWriteOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(ParameterWriteOp op,
-                                PatternRewriter &rewriter) const override {
-    auto ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPoint(op);
-    bool needsUpdate = false;
-    auto newSourceResource = op.getSource();
-    auto newSourceSize = op.getSourceSize();
-    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
-    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
-    if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
-            newSourceResource.getDefiningOp())) {
-      newSourceResource = subviewOp.getSource();
-      newSourceSize = subviewOp.getSourceSize();
-      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subviewOp.getLoc(), subviewOp.getSourceOffset(), newSourceOffset);
-      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subviewOp.getLoc(), newTargetOffset,
-          rewriter.createOrFold<mlir::arith::IndexCastOp>(
-              subviewOp.getLoc(), rewriter.getI64Type(),
-              subviewOp.getSourceOffset()));
-      needsUpdate = true;
-    }
-    rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
-      return failure();
-    rewriter.modifyOpInPlace(op, [&]() {
-      op.getSourceMutable().assign(newSourceResource);
-      op.getSourceSizeMutable().assign(newSourceSize);
-      op.getSourceOffsetMutable().assign(newSourceOffset);
-      op.getTargetOffsetMutable().assign(newTargetOffset);
-    });
-    return success();
-  }
-};
-
-} // namespace
-
-void ParameterWriteOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                   MLIRContext *context) {
-  results.insert<ElideUnusedOp<ParameterWriteOp>>(context);
-  results.insert<FoldParameterWriteSourceSubview>(context);
-  results.insert<ElideImmediateTimepointWait<ParameterWriteOp>>(context);
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.gather
-//===----------------------------------------------------------------------===//
-
-void ParameterGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                    MLIRContext *context) {
-  results.insert<ElideUnusedOp<ParameterGatherOp>>(context);
-  results.insert<ElideImmediateTimepointWait<ParameterGatherOp>>(context);
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.scatter
-//===----------------------------------------------------------------------===//
-
-void ParameterScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                     MLIRContext *context) {
-  results.insert<ElideUnusedOp<ParameterScatterOp>>(context);
-  results.insert<ElideImmediateTimepointWait<ParameterScatterOp>>(context);
-}
-
-//===----------------------------------------------------------------------===//
 // stream.file.read
 //===----------------------------------------------------------------------===//
 
@@ -3017,6 +2826,197 @@ void CmdSerialOp::getCanonicalizationPatterns(RewritePatternSet &results,
 void CmdConcurrentOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   results.insert<ElideEmptyCmdRegionOp<CmdConcurrentOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.load
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct FoldParameterLoadTargetSubviews
+    : public OpRewritePattern<CmdParameterLoadOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(CmdParameterLoadOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+
+    SmallVector<Value> newSourceOffsets;
+    SmallVector<Value> newResultSizes;
+    size_t resultCount = op.getResults().size();
+    newSourceOffsets.reserve(resultCount);
+    newResultSizes.reserve(resultCount);
+
+    for (auto [loadResult, newSourceOffset, newResultSize] : llvm::zip_equal(
+             op.getResults(), op.getSourceOffsets(), op.getResultSizes())) {
+      if (loadResult.hasOneUse()) {
+        Operation *user = *loadResult.getUsers().begin();
+        if (auto subviewOp = dyn_cast<IREE::Stream::ResourceSubviewOp>(user)) {
+          auto viewSourceOffset = subviewOp.getSourceOffset();
+          auto viewResultSize = subviewOp.getResultSize();
+          if (IREE::Util::tryMoveProducerBefore(viewSourceOffset, op) &&
+              IREE::Util::tryMoveProducerBefore(viewResultSize, op)) {
+            newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+                subviewOp.getLoc(), newSourceOffset,
+                rewriter.createOrFold<mlir::arith::IndexCastOp>(
+                    subviewOp.getLoc(), rewriter.getI64Type(),
+                    viewSourceOffset));
+            newResultSize = viewResultSize;
+            rewriter.replaceAllUsesWith(subviewOp.getResult(), loadResult);
+            needsUpdate = true;
+          }
+        }
+      }
+      newSourceOffsets.push_back(newSourceOffset);
+      newResultSizes.push_back(newResultSize);
+    }
+
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate)
+      return failure();
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceOffsetsMutable().assign(newSourceOffsets);
+      op.getResultSizesMutable().assign(newResultSizes);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void CmdParameterLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.insert<ElideUnusedOp<CmdParameterLoadOp>>(context);
+  results.insert<FoldParameterLoadTargetSubviews>(context);
+  results.insert<ElideImmediateTimepointWait<CmdParameterLoadOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.read
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct FoldParameterReadTargetSubview
+    : public OpRewritePattern<CmdParameterReadOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(CmdParameterReadOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
+    auto newTargetResource = op.getTarget();
+    auto newTargetSize = op.getTargetSize();
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
+    if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+            newTargetResource.getDefiningOp())) {
+      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), newSourceOffset,
+          rewriter.createOrFold<mlir::arith::IndexCastOp>(
+              subviewOp.getLoc(), rewriter.getI64Type(),
+              subviewOp.getSourceOffset()));
+      newTargetResource = subviewOp.getSource();
+      newTargetSize = subviewOp.getSourceSize();
+      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), subviewOp.getSourceOffset(), newTargetOffset);
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate)
+      return failure();
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+      op.getTargetMutable().assign(newTargetResource);
+      op.getTargetSizeMutable().assign(newTargetSize);
+      op.getTargetOffsetMutable().assign(newTargetOffset);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void CmdParameterReadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.insert<ElideUnusedOp<CmdParameterReadOp>>(context);
+  results.insert<FoldParameterReadTargetSubview>(context);
+  results.insert<ElideImmediateTimepointWait<CmdParameterReadOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.write
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct FoldParameterWriteSourceSubview
+    : public OpRewritePattern<CmdParameterWriteOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(CmdParameterWriteOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newSourceResource = op.getSource();
+    auto newSourceSize = op.getSourceSize();
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
+    if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+            newSourceResource.getDefiningOp())) {
+      newSourceResource = subviewOp.getSource();
+      newSourceSize = subviewOp.getSourceSize();
+      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), subviewOp.getSourceOffset(), newSourceOffset);
+      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), newTargetOffset,
+          rewriter.createOrFold<mlir::arith::IndexCastOp>(
+              subviewOp.getLoc(), rewriter.getI64Type(),
+              subviewOp.getSourceOffset()));
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate)
+      return failure();
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceMutable().assign(newSourceResource);
+      op.getSourceSizeMutable().assign(newSourceSize);
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+      op.getTargetOffsetMutable().assign(newTargetOffset);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void CmdParameterWriteOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ElideUnusedOp<CmdParameterWriteOp>>(context);
+  results.insert<FoldParameterWriteSourceSubview>(context);
+  results.insert<ElideImmediateTimepointWait<CmdParameterWriteOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.gather
+//===----------------------------------------------------------------------===//
+
+void CmdParameterGatherOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ElideUnusedOp<CmdParameterGatherOp>>(context);
+  results.insert<ElideImmediateTimepointWait<CmdParameterGatherOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.scatter
+//===----------------------------------------------------------------------===//
+
+void CmdParameterScatterOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ElideUnusedOp<CmdParameterScatterOp>>(context);
+  results.insert<ElideImmediateTimepointWait<CmdParameterScatterOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
