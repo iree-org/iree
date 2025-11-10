@@ -2485,6 +2485,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-util-attribute-call-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-util-attribute-call-graph
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-util-combine-initializers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-util-combine-initializers
@@ -4934,6 +4943,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-util-attribute-call-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-util-attribute-call-graph
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-util-combine-initializers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-util-combine-initializers
@@ -5249,6 +5267,14 @@
 <p><em>Annotates ops with globally unique IDs for debugging.</em></p>
 <h3 id="-iree-util-apply-patterns"><code>-iree-util-apply-patterns</code><a class="headerlink" href="#-iree-util-apply-patterns" title="Permanent link">link</a></h3>
 <p><em>Applies some risky/IREE-specific canonicalization patterns.</em></p>
+<h3 id="-iree-util-attribute-call-graph"><code>-iree-util-attribute-call-graph</code><a class="headerlink" href="#-iree-util-attribute-call-graph" title="Permanent link">link</a></h3>
+<p><em>Propagates attributes from callees to call sites.</em></p>
+<p>Walks all call operations and propagates relevant attributes from the
+called functions to the call sites. This includes:
+* Attributes implementing CallAnnotationAttrInterface
+* nosideeffects (for side-effect analysis)</p>
+<p>This allows subsequent passes to check attributes directly on call sites
+without expensive symbol table lookups during analysis.</p>
 <h3 id="-iree-util-combine-initializers"><code>-iree-util-combine-initializers</code><a class="headerlink" href="#-iree-util-combine-initializers" title="Permanent link">link</a></h3>
 <p><em>Combines global initializers into one.</em></p>
 <h3 id="-iree-util-drop-compiler-hints"><code>-iree-util-drop-compiler-hints</code><a class="headerlink" href="#-iree-util-drop-compiler-hints" title="Permanent link">link</a></h3>
