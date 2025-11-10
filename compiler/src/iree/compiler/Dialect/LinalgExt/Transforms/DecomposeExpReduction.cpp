@@ -146,8 +146,9 @@ struct DecomposeExpReduction : OpRewritePattern<ExpReductionOp> {
   LogicalResult matchAndRewrite(ExpReductionOp expReductionOp,
                                 PatternRewriter &rewriter) const override {
     auto decomposeResults = expReductionOp.decomposeOperation(rewriter);
-    if (failed(decomposeResults))
+    if (failed(decomposeResults)) {
       return failure();
+    }
     rewriter.replaceOp(expReductionOp,
                        decomposeResults->begin()->getDefiningOp());
     return success();
