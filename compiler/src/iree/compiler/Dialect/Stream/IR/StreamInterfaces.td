@@ -334,6 +334,115 @@ def Stream_TimelineOp : Stream_OpInterface<"TimelineOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Stream::TimelineAwareOpInterface
+//===----------------------------------------------------------------------===//
+
+def Stream_TimelineAwareOp : Stream_OpInterface<"TimelineAwareOpInterface"> {
+  let description = [{
+    Interface for operations that participate in asynchronous timelines but
+    may not directly implement TimelineOpInterface. This allows external ops
+    (like util.call with async semantics) to integrate with Stream scheduling.
+
+    The interface provides hooks to build timeline synchronization points that
+    adapt based on where they're invoked relative to the operation.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if this operation's timeline participation should be
+        considered during scheduling. Some ops may conditionally participate
+        based on their operands/attributes.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"participatesInTimeline",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns fence operands (or other async completion values) that this
+        operation will await before executing.
+
+        Example:
+        ```
+          %results = util.call @async_fn(%wait_fence) : (!hal.fence) -> ...
+                                         ^ returned
+        ```
+      }],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"getAwaitFences",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the fence (or other async completion value) that this operation
+        will signal when complete.
+        Returns null if the operation doesn't signal completion via a fence.
+
+        Example:
+        ```
+          %results = util.call @async_fn(%wait_fence, %signal_fence)
+                                                      ^ returned
+        ```
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getSignalFence",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Builds timepoints that must be awaited before this operation executes.
+        Returns empty if the operation doesn't need to wait on anything.
+
+        Example: for a util.call with async arguments this would build
+        stream.timepoint.import ops for inputs that need to be awaited.
+      }],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildAwaitTimepoints",
+      /*args=*/(ins "OpBuilder &":$builder),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Builds a timepoint representing completion of this operation.
+        The builder's insertion point determines the behavior:
+
+        - If called BEFORE the op: must return a timepoint that will be
+          signaled when the op completes. May insert export/join/barrier
+          operations to maintain SSA dominance.
+
+        - If called AFTER the op: can directly build imports from results
+          or return result timepoints if the op produces them.
+
+        Returns null if the operation doesn't participate in timeline signaling.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"buildResultTimepoint",
+      /*args=*/(ins "OpBuilder &":$builder),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Stream::AffinityTopologyAttrInterface
 //===----------------------------------------------------------------------===//
 
