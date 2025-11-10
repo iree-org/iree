@@ -253,11 +253,9 @@ bool ireeCodegenHasIGEMMGenericConvDetails(MlirOperation op) {
     return false;
   }
 
-  llvm::FailureOr<mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails>
-      maybeDetails =
-          mlir::iree_compiler::IREE::LinalgExt::getIGEMMGenericConvDetails(
-              linalgOp);
-  return succeeded(maybeDetails);
+  return succeeded(
+      mlir::iree_compiler::IREE::LinalgExt::getIGEMMGenericConvDetails(
+          linalgOp));
 }
 
 ireeCodegenIGEMMGenericConvDetails
@@ -270,7 +268,7 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
               linalgOp);
   assert(succeeded(maybeDetails) &&
          "Failed to get IGEMM details; must check with "
-         "ireeCodegenCanGetIGEMMGenericConvDetails first");
+         "ireeCodegenHasIGEMMGenericConvDetails first");
 
   const mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails &details =
       *maybeDetails;
@@ -278,9 +276,8 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
   mlir::Builder builder(linalgOp.getContext());
 
   // Helper to convert unsigned to int64_t.
-  auto toInt64 = [](const llvm::SmallVector<unsigned, 2> &vec) {
-    return llvm::map_to_vector(
-        vec, [](unsigned val) { return static_cast<int64_t>(val); });
+  auto toInt64 = [](llvm::ArrayRef<unsigned> vec) {
+    return llvm::map_to_vector(vec, llvm::StaticCastTo<int64_t>);
   };
 
   ireeCodegenIGEMMGenericConvDetails result;
