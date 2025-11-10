@@ -31,6 +31,21 @@ func.func @bufferize_coalesced_gather_dma_with_indices(%idx0: vector<4xi32>,
 
 // -----
 
+// Test bufferization with tensor indices
+func.func @bufferize_coalesced_gather_dma_tensor_indices(%idx0: tensor<4xi32>,
+                                                          %source: tensor<4x64xf32>,
+                                                          %dest: tensor<4x64xf32>,
+                                                          %lane: index) -> tensor<4x64xf32> {
+  %result = iree_gpu.coalesced_gather_dma %source[%idx0] into %dest lane(%lane)
+    : tensor<4x64xf32>, tensor<4xi32>, tensor<4x64xf32>, index -> tensor<4x64xf32>
+  return %result : tensor<4x64xf32>
+}
+
+// CHECK-LABEL: func @bufferize_coalesced_gather_dma_tensor_indices
+//       CHECK:   iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : memref<4x64xf32{{.+}}>, memref<4xi32{{.+}}>, memref<4x64xf32{{.+}}>, index
+
+// -----
+
 // Test bufferization with 1D tensors
 func.func @bufferize_coalesced_gather_dma_1d(%source: tensor<1024xf32>,
                                               %dest: tensor<1024xf32>,

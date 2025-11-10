@@ -856,7 +856,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       {"mma_kind", kind}};
 
   // Use global load DMA attribute (subgroup sizes will be derived from
-  // translation_info)
+  // translation_info).
   Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
   SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
   SmallVector<int64_t> promotionList = {0, 1};

@@ -344,11 +344,26 @@ struct CoalescedGatherDMAOpBufferizationInterface
       return failure();
     }
 
+    // Bufferize tensor indices to memrefs, keep vector indices as-is.
+    SmallVector<Value> bufferizedIndices;
+    for (Value index : gatherOp.getIndices()) {
+      if (isa<TensorType>(index.getType())) {
+        FailureOr<Value> indexBuffer =
+            getBuffer(rewriter, index, options, state);
+        if (failed(indexBuffer)) {
+          return failure();
+        }
+        bufferizedIndices.push_back(*indexBuffer);
+      } else {
+        bufferizedIndices.push_back(index);
+      }
+    }
+
     rewriter.setInsertionPoint(gatherOp);
 
     IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
-        gatherOp.getIndices(), *initBuffer, gatherOp.getLane());
+        bufferizedIndices, *initBuffer, gatherOp.getLane());
 
     replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
 
