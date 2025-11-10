@@ -635,7 +635,7 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536,
-            workgroup_count=304.0,  # should be int.
+            workgroup_count=304.0,  # Should be int.
             simds_per_workgroup=4,
             mma_intrinsics=[],
         )
