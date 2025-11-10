@@ -1,6 +1,7 @@
-// RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory),cse,canonicalize)" %s --split-input-file | FileCheck %s
+// RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory),cse,canonicalize)" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
+// RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory{num-stages=1}))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK-1STAGE
 
-// CHECK-LABEL: @prefetch_add
+// CHECK-ALL-LABEL: @prefetch_add
 // CHECK-SAME: (%[[GLOBAL:.*]]: memref<128xf32>)
 func.func @prefetch_add(%arg0: memref<128xf32>) {
   // CHECK-DAG: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
@@ -17,6 +18,7 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
+  // CHECK-1STAGE: scf.for %{{.*}} = %c0 to %c128 step %c1
   %0 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst) -> (vector<1xf32>) {
     // CHECK-DAG: %[[IVPLUS1:.*]] = arith.addi %[[IV]], %[[C1]] : index
     // CHECK: %[[KER_READ:.*]] = vector.transfer_read %[[GLOBAL]][%[[IVPLUS1]]]
@@ -43,7 +45,7 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
 
 // -----
 
-// CHECK-LABEL: @prefetch_multi_scf_return
+// CHECK-ALL-LABEL: @prefetch_multi_scf_return
 // CHECK-SAME: (%[[GLOBAL:.*]]: memref<128xf32>)
 func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, vector<1xf32>) {
   // CHECK-DAG: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
@@ -88,7 +90,7 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
 
 // -----
 
-// CHECK-LABEL: @prefetch_add_with_if
+// CHECK-ALL-LABEL: @prefetch_add_with_if
 // CHECK-SAME: (%[[GLOBAL:.*]]: memref<128xf32>)
 func.func @prefetch_add_with_if(%arg0: memref<128xf32>) {
   // CHECK-DAG: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
@@ -144,7 +146,7 @@ func.func @prefetch_add_with_if(%arg0: memref<128xf32>) {
 
 // -----
 
-// CHECK-LABEL: @noprefetch_copyback
+// CHECK-ALL-LABEL: @noprefetch_copyback
 func.func @noprefetch_copyback(%arg0: memref<128xf32>, %arg1: memref<128xf32>) {
   %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -161,7 +163,7 @@ func.func @noprefetch_copyback(%arg0: memref<128xf32>, %arg1: memref<128xf32>) {
 
 // -----
 
-// CHECK-LABEL: @prefetch_scf_if
+// CHECK-ALL-LABEL: @prefetch_scf_if
 func.func @prefetch_scf_if(%arg0: memref<128xf32>, %cond : i1) {
   %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -229,7 +231,7 @@ func.func @prefetch_scf_if(%arg0: memref<128xf32>, %cond : i1) {
 
 // -----
 
-// CHECK-LABEL: @noprefetch_scf_if_readwritetogether
+// CHECK-ALL-LABEL: @noprefetch_scf_if_readwritetogether
 func.func @noprefetch_scf_if_readwritetogether(%arg0: memref<128xf32>, %cond : i1) {
   %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -255,7 +257,7 @@ func.func @noprefetch_scf_if_readwritetogether(%arg0: memref<128xf32>, %cond : i
 
 // -----
 
-// CHECK-LABEL: @noprefetch_unsupportedif
+// CHECK-ALL-LABEL: @noprefetch_unsupportedif
 func.func @noprefetch_unsupportedif(%arg0: memref<128xf32>, %cond: i1) {
   %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -282,7 +284,7 @@ func.func @noprefetch_unsupportedif(%arg0: memref<128xf32>, %cond: i1) {
 
 // -----
 
-// CHECK-LABEL: @prefetch_scf_if_transientreadwrite
+// CHECK-ALL-LABEL: @prefetch_scf_if_transientreadwrite
 func.func @prefetch_scf_if_transientreadwrite(%arg0: memref<128xf32>, %cond : i1) {
   %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
   %cst_0 = arith.constant 0.000000e+00 : f32
