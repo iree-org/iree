@@ -21,3 +21,27 @@ util.func public @tensorBitCastCastProducer(%arg0: tensor<10x3x6xi8>, %arg1: ind
   util.return %1 : tensor<?x?x3xi16>
   // CHECK-NEXT: util.return %[[CAST]]
 }
+
+// -----
+
+// CHECK-LABEL: @barrierStartFoldDuplicate
+util.func public @barrierStartFoldDuplicate(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+  // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]
+  %0 = iree_tensor_ext.compute_barrier.start %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: %[[BARRIER:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %1 = iree_tensor_ext.compute_barrier.start %0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: util.return %[[BARRIER]]
+  util.return %1 : tensor<4x8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @barrierEndFoldDuplicate
+util.func public @barrierEndFoldDuplicate(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+  // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]
+  %0 = iree_tensor_ext.compute_barrier.end %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: %[[BARRIER:.+]] = iree_tensor_ext.compute_barrier.end %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %1 = iree_tensor_ext.compute_barrier.end %0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: util.return %[[BARRIER]]
+  util.return %1 : tensor<4x8xf32>
+}

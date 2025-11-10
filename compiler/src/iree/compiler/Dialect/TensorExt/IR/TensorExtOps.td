@@ -483,6 +483,7 @@ def IREETensorExt_ComputeBarrierStartOp : IREETensorExt_PureOp<"compute_barrier.
     ValueRange getResultDynamicDims(unsigned idx) { return getValueDims(); }
   }];
 
+  let hasFolder = 1;
   let hasVerifier = 1;
 }
 
@@ -522,6 +523,7 @@ def IREETensorExt_ComputeBarrierEndOp : IREETensorExt_PureOp<"compute_barrier.en
     ValueRange getResultDynamicDims(unsigned idx) { return getValueDims(); }
   }];
 
+  let hasFolder = 1;
   let hasVerifier = 1;
 }
 
