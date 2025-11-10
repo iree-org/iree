@@ -1094,14 +1094,14 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   auto expRedGeneric = linalg::GenericOp::create(
       rewriter, loc, TypeRange(normOuts), inputs, normOuts,
       getIndexingMapsArray(), getLoopIteratorTypes());
-  rewriter.inlineRegionBefore(getRegion(), expRedGeneric.getRegion(),
-                              expRedGeneric.getRegion().begin());
+  expRedGeneric->setDiscardableAttrs(
+      getOperation()->getDiscardableAttrDictionary());
+  rewriter.cloneRegionBefore(getRegion(), expRedGeneric.getRegion(),
+                             expRedGeneric.getRegion().begin());
   rewriter.setInsertionPointAfter(expRedGeneric.getBody()->getTerminator());
   auto yieldOp =
       cast<IREE::LinalgExt::YieldOp>(expRedGeneric.getBody()->getTerminator());
   rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp, yieldOp.getOperands());
-  expRedGeneric->setDiscardableAttrs(
-      getOperation()->getDiscardableAttrDictionary());
   return SmallVector<Value>(expRedGeneric->getResults());
 }
 
