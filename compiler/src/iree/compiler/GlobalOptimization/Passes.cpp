@@ -167,7 +167,6 @@ void buildGlobalOptimizationPassPipeline(
                          createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
-      .addPass(DispatchCreation::createFoldReshapesIntoTensorBarriersPass)
       // Propagate transposes immediately before set encoding/data tiling
       // because transpose propagation cannot take an opinion on the preferred
       // layout of various operations. This simplifies local propagation

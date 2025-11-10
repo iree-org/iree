@@ -99,21 +99,6 @@ def ElementwiseOpFusionPass :
   ];
 }
 
-def FoldReshapesIntoTensorBarriersPass :
-    InterfacePass<"iree-dispatch-creation-fold-reshapes-into-tensor-barriers",
-                  "mlir::FunctionOpInterface"> {
-  let summary = "Fold reshape operations into tensor barriers.";
-  let description = [{
-    Moves tensor.expand_shape and tensor.collapse_shape operations through
-    iree_tensor_ext.barrier.start and iree_tensor_ext.barrier.end operations.
-    This blocks reshapes on the edge of the program from being propagated.
-  }];
-  let dependentDialects = [
-    "IREE::TensorExt::IREETensorExtDialect",
-    "mlir::tensor::TensorDialect",
-  ];
-}
-
 def FoldUnitExtentDimsPass :
     Pass<"iree-dispatch-creation-fold-unit-extent-dims", "mlir::ModuleOp"> {
   let summary = "Fold unit extent dimension of operations.";

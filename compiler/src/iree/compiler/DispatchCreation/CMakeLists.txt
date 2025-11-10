@@ -26,7 +26,6 @@ iree_cc_library(
     "ConvertEncodingToFlow.cpp"
     "ConvertTensorToFlow.cpp"
     "ElementwiseOpFusion.cpp"
-    "FoldReshapesIntoTensorBarriers.cpp"
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormScalarDispatches.cpp"
