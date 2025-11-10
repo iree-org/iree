@@ -938,12 +938,118 @@ static void printParameterLoadOperations(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<ParameterGatherOperations>(
+// custom<AsyncParameterGatherOperations>(
+//     $source_scope, $source_keys, $source_offsets,
+//     $target, type($target), $target_size, $target_offsets, $target_ends,
+//     $target_lengths)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseAsyncParameterGatherOperations(
+    OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
+    OpAsmParser::UnresolvedOperand &target, Type &targetType,
+    OpAsmParser::UnresolvedOperand &targetSize,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetEnds,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetLengths) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> sourceKeyAttrs;
+  do {
+    StringAttr rowSourceScopeAttr;
+    StringAttr sourceKeyAttr;
+    OpAsmParser::UnresolvedOperand sourceOffset;
+    OpAsmParser::UnresolvedOperand targetOffset;
+    OpAsmParser::UnresolvedOperand targetEnd;
+    OpAsmParser::UnresolvedOperand targetLength;
+    OpAsmParser::UnresolvedOperand rowTarget;
+    Type rowTargetType;
+    OpAsmParser::UnresolvedOperand rowTargetSize;
+    if (failed(parseParameterReference(parser, rowSourceScopeAttr,
+                                       sourceKeyAttr)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(sourceOffset)) ||
+        failed(parser.parseRSquare()) || failed(parser.parseArrow()) ||
+        failed(parser.parseOperand(rowTarget)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(targetOffset)) ||
+        failed(parser.parseKeyword("to")) ||
+        failed(parser.parseOperand(targetEnd)) ||
+        failed(parser.parseKeyword("for")) ||
+        failed(parser.parseOperand(targetLength)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.parseColonType(rowTargetType)) ||
+        failed(parser.parseLBrace()) ||
+        failed(parser.parseOperand(rowTargetSize)) ||
+        failed(parser.parseRBrace())) {
+      return failure();
+    }
+    if (!targetType) {
+      sourceScopeAttr = rowSourceScopeAttr;
+      target = rowTarget;
+      targetType = rowTargetType;
+      targetSize = rowTargetSize;
+    } else if (rowSourceScopeAttr != sourceScopeAttr ||
+               rowTarget.name != target.name || rowTargetType != targetType ||
+               rowTargetSize.name != targetSize.name) {
+      return parser.emitError(
+          parser.getCurrentLocation(),
+          "each operation must use the same scope and target resource");
+    }
+    sourceKeyAttrs.push_back(sourceKeyAttr);
+    sourceOffsets.push_back(sourceOffset);
+    targetOffsets.push_back(targetOffset);
+    targetEnds.push_back(targetEnd);
+    targetLengths.push_back(targetLength);
+  } while (succeeded(parser.parseOptionalComma()));
+  sourceKeysAttr = builder.getArrayAttr(sourceKeyAttrs);
+  return success();
+}
+
+static void printAsyncParameterGatherOperations(
+    OpAsmPrinter &p, Operation *op, StringAttr sourceScopeAttr,
+    ArrayAttr sourceKeysAttr, ValueRange sourceOffsets, Value target,
+    Type targetType, Value targetSize, ValueRange targetOffsets,
+    ValueRange targetEnds, ValueRange targetLengths) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(sourceKeysAttr.getAsRange<StringAttr>(), sourceOffsets,
+                      targetOffsets, targetEnds, targetLengths),
+      [&](std::tuple<StringAttr, Value, Value, Value, Value> it) {
+        auto [sourceKeyAttr, sourceOffset, targetOffset, targetEnd,
+              targetLength] = it;
+        printParameterReference(p, op, sourceScopeAttr, sourceKeyAttr);
+        p << "[";
+        p.printOperand(sourceOffset);
+        p << "] -> ";
+        p.printOperand(target);
+        p << "[";
+        p.printOperand(targetOffset);
+        p << " to ";
+        p.printOperand(targetEnd);
+        p << " for ";
+        p.printOperand(targetLength);
+        p << "] : ";
+        p.printType(targetType);
+        p << "{";
+        p.printOperand(targetSize);
+        p << "}";
+      },
+      [&]() {
+        p << ',';
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<CmdParameterGatherOperations>(
 //     $source_scope, $source_keys, $source_offsets,
 //     $target, type($target), $target_size, $target_offsets, $target_lengths)
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseParameterGatherOperations(
+static ParseResult parseCmdParameterGatherOperations(
     OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
     OpAsmParser::UnresolvedOperand &target, Type &targetType,
@@ -999,7 +1105,7 @@ static ParseResult parseParameterGatherOperations(
   return success();
 }
 
-static void printParameterGatherOperations(
+static void printCmdParameterGatherOperations(
     OpAsmPrinter &p, Operation *op, StringAttr sourceScopeAttr,
     ArrayAttr sourceKeysAttr, ValueRange sourceOffsets, Value target,
     Type targetType, Value targetSize, ValueRange targetOffsets,
@@ -1035,12 +1141,117 @@ static void printParameterGatherOperations(
 }
 
 //===----------------------------------------------------------------------===//
-// custom<ParameterScatterOperations>(
+// custom<AsyncParameterScatterOperations>(
+//     $source, type($source), $source_size, $source_offsets, $source_ends,
+//     $source_lengths, $target_scope, $target_keys, $target_offsets)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseAsyncParameterScatterOperations(
+    OpAsmParser &parser, OpAsmParser::UnresolvedOperand &source,
+    Type &sourceType, OpAsmParser::UnresolvedOperand &sourceSize,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceEnds,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceLengths,
+    StringAttr &targetScopeAttr, ArrayAttr &targetKeysAttr,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetOffsets) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> targetKeyAttrs;
+  do {
+    OpAsmParser::UnresolvedOperand rowSource;
+    Type rowSourceType;
+    OpAsmParser::UnresolvedOperand rowSourceSize;
+    OpAsmParser::UnresolvedOperand sourceOffset;
+    OpAsmParser::UnresolvedOperand sourceEnd;
+    OpAsmParser::UnresolvedOperand sourceLength;
+    StringAttr rowTargetScopeAttr;
+    StringAttr targetKeyAttr;
+    OpAsmParser::UnresolvedOperand targetOffset;
+    if (failed(parser.parseOperand(rowSource)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(sourceOffset)) ||
+        failed(parser.parseKeyword("to")) ||
+        failed(parser.parseOperand(sourceEnd)) ||
+        failed(parser.parseKeyword("for")) ||
+        failed(parser.parseOperand(sourceLength)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.parseColonType(rowSourceType)) ||
+        failed(parser.parseLBrace()) ||
+        failed(parser.parseOperand(rowSourceSize)) ||
+        failed(parser.parseRBrace()) || failed(parser.parseArrow()) ||
+        failed(parseParameterReference(parser, rowTargetScopeAttr,
+                                       targetKeyAttr)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(targetOffset)) ||
+        failed(parser.parseRSquare())) {
+      return failure();
+    }
+    if (!sourceType) {
+      source = rowSource;
+      sourceType = rowSourceType;
+      sourceSize = rowSourceSize;
+      targetScopeAttr = rowTargetScopeAttr;
+    } else if (rowSource.name != source.name || rowSourceType != sourceType ||
+               rowSourceSize.name != sourceSize.name ||
+               rowTargetScopeAttr != targetScopeAttr) {
+      return parser.emitError(
+          parser.getCurrentLocation(),
+          "each operation must use the same source resource and scope");
+    }
+    sourceOffsets.push_back(sourceOffset);
+    sourceEnds.push_back(sourceEnd);
+    sourceLengths.push_back(sourceLength);
+    targetKeyAttrs.push_back(targetKeyAttr);
+    targetOffsets.push_back(targetOffset);
+  } while (succeeded(parser.parseOptionalComma()));
+  targetKeysAttr = builder.getArrayAttr(targetKeyAttrs);
+  return success();
+}
+
+static void printAsyncParameterScatterOperations(
+    OpAsmPrinter &p, Operation *op, Value source, Type sourceType,
+    Value sourceSize, ValueRange sourceOffsets, ValueRange sourceEnds,
+    ValueRange sourceLengths, StringAttr targetScopeAttr,
+    ArrayAttr targetKeysAttr, ValueRange targetOffsets) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(sourceOffsets, sourceEnds, sourceLengths,
+                      targetKeysAttr.getAsRange<StringAttr>(), targetOffsets),
+      [&](std::tuple<Value, Value, Value, StringAttr, Value> it) {
+        auto [sourceOffset, sourceEnd, sourceLength, targetKeyAttr,
+              targetOffset] = it;
+        p.printOperand(source);
+        p << "[";
+        p.printOperand(sourceOffset);
+        p << " to ";
+        p.printOperand(sourceEnd);
+        p << " for ";
+        p.printOperand(sourceLength);
+        p << "] : ";
+        p.printType(sourceType);
+        p << "{";
+        p.printOperand(sourceSize);
+        p << "} -> ";
+        printParameterReference(p, op, targetScopeAttr, targetKeyAttr);
+        p << "[";
+        p.printOperand(targetOffset);
+        p << "]";
+      },
+      [&]() {
+        p << ',';
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<CmdParameterScatterOperations>(
 //     $source, type($source), $source_size, $source_offsets, $source_lengths,
 //     $target_scope, $target_keys, $target_offsets)
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseParameterScatterOperations(
+static ParseResult parseCmdParameterScatterOperations(
     OpAsmParser &parser, OpAsmParser::UnresolvedOperand &source,
     Type &sourceType, OpAsmParser::UnresolvedOperand &sourceSize,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
@@ -1096,7 +1307,7 @@ static ParseResult parseParameterScatterOperations(
   return success();
 }
 
-static void printParameterScatterOperations(
+static void printCmdParameterScatterOperations(
     OpAsmPrinter &p, Operation *op, Value source, Type sourceType,
     Value sourceSize, ValueRange sourceOffsets, ValueRange sourceLengths,
     StringAttr targetScopeAttr, ArrayAttr targetKeysAttr,
@@ -2326,6 +2537,18 @@ void AsyncConstantOp::getAsyncAccessRanges(
 // stream.async.splat
 //===----------------------------------------------------------------------===//
 
+void AsyncSplatOp::build(OpBuilder &builder, OperationState &state,
+                         Type result_type, Value value, Value result_size,
+                         Attribute affinity, Value await_timepoint) {
+  state.addTypes(result_type);
+  if (await_timepoint)
+    state.addOperands(await_timepoint);
+  state.addOperands(value);
+  state.addOperands(result_size);
+  if (affinity)
+    state.addAttribute("affinity", affinity);
+}
+
 LogicalResult AsyncSplatOp::verify() {
   AsyncSplatOp op = *this;
   if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
@@ -3369,6 +3592,228 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
     eraseIndices.set(i);
   block.eraseArguments(eraseIndices);
   return newOp;
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterLoadOp::verify() {
+  AsyncParameterLoadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+void AsyncParameterLoadOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getResultSize(), getResultSize()});
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.read
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterReadOp::verify() {
+  AsyncParameterReadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncParameterReadOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::std::optional<unsigned>
+AsyncParameterReadOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0)
+    return {0};        // result tied to target
+  return std::nullopt; // result_timepoint not tied
+}
+
+SmallVector<int64_t> AsyncParameterReadOp::getTiedResultOperandIndices() {
+  return {
+      0,
+      IREE::Util::TiedOpInterface::kUntiedIndex}; // result tied to target,
+                                                  // result_timepoint not tied
+}
+
+void AsyncParameterReadOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Write, getTarget(),
+                    getTargetOffset(), getTargetEnd(), getTargetLength()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(),
+                    getTargetOffset(), getTargetEnd(), getTargetLength()});
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.write
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterWriteOp::verify() {
+  AsyncParameterWriteOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncParameterWriteOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+AsyncParameterWriteOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0)
+    return {0};        // result tied to source
+  return std::nullopt; // result_timepoint not tied
+}
+
+SmallVector<int64_t> AsyncParameterWriteOp::getTiedResultOperandIndices() {
+  return {
+      0,
+      IREE::Util::TiedOpInterface::kUntiedIndex}; // result tied to source,
+                                                  // result_timepoint not tied
+}
+
+void AsyncParameterWriteOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Read, getSource(),
+                    getSourceOffset(), getSourceEnd(), getSourceLength()});
+  ranges.push_back({ResourceAccessBitfield::Read, getResult(),
+                    getSourceOffset(), getSourceEnd(), getSourceLength()});
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.gather
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterGatherOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, OpaqueProperties properties, RegionRange regions,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+  // The result type matches the target operand type.
+  AsyncParameterGatherOpAdaptor adaptor(operands, attributes, properties,
+                                        regions);
+  inferredReturnTypes.push_back(adaptor.getTarget().getType());
+  inferredReturnTypes.push_back(IREE::Stream::TimepointType::get(context));
+  return success();
+}
+
+LogicalResult AsyncParameterGatherOp::verify() {
+  AsyncParameterGatherOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount ||
+      op.getTargetEnds().size() != expectedCount ||
+      op.getTargetLengths().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source keys, source offsets, target offsets, "
+              "target ends, and lengths are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncParameterGatherOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::std::optional<unsigned>
+AsyncParameterGatherOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0)
+    return {
+        getSourceOffsets()
+            .size()};  // result tied to target (after variadic source_offsets)
+  return std::nullopt; // result_timepoint not tied
+}
+
+SmallVector<int64_t> AsyncParameterGatherOp::getTiedResultOperandIndices() {
+  return {
+      static_cast<int64_t>(getSourceOffsets().size()),
+      IREE::Util::TiedOpInterface::kUntiedIndex}; // result tied to target,
+                                                  // result_timepoint not tied
+}
+
+void AsyncParameterGatherOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  // Gather writes to the entire target resource across all gather operations.
+  // We conservatively mark the entire target as written. We could return
+  // the exact ranges (adding more) but I don't currently know the performance
+  // implications of that (this may be part of an n^2 algorithm).
+  ranges.push_back({ResourceAccessBitfield::Write, getTarget(), Value{},
+                    getTargetSize(), getTargetSize()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getTargetSize(), getTargetSize()});
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.scatter
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterScatterOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, OpaqueProperties properties, RegionRange regions,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+  // The result type matches the source operand type.
+  AsyncParameterScatterOpAdaptor adaptor(operands, attributes, properties,
+                                         regions);
+  inferredReturnTypes.push_back(adaptor.getSource().getType());
+  inferredReturnTypes.push_back(IREE::Stream::TimepointType::get(context));
+  return success();
+}
+
+LogicalResult AsyncParameterScatterOp::verify() {
+  AsyncParameterScatterOp op = *this;
+  size_t expectedCount = op.getTargetKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getSourceEnds().size() != expectedCount ||
+      op.getSourceLengths().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source offsets, source ends, lengths, "
+              "target keys, and target offsets are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncParameterScatterOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+AsyncParameterScatterOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0)
+    return {0};        // result tied to source
+  return std::nullopt; // result_timepoint not tied
+}
+
+SmallVector<int64_t> AsyncParameterScatterOp::getTiedResultOperandIndices() {
+  return {
+      0,
+      IREE::Util::TiedOpInterface::kUntiedIndex}; // result tied to source,
+                                                  // result_timepoint not tied
+}
+
+void AsyncParameterScatterOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  // Scatter reads from the entire source resource across all scatter
+  // operations. We conservatively mark the entire source as read. We could
+  // return the exact ranges (adding more) but I don't currently know the
+  // performance implications of that (this may be part of an n^2 algorithm).
+  ranges.push_back({ResourceAccessBitfield::Read, getSource(), Value{},
+                    getSourceSize(), getSourceSize()});
+  ranges.push_back({ResourceAccessBitfield::Read, getResult(), Value{},
+                    getSourceSize(), getSourceSize()});
 }
 
 //===----------------------------------------------------------------------===//
