@@ -1862,6 +1862,24 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_tensor_extbarrierend-tensorextbarrierendop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.barrier.end (TensorExt::BarrierEndOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_tensor_extbarrierstart-tensorextbarrierstartop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.barrier.start (TensorExt::BarrierStartOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_tensor_extbitcast-tensorextbitcastop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_tensor_ext.bitcast (TensorExt::BitCastOp)
@@ -4749,6 +4767,24 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_tensor_extbarrierend-tensorextbarrierendop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.barrier.end (TensorExt::BarrierEndOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_tensor_extbarrierstart-tensorextbarrierstartop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.barrier.start (TensorExt::BarrierStartOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_tensor_extbitcast-tensorextbitcastop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_tensor_ext.bitcast (TensorExt::BitCastOp)
@@ -4891,6 +4927,8 @@ beyond what is currently available in the Tensor Dialect.</p>
 <ul>
 <li><a href="#iree_tensor_ext-dialect">'iree_tensor_ext' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
+<li><a href="#iree_tensor_extbarrierend-tensorextbarrierendop">iree_tensor_ext.barrier.end (TensorExt::BarrierEndOp)</a></li>
+<li><a href="#iree_tensor_extbarrierstart-tensorextbarrierstartop">iree_tensor_ext.barrier.start (TensorExt::BarrierStartOp)</a></li>
 <li><a href="#iree_tensor_extbitcast-tensorextbitcastop">iree_tensor_ext.bitcast (TensorExt::BitCastOp)</a></li>
 <li><a href="#iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop">iree_tensor_ext.dispatch.tensor.load (TensorExt::DispatchTensorLoadOp)</a></li>
 <li><a href="#iree_tensor_extdispatchtensorstore-tensorextdispatchtensorstoreop">iree_tensor_ext.dispatch.tensor.store (TensorExt::DispatchTensorStoreOp)</a></li>
@@ -4911,6 +4949,100 @@ beyond what is currently available in the Tensor Dialect.</p>
 </ul>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
+<h3 id="iree_tensor_extbarrierend-tensorextbarrierendop"><code>iree_tensor_ext.barrier.end</code> (TensorExt::BarrierEndOp)<a class="headerlink" href="#iree_tensor_extbarrierend-tensorextbarrierendop" title="Permanent link">link</a></h3>
+<p><em>Tensor barrier end operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.barrier.end` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
+              type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>This barrier prevents certain transformations (like reshape propagation)
+from moving operations up across this boundary.
+The operand is returned as the result with identical type.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>value</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>value_dims</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="iree_tensor_extbarrierstart-tensorextbarrierstartop"><code>iree_tensor_ext.barrier.start</code> (TensorExt::BarrierStartOp)<a class="headerlink" href="#iree_tensor_extbarrierstart-tensorextbarrierstartop" title="Permanent link">link</a></h3>
+<p><em>Tensor barrier start operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.barrier.start` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
+              type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>This barrier prevents certain transformations (like reshape propagation)
+from moving operations down across this boundary.
+The operand is returned as the result with identical type.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>value</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>value_dims</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_tensor_extbitcast-tensorextbitcastop"><code>iree_tensor_ext.bitcast</code> (TensorExt::BitCastOp)<a class="headerlink" href="#iree_tensor_extbitcast-tensorextbitcastop" title="Permanent link">link</a></h3>
 <p><em>Bitcasts a tensor without modifying the contents.</em></p>
 <p>Syntax:</p>
@@ -4933,7 +5065,7 @@ translation such as bufferization.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4956,7 +5088,7 @@ translation such as bufferization.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4997,7 +5129,7 @@ results of regions that may overlap.</p>
 <tr><td><code>static_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5028,7 +5160,7 @@ results of regions that may overlap.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5068,7 +5200,7 @@ workgroup stores into overlapping regions of the full output tensor.</p>
 <tr><td><code>static_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5119,7 +5251,7 @@ and distribute the root of the DAG).</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5134,7 +5266,7 @@ and distribute the root of the DAG).</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5178,7 +5310,7 @@ workload could be more than just values of index types.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5193,7 +5325,7 @@ workload could be more than just values of index types.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5231,7 +5363,7 @@ workgroups required to run the computation after accounting for the
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5258,7 +5390,7 @@ workgroups required to run the computation after accounting for the
 </tr>
 </tbody>
 </table>
-<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5306,7 +5438,7 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
-<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
+<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5321,7 +5453,7 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
+<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
