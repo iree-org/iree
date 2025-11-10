@@ -84,6 +84,32 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     return success();
   }
 
+  SmallVector<int64_t> loopRanges = op.getStaticLoopRanges();
+  for (auto [iterDim, factor] : expansionInfo) {
+    if (factor < 1) {
+      return op.emitError("invalid expansion factor ") << factor;
+    }
+
+    if (iterDim >= loopRanges.size()) {
+      return op.emitOpError("expand_dims dimension ")
+             << iterDim << " out of bounds";
+    }
+
+    // TODO: Support expansion of dynamic/unaligned shapes.
+    int64_t dimSize = loopRanges[iterDim];
+    if (ShapedType::isDynamic(dimSize)) {
+      return op.emitOpError("dimension ")
+             << iterDim
+             << " is dynamic, but expand_dims requires static dimensions";
+    }
+
+    if (dimSize % factor != 0) {
+      return op.emitOpError("dimension ")
+             << iterDim << " (size=" << dimSize
+             << ") not divisible by expansion factor " << factor;
+    }
+  }
+
   LLVM_DEBUG({
     llvm::dbgs() << "Expanding dimensions for op:\n";
     op->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
