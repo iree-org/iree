@@ -670,6 +670,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
     Value getOperandSize(unsigned idx) { return {}; }
     Value getResultSize(unsigned idx) { return getResultSizes()[idx]; }
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 }
 
@@ -3863,6 +3864,7 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
 
   let extraClassDeclaration = [{
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 
   let hasFolder = 1;
@@ -3956,7 +3958,10 @@ def Stream_TimepointChainExternalOp :
 }
 
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
-  Stream_TimelineOp,
+  DeclareOpInterfaceMethods<Stream_TimelineOp, [
+    "setAwaitTimepoint",
+    "setAwaitTimepoints",
+  ]>,
 ]> {
   let summary = [{Joins one or more timepoints into the max of all of them.}];
   let description = [{
@@ -4039,6 +4044,7 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
     Value getOperandSize(unsigned idx) { return getResourceSize(); }
     Value getResultSize(unsigned idx) { return getResourceSize(); }
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 
   let hasVerifier = 1;
@@ -4048,7 +4054,11 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
 
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
-  Stream_TimelineOp,
+  DeclareOpInterfaceMethods<Stream_TimelineOp, [
+    "getAwaitTimepoints",
+    "setAwaitTimepoint",
+    "getResultTimepoint",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResultOperandIndex",
@@ -4105,10 +4115,6 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
     Value getResultSize(unsigned idx) {
       return getResourceOperandSizes()[idx];
     }
-    SmallVector<Value> getAwaitTimepoints() {
-      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
-    }
-    Value getResultTimepoint() { return {}; }
   }];
 
   let hasVerifier = 1;
@@ -4587,5 +4593,67 @@ def Stream_YieldOp : Stream_Op<"yield", [
 }
 
 } // OpGroupMiscellaneousOps
+
+//===----------------------------------------------------------------------===//
+// Test ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupTestOps : OpDocGroup {
+  let summary = "Test-only ops for Stream dialect testing";
+  let description = "Ops used only in unit tests.";
+}
+
+let opDocGroup = OpGroupTestOps in {
+
+def Stream_TestTimelineAwareOp : Stream_PureOp<"test.timeline_aware", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Stream_TimelineAwareOp, [
+    "buildAwaitTimepoints",
+    "buildResultTimepoint",
+  ]>,
+]> {
+  let summary = [{Test op implementing TimelineAwareOpInterface.}];
+  let description = [{
+    Test-only operation that implements TimelineAwareOpInterface directly,
+    allowing Stream dialect tests to verify timeline-aware behavior without
+    requiring HAL/etc dialect dependencies.
+
+    Mimics util.call with the HAL coarse-fences model:
+    - Takes wait fences that must complete before execution.
+    - Takes a signal fence to signal when complete.
+    - Returns an arbitrary result.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$args,
+    Variadic<Stream_TestFence>:$wait_fence_likes,
+    Stream_TestFence:$signal_fence_like
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    `(` $args `)` `waits` `(` $wait_fence_likes `)` `signals` `(` $signal_fence_like `)`
+    attr-dict `:` functional-type($args, $results)
+  }];
+
+  let extraClassDeclaration = [{
+    bool participatesInTimeline() { return true; }
+
+    SmallVector<Value> getAwaitFences() {
+      // Return all wait fences (excluding signal fence).
+      SmallVector<Value> fences;
+      for (auto fence : getWaitFenceLikes()) {
+        fences.push_back(fence);
+      }
+      return fences;
+    }
+
+    Value getSignalFence() { return getSignalFenceLike(); }
+  }];
+}
+
+}  // OpGroupTestOps
 
 #endif  // IREE_DIALECT_STREAM_OPS
