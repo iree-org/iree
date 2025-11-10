@@ -284,6 +284,7 @@ void addMultiTilingExpertPassPipeline(
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
   funcPassManager.addPass(createForallToForPass());
   if (pipelineOpt.enablePeeling) {
     funcPassManager.addPass(createLLVMCPUPeelPass());
@@ -346,6 +347,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
   // Convert forall to for before vectorization preparation.
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
   funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   if (pipelineOpt.enablePeeling) {
@@ -399,6 +401,7 @@ void addMmt4dTilingExpertPassPipeline(
       createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
   funcPassManager.addPass(iree_compiler::createForallToForPass());
   funcPassManager.addPass(createLLVMCPUTileToVectorSizePass());
 
@@ -487,6 +490,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
   funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   {
@@ -534,10 +538,12 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
   // Lower `ukernel.*` ops to function calls
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
+  // PCF Lowerings
+  modulePassManager.addPass(IREE::PCF::createResolveTokensPass());
+  modulePassManager.addPass(IREE::PCF::createConvertSRefToMemRefPass());
+
   FunctionLikeNest(modulePassManager)
-      // PCF Lowerings
-      .addPass(IREE::PCF::createResolveTokensPass)
-      .addPass(IREE::PCF::createConvertSRefToMemRefPass)
+      // PCF -> SCF
       .addPass(IREE::PCF::createLowerStructuralPCFPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)

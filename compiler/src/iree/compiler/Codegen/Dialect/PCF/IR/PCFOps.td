@@ -90,6 +90,7 @@ let opDocGroup = OpGroupParallelOps in {
 
 def GenericOp : PCF_Op<"generic", [
        AttrSizedOperandSegments,
+       AutomaticAllocationScope,
        RecursiveMemoryEffects,
        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmBlockArgumentNames"]>,
      ]> {
@@ -278,6 +279,7 @@ def GenericOp : PCF_Op<"generic", [
 
 def LoopOp : PCF_Op<"loop", [
        AttrSizedOperandSegments,
+       AutomaticAllocationScope,
        RecursiveMemoryEffects,
        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmBlockArgumentNames"]>,
        DeclareOpInterfaceMethods<RegionBranchOpInterface>,
@@ -587,6 +589,8 @@ def PCF_WriteSliceOp : PCF_Op<"write_slice", [
       "ValueRange":$offsets, "ValueRange":$sizes, "ValueRange":$strides,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
   ];
+
+  let hasFolder = 1;
 }
 
 } // OpGroupWriteOps
@@ -689,6 +693,8 @@ def PCF_ReadSliceOp : PCF_Op<"read_slice", [
       "ValueRange":$offsets, "ValueRange":$sizes, "ValueRange":$strides,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
   ];
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -780,6 +786,7 @@ def PCF_GetMemrefOp : PCF_Op<"get_memref", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
   ];
 
+  let hasFolder = 1;
   let hasVerifier = 1;
 }
 

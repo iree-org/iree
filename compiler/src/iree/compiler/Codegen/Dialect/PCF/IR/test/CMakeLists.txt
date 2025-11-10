@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "control_flow_ops.mlir"
+    "folders.mlir"
     "invalid.mlir"
     "types.mlir"
     "write_ops.mlir"

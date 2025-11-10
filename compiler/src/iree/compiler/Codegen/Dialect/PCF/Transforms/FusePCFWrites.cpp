@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-pcf-fuse-pcf-writes"
 
@@ -102,6 +103,24 @@ composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
 
   if (!insertSliceOp) {
     return failure();
+  }
+
+  // Collect all values used by the write_slice that are not the forall result.
+  // These need to be available inside the forall body.
+  SmallVector<Value> writeSliceOperands;
+  writeSliceOperands.push_back(writeSliceOp.getDest());
+  writeSliceOperands.append(writeSliceOp.getOffsets().begin(),
+                            writeSliceOp.getOffsets().end());
+  writeSliceOperands.append(writeSliceOp.getStrides().begin(),
+                            writeSliceOp.getStrides().end());
+
+  // Move the definitions of these operands before the forall if they are
+  // defined after it. This can happen if the producer of an operand dominates
+  // the forall but is placed after it in the IR.
+  if (failed(moveValueDefinitions(rewriter, writeSliceOperands, forallOp))) {
+    return rewriter.notifyMatchFailure(
+        writeSliceOp,
+        "failed to move write_slice operand definitions before forall");
   }
 
   // Compose the offsets, sizes, and strides and insert the new write_slice

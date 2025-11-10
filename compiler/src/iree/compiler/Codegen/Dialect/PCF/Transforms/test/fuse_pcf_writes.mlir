@@ -113,3 +113,38 @@ func.func @no_fusion_different_source(%init: tensor<32x64xf32>, %other: tensor<3
 
 //       CHECK:   pcf.write_slice %[[OTHER]] into %[[DEST]][0, 0] [32, 64] [1, 1]
 //       CHECK:   return
+
+// -----
+
+func.func @fuse_with_offset_after_forall(%init: tensor<32x64xf32>, %dest: !pcf.sref<32x64xf32, sync(#pcf.sequential)>, %offset_base: index) {
+  %result = scf.forall (%i, %j) in (4, 8) shared_outs(%iter = %init) -> tensor<32x64xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %tile = tensor.generate {
+    ^bb0(%ii: index, %jj: index):
+      tensor.yield %c0 : f32
+    } : tensor<8x8xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %tile into %iter[%i, %j] [8, 8] [1, 1] : tensor<8x8xf32> into tensor<32x64xf32>
+    }
+  }
+  // Define the offset after the forall - this should be moved before it
+  %c16 = arith.constant 16 : index
+  %offset = arith.addi %c16, %offset_base : index
+  pcf.write_slice %result into %dest[%offset, 0] [32, 64] [1, 1] : tensor<32x64xf32> into !pcf.sref<32x64xf32, sync(#pcf.sequential)>
+  return
+}
+
+// CHECK-LABEL: @fuse_with_offset_after_forall(
+//  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<32x64xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9_]+]]: !pcf.sref<32x64xf32, sync(#pcf.sequential)>
+//  CHECK-SAME:   %[[OFFSET_BASE:[A-Za-z0-9_]+]]: index
+
+//   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
+//   CHECK-DAG:   %[[OFFSET:.+]] = arith.addi %[[OFFSET_BASE]], %[[C16]]
+//       CHECK:   scf.forall (%[[I:.+]], %[[J:.+]]) in (4, 8) {
+//       CHECK:     %[[TILE:.+]] = tensor.generate
+//       CHECK:     %[[COMPOSED_OFFSET:.+]] = arith.addi %[[OFFSET]], %[[I]]
+//       CHECK:     pcf.write_slice %[[TILE]] into %[[DEST]][%[[COMPOSED_OFFSET]], %[[J]]] [8, 8] [1, 1]
+//       CHECK:   }
+//       CHECK-NOT:   pcf.write_slice
+//       CHECK:   return

@@ -748,6 +748,155 @@ void GetMemrefOp::build(OpBuilder &b, OperationState &result, Type resultType,
   build(b, result, resultType, source, offsetValues, sizeValues, strideValues);
 }
 
+//===----------------------------------------------------------------------===//
+// Folders
+//===----------------------------------------------------------------------===//
+
+LogicalResult WriteSliceOp::fold(FoldAdaptor adaptor,
+                                 SmallVectorImpl<OpFoldResult> &results) {
+  bool changed = false;
+  OpBuilder builder(getContext());
+
+  SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
+  SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
+
+  // Try to fold dynamic offsets to static
+  for (auto &offset : mixedOffsets) {
+    if (auto value = dyn_cast<Value>(offset)) {
+      std::optional<int64_t> constantValue = getConstantIntValue(value);
+      if (constantValue.has_value()) {
+        offset = builder.getI64IntegerAttr(*constantValue);
+        changed = true;
+      }
+    }
+  }
+
+  // Try to fold dynamic strides to static
+  for (auto &stride : mixedStrides) {
+    if (auto value = dyn_cast<Value>(stride)) {
+      std::optional<int64_t> constantValue = getConstantIntValue(value);
+      if (constantValue.has_value()) {
+        stride = builder.getI64IntegerAttr(*constantValue);
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) {
+    return failure();
+  }
+
+  // Dispatch back to static/dynamic
+  SmallVector<int64_t> staticOffsets, staticStrides;
+  SmallVector<Value> dynamicOffsets, dynamicStrides;
+  dispatchIndexOpFoldResults(mixedOffsets, dynamicOffsets, staticOffsets);
+  dispatchIndexOpFoldResults(mixedStrides, dynamicStrides, staticStrides);
+
+  // Update the op's attributes in-place
+  setStaticOffsetsAttr(builder.getDenseI64ArrayAttr(staticOffsets));
+  setStaticStridesAttr(builder.getDenseI64ArrayAttr(staticStrides));
+  getOffsetsMutable().assign(dynamicOffsets);
+  getStridesMutable().assign(dynamicStrides);
+
+  return success();
+}
+
+OpFoldResult ReadSliceOp::fold(FoldAdaptor adaptor) {
+  bool changed = false;
+  OpBuilder builder(getContext());
+
+  SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
+  SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
+
+  // Try to fold dynamic offsets to static
+  for (auto &offset : mixedOffsets) {
+    if (auto value = dyn_cast<Value>(offset)) {
+      std::optional<int64_t> constantValue = getConstantIntValue(value);
+      if (constantValue.has_value()) {
+        offset = builder.getI64IntegerAttr(*constantValue);
+        changed = true;
+      }
+    }
+  }
+
+  // Try to fold dynamic strides to static
+  for (auto &stride : mixedStrides) {
+    if (auto value = dyn_cast<Value>(stride)) {
+      std::optional<int64_t> constantValue = getConstantIntValue(value);
+      if (constantValue.has_value()) {
+        stride = builder.getI64IntegerAttr(*constantValue);
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) {
+    return {};
+  }
+
+  // Dispatch back to static/dynamic
+  SmallVector<int64_t> staticOffsets, staticStrides;
+  SmallVector<Value> dynamicOffsets, dynamicStrides;
+  dispatchIndexOpFoldResults(mixedOffsets, dynamicOffsets, staticOffsets);
+  dispatchIndexOpFoldResults(mixedStrides, dynamicStrides, staticStrides);
+
+  // Update the op's attributes in-place
+  setStaticOffsetsAttr(builder.getDenseI64ArrayAttr(staticOffsets));
+  setStaticStridesAttr(builder.getDenseI64ArrayAttr(staticStrides));
+  getOffsetsMutable().assign(dynamicOffsets);
+  getStridesMutable().assign(dynamicStrides);
+
+  return {};
+}
+
+OpFoldResult GetMemrefOp::fold(FoldAdaptor adaptor) {
+  bool changed = false;
+  OpBuilder builder(getContext());
+
+  SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
+  SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
+
+  // Try to fold dynamic offsets to static
+  for (auto &offset : mixedOffsets) {
+    if (auto value = dyn_cast<Value>(offset)) {
+      std::optional<int64_t> constantValue = getConstantIntValue(value);
+      if (constantValue.has_value()) {
+        offset = builder.getI64IntegerAttr(*constantValue);
+        changed = true;
+      }
+    }
+  }
+
+  // Try to fold dynamic strides to static
+  for (auto &stride : mixedStrides) {
+    if (auto value = dyn_cast<Value>(stride)) {
+      std::optional<int64_t> constantValue = getConstantIntValue(value);
+      if (constantValue.has_value()) {
+        stride = builder.getI64IntegerAttr(*constantValue);
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) {
+    return {};
+  }
+
+  // Dispatch back to static/dynamic
+  SmallVector<int64_t> staticOffsets, staticStrides;
+  SmallVector<Value> dynamicOffsets, dynamicStrides;
+  dispatchIndexOpFoldResults(mixedOffsets, dynamicOffsets, staticOffsets);
+  dispatchIndexOpFoldResults(mixedStrides, dynamicStrides, staticStrides);
+
+  // Update the op's attributes in-place
+  setStaticOffsetsAttr(builder.getDenseI64ArrayAttr(staticOffsets));
+  setStaticStridesAttr(builder.getDenseI64ArrayAttr(staticStrides));
+  getOffsetsMutable().assign(dynamicOffsets);
+  getStridesMutable().assign(dynamicStrides);
+
+  return {};
+}
+
 LogicalResult GetMemrefOp::verify() {
   auto resultType = getResultType();
 

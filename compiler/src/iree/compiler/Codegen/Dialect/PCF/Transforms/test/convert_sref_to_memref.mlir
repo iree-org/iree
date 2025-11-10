@@ -468,6 +468,6 @@ util.func private @convert_get_memref_dynamic_layout(%arg0: memref<?x?xi32, stri
 //  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: memref<?x?xi32, strided<[?, ?], offset: ?>>
 //       CHECK:   pcf.generic
 //  CHECK-NEXT:     execute[{{.*}}] {
-//       CHECK:     %[[SV:.+]] = memref.subview %[[ARG0]][%{{.*}}, %{{.*}}] [%{{.*}}, %{{.*}}] [1, 1] : memref<?x?xi32, strided<[?, ?], offset: ?>> to memref<?x?xi32, strided<[?, ?], offset: ?>>
+//       CHECK:     %[[SV:.+]] = memref.subview %[[ARG0]][0, 0] [%{{.*}}, %{{.*}}] [1, 1] : memref<?x?xi32, strided<[?, ?], offset: ?>> to memref<?x?xi32, strided<[?, ?], offset: ?>>
 //       CHECK:     util.optimization_barrier %[[SV]]
 //       CHECK:     pcf.return

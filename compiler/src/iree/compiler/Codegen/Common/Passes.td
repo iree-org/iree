@@ -163,6 +163,25 @@ def CombineLayoutTransformationPass :
   ];
 }
 
+def CombineSplitKWorkgroupLoopPass
+    : Pass<"iree-codegen-combine-splitk-workgroup-loop"> {
+  let summary = "Combines split-k reduction scf.forall with nested pcf.loop into pcf.generic";
+  let description = [{
+    Transforms split-k reduction patterns by combining an scf.forall with
+    split_reduction_mapping containing a pcf.loop into a single pcf.generic
+    operation. The nested loops are converted to sequential scf.for loops
+    with proper delinearization for load balancing.
+  }];
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "iree_compiler::IREE::PCF::PCFDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def ConvolutionToIGEMMPass :
     InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
   let summary =
