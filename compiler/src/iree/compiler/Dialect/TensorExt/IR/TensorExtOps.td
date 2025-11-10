@@ -443,4 +443,72 @@ def IREETensorExt_DispatchWorkloadOrdinalOp :
   let hasFolder = 1;
 }
 
+//===---------------------------------------------------------------------===//
+// Barrier Ops
+//===---------------------------------------------------------------------===//
+
+def IREETensorExt_BarrierStartOp : IREETensorExt_PureOp<"barrier.start", [
+  Util_ShapeAwareOp,
+]> {
+  let summary = "Tensor barrier start operation";
+  let description = [{
+    This barrier prevents certain transformations (like reshape propagation)
+    from moving operations down across this boundary.
+    The operand is returned as the result with identical type.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$value,
+    IREETensorExt_ShapeDynamicDims:$value_dims
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $value `:` type($value) (`{` $value_dims^ `}`)? `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getValueDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getValueDims(); }
+  }];
+
+  let hasVerifier = 1;
+}
+
+def IREETensorExt_BarrierEndOp : IREETensorExt_PureOp<"barrier.end", [
+  Util_ShapeAwareOp,
+]> {
+  let summary = "Tensor barrier end operation";
+  let description = [{
+    This barrier prevents certain transformations (like reshape propagation)
+    from moving operations up across this boundary.
+    The operand is returned as the result with identical type.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$value,
+    IREETensorExt_ShapeDynamicDims:$value_dims
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $value `:` type($value) (`{` $value_dims^ `}`)? `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getValueDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getValueDims(); }
+  }];
+
+  let hasVerifier = 1;
+}
+
 #endif  // IREE_DIALECT_TENSOR_EXT_OPS
