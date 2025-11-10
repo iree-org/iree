@@ -42,8 +42,9 @@ static LogicalResult captureUsedOperationsAndBlockArguments(
   auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
   Value result = yieldOp.getOperand(resultNumber);
 
-  if (failed(getBackwardSlice(result, &usedOperations, options)))
+  if (failed(getBackwardSlice(result, &usedOperations, options))) {
     return failure();
+  }
 
   // Get all block arguments used by the operations. If any of the arguments
   // used is a dpsInit argument other than resultNumber, return failure.
