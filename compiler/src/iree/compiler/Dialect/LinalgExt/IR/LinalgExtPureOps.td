@@ -28,10 +28,10 @@ def OpGroupUtilityOps : OpDocGroup {
 
 let opDocGroup = OpGroupUtilityOps in {
 
-  def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
+def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
     Arguments<(ins ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dim)>,
     Results<(outs Index:$result)> {
-    let summary = [{LinalgExt index operation.}];
+  let summary = [{LinalgExt index operation.}];
   let description = [{
     This operation is a mirror of `linalg.index` operation and has the same
     semantics, except that `linalg.index` enforces that the parent op is a
