@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCF.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
@@ -67,7 +68,7 @@ struct CombineSplitKWorkgroupLoopPass final
 LogicalResult CombineSplitKWorkgroupLoopPattern::matchSplitKMapping(
     scf::ForallOp forallOp) const {
   std::optional<ArrayAttr> maybeMapping = forallOp.getMappingAttr();
-  if (!maybeMapping || maybeMapping.value().empty()) {
+  if (!maybeMapping || !maybeMapping.value() || maybeMapping.value().empty()) {
     return failure();
   }
 
@@ -231,9 +232,43 @@ LogicalResult CombineSplitKWorkgroupLoopPattern::matchAndRewrite(
   // Step 8: Extract loop count (we'll need it later).
   Value loopCount = loopOp.getCount()[0];
 
-  // Step 9: Create pcf.generic.
+  // Step 8.5: Compute total iteration count for forall before creating generic.
   rewriter.setInsertionPoint(forallOp);
+  Value forallTotalIters = nullptr;
+  for (auto [lb, ub, step] :
+       llvm::zip(forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
+                 forallOp.getMixedStep())) {
+    Value lbVal = getValueOrCreateConstantIndexOp(rewriter, loc, lb);
+    Value ubVal = getValueOrCreateConstantIndexOp(rewriter, loc, ub);
+    Value stepVal = getValueOrCreateConstantIndexOp(rewriter, loc, step);
 
+    Value range =
+        arith::SubIOp::create(rewriter, loc, ubVal, lbVal).getResult();
+    Value count =
+        arith::CeilDivSIOp::create(rewriter, loc, range, stepVal).getResult();
+
+    if (!forallTotalIters) {
+      forallTotalIters = count;
+    } else {
+      forallTotalIters =
+          arith::MulIOp::create(rewriter, loc, forallTotalIters, count)
+              .getResult();
+    }
+  }
+
+  // Step 8.6: Compute total workgroup count = forallTotalIters * loopCount.
+  Value totalWorkgroupCount =
+      arith::MulIOp::create(rewriter, loc, forallTotalIters, loopCount)
+          .getResult();
+
+  // Step 8.7: Create workgroup count hint.
+  [[maybe_unused]] LogicalResult hintRes = createWorkgroupCountHint(
+      rewriter, loc, {totalWorkgroupCount}, /*maxWorkgroupParallelDims=*/1,
+      /*reverse=*/false);
+  assert(succeeded(hintRes) &&
+         "Unexpected failure to construct workgroup count hint");
+
+  // Step 9: Create pcf.generic.
   auto genericOp = IREE::PCF::GenericOp::create(
       rewriter, loc,
       /*resultTypes=*/forallOp.getResultTypes(),
@@ -242,6 +277,16 @@ LogicalResult CombineSplitKWorkgroupLoopPattern::matchAndRewrite(
       /*dynamic_sizes=*/ValueRange{},
       /*is_tied=*/SmallVector<bool>(forallOp.getNumResults(), true),
       /*num_iterators=*/1);
+
+  // Step 9.5: Set sync scope to parent only for the pcf.generic sref arguments.
+  Attribute syncScope = IREE::PCF::SyncOnParentAttr::get(rewriter.getContext());
+  for (auto regionRefArg : genericOp.getRegionRefArgs()) {
+    auto srefType = cast<IREE::PCF::ShapedRefType>(regionRefArg.getType());
+    auto newSrefType = IREE::PCF::ShapedRefType::get(
+        rewriter.getContext(), srefType.getShape(), srefType.getElementType(),
+        srefType.getScope(), syncScope);
+    regionRefArg.setType(newSrefType);
+  }
 
   // Get forall body and terminator before we start transforming
   Block *forallBody = &forallOp.getRegion().front();

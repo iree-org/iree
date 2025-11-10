@@ -48,8 +48,12 @@ func.func @combine_splitk_reduction() attributes {translation_info = #iree_codeg
 
 // CHECK-LABEL: func.func @combine_splitk_reduction
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x1024xf32>
+//       CHECK:   %[[FORALL_COUNT:.+]] = arith.ceildivsi
+//       CHECK:   %[[TOTAL_WG_COUNT:.+]] = arith.muli %[[FORALL_COUNT]], %c8
+//       CHECK:   iree_codegen.workgroup_count_hint(%[[TOTAL_WG_COUNT]])
 //       CHECK:   %[[GENERIC:.+]] = pcf.generic scope(#iree_codegen.workgroup<linearize>)
 //  CHECK-NEXT:       execute(%{{.+}} = %[[EMPTY]])[%[[LINEAR_ID:.+]]: index, %[[TOTAL_WORKERS:.+]]: index]
+//  CHECK-NEXT:            : (!pcf.sref<128x1024xf32, sync(#iree_codegen.workgroup<linearize>)>)
 //       CHECK:     %[[TOTAL_ITERS:.+]] = arith.ceildivsi
 //       CHECK:     %[[FORALL_ID:.+]] = arith.divsi %[[LINEAR_ID]], %c8
 //       CHECK:     %[[LOOP_ID:.+]] = arith.remsi %[[LINEAR_ID]], %c8

@@ -237,7 +237,7 @@ struct FuseTensorToBufferConvertersPass final
     RewritePatternSet patterns(context);
     patterns.add<FuseStoreToBuffer, FuseDispatchTensorStore>(context);
     IREE::PCF::populatePCFDropUnusedResultPatterns(patterns);
-
+    tensor::populateFoldTensorEmptyPatterns(patterns);
     if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
       return signalPassFailure();
     }
