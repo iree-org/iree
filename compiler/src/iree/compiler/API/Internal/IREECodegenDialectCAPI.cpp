@@ -25,7 +25,6 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/Support/LogicalResult.h"
 
 using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
@@ -275,27 +274,47 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
 
   mlir::Builder builder(linalgOp.getContext());
 
-  // Helper to convert unsigned to int64_t.
-  auto toInt64 = [](llvm::ArrayRef<unsigned> vec) {
-    return llvm::map_to_vector(vec, llvm::StaticCastTo<int64_t>);
-  };
-
   ireeCodegenIGEMMGenericConvDetails result;
+
+  result.igemmContractionMaps = wrap(builder.getArrayAttr(llvm::map_to_vector(
+      details.igemmContractionMaps, [](auto map) -> mlir::Attribute {
+        return mlir::AffineMapAttr::get(map);
+      })));
+
   result.igemmLoopBounds =
       wrap(builder.getI64ArrayAttr(details.igemmLoopBounds));
-  result.convDimsBatch =
-      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.batch)));
-  result.convDimsOutputImage =
-      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.outputImage)));
-  result.convDimsOutputChannel =
-      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.outputChannel)));
-  result.convDimsFilterLoop =
-      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.filterLoop)));
-  result.convDimsInputChannel =
-      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.inputChannel)));
-  result.convDimsDepth =
-      wrap(builder.getI64ArrayAttr(toInt64(details.convDims.depth)));
+
+  llvm::SmallVector<mlir::Attribute> iteratorAttrs;
+  for (auto iterType : details.igemmLoopIterators) {
+    iteratorAttrs.push_back(
+        builder.getStringAttr(mlir::utils::stringifyIteratorType(iterType)));
+  }
+  result.igemmLoopIterators = wrap(builder.getArrayAttr(iteratorAttrs));
+
+  result.im2colOutputPerm =
+      wrap(builder.getI64ArrayAttr(details.im2colOutputPerm));
+
+  llvm::SmallVector<mlir::Attribute> reassocAttrs;
+  for (const auto &indices : details.filterReassocIndices) {
+    reassocAttrs.push_back(builder.getI64ArrayAttr(
+        llvm::map_to_vector(indices, llvm::StaticCastTo<int64_t>)));
+  }
+  result.filterReassocIndices = wrap(builder.getArrayAttr(reassocAttrs));
+
   result.isOutputChannelFirst = details.isOutputChannelFirst;
+
+  // Mapping from conv dimensions to IGEMM dimensions.
+  // Encode as ArrayAttr of [conv_dim, igemm_dim] pairs.
+  llvm::SmallVector<mlir::Attribute> dimMapAttrs;
+  for (const auto &[convDim, igemmExpr] : details.convToIgemmDimMap) {
+    // All entries in convToIgemmDimMap must be AffineDimExpr.
+    auto dimExpr = llvm::cast<mlir::AffineDimExpr>(igemmExpr);
+    llvm::SmallVector<mlir::Attribute> pairAttrs;
+    pairAttrs.push_back(builder.getI64IntegerAttr(convDim));
+    pairAttrs.push_back(builder.getI64IntegerAttr(dimExpr.getPosition()));
+    dimMapAttrs.push_back(builder.getArrayAttr(pairAttrs));
+  }
+  result.convToIgemmDimMap = wrap(builder.getArrayAttr(dimMapAttrs));
 
   return result;
 }

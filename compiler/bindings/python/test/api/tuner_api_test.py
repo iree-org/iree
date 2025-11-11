@@ -7,6 +7,7 @@
 from iree.compiler import ir
 from iree.compiler.dialects import iree_codegen
 from iree.compiler.dialects import affine
+from iree.compiler.ir import AffineMap, AffineDimExpr
 
 
 def run(fn):
@@ -169,29 +170,31 @@ def test_igemm_conv_details():
 
     details = iree_codegen.get_igemm_generic_conv_details(root_op_list[0])
     assert details is not None, "IGEMM details should be valid for NHWC_HWCF conv"
-    assert details.igemm_loop_bounds == [
-        1,
-        14,
-        14,
-        16,
-        36,
-    ], f"got {details.igemm_loop_bounds}"
-    assert details.conv_dims_batch == [0], f"got {details.conv_dims_batch}"
-    assert details.conv_dims_output_image == [
-        1,
-        2,
-    ], f"got {details.conv_dims_output_image}"
-    assert details.conv_dims_output_channel == [
-        3
-    ], f"got {details.conv_dims_output_channel}"
-    assert details.conv_dims_filter_loop == [
-        4,
-        5,
-    ], f"got {details.conv_dims_filter_loop}"
-    assert details.conv_dims_input_channel == [
-        6
-    ], f"got {details.conv_dims_input_channel}"
-    assert not details.is_output_channel_first, f"got {details.is_output_channel_first}"
+    assert details.igemm_loop_bounds == [1, 14, 14, 16, 36]
+
+    assert len(details.igemm_contraction_maps) == 3
+    maps = [map_attr.value for map_attr in details.igemm_contraction_maps]
+    d0, d1, d2, d3, d4 = [AffineDimExpr.get(i) for i in range(5)]
+    # For channel-last (NHWC): input (N,H,W,K), filter (K,OC), output (N,H,W,OC).
+    assert maps[0] == AffineMap.get(
+        5, 0, [d0, d1, d2, d4]
+    ), f"Input map mismatch: {maps[0]}"
+    assert maps[1] == AffineMap.get(5, 0, [d4, d3]), f"Filter map mismatch: {maps[1]}"
+    assert maps[2] == AffineMap.get(
+        5, 0, [d0, d1, d2, d3]
+    ), f"Output map mismatch: {maps[2]}"
+    iter_types = [str(attr) for attr in details.igemm_loop_iterators]
+    assert iter_types == [
+        '"parallel"',
+        '"parallel"',
+        '"parallel"',
+        '"parallel"',
+        '"reduction"',
+    ]
+    assert details.im2col_output_perm == [0, 1, 2, 3]
+    assert details.filter_reassoc_indices == [[0, 1, 2], [3]]
+    assert not details.is_output_channel_first
+    assert details.conv_to_igemm_dim_map == {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 4}
 
     # Test 2: conv_2d_nhwc_fhwc.
     module_str = """
@@ -209,24 +212,30 @@ def test_igemm_conv_details():
 
     details = iree_codegen.get_igemm_generic_conv_details(root_op_list[0])
     assert details is not None, "IGEMM details should be valid for NHWC_FHWC conv"
-    assert details.igemm_loop_bounds == [
-        1,
-        14,
-        14,
-        16,
-        36,
-    ], f"got {details.igemm_loop_bounds}"
-    assert details.conv_dims_batch == [0], f"got {details.conv_dims_batch}"
-    assert details.conv_dims_output_image == [
-        1,
-        2,
-    ], f"got {details.conv_dims_output_image}"
-    assert details.conv_dims_output_channel == [
-        3
-    ], f"got {details.conv_dims_output_channel}"
-    assert isinstance(
-        details.is_output_channel_first, bool
-    ), f"got {type(details.is_output_channel_first)}"
+    assert details.igemm_loop_bounds == [1, 14, 14, 16, 36]
+    assert len(details.igemm_contraction_maps) == 3
+    maps = [map_attr.value for map_attr in details.igemm_contraction_maps]
+    # Verify expected affine maps (NHWC_FHWC layout).
+    d0, d1, d2, d3, d4 = [AffineDimExpr.get(i) for i in range(5)]
+    assert maps[0] == AffineMap.get(
+        5, 0, [d0, d1, d2, d4]
+    ), f"Input map mismatch: {maps[0]}"
+    assert maps[1] == AffineMap.get(5, 0, [d3, d4]), f"Filter map mismatch: {maps[1]}"
+    assert maps[2] == AffineMap.get(
+        5, 0, [d0, d1, d2, d3]
+    ), f"Output map mismatch: {maps[2]}"
+    iter_types = [str(attr) for attr in details.igemm_loop_iterators]
+    assert iter_types == [
+        '"parallel"',
+        '"parallel"',
+        '"parallel"',
+        '"parallel"',
+        '"reduction"',
+    ]
+    assert details.im2col_output_perm == [0, 1, 2, 3]
+    assert details.filter_reassoc_indices == [[0], [1, 2, 3]]
+    assert not details.is_output_channel_first
+    assert details.conv_to_igemm_dim_map == {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 4}
 
     # Test 3: conv_2d_nchw_fchw.
     module_str = """
@@ -244,22 +253,31 @@ def test_igemm_conv_details():
 
     details = iree_codegen.get_igemm_generic_conv_details(root_op_list[0])
     assert details is not None, "IGEMM details should be valid for NCHW conv"
-    assert details.igemm_loop_bounds == [
-        1,
-        16,
-        14,
-        14,
-        36,
-    ], f"got {details.igemm_loop_bounds}"
-    assert details.conv_dims_batch == [0], f"got {details.conv_dims_batch}"
-    assert details.conv_dims_output_image == [
-        2,
-        3,
-    ], f"got {details.conv_dims_output_image}"
-    assert details.conv_dims_filter_loop == [
-        5,
-        6,
-    ], f"got {details.conv_dims_filter_loop}"
+    assert details.igemm_loop_bounds == [1, 16, 14, 14, 36]
+    assert len(details.igemm_contraction_maps) == 3
+    maps = [map_attr.value for map_attr in details.igemm_contraction_maps]
+    # Verify expected affine maps for NCHW with loop dims [N, OC, H, W, K].
+    # Note: operands are swapped - filter first, then input.
+    d0, d1, d2, d3, d4 = [AffineDimExpr.get(i) for i in range(5)]
+    assert maps[0] == AffineMap.get(5, 0, [d1, d4]), f"Filter map mismatch: {maps[0]}"
+    assert maps[1] == AffineMap.get(
+        5, 0, [d0, d2, d3, d4]
+    ), f"Input map mismatch: {maps[1]}"
+    assert maps[2] == AffineMap.get(
+        5, 0, [d0, d1, d2, d3]
+    ), f"Output map mismatch: {maps[2]}"
+    iter_types = [str(attr) for attr in details.igemm_loop_iterators]
+    assert iter_types == [
+        '"parallel"',
+        '"parallel"',
+        '"parallel"',
+        '"parallel"',
+        '"reduction"',
+    ]
+    assert details.im2col_output_perm == [0, 1, 2, 3]
+    assert details.filter_reassoc_indices == [[0], [1, 2, 3]]
+    assert details.is_output_channel_first
+    assert details.conv_to_igemm_dim_map == {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 4}
 
     # Test 4: linalg.generic with convolution pattern (weight backward).
     module_str = """
@@ -289,16 +307,19 @@ def test_igemm_conv_details():
     assert (
         details is not None
     ), "IGEMM details should be valid for generic 1D conv weight backward"
-    assert details.igemm_loop_bounds == [
-        96,
-        3,
-        96,
-        98304,
-    ], f"got {details.igemm_loop_bounds}"
-    assert details.conv_dims_output_image == [
-        1
-    ], f"got {details.conv_dims_output_image}"
-    assert details.conv_dims_filter_loop == [4], f"got {details.conv_dims_filter_loop}"
+    assert details.igemm_loop_bounds == [96, 3, 96, 98304]
+    assert len(details.igemm_contraction_maps) == 3
+    maps = [map_attr.value for map_attr in details.igemm_contraction_maps]
+    d0, d1, d2, d3 = [AffineDimExpr.get(i) for i in range(4)]
+    assert maps[0] == AffineMap.get(4, 0, [d3, d0]), f"Map 0 mismatch: {maps[0]}"
+    assert maps[1] == AffineMap.get(4, 0, [d1, d3, d2]), f"Map 1 mismatch: {maps[1]}"
+    assert maps[2] == AffineMap.get(4, 0, [d0, d1, d2]), f"Map 2 mismatch: {maps[2]}"
+    iter_types = [str(attr) for attr in details.igemm_loop_iterators]
+    assert iter_types == ['"parallel"', '"parallel"', '"parallel"', '"reduction"']
+    assert details.im2col_output_perm == [1, 2, 0]
+    assert details.filter_reassoc_indices == [[0, 1, 2], [3]]
+    assert details.is_output_channel_first
+    assert details.conv_to_igemm_dim_map == {0: 0, 1: 1, 2: 2, 3: 3, 4: 3, 5: 3}
 
     # Test with a non-conv operation.
     module_str = """
