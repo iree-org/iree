@@ -3243,10 +3243,20 @@ LogicalResult UnMaskOp::getIterationDomainTileFromOperandTiles(
     ArrayRef<SmallVector<OpFoldResult>> allSizes,
     SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
     SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
-  if (operandNumbers.size() != 1 ||
-      operandNumbers.front() != getSrcMutable().getOperandNumber()) {
-    return failure();
+  // If the destination tensor is tiled, the iteration domain is the same as
+  // the destination tile.
+  if (const unsigned *dstIt =
+          llvm::find(operandNumbers, getDestMutable().getOperandNumber())) {
+    if (dstIt != operandNumbers.end()) {
+      iterDomainOffsets = allOffsets[dstIt - operandNumbers.begin()];
+      iterDomainSizes = allSizes[dstIt - operandNumbers.begin()];
+      return success();
+    }
   }
+
+  // Find the iteration domain from the source tensor.
+  assert(operandNumbers.size() == 1);
+  assert(operandNumbers.front() == getSrcMutable().getOperandNumber());
   ArrayRef<OpFoldResult> offsets(allOffsets[0]);
   ArrayRef<OpFoldResult> sizes(allSizes[0]);
 

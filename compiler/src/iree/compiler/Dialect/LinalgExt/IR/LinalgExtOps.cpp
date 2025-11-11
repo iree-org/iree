@@ -2664,6 +2664,15 @@ OpFoldResult UnMaskOp::fold(FoldAdaptor adaptor) {
       srcType == dstType) {
     return getSrc();
   }
+  if (auto producer = getSrc().getDefiningOp<IREE::LinalgExt::UnMaskOp>()) {
+    getSrcMutable().set(producer.getSrc());
+    return getResult();
+  }
+  if (auto producer = getDest().getDefiningOp<DestinationStyleOpInterface>()) {
+    getDestMutable().set(
+        producer.getTiedOpOperand(cast<OpResult>(getDest()))->get());
+    return getResult();
+  }
   return OpFoldResult();
 }
 
