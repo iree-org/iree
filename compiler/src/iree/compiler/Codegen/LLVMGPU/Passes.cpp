@@ -761,6 +761,13 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const GPUPipelineOptions &options,
                                         bool forROCDL) {
+  funcPassManager.addPass(
+      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
+  // Apply padding to start and cleanup before tiling.
+  funcPassManager.addPass(createGPUApplyPaddingLevelPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+
   ReorderWorkgroupsStrategy reorderStrategy =
       getReorderWorkgroupsStrategy(options.reorderStrategy);
 
@@ -771,57 +778,31 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // Some of the elementwise fusion can benefit from this pass.
   funcPassManager.addPass(createRematerializeParallelOpsPass());
 
-  funcPassManager.addPass(
-      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
-
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
 
-  // Tile to reduction loops.
-  {
+  for (auto level : {IREE::GPU::TilingLevel::Reduction,
+                     IREE::GPU::TilingLevel::PartialReduction,
+                     IREE::GPU::TilingLevel::Serial}) {
     GPUApplyTilingLevelPassOptions options;
-    options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
+    options.tilingLevel = level;
     options.allowZeroSlices = true;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
-    funcPassManager.addPass(affine::createLoopCoalescingPass());
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
   }
 
-  // Tile to reduction loops.
-  {
-    GPUApplyPaddingLevelPassOptions padOptions;
-    padOptions.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;
-    funcPassManager.addPass(createGPUApplyPaddingLevelPass(padOptions));
-    GPUApplyTilingLevelPassOptions options;
-    options.tilingLevel = IREE::GPU::TilingLevel::PartialReduction;
-    options.allowZeroSlices = true;
-    funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
-    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
-    // Post tiling, the tensor.pad multiples can be simplified to static
-    // sizes, run dim simplification to infer and propagate these sizes.
-    funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-    funcPassManager.addPass(affine::createSimplifyAffineMinMaxPass());
-    funcPassManager.addPass(memref::createReifyResultShapesPass());
-    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
-    funcPassManager.addPass(affine::createLoopCoalescingPass());
-    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
-  }
-
-  // Tile to serial loops.
-  {
-    GPUApplyTilingLevelPassOptions options;
-    options.tilingLevel = IREE::GPU::TilingLevel::Serial;
-    options.allowZeroSlices = true;
-    funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
-    funcPassManager.addPass(affine::createLoopCoalescingPass());
-    funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
-  }
+  // Post tiling, the tensor.pad multiples can be simplified to static
+  // sizes, run dim simplification to infer and propagate these sizes.
+  funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
+  funcPassManager.addPass(affine::createSimplifyAffineMinMaxPass());
+  funcPassManager.addPass(memref::createReifyResultShapesPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(affine::createLoopCoalescingPass());
+  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());

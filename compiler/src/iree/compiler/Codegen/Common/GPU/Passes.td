@@ -364,19 +364,8 @@ def GPUApplyTilingLevelPass :
 
 def GPUApplyPaddingLevelPass :
     InterfacePass<"iree-codegen-gpu-apply-padding-level", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to pad based on tiling configs";
+  let summary = "Pass to pad based on padding configs";
   let dependentDialects = ["::mlir::tensor::TensorDialect"];
-  let options = [
-    Option<"tilingLevel", "tiling-level", "IREE::GPU::TilingLevel",
-           /*default=*/"IREE::GPU::TilingLevel::Reduction",
-           "Tiling level to tile. Supported levels are 'reduction' and 'thread'",
-           [{llvm::cl::values(
-              clEnumValN(IREE::GPU::TilingLevel::Reduction, "reduction",
-                         "Tile and fuse all annotated ops to serial loops"),
-              clEnumValN(IREE::GPU::TilingLevel::PartialReduction, "partial_reduction",
-                         "Tile and fuse all annotated ops to partial reduuction loops")
-           )}]>
-  ];
 }
 
 def GPUTensorTileToSerialLoopsPass :
