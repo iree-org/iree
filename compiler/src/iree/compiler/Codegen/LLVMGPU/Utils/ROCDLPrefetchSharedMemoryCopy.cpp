@@ -35,9 +35,10 @@ namespace mlir::iree_compiler {
 namespace {
 // Structure to hold the stage classification result.
 struct StageClassification {
-  SmallVector<Operation *> readStage;
-  SmallVector<Operation *> writeStage;
-  SmallVector<Operation *> computeStage;
+  SmallVector<Operation *> globalReadStage;  // Global memory reads
+  SmallVector<Operation *> sharedWriteStage; // Writes to shared/private memory
+  SmallVector<Operation *> sharedReadStage;  // Reads from shared memory
+  SmallVector<Operation *> computeStage;     // Compute operations
 };
 } // namespace
 
@@ -45,6 +46,12 @@ struct StageClassification {
 static bool isGlobalMemoryRead(vector::TransferReadOp read) {
   auto srcType = dyn_cast<MemRefType>(read.getBase().getType());
   return hasGlobalMemoryAddressSpace(srcType);
+}
+
+// Helper function to check if a transfer_read is from shared memory.
+static bool isSharedMemoryRead(vector::TransferReadOp read) {
+  auto srcType = dyn_cast<MemRefType>(read.getBase().getType());
+  return hasSharedMemoryAddressSpace(srcType);
 }
 
 // Helper function to check if a transfer_write is to shared memory.
@@ -124,6 +131,7 @@ static LogicalResult checkLoopIterations(scf::ForOp forOp) {
 static LogicalResult
 identifyRootOperations(scf::ForOp forOp, SmallVector<Operation *> &readRoots,
                        SmallVector<Operation *> &writeRoots,
+                       SmallVector<Operation *> &sharedReadRoots,
                        SmallVector<Operation *> &computeRoots) {
 
   LDBG() << "\n=== Step 1: Identifying Root Operations ===";
@@ -133,7 +141,12 @@ identifyRootOperations(scf::ForOp forOp, SmallVector<Operation *> &readRoots,
     if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
       if (isGlobalMemoryRead(read)) {
         readRoots.push_back(&op);
-        LDBG() << "  Read root: " << op;
+        LDBG() << "  Global read root: " << op;
+      }
+      // Shared memory read stage roots: vector.transfer_read from shared memory
+      else if (isSharedMemoryRead(read)) {
+        sharedReadRoots.push_back(&op);
+        LDBG() << "  Shared read root: " << op;
       }
     }
     // Write stage roots: all vector.transfer_write operations
@@ -157,8 +170,9 @@ identifyRootOperations(scf::ForOp forOp, SmallVector<Operation *> &readRoots,
     }
   }
 
-  LDBG() << "Found " << readRoots.size() << " read roots, " << writeRoots.size()
-         << " write roots, " << computeRoots.size() << " compute roots";
+  LDBG() << "Found " << readRoots.size() << " global read roots, "
+         << writeRoots.size() << " write roots, " << sharedReadRoots.size()
+         << " shared read roots, " << computeRoots.size() << " compute roots";
 
   // Validate that we have at least one read root - pipelining requires
   // global memory reads to prefetch
@@ -229,11 +243,13 @@ static LogicalResult computeBackwardSlice(ArrayRef<Operation *> roots,
 static LogicalResult classifyOperationsIntoStages(
     scf::ForOp forOp, const SetVector<Operation *> &readSlice,
     const SetVector<Operation *> &writeSlice,
+    const SetVector<Operation *> &sharedReadSlice,
     const SetVector<Operation *> &computeSlice, StageClassification &result) {
 
   LDBG() << "\n=== Step 3: Classifying Operations into Stages ===";
-  LDBG() << "  Read slice size: " << readSlice.size();
+  LDBG() << "  Global read slice size: " << readSlice.size();
   LDBG() << "  Write slice size: " << writeSlice.size();
+  LDBG() << "  Shared read slice size: " << sharedReadSlice.size();
   LDBG() << "  Compute slice size: " << computeSlice.size();
 
   // If compute slice only has the yield, there's no real compute
@@ -247,21 +263,28 @@ static LogicalResult classifyOperationsIntoStages(
     bool assigned = false;
 
     if (readSlice.contains(&op)) {
-      result.readStage.push_back(&op);
+      result.globalReadStage.push_back(&op);
       assigned = true;
-      LDBG() << "  READ: " << op;
+      LDBG() << "  GLOBAL READ: " << op;
     }
 
     // Don't duplicate ops that are in read stage
     if (writeSlice.contains(&op) && !assigned) {
-      result.writeStage.push_back(&op);
+      result.sharedWriteStage.push_back(&op);
       assigned = true;
       LDBG() << "  WRITE: " << op;
     }
 
-    // Don't duplicate ops already assigned to read or write stages. The compute
-    // slice (from scf.yield) naturally includes all operations, but we want to
-    // classify them based on their primary purpose
+    // Don't duplicate ops that are in previous stages
+    if (sharedReadSlice.contains(&op) && !assigned) {
+      result.sharedReadStage.push_back(&op);
+      assigned = true;
+      LDBG() << "  SHARED READ: " << op;
+    }
+
+    // Don't duplicate ops already assigned to read, write, or shared read
+    // stages. The compute slice (from scf.yield) naturally includes all
+    // operations, but we want to classify them based on their primary purpose
     if (computeSlice.contains(&op) && !assigned) {
       result.computeStage.push_back(&op);
       assigned = true;
@@ -276,11 +299,17 @@ static LogicalResult classifyOperationsIntoStages(
   }
 
   LDBG() << "\n=== Final Stage Classification ===";
-  LDBG() << "--- Read Stage (" << result.readStage.size() << " ops) ---";
-  for (Operation *op : result.readStage)
+  LDBG() << "--- Global Read Stage (" << result.globalReadStage.size()
+         << " ops) ---";
+  for (Operation *op : result.globalReadStage)
     LDBG() << *op;
-  LDBG() << "--- Write Stage (" << result.writeStage.size() << " ops) ---";
-  for (Operation *op : result.writeStage)
+  LDBG() << "--- Shared Write Stage (" << result.sharedWriteStage.size()
+         << " ops) ---";
+  for (Operation *op : result.sharedWriteStage)
+    LDBG() << *op;
+  LDBG() << "--- Shared Read Stage (" << result.sharedReadStage.size()
+         << " ops) ---";
+  for (Operation *op : result.sharedReadStage)
     LDBG() << *op;
   LDBG() << "--- Compute Stage (" << result.computeStage.size() << " ops) ---";
   for (Operation *op : result.computeStage)
@@ -306,25 +335,30 @@ computeStageClassification(scf::ForOp forOp) {
   }
 
   // Step 1: Identify root operations (with inline validation)
-  SmallVector<Operation *> readRoots, writeRoots, computeRoots;
-  if (failed(
-          identifyRootOperations(forOp, readRoots, writeRoots, computeRoots))) {
+  SmallVector<Operation *> readRoots, writeRoots, sharedReadRoots, computeRoots;
+  if (failed(identifyRootOperations(forOp, readRoots, writeRoots,
+                                    sharedReadRoots, computeRoots))) {
     return failure();
   }
 
   // Step 2: Compute backward slices
   LDBG() << "\n=== Step 2: Computing Backward Slices ===";
-  SetVector<Operation *> readSlice, writeSlice, computeSlice;
+  SetVector<Operation *> readSlice, writeSlice, sharedReadSlice, computeSlice;
 
   if (failed(computeBackwardSlice(readRoots, forOp, readSlice))) {
     return failure();
   }
-  LDBG() << "  Read slice: " << readSlice.size() << " operations";
+  LDBG() << "  Global read slice: " << readSlice.size() << " operations";
 
   if (failed(computeBackwardSlice(writeRoots, forOp, writeSlice))) {
     return failure();
   }
   LDBG() << "  Write slice: " << writeSlice.size() << " operations";
+
+  if (failed(computeBackwardSlice(sharedReadRoots, forOp, sharedReadSlice))) {
+    return failure();
+  }
+  LDBG() << "  Shared read slice: " << sharedReadSlice.size() << " operations";
 
   if (failed(computeBackwardSlice(computeRoots, forOp, computeSlice))) {
     return failure();
@@ -334,7 +368,8 @@ computeStageClassification(scf::ForOp forOp) {
   // Step 3: Classify operations into stages
   StageClassification result;
   if (failed(classifyOperationsIntoStages(forOp, readSlice, writeSlice,
-                                          computeSlice, result))) {
+                                          sharedReadSlice, computeSlice,
+                                          result))) {
     return failure();
   }
 
@@ -371,18 +406,27 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
   };
 
   if (numStages == 2) {
-    // Two-stage pipelining: readStage in stage 0, compute+write in stage 1.
-    for (Operation *op : stages.readStage)
+    // Two-stage pipelining: globalReadStage in stage 0,
+    // sharedRead+compute+sharedWrite in stage 1.
+    for (Operation *op : stages.globalReadStage)
       assignOp(op, /*stage=*/0);
-    for (Operation *op : stages.writeStage)
+    for (Operation *op : stages.sharedWriteStage)
       assignOp(op, /*stage=*/0);
+    // Shared read assigned to same stage as compute (stage 1)
+    for (Operation *op : stages.sharedReadStage)
+      assignOp(op, /*stage=*/1);
     for (Operation *op : stages.computeStage)
       assignOp(op, /*stage=*/1);
   } else {
-    for (Operation *op : stages.readStage)
+    // Multi-stage pipelining: globalReadStage in stage 0, sharedWrite in stage
+    // 1, sharedRead+compute in stage 2
+    for (Operation *op : stages.globalReadStage)
       assignOp(op, /*stage=*/0);
-    for (Operation *op : stages.writeStage)
+    for (Operation *op : stages.sharedWriteStage)
       assignOp(op, /*stage=*/1);
+    // Shared read assigned to same stage as compute (stage 2)
+    for (Operation *op : stages.sharedReadStage)
+      assignOp(op, /*stage=*/2);
     for (Operation *op : stages.computeStage)
       assignOp(op, /*stage=*/2);
   }
@@ -390,10 +434,10 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
 
 // Populates cluster IDs for each operation based on stage groupings.
 // Cluster ordering determines execution order within each iteration:
-// - 2-stage pipeline: read -> compute -> write
-//   (read i+1, compute i, write i)
-// - 3-stage pipeline: compute -> write -> read
-//   (compute i, write i+1, read i+2)
+// - 2-stage pipeline: globalRead -> sharedRead -> compute -> sharedWrite
+//   (globalRead i+1, sharedRead i+1, compute i, sharedWrite i)
+// - 3-stage pipeline: sharedRead -> compute -> sharedWrite -> globalRead
+//   (sharedRead i+2, compute i, sharedWrite i+1, globalRead i+2)
 static void
 populateOpToClusterMap(const StageClassification &stages,
                        unsigned numStages,
@@ -402,9 +446,15 @@ populateOpToClusterMap(const StageClassification &stages,
   unsigned clusterID = 0;
 
   if (numStages == 2) {
-    // 2-stage pipeline: read first, then compute, then write
-    // This allows reading for next iteration while computing current
-    for (Operation *op : stages.readStage) {
+    // 2-stage pipeline: globalRead first, then sharedRead, then compute, then
+    // sharedWrite This allows reading for next iteration while computing
+    // current
+    for (Operation *op : stages.globalReadStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.sharedReadStage) {
       opToCluster[op] = clusterID;
     }
     ++clusterID;
@@ -414,24 +464,30 @@ populateOpToClusterMap(const StageClassification &stages,
     }
     ++clusterID;
 
-    for (Operation *op : stages.writeStage) {
+    for (Operation *op : stages.sharedWriteStage) {
       opToCluster[op] = clusterID;
     }
     ++clusterID;
   } else {
-    // 3+ stage pipeline: compute first, then write, then read
-    // This maximizes distance between read and use
+    // 3+ stage pipeline: sharedRead first, then compute, then sharedWrite, then
+    // globalRead This maximizes distance between read and use
+
+    for (Operation *op : stages.sharedReadStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
     for (Operation *op : stages.computeStage) {
       opToCluster[op] = clusterID;
     }
     ++clusterID;
 
-    for (Operation *op : stages.writeStage) {
+    for (Operation *op : stages.sharedWriteStage) {
       opToCluster[op] = clusterID;
     }
     ++clusterID;
 
-    for (Operation *op : stages.readStage) {
+    for (Operation *op : stages.globalReadStage) {
       opToCluster[op] = clusterID;
     }
     ++clusterID;
@@ -452,9 +508,10 @@ static void buildFinalSchedule(
 
   // Collect all operations from all stages with their cluster IDs
   SmallVector<Operation *> allOps;
-  allOps.append(stages.readStage.begin(), stages.readStage.end());
+  allOps.append(stages.globalReadStage.begin(), stages.globalReadStage.end());
   allOps.append(stages.computeStage.begin(), stages.computeStage.end());
-  allOps.append(stages.writeStage.begin(), stages.writeStage.end());
+  allOps.append(stages.sharedWriteStage.begin(), stages.sharedWriteStage.end());
+  allOps.append(stages.sharedReadStage.begin(), stages.sharedReadStage.end());
 
   // Sort by cluster ID, maintaining original order within each cluster
   llvm::stable_sort(allOps, [&](Operation *a, Operation *b) {
