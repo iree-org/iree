@@ -137,6 +137,7 @@ void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
                                                  PatternBenefit benefit = 1);
 
 void populateDecomposeMemrefsPatterns(RewritePatternSet &patterns);
+void populateAlignMemRefOpsPatterns(RewritePatternSet &patterns);
 
 /// Add a pattern to combine instructions across scf.for boundary. It is common
 /// when doing incremental lowering to generate transient ops that cancel each
