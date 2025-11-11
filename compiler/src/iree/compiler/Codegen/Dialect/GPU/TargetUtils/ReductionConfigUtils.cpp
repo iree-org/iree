@@ -160,6 +160,7 @@ getVectorDistributeReductionConfig(
   SmallVector<int64_t> threadTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> threadCounts(op.getNumLoops(), 1);
   SmallVector<int64_t> subGroupCounts(op.getNumLoops(), 1);
+  SmallVector<int64_t> padding(op.getNumLoops(), 0);
   SmallVector<int64_t> mapping(op.getNumLoops());
   std::iota(mapping.begin(), mapping.end(), 0);
 
@@ -218,6 +219,7 @@ getVectorDistributeReductionConfig(
     threadTileSizes[parallelDims.back()] = threadLoads;
     threadCounts[parallelDims.back()] = threadBasis;
     subGroupCounts[parallelDims.back()] = subgroupBasis;
+    padding[parallelDims.back()] = threadBasis * threadLoads * subgroupBasis;
 
     ArrayAttr subgroupBasisAttr = b.getArrayAttr(
         {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
@@ -230,7 +232,8 @@ getVectorDistributeReductionConfig(
         NamedAttribute("serial", b.getI64ArrayAttr(serialTileSizes)),
         NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
         NamedAttribute("lane_basis", laneBasisAttr),
-        NamedAttribute("subgroup_basis", subgroupBasisAttr)};
+        NamedAttribute("subgroup_basis", subgroupBasisAttr),
+        NamedAttribute("padding", b.getI64ArrayAttr(padding))};
 
     auto configDict = b.getDictionaryAttr(configAttrs);
     auto loweringConfig =
@@ -298,6 +301,7 @@ getVectorDistributeReductionConfig(
   threadTileSizes[lastReductionDim] = threadLoads;
   threadCounts[lastReductionDim] = threadBasis;
   subGroupCounts[lastReductionDim] = subgroupBasis;
+  padding[lastReductionDim] = threadBasis * threadLoads * subgroupBasis;
 
   ArrayAttr subgroupBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
@@ -311,7 +315,8 @@ getVectorDistributeReductionConfig(
                      b.getI64ArrayAttr(partialReductionTileSizes)),
       NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
       NamedAttribute("lane_basis", threadBasisAttr),
-      NamedAttribute("subgroup_basis", subgroupBasisAttr)};
+      NamedAttribute("subgroup_basis", subgroupBasisAttr),
+      NamedAttribute("padding", b.getI64ArrayAttr(padding))};
 
   auto configDict = b.getDictionaryAttr(configAttrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
