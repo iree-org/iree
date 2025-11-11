@@ -77,14 +77,14 @@ util.func public @no_split_large_N_F_sizes(%arg0: tensor<16x98x50x1024xf32>, %ar
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5, d2 + d6, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-util.func public @no_split_small_H_W_sizes(%arg0: tensor<16x26x18x288xf32>, %arg1: tensor<16x24x16x288xf32>, %arg2: tensor<288x3x3x288xf32>) -> tensor<288x3x3x288xf32> {
-  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x26x18x288xf32>, tensor<16x24x16x288xf32>) outs(%arg2 : tensor<288x3x3x288xf32>) {
+util.func public @no_split_small_H_W_sizes(%arg0: tensor<16x26x18x96xf32>, %arg1: tensor<16x24x16x96xf32>, %arg2: tensor<96x3x3x96xf32>) -> tensor<96x3x3x96xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x26x18x96xf32>, tensor<16x24x16x96xf32>) outs(%arg2 : tensor<96x3x3x96xf32>) {
   ^bb0(%in: f32, %in_3: f32, %out: f32):
     %12 = arith.mulf %in, %in_3 : f32
     %13 = arith.addf %out, %12 : f32
     linalg.yield %13 : f32
-  } -> tensor<288x3x3x288xf32>
-  util.return %0 : tensor<288x3x3x288xf32>
+  } -> tensor<96x3x3x96xf32>
+  util.return %0 : tensor<96x3x3x96xf32>
 }
 
 // CHECK-LABEL:  @no_split_small_H_W_sizes
