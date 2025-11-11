@@ -1907,8 +1907,8 @@ getMmt4dInnerTileSizes(linalg::LinalgOp op) {
     return std::nullopt;
   }
   if (auto fillOp = dyn_cast<linalg::FillOp>(destOp)) {
-    auto emptyOp =
-        dyn_cast<tensor::EmptyOp>(fillOp.getDpsInitOperand(0)->getOwner());
+    auto emptyOp = dyn_cast<tensor::EmptyOp>(
+        fillOp.getDpsInitOperand(0)->get().getDefiningOp());
     if (!emptyOp) {
       LDBG() << "Could not infer inner tile sizes of a scalable mmt4d op!";
       return std::nullopt;
@@ -1930,7 +1930,6 @@ static bool adjustVectorSizesForScalableVectorization(
     SmallVector<int64_t> &vecTileSizes,
     IREE::Codegen::ScalableTileFlags &vecScalableTileFlags) {
   int64_t mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
-  auto rhsType = cast<ShapedType>(op.getDpsInputs()[1].getType());
   std::optional<SizesAndScalableFlags> scalableInnerTilesAndFlags =
       getMmt4dInnerTileSizes(op);
   if (!scalableInnerTilesAndFlags) {
@@ -1938,7 +1937,7 @@ static bool adjustVectorSizesForScalableVectorization(
     return false;
   }
   // TODO: Enable materialization and add corresponding mechanisms for SME.
-  if (hasSMEFeature(targetConfig) || !clDisableArmSMETiling) {
+  if (hasSMEFeature(targetConfig) && !clDisableArmSMETiling) {
     LDBG() << "SME is not supported yet!";
     return false;
   }
@@ -2020,7 +2019,7 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   // corresponding scalable flags.
   if (targetConfig && isScalableVectorizationEnabled())
     scalableTilesFound = adjustVectorSizesForScalableVectorization(
-        op, targetConfig, M0, N0, vecTileSize, vecScalableFlags);
+        op, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags);
   // In the existence of scalable tiles, we do not yet support limiting vector
   // sizes as this assumes static tile sizes.
   // TODO: extend this mechanism to handle _scalable_ tile sizes as well.

@@ -1623,7 +1623,7 @@ getScalableTileSizesAndFlags(ArrayRef<OpFoldResult> mixedInnerTiles) {
     // This is the case for scalable tile sizes.
     if (auto innerTileVal = dyn_cast<Value>(mixedInnerTiles[pos])) {
       std::optional<int64_t> innerTile =
-          getConstantVscaleMultiplier(innerTileVal);
+          vector::getConstantVscaleMultiplier(innerTileVal);
       if (!innerTile) {
         LDBG() << "Found non-scalable dynamic inner tile!";
         return std::nullopt;
