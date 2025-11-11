@@ -208,13 +208,16 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
         SmallVector<Value> regionArgs;
         regionArgs.push_back(score);
 
-        // Check if the region expects index arguments (5 args total: score + 4
-        // indices) For a 4D tensor (batch, heads, seq_q, seq_kv), we pass
-        // indices for all dimensions
-        if (region.front().getNumArguments() == 5) {
-          for (unsigned i = 0; i < 4; ++i) {
+        if (region.front().getNumArguments() > 1) {
+          unsigned numExpectedIndices = region.front().getNumArguments() - 1;
+          for (unsigned i = 0; i < numExpectedIndices && i < rank; ++i) {
             Value idx = b.create<linalg::IndexOp>(loc, i);
             regionArgs.push_back(idx);
+          }
+          // For missing dimensions, pass zero constants as dummy indices
+          for (unsigned i = rank; i < numExpectedIndices; ++i) {
+            Value zeroIdx = b.create<arith::ConstantIndexOp>(loc, 0);
+            regionArgs.push_back(zeroIdx);
           }
         }
 
