@@ -5,7 +5,7 @@
     "gfx942",
     "punet"
   ],
-  "module": "sdxl/modules/punet_gfx942",
-  "golden_dispatch_count" : 1482,
+  "module": "sdxl/modules/punet_gfx942_v2",
+  "golden_dispatch_count" : 1530,
   "golden_binary_size" : 2000000
 }
