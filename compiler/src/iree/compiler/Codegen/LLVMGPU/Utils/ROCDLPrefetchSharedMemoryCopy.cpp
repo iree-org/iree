@@ -418,15 +418,92 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
     for (Operation *op : stages.computeStage)
       assignOp(op, /*stage=*/1);
   } else {
-    // Multi-stage pipelining: globalReadStage in stage 0, sharedWrite in stage
-    // 1, sharedRead+compute in stage 2
+    // Multi-stage pipelining: globalReadStage in stage 0,
+    // sharedWrite + first-compute sharedReads in stage 1, remaining sharedRead
+    // + compute in stage 2
     for (Operation *op : stages.globalReadStage)
       assignOp(op, /*stage=*/0);
     for (Operation *op : stages.sharedWriteStage)
       assignOp(op, /*stage=*/1);
-    // Shared read assigned to same stage as compute (stage 2)
-    for (Operation *op : stages.sharedReadStage)
-      assignOp(op, /*stage=*/2);
+
+    // Strategy: For MFMA operations, ensure ALL their shared memory operands
+    // are prefetched in stage 1. This is critical for multi-operand operations
+    // like MFMA where all operands must be available to issue. We only prefetch
+    // shared reads that come from MFMA instructions to ensure correctness.
+    llvm::DenseSet<Operation *> earlyReads;
+
+    // Helper to trace back through operand chains to find shared memory reads
+    auto findSharedReadsInOperandChain =
+        [&](OperandRange values, llvm::DenseSet<Operation *> &visited) {
+          llvm::SmallVector<Value> worklist;
+          for (Value value : values) {
+            worklist.push_back(value);
+          }
+
+          while (!worklist.empty()) {
+            Value current = worklist.pop_back_val();
+            Operation *defOp = current.getDefiningOp();
+            if (!defOp || visited.contains(defOp))
+              continue;
+            visited.insert(defOp);
+
+            // Check if this is a shared memory read
+            bool isSharedRead = false;
+            for (Operation *readOp : stages.sharedReadStage) {
+              if (readOp == defOp) {
+                earlyReads.insert(readOp);
+                LDBG() << "    Found shared read in operand chain: " << *readOp;
+                isSharedRead = true;
+                break;
+              }
+            }
+
+            // If this is a shared read, we found what we're looking for
+            // Continue tracing back through other paths, but don't trace
+            // further back from this operation
+            if (isSharedRead)
+              continue;
+
+            // Trace back through operands of this operation
+            for (Value operand : defOp->getOperands()) {
+              worklist.push_back(operand);
+            }
+          }
+        };
+
+    // Find the first MFMA operation and prefetch its shared reads
+    // We only need to prefetch for the first MFMA; subsequent MFMAs in the
+    // same iteration will use data from previous iterations that's already
+    // been prefetched.
+    for (Operation *computeOp : stages.computeStage) {
+      // Only consider amdgpu.mfma operations for prefetching
+      if (auto mfmaOp = dyn_cast<amdgpu::MFMAOp>(computeOp)) {
+        LDBG() << "Found first MFMA operation: " << *mfmaOp;
+
+        // Find ALL shared memory reads that feed this MFMA operation
+        // by tracing back through the operand chains
+        llvm::DenseSet<Operation *> visited;
+        findSharedReadsInOperandChain(mfmaOp->getOperands(), visited);
+
+        // Only prefetch for the first MFMA
+        break;
+      }
+    }
+
+    LDBG() << "Total shared reads for MFMA operations: " << earlyReads.size()
+           << " out of " << stages.sharedReadStage.size();
+
+    // Assign stages based on the selection
+    for (Operation *op : stages.sharedReadStage) {
+      if (earlyReads.contains(op)) {
+        // Goes to stage 1 (with sharedWrite)
+        assignOp(op, /*stage=*/1);
+      } else {
+        // Remaining go to stage 2 (with compute)
+        assignOp(op, /*stage=*/2);
+      }
+    }
+
     for (Operation *op : stages.computeStage)
       assignOp(op, /*stage=*/2);
   }
@@ -436,11 +513,13 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
 // Cluster ordering determines execution order within each iteration:
 // - 2-stage pipeline: globalRead -> sharedRead -> compute -> sharedWrite
 //   (globalRead i+1, sharedRead i+1, compute i, sharedWrite i)
-// - 3-stage pipeline: sharedRead -> compute -> sharedWrite -> globalRead
-//   (sharedRead i+2, compute i, sharedWrite i+1, globalRead i+2)
+// - 3-stage pipeline:
+//   sharedWrite -> earlySharedRead (stage 1) -> lateSharedRead (stage
+//   2) -> compute -> globalRead This ensures early reads happen AFTER writes,
+//   avoiding read-before-write hazards
 static void
-populateOpToClusterMap(const StageClassification &stages,
-                       unsigned numStages,
+populateOpToClusterMap(const StageClassification &stages, unsigned numStages,
+                       const llvm::DenseMap<Operation *, unsigned> &opToStage,
                        llvm::DenseMap<Operation *, unsigned> &opToCluster) {
 
   unsigned clusterID = 0;
@@ -469,24 +548,53 @@ populateOpToClusterMap(const StageClassification &stages,
     }
     ++clusterID;
   } else {
-    // 3+ stage pipeline: sharedRead first, then compute, then sharedWrite, then
-    // globalRead This maximizes distance between read and use
+    // 3+ stage pipeline with first-compute prefetch:
+    // Cluster order: remaining sharedRead (stage 2) -> compute (stage 2) ->
+    //                sharedWrite (stage 1) -> first-compute sharedReads (stage
+    //                1) -> globalRead (stage 0)
+    // This ensures all operands of the first compute are prefetched in stage 1,
+    // critical for multi-operand ops like MFMA
 
+    // Cluster 0: Remaining shared reads (assigned to stage 2)
+    // These execute first in the loop body (stage 2 of iteration i)
     for (Operation *op : stages.sharedReadStage) {
-      opToCluster[op] = clusterID;
+      auto it = opToStage.find(op);
+      if (it != opToStage.end() && it->second == 2) {
+        // This is a remaining read (stage 2)
+        opToCluster[op] = clusterID;
+      }
     }
     ++clusterID;
 
+    // Cluster 1: Compute operations (stage 2)
+    // Execute after remaining reads in the same stage
     for (Operation *op : stages.computeStage) {
       opToCluster[op] = clusterID;
     }
     ++clusterID;
 
+    // Cluster 2: sharedWrite operations (stage 1)
+    // Execute after compute, in stage 1 of iteration i+1
     for (Operation *op : stages.sharedWriteStage) {
       opToCluster[op] = clusterID;
     }
     ++clusterID;
 
+    // Cluster 3: First-compute shared reads (assigned to stage 1)
+    // These execute after sharedWrite in the same stage (stage 1)
+    // This avoids read-before-write hazards while ensuring all operands
+    // of the first compute are available when it executes
+    for (Operation *op : stages.sharedReadStage) {
+      auto it = opToStage.find(op);
+      if (it != opToStage.end() && it->second == 1) {
+        // This is a first-compute operand read (stage 1)
+        opToCluster[op] = clusterID;
+      }
+    }
+    ++clusterID;
+
+    // Cluster 4: Global read operations (stage 0)
+    // Execute last, in stage 0 of iteration i+2
     for (Operation *op : stages.globalReadStage) {
       opToCluster[op] = clusterID;
     }
@@ -691,6 +799,9 @@ dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp,
                                                unsigned numStages) {
+  LDBG() << "Prefetching shared memory copies with " << numStages
+         << " stages for loop:\n"
+         << forOp;
   // No prefetching needed for single-stage pipelining.
   if (numStages <= 1) {
     return forOp;
@@ -712,7 +823,7 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   // Step 1: Populate standalone opToCluster map
   llvm::DenseMap<Operation *, unsigned> opToCluster;
-  populateOpToClusterMap(stages, numStages, opToCluster);
+  populateOpToClusterMap(stages, numStages, opToStage, opToCluster);
 
   // Step 2: Use opToCluster + opToStage to build the final schedule
   std::vector<std::pair<Operation *, unsigned>> finalSchedule;
