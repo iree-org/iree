@@ -415,10 +415,6 @@ struct FlexAttentionOpConversion
         builtinValue, scale, outputTensor,
         rewriter.getAffineMapArrayAttr(indexingMaps), mask);
 
-    // auto attention = IREE::LinalgExt::AttentionOp::create(
-    //     rewriter, loc, result.getType(), query, key, value, scale, result,
-    //     rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
-    // Create region for score_mod
     {
       OpBuilder::InsertionGuard g(rewriter);
       Block *block = rewriter.createBlock(&attentionOp.getRegion());
