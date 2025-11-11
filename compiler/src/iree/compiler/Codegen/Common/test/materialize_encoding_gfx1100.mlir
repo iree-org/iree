@@ -29,5 +29,5 @@ func.func @matmul_lowering_WMMAR3_F32_16x16x16_F16(
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = WMMAR3_F32_16x16x16_F16, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = WMMAR3_F32_16x16x16_F16, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, operands_interleaving_intrinsics_k = [0, 1]>
 // CHECK:       return %[[MMA]]

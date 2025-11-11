@@ -342,16 +342,33 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
 
   // Returns the final choice of attributes.
   if (auto intrinsicMma = dyn_cast<MMAAttr>(intrinsicAttr)) {
-    return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), intrinsicsM,
-                                 subgroupsM, intrinsicsN, subgroupsN,
-                                 intrinsicsK, subgroupsK);
+    // For non-scaled matmuls, the purpose of unrolling on K is to allow LHS/RHS
+    // loads to match the preferred load instruction size. This is achieved by
+    // enabling interleaving for those operands.
+    auto mmaInterleaveK =
+        DenseI64ArrayAttr::get(ctx, {kMMAOperandLhs, kMMAOperandRhs});
+    return DataTiledMMAAttr::get(
+        ctx, intrinsicMma.getIntrinsic(), intrinsicsM, subgroupsM, intrinsicsN,
+        subgroupsN, intrinsicsK, subgroupsK,
+        /*operands_interleaving_intrinsics_m=*/{},
+        /*operands_interleaving_intrinsics_n=*/{},
+        /*operands_interleaving_intrinsics_k=*/mmaInterleaveK);
   }
+  // For scaled matmuls, interleaving happens because we want to load all
+  // the unrolled scales with each vector load, so we need to interleave at
+  // the very last dimension for the scales. For the LHS/RHS, we load in blocks,
+  // so we don't need to interleave.
+  auto scaledMmaInterleaveK = DenseI64ArrayAttr::get(
+      ctx, {kScaledMMAOperandLhsScale, kScaledMMAOperandRhsScale});
   auto intrinsicScaledMma = cast<ScaledMMAAttr>(intrinsicAttr);
   return DataTiledScaledMMAAttr::get(
       ctx, intrinsicScaledMma.getIntrinsic(),
       intrinsicScaledMma.getLhsElemType(), intrinsicScaledMma.getRhsElemType(),
       intrinsicScaledMma.getAccElemType(), intrinsicsM, subgroupsM, intrinsicsN,
-      subgroupsN, intrinsicsK, subgroupsK);
+      subgroupsN, intrinsicsK, subgroupsK,
+      /*operands_interleaving_intrinsics_m=*/{},
+      /*operands_interleaving_intrinsics_n=*/{},
+      /*operands_interleaving_intrinsics_k=*/scaledMmaInterleaveK);
 }
 
 static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
