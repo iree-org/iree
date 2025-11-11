@@ -19,6 +19,7 @@ iree_cc_library(
     "CompilerDriver.cpp"
     "Diagnostics.cpp"
   DEPS
+    LLVMRemarks
     LLVMSupport
     LLVMTargetParser
     MLIRBuiltinToLLVMIRTranslation
@@ -27,6 +28,7 @@ iree_cc_library(
     MLIRDebug
     MLIRIR
     MLIRParser
+    MLIRRemarkStreamer
     MLIRSupport
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
