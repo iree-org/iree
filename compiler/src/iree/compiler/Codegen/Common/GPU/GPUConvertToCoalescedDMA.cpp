@@ -408,29 +408,45 @@ struct ConvertGatherToCoalescedDMA
 
     Value indices = tiledGatherOp.getIndices();
 
+    // Create the DMA op with properly extracted indices (keeping tensor type)
+    rewriter.setInsertionPoint(inParallelOp);
+    SmallVector<Value> indicesVec;
+
     if (indices) {
-      rewriter.setInsertionPoint(inParallelOp);
       auto indicesType = cast<RankedTensorType>(indices.getType());
 
-      // TODO: Support multi-dimensional indices in the future.
-      // Currently only 1D indices are supported for gather operations.
-      if (indicesType.getRank() > 1) {
-        return rewriter.notifyMatchFailure(
-            tiledGatherOp,
-            "Only 1D indices are currently supported for gather operations");
-      }
-      SmallVector<Value> readIndices(indicesType.getRank());
-      for (int64_t i = 0; i < indicesType.getRank(); ++i) {
-        readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
+      if (indicesType.getRank() == 1) {
+        // For 1D indices, use directly as tensor
+        indicesVec.push_back(indices);
+      } else {
+        int64_t batchSize = indicesType.getShape()[0];
+        int64_t indexDepth = indicesType.getShape()[1];
+        auto elementType = indicesType.getElementType();
+
+        for (int64_t dim = 0; dim < indexDepth; ++dim) {
+          SmallVector<OpFoldResult> offsets = {rewriter.getIndexAttr(0),
+                                               rewriter.getIndexAttr(dim)};
+          SmallVector<OpFoldResult> sizes = {rewriter.getIndexAttr(batchSize),
+                                             rewriter.getIndexAttr(1)};
+          SmallVector<OpFoldResult> strides = {rewriter.getIndexAttr(1),
+                                               rewriter.getIndexAttr(1)};
+
+          Value extractedSlice = tensor::ExtractSliceOp::create(
+              rewriter, loc, indices, offsets, sizes, strides);
+
+          // Collapse from [N, 1] to [N]
+          SmallVector<ReassociationIndices> reassociation = {{0, 1}};
+          auto collapsedType = RankedTensorType::get({batchSize}, elementType);
+          Value collapsedSlice = tensor::CollapseShapeOp::create(
+              rewriter, loc, collapsedType, extractedSlice, reassociation);
+
+          indicesVec.push_back(collapsedSlice);
+        }
       }
     }
 
     // Create the DMA op
     rewriter.setInsertionPointToStart(&inParallelBlock);
-    SmallVector<Value> indicesVec;
-    if (indices) {
-      indicesVec.push_back(indices);
-    }
 
     IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, Type(), source,
                                             indicesVec, sharedOut, laneId);

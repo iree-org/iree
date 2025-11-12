@@ -251,25 +251,49 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     }
   }
 
+  // For gather operations with indices, all index vectors should have the same
+  // length equal to the batch size (first dimension of destination).
+  if (!indices.empty()) {
+    // Verify all index vectors are 1D and have the same length
+    auto firstIndexShape = cast<ShapedType>(indices[0].getType()).getShape();
+    if (firstIndexShape.size() != 1) {
+      return emitOpError("expected index 0 to be a 1-D tensor or vector");
+    }
+    int64_t batchSize = firstIndexShape.front();
+
+    for (auto [i, indexVal] : llvm::enumerate(indices)) {
+      auto indexShape = cast<ShapedType>(indexVal.getType()).getShape();
+      if (indexShape.size() != 1) {
+        return emitOpError("expected index ")
+               << i << " to be a 1-D tensor or vector";
+      }
+      if (indexShape.front() != batchSize) {
+        return emitOpError(
+                   "expected all index vectors to have the same length; ")
+               << "index " << i << " has length " << indexShape.front()
+               << " but expected " << batchSize;
+      }
+    }
+
+    // The batch size should match the first dimension of the destination
+    if (!initShape.empty() && batchSize != initShape[0]) {
+      return emitOpError("expected batch size (length of index vectors: ")
+             << batchSize << ") to match first destination dimension ("
+             << initShape[0] << ")";
+    }
+  }
+
+  // Verify the contiguous (non-indexed) dimensions match between source and
+  // dest
   for (auto [dim, size] : llvm::enumerate(initShape)) {
-    if (dim > sourceShape.size()) {
+    if (dim >= sourceShape.size()) {
       return emitOpError("expected source to have at least ")
              << (dim + 1) << " dimensions when destination has rank "
              << initShape.size();
     }
 
-    // Check the indices is the same shape of init.
+    // Skip indexed dimensions - they're validated above
     if (dim < indices.size()) {
-      auto indexShape = cast<ShapedType>(indices[dim].getType()).getShape();
-      if (indexShape.size() != 1) {
-        return emitOpError("expected index ")
-               << dim << " to be a 1-D tensor or vector";
-      }
-      if (indexShape.front() != size) {
-        return emitOpError("expected index ")
-               << dim << " to have length " << size
-               << " to match destination dimension " << dim;
-      }
       continue;
     }
 
