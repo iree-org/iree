@@ -334,6 +334,16 @@ struct DecomposeMismatchEncodingTensorLoadOp
           loadOp, "source bound type is not a RankedTensorType");
     }
 
+    // Only decompose if there's an encoding involved. If neither the source
+    // nor the destination has an encoding, this pattern should not match.
+    // This can happen when isLoadOfWholeSource() returns true but the load
+    // reshapes the tensor (e.g., loading a 4D tensor from a 5D source).
+    RankedTensorType destType = loadOp.getResult().getType();
+    if (!boundTensorType.getEncoding() && !destType.getEncoding()) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "no encoding involved in source or destination");
+    }
+
     // We have to check the bound type from converted DispatchTensorType because
     // it is what we'll see in encoding materialization. E.g.,
     // GPUPaddingResolver converts RankedTensorType into the same type, but it
@@ -341,7 +351,6 @@ struct DecomposeMismatchEncodingTensorLoadOp
     // larger tensor shape for bound type.
     auto convertedSrcType =
         typeConverter.convertType<IREE::TensorExt::DispatchTensorType>(srcType);
-    RankedTensorType destType = loadOp.getResult().getType();
     if (typeConverter.convertType(convertedSrcType.getBoundType()) ==
         typeConverter.convertType(destType)) {
       return rewriter.notifyMatchFailure(
@@ -393,12 +402,21 @@ struct DecomposeMismatchEncodingTensorStoreOp
           storeOp, "target bound type is not a RankedTensorType");
     }
 
+    // Only decompose if there's an encoding involved. If neither the value
+    // nor the target has an encoding, this pattern should not match.
+    // This can happen when isStoreToWholeTarget() returns true but the store
+    // reshapes the tensor (e.g., storing a 4D tensor to a 5D target).
+    RankedTensorType valueType = storeOp.getValue().getType();
+    if (!boundTensorType.getEncoding() && !valueType.getEncoding()) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "no encoding involved in value or target");
+    }
+
     // Similar to DecomposeMismatchEncodingTensorLoadOp, we have to check with
     // the bound type from converted DispatchTensorType.
     auto convertedTargetType =
         typeConverter.convertType<IREE::TensorExt::DispatchTensorType>(
             targetType);
-    RankedTensorType valueType = storeOp.getValue().getType();
     if (typeConverter.convertType(convertedTargetType.getBoundType()) ==
         typeConverter.convertType(valueType)) {
       return rewriter.notifyMatchFailure(
