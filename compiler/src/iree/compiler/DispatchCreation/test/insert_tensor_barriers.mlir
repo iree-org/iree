@@ -13,11 +13,11 @@ util.func public @simple_linalg(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
   util.return %0 : tensor<4x8xf32>
 }
 // CHECK-LABEL: util.func public @simple_linalg
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x8xf32>
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.barrier.start %[[ARG0]]
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.barrier.end %[[GENERIC]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
 //       CHECK:   util.return %[[END]]
 
 // -----
@@ -44,14 +44,14 @@ util.func public @multiple_compute_ops(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   util.return %1 : tensor<4xf32>
 }
 // CHECK-LABEL: util.func public @multiple_compute_ops
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4xf32>
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.barrier.start %[[ARG0]]
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
 //       CHECK:   %[[GENERIC1:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[GENERIC0]] :
-//   CHECK-NOT:   barrier.start
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.barrier.end %[[GENERIC1]]
+//   CHECK-NOT:   compute_barrier.start
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC1]]
 //       CHECK:   util.return %[[END]]
 
 // -----
@@ -72,14 +72,14 @@ util.func public @with_reshapes(%arg0: tensor<32xf32>) -> tensor<4x8xf32> {
   util.return %result : tensor<4x8xf32>
 }
 // CHECK-LABEL: util.func public @with_reshapes
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<32xf32>
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.barrier.start %[[ARG0]]
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[START]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[EXPANDED]] :
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[GENERIC]]
 //       CHECK:   %[[RESULT:.+]] = tensor.expand_shape %[[COLLAPSED]]
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.barrier.end %[[RESULT]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[RESULT]]
 //       CHECK:   util.return %[[END]]
 
 // -----
@@ -89,10 +89,10 @@ util.func public @tensor_reshape_only(%arg0: tensor<32xf32>) -> tensor<4x8xf32> 
   util.return %expanded : tensor<4x8xf32>
 }
 // CHECK-LABEL: util.func public @tensor_reshape_only
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<32xf32>
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.barrier.start %[[ARG0]]
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[START]]
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.barrier.end %[[EXPANDED]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[EXPANDED]]
 //       CHECK:   util.return %[[END]]
 
 // -----
@@ -115,10 +115,10 @@ util.func public @with_hal_ops(%arg0: !hal.buffer_view, %arg1: !hal.fence) -> !h
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !hal.buffer_view
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.fence
 //       CHECK:   %[[IMPORT:.+]] = hal.tensor.import wait(%[[ARG1]]) => %[[ARG0]]
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.barrier.start %[[IMPORT]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[IMPORT]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.barrier.end %[[GENERIC]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
 //       CHECK:   %[[EXPORT:.+]] = hal.tensor.export %[[END]]
 //       CHECK:   util.return %[[EXPORT]]
 
@@ -135,15 +135,15 @@ util.func public @with_hal_barrier_dynamic(%arg0: tensor<?xf32>, %arg1: !hal.fen
 }
 // Verifies that tensor.dim doesn't trigger barrier insertion (metadata ops).
 // CHECK-LABEL: util.func public @with_hal_barrier_dynamic
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.fence
-//   CHECK-NOT:   barrier.start
+//   CHECK-NOT:   compute_barrier.start
 //       CHECK:   %[[BARRIER:.+]]:2 = hal.tensor.barrier join(%[[ARG0]], %[[ARG0]]
 //       CHECK:   %[[DIM0:.+]] = tensor.dim %[[BARRIER]]#0
 //       CHECK:   %[[DIM1:.+]] = tensor.dim %[[BARRIER]]#1
 //       CHECK:   %[[EXPORT0:.+]] = hal.tensor.export %[[BARRIER]]#0
 //       CHECK:   %[[EXPORT1:.+]] = hal.tensor.export %[[BARRIER]]#1
-//   CHECK-NOT:   barrier.end
+//   CHECK-NOT:   compute_barrier.end
 //       CHECK:   util.return %[[EXPORT0]], %[[EXPORT1]]
 
 // -----
@@ -165,9 +165,9 @@ util.func public @linalg_with_dynamic_dims(%arg0: tensor<?x?xf32>) -> tensor<?x?
   util.return %result : tensor<?x?xf32>
 }
 // CHECK-LABEL: util.func public @linalg_with_dynamic_dims
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.barrier.start %[[ARG0]]
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.barrier.end %[[GENERIC]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
 //       CHECK:   util.return %[[END]]

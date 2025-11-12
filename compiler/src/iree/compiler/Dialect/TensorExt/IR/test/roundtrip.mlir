@@ -53,8 +53,8 @@ util.func public @tensorBitCastDynamic(%arg0: tensor<?x16xi32>, %arg1: index, %a
 
 // CHECK-LABEL: @barrier_start_static
 util.func public @barrier_start_static(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
-  // CHECK: iree_tensor_ext.barrier.start
-  %0 = iree_tensor_ext.barrier.start %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK: iree_tensor_ext.compute_barrier.start
+  %0 = iree_tensor_ext.compute_barrier.start %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
   util.return %0 : tensor<4x8xf32>
 }
 
@@ -63,8 +63,8 @@ util.func public @barrier_start_static(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32
 // CHECK-LABEL: @barrier_start_dynamic
 // CHECK-SAME: %[[ARG0:.+]]: tensor<?x?xf32>, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index
 util.func public @barrier_start_dynamic(%arg0: tensor<?x?xf32>, %dim0: index, %dim1: index) -> tensor<?x?xf32> {
-  // CHECK: iree_tensor_ext.barrier.start %arg0 : tensor<?x?xf32>{%[[DIM0]], %[[DIM1]]} -> tensor<?x?xf32>
-  %0 = iree_tensor_ext.barrier.start %arg0 : tensor<?x?xf32>{%dim0, %dim1} -> tensor<?x?xf32>
+  // CHECK: iree_tensor_ext.compute_barrier.start %arg0 : tensor<?x?xf32>{%[[DIM0]], %[[DIM1]]} -> tensor<?x?xf32>
+  %0 = iree_tensor_ext.compute_barrier.start %arg0 : tensor<?x?xf32>{%dim0, %dim1} -> tensor<?x?xf32>
   util.return %0 : tensor<?x?xf32>
 }
 
@@ -72,8 +72,8 @@ util.func public @barrier_start_dynamic(%arg0: tensor<?x?xf32>, %dim0: index, %d
 
 // CHECK-LABEL: @barrier_end_static
 util.func public @barrier_end_static(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
-  // CHECK: iree_tensor_ext.barrier.end
-  %0 = iree_tensor_ext.barrier.end %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK: iree_tensor_ext.compute_barrier.end
+  %0 = iree_tensor_ext.compute_barrier.end %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
   util.return %0 : tensor<4x8xf32>
 }
 
@@ -82,7 +82,7 @@ util.func public @barrier_end_static(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> 
 // CHECK-LABEL: @barrier_end_dynamic
 // CHECK-SAME: %[[ARG0:.+]]: tensor<?x?xf32>, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index
 util.func public @barrier_end_dynamic(%arg0: tensor<?x?xf32>, %dim0: index, %dim1: index) -> tensor<?x?xf32> {
-  // CHECK: iree_tensor_ext.barrier.end %[[ARG0]] : tensor<?x?xf32>{%[[DIM0]], %[[DIM1]]} -> tensor<?x?xf32>
-  %0 = iree_tensor_ext.barrier.end %arg0 : tensor<?x?xf32>{%dim0, %dim1} -> tensor<?x?xf32>
+  // CHECK: iree_tensor_ext.compute_barrier.end %[[ARG0]] : tensor<?x?xf32>{%[[DIM0]], %[[DIM1]]} -> tensor<?x?xf32>
+  %0 = iree_tensor_ext.compute_barrier.end %arg0 : tensor<?x?xf32>{%dim0, %dim1} -> tensor<?x?xf32>
   util.return %0 : tensor<?x?xf32>
 }
