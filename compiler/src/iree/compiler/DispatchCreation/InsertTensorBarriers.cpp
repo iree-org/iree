@@ -35,7 +35,7 @@ static bool isComputeOp(Operation *op) {
 
 // Traverse forward along use-def chains starting from `val` to identify values
 // that flow into compute operations. These values are candidates for inserting
-// barrier.start operations.
+// compute_barrier.start operations.
 static void collectInputsToComputeRegion(Value val,
                                          llvm::SetVector<Value> &inputValues,
                                          llvm::DenseSet<Value> &visited) {
@@ -60,7 +60,7 @@ static void collectInputsToComputeRegion(Value val,
 
 // Traverse backward along use-def chains starting from `val` to identify values
 // produced by compute operations. These values are candidates for inserting
-// barrier.end operations.
+// compute_barrier.end operations.
 static void
 collectOutputsFromComputeRegion(Value val, llvm::SetVector<Value> &outputValues,
                                 llvm::DenseSet<Value> &visited) {
@@ -86,7 +86,8 @@ struct InsertTensorBarriersPass final
     auto funcOp = getOperation();
     OpBuilder builder(funcOp.getContext());
 
-    // Insert barrier.start operations for values that flow into compute ops.
+    // Insert compute_barrier.start operations for values that flow into compute
+    // ops.
     llvm::SetVector<Value> needsStartBarrier;
     llvm::DenseSet<Value> visited;
     llvm::for_each(funcOp.getArguments(), [&](BlockArgument arg) {
@@ -98,8 +99,8 @@ struct InsertTensorBarriersPass final
         continue;
       }
       builder.setInsertionPointAfterValue(val);
-      auto startOp =
-          IREE::TensorExt::BarrierStartOp::create(builder, val.getLoc(), val);
+      auto startOp = IREE::TensorExt::ComputeBarrierStartOp::create(
+          builder, val.getLoc(), val);
 
       val.replaceUsesWithIf(startOp.getResult(), [&](OpOperand &use) {
         return isComputeOp(use.getOwner()) &&
@@ -107,7 +108,8 @@ struct InsertTensorBarriersPass final
       });
     }
 
-    // Insert barrier.end operations for values that flow out of compute ops.
+    // Insert compute_barrier.end operations for values that flow out of compute
+    // ops.
     llvm::SetVector<Value> needsEndBarrier;
     visited.clear();
     funcOp.walk([&](Operation *op) {
@@ -129,8 +131,8 @@ struct InsertTensorBarriersPass final
       }
 
       builder.setInsertionPointAfter(definingOp);
-      auto endOp =
-          IREE::TensorExt::BarrierEndOp::create(builder, val.getLoc(), val);
+      auto endOp = IREE::TensorExt::ComputeBarrierEndOp::create(
+          builder, val.getLoc(), val);
       val.replaceUsesWithIf(endOp.getResult(), [&](OpOperand &use) {
         return !isComputeOp(use.getOwner()) && use.getOwner() != endOp &&
                !isa<tensor::DimOp>(use.getOwner());

@@ -23,10 +23,10 @@ struct RemoveTensorBarriersPass final
     auto funcOp = getOperation();
     IRRewriter rewriter(funcOp.getContext());
 
-    funcOp.walk([&](IREE::TensorExt::BarrierStartOp op) {
+    funcOp.walk([&](IREE::TensorExt::ComputeBarrierStartOp op) {
       rewriter.replaceOp(op, op.getValue());
     });
-    funcOp.walk([&](IREE::TensorExt::BarrierEndOp op) {
+    funcOp.walk([&](IREE::TensorExt::ComputeBarrierEndOp op) {
       rewriter.replaceOp(op, op.getValue());
     });
   }
