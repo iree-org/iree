@@ -46,7 +46,7 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       *this,
       "split-reduction",
       llvm::cl::desc("Enable split reduction for dispatch creation pipeline"),
-      llvm::cl::init(false),
+      llvm::cl::init(true),
   };
   Option<bool> constExprHoisting{
       *this,
