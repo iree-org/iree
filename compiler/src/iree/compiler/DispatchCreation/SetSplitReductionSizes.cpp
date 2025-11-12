@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -94,7 +95,8 @@ struct SetSplitReductionSizesPass final
       }
 
       // --- Case 1: Outer reduction ---
-      if (auto tileSizes = getOuterReductionSizes(tilingOp)) {
+      if (auto tileSizes =
+              getOuterReductionSizes(tilingOp, enableSplitArgCompare)) {
         IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
         return;
       }
@@ -118,10 +120,18 @@ private:
   /// targeting reductions such as those that appear in batch normalization,
   /// which reduce over outer dimensions of a tensor.
   std::optional<SmallVector<int64_t>>
-  getOuterReductionSizes(PartialReductionOpInterface op) const {
+  getOuterReductionSizes(PartialReductionOpInterface op,
+                         bool enableSplitArgCompare) const {
     SmallVector<utils::IteratorType> iters = op.getLoopIteratorTypes();
     if (iters.empty() || iters.front() != utils::IteratorType::reduction) {
       LDBG() << "skipping op; not outer-reduction";
+      return std::nullopt;
+    }
+
+    auto argCompareOp =
+        dyn_cast<IREE::LinalgExt::ArgCompareOp>(op.getOperation());
+    if (argCompareOp && !enableSplitArgCompare) {
+      LDBG() << "skipping op; disable splitting on arg-compare ops";
       return std::nullopt;
     }
 

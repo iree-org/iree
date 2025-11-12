@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes{enable-split-arg-compare}))" --split-input-file %s | FileCheck %s --check-prefix=ARGCOMPARE
 
 // CHECK-LABEL: @basic
 util.func public @basic(%arg0: tensor<4096xf32>) -> tensor<1xf32> {
@@ -95,10 +96,8 @@ util.func public @negative_outer_dynamic_reduction(%arg0: tensor<?x64xf32>, %d0:
 
 // -----
 
-// CHECK-LABEL: @arg_compare_basic
 util.func public @arg_compare_basic(%arg0: tensor<4096xf32>)
     -> (tensor<f32>, tensor<index>) {
-  // CHECK: iree_linalg_ext.split_reduction = [1024 : index]
   %c0f = arith.constant 0.0 : f32
   %c0i = arith.constant 0 : index
 
@@ -121,13 +120,16 @@ util.func public @arg_compare_basic(%arg0: tensor<4096xf32>)
   util.return %res#0, %res#1 : tensor<f32>, tensor<index>
 }
 
+// CHECK-LABEL: @arg_compare_basic
+// CHECK-NOT: iree_linalg_ext.split_reduction
+
+// ARGCOMPARE-LABEL: @arg_compare_basic
+// ARGCOMPARE: iree_linalg_ext.split_reduction = [1024 : index]
+
 // -----
 
-// CHECK-LABEL: @arg_compare_inner_dynamic_parallel
 util.func public @arg_compare_inner_dynamic_parallel(%arg0: tensor<4096x?xf32>, %d0: index)
     -> (tensor<?xf32>, tensor<?xindex>) {
-  // Dynamic parallel dimension shouldn't prevent tiling.
-  // CHECK: iree_linalg_ext.split_reduction = [1024 : index]
   %c0f = arith.constant 0.0 : f32
   %c0i = arith.constant 0 : index
 
@@ -150,14 +152,18 @@ util.func public @arg_compare_inner_dynamic_parallel(%arg0: tensor<4096x?xf32>, 
   util.return %res_val, %res_idx : tensor<?xf32>, tensor<?xindex>
 }
 
+// CHECK-LABEL: @arg_compare_inner_dynamic_parallel
+// CHECK-NOT: iree_linalg_ext.split_reduction
+
+// Dynamic parallel dimension shouldn't prevent tiling.
+// ARGCOMPARE-LABEL: @arg_compare_inner_dynamic_parallel
+// ARGCOMPARE: iree_linalg_ext.split_reduction = [1024 : index]
+
 // -----
 
-// CHECK-LABEL: @arg_compare_negative_outer_dynamic_reduction
 util.func public @arg_compare_negative_outer_dynamic_reduction(
     %arg0: tensor<?x64xf32>, %d0: index)
     -> (tensor<64xf32>, tensor<64xindex>) {
-  // We bail out on dynamic reduction dimensions.
-  // CHECK-NOT: iree_linalg_ext.split_reduction
   %c0f = arith.constant 0.0 : f32
   %c0i = arith.constant 0 : index
 
@@ -179,3 +185,10 @@ util.func public @arg_compare_negative_outer_dynamic_reduction(
 
   util.return %res_val, %res_idx : tensor<64xf32>, tensor<64xindex>
 }
+
+// CHECK-LABEL: @arg_compare_negative_outer_dynamic_reduction
+// CHECK-NOT: iree_linalg_ext.split_reduction
+
+// We bail out on dynamic reduction dimensions.
+// ARGCOMPARE-LABEL: @arg_compare_negative_outer_dynamic_reduction
+// ARGCOMPARE-NOT: iree_linalg_ext.split_reduction

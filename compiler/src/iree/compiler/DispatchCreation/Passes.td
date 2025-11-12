@@ -288,7 +288,9 @@ def SetSplitReductionSizesPass :
     Option<"splitReductionTargetSize", "split-reduction-target-size", "int64_t", "1024",
            "Target tile size for split reduction. Inner reduction "
            "dimensions are tiled first, with the tile size rounded "
-           "up until it evenly divides the iteration domain.">
+           "up until it evenly divides the iteration domain.">,
+    Option<"enableSplitArgCompare", "enable-split-arg-compare", "bool",
+           /*default=*/"false", "Enable setting split reduction size on arg compare ops">
   ];
   let dependentDialects = [];
 }
