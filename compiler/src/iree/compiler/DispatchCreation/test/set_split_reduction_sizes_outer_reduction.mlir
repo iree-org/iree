@@ -1,9 +1,7 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes))" --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes{enable-split-arg-compare}))" --split-input-file %s | FileCheck %s --check-prefix=ARGCOMPARE
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes{enable-split-outer-reduction}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes))" --split-input-file %s | FileCheck %s --check-prefix=DISABLE
 
-// CHECK-LABEL: @basic
 util.func public @basic(%arg0: tensor<4096xf32>) -> tensor<1xf32> {
-  // CHECK: iree_linalg_ext.split_reduction = [1024 : index]
   %1 = arith.constant dense<0.0> : tensor<1xf32>
   %2 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (0)>],
@@ -16,12 +14,14 @@ util.func public @basic(%arg0: tensor<4096xf32>) -> tensor<1xf32> {
   util.return %2 : tensor<1xf32>
 }
 
+// CHECK-LABEL: @basic
+// CHECK: iree_linalg_ext.split_reduction = [1024 : index]
+
+// DISABLE-NOT: iree_linalg_ext.split_reduction
+
 // -----
 
-// CHECK-LABEL: @basic_multi_dim
 util.func public @basic_multi_dim(%arg0: tensor<4x512xf32>) -> tensor<f32> {
-  // With multiple reduction dims, inner dims are tiled first.
-  // CHECK: iree_linalg_ext.split_reduction = [2 : index, 512 : index]
   %1 = arith.constant dense<0.0> : tensor<f32>
   %2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> ()>],
@@ -34,13 +34,13 @@ util.func public @basic_multi_dim(%arg0: tensor<4x512xf32>) -> tensor<f32> {
   util.return %2 : tensor<f32>
 }
 
+// With multiple reduction dims, inner dims are tiled first.
+// CHECK-LABEL: @basic_multi_dim
+// CHECK: iree_linalg_ext.split_reduction = [2 : index, 512 : index]
+
 // -----
 
-// CHECK-LABEL: @basic_round_split_tile_size_up
 util.func public @basic_round_split_tile_size_up(%arg0: tensor<255x255xf32>) -> tensor<f32> {
-  // To get the tile size to divide the iteration domain evenly, we chose a tile
-  // size (5x255=1275) that exceeds the specified target tile size (1024).
-  // CHECK: iree_linalg_ext.split_reduction = [5 : index, 255 : index]
   %1 = arith.constant dense<0.0> : tensor<f32>
   %2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> ()>],
@@ -53,12 +53,14 @@ util.func public @basic_round_split_tile_size_up(%arg0: tensor<255x255xf32>) -> 
   util.return %2 : tensor<f32>
 }
 
+// To get the tile size to divide the iteration domain evenly, we chose a tile
+// size (5x255=1275) that exceeds the specified target tile size (1024).
+// CHECK-LABEL: @basic_round_split_tile_size_up
+// CHECK: iree_linalg_ext.split_reduction = [5 : index, 255 : index]
+
 // -----
 
-// CHECK-LABEL: @inner_dynamic_parallel
 util.func public @inner_dynamic_parallel(%arg0: tensor<4096x?xf32>, %d0: index) -> tensor<?xf32> {
-  // Dynamic parallel dimensions shouldn't prevent tiling.
-  // CHECK: iree_linalg_ext.split_reduction = [1024 : index]
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f32
   %0 = tensor.empty(%d0) : tensor<?xf32>
@@ -74,12 +76,13 @@ util.func public @inner_dynamic_parallel(%arg0: tensor<4096x?xf32>, %d0: index) 
   util.return %2 : tensor<?xf32>
 }
 
+// Dynamic parallel dimensions shouldn't prevent tiling.
+// CHECK-LABEL: @inner_dynamic_parallel
+// CHECK: iree_linalg_ext.split_reduction = [1024 : index]
+
 // -----
 
-// CHECK-LABEL: @negative_outer_dynamic_reduction
 util.func public @negative_outer_dynamic_reduction(%arg0: tensor<?x64xf32>, %d0: index) -> tensor<64xf32> {
-  // We bail out on dynamic reduction dimensions.
-  // CHECK-NOT: iree_linalg_ext.split_reduction
   %cst = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<64xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64xf32>) -> tensor<64xf32>
@@ -93,6 +96,10 @@ util.func public @negative_outer_dynamic_reduction(%arg0: tensor<?x64xf32>, %d0:
   } -> tensor<64xf32>
   util.return %2 : tensor<64xf32>
 }
+
+// We bail out on dynamic reduction dimensions.
+// CHECK-LABEL: @negative_outer_dynamic_reduction
+// CHECK-NOT: iree_linalg_ext.split_reduction
 
 // -----
 
@@ -121,10 +128,9 @@ util.func public @arg_compare_basic(%arg0: tensor<4096xf32>)
 }
 
 // CHECK-LABEL: @arg_compare_basic
-// CHECK-NOT: iree_linalg_ext.split_reduction
+// CHECK: iree_linalg_ext.split_reduction = [1024 : index]
 
-// ARGCOMPARE-LABEL: @arg_compare_basic
-// ARGCOMPARE: iree_linalg_ext.split_reduction = [1024 : index]
+// DISABLE-NOT: iree_linalg_ext.split_reduction
 
 // -----
 
@@ -152,12 +158,9 @@ util.func public @arg_compare_inner_dynamic_parallel(%arg0: tensor<4096x?xf32>, 
   util.return %res_val, %res_idx : tensor<?xf32>, tensor<?xindex>
 }
 
-// CHECK-LABEL: @arg_compare_inner_dynamic_parallel
-// CHECK-NOT: iree_linalg_ext.split_reduction
-
 // Dynamic parallel dimension shouldn't prevent tiling.
-// ARGCOMPARE-LABEL: @arg_compare_inner_dynamic_parallel
-// ARGCOMPARE: iree_linalg_ext.split_reduction = [1024 : index]
+// CHECK-LABEL: @arg_compare_inner_dynamic_parallel
+// CHECK: iree_linalg_ext.split_reduction = [1024 : index]
 
 // -----
 
@@ -186,9 +189,6 @@ util.func public @arg_compare_negative_outer_dynamic_reduction(
   util.return %res_val, %res_idx : tensor<64xf32>, tensor<64xindex>
 }
 
+// We bail out on dynamic reduction dimensions.
 // CHECK-LABEL: @arg_compare_negative_outer_dynamic_reduction
 // CHECK-NOT: iree_linalg_ext.split_reduction
-
-// We bail out on dynamic reduction dimensions.
-// ARGCOMPARE-LABEL: @arg_compare_negative_outer_dynamic_reduction
-// ARGCOMPARE-NOT: iree_linalg_ext.split_reduction
