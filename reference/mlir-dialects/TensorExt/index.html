@@ -1862,27 +1862,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_tensor_extbarrierend-tensorextbarrierendop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_tensor_ext.barrier.end (TensorExt::BarrierEndOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_tensor_extbarrierstart-tensorextbarrierstartop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_tensor_ext.barrier.start (TensorExt::BarrierStartOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_tensor_extbitcast-tensorextbitcastop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_tensor_ext.bitcast (TensorExt::BitCastOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.compute_barrier.end (TensorExt::ComputeBarrierEndOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.compute_barrier.start (TensorExt::ComputeBarrierStartOp)
     </span>
   </a>
   
@@ -4767,27 +4767,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_tensor_extbarrierend-tensorextbarrierendop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_tensor_ext.barrier.end (TensorExt::BarrierEndOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_tensor_extbarrierstart-tensorextbarrierstartop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_tensor_ext.barrier.start (TensorExt::BarrierStartOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_tensor_extbitcast-tensorextbitcastop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_tensor_ext.bitcast (TensorExt::BitCastOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.compute_barrier.end (TensorExt::ComputeBarrierEndOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.compute_barrier.start (TensorExt::ComputeBarrierStartOp)
     </span>
   </a>
   
@@ -4927,9 +4927,9 @@ beyond what is currently available in the Tensor Dialect.</p>
 <ul>
 <li><a href="#iree_tensor_ext-dialect">'iree_tensor_ext' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
-<li><a href="#iree_tensor_extbarrierend-tensorextbarrierendop">iree_tensor_ext.barrier.end (TensorExt::BarrierEndOp)</a></li>
-<li><a href="#iree_tensor_extbarrierstart-tensorextbarrierstartop">iree_tensor_ext.barrier.start (TensorExt::BarrierStartOp)</a></li>
 <li><a href="#iree_tensor_extbitcast-tensorextbitcastop">iree_tensor_ext.bitcast (TensorExt::BitCastOp)</a></li>
+<li><a href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop">iree_tensor_ext.compute_barrier.end (TensorExt::ComputeBarrierEndOp)</a></li>
+<li><a href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop">iree_tensor_ext.compute_barrier.start (TensorExt::ComputeBarrierStartOp)</a></li>
 <li><a href="#iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop">iree_tensor_ext.dispatch.tensor.load (TensorExt::DispatchTensorLoadOp)</a></li>
 <li><a href="#iree_tensor_extdispatchtensorstore-tensorextdispatchtensorstoreop">iree_tensor_ext.dispatch.tensor.store (TensorExt::DispatchTensorStoreOp)</a></li>
 <li><a href="#iree_tensor_extdispatchworkgroup_count_from_dag_root-tensorextdispatchworkgroupcountfromdagrootop">iree_tensor_ext.dispatch.workgroup_count_from_dag_root (TensorExt::DispatchWorkgroupCountFromDagRootOp)</a></li>
@@ -4949,18 +4949,27 @@ beyond what is currently available in the Tensor Dialect.</p>
 </ul>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
-<h3 id="iree_tensor_extbarrierend-tensorextbarrierendop"><code>iree_tensor_ext.barrier.end</code> (TensorExt::BarrierEndOp)<a class="headerlink" href="#iree_tensor_extbarrierend-tensorextbarrierendop" title="Permanent link">link</a></h3>
-<p><em>Tensor barrier end operation</em></p>
+<h3 id="iree_tensor_extbitcast-tensorextbitcastop"><code>iree_tensor_ext.bitcast</code> (TensorExt::BitCastOp)<a class="headerlink" href="#iree_tensor_extbitcast-tensorextbitcastop" title="Permanent link">link</a></h3>
+<p><em>Bitcasts a tensor without modifying the contents.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.barrier.end` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
-              type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.bitcast` $source `:`
+              type($source) (`{` $source_dims^ `}`)? `-&gt;`
+              type($result) (`{` $result_dims^ `}`)?
               attr-dict-with-keyword
 </code></pre></div>
-<p>This barrier prevents certain transformations (like reshape propagation)
-from moving operations up across this boundary.
-The operand is returned as the result with identical type.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Bitcasts a tensor |source| to the shape implied by this operations result
+type interleaved with |result_dims|, potentially with a different element
+type. For example,</p>
+<div class="highlight"><pre><span></span><code>result_dims = {%0, %1}
+result_type = tensor&lt;1x?x2x?x3 x!eltype&gt;
+</code></pre></div>
+<p>produces a tensor of shape [1, %0, 2, %1, 3] and element type <code>!eltype</code>.
+Note that the source and result tensors must serialized to the same size.</p>
+<p>Different from the flow.bitcast op, the op is allowed to be cloned into
+dispatch regions and supports transformations required by executable
+translation such as bufferization.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
@@ -4972,11 +4981,15 @@ The operand is returned as the result with identical type.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>value</code></td>
+<td style="text-align: center;"><code>source</code></td>
 <td>ranked tensor of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>value_dims</code></td>
+<td style="text-align: center;"><code>source_dims</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_dims</code></td>
 <td>variadic of index</td>
 </tr>
 </tbody>
@@ -4996,15 +5009,15 @@ The operand is returned as the result with identical type.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="iree_tensor_extbarrierstart-tensorextbarrierstartop"><code>iree_tensor_ext.barrier.start</code> (TensorExt::BarrierStartOp)<a class="headerlink" href="#iree_tensor_extbarrierstart-tensorextbarrierstartop" title="Permanent link">link</a></h3>
-<p><em>Tensor barrier start operation</em></p>
+<h3 id="iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop"><code>iree_tensor_ext.compute_barrier.end</code> (TensorExt::ComputeBarrierEndOp)<a class="headerlink" href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop" title="Permanent link">link</a></h3>
+<p><em>Tensor compute barrier end operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.barrier.start` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.compute_barrier.end` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
               type($result)
               attr-dict-with-keyword
 </code></pre></div>
 <p>This barrier prevents certain transformations (like reshape propagation)
-from moving operations down across this boundary.
+from moving operations up across this boundary.
 The operand is returned as the result with identical type.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
@@ -5043,27 +5056,18 @@ The operand is returned as the result with identical type.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="iree_tensor_extbitcast-tensorextbitcastop"><code>iree_tensor_ext.bitcast</code> (TensorExt::BitCastOp)<a class="headerlink" href="#iree_tensor_extbitcast-tensorextbitcastop" title="Permanent link">link</a></h3>
-<p><em>Bitcasts a tensor without modifying the contents.</em></p>
+<h3 id="iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop"><code>iree_tensor_ext.compute_barrier.start</code> (TensorExt::ComputeBarrierStartOp)<a class="headerlink" href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop" title="Permanent link">link</a></h3>
+<p><em>Tensor compute barrier start operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.bitcast` $source `:`
-              type($source) (`{` $source_dims^ `}`)? `-&gt;`
-              type($result) (`{` $result_dims^ `}`)?
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.compute_barrier.start` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
+              type($result)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Bitcasts a tensor |source| to the shape implied by this operations result
-type interleaved with |result_dims|, potentially with a different element
-type. For example,</p>
-<div class="highlight"><pre><span></span><code>result_dims = {%0, %1}
-result_type = tensor&lt;1x?x2x?x3 x!eltype&gt;
-</code></pre></div>
-<p>produces a tensor of shape [1, %0, 2, %1, 3] and element type <code>!eltype</code>.
-Note that the source and result tensors must serialized to the same size.</p>
-<p>Different from the flow.bitcast op, the op is allowed to be cloned into
-dispatch regions and supports transformations required by executable
-translation such as bufferization.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
+<p>This barrier prevents certain transformations (like reshape propagation)
+from moving operations down across this boundary.
+The operand is returned as the result with identical type.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
@@ -5075,15 +5079,11 @@ translation such as bufferization.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>source</code></td>
+<td style="text-align: center;"><code>value</code></td>
 <td>ranked tensor of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>source_dims</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>result_dims</code></td>
+<td style="text-align: center;"><code>value_dims</code></td>
 <td>variadic of index</td>
 </tr>
 </tbody>
