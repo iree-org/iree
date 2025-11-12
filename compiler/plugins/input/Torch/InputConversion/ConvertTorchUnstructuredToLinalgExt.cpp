@@ -179,12 +179,11 @@ struct FlexAttentionOpConversion
     Location loc = op.getLoc();
     MLIRContext *ctx = getContext();
     // Extract operands (new order: query, key, value, 8 block_mask tensors,
-    // scale, enable_gqa, return_lse)
+    // scale, return_lse)
     Value query = op.getQuery();
     Value key = op.getKey();
     Value value = op.getValue();
     Value scaleValue = op.getScale();
-    Value enableGqaValue = op.getEnableGqa();
     Value returnLseValue = op.getReturnLse();
 
     // Get tensor types
@@ -205,19 +204,6 @@ struct FlexAttentionOpConversion
     // Query shape: [B, H, M, E]
     if (queryShape.size() != 4) {
       return rewriter.notifyMatchFailure(op, "expected 4D query tensor");
-    }
-
-    // Check enable_gqa flag
-    bool enableGqa = false;
-    if (!matchPattern(enableGqaValue,
-                      torch::Torch::m_TorchConstantBool(&enableGqa))) {
-      return rewriter.notifyMatchFailure(op,
-                                         "expected constant enable_gqa value");
-    }
-    // TODO: GQA (Grouped Query Attention) support is not yet implemented
-    if (enableGqa) {
-      return rewriter.notifyMatchFailure(
-          op, "GQA (enable_gqa=true) is not yet implemented");
     }
 
     int64_t batch = queryShape[0];
