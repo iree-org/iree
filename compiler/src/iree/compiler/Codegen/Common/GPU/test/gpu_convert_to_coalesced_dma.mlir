@@ -87,10 +87,9 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
   // Thread-level forall:
   // CHECK:   %[[THREAD_RESULT:.+]] = scf.forall (%[[LANE:.+]]) in (64)
   // CHECK-SAME:   shared_outs(%[[THREAD_INIT:.+]] = %[[SLICE_DST]]) -> (tensor<4x128xf32>) {
-  // CHECK:     %[[INDICES_VEC:.+]] = vector.transfer_read
   // CHECK:     scf.forall.in_parallel {
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[SLICE_SRC]][%[[INDICES_VEC]]] into %[[THREAD_INIT]] lane(%[[LANE]])
-  // CHECK-SAME:       : tensor<64x128xf32>, vector<4xi32>, tensor<4x128xf32>, index
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[SLICE_SRC]][%[[SLICE_INDICES]]] into %[[THREAD_INIT]] lane(%[[LANE]])
+  // CHECK-SAME:       : tensor<64x128xf32>, tensor<4xi32>, tensor<4x128xf32>, index
   // CHECK:     }
   // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
 
