@@ -6,7 +6,7 @@ util.func public @simple_barrier(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
   util.return %1 : tensor<4x8xf32>
 }
 // CHECK-LABEL: util.func public @simple_barrier
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x8xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //   CHECK-NOT:   compute_barrier.start
 //   CHECK-NOT:   compute_barrier.end
 //       CHECK:   util.return %[[ARG0]]
@@ -28,7 +28,7 @@ util.func public @barrier_with_compute(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32
   util.return %2 : tensor<4x8xf32>
 }
 // CHECK-LABEL: util.func public @barrier_with_compute
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x8xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //   CHECK-NOT:   compute_barrier.start
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
@@ -46,8 +46,8 @@ util.func public @multiple_barriers(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) 
   util.return %2, %3 : tensor<4xf32>, tensor<4xf32>
 }
 // CHECK-LABEL: util.func public @multiple_barriers
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4xf32>
-//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<4xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]
 //   CHECK-NOT:   compute_barrier.start
 //   CHECK-NOT:   compute_barrier.end
 //       CHECK:   util.return %[[ARG0]], %[[ARG1]]
@@ -60,7 +60,7 @@ util.func public @barrier_with_dynamic_dims(%arg0: tensor<?x?xf32>, %dim0: index
   util.return %1 : tensor<?x?xf32>
 }
 // CHECK-LABEL: util.func public @barrier_with_dynamic_dims
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //   CHECK-NOT:   compute_barrier.start
 //   CHECK-NOT:   compute_barrier.end
 //       CHECK:   util.return %[[ARG0]]

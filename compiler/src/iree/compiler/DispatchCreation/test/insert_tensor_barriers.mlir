@@ -13,7 +13,7 @@ util.func public @simple_linalg(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
   util.return %0 : tensor<4x8xf32>
 }
 // CHECK-LABEL: util.func public @simple_linalg
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x8xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
@@ -44,7 +44,7 @@ util.func public @multiple_compute_ops(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   util.return %1 : tensor<4xf32>
 }
 // CHECK-LABEL: util.func public @multiple_compute_ops
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
@@ -72,7 +72,7 @@ util.func public @with_reshapes(%arg0: tensor<32xf32>) -> tensor<4x8xf32> {
   util.return %result : tensor<4x8xf32>
 }
 // CHECK-LABEL: util.func public @with_reshapes
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<32xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[START]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
@@ -89,7 +89,7 @@ util.func public @tensor_reshape_only(%arg0: tensor<32xf32>) -> tensor<4x8xf32> 
   util.return %expanded : tensor<4x8xf32>
 }
 // CHECK-LABEL: util.func public @tensor_reshape_only
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<32xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[START]]
 //       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[EXPANDED]]
@@ -135,7 +135,7 @@ util.func public @with_hal_barrier_dynamic(%arg0: tensor<?xf32>, %arg1: !hal.fen
 }
 // Verifies that tensor.dim doesn't trigger barrier insertion (metadata ops).
 // CHECK-LABEL: util.func public @with_hal_barrier_dynamic
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.fence
 //   CHECK-NOT:   compute_barrier.start
 //       CHECK:   %[[BARRIER:.+]]:2 = hal.tensor.barrier join(%[[ARG0]], %[[ARG0]]
@@ -165,7 +165,7 @@ util.func public @linalg_with_dynamic_dims(%arg0: tensor<?x?xf32>) -> tensor<?x?
   util.return %result : tensor<?x?xf32>
 }
 // CHECK-LABEL: util.func public @linalg_with_dynamic_dims
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :

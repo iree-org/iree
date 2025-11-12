@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
@@ -83,7 +84,7 @@ struct InsertTensorBarriersPass final
   using Base::Base;
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
     OpBuilder builder(funcOp.getContext());
 
     // Insert compute_barrier.start operations for values that flow into compute
@@ -98,10 +99,10 @@ struct InsertTensorBarriersPass final
       if (!isa<RankedTensorType>(val.getType())) {
         continue;
       }
+      OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointAfterValue(val);
       auto startOp = IREE::TensorExt::ComputeBarrierStartOp::create(
           builder, val.getLoc(), val);
-
       val.replaceUsesWithIf(startOp.getResult(), [&](OpOperand &use) {
         return isComputeOp(use.getOwner()) &&
                !isa<tensor::DimOp>(use.getOwner());
@@ -129,7 +130,7 @@ struct InsertTensorBarriersPass final
       if (!definingOp) {
         continue;
       }
-
+      OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointAfter(definingOp);
       auto endOp = IREE::TensorExt::ComputeBarrierEndOp::create(
           builder, val.getLoc(), val);
