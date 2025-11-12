@@ -857,15 +857,10 @@ bool Invocation::initializeInvocation() {
     mlir::remark::RemarkCategories cats{/*all=*/remarksFilter, /*passed=*/"",
                                         /*missed=*/"", /*analysis=*/"",
                                         /*failed=*/""};
-    // Always use REMARK_POLICY_ALL for now.
-    auto createPolicy = []()
-        -> std::unique_ptr<mlir::remark::detail::RemarkEmittingPolicyBase> {
-      return std::make_unique<mlir::remark::RemarkEmittingPolicyAll>();
-    };
-    // Always use YAML streamer for now.
+    // Always use YAML streamer and REMARK_POLICY_ALL for now.
     if (failed(mlir::remark::enableOptimizationRemarksWithLLVMStreamer(
             session.context, remarksOutputFile, llvm::remarks::Format::YAML,
-            createPolicy(), cats))) {
+            std::make_unique<mlir::remark::RemarkEmittingPolicyAll>(), cats))) {
       emitError(UnknownLoc::get(&session.context))
           << "Failed to enable optimization remarks with YAML streamer";
       return false;

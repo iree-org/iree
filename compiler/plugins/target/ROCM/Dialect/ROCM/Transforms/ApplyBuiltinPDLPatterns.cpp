@@ -399,8 +399,7 @@ public:
       }
       // Emit remark using structured API.
       remark::analysis(op->getLoc(),
-                       remark::RemarkOpts::name("UKernel").category(
-                           "ApplyBuiltinPDLPatternsDriverPass"))
+                       remark::RemarkOpts::name("UKernel").category(getName()))
           << ukernelDesc.getUkernelName().str();
       if (ukernelSymbols.contains(ukernelDesc.getUkernelName())) {
         return WalkResult::advance();

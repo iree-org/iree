@@ -1,6 +1,10 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-rocm-apply-builtin-pdl-patterns-driver{enable-tensor-ukernels=true})' \
 // RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s
 
+// Test remarks output for ukernels
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-rocm-apply-builtin-pdl-patterns-driver{enable-tensor-ukernels=true})' \
+// RUN:   --remarks-filter=".*" --split-input-file %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS
+
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
@@ -50,6 +54,13 @@ module attributes {
 // CHECK-LABEL: util.func private @pingpong_medium_f8E4M3FNUZ_expanded
 // CHECK:         iree_codegen.inner_tiled
 
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_medium_f8E4M3FNUZ_expanded
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_medium_f8E4M3FNUZ_expanded
+
 // -----
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -92,6 +103,10 @@ module attributes {
 // CHECK-LABEL: util.func private @pingpong_large_f8E4M3FNUZ_expanded
 // CHECK:         iree_codegen.inner_tiled
 
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_large_f8E4M3FNUZ_expanded
+
 // -----
 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -133,6 +148,10 @@ module attributes {
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_f16", tensor>
 // CHECK-LABEL: util.func private @pingpong_large_f16
 // CHECK:         iree_codegen.inner_tiled
+
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_large_f16
 
 // -----
 
@@ -218,6 +237,10 @@ module attributes {
 // CHECK-LABEL: util.func private @pingpong_medium_f16_expanded
 // CHECK:         iree_codegen.inner_tiled
 
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_medium_f16_expanded
+
 // -----
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -259,6 +282,10 @@ module attributes {
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_f16_expanded", tensor>
 // CHECK-LABEL: util.func private @pingpong_large_f16_expanded
 // CHECK:         iree_codegen.inner_tiled
+
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_large_f16_expanded
 
 // -----
 
@@ -302,6 +329,10 @@ module attributes {
 // CHECK-LABEL: util.func private @pingpong_large_bf16
 // CHECK:         iree_codegen.inner_tiled
 
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_large_bf16
+
 // -----
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -343,6 +374,10 @@ module attributes {
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_bf16_expanded", tensor>
 // CHECK-LABEL: util.func private @pingpong_large_bf16_expanded
 // CHECK:         iree_codegen.inner_tiled
+
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_large_bf16_expanded
 
 // -----
 
@@ -386,6 +421,10 @@ module attributes {
 // CHECK-LABEL: util.func private @pingpong_medium_bf16_expanded
 // CHECK:         iree_codegen.inner_tiled
 
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_medium_bf16_expanded
+
 // -----
 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -420,6 +459,10 @@ module attributes {
 // CHECK-LABEL: @inner_tiled_f8_large
 // CHECK:         iree_codegen.inner_tiled
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_dt_large_f8E4M3FNUZ", tensor>
+
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_dt_large_f8E4M3FNUZ
 
 // -----
 
@@ -456,6 +499,10 @@ module attributes {
 // CHECK:         iree_codegen.inner_tiled
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_dt_medium_f8E4M3FNUZ", tensor>
 
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_dt_medium_f8E4M3FNUZ
+
 // -----
 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -490,3 +537,7 @@ module attributes {
 // CHECK-LABEL: @inner_tiled_f16_large
 // CHECK:         iree_codegen.inner_tiled
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_dt_large_f16", tensor>
+
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_dt_large_f16
