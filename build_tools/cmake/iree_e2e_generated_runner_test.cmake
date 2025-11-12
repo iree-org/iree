@@ -119,7 +119,10 @@ function(iree_e2e_runner_test)
     add_custom_command(
       TARGET "${_NAME}${_RULE_VARIANT_NAME}"
       POST_BUILD
-      COMMAND bash -c "if [ -f '${_REMARKS_FILE}' ] && grep -q '${_RULE_CHECK_REMARKS_PATTERN}' '${_REMARKS_FILE}'; then echo '✓ Found expected ukernel pattern: ${_RULE_CHECK_REMARKS_PATTERN}'; else echo 'ERROR: Expected pattern ${_RULE_CHECK_REMARKS_PATTERN} not found in remarks' >&2; exit 1; fi"
+      COMMAND "${Python3_EXECUTABLE}"
+              "${PROJECT_SOURCE_DIR}/build_tools/scripts/check_remarks_pattern.py"
+              "${_REMARKS_FILE}"
+              "${_RULE_CHECK_REMARKS_PATTERN}"
       VERBATIM
     )
   endif()
