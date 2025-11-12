@@ -48,7 +48,6 @@ struct FuseTilableForallConsumers final
 
     tensor::ParallelInsertSliceOp producerSlice;
     LoopLikeOpInterface sliceOwner;
-    Value fusionOperand;
     for (auto operand : dpsOp.getDpsInputs()) {
       auto forallProducer = operand.getDefiningOp<scf::ForallOp>();
       if (!forallProducer) {
@@ -57,34 +56,13 @@ struct FuseTilableForallConsumers final
       if (forallProducer->getBlock() != tilableOp->getBlock()) {
         continue;
       }
-      Value iterArg = forallProducer.getTiedBlockArgument(
-          forallProducer.getTiedOpOperand(cast<OpResult>(operand)));
-
-      for (auto user : iterArg.getUsers()) {
-        auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(user);
-        if (sliceOp && sliceOp.getDest() == iterArg) {
-          producerSlice = sliceOp;
-          sliceOwner = forallProducer;
-          fusionOperand = operand;
-          break;
-        }
-      }
-      if (producerSlice) {
-        break;
-      }
+      sliceOwner = forallProducer;
+      break;
     }
 
-    if (!producerSlice) {
+    if (!sliceOwner) {
       return rewriter.notifyMatchFailure(tilableOp,
                                          "no scf.forall producer to fuse into");
-    }
-
-    for (auto operand : tilableOp->getOperands()) {
-      if (operand != fusionOperand && operand.getDefiningOp() == sliceOwner) {
-        return rewriter.notifyMatchFailure(tilableOp,
-                                           "unimplemented: Cannot fuse op with "
-                                           "multiple uses of producer loop");
-      }
     }
 
     // The `tileAndFuseConsumerOfSlices` transform will fail if there are any
@@ -116,8 +94,7 @@ struct FuseTilableForallConsumers final
     }
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlices(rewriter, producerSlice.getOperation(),
-                                         {sliceOwner});
+        scf::tileAndFuseConsumer(rewriter, tilableOp, {sliceOwner});
     if (failed(fuseConsumerResults)) {
       return failure();
     }
