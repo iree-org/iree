@@ -471,6 +471,13 @@ def IREETensorExt_BarrierStartOp : IREETensorExt_PureOp<"barrier.start", [
     attr-dict-with-keyword
   }];
 
+  let builders = [
+    OpBuilder<(ins "Value":$value), [{
+      build($_builder, $_state, value.getType(), value,
+            IREE::Util::buildDynamicDimsForValue($_state.location, value, $_builder));
+    }]>,
+  ];
+
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return getValueDims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return getValueDims(); }
@@ -502,6 +509,13 @@ def IREETensorExt_BarrierEndOp : IREETensorExt_PureOp<"barrier.end", [
     type($result)
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$value), [{
+      build($_builder, $_state, value.getType(), value,
+            IREE::Util::buildDynamicDimsForValue($_state.location, value, $_builder));
+    }]>,
+  ];
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return getValueDims(); }
