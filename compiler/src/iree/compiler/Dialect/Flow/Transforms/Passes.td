@@ -268,6 +268,15 @@ def ReplicateGlobalsPerAffinityPass :
     "IREE::Flow::FlowDialect",
     "IREE::Util::UtilDialect",
   ];
+
+  let options = [
+    Option<
+      "useTransfers", "use-transfers",
+      "bool",
+      /*default=*/"false",
+      "Use transfers instead of replicating globals"
+    >,
+  ];
 }
 
 def TopLevelSCFToCFGPass :
