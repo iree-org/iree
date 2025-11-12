@@ -19,9 +19,9 @@
         "cpu": 170.0
     },
     "golden_dispatch": {
-        "cpu": 2050
+        "cpu": 2130
     },
     "golden_size": {
-        "cpu": 920000
+        "cpu": 600000
     }
 }
