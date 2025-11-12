@@ -358,6 +358,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseNestedLaneAndWarpForalls>(context);
     populateForallLoopHoistingPattern(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      funcOp->emitOpError("failed to apply fusion + hoisting patterns (set 1)");
       return signalPassFailure();
     }
   }
@@ -379,6 +380,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      funcOp->emitOpError("failed to apply fusion + hoisting patterns (set 2)");
       return signalPassFailure();
     }
   }
@@ -393,6 +395,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      funcOp->emitOpError("failed to apply fusion + hoisting patterns (set 3)");
       return signalPassFailure();
     }
   }
