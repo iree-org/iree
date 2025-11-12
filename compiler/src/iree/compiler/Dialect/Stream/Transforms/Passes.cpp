@@ -28,6 +28,12 @@ static llvm::cl::opt<bool> clReplicateGlobalsPerAffinity(
         "Replicates globals for each unique affinity they are used with."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clTransferGlobalsPerAffinity(
+    "iree-stream-experimental-transfer-globals-per-affinity",
+    llvm::cl::desc(
+        "Transfers globals to each unique affinity they are used with."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -106,8 +112,14 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::Stream::createAnnotateAffinitiesPass());
   }
 
+  assert((!clReplicateGlobalsPerAffinity || !clTransferGlobalsPerAffinity) &&
+         "Cannot replicate and transfer at the same time.");
   if (clReplicateGlobalsPerAffinity) {
     passManager.addPass(IREE::Stream::createReplicateGlobalsPerAffinityPass());
+  }
+  if (clTransferGlobalsPerAffinity) {
+    passManager.addPass(IREE::Stream::createReplicateGlobalsPerAffinityPass(
+        IREE::Stream::ReplicateGlobalsPerAffinityPassOptions{true}));
   }
 
   // Converts from all input dialects into various levels of the stream dialect.
