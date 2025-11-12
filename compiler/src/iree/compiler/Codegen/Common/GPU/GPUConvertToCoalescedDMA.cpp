@@ -60,9 +60,8 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx,
 
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
-template <typename OpTy>
 static SmallVector<OpFoldResult>
-computeThreadNumThreadsImpl(OpBuilder &builder, OpTy op,
+computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
                             RankedTensorType outputType) {
   // Check that this operation has the use_global_load_dma config.
   auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
@@ -71,7 +70,7 @@ computeThreadNumThreadsImpl(OpBuilder &builder, OpTy op,
   }
 
   // Get the function containing this operation.
-  auto funcOp = op->template getParentOfType<FunctionOpInterface>();
+  auto funcOp = op->getParentOfType<FunctionOpInterface>();
   if (!funcOp) {
     return {};
   }
@@ -409,7 +408,6 @@ struct ConvertGatherToCoalescedDMA
 
     Value indices = tiledGatherOp.getIndices();
 
-    // Convert indices tensor to vector
     if (indices) {
       rewriter.setInsertionPoint(inParallelOp);
       auto indicesType = cast<RankedTensorType>(indices.getType());
@@ -421,34 +419,9 @@ struct ConvertGatherToCoalescedDMA
             tiledGatherOp,
             "Only 1D indices are currently supported for gather operations");
       }
-      Type elementType = indicesType.getElementType();
-
-      VectorType vectorTypeOriginal =
-          VectorType::get(indicesType.getShape(), elementType);
-
       SmallVector<Value> readIndices(indicesType.getRank());
       for (int64_t i = 0; i < indicesType.getRank(); ++i) {
         readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
-      }
-
-      Type paddingType = elementType;
-      if (elementType.isIndex()) {
-        paddingType = rewriter.getI32Type();
-      }
-      TypedAttr zeroPadAttr = rewriter.getIntegerAttr(paddingType, 0);
-      Value zeroPad = arith::ConstantOp::create(rewriter, loc, zeroPadAttr);
-
-      Value indicesVec = vector::TransferReadOp::create(
-          rewriter, loc, vectorTypeOriginal, indices, readIndices, zeroPad);
-
-      Type i32Type = rewriter.getI32Type();
-      if (elementType != i32Type) {
-        VectorType i32VectorType =
-            VectorType::get(indicesType.getShape(), i32Type);
-        indices = arith::IndexCastOp::create(rewriter, loc, i32VectorType,
-                                             indicesVec);
-      } else {
-        indices = indicesVec;
       }
     }
 

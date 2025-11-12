@@ -320,6 +320,10 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
       dimension of `source` must have unspecified indices and the dim's
       size must be a supported DMA width for your target.
 
+      `$indices` supports both index and i32 element types. The reason
+      is that one lowering path (from linalg_ext.gather) already have
+      indices in i32 type.
+
     * `$source`: Source tensor/memref containing the data to be gathered.
     * `$init`: Destination tensor/memref receiving the gathered data
       (destination-passing style).
@@ -344,7 +348,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
   let arguments = (ins
     AnyRankedTensorOrMemRef:$source,
-    Variadic<AnyTypeOf<[RankedTensorOf<[I32]>, MemRefOf<[I32]>, VectorOfAnyRankOf<[I32]>]>>:$indices,
+    Variadic<RankedTensorOrVectorOrMemRefOf<[I32, Index]>>:$indices,
     AnyRankedTensorOrMemRef:$init,
     Index:$lane
   );
