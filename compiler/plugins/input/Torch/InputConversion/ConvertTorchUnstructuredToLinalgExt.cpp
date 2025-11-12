@@ -409,11 +409,22 @@ struct FlexAttentionOpConversion
 
     indexingMaps.push_back(oMap);
 
+    // Create decomposition config with use_exp2 flag
+    // PyTorch's compiled kernels use exp2 for performance, so we match that
+    SmallVector<NamedAttribute> decompositionConfigAttrs;
+    decompositionConfigAttrs.push_back(
+        rewriter.getNamedAttr("use_exp2", rewriter.getBoolAttr(false)));
+    DictionaryAttr decompositionConfig =
+        rewriter.getDictionaryAttr(decompositionConfigAttrs);
+
     // Create attention op
     auto attentionOp = IREE::LinalgExt::AttentionOp::create(
         rewriter, loc, outputTensor.getType(), builtinQuery, builtinKey,
         builtinValue, scale, outputTensor,
         rewriter.getAffineMapArrayAttr(indexingMaps), mask);
+
+    // Set decomposition config
+    attentionOp.setDecompositionConfigAttr(decompositionConfig);
 
     {
       OpBuilder::InsertionGuard g(rewriter);
