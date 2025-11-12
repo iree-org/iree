@@ -55,7 +55,7 @@ jobs:
             exit 1
           fi
       - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@11a0bfe3b50977e38aa2bd4a4ebd296415e83c19 # v1.15.4
+        uses: sarisia/actions-status-discord@b8381b25576cb341b2af39926ab42c5056cc44ed # v1.15.5
         if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
