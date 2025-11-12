@@ -335,36 +335,36 @@ struct FlexAttentionOpConversion
 
             SmallVector<Value> torchIndices;
             for (unsigned i = 0; i < 4; ++i) {
-              Value idx = b.create<linalg::IndexOp>(loc, i);
-              Value idxI32 = b.create<arith::IndexCastOp>(loc, i32Type, idx);
-              Value idxTensor = b.create<tensor::FromElementsOp>(
-                  loc, i32ScalarTensorType, ValueRange{idxI32});
+              Value idx = linalg::IndexOp::create(b, loc, i);
+              Value idxI32 = arith::IndexCastOp::create(b, loc, i32Type, idx);
+              Value idxTensor = tensor::FromElementsOp::create(
+                  b, loc, i32ScalarTensorType, ValueRange{idxI32});
               Value torchIdx =
-                  b.create<torch::TorchConversion::FromBuiltinTensorOp>(
-                      loc, torchI32ScalarType, idxTensor);
+                  torch::TorchConversion::FromBuiltinTensorOp::create(
+                      b, loc, torchI32ScalarType, idxTensor);
               torchIndices.push_back(torchIdx);
             }
 
             // Call mask_mod_fn(b, h, q_idx, kv_idx)
-            auto callOp = b.create<func::CallOp>(
-                loc, TypeRange{torchBoolScalarType}, *maskModSymbol,
-                ValueRange(torchIndices));
+            auto callOp =
+                func::CallOp::create(b, loc, TypeRange{torchBoolScalarType},
+                                     *maskModSymbol, ValueRange(torchIndices));
             Value torchMaskResult = callOp.getResult(0);
 
             // Convert result back to builtin tensor
             Value maskResult =
-                b.create<torch::TorchConversion::ToBuiltinTensorOp>(
-                    loc, boolScalarTensorType, torchMaskResult);
+                torch::TorchConversion::ToBuiltinTensorOp::create(
+                    b, loc, boolScalarTensorType, torchMaskResult);
 
             // Extract scalar from 0-d tensor
             Value maskBool =
-                b.create<tensor::ExtractOp>(loc, maskResult, ValueRange{});
+                tensor::ExtractOp::create(b, loc, maskResult, ValueRange{});
 
             // Select: mask ? 0.0 : -inf
             Value maskValue =
-                b.create<arith::SelectOp>(loc, maskBool, zero, negInf);
+                arith::SelectOp::create(b, loc, maskBool, zero, negInf);
 
-            b.create<linalg::YieldOp>(loc, maskValue);
+            linalg::YieldOp::create(b, loc, maskValue);
           });
 
       mask = maskGeneric.getResult(0);
