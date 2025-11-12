@@ -2946,6 +2946,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-insert-tensor-barriers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-dispatch-creation-insert-tensor-barriers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-dispatch-creation-materialize-default-workgroup-count-region" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-dispatch-creation-materialize-default-workgroup-count-region
@@ -2958,6 +2967,15 @@
   <a href="#-iree-dispatch-creation-propagate-encodings" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-dispatch-creation-propagate-encodings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-remove-tensor-barriers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-dispatch-creation-remove-tensor-barriers
     </span>
   </a>
   
@@ -5438,6 +5456,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-insert-tensor-barriers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-dispatch-creation-insert-tensor-barriers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-dispatch-creation-materialize-default-workgroup-count-region" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-dispatch-creation-materialize-default-workgroup-count-region
@@ -5450,6 +5477,15 @@
   <a href="#-iree-dispatch-creation-propagate-encodings" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-dispatch-creation-propagate-encodings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-remove-tensor-barriers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-dispatch-creation-remove-tensor-barriers
     </span>
   </a>
   
@@ -5703,11 +5739,25 @@ num-size-3-groups : Number of fusion groups of size 3
 <p><em>Hoists tensor encoding ops out of flow dispatch regions.</em></p>
 <h3 id="-iree-dispatch-creation-hoist-uniform-scalar-compute"><code>-iree-dispatch-creation-hoist-uniform-scalar-compute</code><a class="headerlink" href="#-iree-dispatch-creation-hoist-uniform-scalar-compute" title="Permanent link">link</a></h3>
 <p><em>Hoists scalar (computation) out of dispatch regions.</em></p>
+<h3 id="-iree-dispatch-creation-insert-tensor-barriers"><code>-iree-dispatch-creation-insert-tensor-barriers</code><a class="headerlink" href="#-iree-dispatch-creation-insert-tensor-barriers" title="Permanent link">link</a></h3>
+<p><em>Insert tensor barrier markers around computation regions.</em></p>
+<p>Walks from function boundaries and inserts iree_tensor_ext.barrier.start
+and iree_tensor_ext.barrier.end operations at the boundaries of
+computation regions (tensor/linalg/linalgext ops). These barriers allow
+controlling where certain transformations like reshape propagation can occur.</p>
+<p>The pass identifies compute operations and wraps tensor values flowing
+into and out of the compute region with the barrier operations.</p>
 <h3 id="-iree-dispatch-creation-materialize-default-workgroup-count-region"><code>-iree-dispatch-creation-materialize-default-workgroup-count-region</code><a class="headerlink" href="#-iree-dispatch-creation-materialize-default-workgroup-count-region" title="Permanent link">link</a></h3>
 <p><em>Canonicalize dispatch workgroups ops.</em></p>
 <p>Apply dispatch workgroups canonicalization patterns.</p>
 <h3 id="-iree-dispatch-creation-propagate-encodings"><code>-iree-dispatch-creation-propagate-encodings</code><a class="headerlink" href="#-iree-dispatch-creation-propagate-encodings" title="Permanent link">link</a></h3>
 <p><em>Propagate encodings across other operations.</em></p>
+<h3 id="-iree-dispatch-creation-remove-tensor-barriers"><code>-iree-dispatch-creation-remove-tensor-barriers</code><a class="headerlink" href="#-iree-dispatch-creation-remove-tensor-barriers" title="Permanent link">link</a></h3>
+<p><em>Remove tensor barrier markers from the program.</em></p>
+<p>Removes iree_tensor_ext.barrier.start and iree_tensor_ext.barrier.end
+operations from the program. These are identity operations that simply
+pass through their operands, so they can be safely removed by replacing
+all uses of their results with their operands.</p>
 <h3 id="-iree-dispatch-creation-set-encoding"><code>-iree-dispatch-creation-set-encoding</code><a class="headerlink" href="#-iree-dispatch-creation-set-encoding" title="Permanent link">link</a></h3>
 <p><em>Introduces tensor encoding for flow dispatch regions.</em></p>
 <p>Sets the encoding for compute operations to allow execution of the
