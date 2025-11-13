@@ -46,6 +46,20 @@ util.func public @barrier_end_static_with_dims(%arg0: tensor<4x8xf32>, %dim0: in
   util.return %0 : tensor<4x8xf32>
 }
 
+// -----
+
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.ragged_tensor
+//===----------------------------------------------------------------------===//
+
+// Check that the sparse dimensions are in-bounds of the rank.
+// expected-error @+1{{sparse dimensions specified are greater than the rank of the tensor}}
+util.func public @test(memref<?xf32, #iree_tensor_ext.ragged_tensor<0>>) {
+  return
+}
+
+// -----
+
 //===----------------------------------------------------------------------===//
 // iree_tensor_ext.cast_to_ragged_shape
 //===----------------------------------------------------------------------===//
@@ -113,7 +127,7 @@ util.func public @resultRankTwoMoreThanSourceRank(%source : tensor<?x?x?xf32>,
 util.func public @missingRaggedTensorAttr(%source : tensor<?x?x?xf32>,
     %columnLengths : tensor<?xindex>, %numRaggedRows : index,
     %d0 : index, %d1 : index, %d2 : index) -> tensor<?x?x?x?xf32> {
-  // expected-error @+1 {{expected result type to have an encoding of type `RaggedTensorAttr`}}
+  // expected-error @+1 {{expected result type to have an encoding attribute that implements the `SparseTensorAttrInterface`}}
   %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%columnLengths)
       num_ragged_rows(%numRaggedRows) : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<?xindex>)
       -> tensor<?x?x?x?xf32>
@@ -126,11 +140,24 @@ util.func public @missingRaggedTensorAttr(%source : tensor<?x?x?xf32>,
 util.func public @wrongEncodingAttr(%source : tensor<?x?x?xf32>,
     %columnLengths : tensor<?xindex>, %numRaggedRows : index,
     %d0 : index, %d1 : index, %d2 : index) -> tensor<?x?x?x?xf32, "foo"> {
-  // expected-error @+1 {{expected result type to have an encoding of type `RaggedTensorAttr`}}
+  // expected-error @+1 {{expected result type to have an encoding attribute that implements the `SparseTensorAttrInterface`}}
   %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%columnLengths)
       num_ragged_rows(%numRaggedRows) : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<?xindex>)
       -> tensor<?x?x?x?xf32, "foo">
   util.return %0 : tensor<?x?x?x?xf32, "foo">
+}
+
+// -----
+
+// Error if the result does not have a `iree_tensor_ext.ragged_tensor` attribute.
+util.func public @wrongEncodingAttr(%source : memref<?x?x?xf32>,
+    %columnLengths : memref<?xindex>, %numRaggedRows : index,
+    %d0 : index, %d1 : index, %d2 : index) -> memref<?x?x?x?xf32> {
+  // expected-error @+1 {{expected result type to have a layout attribute that implements the `SparseTensorAttrInterface`}}
+  %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%columnLengths)
+      num_ragged_rows(%numRaggedRows) : (memref<?x?x?xf32>{%d0, %d1, %d2}, memref<?xindex>)
+      -> memref<?x?x?x?xf32>
+  util.return %0 : memref<?x?x?x?xf32>
 }
 
 // -----

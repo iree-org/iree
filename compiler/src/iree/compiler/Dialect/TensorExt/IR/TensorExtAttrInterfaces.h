@@ -10,17 +10,6 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 
-namespace mlir::iree_compiler::IREE::TensorExt {
-
-namespace detail {
-LogicalResult getSparseStridesAndOffsets(Attribute attr,
-                                         ArrayRef<int64_t> shape,
-                                         SmallVectorImpl<int64_t> &strides,
-                                         int64_t &offset);
-}
-
-} // namespace mlir::iree_compiler::IREE::TensorExt
-
 // clang-format off: must be included after all LLVM/MLIR headers
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrInterfaces.h.inc" // IWYU pragma: keep
 // clang-format on: must be included after all LLVM/MLIR headers

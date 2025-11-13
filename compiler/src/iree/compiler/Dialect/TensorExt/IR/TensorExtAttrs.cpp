@@ -36,7 +36,23 @@ SmallVector<int64_t> RaggedTensorAttr::getSparseDimensions() const {
   return {raggedRow, raggedRow + 1};
 }
 
+/// MemRefLayoutAttrInterface methods.
+
 AffineMap RaggedTensorAttr::getAffineMap() const { return AffineMap(); }
+
+bool RaggedTensorAttr::isIdentity() const { return false; }
+
+LogicalResult RaggedTensorAttr::verifyLayout(
+    ArrayRef<int64_t> shape,
+    function_ref<InFlightDiagnostic()> emitError) const {
+  SmallVector<int64_t> sparseDimensions = getSparseDimensions();
+  if (llvm::any_of(sparseDimensions,
+                   [&](int64_t dim) { return dim >= shape.size(); })) {
+    return emitError() << "sparse dimensions specified are greater than the "
+                          "rank of the tensor";
+  }
+  return success();
+}
 
 static SmallVector<int64_t>
 getDefaultStrides(ArrayRef<int64_t> shape,

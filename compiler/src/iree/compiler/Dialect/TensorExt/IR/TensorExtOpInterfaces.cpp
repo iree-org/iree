@@ -6,6 +6,58 @@
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOpInterfaces.h"
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrInterfaces.h"
+
 // clang-format off: must be included after all LLVM/MLIR headers
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOpInterfaces.cpp.inc" // IWYU pragma: keep
 // clang-format on: must be included after all LLVM/MLIR headers
+
+namespace mlir::iree_compiler::IREE::TensorExt {
+
+LogicalResult verifySparseOpInterface(SparseOpInterface sparseOp) {
+  // Check that the operation has only one result.
+  if (sparseOp->getNumResults() != 1) {
+    return sparseOp.emitOpError("sparse operations can only have result");
+  }
+
+  // The sparse operation needs to return a shaped type that has an attribute
+  // specifying the sparsity.
+  Type resultType = sparseOp->getResult(0).getType();
+  SparseTensorAttrInterface sparseAttr;
+  if (auto tensorType = dyn_cast<RankedTensorType>(resultType)) {
+    sparseAttr =
+        dyn_cast_or_null<SparseTensorAttrInterface>(tensorType.getEncoding());
+    if (!sparseAttr) {
+      return sparseOp.emitOpError(
+          "expected result type to have an encoding attribute that implements "
+          "the `SparseTensorAttrInterface`");
+    }
+  } else if (auto memrefType = dyn_cast<MemRefType>(resultType)) {
+    sparseAttr =
+        dyn_cast_or_null<SparseTensorAttrInterface>(memrefType.getLayout());
+    if (!sparseAttr) {
+      return sparseOp.emitOpError(
+          "expected result type to have a layout attribute that implements "
+          "the `SparseTensorAttrInterface`");
+    }
+  } else {
+    return sparseOp->emitOpError("unhandled return type for sparse operation");
+  }
+
+  assert(sparseAttr);
+  SmallVector<int64_t> sparseDimensions = sparseAttr.getSparseDimensions();
+  if (sparseDimensions.size() < 2) {
+    return sparseOp.emitOpError(
+        "need at least two sparse dimensions for the result of a sparse op");
+  }
+  // Assert that the sparse dimensions are contiguous.
+  for (int i = 1; i < sparseDimensions.size(); ++i) {
+    if (sparseDimensions[i] != sparseDimensions[i - 1] + 1) {
+      return sparseOp.emitOpError(
+          "expected sparse dimensions to be contiguous");
+    }
+  }
+  return success();
+}
+
+} // namespace mlir::iree_compiler::IREE::TensorExt

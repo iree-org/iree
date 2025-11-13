@@ -15,6 +15,8 @@ def RaggedTensorAttr :
     DeclareAttrInterfaceMethods<IREETensorExt_SparseTensorAttrInterface>,
     DeclareAttrInterfaceMethods<MemRefLayoutAttrInterface, [
       "getAffineMap",
+      "isIdentity",
+      "verifyLayout",
       "getStridesAndOffset"
     ]>]> {
   let mnemonic = "ragged_tensor";

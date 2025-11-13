@@ -45,6 +45,11 @@ def IREETensorExt_SparseOpInterface :
     given logical shape with tensor encoding which implements the
     `SparseTensorAttrInterface`.
   }];
+
+  let verify = [{
+   return ::mlir::iree_compiler::IREE::TensorExt::verifySparseOpInterface(
+     ::mlir::cast<::mlir::iree_compiler::IREE::TensorExt::SparseOpInterface>($_op));
+  }];
 }
 
 #endif // IREE_DIALECT_TENSOR_EXT_INTERFACES

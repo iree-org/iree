@@ -11,6 +11,15 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 
+namespace mlir::iree_compiler::IREE::TensorExt {
+
+class SparseOpInterface;
+// Interface verification method to verify the sparse op satisfies
+// interface constraints.
+LogicalResult verifySparseOpInterface(SparseOpInterface sparseOp);
+
+}
+
 // clang-format off: must be included after all LLVM/MLIR headers
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOpInterfaces.h.inc" // IWYU pragma: keep
 // clang-format on: must be included after all LLVM/MLIR headers

@@ -134,7 +134,7 @@ util.func public @castToRaggedDynamic(%source : tensor<?x?x?xf32>,
 
 util.func public @castToRaggedDynamicMemRef(%source : memref<?x?x?xf32>,
     %columnLengths : memref<?xindex>, %numRaggedRows : index)
-    -> memref<?x?x?x?xf32> {
+    -> memref<?x?x?x?xf32, #iree_tensor_ext.ragged_tensor<1>> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -143,8 +143,8 @@ util.func public @castToRaggedDynamicMemRef(%source : memref<?x?x?xf32>,
   %d2 = memref.dim %source, %c2 : memref<?x?x?xf32>
   %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%columnLengths)
       num_ragged_rows(%numRaggedRows) : (memref<?x?x?xf32>{%d0, %d1, %d2}, memref<?xindex>)
-      -> memref<?x?x?x?xf32>
-  util.return %0 : memref<?x?x?x?xf32>
+      -> memref<?x?x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+  util.return %0 : memref<?x?x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
 }
 // CHECK-LABEL: @castToRaggedDynamic
 

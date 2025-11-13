@@ -416,6 +416,7 @@ LogicalResult ComputeBarrierEndOp::verify() {
     return op.emitOpError("value and result types must match");
   }
   return success();
+}
 
 //===----------------------------------------------------------------------===//
 // iree_tensor_ext.cast_to_ragged_shape
@@ -442,17 +443,15 @@ LogicalResult CastToRaggedShapeOp::verify() {
            << ", i.e. one more than the source rank, but got "
            << resultType.getRank();
   }
-  if (isa<RankedTensorType>(resultType)) {
-    RaggedTensorAttr raggedTensorAttr = getResultSparseEncoding();
-    if (!raggedTensorAttr) {
-      return emitOpError("expected result type to have an encoding of type "
-                         "`RaggedTensorAttr`");
-    }
-    if (raggedTensorAttr.getRaggedRow() != raggedDim) {
-      return emitOpError("mismatch in specified `ragged_dim` value of ")
-             << raggedDim << " and `raggedRow` value in the sparse encoding "
-             << raggedTensorAttr.getRaggedRow();
-    }
+  RaggedTensorAttr raggedTensorAttr = getResultSparseEncoding();
+  if (!raggedTensorAttr) {
+    return emitOpError("expected result type to have an encoding of type "
+                       "`RaggedTensorAttr`");
+  }
+  if (raggedTensorAttr.getRaggedRow() != raggedDim) {
+    return emitOpError("mismatch in specified `ragged_dim` value of ")
+           << raggedDim << " and `raggedRow` value in the sparse encoding "
+           << raggedTensorAttr.getRaggedRow();
   }
 
   if (Value numRaggedRows = getNumRaggedRows()) {

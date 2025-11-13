@@ -8,20 +8,6 @@
 
 #include "mlir/Support/LLVM.h"
 
-namespace mlir::iree_compiler::IREE::TensorExt {
-
-namespace detail {
-
-LogicalResult getSparseStridesAndOffsets(Attribute sparseAttr,
-                                         ArrayRef<int64_t> shape,
-                                         SmallVectorImpl<int64_t> &strides,
-                                         int64_t &offset) {
-  return failure();
-}
-} // namespace detail
-
-} // namespace mlir::iree_compiler::IREE::TensorExt
-
 // clang-format off: must be included after all LLVM/MLIR headers
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrInterfaces.cpp.inc" // IWYU pragma: keep
 // clang-format on: must be included after all LLVM/MLIR headers
