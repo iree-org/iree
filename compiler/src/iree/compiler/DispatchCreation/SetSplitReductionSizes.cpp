@@ -59,7 +59,7 @@ findSmallestFactorWithLowerBound(int64_t x, int64_t lowerBound) {
   assert(lowerBound > 0);
   // We expect all numbers here to be relatively small, so just do trial
   // division (with a limit just to be safe).
-  static constexpr int64_t kMaxIterations = 1 << 15;
+  static constexpr int64_t kMaxIterations = 1 << 22;
   int64_t upperBound = std::min(x, kMaxIterations);
   for (int64_t i = lowerBound; i <= upperBound; i++) {
     if (x % i == 0) {
@@ -398,6 +398,17 @@ private:
     // The constants below are determined based on empirical data.
     const int64_t ratioThreshold = 384;
     const int64_t largeKSize = 24576;
+    const int64_t largeMNSize = 4096;
+
+    // When the M or N size is large, the workload tends to distributed across
+    // many workgroups, making split reduction little to no effect.
+    if (mSize >= largeMNSize || nSize >= largeMNSize) {
+      LDBG() << "skipping op; large M or N size";
+      return std::nullopt;
+    }
+
+    // When the reduction size is small relative to the M/N sizes, split
+    // reduction often has no effect or even degrades performance.
     int64_t ratio = kSize / std::sqrt(mSize * nSize) / batchSize;
     if (ratio <= ratioThreshold && kSize < largeKSize) {
       LDBG() << "skipping op; small reduction size";
@@ -411,9 +422,9 @@ private:
     SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
     int64_t outputSize = mSize * nSize * batchSize;
     int64_t limitParallelLoops;
-    if (outputSize < 16 * 16) {
+    if (outputSize < 16 * 16 || kSize > 1e7) {
       limitParallelLoops = 2048;
-    } else if (outputSize < 64 * 64) {
+    } else if (outputSize < 64 * 64 || kSize > 1e6) {
       limitParallelLoops = 128;
     } else if (outputSize < 128 * 128) {
       limitParallelLoops = 64;
