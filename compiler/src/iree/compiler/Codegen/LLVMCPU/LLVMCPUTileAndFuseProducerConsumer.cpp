@@ -52,31 +52,44 @@ static Operation *getRootOp(ArrayRef<Operation *> computeOps,
   return rootOp;
 }
 
-/// Returns the last operation that has `level` tiling level in lowering config.
-/// When `startBeforeRootOp` is true, only considers operations that appear
-/// before the root op (or ukernel ops) in the compute sequence, enabling
-/// anchoring on producer operations. When false, considers all operations
-/// including those after the root, enabling anchoring on consumer operations.
-/// Returns nullptr if no suitable anchor operation is found.
-static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
-                                  IREE::CPU::TilingLevel level,
-                                  bool startBeforeRootOp) {
-  bool meet = true;
-  if (startBeforeRootOp) {
-    meet = false;
-  }
+/// Returns the last operation that has `level` tiling level in lowering config
+/// after the root op (or ukernel ops) in the compute sequence.
+static Operation *getLastAnchorOpAfterRootOp(ArrayRef<Operation *> computeOps,
+                                             IREE::CPU::TilingLevel level) {
   for (Operation *op : llvm::reverse(computeOps)) {
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
-    if (meet && loweringConfig &&
+    if ((loweringConfig && loweringConfig.hasWorkgroupTilingLevel()) ||
+        isa<IREE::Codegen::UKernelGenericOp>(op)) {
+      break;
+    }
+    if (loweringConfig &&
         loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       return op;
     }
-    if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel()) {
-      meet = true;
+  }
+  return nullptr;
+}
+
+/// Returns the last operation that has `level` tiling level in lowering config
+/// before the root op (or ukernel ops) in the compute sequence.
+static Operation *getLastAnchorOpBeforeRootOp(ArrayRef<Operation *> computeOps,
+                                              IREE::CPU::TilingLevel level) {
+  bool foundRootOrUkernelOp = false;
+  for (Operation *op : llvm::reverse(computeOps)) {
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+        getLoweringConfig(op);
+    if ((loweringConfig && loweringConfig.hasWorkgroupTilingLevel()) ||
+        isa<IREE::Codegen::UKernelGenericOp>(op)) {
+      foundRootOrUkernelOp = true;
+      continue;
     }
-    if (isa<IREE::Codegen::UKernelGenericOp>(op)) {
-      meet = true;
+    if (!foundRootOrUkernelOp) {
+      continue;
+    }
+    if (loweringConfig &&
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
+      return op;
     }
   }
   return nullptr;
@@ -253,12 +266,12 @@ void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
     }
 
   } else {
-    if (Operation *anchorOp = getLastAnchorOp(computeOps, tilingLevel,
-                                              /*startBeforeRootOp=*/false)) {
+    if (Operation *anchorOp =
+            getLastAnchorOpAfterRootOp(computeOps, tilingLevel)) {
       anchorOps.push_back(anchorOp);
     }
-    if (Operation *anchorOp = getLastAnchorOp(computeOps, tilingLevel,
-                                              /*startBeforeRootOp=*/true)) {
+    if (Operation *anchorOp =
+            getLastAnchorOpBeforeRootOp(computeOps, tilingLevel)) {
       anchorOps.push_back(anchorOp);
     }
   }
