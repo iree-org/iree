@@ -3190,6 +3190,113 @@ LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
 }
 
 //===---------------------------------------------------------------------===//
+// UnMask Op
+//===---------------------------------------------------------------------===//
+
+SmallVector<utils::IteratorType> UnMaskOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getDest().getType().getRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+SmallVector<Range> UnMaskOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  SmallVector<OpFoldResult> sizes =
+      tensor::getMixedSizes(builder, loc, getDest());
+  SmallVector<Range> ranges = llvm::map_to_vector(
+      tensor::getMixedSizes(builder, loc, getDest()),
+      [&](OpFoldResult size) { return Range{zero, size, one}; });
+  return ranges;
+}
+
+FailureOr<TilingResult>
+UnMaskOp::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  SmallVector<OpFoldResult> strides(sizes.size(), builder.getIndexAttr(1));
+  Operation *srcSlice =
+      getSlice(builder, getLoc(), getSrc(), offsets, sizes, strides);
+  Operation *dstSlice =
+      getSlice(builder, getLoc(), getDest(), offsets, sizes, strides);
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), dstSlice->getResultTypes(),
+                  {srcSlice->getResult(0), dstSlice->getResult(0)});
+  return TilingResult{{tiledOp},
+                      SmallVector<Value>(tiledOp->getResults()),
+                      {srcSlice, dstSlice}};
+}
+
+LogicalResult UnMaskOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultSizes = llvm::to_vector(sizes);
+  resultOffsets = llvm::to_vector(offsets);
+  return success();
+}
+
+LogicalResult UnMaskOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes) {
+  if (operandNumbers.size() != 1 ||
+      operandNumbers.front() != getSrcMutable().getOperandNumber()) {
+    return failure();
+  }
+  ArrayRef<OpFoldResult> offsets(allOffsets[0]);
+  ArrayRef<OpFoldResult> sizes(allSizes[0]);
+
+  Location loc = getLoc();
+
+  AffineExpr dim0, dim1;
+  bindDims(b.getContext(), dim0, dim1);
+  // Subtract two integers.
+  auto sub = [&](OpFoldResult v1, OpFoldResult v2) {
+    return affine::makeComposedFoldedAffineApply(
+        b, loc, AffineMap::get(2, 0, dim0 - dim1, b.getContext()), {v1, v2});
+  };
+  // Take the minimum of two integers.
+  auto idMap = AffineMap::getMultiDimIdentityMap(2, b.getContext());
+  auto min = [&](OpFoldResult v1, OpFoldResult v2) {
+    return affine::makeComposedFoldedAffineMin(b, loc, idMap, {v1, v2});
+  };
+
+  // The iteration domain is defined in terms of the unmasked tensor domain.
+  // We can calculate the unmasked tensor domain from the masked tensor domain
+  // using:
+  //
+  // dstOffset = min(offset, dstDim - 1)
+  // dstSize = min(size, dstDim - dstOffset)
+  for (auto [offset, size, dimSize] : llvm::zip_equal(
+           offsets, sizes, tensor::getMixedSizes(b, getLoc(), getDest()))) {
+    OpFoldResult dimSizeMinusOne = sub(dimSize, b.getIndexAttr(1));
+    OpFoldResult dstOffset = min(offset, dimSizeMinusOne);
+    OpFoldResult dstSize = min(size, sub(dimSize, dstOffset));
+    iterDomainOffsets.push_back(dstOffset);
+    iterDomainSizes.push_back(dstSize);
+  }
+
+  return success();
+}
+
+FailureOr<TilingResult> UnMaskOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes) {
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromOperandTiles(
+          b, operandNumbers, allOffsets, allSizes, mappedOffsets,
+          mappedSizes))) {
+    return failure();
+  }
+  return getTiledImplementation(b, mappedOffsets, mappedSizes);
+}
+
+//===---------------------------------------------------------------------===//
 // CustomOp
 //===---------------------------------------------------------------------===//
 
