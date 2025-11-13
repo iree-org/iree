@@ -143,8 +143,6 @@ typedef struct iree_vm_wait_result_t {
 
 // Returns the implementation-defined frame storage associated with |frame|.
 // The pointer will contain at least as many bytes as requested by frame_size.
-// The storage is aligned to 16 bytes to ensure proper alignment of VM
-// registers.
 static inline void* iree_vm_stack_frame_storage(iree_vm_stack_frame_t* frame) {
   IREE_ASSERT(frame);
   IREE_ASSERT_ALIGNED(frame, sizeof(iree_max_align_t));
