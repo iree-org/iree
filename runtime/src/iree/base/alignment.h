@@ -339,12 +339,12 @@ static inline void iree_unaligned_store_le_u8(uint8_t* ptr, uint8_t value) {
 
 static inline uint16_t iree_unaligned_load_le_u16(const uint16_t* ptr) {
   uint16_t value;
-  memcpy(&value, ptr, sizeof(value));
+  memcpy(&value, (const char*)ptr, sizeof(value));
   return value;
 }
 
 static inline void iree_unaligned_store_le_u16(uint16_t* ptr, uint16_t value) {
-  memcpy(ptr, &value, sizeof(value));
+  memcpy((char*)ptr, &value, sizeof(value));
 }
 
 #else
@@ -367,20 +367,20 @@ static inline void iree_unaligned_store_le_u16(uint16_t* ptr, uint16_t value) {
 
 static inline uint32_t iree_unaligned_load_le_u32(const uint32_t* ptr) {
   uint32_t value;
-  memcpy(&value, ptr, sizeof(value));
+  memcpy(&value, (const char*)ptr, sizeof(value));
   return value;
 }
 static inline float iree_unaligned_load_le_f32(const float* ptr) {
   float value;
-  memcpy(&value, ptr, sizeof(value));
+  memcpy(&value, (const char*)ptr, sizeof(value));
   return value;
 }
 
 static inline void iree_unaligned_store_le_u32(uint32_t* ptr, uint32_t value) {
-  memcpy(ptr, &value, sizeof(value));
+  memcpy((char*)ptr, &value, sizeof(value));
 }
 static inline void iree_unaligned_store_le_f32(float* ptr, float value) {
-  memcpy(ptr, &value, sizeof(value));
+  memcpy((char*)ptr, &value, sizeof(value));
 }
 
 #else
@@ -405,20 +405,20 @@ static inline void iree_unaligned_store_le_f32(float* ptr, float value) {
 
 static inline uint64_t iree_unaligned_load_le_u64(const uint64_t* ptr) {
   uint64_t value;
-  memcpy(&value, ptr, sizeof(value));
+  memcpy(&value, (const char*)ptr, sizeof(value));
   return value;
 }
 static inline double iree_unaligned_load_le_f64(const double* ptr) {
   double value;
-  memcpy(&value, ptr, sizeof(value));
+  memcpy(&value, (const char*)ptr, sizeof(value));
   return value;
 }
 
 static inline void iree_unaligned_store_le_u64(uint64_t* ptr, uint64_t value) {
-  memcpy(ptr, &value, sizeof(value));
+  memcpy((char*)ptr, &value, sizeof(value));
 }
 static inline void iree_unaligned_store_le_f64(double* ptr, double value) {
-  memcpy(&value, ptr, sizeof(value));
+  memcpy(&value, (char*)ptr, sizeof(value));
 }
 
 #else
