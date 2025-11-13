@@ -87,7 +87,7 @@ jobs:
       - name: Build riscv64
         env:
           IREE_HOST_BIN_DIR: ${{ env.VENV_DIR }}/bin
-        run: ./build_tools/cmake/build_riscv.sh
+        run: ./build_tools/cmake/build_riscv_linux.sh
       - name: Test riscv64
         env:
           QEMU_RV64_BIN: ${{ env.QEMU_PATH_PREFIX }}/qemu-riscv64
