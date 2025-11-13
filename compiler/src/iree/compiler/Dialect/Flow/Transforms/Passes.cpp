@@ -69,6 +69,12 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
         "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clReplicateGlobalsPerAffinity(
+    "iree-flow-experimental-replicate-globals-per-affinity",
+    llvm::cl::desc(
+        "Replicates globals for each unique affinity they are used with."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Flow {
 
 using FunctionLikeNest =
@@ -232,6 +238,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
     auto executablePassManager = passManager.nest<IREE::Flow::ExecutableOp>();
     executablePassManager.addPass(IREE::Flow::createCanonicalizePass());
     executablePassManager.addPass(mlir::createCSEPass());
+  }
+
+  // Replicate globals per affinity if requested.
+  if (clReplicateGlobalsPerAffinity) {
+    passManager.addPass(IREE::Flow::createReplicateGlobalsPerAffinityPass());
   }
 
   // Symbol DCE any remaining variables/functions that are now no longer

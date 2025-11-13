@@ -22,12 +22,6 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clReplicateGlobalsPerAffinity(
-    "iree-stream-experimental-replicate-globals-per-affinity",
-    llvm::cl::desc(
-        "Replicates globals for each unique affinity they are used with."),
-    llvm::cl::init(false));
-
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -104,10 +98,6 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // debugging of analysis errors in end-user tooling.
   if (clAnnotateInputAffinities) {
     passManager.addPass(IREE::Stream::createAnnotateAffinitiesPass());
-  }
-
-  if (clReplicateGlobalsPerAffinity) {
-    passManager.addPass(IREE::Stream::createReplicateGlobalsPerAffinityPass());
   }
 
   // Converts from all input dialects into various levels of the stream dialect.
