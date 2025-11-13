@@ -21,6 +21,7 @@
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -285,7 +286,7 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
       wrap(builder.getI64ArrayAttr(details.igemmLoopBounds));
 
   llvm::SmallVector<mlir::Attribute> iteratorAttrs;
-  for (auto iterType : details.igemmLoopIterators) {
+  for (mlir::utils::IteratorType iterType : details.igemmLoopIterators) {
     iteratorAttrs.push_back(
         builder.getStringAttr(mlir::utils::stringifyIteratorType(iterType)));
   }
@@ -295,7 +296,8 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
       wrap(builder.getI64ArrayAttr(details.im2colOutputPerm));
 
   llvm::SmallVector<mlir::Attribute> reassocAttrs;
-  for (const auto &indices : details.filterReassocIndices) {
+  for (const mlir::ReassociationIndices &indices :
+       details.filterReassocIndices) {
     reassocAttrs.push_back(builder.getI64ArrayAttr(
         llvm::map_to_vector(indices, llvm::StaticCastTo<int64_t>)));
   }

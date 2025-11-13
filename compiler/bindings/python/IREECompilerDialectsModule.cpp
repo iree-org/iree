@@ -720,11 +720,11 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "filter_reassoc_indices",
           [](const ireeCodegenIGEMMGenericConvDetails &self)
               -> std::vector<std::vector<int64_t>> {
-            std::vector<std::vector<int64_t>> result;
             MlirAttribute attr = self.filterReassocIndices;
             assert(!mlirAttributeIsNull(attr) && mlirAttributeIsAArray(attr) &&
                    "filterReassocIndices should be a valid ArrayAttr");
             size_t n = mlirArrayAttrGetNumElements(attr);
+            std::vector<std::vector<int64_t>> result;
             result.reserve(n);
             for (size_t i = 0; i < n; ++i) {
               MlirAttribute innerArrayAttr = mlirArrayAttrGetElement(attr, i);
