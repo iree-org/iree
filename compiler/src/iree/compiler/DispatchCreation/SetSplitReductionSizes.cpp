@@ -398,11 +398,11 @@ private:
     // The constants below are determined based on empirical data.
     const int64_t ratioThreshold = 384;
     const int64_t largeKSize = 24576;
-    const int64_t largeMNSize = 4096;
+    const int64_t largeMNSize = 1024;
 
     // When the M or N size is large, the workload tends to distributed across
     // many workgroups, making split reduction little to no effect.
-    if (mSize >= largeMNSize || nSize >= largeMNSize) {
+    if (mSize > largeMNSize || nSize > largeMNSize) {
       LDBG() << "skipping op; large M or N size";
       return std::nullopt;
     }
