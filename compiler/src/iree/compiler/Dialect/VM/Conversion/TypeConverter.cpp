@@ -109,7 +109,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
         !llvm::isa<IntegerType>(inputs.front().getType())) {
       return nullptr;
     }
-    return builder.create<arith::IndexCastOp>(loc, type, inputs.front());
+    return arith::IndexCastOp::create(builder, loc, type, inputs.front());
   });
 
   addTargetMaterialization(

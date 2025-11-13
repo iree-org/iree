@@ -22,15 +22,18 @@ struct ElementwiseOpsFusabilityOptions {
   bool fuseMultiReduction = false;
   // Control fusion with producer that is a truncate-like operation.
   bool fuseTruncateOps = false;
+  // Control fusion with a consumer that is broadcast-like.
+  bool fuseBroadcastConsumers = false;
 };
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
                                 ElementwiseOpsFusabilityOptions options);
 
 /// Returns the closest producer dispatch region op result and the chain of
 /// operations being looked past during the traversal to find the producer
-/// dispatch. Returns std::nullopt if the dispatch or any ops in the chain have
-/// multiple uses.
+/// dispatch. Returns std::nullopt if the dispatch can not be found in the
+/// chain or any op in the chain is not a reshape-like op.
 std::optional<std::pair<OpResult, SmallVector<Operation *>>>
-getProducerDispatchValueAndOpChain(Value operand);
+getProducerDispatchValueAndOpChain(Value operand,
+                                   bool enableAggressiveFusion = false);
 
 } // namespace mlir::iree_compiler::DispatchCreation

@@ -25,8 +25,6 @@
 #include <cassert>
 
 #define DEBUG_TYPE "iree-encoding-attrs"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
@@ -65,7 +63,12 @@ LayoutAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
   return success();
 }
 
-bool LayoutAttr::isSerialized() const { return true; }
+bool LayoutAttr::isSerialized() const {
+  ArrayRef<Attribute> layouts = getLayouts().getValue();
+  return llvm::all_of(layouts, [](Attribute layout) {
+    return cast<SerializableAttr>(layout).isSerialized();
+  });
+}
 
 bool LayoutAttr::isIdentityLayout() const {
   auto layouts = getLayouts().getAsRange<SerializableAttr>();
@@ -85,7 +88,7 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
       res = requestedSize;
       continue;
     }
-    res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
+    res = arith::MaxUIOp::create(builder, loc, res, requestedSize);
   }
   return res;
 }
@@ -353,29 +356,6 @@ std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
 }
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.matmul_k
-//===---------------------------------------------------------------------===//
-
-std::optional<SmallVector<int32_t>> MatmulKAttr::getReductionDims() const {
-  return llvm::to_vector(getKDims().asArrayRef());
-}
-
-//===---------------------------------------------------------------------===//
-// iree_encoding.matmul_k
-//===---------------------------------------------------------------------===//
-
-MatmulKAttr MatmulKAttr::get(MLIRContext *ctx, ArrayRef<int32_t> kDims) {
-  return get(ctx, DenseI32ArrayAttr::get(ctx, kDims));
-}
-
-bool MatmulKAttr::isSerialized() const { return false; }
-
-Attribute MatmulKAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
-  MLIRContext *ctx = getContext();
-  return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
-}
-
-//===---------------------------------------------------------------------===//
 // iree_encoding.padding
 //===---------------------------------------------------------------------===//
 
@@ -457,7 +437,7 @@ Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
 
   const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;
-  Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value dynamicProduct = arith::ConstantIndexOp::create(builder, loc, 1);
 
   size_t dynamicDimIdx = 0;
   for (auto [dimSize, padValue] : llvm::zip_equal(type.getShape(), padding)) {
@@ -470,9 +450,9 @@ Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
     ++dynamicDimIdx;
 
     if (padValue != 0) {
-      dynamicDimSize = builder.create<arith::AddIOp>(
-          loc, dynamicDimSize,
-          builder.create<arith::ConstantIndexOp>(loc, padValue),
+      dynamicDimSize = arith::AddIOp::create(
+          builder, loc, dynamicDimSize,
+          arith::ConstantIndexOp::create(builder, loc, padValue),
           arith::IntegerOverflowFlags::nsw);
     }
     dynamicProduct = builder.createOrFold<arith::MulIOp>(
@@ -480,7 +460,7 @@ Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
   }
 
   return builder.createOrFold<arith::MulIOp>(
-      loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
+      loc, arith::ConstantIndexOp::create(builder, loc, staticProduct),
       dynamicProduct, arith::IntegerOverflowFlags::nsw);
 }
 
@@ -506,7 +486,7 @@ Value IdentityAttr::calculateStorageSizeInBytes(Location loc,
                                                 ValueRange dynamicDims) const {
   const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;
-  Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value dynamicProduct = arith::ConstantIndexOp::create(builder, loc, 1);
 
   size_t dynamicDimIdx = 0;
   for (int64_t dimSize : type.getShape()) {
@@ -521,7 +501,7 @@ Value IdentityAttr::calculateStorageSizeInBytes(Location loc,
         loc, dynamicProduct, dynamicDimSize, arith::IntegerOverflowFlags::nsw);
   }
   return builder.createOrFold<arith::MulIOp>(
-      loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
+      loc, arith::ConstantIndexOp::create(builder, loc, staticProduct),
       dynamicProduct, arith::IntegerOverflowFlags::nsw);
 }
 
@@ -540,6 +520,44 @@ IdentityResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
 
 Attribute IdentityResolverAttr::getLayout(RankedTensorType type) const {
   return Encoding::IdentityAttr::get(getContext());
+}
+
+Type IdentityResolverAttr::convertType(Type type) const {
+  using IREE::TensorExt::DispatchTensorType;
+  return TypeSwitch<Type, Type>(type)
+      .Case<RankedTensorType>([&](auto rankedTensorType) {
+        return rankedTensorType.dropEncoding();
+      })
+      .Case<DispatchTensorType>([&](auto dispatchTensorType) {
+        auto boundType =
+            dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+        if (!boundType || !boundType.getEncoding()) {
+          return dispatchTensorType;
+        }
+        Type convertedBoundType = this->convertType(boundType);
+        return DispatchTensorType::get(dispatchTensorType.getAccess(),
+                                       convertedBoundType);
+      })
+      .Default([&](auto concreteType) { return concreteType; });
+}
+
+LogicalResult IdentityResolverAttr::getOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, IREE::TensorExt::DispatchTensorType type,
+    ValueRange dynamicDims, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<OpFoldResult> strides,
+    SmallVectorImpl<OpFoldResult> &newOffsets,
+    SmallVectorImpl<OpFoldResult> &newSizes,
+    SmallVectorImpl<OpFoldResult> &newStrides) const {
+  newSizes.assign(sizes.begin(), sizes.end());
+  newOffsets.assign(offsets.begin(), offsets.end());
+  newStrides.assign(strides.begin(), strides.end());
+  return success();
+}
+
+Operation *IdentityResolverAttr::lowerOp(OpBuilder &b, Operation *op,
+                                         TypeRange convertedResTypes,
+                                         ValueRange convertedOperands) const {
+  return clone(b, op, convertedResTypes, convertedOperands);
 }
 
 //===---------------------------------------------------------------------===//

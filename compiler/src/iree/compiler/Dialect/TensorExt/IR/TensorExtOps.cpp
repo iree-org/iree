@@ -382,6 +382,38 @@ void DispatchWorkloadOrdinalOp::inferResultRanges(
   setResultRange(getResult(), argRanges[0]);
 }
 
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.compute_barrier.start
+//===----------------------------------------------------------------------===//
+
+LogicalResult ComputeBarrierStartOp::verify() {
+  ComputeBarrierStartOp op = *this;
+  if (failed(verifyOpDynamicDims(op, {op.getValue()}, op.getValueDims()))) {
+    return failure();
+  }
+
+  if (op.getValue().getType() != op.getResult().getType()) {
+    return op.emitOpError("value and result types must match");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.compute_barrier.end
+//===----------------------------------------------------------------------===//
+
+LogicalResult ComputeBarrierEndOp::verify() {
+  ComputeBarrierEndOp op = *this;
+  if (failed(verifyOpDynamicDims(op, {op.getValue()}, op.getValueDims()))) {
+    return failure();
+  }
+
+  if (op.getValue().getType() != op.getResult().getType()) {
+    return op.emitOpError("value and result types must match");
+  }
+  return success();
+}
+
 } // namespace mlir::iree_compiler::IREE::TensorExt
 
 //===----------------------------------------------------------------------===//

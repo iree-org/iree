@@ -31,12 +31,13 @@ namespace mlir::iree_compiler::DispatchCreation {
 namespace {
 
 /// Return true if the op is fusable with a SetEncodingOp consumer. The op's
-/// containing dispatch must contain only reshape ops, encoding ops, linalg ops,
-/// and attention ops. Non ShapedType ops (like arith ops, dim ops, etc.) are
-/// also allowed.
-/// TODO(#20179): It should be done by interface methods.
-static bool isFusableWithSetEncoding(Operation *op) {
-  auto parentRegion = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
+/// containing dispatch must contain only:
+///   - Reshape ops, encoding ops, linalg ops, gather ops, and attention ops.
+///   - Non ShapedType ops, e.g., like arith ops, dim ops, etc.
+///   - tensor::ExtractSliceOp is allowed as they can be folded into dispatch
+///     tensor load ops.
+static bool isFusableWithSetEncoding(Operation *target) {
+  auto parentRegion = target->getParentOfType<IREE::Flow::DispatchRegionOp>();
   // Make sure the dispatch region has only one block.
   if (!llvm::hasSingleElement(parentRegion.getBody())) {
     return false;
@@ -49,25 +50,23 @@ static bool isFusableWithSetEncoding(Operation *op) {
       continue;
     }
     if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp,
-             IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp,
-             linalg::LinalgOp, IREE::LinalgExt::AttentionOp>(op)) {
+             tensor::ExtractSliceOp, IREE::Encoding::SetEncodingOp,
+             IREE::Encoding::UnsetEncodingOp, linalg::LinalgOp,
+             IREE::LinalgExt::AttentionOp, IREE::LinalgExt::GatherOp>(op)) {
       return false;
     }
   }
   return true;
 }
 
-struct FuseEncodingOpsIntoDispatchRegionsPass
-    : public DispatchCreation::impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
+struct FuseEncodingOpsIntoDispatchRegionsPass final
+    : impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
           FuseEncodingOpsIntoDispatchRegionsPass> {
+  using Base::Base;
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
-
-    // Run CSE to eliminate common encoding ops.
-    DominanceInfo domInfo;
-    mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
 
     SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
@@ -79,7 +78,8 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     for (IREE::Encoding::SetEncodingOp encodingOp : encodingOps) {
       OpOperand &operand = encodingOp.getSourceMutable();
       std::optional<std::pair<OpResult, SmallVector<Operation *>>>
-          producerChain = getProducerDispatchValueAndOpChain(operand.get());
+          producerChain = getProducerDispatchValueAndOpChain(
+              operand.get(), enableAggressiveFusion);
       // Nothing to fuse with, so wrap the `encodingOp` in its own dispatch.
       if (!producerChain) {
         continue;
@@ -99,9 +99,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
       }
 
       // Place the op in its own dispatch region if fusion is not possible.
-      if (!isa<IREE::Encoding::MatmulKAttr>(
-              encodingOp.getResultType().getEncoding()) &&
-          !isFusableWithSetEncoding(producerInRegion.getOwner())) {
+      if (!isFusableWithSetEncoding(producerInRegion.getOwner())) {
         continue;
       }
       // Fuse the `encodingOp` and the producer chain into the dispatch.

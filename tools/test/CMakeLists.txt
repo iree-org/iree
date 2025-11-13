@@ -27,12 +27,15 @@ iree_lit_test_suite(
     "iree-compile-help.txt"
     "iree-convert-parameters.txt"
     "iree-dump-parameters.txt"
+    "iree-link-bundle.mlir"
+    "iree-link.mlir"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
     "iree-run-module-inputs.mlir"
     "iree-run-module-multi.mlir"
     "iree-run-module-outputs.mlir"
     "iree-run-module.mlir"
+    "iree-tblgen-json.td"
     "multiple_args.mlir"
     "multiple_exported_functions.mlir"
     "null_values.mlir"
@@ -48,12 +51,23 @@ iree_lit_test_suite(
     iree-compile
     iree-convert-parameters
     iree-dump-parameters
+    iree-link
     iree-opt
     iree-run-mlir
     iree-run-module
+    iree-tblgen
     not
   DATA
+    MLIROpBaseTdFiles
     echo_npy.py
+    iree-link-anonymous.mlir
+    iree-link-globals-a.mlir
+    iree-link-globals-b.mlir
+    iree-link-globals-c.mlir
+    iree-link-module-a.mlir
+    iree-link-module-b.mlir
+    iree-link-module-c.mlir
+    iree::compiler::Utils::td_files
     parameters_a.safetensors
     parameters_b.safetensors
   LABELS

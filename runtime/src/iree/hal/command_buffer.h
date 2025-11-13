@@ -63,6 +63,15 @@ enum iree_hal_command_buffer_mode_bits_t {
   // `IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=1` - if shimming command buffers
   // or performing replay this validation can be disabled per-command buffer.
   IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED = 1u << 5,
+
+  // Disables resource lifetime management.
+  // ***DANGER***: all resources used in the command buffer will not be retained
+  // and **MUST** remain valid for the lifetime of the command buffer. This is
+  // not safe in IREE as all code assumes proper retain semantics. If layering
+  // on top of the HAL with a different programming model that makes assumptions
+  // about lifetime this flag disables the internal resource tracking to reduce
+  // overhead.
+  IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED = 1u << 6,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
@@ -141,6 +150,12 @@ typedef struct iree_hal_buffer_ref_list_t {
   iree_host_size_t count;
   const iree_hal_buffer_ref_t* values;
 } iree_hal_buffer_ref_list_t;
+
+// Returns an empty buffer ref list.
+static inline iree_hal_buffer_ref_list_t iree_hal_buffer_ref_list_empty(void) {
+  iree_hal_buffer_ref_list_t list = {0};
+  return list;
+}
 
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
@@ -465,7 +480,7 @@ typedef struct iree_hal_dispatch_config_t {
 static inline iree_hal_dispatch_config_t iree_hal_make_static_dispatch_config(
     uint32_t workgroup_count_x, uint32_t workgroup_count_y,
     uint32_t workgroup_count_z) {
-  iree_hal_dispatch_config_t config = {0};
+  iree_hal_dispatch_config_t config = {};
   config.workgroup_count[0] = workgroup_count_x;
   config.workgroup_count[1] = workgroup_count_y;
   config.workgroup_count[2] = workgroup_count_z;
@@ -932,7 +947,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
 // execution.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
@@ -1083,7 +1099,8 @@ typedef struct iree_hal_command_buffer_vtable_t {
 
   iree_status_t(IREE_API_PTR* dispatch)(
       iree_hal_command_buffer_t* command_buffer,
-      iree_hal_executable_t* executable, int32_t entry_point,
+      iree_hal_executable_t* executable,
+      iree_hal_executable_export_ordinal_t export_ordinal,
       const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
       iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 } iree_hal_command_buffer_vtable_t;

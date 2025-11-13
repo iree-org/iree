@@ -95,8 +95,8 @@ tryReuseExistingAllocation(IREE::Stream::ResourceAllocaOp allocaOp) {
   Value availableTimepoint = chosenDeallocaOp.getAwaitTimepoint();
   if (!availableTimepoint) {
     OpBuilder builder(chosenDeallocaOp);
-    availableTimepoint = builder.create<IREE::Stream::TimepointImmediateOp>(
-        chosenDeallocaOp.getLoc());
+    availableTimepoint = IREE::Stream::TimepointImmediateOp::create(
+        builder, chosenDeallocaOp.getLoc());
   }
   allocaOp.replaceAllUsesWith(
       ValueRange{chosenDeallocaOp.getOperand(), availableTimepoint});
@@ -111,7 +111,7 @@ struct ReuseAllocationsPass
     : public IREE::Stream::impl::ReuseAllocationsPassBase<
           ReuseAllocationsPass> {
   void runOnOperation() override {
-    auto parentOp = getOperation();
+    mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;

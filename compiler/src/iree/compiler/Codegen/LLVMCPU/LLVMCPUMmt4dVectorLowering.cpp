@@ -33,8 +33,7 @@ namespace {
 struct LLVMCPUMmt4dVectorLoweringPass
     : public impl::LLVMCPUMmt4dVectorLoweringPassBase<
           LLVMCPUMmt4dVectorLoweringPass> {
-  using impl::LLVMCPUMmt4dVectorLoweringPassBase<
-      LLVMCPUMmt4dVectorLoweringPass>::LLVMCPUMmt4dVectorLoweringPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
@@ -45,7 +44,7 @@ struct LLVMCPUMmt4dVectorLoweringPass
 
 void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   std::optional<int64_t> numLoops;
   funcOp.walk([&](vector::ContractionOp op) {

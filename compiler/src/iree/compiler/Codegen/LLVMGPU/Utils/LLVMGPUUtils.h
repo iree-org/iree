@@ -28,7 +28,8 @@ class VectorContractOpInfo;
 class ContractionVectorLayoutOptions : public VectorLayoutOptions {
 public:
   ContractionVectorLayoutOptions(Operation *root, Value laneId,
-                                 int64_t subgroupSize);
+                                 int64_t subgroupSize,
+                                 ArrayRef<int64_t> workgroupSize);
   RewritePatternSet &getPatterns();
   VectorLayoutInterface getDefaultLayout(VectorType type) const override;
 
@@ -54,32 +55,21 @@ void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp);
 
 // Prefetches data written to shared memory for the next iteration. Returns the
 // new loop on success or failure when the `forOp` is not supported.
+//
+// numStages: Controls the depth of prefetching/pipelining.
+//   - 1: No pipelining (operations remain in original order)
+//   - 2: Two-stage pipeline (default) - prefetches 1 iteration ahead
+//   - 3+: Multi-stage pipeline - prefetches (numStages-1) iterations ahead
+// Stream pipeliner always prefetches one less than the number of stages.
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
-                                               scf::ForOp forOp);
+                                               scf::ForOp forOp,
+                                               unsigned numStages = 2);
 
 /// Insert barriers and wait operations if there are allocs of a different alias
 /// group before the given alloc.
 void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
                 ArrayRef<Operation *> aliasGroup, bool hasAsyncCopies = true);
 
-namespace IREE {
-namespace GPU {
-class MMAScheduleAttr;
-
-::llvm::FailureOr<::std::tuple<IREE::VectorExt::VectorLayoutInterface,
-                               IREE::VectorExt::VectorLayoutInterface,
-                               IREE::VectorExt::VectorLayoutInterface>>
-getContractionLayout(IREE::GPU::MMAScheduleAttr scheduleAttr,
-                     VectorContractOpInfo &opInfo, linalg::LinalgOp contractOp);
-
-::llvm::FailureOr<::std::tuple<IREE::VectorExt::VectorLayoutInterface,
-                               IREE::VectorExt::VectorLayoutInterface,
-                               IREE::VectorExt::VectorLayoutInterface>>
-getContractionLayout(IREE::GPU::MMAScheduleAttr scheduleAttr,
-                     VectorContractOpInfo &opInfo,
-                     vector::ContractionOp contractOp);
-} // namespace GPU
-} // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
 

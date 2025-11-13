@@ -40,4 +40,36 @@ def HAL_Dialect : Dialect {
   let useDefaultAttributePrinterParser = 0;
 }
 
+//===----------------------------------------------------------------------===//
+// HAL Dialect TableGen File Structure and Dependencies
+//===----------------------------------------------------------------------===//
+//
+// This dialect's definitions are partitioned into the following files
+// to enhance modularity and manage dependencies:
+//
+// 1. HALDialect.td: Defines the core 'hal' dialect.
+//
+// 2. HALBase.td: Defines fundamental base classes for ops, types,
+//    attributes, and interfaces, along with common type aliases and op traits.
+//    Includes: HALDialect.td (for dialect definition).
+//
+// 3. HALAttrs.td: Defines all dialect-specific attributes and enums.
+//    Includes: HALBase.td (for HAL_AttrDef), HALTypes.td (for types used in
+//              attributes).
+//
+// 4. HALInterfaces.td: Defines all dialect-specific interfaces.
+//    Includes: UtilBase.td (for base interface classes).
+//
+// 5. HALTypes.td: Defines all dialect-specific types.
+//    Includes: HALBase.td (for HAL_TypeDef),
+//              HALInterfaces.td (for types implementing interfaces).
+//
+// 6. HALOps.td: Defines all dialect-specific operations.
+//    Includes: HALBase.td (for HAL_Op and traits),
+//              HALAttrs.td (for attributes used in ops),
+//              HALTypes.td (for types used in ops).
+//
+// This structure aims to prevent circular dependencies and improve
+// maintainability.
+
 #endif // IREE_DIALECT_HAL_DIALECT

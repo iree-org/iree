@@ -22,6 +22,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include <numeric>
 
@@ -108,6 +109,13 @@ bool isValueUsableForOp(Value value, Operation *op);
 // Tries to reorder the producer of |value| above |consumerOp|.
 // Returns true if the move was successful.
 bool tryMoveProducerBefore(Value value, Operation *consumerOp);
+
+// Materializes a constant value as an operation.
+// Tries multiple approaches: arith::ConstantOp for compatible types,
+// then attribute dialect materialization, then type dialect materialization.
+// Returns nullptr if materialization fails.
+Operation *materializeConstant(OpBuilder &builder, Location loc,
+                               TypedAttr attr);
 
 // Returns true if the given callable op is public or external (no body).
 // Such callables cannot have their signature changed without (potentially)

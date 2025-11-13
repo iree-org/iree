@@ -242,7 +242,7 @@ void moveLoopInvariantCodeFromGenericOps(Operation *op) {
 namespace {
 struct CastLikeExtractSliceOpFolder final
     : OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -257,7 +257,7 @@ struct CastLikeExtractSliceOpFolder final
 
 struct CastLikeInsertSliceOpFolder final
     : OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -282,7 +282,7 @@ struct CastLikeInsertSliceOpFolder final
 /// write to memory.
 // TODO: Consider upstreaming
 struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
                                 PatternRewriter &rewriter) const override {
@@ -337,8 +337,8 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
            "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
 
     // Materialize the padding with a constant.
-    auto padVal = rewriter.create<vector::BroadcastOp>(
-        rPad.getLoc(), valToStore.getType(), rPad);
+    auto padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                              valToStore.getType(), rPad);
     rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
     return success();
   }
@@ -365,7 +365,7 @@ static Operation *getEarliestInsertionPointInsideBlock(Block *block,
 }
 
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
 
   // TODO: This is a temporary hack enabled for bufferization to

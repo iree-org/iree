@@ -9,6 +9,7 @@
 
 #include <mutex>
 
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"

@@ -20,7 +20,6 @@ EXPORTS
   ireeGPUGetSingleSubgroupLayout
   ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
-  ireeCodegenQueryMMAIntrinsics
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
@@ -79,7 +78,7 @@ EXPORTS
   ireeGPULoweringConfigAttrGet
   ireeGPULoweringConfigAttrGetAttributes
   ireeGPULoweringConfigAttrGetMmaKind
-  ireeGPULoweringConfigAttrGetSubgroupCount
+  ireeGPULoweringConfigAttrGetSubgroupBasis
   ireeGPULoweringConfigAttrGetTileSizes
   ireeGPULoweringConfigAttrGetTypeID
   ireeGPUMMAAttrGet
@@ -103,6 +102,10 @@ EXPORTS
   ireeGPUReorderWorkgroupsStrategyAttrGet
   ireeGPUReorderWorkgroupsStrategyAttrGetTypeID
   ireeGPUReorderWorkgroupsStrategyAttrGetValue
+  ireeGPUTargetInfoGet
+  ireeGPUTargetInfoGetMMAIntrinsics
+  ireeHALExecutableTargetAttrGetGPUTargetInfo
+  ireeLinkRunMain
   ireeMlirLspServerRunMain
   ireeOptRunMain
   ireeReduceRunMain

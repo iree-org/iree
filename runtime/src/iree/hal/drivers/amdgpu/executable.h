@@ -54,6 +54,15 @@ iree_status_t iree_hal_amdgpu_executable_format_supported(
 // This is limited by the field size in iree_hal_amdgpu_device_kernel_args_t.
 #define IREE_HAL_AMDGPU_MAX_DISPATCH_CONSTANT_COUNT UINT16_MAX
 
+// Infers the format of the executable and calculates its total size.
+// If executable_data.data_length is 0 attempts to infer size from the data.
+// Returns the canonical format string and total size of the executable data.
+// The format will be the ISA name like "amdgcn-amd-amdhsa--gfx1100".
+iree_status_t iree_hal_amdgpu_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size);
+
 // Creates a AMDGPU executable from a binary in memory. Each executable may
 // contain multiple entry points and be composed of several modules presented to
 // the HAL as a single instance. See iree_hal_executable_params_t for more
@@ -73,7 +82,8 @@ iree_status_t iree_hal_amdgpu_executable_create(
 // is no host representation and objects are per agent. To get an agent-specific
 // kernel_object use iree_hal_amdgpu_executable_lookup_kernel_args_for_device.
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
-    iree_hal_executable_t* executable, iree_host_size_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args);
 
 // Returns metadata about an exported kernel function in device memory.
@@ -81,7 +91,8 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
 // |device_ordinal| in the topology and cannot be used on any other device. The
 // returned pointers will remain valid for the lifetime of the executable.
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
-    iree_hal_executable_t* executable, iree_host_size_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args);
 

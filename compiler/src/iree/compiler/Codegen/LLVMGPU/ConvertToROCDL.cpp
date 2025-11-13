@@ -59,7 +59,7 @@ namespace {
 // operations as well.
 struct ReplaceGPUBarrierWithLDSBarrier
     : public OpRewritePattern<gpu::BarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(gpu::BarrierOp op,
                                 PatternRewriter &rewriter) const override {
@@ -96,7 +96,7 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 /// effort.
 constexpr StringLiteral kSwapName = "iree_gpu.swap_mfma";
 struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ROCDL::SetPrioOp setPrio,
                                 PatternRewriter &rewriter) const override {
     if (!setPrio->hasAttr(kSwapName)) {
@@ -179,8 +179,7 @@ static LogicalResult validateDataTypes(Operation *op,
 /// code.
 struct ConvertToROCDLPass final
     : impl::ConvertToROCDLPassBase<ConvertToROCDLPass> {
-  using impl::ConvertToROCDLPassBase<
-      ConvertToROCDLPass>::ConvertToROCDLPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
@@ -197,6 +196,14 @@ struct ConvertToROCDLPass final
       return signalPassFailure();
     }
     bool use32BitIndices = clROCMIndexingBits == 32;
+
+    StringRef targetArch = getGPUTargetAttr(m).getArch();
+    FailureOr<amdgpu::Chipset> maybeChipset =
+        amdgpu::Chipset::parse(targetArch);
+    if (failed(maybeChipset)) {
+      m.emitOpError() << "Invalid chipset name: " << targetArch;
+      return signalPassFailure();
+    }
 
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
@@ -226,12 +233,6 @@ struct ConvertToROCDLPass final
               vector::VectorContractLowering::OuterProduct);
       // These patterns only convert a subset of arith that target specific
       // rocdl intrinsics (e.g. fp8 conversions).
-      StringRef chipset = getGPUTargetAttr(m).getArch();
-      FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
-      if (failed(maybeChipset)) {
-        m.emitOpError() << "Invalid chipset name: " << chipset;
-        return signalPassFailure();
-      }
       WalkResult allTypesValid = m.walk([&](Operation *op) {
         if (failed(validateDataTypes(op, *maybeChipset))) {
           return WalkResult::interrupt();
@@ -241,9 +242,12 @@ struct ConvertToROCDLPass final
       if (allTypesValid.wasInterrupted()) {
         return signalPassFailure();
       }
+      bool supportsScaledExtTrunc =
+          !getGPUTargetAttr(m).getWgp().getScaledMma().empty();
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
-          /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
+          /*allowPackedF16Rtz=*/false, supportsScaledExtTrunc,
+          /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
       populateSwapSetPrioWithMFMAPatterns(patterns);
       populateConvertGPUToAMDGPUPatterns(patterns);
@@ -256,6 +260,9 @@ struct ConvertToROCDLPass final
       vector::populateVectorInterleaveToShufflePatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
           patterns, options.vectorContractLowering);
+
+      vector::populateVectorFromElementsUnrollPatterns(patterns);
+      vector::populateVectorToElementsUnrollPatterns(patterns);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
@@ -290,7 +297,7 @@ struct ConvertToROCDLPass final
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      populateGpuPromoteShuffleToAMDGPUPatterns(patterns);
+      populateGpuPromoteShuffleToAMDGPUPatterns(patterns, maybeChipset);
       populateGpuSubgroupIdPatterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
@@ -325,10 +332,8 @@ struct ConvertToROCDLPass final
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
-      StringRef targetArch = getGPUTargetAttr(m).getArch();
-      amdgpu::Chipset chipset =
-          amdgpu::Chipset::parse(targetArch).value_or(amdgpu::Chipset());
-      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns, chipset);
+      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
+                                              *maybeChipset);
       vector::populateVectorRankReducingFMAPattern(llvmPatterns);
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
       vector::populateVectorStepLoweringPatterns(llvmPatterns);
@@ -336,12 +341,15 @@ struct ConvertToROCDLPass final
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       vector::populateVectorTransferLoweringPatterns(llvmPatterns,
                                                      /*maxTransferRank=*/1);
-      populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
-                                           gpu::amd::Runtime::Unknown, chipset);
+      // We pass Runtime::HIP in order to enable gpu.printf for debugging.
+      // At time of writing, that flag has no other effect.
+      populateGpuToROCDLConversionPatterns(
+          converter, llvmPatterns, gpu::amd::Runtime::HIP, *maybeChipset);
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
-      populateMathToROCDLConversionPatterns(converter, llvmPatterns);
+      populateMathToROCDLConversionPatterns(converter, llvmPatterns,
+                                            /*chipset=*/*maybeChipset);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {

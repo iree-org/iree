@@ -24,20 +24,20 @@ static std::tuple<Value, Value>
 splitBufferSlot(Location loc, Value bufferOrSlot, OpBuilder &builder) {
   if (!bufferOrSlot) {
     return std::make_tuple(
-        builder.create<IREE::VM::ConstI32ZeroOp>(loc),
-        builder.create<IREE::VM::ConstRefZeroOp>(
-            loc,
+        IREE::VM::ConstI32ZeroOp::create(builder, loc),
+        IREE::VM::ConstRefZeroOp::create(
+            builder, loc,
             IREE::VM::RefType::get(builder.getType<IREE::HAL::BufferType>())));
   } else if (isa<IREE::VM::RefType>(bufferOrSlot.getType())) {
     // Direct buffer binding; pass 0 for table slot.
-    return std::make_tuple(builder.create<IREE::VM::ConstI32ZeroOp>(loc),
+    return std::make_tuple(IREE::VM::ConstI32ZeroOp::create(builder, loc),
                            bufferOrSlot);
   } else {
     // Indirect binding table reference; pass null for the buffer.
     return std::make_tuple(
         castToImportType(bufferOrSlot, builder.getI32Type(), builder),
-        builder.create<IREE::VM::ConstRefZeroOp>(
-            loc,
+        IREE::VM::ConstRefZeroOp::create(
+            builder, loc,
             IREE::VM::RefType::get(builder.getType<IREE::HAL::BufferType>())));
   }
 }
@@ -83,7 +83,7 @@ public:
                                               rewriter.getI32Type(), rewriter));
     } else {
       callOperands.push_back(
-          rewriter.create<IREE::VM::ConstI32ZeroOp>(op.getLoc()));
+          IREE::VM::ConstI32ZeroOp::create(rewriter, op.getLoc()));
     }
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
@@ -265,7 +265,7 @@ public:
     Value zeroI64;
     auto getZeroI64 = [&]() {
       if (!zeroI64) {
-        zeroI64 = rewriter.create<IREE::VM::ConstI64ZeroOp>(op.getLoc());
+        zeroI64 = IREE::VM::ConstI64ZeroOp::create(rewriter, op.getLoc());
       }
       return zeroI64;
     };
@@ -286,13 +286,13 @@ public:
     SmallVector<Value> callOperands;
     callOperands.push_back(adaptor.getCommandBuffer());
     callOperands.push_back(adaptor.getChannel());
-    callOperands.push_back(rewriter.create<IREE::VM::ConstI32Op>(
-        op.getLoc(), adaptor.getOp().getEncodedValue()));
+    callOperands.push_back(IREE::VM::ConstI32Op::create(
+        rewriter, op.getLoc(), adaptor.getOp().getEncodedValue()));
     if (auto paramValue = adaptor.getParam()) {
       callOperands.push_back(paramValue);
     } else {
       callOperands.push_back(
-          rewriter.create<IREE::VM::ConstI32ZeroOp>(op.getLoc()));
+          IREE::VM::ConstI32ZeroOp::create(rewriter, op.getLoc()));
     }
 
     auto [sendBufferSlot, sendBuffer] =
@@ -346,7 +346,7 @@ public:
 
     auto i32Type = rewriter.getI32Type();
     auto i64Type = rewriter.getI64Type();
-    Value zeroI32 = rewriter.create<IREE::VM::ConstI32ZeroOp>(op.getLoc());
+    Value zeroI32 = IREE::VM::ConstI32ZeroOp::create(rewriter, op.getLoc());
 
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
@@ -417,7 +417,7 @@ public:
 
     auto i32Type = rewriter.getI32Type();
     auto i64Type = rewriter.getI64Type();
-    Value zeroI32 = rewriter.create<IREE::VM::ConstI32ZeroOp>(op.getLoc());
+    Value zeroI32 = IREE::VM::ConstI32ZeroOp::create(rewriter, op.getLoc());
 
     auto [workgroupsBufferSlot, workgroupsBuffer] =
         splitBufferSlot(op.getLoc(), adaptor.getWorkgroupsBuffer(), rewriter);

@@ -179,7 +179,7 @@ module {
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
       m_offset = [0] * [1] k_offset = [0] * [1]
       batch_pos = [0] m_pos = [2, 3] k_pos = [1]
-      input_k_perm = [0, 1, 2]
+      input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
       ins(%2 : tensor<2x34x34x128xf16>)
       outs(%3 : tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
     return %4 : tensor<2x128x8xf16>
@@ -204,7 +204,7 @@ module {
       strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
       m_offset = [0, 0] * [3, 1] k_offset = [0] * [1]
       batch_pos = [3] m_pos = [1, 2] k_pos = [0]
-      input_k_perm = [0, 1, 2]
+      input_k_perm = [0, 1, 2] output_perm = [0, 1, 2, 3]
       ins(%2 : tensor<16x26x18x32xbf16>)
       outs(%3 : tensor<32x1x1x32xbf16>) -> tensor<32x1x1x32xbf16>
     return %4 : tensor<32x1x1x32xbf16>
@@ -238,3 +238,24 @@ func.func @scatter(%arg0: tensor<3x32x16xf32>, %arg1: tensor<3x1xi32>) -> tensor
 //       CHECK:   scf.forall ({{.*}}) = (0, 0, 0) to (3, 32, 16) step (1, 1, 4)
 //       CHECK:     linalg_ext.scatter
 //       CHECK:     scf.forall.in_parallel
+
+// -----
+
+#config = #iree_gpu.derived_thread_config
+func.func @map_scatter(%arg0: tensor<2x32xf32>, %arg1: tensor<64x256xf32>) -> tensor<64x256xf32>
+    attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32] subgroup_size = 64, {}>
+    } {
+  %true = arith.constant true
+  %1 = iree_linalg_ext.map_scatter {lowering_config = #config} %arg0 into %arg1 {
+  ^bb0(%arg2: index, %arg3: index):
+    iree_linalg_ext.yield %arg2, %arg3, %true : index, index, i1
+  } : tensor<2x32xf32> into tensor<64x256xf32> -> tensor<64x256xf32>
+  return %1 : tensor<64x256xf32>
+}
+
+// CHECK-LABEL: @map_scatter
+//       CHECK: scf.forall ({{.*}}) = (0, 0) to (2, 32) step (1, 4)
+//       CHECK:   iree_linalg_ext.map_scatter
+//       CHECK:     tensor<1x4xf32> into tensor<64x256xf32>
+//       CHECK:   scf.forall.in_parallel

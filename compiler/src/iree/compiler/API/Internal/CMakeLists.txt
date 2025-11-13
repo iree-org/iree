@@ -19,6 +19,7 @@ iree_cc_library(
     "CompilerDriver.cpp"
     "Diagnostics.cpp"
   DEPS
+    LLVMRemarks
     LLVMSupport
     LLVMTargetParser
     MLIRBuiltinToLLVMIRTranslation
@@ -27,6 +28,7 @@ iree_cc_library(
     MLIRDebug
     MLIRIR
     MLIRParser
+    MLIRRemarkStreamer
     MLIRSupport
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
@@ -91,6 +93,25 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    IREELinkToolEntryPoint
+  SRCS
+    "IREELinkToolEntryPoint.cpp"
+  DEPS
+    LLVMSupport
+    MLIRBytecodeWriter
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRSupport
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Tools::init_passes_and_dialects
+    iree::compiler::Utils
+    iree::compiler::bindings::c::headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     IREEReduceToolEntryPoint
   SRCS
     "IREEReduceToolEntryPoint.cpp"
@@ -135,6 +156,7 @@ iree_cc_library(
     MLIRCAPIIR
     MLIRIR
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Utils
     iree::compiler::bindings::c::headers
   PUBLIC
 )
@@ -144,25 +166,20 @@ iree_cc_library(
 set(_lld_copts)
 set(_lld_deps)
 
-# TODO(#14086): implement linking in the installed-LLVM case.
-if(IREE_BUILD_BUNDLED_LLVM)
-  # Use generator expressions to conditionally include LLD targets, providing
-  # a compiler definition if not available.
-  macro(_add_dependent_lld_target target not_definition)
-    list(APPEND _lld_deps
-      $<TARGET_NAME_IF_EXISTS:${target}>
-      $<IF:$<TARGET_EXISTS:${target}>,lldCommon,>
-    )
-    list(APPEND _lld_copts
-      $<IF:$<TARGET_EXISTS:${target}>,,-D${not_definition}>)
-  endmacro()
-  _add_dependent_lld_target(lldCOFF IREE_COMPILER_LLD_COFF_DISABLED)
-  _add_dependent_lld_target(lldELF IREE_COMPILER_LLD_ELF_DISABLED)
-  _add_dependent_lld_target(lldMachO IREE_COMPILER_LLD_MACHO_DISABLED)
-  _add_dependent_lld_target(lldWasm IREE_COMPILER_LLD_WASM_DISABLED)
-else()
-  list(APPEND _lld_copts -DIREE_COMPILER_LLD_DISABLED)
-endif()
+# Use generator expressions to conditionally include LLD targets, providing
+# a compiler definition if not available.
+macro(_add_dependent_lld_target target not_definition)
+  list(APPEND _lld_deps
+    $<TARGET_NAME_IF_EXISTS:${target}>
+    $<IF:$<TARGET_EXISTS:${target}>,lldCommon,>
+  )
+  list(APPEND _lld_copts
+    $<IF:$<TARGET_EXISTS:${target}>,,-D${not_definition}>)
+endmacro()
+_add_dependent_lld_target(lldCOFF IREE_COMPILER_LLD_COFF_DISABLED)
+_add_dependent_lld_target(lldELF IREE_COMPILER_LLD_ELF_DISABLED)
+_add_dependent_lld_target(lldMachO IREE_COMPILER_LLD_MACHO_DISABLED)
+_add_dependent_lld_target(lldWasm IREE_COMPILER_LLD_WASM_DISABLED)
 
 iree_cc_library(
   NAME

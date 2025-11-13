@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -30,7 +29,7 @@ using iree_compiler::IREE::LinalgExt::IREELinalgExtDialect;
 /// to set the configuration.
 /// TODO(Max191): Use a funcOp walk instead of a pattern for this.
 struct SetIGEMMConfiguration final : OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   SetIGEMMConfiguration(MLIRContext *context, IGEMMConfigFn configFn)
       : OpRewritePattern(context), configFn(configFn) {}

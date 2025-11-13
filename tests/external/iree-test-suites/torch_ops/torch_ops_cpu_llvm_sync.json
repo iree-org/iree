@@ -1,0 +1,13 @@
+{
+  "config_name": "simple",
+  "iree_compile_flags": [
+    "--iree-hal-target-device=local",
+    "--iree-hal-target-backends=llvm-cpu",
+    "--iree-llvmcpu-target-cpu=host"
+  ],
+  "iree_run_module_flags": [],
+  "skip_compile_tests": [],
+  "skip_run_tests": [],
+  "expected_compile_failures": [],
+  "expected_run_failures": []
+}

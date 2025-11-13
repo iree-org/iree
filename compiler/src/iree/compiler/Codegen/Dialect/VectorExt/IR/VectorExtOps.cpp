@@ -591,7 +591,7 @@ OpFoldResult TransferGatherOp::fold(FoldAdaptor adaptor) {
 }
 
 struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(TransferGatherOp xferOp,
                                 PatternRewriter &rewriter) const override {
@@ -606,8 +606,8 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
       // Extract the scalar and add it to the
       // corressponding base.
       OpOperand &base = xferOp.getIndicesMutable()[index];
-      Value extracted = rewriter.create<vector::ExtractOp>(
-          xferOp.getLoc(), indexVec,
+      Value extracted = vector::ExtractOp::create(
+          rewriter, xferOp.getLoc(), indexVec,
           SmallVector<int64_t>(vectorTy.getRank(), 0));
       AffineExpr d0, d1;
       bindDims(xferOp.getContext(), d0, d1);
@@ -632,7 +632,7 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
 
 struct FoldContigousGatherToTransferRead final
     : OpRewritePattern<TransferGatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(TransferGatherOp xferOp,
                                 PatternRewriter &rewriter) const override {

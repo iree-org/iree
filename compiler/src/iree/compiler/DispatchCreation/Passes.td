@@ -46,16 +46,53 @@ def BubbleUpExpandShapesPass :
   ];
 }
 
+def InsertTensorBarriersPass :
+    InterfacePass<"iree-dispatch-creation-insert-tensor-barriers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Insert tensor barrier markers around computation regions.";
+  let description = [{
+    Walks from function boundaries and inserts iree_tensor_ext.compute_barrier.start
+    and iree_tensor_ext.compute_barrier.end operations at the boundaries of
+    computation regions (tensor/linalg/linalgext ops). These barriers allow
+    controlling where certain transformations like reshape propagation can occur.
+
+    The pass identifies compute operations and wraps tensor values flowing
+    into and out of the compute region with the barrier operations.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
+}
+
+def RemoveTensorBarriersPass :
+    InterfacePass<"iree-dispatch-creation-remove-tensor-barriers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Remove tensor barrier markers from the program.";
+  let description = [{
+    Removes iree_tensor_ext.compute_barrier.start and iree_tensor_ext.compute_barrier.end
+    operations from the program. These are identity operations that simply
+    pass through their operands, so they can be safely removed by replacing
+    all uses of their results with their operands.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
+}
+
 def ElementwiseOpFusionPass :
     Pass<"iree-dispatch-creation-elementwise-op-fusion", ""> {
   let summary = "Fuse elementwise operations.";
   let options = [
     Option<"intraDispatch", "intra-dispatch", "bool",
-           /*default=*/"false", "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
+           /*default=*/"false",
+           "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
     Option<"fuseMultiReduction", "fuse-multi-reduction", "bool",
            /*default=*/"true", "Fuse ops that have multiple reduction iterators">,
     Option<"fuseTruncateOps", "fuse-truncate-ops", "bool",
-           /*default=*/"false", "Fuse producer truncate-like operations with consumers">,
+           /*default=*/"false",
+           "Fuse producer truncate-like operations with consumers">,
+    Option<"fuseBroadcastOps", "fuse-broadcast-ops", "bool",
+           /*default=*/"false", "Fuse broadcast-like ops with producers">,
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
@@ -277,12 +314,26 @@ def FormScalarDispatchesPass :
   ];
 }
 
+def SetSplitReductionSizesPass :
+    Pass<"iree-dispatch-creation-set-split-reduction-sizes"> {
+  let summary = "Set 'iree_linalg_ext.split_reduction' attribute on ops";
+  let options = [
+    Option<"splitReductionTargetSize", "split-reduction-target-size", "int64_t", "1024",
+           "Target tile size for split reduction. Inner reduction "
+           "dimensions are tiled first, with the tile size rounded "
+           "up until it evenly divides the iteration domain.">
+  ];
+  let dependentDialects = [];
+}
+
 def FormSplitReductionDispatchesPass :
     InterfacePass<"iree-dispatch-creation-form-split-reduction-dispatches", "mlir::FunctionOpInterface"> {
   let summary = "Partially tile reduction operations and place into dispatches";
   let options = [
     ListOption<"splitSize", "split-size", "int",
-        "Tile sizes for split reduction (innermost first)">
+        "Tile sizes for split reduction (innermost first)">,
+    Option<"enableFusePad", "enable-fuse-pad", "bool",
+        /*default=*/"false", "Fuse pad into scf.forall">
   ];
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
@@ -300,6 +351,11 @@ def FuseEncodingOpsIntoDispatchRegionsPass :
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
+  ];
+  let options = [
+    Option<"enableAggressiveFusion", "enable-aggressive-fusion", "bool",
+    /*default=*/"false",
+    "Enable encoding op fusion if the producer has more than one use">,
   ];
 }
 
@@ -359,9 +415,6 @@ def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
             clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
                 "padding", "Encode tensors that need to be padded."),
-            clEnumValN(
-                mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
-                "matmulk", "Only encodes reduction dimensions in the encoding."),
             clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
                 "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,

@@ -98,6 +98,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    executable_header
+  HDRS
+    "executable_header.h"
+  SRCS
+    "executable_header.c"
+  DEPS
+    iree::base
+    iree::base::internal::flatcc::parsing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     file_cache
   HDRS
     "file_cache.h"

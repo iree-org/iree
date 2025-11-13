@@ -18,7 +18,7 @@ util.func public @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<c
   // CHECK-SAME: type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]])
   // CHECK-NEXT: "scope"::"key0"[%c50_i64] : !hal.buffer{%c100}
   // CHECK-NEXT: "scope"::"key1"[%c51_i64] : !hal.buffer{%c101}
-  %results:2, %result_timepoint = stream.parameter.load on(#hal.device.affinity<@device>) await(%wait) => {
+  %results:2, %result_timepoint = stream.cmd.parameter.load on(#hal.device.affinity<@device>) await(%wait) => {
     "scope"::"key0"[%c50_i64] : !stream.resource<constant>{%c100},
     "scope"::"key1"[%c51_i64] : !stream.resource<constant>{%c101}
   } => !stream.timepoint
@@ -43,7 +43,7 @@ util.func public @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.res
   // CHECK-SAME: wait(%[[WAIT]]) signal(%[[SIGNAL]])
   // CHECK-SAME: type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]])
   // CHECK-NEXT: "key"[%c50_i64] : !hal.buffer{%c100}
-  %result, %result_timepoint = stream.parameter.load on(#hal.device.affinity<@device>) await(%wait) => {
+  %result, %result_timepoint = stream.cmd.parameter.load on(#hal.device.affinity<@device>) await(%wait) => {
     "key"[%c50_i64] : !stream.resource<constant>{%c100}
   } => !stream.timepoint
   // CHECK: return %[[BUFFER]], %[[SIGNAL]]
@@ -67,7 +67,7 @@ util.func public @parameterRead(%wait: !stream.timepoint, %target: !stream.resou
   // CHECK: io_parameters.gather<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
   // CHECK-SAME: wait(%[[WAIT]]) signal(%[[SIGNAL]])
   // CHECK-NEXT:   "scope"::"key"[%c50_i64] -> %[[TARGET]][%c100 for %c200] : !hal.buffer
-  %timepoint = stream.parameter.read on(#hal.device.affinity<@device>) await(%wait) => "scope"::"key"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300} => !stream.timepoint
+  %timepoint = stream.cmd.parameter.read on(#hal.device.affinity<@device>) await(%wait) => "scope"::"key"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300} => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
   util.return %timepoint : !stream.timepoint
 }
@@ -89,7 +89,7 @@ util.func public @parameterWrite(%wait: !stream.timepoint, %source: !stream.reso
   // CHECK: io_parameters.scatter<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
   // CHECK-SAME: wait(%[[WAIT]]) signal(%[[SIGNAL]])
   // CHECK-NEXT:   %[[SOURCE]][%c100 for %c200] : !hal.buffer -> "scope"::"key"[%c50_i64]
-  %timepoint = stream.parameter.write on(#hal.device.affinity<@device>) await(%wait) => %source[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
+  %timepoint = stream.cmd.parameter.write on(#hal.device.affinity<@device>) await(%wait) => %source[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
   util.return %timepoint : !stream.timepoint
 }
@@ -119,7 +119,7 @@ util.func public @parameterGather(%wait: !stream.timepoint, %target: !stream.res
   // CHECK-NEXT:   "scope"::"key0"[%c50_i64] -> %[[TARGET]][%c100 for %c200] : !hal.buffer,
   // CHECK-NEXT:   "scope"::"key1"[%c51_i64] -> %[[TARGET]][%c101 for %c201] : !hal.buffer,
   // CHECK-NEXT:   "scope"::"key2"[%c52_i64] -> %[[TARGET]][%c102 for %c202] : !hal.buffer
-  %timepoint = stream.parameter.gather on(#hal.device.affinity<@device>) await(%wait) => {
+  %timepoint = stream.cmd.parameter.gather on(#hal.device.affinity<@device>) await(%wait) => {
     "scope"::"key0"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300},
     "scope"::"key1"[%c51_i64] -> %target[%c101 for %c201] : !stream.resource<transient>{%c300},
     "scope"::"key2"[%c52_i64] -> %target[%c102 for %c202] : !stream.resource<transient>{%c300}
@@ -149,7 +149,7 @@ util.func public @parameterGatherNoScope(%wait: !stream.timepoint, %target: !str
   // CHECK-SAME: wait(%[[WAIT]]) signal(%[[SIGNAL]])
   // CHECK-NEXT:   "key0"[%c50_i64] -> %[[TARGET]][%c100 for %c200] : !hal.buffer,
   // CHECK-NEXT:   "key1"[%c51_i64] -> %[[TARGET]][%c101 for %c201] : !hal.buffer
-  %timepoint = stream.parameter.gather on(#hal.device.affinity<@device>) await(%wait) => {
+  %timepoint = stream.cmd.parameter.gather on(#hal.device.affinity<@device>) await(%wait) => {
     "key0"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300},
     "key1"[%c51_i64] -> %target[%c101 for %c201] : !stream.resource<transient>{%c300}
   } => !stream.timepoint
@@ -183,7 +183,7 @@ util.func public @parameterScatter(%wait: !stream.timepoint, %source: !stream.re
   // CHECK-NEXT:   %[[SOURCE]][%c101 for %c201] : !hal.buffer -> "scope"::"key1"[%c51_i64],
   // CHECK-NEXT:   %[[SOURCE]][%c102 for %c202] : !hal.buffer -> "scope"::"key2"[%c52_i64]
   // CHECK-NEXT: }
-  %timepoint = stream.parameter.scatter on(#hal.device.affinity<@device>) await(%wait) => {
+  %timepoint = stream.cmd.parameter.scatter on(#hal.device.affinity<@device>) await(%wait) => {
     %source[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key0"[%c50_i64],
     %source[%c101 for %c201] : !stream.resource<transient>{%c300} -> "scope"::"key1"[%c51_i64],
     %source[%c102 for %c202] : !stream.resource<transient>{%c300} -> "scope"::"key2"[%c52_i64]

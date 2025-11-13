@@ -54,7 +54,7 @@ builtin.module {
         strided<[4096, 64, 1], offset: ?>>
   %2 = vector.load %0[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
   %3 = vector.reduction <maximumf>, %2 : vector<2xf32> into f32
-  %4 = vector.splat %3 : vector<2xf32>
+  %4 = vector.broadcast %3 : f32 to vector<2xf32>
   vector.store %4, %1[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
   return
   }
@@ -73,8 +73,11 @@ builtin.module {
     return
   }
 }
+// CHECK: #[[$MMRA:.+]] = #llvm.mmra_tag<"amdgpu-synchronize-as":"local">
 // CHECK-LABEL: llvm.func @simple_barrier
-// CHECK: llvm.inline_asm has_side_effects asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES\0As_waitcnt lgkmcnt(0)\0As_barrier", ""  : () -> ()
+// CHECK: llvm.fence syncscope("workgroup") release {llvm.mmra = #[[$MMRA]]}
+// CHECK: llvm.inline_asm has_side_effects asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES\0As_barrier", ""  : () -> ()
+// CHECK: llvm.fence syncscope("workgroup") acquire {llvm.mmra = #[[$MMRA]]}
 
 // -----
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -280,14 +283,14 @@ module {
     rocdl.s.setprio 2 { iree_gpu.swap_mfma = 1 }
     rocdl.s.setprio 3 { iree_gpu.swap_mfma = 2 }
     rocdl.s.setprio 4 { iree_gpu.swap_mfma = 5 }
-    %0 = amdgpu.mfma %in * %in + %out {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %0 = amdgpu.mfma 4x4x1 %in * %in + %out {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
-    %1 = amdgpu.mfma %in * %in + %0 {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %1 = amdgpu.mfma 4x4x1 %in * %in + %0 {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
-    %2 = amdgpu.mfma %in * %in + %1 {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %2 = amdgpu.mfma 4x4x1 %in * %in + %1 {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
     call @foo(%2) : (vector<4xf32>) -> ()
     return

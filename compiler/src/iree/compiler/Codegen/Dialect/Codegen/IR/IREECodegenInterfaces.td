@@ -9,6 +9,55 @@
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 
+def IREECodegen_InnerTiledSemanticsAttrInterface
+    : AttrInterface<"InnerTiledSemanticsAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    Attribute interface used to describe aspects of tile shape semantics
+    that are orthogonal to InnerTileDescAttrInterface and that may change during
+    lowerings, whereas the InnerTileDescAttrInterface describes aspects that are
+    invariant during lowerings. This includes:
+    1. Expanded vs opaque tile shapes.
+    2. On GPU: distributed vs undistributed tile shapes.
+    Having this split into a separate interface allows mutating those
+    attribtutes separately.
+  }];
+
+  let methods =
+      [InterfaceMethod<
+           /*desc=*/[{
+        For each operand, return the vector type of the inner tile.
+
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
+      }],
+           /*retType=*/"void",
+           /*methodName=*/"getTileTypes",
+           /*args=*/
+           (ins "::mlir::iree_compiler::IREE::Codegen::"
+                "InnerTileDescAttrInterface":$kind,
+               "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)>,
+       InterfaceMethod<
+           /*desc=*/[{
+        Returns true for opaque semantics, meaning that the only significant
+        aspect of tile shapes is the number of elements. When false, tile shapes
+        are fully expanded and only unit dims are ignored.
+      }],
+           /*retTy=*/"bool",
+           /*methodName=*/"getOpaque",
+           /*args=*/(ins)>];
+}
+
+def IREECodegen_AnyInnerTiledSemanticscAttr
+    : Attr<Or<[CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Codegen::"
+                     "InnerTiledSemanticsAttrInterface>($_self)">,
+]>,
+           "Attribute implementing InnerTiledSemanticsAttrInterface"> {
+  let storageType = [{ IREE::Codegen::InnerTiledSemanticsAttrInterface }];
+  let returnType = [{ IREE::Codegen::InnerTiledSemanticsAttrInterface }];
+  let convertFromStorage = "$_self";
+}
+
 def IREECodegen_InnerTileDescAttrInterface :
   AttrInterface<"InnerTileDescAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
@@ -224,11 +273,57 @@ def IREECodegen_InnerTileDescAttrInterface :
 }
 
 def IREECodegen_AnyInnerTileDescAttr : Attr<Or<[
-  CPred<"isa<IREE::Codegen::InnerTileDescAttrInterface>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface>($_self)">,
 ]>, "buffer-like constant attribute values"> {
   let storageType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
   let returnType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
   let convertFromStorage = "$_self";
+}
+
+def IREECodegen_WorkgroupReorderingAttrInterface :
+  AttrInterface<"WorkgroupReorderingAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that describes workgroup reordering patterns.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Function that generates the workgroup loop headers.
+          - `loopRanges`: Values that represent the full size of the iteration space being tiled.
+          - `givenTileSizes`: The tile sizes that are to be used to tile the iteration space.
+          - `destinationTensors`: The tensors to use as destinations for the results of the tiled loop.
+      }],
+      /*retTy=*/"::mlir::FailureOr<::mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo>",
+      /*methodName=*/"generateLoopHeaderFn",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::llvm::ArrayRef<::mlir::Range>":$loopRanges,
+                    "::llvm::ArrayRef<::mlir::OpFoldResult>":$tileSizes,
+                    "::mlir::ValueRange":$destinationTensors)
+    >,
+     InterfaceMethod<
+      /*desc=*/[{
+        Function that generates the workgroup loop terminator.
+          - `loops`: generated loops from the generateLoopHeaderFn callback above
+          - `tiledResults`: Tiles of the result computed for the iteration space tile.
+          - `resultOffsets`: For each of the `tiledResults`, the offset at which the result tile is
+          to be "inserted" back into the destination tensor.
+          - `resultSizes`: For each of the `tiledResults`, the size of the result tile that is to
+          be "inserted" back into the destination tensor.
+      }],
+      /*retType=*/"::mlir::LogicalResult",
+      /*methodName=*/"generateLoopTerminatorFn",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::mlir::ArrayRef<::mlir::LoopLikeOpInterface>":$loops,
+                    "::mlir::ValueRange":$tiledResults,
+                    "::llvm::ArrayRef<::llvm::SmallVector<::mlir::OpFoldResult>>":$resultOffsets,
+                    "::llvm::ArrayRef<::llvm::SmallVector<::mlir::OpFoldResult>>":$resultSizes,
+                    "::mlir::ValueRange":$destinationTensors)
+    >
+  ];
 }
 
 def IREECodegen_LoweringConfigAttrInterface :
@@ -415,7 +510,19 @@ def IREECodegen_LoweringConfigAttrInterface :
       /*defaultImplementation=*/[{
         return std::nullopt;
       }]
-    >
+    >,
+     InterfaceMethod<
+      /*desc=*/[{
+        Gets the workgroup reordering strategy to apply to the annotated
+        operation.
+      }],
+      /*retTy=*/"::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface",
+      /*methodName=*/"getWorkgroupReorderingStrategy",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return nullptr;
+      }]>
   ];
 }
 
@@ -486,7 +593,7 @@ def IREECodegen_SwizzleAttrInterface :
 }
 
 def IREECodegen_AnySwizzleAttr : Attr<Or<[
-  CPred<"isa<IREE::Codegen::SwizzleAttrInterface>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Codegen::SwizzleAttrInterface>($_self)">,
 ]>, "swizzling descriptor attributes"> {
   let storageType = [{ IREE::Codegen::SwizzleAttrInterface }];
   let returnType = [{ IREE::Codegen::SwizzleAttrInterface }];
@@ -547,6 +654,51 @@ def IREECodegen_UKernelProviderInterface :
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Creates and replaces the |contextual_op| with a ukernel referenced by
+        |name| backed by this attribute. Takes |target_configuration| in
+        case the provider wants to make any feature specific decisions for
+        which implementation to provide. It takes in |inputs|, |outputs| and
+        |other_operands| and adds to it a few context-specific as well as
+        backend specific implementations to create the ukernel op.
+        Returning std::nullopt indicates falling back to default implementation.
+        Otherwise success/failure indicates the status of the custom replacement
+        implementation.
+      }],
+      /*retTy=*/"std::optional<::mlir::LogicalResult>",
+      /*methodName=*/"createAndReplaceWithUkernelOp",
+      /*args=*/(ins "::mlir::RewriterBase&":$b,
+                    "::mlir::StringRef":$name,
+                    "::mlir::DictionaryAttr":$target_configuration,
+                    "::mlir::Operation *":$contextual_op,
+                    "::llvm::ArrayRef<::mlir::Value>":$inputs,
+                    "::llvm::ArrayRef<::mlir::Value>":$outputs,
+                    "::llvm::SmallVectorImpl<::mlir::Value>&":$other_operands),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a data layout attribute for the provided |encoding| and
+        |target_configuration|.
+
+        The return type is deliberately '::mlir::Attribute' to accommodate
+        various data layout specifications. Callers, such as encoding
+        resolvers, are expected to handle a range of possible attributes
+        and gracefully manage cases where an unsupported attribute is returned.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getDataLayoutForUKernel",
+      /*args=*/(ins "::mlir::Attribute":$encoding,
+                    "::mlir::DictionaryAttr":$target_configuration),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
       }]
     >,
   ];

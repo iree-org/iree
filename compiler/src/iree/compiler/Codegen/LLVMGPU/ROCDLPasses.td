@@ -56,10 +56,4 @@ def ROCDLLowerExecutableTargetPass : InterfacePass<
                 "pass pipeline";
 }
 
-def ROCDLSelectLoweringStrategyPass :
-    Pass<"iree-rocdl-select-lowering-strategy", "ModuleOp"> {
-  let summary = "Select a suitable lowering strategy for an IREE "
-                "hal.executable.variant op";
-}
-
 #endif // IREE_CODEGEN_LLVMGPU_ROCDLPASSES

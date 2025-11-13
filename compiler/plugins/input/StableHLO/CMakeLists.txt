@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRShapeDialect
     MLIRTransforms
     StablehloOps
+    StablehloPasses
     VhloOps
     iree::compiler::PluginAPI
     iree::compiler::plugins::input::StableHLO::Conversion

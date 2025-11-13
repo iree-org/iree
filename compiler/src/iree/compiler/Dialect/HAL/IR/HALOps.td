@@ -10,6 +10,7 @@
 include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
+include "iree/compiler/Dialect/HAL/IR/HALTypes.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
@@ -23,11 +24,6 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
-class HAL_PureOp<string mnemonic, list<Trait> traits = []> :
-    HAL_Op<mnemonic, !listconcat(traits, [Pure])>;
-
-class HAL_MakeTupleOp<string mnemonic, list<Trait> traits = []> :
-    HAL_PureOp<mnemonic, traits>;
 
 //===----------------------------------------------------------------------===//
 // Magic temporary hacks
@@ -2614,19 +2610,29 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   let summary = [{Target-specific executable module.}];
   let description = [{
     An executable module representing a target-specific compiled
-    kernel/shader/etc.
+    kernel/shader/etc. Executables are treated as independent compilation units
+    and may contain multiple exported entry points that are able to share code
+    internally. To support multi-targeting each executable may have one or more
+    target-specific variants that are lowered independently during compilation
+    while still appearing as one executable at runtime (ala fat binaries).
+
+    At runtime executables are loaded during module initialization and cached
+    for the lifetime of the module. If the `lazy` attribute is set the
+    executable _may_ have its loading deferred until first use.
   }];
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name
+    SymbolNameAttr:$sym_name,
     // TODO(benvanik): entry point types for verification.
+    UnitAttr:$lazy
   );
 
   let regions = (region SizedRegion<1>:$body);
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
+    (`lazy` $lazy^)?
     $sym_name
     attr-dict-with-keyword
     regions
@@ -3483,7 +3489,7 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
 
 def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{Returns an alias to a subspan of interface binding data.}];

@@ -7,7 +7,9 @@
 #ifndef IREE_DIALECT_ENCODING_BASE
 #define IREE_DIALECT_ENCODING_BASE
 
+include "iree/compiler/Utils/DocMetadata.td"
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Dialect definition
@@ -75,6 +77,51 @@ def IREEEncoding_Dialect : Dialect {
     void registerAttributes();
   }];
   let useDefaultAttributePrinterParser = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Base dialect op/type/attr/interface classes
+//===----------------------------------------------------------------------===//
+
+class IREEEncoding_Op<string mnemonic, list<Trait> traits = []> :
+    Op<IREEEncoding_Dialect, mnemonic, traits> {
+  let hasCustomAssemblyFormat = 1;
+
+  // Optional documentation metadata for rich doc generation.
+  Util_OpDocMetadata docMetadata = ?;
+}
+
+class IREEEncoding_PureOp<string mnemonic, list<Trait> traits = []> :
+    IREEEncoding_Op<mnemonic, !listconcat(traits, [Pure])>;
+
+class IREEEncoding_TypeDef<string name, list<Trait> traits = []> :
+    TypeDef<IREEEncoding_Dialect, name, traits> {
+  // Optional documentation metadata for rich doc generation.
+  Util_TypeDocMetadata docMetadata = ?;
+}
+
+class IREEEncoding_AttrDef<string name, list<Trait> traits = []> :
+    AttrDef<IREEEncoding_Dialect, name, traits> {
+  // Optional documentation metadata for rich doc generation.
+  Util_AttrDocMetadata docMetadata = ?;
+}
+
+class IREEEncoding_OpInterface<string name, list<Interface> baseInterfaces = []> :
+    OpInterface<name, baseInterfaces> {
+  // Optional documentation metadata for rich doc generation.
+  Util_InterfaceDocMetadata docMetadata = ?;
+}
+
+class IREEEncoding_TypeInterface<string name, list<Interface> baseInterfaces = []> :
+    TypeInterface<name, baseInterfaces> {
+  // Optional documentation metadata for rich doc generation.
+  Util_InterfaceDocMetadata docMetadata = ?;
+}
+
+class IREEEncoding_AttrInterface<string name, list<Interface> baseInterfaces = []> :
+    AttrInterface<name, baseInterfaces> {
+  // Optional documentation metadata for rich doc generation.
+  Util_InterfaceDocMetadata docMetadata = ?;
 }
 
 #endif // IREE_DIALECT_ENCODING_BASE

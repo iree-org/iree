@@ -26,7 +26,7 @@ class StripAndSplatConstantsPass
     : public impl::StripAndSplatConstantsPassBase<StripAndSplatConstantsPass> {
 public:
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Give each splatted value a module-unique byte value so that it's easier
     // to track back to where it came from in the final output.

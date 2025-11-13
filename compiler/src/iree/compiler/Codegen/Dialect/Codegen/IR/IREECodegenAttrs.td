@@ -40,20 +40,14 @@ def LLVMGPU_SimpleDistribute
     : I32EnumAttrCase<"LLVMGPUDistribute", 102>;
 def LLVMGPU_Vectorize
     : I32EnumAttrCase<"LLVMGPUVectorize", 103>;
-def LLVMGPU_MatmulTensorCore
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 104>;
 def LLVMGPU_TransposeSharedMem
-    : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 105>;
-def LLVMGPU_WarpReduction
-    : I32EnumAttrCase<"LLVMGPUWarpReduction", 106>;
-def LLVMGPU_MatmulTensorCoreMmaSync
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 107>;
+    : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 104>;
 def LLVMGPU_VectorDistribute
-    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 108>;
+    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 105>;
 def LLVMGPU_WinogradVectorize
-    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 109>;
+    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 106>;
 def LLVMGPU_TileAndFuse
-    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 110>;
+    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 107>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -92,10 +86,8 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
 
     // LLVMGPU CodeGen pipelines
     LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
-    LLVMGPU_Vectorize, LLVMGPU_MatmulTensorCore,
-    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-    LLVMGPU_MatmulTensorCoreMmaSync, LLVMGPU_VectorDistribute,
-    LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
+    LLVMGPU_Vectorize, LLVMGPU_TransposeSharedMem,
+    LLVMGPU_VectorDistribute, LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
 
     // SPIR-V CodeGen pipelines
     SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
@@ -433,21 +425,6 @@ def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> 
 }
 
 //===---------------------------------------------------------------------===//
-// iree_codegen.encoding_nop_layout
-//===---------------------------------------------------------------------===//
-
-def IREECodegen_EncodingNopLayoutAttr  :
-    AttrDef<IREECodegen_Dialect, "EncodingNopLayout"> {
-  let mnemonic = "encoding_nop_layout";
-  let summary = [{An attribute with implementation that treats encoding as nop.}];
-  let description = [{
-    An attribute that implements the interface methods that discards the
-    encodings. It can be a default attribute when a backend does not implement
-    encoding details.
-  }];
-}
-
-//===---------------------------------------------------------------------===//
 // iree_codegen.rotate_rows
 //===---------------------------------------------------------------------===//
 
@@ -546,6 +523,109 @@ def IREECodegen_UKernelDescriptorAttr  :
   );
   let assemblyFormat = [{
     `<` $ukernel_name `,` $kind `>`
+  }];
+}
+
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.xor_shuffle
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_XORShuffleAttr  :
+    AttrDef<IREECodegen_Dialect, "XORShuffle", [
+    DeclareAttrInterfaceMethods<IREECodegen_SwizzleAttrInterface, [
+        "swizzleOffset",
+        "getAccessElementCount"
+      ]>
+    ]> {
+  let mnemonic = "xor_shuffle";
+  let summary = "An attribute that describes an XOR-based swizzling pattern.";
+  let description = [{
+    Shuffles accesses of |access_width| within rows of size
+    |row_width|. For any given access into logical memref of shape
+    `memref<...xNx|access_width|x!eltype>` where `N = row_width / access_width`
+    at position `(i, j, 0)` is shuffled to `(i, ((i/per_phase) %N) XOR j , 0)`. For example,
+
+    ```
+    row_width = 16, access_width = 4, per_phase = 1
+
+    0000 1111 2222 3333 /// 0 1 2 3
+    4444 5555 6666 7777 /// 0 1 2 3
+    8888 9999 AAAA BBBB /// 0 1 2 3
+    CCCC DDDD EEEE FFFF /// 0 1 2 3
+    ```
+
+    is swizzled to
+    ```
+    0000 1111 2222 3333 /// 0 1 2 3
+    7777 4444 5555 6666 /// 1 0 3 2
+    BBBB AAAA 8888 9999 /// 2 3 0 1
+    FFFF EEEE DDDD CCCC /// 3 2 1 0
+    ```
+    |access_width| allows to keep the same shuffling accross multiple rows. For example,
+
+    ```
+    row_width = 16, access_width = 4, per_phase = 2
+
+    0000 1111 2222 3333 /// 0 1 2 3
+    4444 5555 6666 7777 /// 0 1 2 3
+    8888 9999 AAAA BBBB /// 0 1 2 3
+    CCCC DDDD EEEE FFFF /// 0 1 2 3
+    ```
+
+    is swizzled to
+    ```
+    0000 1111 2222 3333 /// 0 1 2 3
+    7777 4444 5555 6666 /// 0 1 2 3
+    BBBB AAAA 8888 9999 /// 1 0 3 2
+    FFFF EEEE DDDD CCCC /// 1 0 3 2
+    ```
+
+    The pattern repeats for subsequent rows.
+  }];
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$row_width,
+    AttrParameter<"int64_t", "">:$access_width,
+    OptionalParameter<"int64_t", "row stride. Default to row_width">:$row_stride,
+    OptionalParameter<"int64_t", "Default to 1">:$per_phase
+  );
+  let assemblyFormat = [{
+    `<` $row_width `,` $access_width  (`,` $row_stride^)? (`,` $per_phase^)? `>`
+  }];
+  let genVerifyDecl = 1;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.denormal_mode
+//===---------------------------------------------------------------------===//
+
+// Do not add any denormal mode.
+def DenormalMode_None : I32EnumCase<"None", 0, "none">;
+// Convert denormals to zero while preserving sign.
+def DenormalMode_PreserveSign : I32EnumCase<"PreserveSign", 1, "preserve-sign">;
+// Convert denormals to positive zero.
+def DenormalMode_PositiveZero : I32EnumCase<"PositiveZero", 2, "positive-zero">;
+
+// Denormal fp mode.
+def DenormalFpMathEnum : I32Enum<
+  "DenormalFpMath",
+  "Denormal mode for fp math", [
+    DenormalMode_None,
+    DenormalMode_PreserveSign,
+    DenormalMode_PositiveZero
+  ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+}
+
+def DenormalFpMathAttr :
+  EnumAttr<IREECodegen_Dialect, DenormalFpMathEnum, "denormal_fp_math"> {
+  let assemblyFormat = "`<` $value `>`";
+
+  let extraClassDeclaration = [{
+    /// Returns the key name for fp32 DenormalFpMathAttr in a DictionaryAttr.
+    static StringRef getFP32DictKeyName() {
+      return "iree_codegen.denormal_fp_math_f32";
+    }
   }];
 }
 

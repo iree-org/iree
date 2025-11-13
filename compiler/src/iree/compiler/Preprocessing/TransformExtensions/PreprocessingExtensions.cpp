@@ -6,9 +6,13 @@
 
 #include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Utils/EquivalenceUtils.h"
-#include "llvm/Support/Debug.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
@@ -32,32 +36,6 @@ void registerTransformDialectPreprocessingExtension(DialectRegistry &registry) {
 //===----------------------------------------------------------------------===//
 // MatchCastCompatibleDagFromRootOp
 //===----------------------------------------------------------------------===//
-
-static bool isCastableToTensorType(Type from, RankedTensorType to) {
-  auto tensorType = dyn_cast<RankedTensorType>(from);
-  if (!tensorType) {
-    return false;
-  }
-  if (tensorType.getRank() != to.getRank()) {
-    return false;
-  }
-  if (tensorType.getElementType() != to.getElementType()) {
-    return false;
-  }
-  for (auto [fromSize, toSize] :
-       llvm::zip_equal(tensorType.getShape(), to.getShape())) {
-    // If the target dimension is dynamic we can always cast to it.
-    if (ShapedType::isDynamic(toSize)) {
-      continue;
-    }
-    // Casting a dynamic dimension to a static one is never valid, and static
-    // sizes must always match.
-    if (toSize != fromSize) {
-      return false;
-    }
-  }
-  return true;
-}
 
 // Compares the regions between two operations in lockstep for equality.
 static DiagnosedSilenceableFailure
@@ -246,6 +224,291 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::verify() {
   }
   // TODO: Region verification that it includes a single DAG.
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchContractionOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchContractionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
+  if (!linalgOp) {
+    return emitSilenceableFailure(loc) << "Operation is not a LinalgOp.";
+  }
+
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return emitSilenceableFailure(loc)
+           << "Operation is not a contraction operation.";
+  }
+
+  Type targetLhsType = getLhsType();
+  Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
+  if (currentLhsType != targetLhsType) {
+    return emitSilenceableFailure(loc)
+           << "LHS type doesn't match: expected " << targetLhsType << ", got "
+           << currentLhsType;
+  }
+
+  Type targetRhsType = getRhsType();
+  Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
+  if (currentRhsType != targetRhsType) {
+    return emitSilenceableFailure(loc)
+           << "RHS type doesn't match: expected " << targetRhsType << ", got "
+           << currentRhsType;
+  }
+
+  Type targetOutputType = getOutputType();
+  // Since linalg::isaContractionOpInterface already verified single output in
+  // above code, we can directly access it.
+  Type currentOutputType =
+      getElementTypeOrSelf(linalgOp.getDpsInits()[0].getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
+  }
+
+  ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+  if (std::optional<ArrayAttr> targetIndexingMaps = getIndexingMaps()) {
+    if (currentIndexingMaps != *targetIndexingMaps) {
+      return emitSilenceableFailure(loc) << "indexing maps don't match";
+    }
+  }
+
+  // Get the actual size values for batch/m/n/k dimensions after verifying it's
+  // a contraction operation.
+  linalg::ContractionDimensions contractionDims =
+      linalg::inferContractionDims(linalgOp).value();
+  SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
+  Builder builder(getContext());
+
+  auto iterationSizes = [&](ArrayRef<unsigned> dimIndices) {
+    return llvm::map_to_vector(dimIndices, [&](unsigned dimIdx) -> Attribute {
+      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+    });
+  };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    iterationSizes(contractionDims.batch));
+  results.setParams(cast<OpResult>(getMDims()),
+                    iterationSizes(contractionDims.m));
+  results.setParams(cast<OpResult>(getNDims()),
+                    iterationSizes(contractionDims.n));
+  results.setParams(cast<OpResult>(getKDims()),
+                    iterationSizes(contractionDims.k));
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchAttentionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(current);
+  if (!attentionOp) {
+    return emitSilenceableFailure(loc)
+           << "Operation is not an attention operation.";
+  }
+
+  Type targetQueryType = getQueryType();
+  Type currentQueryType =
+      getElementTypeOrSelf(attentionOp.getQuery().getType());
+  if (currentQueryType != targetQueryType) {
+    return emitSilenceableFailure(loc)
+           << "Query type doesn't match: expected " << targetQueryType
+           << ", got " << currentQueryType;
+  }
+
+  Type targetKeyType = getKeyType();
+  Type currentKeyType = getElementTypeOrSelf(attentionOp.getKey().getType());
+  if (currentKeyType != targetKeyType) {
+    return emitSilenceableFailure(loc)
+           << "Key type doesn't match: expected " << targetKeyType << ", got "
+           << currentKeyType;
+  }
+
+  Type targetValueType = getValueType();
+  Type currentValueType =
+      getElementTypeOrSelf(attentionOp.getValue().getType());
+  if (currentValueType != targetValueType) {
+    return emitSilenceableFailure(loc)
+           << "Value type doesn't match: expected " << targetValueType
+           << ", got " << currentValueType;
+  }
+
+  Type targetOutputType = getOutputType();
+  Type currentOutputType =
+      getElementTypeOrSelf(attentionOp.getOutput().getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "Output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
+  }
+
+  ArrayAttr currentIndexingMaps = attentionOp.getIndexingMaps();
+  ArrayAttr targetIndexingMaps = getIndexingMaps();
+  if (currentIndexingMaps != targetIndexingMaps) {
+    return emitSilenceableFailure(loc) << "indexing maps don't match";
+  }
+
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(
+          attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+          attentionOp.getValueMap(), attentionOp.getOutputMap());
+  if (failed(maybeOpInfo)) {
+    return emitSilenceableFailure(loc)
+           << "Failed to infer attention dimensions";
+  }
+  IREE::LinalgExt::AttentionOpDetail opInfo = *maybeOpInfo;
+  SmallVector<int64_t> iterationDomain = attentionOp.getStaticLoopRanges();
+
+  Builder builder(getContext());
+  auto iterationSizes = [&](ArrayRef<int64_t> dimIndices) {
+    return llvm::map_to_vector(dimIndices, [&](int64_t dimIdx) -> Attribute {
+      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+    });
+  };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    iterationSizes(opInfo.getBatchDims()));
+  results.setParams(cast<OpResult>(getMDims()),
+                    iterationSizes(opInfo.getMDims()));
+  results.setParams(cast<OpResult>(getNDims()),
+                    iterationSizes(opInfo.getNDims()));
+  results.setParams(cast<OpResult>(getK1Dims()),
+                    iterationSizes(opInfo.getK1Dims()));
+  results.setParams(cast<OpResult>(getK2Dims()),
+                    iterationSizes(opInfo.getK2Dims()));
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchConvolutionOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchConvolutionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
+  if (!linalgOp) {
+    return emitSilenceableFailure(loc) << "Operation is not a LinalgOp.";
+  }
+
+  if (!linalg::isaConvolutionOpInterface(linalgOp)) {
+    return emitSilenceableFailure(loc)
+           << "Operation is not a convolution operation.";
+  }
+
+  Type targetLhsType = getLhsType();
+  Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
+  if (currentLhsType != targetLhsType) {
+    return emitSilenceableFailure(loc)
+           << "LHS type doesn't match: expected " << targetLhsType << ", got "
+           << currentLhsType;
+  }
+
+  Type targetRhsType = getRhsType();
+  Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
+  if (currentRhsType != targetRhsType) {
+    return emitSilenceableFailure(loc)
+           << "RHS type doesn't match: expected " << targetRhsType << ", got "
+           << currentRhsType;
+  }
+
+  Type targetOutputType = getOutputType();
+  Type currentOutputType =
+      getElementTypeOrSelf(linalgOp.getDpsInits()[0].getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
+  }
+
+  ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+  if (std::optional<ArrayAttr> targetIndexingMaps = getIndexingMaps()) {
+    if (currentIndexingMaps != *targetIndexingMaps) {
+      return emitSilenceableFailure(loc) << "indexing maps don't match";
+    }
+  }
+
+  FailureOr<linalg::ConvolutionDimensions> maybeConvDims =
+      linalg::inferConvolutionDims(linalgOp);
+  if (failed(maybeConvDims)) {
+    return emitSilenceableFailure(loc)
+           << "Failed to infer convolution dimensions.";
+  }
+  linalg::ConvolutionDimensions convDims = *maybeConvDims;
+  SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
+
+  Builder builder(getContext());
+  auto buildI64Attrs = [&builder](const auto &values, const auto &transform) {
+    return llvm::map_to_vector(values, [&](auto val) -> Attribute {
+      return builder.getI64IntegerAttr(transform(val));
+    });
+  };
+  auto getIterationSize = [&](unsigned idx) { return iterationDomain[idx]; };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    buildI64Attrs(convDims.batch, getIterationSize));
+  results.setParams(cast<OpResult>(getOutputImageDims()),
+                    buildI64Attrs(convDims.outputImage, getIterationSize));
+  results.setParams(cast<OpResult>(getOutputChannelDims()),
+                    buildI64Attrs(convDims.outputChannel, getIterationSize));
+  results.setParams(cast<OpResult>(getFilterDims()),
+                    buildI64Attrs(convDims.filterLoop, getIterationSize));
+  results.setParams(cast<OpResult>(getInputChannelDims()),
+                    buildI64Attrs(convDims.inputChannel, getIterationSize));
+  results.setParams(cast<OpResult>(getDepthDims()),
+                    buildI64Attrs(convDims.depth, getIterationSize));
+  results.setParams(
+      cast<OpResult>(getStrides()),
+      buildI64Attrs(convDims.strides, [](int64_t val) { return val; }));
+  results.setParams(
+      cast<OpResult>(getDilations()),
+      buildI64Attrs(convDims.dilations, [](int64_t val) { return val; }));
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchDimsEqualOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure IREE::transform_dialect::MatchDimsEqualOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
+  ArrayRef<transform::Param> actualDimAttrs =
+      state.getParams(getDimensionSizes());
+  ArrayRef<int64_t> expectedDims = getExpectedValues();
+
+  SmallVector<std::optional<int64_t>> actualDims = llvm::map_to_vector(
+      actualDimAttrs, [](Attribute attr) -> std::optional<int64_t> {
+        if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+          return intAttr.getInt();
+        }
+        return std::nullopt;
+      });
+
+  if (!llvm::equal(actualDims, expectedDims,
+                   [](const std::optional<int64_t> &lhs, int64_t rhs) {
+                     return rhs == -1 || lhs == rhs;
+                   })) {
+    return emitSilenceableError() << "Dimension sizes do not match";
+  }
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+void IREE::transform_dialect::MatchDimsEqualOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getDimensionSizesMutable(), effects);
 }
 
 //===----------------------------------------------------------------------===//

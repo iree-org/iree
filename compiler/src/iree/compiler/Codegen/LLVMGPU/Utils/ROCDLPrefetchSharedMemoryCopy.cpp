@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -23,7 +22,6 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -45,7 +43,6 @@ public:
     }
 
     LoopPrefetcher prefetcher;
-    prefetcher.mapping = SmallVector<IRMapping>(4);
     prefetcher.forOp = op;
     prefetcher.lb = prefetcher.ub = prefetcher.step = 0;
 
@@ -62,78 +59,10 @@ public:
     return prefetcher;
   }
 
-  // Emits the prologue before the main pipelined loop.
-  void emitPrologue(RewriterBase &rewriter) {
-    Location loc = forOp.getLoc();
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, lb);
-    // Directly write in the prologue and use the shared memory to communicate
-    // data instead of the loop carried values. Read (0)
-    emitRead(mapping[0], rewriter, zero);
-    // Write(0)
-    emitWrite(mapping[0], rewriter, zero);
-  }
-
-  /// Emits the main pipelined loop structure.
-  scf::ForOp createKernelLoop(RewriterBase &rewriter) {
-    Location loc = forOp.getLoc();
-    int64_t newUpperBound = ub - step;
-    auto newUb = rewriter.create<arith::ConstantIndexOp>(loc, newUpperBound);
-
-    // Keep original iter args and then add some for what's being loaded to
-    // registers.
-    auto iterArgs = llvm::to_vector_of<Value>(forOp.getInitArgs());
-    auto newForOp = rewriter.create<scf::ForOp>(
-        loc, forOp.getLowerBound(), newUb, forOp.getStep(), iterArgs);
-
-    // When there are no iter args, the loop body terminator will be created.
-    // Since we always create it below, remove the terminator if it was created.
-    if (!newForOp.getBody()->empty())
-      rewriter.eraseOp(newForOp.getBody()->getTerminator());
-
-    return newForOp;
-  }
-
-  /// Emits contents into the main pipelined loop structure.
-  void createKernel(RewriterBase &rewriter, scf::ForOp newForOp) {
-    rewriter.setInsertionPoint(newForOp.getBody(), newForOp.getBody()->begin());
-    Location loc = forOp.getLoc();
-    Value indVar = newForOp.getInductionVar();
-    Value increment = rewriter.create<arith::ConstantIndexOp>(loc, step);
-    Value iPlusOne = rewriter.create<arith::AddIOp>(
-        loc, indVar, increment, arith::IntegerOverflowFlags::nsw);
-
-    for (int i = 0; i < 3; ++i) {
-      for (auto [idx, arg] : llvm::enumerate(forOp.getRegionIterArgs())) {
-        mapping[i].map(arg, newForOp.getRegionIterArgs()[idx]);
-      }
-    }
-
-    emitRead(mapping[1], rewriter, iPlusOne);
-    emitBarrier(loc, rewriter);
-    emitCompute(mapping[0], rewriter, indVar);
-    emitBarrier(loc, rewriter);
-    emitSchedBarrier(loc, rewriter);
-    emitWrite(mapping[1], rewriter, iPlusOne);
-    updateYield(mapping[0], rewriter);
-    return;
-  }
-
-  // Emits the epilogue after the main pipelined loop and returns the final
-  // results to replace the original loop results main loop.
-  SmallVector<Value> emitEpilogue(RewriterBase &rewriter, scf::ForOp newForOp) {
-    rewriter.setInsertionPointAfter(newForOp);
-    Location loc = forOp.getLoc();
-    Value nMinusOne =
-        rewriter.create<arith::ConstantIndexOp>(loc, ub - 1 * step);
-
-    // Map iter_args to results of newForOp.
-    for (unsigned i = 0, e = forOp->getNumResults(); i != e; ++i) {
-      mapping[0].map(forOp.getRegionIterArg(i), newForOp.getResult(i));
-    }
-
-    emitBarrier(loc, rewriter);
-    return emitCompute(mapping[0], rewriter, nMinusOne);
-  }
+  // Ops in the original scf.for loop that belongs to different classes.
+  SmallVector<Operation *> readStage;
+  SmallVector<Operation *> writeStage;
+  SmallVector<Operation *> computeStage;
 
 private:
   LogicalResult initializeLoopInfo() {
@@ -303,104 +232,317 @@ private:
     return success();
   }
 
-  /// Creates all read stage ops for a loop iteration with |rewriter| and maps
-  /// the original loop induction variable to |iv| in |mapping|.
-  void emitRead(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), iv);
-
-    for (Operation *op : readStage) {
-      rewriter.clone(*op, mapping);
-    }
-  }
-
-  /// Creates all write stage ops for a loop iteration with |rewriter| and maps
-  /// the original loop induction variable to |iv| in |mapping|.
-  void emitWrite(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), iv);
-
-    for (Operation *op : writeStage) {
-      rewriter.clone(*op, mapping);
-    }
-  }
-
-  /// Creates a gpu.barrier op with |rewriter|.
-  void emitBarrier(Location loc, RewriterBase &rewriter) {
-    rewriter.create<gpu::BarrierOp>(loc);
-  }
-
-  void emitSchedBarrier(Location loc, RewriterBase &rewriter) {
-    rewriter.create<amdgpu::SchedBarrierOp>(
-        loc, amdgpu::sched_barrier_opt_enumAttr::get(
-                 rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
-  }
-
-  /// Creates all compute stage ops for a loop iteration with |rewriter| and
-  /// maps the original loop induction variable to |iv| in |mapping|.
-  SmallVector<Value> emitCompute(IRMapping &mapping, RewriterBase &rewriter,
-                                 Value indVar) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), indVar);
-
-    SmallVector<Value> results;
-    for (Operation *op : computeStage) {
-      if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
-        // On yield, return the operands of the yield converted.
-        results =
-            llvm::map_to_vector<4>(yieldOp.getOperands(), [&](Value operand) {
-              return mapping.lookup(operand);
-            });
-        break;
-      }
-
-      rewriter.clone(*op, mapping);
-    }
-
-    return results;
-  }
-
-  void updateYield(IRMapping &mapping, RewriterBase &rewriter) {
-    for (Operation *op : computeStage) {
-      if (auto yield = dyn_cast<scf::YieldOp>(op)) {
-        rewriter.clone(*op, mapping);
-        break;
-      }
-    }
-  }
-
 private:
-  // Mapping for each pipelined stage.
-  SmallVector<IRMapping, 4> mapping;
   // The original scf.for loop to prefetch shared memory copy from.
   scf::ForOp forOp;
   // Original static loop range and step.
   int64_t lb, ub, step;
-
-  // Ops in the original scf.for loop that belongs to different classes.
-  SmallVector<Operation *> readStage;
-  SmallVector<Operation *> writeStage;
-  SmallVector<Operation *> computeStage;
 };
 
 } // namespace
 
-FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
-                                               scf::ForOp forOp) {
-  rewriter.setInsertionPoint(forOp);
-
-  auto prefetcherOr = LoopPrefetcher::get(forOp);
-  if (failed(prefetcherOr))
-    return failure();
-  LoopPrefetcher &prefetcher = *prefetcherOr;
-
-  prefetcher.emitPrologue(rewriter);
-  scf::ForOp newForOp = prefetcher.createKernelLoop(rewriter);
-  prefetcher.createKernel(rewriter, newForOp);
-
-  SmallVector<Value> results = prefetcher.emitEpilogue(rewriter, newForOp);
-  rewriter.replaceOp(forOp, results);
-  return newForOp;
+// Removes all barrier operations from the loop body.
+// Original barriers are designed for the unpipelined loop structure and will
+// be replaced with barriers appropriate for the pipelined structure.
+static void removeBarriers(scf::ForOp forOp) {
+  SmallVector<Operation *> toErase;
+  // Only remove barriers from the direct loop body, not from nested regions.
+  // Nested loops might not be pipelined and should keep their barriers.
+  for (Operation &op : forOp.getBody()->without_terminator()) {
+    if (isa<gpu::BarrierOp>(op)) {
+      toErase.push_back(&op);
+    }
+  }
+  for (Operation *op : toErase) {
+    op->erase();
+  }
 }
 
+// Populates the opToStage map by assigning stages to operations based on
+// prefetcher groups and number of stages.
+static void
+populateOpToStageMap(LoopPrefetcher &prefetcher, scf::ForOp forOp,
+                     unsigned numStages,
+                     llvm::DenseMap<Operation *, unsigned> &opToStage) {
+  auto assignOp = [&](Operation *op, unsigned stage) {
+    if (!op || isa<scf::YieldOp>(op))
+      return;
+    opToStage[op] = stage;
+  };
+
+  if (numStages == 2) {
+    // Two-stage pipelining: readStage in stage 0, compute+write in stage 1.
+    for (Operation *op : prefetcher.readStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : prefetcher.writeStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : prefetcher.computeStage)
+      assignOp(op, /*stage=*/1);
+  } else {
+    for (Operation *op : prefetcher.readStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : prefetcher.writeStage)
+      assignOp(op, /*stage=*/1);
+    for (Operation *op : prefetcher.computeStage)
+      assignOp(op, /*stage=*/2);
+  }
+}
+
+// Populates cluster IDs for each operation based on stage groupings.
+// Operations are assigned cluster IDs in execution order: read -> compute ->
+// write. Each stage group gets its own cluster ID.
+static void
+populateOpToClusterMap(LoopPrefetcher &prefetcher,
+                       llvm::DenseMap<Operation *, unsigned> &opToCluster) {
+
+  unsigned clusterID = 0;
+
+  // Assign cluster ID 0 to all read stage operations
+  for (Operation *op : prefetcher.readStage) {
+    opToCluster[op] = clusterID;
+  }
+  ++clusterID;
+
+  // Assign cluster ID 1 to all compute stage operations
+  for (Operation *op : prefetcher.computeStage) {
+    opToCluster[op] = clusterID;
+  }
+  ++clusterID;
+
+  // Assign cluster ID 2 to all write stage operations
+  for (Operation *op : prefetcher.writeStage) {
+    opToCluster[op] = clusterID;
+  }
+
+  LDBG() << "Built opToCluster map with " << clusterID + 1 << " clusters";
+}
+
+// Builds the final schedule using opToCluster and opToStage mappings.
+// Sorts operations by cluster ID, maintaining original order within each
+// cluster.
+static void buildFinalSchedule(
+    LoopPrefetcher &prefetcher,
+    const llvm::DenseMap<Operation *, unsigned> &opToStage,
+    const llvm::DenseMap<Operation *, unsigned> &opToCluster,
+    std::vector<std::pair<Operation *, unsigned>> &finalSchedule) {
+
+  // Collect all operations from all stages with their cluster IDs
+  SmallVector<Operation *> allOps;
+  allOps.append(prefetcher.readStage.begin(), prefetcher.readStage.end());
+  allOps.append(prefetcher.computeStage.begin(), prefetcher.computeStage.end());
+  allOps.append(prefetcher.writeStage.begin(), prefetcher.writeStage.end());
+
+  // Sort by cluster ID, maintaining original order within each cluster
+  llvm::stable_sort(allOps, [&](Operation *a, Operation *b) {
+    unsigned clusterA = opToCluster.lookup(a);
+    unsigned clusterB = opToCluster.lookup(b);
+    return clusterA < clusterB;
+  });
+
+  // Build the final schedule from the sorted operations
+  for (Operation *op : allOps) {
+    if (opToStage.count(op)) {
+      unsigned stage = opToStage.lookup(op);
+      finalSchedule.push_back({op, stage});
+    }
+  }
+
+  LDBG() << "Built final schedule with " << finalSchedule.size()
+         << " operations";
+}
+
+// Builds the PipeliningOption with getScheduleFn.
+static scf::PipeliningOption buildPipeliningOption(
+    const std::vector<std::pair<Operation *, unsigned>> &finalSchedule) {
+  scf::PipeliningOption options;
+  options.getScheduleFn =
+      [finalSchedule](scf::ForOp loop,
+                      std::vector<std::pair<Operation *, unsigned>> &outSched) {
+        outSched = finalSchedule;
+      };
+
+  options.peelEpilogue = true;
+  // TODO: Enable dynamic trip count support. We'll want to run in-range
+  // analysis to restrict to cases where we know K is large enough to benefit
+  // from pipelining.
+  options.supportDynamicLoops = false;
+  options.predicateFn = nullptr;
+
+  return options;
+}
+
+// Invokes the pipelineForLoop transformation.
+static FailureOr<scf::ForOp>
+invokePipelineForLoop(scf::ForOp forOp, const scf::PipeliningOption &options) {
+  IRRewriter irRewriter(forOp);
+  bool modifiedIR = false;
+  FailureOr<scf::ForOp> newForOpOrFail =
+      scf::pipelineForLoop(irRewriter, forOp, options, &modifiedIR);
+
+  if (failed(newForOpOrFail)) {
+    return failure();
+  }
+
+  return *newForOpOrFail;
+}
+
+// Helper to check for shared memory.
+static bool hasSharedMemory(Value val) {
+  auto memrefType = dyn_cast<MemRefType>(val.getType());
+  if (!memrefType)
+    return false;
+  auto addrSpace =
+      dyn_cast_or_null<gpu::AddressSpaceAttr>(memrefType.getMemorySpace());
+  return addrSpace && addrSpace.getValue() == gpu::AddressSpace::Workgroup;
+}
+
+// Helper to check if operation or its nested ops have shared memory reads.
+static bool hasNestedSharedRead(Operation *op) {
+  bool found = false;
+  op->walk([&](vector::TransferReadOp readOp) {
+    if (hasSharedMemory(readOp.getBase())) {
+      found = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return found;
+}
+
+// Helper to check if operation or its nested ops have shared memory writes.
+static bool hasNestedSharedWrite(Operation *op) {
+  bool found = false;
+  op->walk([&](vector::TransferWriteOp writeOp) {
+    if (hasSharedMemory(writeOp.getBase())) {
+      found = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return found;
+}
+
+// Inserts synchronization barriers in the pipelined loop.
+// Barriers separate stages: read -> compute (with shared read) -> write.
+static void insertPipelineBarriers(RewriterBase &rewriter,
+                                   scf::ForOp newForOp) {
+  Block *parentBlock = newForOp->getBlock();
+  Location loc = newForOp.getLoc();
+
+  // Insert barriers in the kernel loop body
+  bool insertedComputeBarrier = false;
+  bool insertedWriteBarrier = false;
+
+  for (Operation &op :
+       llvm::make_early_inc_range(newForOp.getBody()->without_terminator())) {
+    // Insert barrier before first shared memory read (compute stage)
+    if (!insertedComputeBarrier && hasNestedSharedRead(&op)) {
+      rewriter.setInsertionPoint(&op);
+      gpu::BarrierOp::create(rewriter, loc);
+      insertedComputeBarrier = true;
+    }
+    // Insert barriers before first shared memory write (write stage)
+    if (!insertedWriteBarrier && hasNestedSharedWrite(&op)) {
+      rewriter.setInsertionPoint(&op);
+      gpu::BarrierOp::create(rewriter, loc);
+      amdgpu::SchedBarrierOp::create(
+          rewriter, loc,
+          amdgpu::sched_barrier_opt_enumAttr::get(
+              rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
+      insertedWriteBarrier = true;
+    }
+  }
+
+  // Check if epilogue needs a barrier at the start
+  // (if epilogue reads from shared memory written by the loop)
+  Block::iterator epilogueStart = std::next(newForOp->getIterator());
+  Block::iterator epilogueEnd = parentBlock->end();
+  if (epilogueStart != epilogueEnd) {
+    for (Block::iterator it = epilogueStart; it != epilogueEnd; ++it) {
+      if (hasNestedSharedRead(&*it)) {
+        rewriter.setInsertionPoint(&*epilogueStart);
+        gpu::BarrierOp::create(rewriter, loc);
+        break;
+      }
+    }
+  }
+}
+
+// Dumps the planned schedule before pipelining for debugging purposes.
+static void
+dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
+             const llvm::DenseMap<Operation *, unsigned> &opToCluster) {
+  LDBG() << "\n=== Planned Pipeline Schedule (before pipelining) ===";
+  LDBG() << "Total operations in schedule: " << finalSchedule.size();
+
+  for (size_t i = 0; i < finalSchedule.size(); ++i) {
+    Operation *op = finalSchedule[i].first;
+    unsigned stage = finalSchedule[i].second;
+    unsigned cluster = opToCluster.lookup(op);
+
+    LDBG() << "  [" << i << "] cluster=" << cluster << " stage=" << stage
+           << " op: " << *op;
+  }
+
+  LDBG() << "=== End Planned Schedule ===\n";
+}
+
+FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
+                                               scf::ForOp forOp,
+                                               unsigned numStages) {
+  // No prefetching needed for single-stage pipelining.
+  if (numStages <= 1) {
+    return forOp;
+  }
+
+  // Multi-stage pipelining (numStages > 2) is not yet implemented.
+  if (numStages > 2) {
+    LDBG()
+        << "Multi-stage pipelining with numStages > 2 is not yet implemented";
+    return failure();
+  }
+
+  auto prefetcherOr = LoopPrefetcher::get(forOp);
+  if (failed(prefetcherOr)) {
+    return failure();
+  }
+  LoopPrefetcher &prefetcher = *prefetcherOr;
+
+  // For multi-stage pipelining, remove original barriers as they're designed
+  // for unpipelined structure. New barriers will be inserted appropriately.
+  removeBarriers(forOp);
+
+  llvm::DenseMap<Operation *, unsigned> opToStage;
+  populateOpToStageMap(prefetcher, forOp, numStages, opToStage);
+
+  // Step 1: Populate standalone opToCluster map
+  llvm::DenseMap<Operation *, unsigned> opToCluster;
+  populateOpToClusterMap(prefetcher, opToCluster);
+
+  // Step 2: Use opToCluster + opToStage to build the final schedule
+  std::vector<std::pair<Operation *, unsigned>> finalSchedule;
+  finalSchedule.reserve(opToStage.size());
+  buildFinalSchedule(prefetcher, opToStage, opToCluster, finalSchedule);
+
+  if (finalSchedule.empty()) {
+    return failure();
+  }
+
+  // Dump the planned schedule before pipelining (while ops are still valid)
+  LLVM_DEBUG(dumpSchedule(finalSchedule, opToCluster));
+
+  scf::PipeliningOption options = buildPipeliningOption(finalSchedule);
+
+  FailureOr<scf::ForOp> newForOpOr = invokePipelineForLoop(forOp, options);
+  if (failed(newForOpOr)) {
+    return failure();
+  }
+
+  scf::ForOp newForOp = *newForOpOr;
+
+  // Insert barriers in the pipelined loop
+  insertPipelineBarriers(rewriter, newForOp);
+
+  return newForOp;
+}
 } // namespace mlir::iree_compiler

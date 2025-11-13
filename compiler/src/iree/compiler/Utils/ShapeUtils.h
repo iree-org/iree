@@ -8,6 +8,7 @@
 #define IREE_COMPILER_UTILS_SHAPEUTILS_H_
 
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ValueRange.h"
 
 namespace mlir::iree_compiler {
@@ -20,6 +21,9 @@ namespace mlir::iree_compiler {
 /// dynamic sizes to compare positively.
 bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                         ShapedType rhsType, ValueRange rhsDynamicDims);
+
+/// Helper to check whether 'from' is castable to the target ranked tensor type.
+bool isCastableToTensorType(Type from, RankedTensorType to);
 
 } // namespace mlir::iree_compiler
 

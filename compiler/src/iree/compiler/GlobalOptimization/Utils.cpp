@@ -47,9 +47,10 @@ std::optional<CastOpInterface> getDefiningNonI1ExtendingCastOp(Value input) {
     return std::nullopt;
   }
   Value castIn = castOp->getOperand(0);
-  if (isa<BlockArgument>(castIn) &&
-      cast<BlockArgument>(castIn).getArgNumber() != 0) {
-    return std::nullopt;
+  if (auto blockArg = dyn_cast<BlockArgument>(castIn)) {
+    if (blockArg.getArgNumber() != 0) {
+      return std::nullopt;
+    }
   }
   if (!isI1Src(castOp) && isExtending(castOp)) {
     result = castOp;
@@ -86,22 +87,20 @@ Value createGenericElementwiseCastOp(
   auto castedType = inputType.clone(elementType);
   SmallVector<OpFoldResult> inputMixedSizes =
       tensor::getMixedSizes(builder, loc, input);
-  Value init =
-      encoding
-          ? builder.create<tensor::EmptyOp>(loc, inputMixedSizes, elementType,
-                                            *encoding)
-          : builder.create<tensor::EmptyOp>(loc, inputMixedSizes, elementType);
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, input, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                b.create(nestedLoc, castOp->getName().getIdentifier(), args[0],
-                         elementType)
-                    ->getResult(0);
-            b.create<linalg::YieldOp>(nestedLoc, castRes);
-          },
-          attrs)
+  Value init = encoding ? tensor::EmptyOp::create(builder, loc, inputMixedSizes,
+                                                  elementType, *encoding)
+                        : tensor::EmptyOp::create(builder, loc, inputMixedSizes,
+                                                  elementType);
+  return linalg::GenericOp::create(
+             builder, loc, castedType, input, init, maps, iteratorTypes,
+             [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+               Value castRes =
+                   b.create(nestedLoc, castOp->getName().getIdentifier(),
+                            args[0], elementType)
+                       ->getResult(0);
+               linalg::YieldOp::create(b, nestedLoc, castRes);
+             },
+             attrs)
       .getResult(0);
 }
 
@@ -118,16 +117,16 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
 
     staticSizes.push_back(ty.getDimSize(i));
     if (ty.isDynamicDim(i)) {
-      dynSizes.push_back(rewriter.create<tensor::DimOp>(val, i));
+      dynSizes.push_back(tensor::DimOp::create(rewriter, val, i));
     }
   }
 
   // Create a zero-filled accumulator.
   Value initAcc =
-      rewriter.create<tensor::EmptyOp>(staticSizes, accETy, dynSizes);
-  Value zeroInt = rewriter.create<arith::ConstantIntOp>(accETy, 0).getResult();
+      tensor::EmptyOp::create(rewriter, staticSizes, accETy, dynSizes);
+  Value zeroInt = arith::ConstantIntOp::create(rewriter, accETy, 0).getResult();
   Value zeroAcc =
-      rewriter.create<linalg::FillOp>(zeroInt, initAcc).getResult(0);
+      linalg::FillOp::create(rewriter, zeroInt, initAcc).getResult(0);
 
   SmallVector<AffineExpr> filterExprs(ty.getRank());
   SmallVector<AffineExpr> outputExprs;
@@ -155,15 +154,14 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
       AffineMap::get(ty.getRank(), 0, filterExprs, context),
       AffineMap::get(ty.getRank(), 0, outputExprs, context)};
 
-  return rewriter
-      .create<linalg::GenericOp>(
-          zeroAcc.getType(), ValueRange{val}, ValueRange{zeroAcc}, affineMaps,
-          iterators,
-          [=](OpBuilder &b, Location loc, ValueRange args) {
-            Value ext = b.create<arith::ExtSIOp>(loc, accETy, args[0]);
-            Value sum = b.create<arith::AddIOp>(loc, ext, args[1]);
-            b.create<linalg::YieldOp>(loc, sum);
-          })
+  return linalg::GenericOp::create(
+             rewriter, zeroAcc.getType(), ValueRange{val}, ValueRange{zeroAcc},
+             affineMaps, iterators,
+             [=](OpBuilder &b, Location loc, ValueRange args) {
+               Value ext = arith::ExtSIOp::create(b, loc, accETy, args[0]);
+               Value sum = arith::AddIOp::create(b, loc, ext, args[1]);
+               linalg::YieldOp::create(b, loc, sum);
+             })
       .getResult(0);
 }
 

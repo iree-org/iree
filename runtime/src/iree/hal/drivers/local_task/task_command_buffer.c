@@ -136,8 +136,10 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_task_list_initialize(&command_buffer->root_tasks);
     iree_task_list_initialize(&command_buffer->leaf_tasks);
     memset(&command_buffer->state, 0, sizeof(command_buffer->state));
-    status = iree_hal_resource_set_allocate(block_pool,
-                                            &command_buffer->resource_set);
+    if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+      status = iree_hal_resource_set_allocate(block_pool,
+                                              &command_buffer->resource_set);
+    }
   }
   if (iree_status_is_ok(status)) {
     *out_command_buffer = &command_buffer->base;
@@ -783,7 +785,8 @@ static iree_status_t iree_hal_task_cmd_dispatch_tile(
 
 static iree_status_t iree_hal_task_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_task_command_buffer_t* command_buffer =
@@ -800,7 +803,7 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
       iree_hal_local_executable_cast(executable);
   iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {0};
   if (local_executable->dispatch_attrs) {
-    dispatch_attrs = local_executable->dispatch_attrs[entry_point];
+    dispatch_attrs = local_executable->dispatch_attrs[export_ordinal];
   }
 
   iree_hal_task_cmd_dispatch_t* cmd = NULL;
@@ -812,7 +815,7 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
                                            total_cmd_size, (void**)&cmd));
 
   cmd->executable = local_executable;
-  cmd->ordinal = entry_point;
+  cmd->ordinal = export_ordinal;
   cmd->constant_count = dispatch_attrs.constant_count;
   cmd->binding_count = dispatch_attrs.binding_count;
 

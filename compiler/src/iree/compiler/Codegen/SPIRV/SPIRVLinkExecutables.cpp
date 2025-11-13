@@ -167,8 +167,8 @@ struct SPIRVLinkExecutablesPass final
     OpBuilder moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     // Create our new "linked" hal.executable.
-    auto linkedExecutableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
-        moduleOp.getLoc(), linkedExecutableName);
+    auto linkedExecutableOp = IREE::HAL::ExecutableOp::create(
+        moduleBuilder, moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
         sourceExecutableOps.front().getVisibility());
     OpBuilder executableBuilder =
@@ -180,11 +180,10 @@ struct SPIRVLinkExecutablesPass final
           executableTargetAttrs.size() == 1
               ? attr.getSymbolNameFragment()
               : llvm::formatv("{}_{}", attr.getSymbolNameFragment(), index);
-      auto linkedTargetOp =
-          executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
-              moduleOp.getLoc(), linkedVariantName, attr);
+      auto linkedTargetOp = IREE::HAL::ExecutableVariantOp::create(
+          executableBuilder, moduleOp.getLoc(), linkedVariantName, attr);
       auto targetBuilder = OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
-      targetBuilder.create<mlir::ModuleOp>(moduleOp.getLoc());
+      mlir::ModuleOp::create(targetBuilder, moduleOp.getLoc());
 
       auto mergeModuleFn = [](mlir::ModuleOp sourceInnerModule,
                               mlir::ModuleOp linkedInnerModule,

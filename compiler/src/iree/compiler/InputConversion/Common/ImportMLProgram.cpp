@@ -175,11 +175,11 @@ public:
       FunctionType funcType =
           rewriter.getFunctionType(/*input=*/TypeRange{}, /*outputs=*/newType);
       ImplicitLocOpBuilder b(globalOp.getLoc(), rewriter);
-      auto funcOp = b.create<IREE::Util::FuncOp>(getterName, funcType);
+      auto funcOp = IREE::Util::FuncOp::create(b, getterName, funcType);
       funcOp.setPublic();
       b.setInsertionPointToStart(funcOp.addEntryBlock());
       auto val = globalOp.createLoadOp(globalOp.getLoc(), b);
-      b.create<IREE::Util::ReturnOp>(val.getLoadedGlobalValue());
+      IREE::Util::ReturnOp::create(b, val.getLoadedGlobalValue());
     }
 
     if (!setterName.empty() && isMutable) {
@@ -187,11 +187,11 @@ public:
       FunctionType funcType =
           rewriter.getFunctionType(/*input=*/newType, /*outputs=*/TypeRange{});
       ImplicitLocOpBuilder b(globalOp.getLoc(), rewriter);
-      auto funcOp = b.create<IREE::Util::FuncOp>(setterName, funcType);
+      auto funcOp = IREE::Util::FuncOp::create(b, setterName, funcType);
       funcOp.setPublic();
       b.setInsertionPointToStart(funcOp.addEntryBlock());
       globalOp.createStoreOp(globalOp.getLoc(), funcOp.getArgument(0), b);
-      b.create<IREE::Util::ReturnOp>();
+      IREE::Util::ReturnOp::create(b);
     }
 
     return success();
@@ -215,19 +215,18 @@ createExternInitFunction(ModuleOp module,
           IREE::Util::VariantType::get(context))},
       /*outputs=*/{});
   auto funcOp =
-      b.create<IREE::Util::FuncOp>("ireeMlProgramGlobalsInit", funcType);
+      IREE::Util::FuncOp::create(b, "ireeMlProgramGlobalsInit", funcType);
   funcOp.setPublic();
   b.setInsertionPointToStart(funcOp.addEntryBlock());
 
   for (auto it : llvm::enumerate(externGlobals)) {
-    auto val = b.create<IREE::Util::ListGetOp>(
-        it.value().newType, funcOp.getArgument(0),
-        b.create<arith::ConstantIndexOp>(it.index()));
-    b.create<IREE::Util::GlobalStoreOp>(val, it.value().name);
+    auto val = IREE::Util::ListGetOp::create(
+        b, it.value().newType, funcOp.getArgument(0),
+        arith::ConstantIndexOp::create(b, it.index()));
+    IREE::Util::GlobalStoreOp::create(b, val, it.value().name);
   }
 
-  b.create<IREE::Util::ReturnOp>();
-
+  IREE::Util::ReturnOp::create(b);
   return success();
 }
 

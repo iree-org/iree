@@ -23,6 +23,9 @@ def ROCM_Dialect : Dialect {
     for AMD targets that lower to LLVM.
   }];
   let useDefaultAttributePrinterParser = 1;
+  let dependentDialects = ["::mlir::iree_compiler::IREE::Util::UtilDialect",
+                           "::mlir::gpu::GPUDialect",
+                           "mlir::ROCDL::ROCDLDialect"];
 
   let extraClassDeclaration = [{
     void registerAttributes();
@@ -31,12 +34,16 @@ def ROCM_Dialect : Dialect {
     bool hasBuiltin(StringRef name);
     /// Helper for getting a builtin.
     std::optional<StringRef> getBuiltin(StringRef name);
+    /// Helper for getting the builtin names.
+    SmallVector<StringRef> getBuiltinNames();
 
     /// Returns the loaded builtin module for the `path`. If the module has
     /// already been loaded in the past, returns the memoized module without
     /// parsing the file again. This function is thead-safe.
     FailureOr<::mlir::ModuleOp>
     getOrLoadBuiltinModule(StringRef path);
+
+    const ArrayRef<Util::FuncOp> getMlirUKernels();
 
     private:
 
@@ -50,6 +57,11 @@ def ROCM_Dialect : Dialect {
     /// Lock to control the updating of the builtin modules such that we only
     /// load the module once and can reuse it across all invocations.
     std::mutex builtinMutex;
+
+    // List of MLIR ukernel functions. These belong in the ModuleOp's cached in
+    // `builtinModules`.
+    ::llvm::SmallVector<Util::FuncOp> mlirUkernels;
+    std::mutex mlirUkernelsMutex;
   }];
 }
 

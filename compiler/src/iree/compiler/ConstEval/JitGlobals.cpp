@@ -69,6 +69,7 @@ emitDebugWarning(Location loc,
 // shared.
 // TODO: See if we can make them copyable?
 struct CompileOptions {
+  GlobalPipelineOptions pipelineOptions;
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
@@ -473,8 +474,8 @@ public:
                                 targetSymbolTable, moduleBuilder)))
       return failure();
 
-    auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
-        initializerOp.getLoc(), "jit_eval",
+    auto funcOp = IREE::Util::FuncOp::create(
+        moduleBuilder, initializerOp.getLoc(), "jit_eval",
         moduleBuilder.getFunctionType({}, {}));
     targetSymbolTable.insert(funcOp);
     IRMapping unusedMapping;
@@ -489,7 +490,7 @@ public:
 private:
   static ModuleOp createInnerModule(ModuleOp sourceModuleOp) {
     OpBuilder builder = OpBuilder::atBlockEnd(sourceModuleOp.getBody());
-    auto m = builder.create<ModuleOp>(sourceModuleOp.getLoc());
+    auto m = ModuleOp::create(builder, sourceModuleOp.getLoc());
     m->setAttr("iree.consteval", builder.getUnitAttr());
     return m;
   }
@@ -583,7 +584,7 @@ private:
     // Rewrite the terminator and the function type.
     entryBlock->getTerminator()->erase();
     OpBuilder termBuilder = OpBuilder::atBlockEnd(entryBlock);
-    termBuilder.create<IREE::Util::ReturnOp>(funcOp.getLoc(), returns);
+    IREE::Util::ReturnOp::create(termBuilder, funcOp.getLoc(), returns);
     funcOp.setType(termBuilder.getFunctionType(argumentTypes, returnTypes));
 
     jitFunctions.push_back(std::move(desc));
@@ -624,12 +625,13 @@ public:
     // Disable constant evaluation for our Jit compilation pipeline.
     // It would make no sense to recursively do constant evaluation, and since
     // we omit the necessary hooks, it is unsupported anyway.
-    compileOptions->globalOptimizationOptions.constExprHoisting = false;
+    compileOptions->pipelineOptions.constExprHoisting = false;
     compileOptions->globalOptimizationOptions.constEval = false;
 
     buildIREEVMTransformPassPipeline(
-        *targetRegistry.value, compileOptions->bindingOptions,
-        compileOptions->inputOptions, compileOptions->preprocessingOptions,
+        *targetRegistry.value, compileOptions->pipelineOptions,
+        compileOptions->bindingOptions, compileOptions->inputOptions,
+        compileOptions->preprocessingOptions,
         compileOptions->globalOptimizationOptions,
         compileOptions->dispatchCreationOptions,
         compileOptions->schedulingOptions, compileOptions->executableOptions,
@@ -721,7 +723,7 @@ public:
 
   void runOnOperation() override {
     llvm::TimerGroup tg("iree-consteval-jit", "Consteval Jit");
-    auto outerModule = getOperation();
+    mlir::ModuleOp outerModuleOp = getOperation();
 
     // Set the target.
     if (!targetDevice) {
@@ -758,14 +760,14 @@ public:
     }
 
     // Build the program.
-    ProgramBuilder programBuilder(outerModule, *deviceTargetAttr,
+    ProgramBuilder programBuilder(outerModuleOp, *deviceTargetAttr,
                                   supportedTypes,
                                   getAnalysis<IREE::Util::ConstExprAnalysis>());
 
     // Iterate over initializers.
     llvm::SmallVector<IREE::Util::InitializerOp> initializerOps;
     llvm::SmallVector<IREE::Util::InitializerOp> deadInitOps;
-    for (auto childOp : outerModule.getOps<IREE::Util::InitializerOp>()) {
+    for (auto childOp : outerModuleOp.getOps<IREE::Util::InitializerOp>()) {
       initializerOps.push_back(childOp);
     }
     for (auto initializerOp : initializerOps) {
@@ -806,7 +808,7 @@ public:
 
     // Process the functions.
     if (failed(processFunctions(binary, programBuilder.getJitFunctions(),
-                                outerModule, tg))) {
+                                outerModuleOp, tg))) {
       signalPassFailure();
       return;
     }

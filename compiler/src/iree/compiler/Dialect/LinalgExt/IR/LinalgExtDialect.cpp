@@ -72,6 +72,11 @@ void IREELinalgExtDialect::initialize() {
   addOperations<
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
       >();
+
+#define GET_OP_LIST
+  addOperations<
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtPureOps.cpp.inc"
+      >();
 }
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc"

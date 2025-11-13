@@ -526,8 +526,8 @@ Value ResourceType::createSubrangeOp(Location loc, Value resource,
                                      Value resourceSize, Value subrangeOffset,
                                      Value subrangeLength,
                                      OpBuilder &builder) const {
-  return builder.create<IREE::Stream::ResourceSubviewOp>(
-      loc, resource, resourceSize, subrangeOffset, subrangeLength);
+  return IREE::Stream::ResourceSubviewOp::create(
+      builder, loc, resource, resourceSize, subrangeOffset, subrangeLength);
 }
 
 //===----------------------------------------------------------------------===//

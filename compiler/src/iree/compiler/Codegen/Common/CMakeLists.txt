@@ -50,24 +50,6 @@ iree_tablegen_library(
 
 iree_cc_library(
   NAME
-    VectorLayoutAnalysis
-  HDRS
-    "VectorLayoutAnalysis.h"
-  SRCS
-    "VectorLayoutAnalysis.cpp"
-  DEPS
-    LLVMSupport
-    MLIRAnalysis
-    MLIRIR
-    MLIRSCFDialect
-    MLIRUBDialect
-    MLIRVectorDialect
-    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     Common
   HDRS
     "BufferizationAnalysis.h"
@@ -138,7 +120,6 @@ iree_cc_library(
     "LoweringConfigInterpreter.cpp"
     "MaterializeEncoding.cpp"
     "MaterializeEncodingIntoNop.cpp"
-    "MaterializeEncodingIntoPadding.cpp"
     "MaterializeEncodingPatterns.cpp"
     "MaterializeTuningSpecsPass.cpp"
     "MathTransformPass.cpp"
@@ -176,6 +157,7 @@ iree_cc_library(
     "TypePropagationPass.cpp"
     "UnrollAnnotatedLoops.cpp"
     "UserConfig.cpp"
+    "VectorLayoutAnalysis.cpp"
     "VectorTransferLowering.cpp"
     "VectorizeMemrefCopy.cpp"
     "VerifyWorkgroupDistribution.cpp"

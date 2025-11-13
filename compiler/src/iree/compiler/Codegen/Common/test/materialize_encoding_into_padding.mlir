@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-encoding-into-padding))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding{test-gpu-encoding-resolver=gpu_padding}))" \
 // RUN:   --iree-gpu-test-target=gfx942 \
 // RUN:   --split-input-file %s | FileCheck %s
 
@@ -77,9 +77,9 @@ func.func @dynamic_set_zero_pad_encoding_and_store() {
   %2 = hal.interface.constant.load layout(<constants = 2, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(1) : i32
   %dynamic_sz = arith.index_castui %2 : i32 to index
   %3 = hal.interface.binding.subspan layout(<constants = 2, bindings = [#binding_ro, #binding], flags = Indirect>) binding(0) alignment(64) offset(%1) flags("ReadOnly|Indirect")
-    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>{%dynamic_sz}
   %4 = hal.interface.binding.subspan layout(<constants = 2, bindings = [#binding_ro, #binding], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect)
-    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048xf16, #pad_encoding>>
+    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048xf16, #pad_encoding>>{%dynamic_sz}
   %5 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%dynamic_sz, 2048], strides = [1, 1]
     : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>{%dynamic_sz} -> tensor<?x2048xf16>
   %6 = iree_encoding.set_encoding %5 : tensor<?x2048xf16> -> tensor<?x2048xf16, #encoding_mmt>

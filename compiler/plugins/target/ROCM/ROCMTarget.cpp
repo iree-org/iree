@@ -26,6 +26,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -36,6 +37,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/Frontend/Offloading/Utility.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -81,12 +83,16 @@ struct ROCMOptions {
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
-  std::string encodingLayoutResolver = GPU::kNoEncodingLayoutResolverName;
+  std::string encodingLayoutResolver =
+      GPU::kDataTilingEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
-
   bool specializeDispatches = false;
   bool enableTensorUKernels = false;
+  IREE::Codegen::DenormalFpMath denormalFpMathF32 =
+      IREE::Codegen::DenormalFpMath::None;
+  bool enableRegSpillWarning = false;
+  bool debugSymbols = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -161,6 +167,22 @@ struct ROCMOptions {
     binder.opt<bool>("iree-hip-enable-tensor-ukernels", enableTensorUKernels,
                      cl::cat(category),
                      cl::desc("Enable MLIR-based ukernels."));
+    binder.opt<IREE::Codegen::DenormalFpMath>(
+        "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
+        cl::desc("Denormal floating point math mode for f32"),
+        cl::values(
+            clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
+                       "preserve-sign",
+                       "Convert denormals to zero while preserving sign"),
+            clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
+                       "positive-zero", "Convert denormals to positive zero")));
+
+    binder.opt<bool>("iree-hip-enable-register-spill-warning",
+                     enableRegSpillWarning, cl::cat(category),
+                     cl::desc("Report register spilling for AMD GPUs"));
+    binder.opt<bool>(
+        "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
+        cl::desc("Generate and embed debug information (DWARF) for HIP."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -251,6 +273,25 @@ static std::string translateModuleToISA(llvm::Module &module,
   return targetISA;
 }
 
+static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
+                                  StringRef obj) {
+  uint16_t abiVersion;
+  llvm::StringMap<llvm::offloading::amdgpu::AMDGPUKernelMetaData> infoMap;
+
+  if (!llvm::offloading::amdgpu::getAMDGPUMetaDataFromImage(
+          llvm::MemoryBufferRef(obj, ""), infoMap, abiVersion)) {
+    for (const auto &[dispatchName, metaData] : infoMap) {
+      if (metaData.SGPRSpillCount > 0 || metaData.VGPRSpillCount > 0) {
+        emitWarning(variantOp.getLoc())
+            << "Register spill: " << "VGPRSpillCount: "
+            << metaData.VGPRSpillCount
+            << " / SGPRSpillCount: " << metaData.SGPRSpillCount
+            << " / Dispatch: " << dispatchName;
+      }
+    }
+  }
+}
+
 } // namespace
 
 class ROCMTargetBackend final : public TargetBackend {
@@ -330,13 +371,21 @@ public:
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
+    if (options.enableROCMUkernels != "none") {
+      addConfig("iree_codegen.ukernel_provider",
+                IREE::ROCM::UKernelProviderAttr::get(context));
+    }
     if (options.wavesPerEu > 0) {
       addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
+    }
+    if (options.denormalFpMathF32 != IREE::Codegen::DenormalFpMath::None) {
+      addConfigDenormalFpMathF32(b.getContext(), options.denormalFpMathF32,
+                                 configItems);
     }
 
     if (options.enableTensorUKernels) {
       addConfig(kUKernelProviderName,
-                IREE::Codegen::SymbolicUKernelProviderAttr::get(context));
+                IREE::ROCM::TensorUKernelProviderAttr::get(context));
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
@@ -352,6 +401,8 @@ public:
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
     registry.insert<IREE::ROCM::ROCMDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
+    registry.insert<mlir::gpu::GPUDialect>();
     // Configuration may load and manipulate transform dialect libraries.
     registerTransformDialectTranslationDependentDialects(registry);
   }
@@ -405,7 +456,7 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    buildLLVMGPUCodegenPassPipeline(passManager, true);
+    buildLLVMGPUCodegenPassPipeline(passManager, true, options.debugSymbols);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
@@ -588,7 +639,6 @@ public:
         }
         llvm::TargetOptions opt;
         opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
-        opt.UnsafeFPMath = false;
         opt.NoInfsFPMath = false;
         opt.NoNaNsFPMath = true;
         // Be extra cautious while this is less tested, and prevent unknown
@@ -651,6 +701,7 @@ public:
       // CI or users may not be prepared for.
       llvmModule->addModuleFlag(llvm::Module::Error,
                                 "amdhsa_code_object_version", abiVersion);
+
       for (llvm::Function &f : llvmModule->functions())
         f.addFnAttr(llvm::Attribute::AlwaysInline);
 
@@ -707,10 +758,10 @@ public:
                          ".linked.ll", *llvmModule);
       }
 
-      // For example 'gfx942'
+      // For example 'gfx942'.
       StringRef targetCPU = targetMachine->getTargetCPU();
 
-      // For example 'amdgcn-amd-amdhsa'
+      // For example 'amdgcn-amd-amdhsa'.
       std::string targetTriple = targetMachine->getTargetTriple().str();
 
       // Run LLVM optimization passes.
@@ -718,18 +769,16 @@ public:
       optimizeModule(*llvmModule, *targetMachine, options.slpVectorization,
                      passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
-
         // Additional context on '-mcpu' flag in PR comments, see for example:
         // https://github.com/iree-org/iree/pull/20716#issuecomment-2851650421
-        std::string header =
-            llvm::formatv(R"TXT(
-; To reproduce the .optimized.ll from the .linked.ll, run:
-; opt -S -mtriple={} -mcpu={} --passes='{}'
-; The flag '-S' to emit LLVMIR.
-; The behavior of some passes depends on '-mtriple' and '-mcpu'
+        std::string header = llvm::formatv(
+            R"TXT(; To reproduce the .optimized.ll from the .linked.ll, run:
+; opt -S -mtriple={} -mcpu={} --passes='{}' <.linked.ll>
+; The flag '-S' is to emit LLVMIR.
+; The behavior of some passes depends on '-mtriple' and '-mcpu'.
 
 )TXT",
-                          targetTriple, targetCPU, passesString);
+            targetTriple, targetCPU, passesString);
 
         dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
                          serializationOptions.dumpBaseName, variantOp.getName(),
@@ -747,11 +796,18 @@ public:
           llvm::errs() << "Error: cloning LLVM IR failed\n";
           return failure();
         }
+        std::string asmHeader = llvm::formatv(
+            R"TXT(; To reproduce the .rocmasm from .optimized.ll, run:
+; llc -mtriple={} -mcpu={} -mattr='{}' -O3 <.optimized.ll> -o <out.rocmasm>
+
+)TXT",
+            targetTriple, targetCPU, targetMachine->getTargetFeatureString());
+
         std::string targetISA =
             translateModuleToISA(*moduleCopy.get(), *targetMachine);
         dumpDataToPath(serializationOptions.dumpIntermediatesPath,
                        serializationOptions.dumpBaseName, variantOp.getName(),
-                       ".rocmasm", targetISA);
+                       ".rocmasm", asmHeader + targetISA);
       }
 
       // Serialize hsaco kernel into the binary that we will embed in the
@@ -760,6 +816,10 @@ public:
       targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
       if (targetHSACO.empty())
         return failure();
+
+      if (options.enableRegSpillWarning) {
+        checkRegisterSpilling(variantOp, targetObj);
+      }
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
@@ -812,9 +872,11 @@ public:
     }
 
     // Add the binary data to the target executable.
-    executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(), binaryContainer.value());
+    binaryOp.setMimeTypeAttr(
+        executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();
   }
@@ -898,12 +960,17 @@ protected:
     }
     auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
 
+    auto isaRef = builder.createString(variantOp.getTarget().getFormat());
+    iree_hal_amdgpu_ExecutableDef_isa_add(builder, isaRef);
     iree_hal_amdgpu_ExecutableDef_exports_add(builder, exportsRef);
     iree_hal_amdgpu_ExecutableDef_modules_add(builder, modulesRef);
     iree_hal_amdgpu_ExecutableDef_source_files_add(builder, sourceFilesRef);
     iree_hal_amdgpu_ExecutableDef_end_as_root(builder);
 
-    return builder.getBufferAttr(variantOp.getContext());
+    return builder.getHeaderPrefixedBufferAttr(
+        variantOp.getContext(),
+        /*magic=*/iree_hal_amdgpu_ExecutableDef_file_identifier,
+        /*version=*/0);
   }
 
   FailureOr<DenseIntElementsAttr>
@@ -987,7 +1054,10 @@ protected:
     iree_hal_hip_ExecutableDef_source_files_add(builder, sourceFilesRef);
     iree_hal_hip_ExecutableDef_end_as_root(builder);
 
-    return builder.getBufferAttr(variantOp.getContext());
+    return builder.getHeaderPrefixedBufferAttr(
+        variantOp.getContext(),
+        /*magic=*/iree_hal_hip_ExecutableDef_file_identifier,
+        /*version=*/0);
   }
 
 private:
@@ -996,7 +1066,7 @@ private:
 
 class AMDGPUTargetDevice final : public TargetDevice {
 public:
-  AMDGPUTargetDevice(const ROCMOptions &options) : options(options) {}
+  AMDGPUTargetDevice(const ROCMOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -1015,14 +1085,11 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const ROCMOptions &options;
 };
 
 class HIPTargetDevice final : public TargetDevice {
 public:
-  HIPTargetDevice(const ROCMOptions &options) : options(options) {}
+  HIPTargetDevice(const ROCMOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -1041,9 +1108,6 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const ROCMOptions &options;
 };
 
 namespace {

@@ -35,7 +35,7 @@ namespace {
 /// be specified. It picks the `tilingLevel`-th list as tiling sizes from
 /// lowering_config.
 struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
-  using impl::LLVMCPUTilePassBase<LLVMCPUTilePass>::LLVMCPUTilePassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
@@ -47,12 +47,12 @@ struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
 };
 
 void LLVMCPUTilePass::runOnOperation() {
-  if (tilingLevel == -1) {
+  if (tilingLevel == IREE::CPU::TilingLevel::InvalidLevel) {
     LDBG() << "tilingLevel not set, skip tiling";
     return;
   }
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   for (auto computeOp : computeOps) {
@@ -73,7 +73,8 @@ void LLVMCPUTilePass::runOnOperation() {
       LDBG() << "can't find lowering_config, skip tiling";
       continue;
     }
-    if (!maybeLoweringConfig.hasTilingLevel(tilingLevel)) {
+    if (!maybeLoweringConfig.hasTilingLevel(
+            static_cast<unsigned>(tilingLevel.getValue()))) {
       LDBG() << "target tiling level does not exist";
       continue;
     }
@@ -85,7 +86,8 @@ void LLVMCPUTilePass::runOnOperation() {
     }
 
     auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getLoweringConfig(op).getTilingLevelAttr(tilingLevel));
+        getLoweringConfig(op).getTilingLevelAttr(
+            static_cast<unsigned>(tilingLevel.getValue())));
     SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
     SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
     scf::SCFTilingOptions tilingOptions;
@@ -122,7 +124,7 @@ void LLVMCPUTilePass::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTilePass(int64_t tilingLevel, bool skipRootOp) {
+createLLVMCPUTilePass(IREE::CPU::TilingLevel tilingLevel, bool skipRootOp) {
   LLVMCPUTilePassOptions options;
   options.tilingLevel = tilingLevel;
   options.skipRootOp = skipRootOp;

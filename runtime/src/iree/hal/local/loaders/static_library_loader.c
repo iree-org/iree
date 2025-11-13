@@ -154,11 +154,54 @@ static iree_status_t iree_hal_static_executable_issue_call(
                         ret);
 }
 
+static iree_host_size_t iree_hal_static_executable_export_count(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_static_executable_t* executable =
+      (iree_hal_static_executable_t*)base_executable;
+  return iree_hal_executable_library_export_count(executable->library.v0);
+}
+
+static iree_status_t iree_hal_static_executable_export_info(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  iree_hal_static_executable_t* executable =
+      (iree_hal_static_executable_t*)base_executable;
+  return iree_hal_executable_library_export_info(executable->library.v0,
+                                                 export_ordinal, out_info);
+}
+
+static iree_status_t iree_hal_static_executable_export_parameters(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  iree_hal_static_executable_t* executable =
+      (iree_hal_static_executable_t*)base_executable;
+  return iree_hal_executable_library_export_parameters(
+      executable->library.v0, export_ordinal, capacity, out_parameters);
+}
+
+static iree_status_t iree_hal_static_executable_lookup_export_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  iree_hal_static_executable_t* executable =
+      (iree_hal_static_executable_t*)base_executable;
+  return iree_hal_executable_library_lookup_export_by_name(
+      executable->library.v0, name, out_export_ordinal);
+}
+
 static const iree_hal_local_executable_vtable_t
     iree_hal_static_executable_vtable = {
         .base =
             {
                 .destroy = iree_hal_static_executable_destroy,
+                .export_count = iree_hal_static_executable_export_count,
+                .export_info = iree_hal_static_executable_export_info,
+                .export_parameters =
+                    iree_hal_static_executable_export_parameters,
+                .lookup_export_by_name =
+                    iree_hal_static_executable_lookup_export_by_name,
             },
         .issue_call = iree_hal_static_executable_issue_call,
 };
@@ -257,6 +300,39 @@ static void iree_hal_static_library_loader_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t iree_hal_static_library_loader_infer_format(
+    iree_hal_executable_loader_t* base_executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Always return "static" as the format string.
+  const char* format_str = "static";
+  const iree_host_size_t format_length = strlen(format_str) + 1;  // + NUL
+  if (executable_format_capacity < format_length) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "insufficient capacity for format string; need %" PRIhsz
+        " but have %" PRIhsz,
+        format_length, executable_format_capacity);
+  }
+
+  // Copy the format string with NUL terminator.
+  memcpy(executable_format, format_str, format_length);
+
+  // Infer the size of the executable data.
+  if (executable_data.data_length != 0) {
+    // Size is known.
+    *out_inferred_size = executable_data.data_length;
+  } else {
+    // Size is unknown - find the first NUL byte.
+    *out_inferred_size =
+        strlen((const char*)executable_data.data) + 1;  // + NUL
+  }
+
+  return iree_ok_status();
+}
+
 static bool iree_hal_static_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -275,7 +351,7 @@ static iree_status_t iree_hal_static_library_loader_try_load(
   // The executable data is just the name of the library.
   iree_string_view_t library_name = iree_make_string_view(
       (const char*)executable_params->executable_data.data,
-      executable_params->executable_data.data_length);
+      executable_params->executable_data.data_length - /*NUL*/ 1);
 
   // Linear scan of the registered libraries; there's usually only one per
   // module (aka source model) and as such it's a small list and probably not
@@ -301,6 +377,7 @@ static iree_status_t iree_hal_static_library_loader_try_load(
 static const iree_hal_executable_loader_vtable_t
     iree_hal_static_library_loader_vtable = {
         .destroy = iree_hal_static_library_loader_destroy,
+        .infer_format = iree_hal_static_library_loader_infer_format,
         .query_support = iree_hal_static_library_loader_query_support,
         .try_load = iree_hal_static_library_loader_try_load,
 };

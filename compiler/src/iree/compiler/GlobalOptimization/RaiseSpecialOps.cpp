@@ -141,8 +141,8 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
     }
   };
 
-  linalg::GenericOp newLinalgOp = rewriter.create<linalg::GenericOp>(
-      linalgOp.getLoc(), linalgOp.getResultTypes(), newInputs,
+  linalg::GenericOp newLinalgOp = linalg::GenericOp::create(
+      rewriter, linalgOp.getLoc(), linalgOp.getResultTypes(), newInputs,
       linalgOp.getOutputs(),
       ArrayAttr::get(linalgOp->getContext(), newIndexingMaps),
       linalgOp.getIteratorTypesAttr(), linalgOp.getDocAttr(),
@@ -198,8 +198,8 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
       offsets.push_back(zero);
       // Get the dim size from the output tensor.
       if (ShapedType::isDynamic(outShape[currOutDim])) {
-        auto dim = rewriter.create<tensor::DimOp>(linalgOp.getLoc(), output,
-                                                  currOutDim);
+        auto dim = tensor::DimOp::create(rewriter, linalgOp.getLoc(), output,
+                                         currOutDim);
         sizes.push_back(dim.getResult());
       } else {
         sizes.push_back(rewriter.getI64IntegerAttr(outShape[currOutDim]));
@@ -220,8 +220,8 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
   // will always be 1.
   SmallVector<OpFoldResult> strides(inputIndexingMap.getNumResults(), one);
 
-  return rewriter.create<tensor::ExtractSliceOp>(
-      linalgOp.getLoc(), outType, input, offsets, sizes, strides);
+  return tensor::ExtractSliceOp::create(rewriter, linalgOp.getLoc(), outType,
+                                        input, offsets, sizes, strides);
 }
 
 /// Matches a linalg.generic operation with a single input and init output
@@ -477,7 +477,7 @@ matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
 
 class FuseMatmulTranspose : public OpRewritePattern<linalg::MatmulOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(matmulOp)) {
@@ -503,7 +503,7 @@ public:
 class FuseBatchMatmulTranspose
     : public OpRewritePattern<linalg::BatchMatmulOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::BatchMatmulOp bmmOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(bmmOp)) {
@@ -559,7 +559,7 @@ static std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
 
 class RaiseGenericFill : public OpRewritePattern<linalg::GenericOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
@@ -588,7 +588,7 @@ public:
 
 class RaiseInsertSliceToPad : public OpRewritePattern<tensor::InsertSliceOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(sliceOp)) {
@@ -630,8 +630,8 @@ public:
           {rewriter.getIndexAttr(dim), size, offset}));
     }
 
-    Value paddingValue = rewriter.create<arith::ConstantOp>(
-        constantDest.getLoc(), denseAttr.getElementType(),
+    Value paddingValue = arith::ConstantOp::create(
+        rewriter, constantDest.getLoc(), denseAttr.getElementType(),
         denseAttr.getSplatValue<TypedAttr>());
     rewriter.replaceOpWithNewOp<tensor::PadOp>(sliceOp, sliceOp.getResultType(),
                                                sliceOp.getSource(), lowPadding,
@@ -891,11 +891,11 @@ static Value createCatNegateAndSlice(RewriterBase &rewriter, Value outTensor,
                                                          : sliceSize / 2);
   Type expandedType =
       RankedTensorType::get(targetShape, sourceType.getElementType());
-  Value expanded = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
-                                                          source, reassoc);
+  Value expanded = tensor::ExpandShapeOp::create(rewriter, loc, expandedType,
+                                                 source, reassoc);
 
-  Value expandedOutTensor = rewriter.create<tensor::ExpandShapeOp>(
-      loc, expandedType, outTensor, reassoc);
+  Value expandedOutTensor = tensor::ExpandShapeOp::create(
+      rewriter, loc, expandedType, outTensor, reassoc);
 
   SmallVector<AffineMap> indexingMaps = {
       rewriter.getMultiDimIdentityMap(targetShape.size())};
@@ -905,40 +905,39 @@ static Value createCatNegateAndSlice(RewriterBase &rewriter, Value outTensor,
   auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange args) {
     SmallVector<Value> extractionIndices;
     for (size_t i = 0, e = targetShape.size(); i < e; ++i) {
-      extractionIndices.push_back(b.create<linalg::IndexOp>(loc, i));
+      extractionIndices.push_back(linalg::IndexOp::create(b, loc, i));
     }
 
     Value c1 =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
+        arith::ConstantOp::create(rewriter, loc, rewriter.getIndexAttr(1));
 
     // Take the reverse of the second to last iterator. Because we statically
     // guaranteed it to be 2 it just becomes `1 - iters[-2]`.
-    Value reverseSplitIdx = rewriter.create<arith::SubIOp>(
-        loc, c1, extractionIndices[targetShape.size() - 2]);
+    Value reverseSplitIdx = arith::SubIOp::create(
+        rewriter, loc, c1, extractionIndices[targetShape.size() - 2]);
     extractionIndices[targetShape.size() - 2] = reverseSplitIdx;
 
     // Extract the value from input tensor and negate the top half of the result
     // slice (lower half of the input slice).
     Value inputVal =
-        b.create<tensor::ExtractOp>(loc, expanded, extractionIndices);
-    Value maybeNegate = b.create<arith::NegFOp>(loc, inputVal);
+        tensor::ExtractOp::create(b, loc, expanded, extractionIndices);
+    Value maybeNegate = arith::NegFOp::create(b, loc, inputVal);
 
-    Value isEqual = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                            reverseSplitIdx, c1);
+    Value isEqual = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq,
+                                          reverseSplitIdx, c1);
     Value select =
-        rewriter.create<arith::SelectOp>(loc, isEqual, maybeNegate, inputVal);
-    b.create<linalg::YieldOp>(loc, select);
+        arith::SelectOp::create(rewriter, loc, isEqual, maybeNegate, inputVal);
+    linalg::YieldOp::create(b, loc, select);
   };
 
   Value result =
-      rewriter
-          .create<linalg::GenericOp>(loc, expandedOutTensor.getType(),
-                                     ValueRange(), expandedOutTensor,
-                                     indexingMaps, iteratorTypes, bodyBuilder)
+      linalg::GenericOp::create(rewriter, loc, expandedOutTensor.getType(),
+                                ValueRange(), expandedOutTensor, indexingMaps,
+                                iteratorTypes, bodyBuilder)
           .getResult(0);
 
-  return rewriter.create<tensor::CollapseShapeOp>(loc, outTensor.getType(),
-                                                  result, reassoc);
+  return tensor::CollapseShapeOp::create(rewriter, loc, outTensor.getType(),
+                                         result, reassoc);
 }
 
 static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
@@ -954,16 +953,16 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
                                       tensor::ConcatOp concatOp, Value source) {
   rewriter.setInsertionPoint(concatOp);
   Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
-  Value outTensor = rewriter.create<tensor::EmptyOp>(
-      source.getLoc(), tensor::getMixedSizes(rewriter, source.getLoc(), source),
-      elemType);
+  Value outTensor = tensor::EmptyOp::create(
+      rewriter, source.getLoc(),
+      tensor::getMixedSizes(rewriter, source.getLoc(), source), elemType);
   return createCatNegateAndSlice(rewriter, outTensor, source);
 }
 
 class InsertSliceNegateAndSlicePattern
     : public OpRewritePattern<tensor::InsertSliceOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(sliceOp)) {
@@ -983,7 +982,7 @@ public:
 class ConcatenateNegateAndSlicePattern
     : public OpRewritePattern<tensor::ConcatOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(concatOp)) {
@@ -1017,28 +1016,28 @@ struct RaiseSpecialOpsPass
 
     // First walk the IR and try to raise any slice-like generics to tensor.
     IRRewriter rewriter(context);
-    funcOp->walk([&](linalg::GenericOp op) {
-      linalg::GenericOp linalgOp = op;
+    SmallVector<linalg::GenericOp> genericOps;
+    funcOp->walk([&](linalg::GenericOp op) { genericOps.push_back(op); });
 
+    for (linalg::GenericOp linalgOp : genericOps) {
+      // Try raising to tensor.extract to an input and create an linalg.generic.
       OpBuilder::InsertionGuard guard(rewriter);
-
-      // Try raising to tensor.export and create an intermediate linalg.generic.
-      rewriter.setInsertionPoint(op);
+      rewriter.setInsertionPoint(linalgOp);
       FailureOr<linalg::GenericOp> maybeNewOp =
           raiseTensorExtractToInput(linalgOp, rewriter);
       if (succeeded(maybeNewOp)) {
+        rewriter.replaceOp(linalgOp, *maybeNewOp);
         linalgOp = *maybeNewOp;
       }
 
       // Try raising to a view-like operation. Replace if the op raising was
       // successful.
-      rewriter.setInsertionPoint(op);
       FailureOr<Operation *> maybeRaisedView =
           tryRaiseToView(linalgOp, rewriter);
       if (succeeded(maybeRaisedView)) {
-        rewriter.replaceOp(op, *maybeRaisedView);
+        rewriter.replaceOp(linalgOp, *maybeRaisedView);
       }
-    });
+    }
 
     // Next run a variety of raising patterns.
     {

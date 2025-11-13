@@ -26,14 +26,11 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/ElementPackingUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -53,9 +50,9 @@ static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
     unsigned sourceBitWidth = sourceType.getIntOrFloatBitWidth();
     unsigned destBitWidth = targetType.getIntOrFloatBitWidth();
     if (sourceBitWidth > destBitWidth) {
-      return b.create<arith::TruncIOp>(loc, targetType, source);
+      return arith::TruncIOp::create(b, loc, targetType, source);
     } else {
-      return b.create<arith::ExtUIOp>(loc, targetType, source);
+      return arith::ExtUIOp::create(b, loc, targetType, source);
     }
   }
   return nullptr;
@@ -310,8 +307,8 @@ struct TensorExtractTypePropagation
   matchAndRewrite(tensor::ExtractOp extractOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     Location loc = extractOp.getLoc();
-    Value newExtract = rewriter.create<tensor::ExtractOp>(
-        loc, adaptor.getTensor(), adaptor.getIndices());
+    Value newExtract = tensor::ExtractOp::create(
+        rewriter, loc, adaptor.getTensor(), adaptor.getIndices());
     Value replacement = convertElementType(
         rewriter, loc, extractOp.getResult().getType(), newExtract);
     rewriter.replaceOp(extractOp, replacement);

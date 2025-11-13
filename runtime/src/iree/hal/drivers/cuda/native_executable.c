@@ -12,6 +12,7 @@
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
 #include "iree/hal/utils/executable_debug_info.h"
+#include "iree/hal/utils/executable_header.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
@@ -57,27 +58,59 @@ static iree_status_t iree_hal_cuda_query_limits(
 
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[0],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[0],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X, device),
       "cuDeviceGetAttribute");
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[1],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[1],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y, device),
       "cuDeviceGetAttribute");
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[2],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[2],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z, device),
       "cuDeviceGetAttribute");
 
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
       cuDeviceGetAttribute(
-          &out_limits->max_block_shared_memory_size,
+          (int32_t*)&out_limits->max_block_shared_memory_size,
           CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN, device),
       "cuDeviceGetAttribute");
 
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_cuda_native_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Read the header prefix (with unsafe inference if size is unknown).
+  const bool unsafe_infer_size = (executable_data.data_length == 0);
+  iree_const_byte_span_t flatbuffer_data = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_hal_read_executable_flatbuffer_header(
+      executable_data, unsafe_infer_size,
+      iree_hal_cuda_ExecutableDef_file_identifier, &flatbuffer_data));
+
+  // Verify the flatbuffer structure.
+  if (!iree_hal_cuda_ExecutableDef_verify_as_root(
+          flatbuffer_data.data, flatbuffer_data.data_length)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to verify executable flatbuffer structure");
+  }
+
+  // Write the format string.
+  iree_string_view_t format = IREE_SV("PTXE");
+  if (format.size >= executable_format_capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable format buffer too small");
+  }
+  memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
+
+  // Return the total size (header + flatbuffer).
+  *out_inferred_size =
+      sizeof(iree_flatbuffer_file_header_t) + flatbuffer_data.data_length;
   return iree_ok_status();
 }
 
@@ -90,10 +123,7 @@ static iree_status_t iree_hal_cuda_query_limits(
 static iree_status_t iree_hal_cuda_native_executable_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data,
     const iree_hal_cuda_limits_t* limits) {
-  if (!flatbuffer_data.data) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "flatbuffer data is not present");
-  }
+  IREE_ASSERT(flatbuffer_data.data && flatbuffer_data.data_length >= 16);
 
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
@@ -222,13 +252,20 @@ iree_status_t iree_hal_cuda_native_executable_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_query_limits(symbols, device, &limits));
 
+  // Read and strip the flatbuffer header prefix.
+  iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_read_executable_flatbuffer_header(
+          executable_params->executable_data, /*unsafe_infer_size=*/false,
+          iree_hal_cuda_ExecutableDef_file_identifier, &executable_flatbuffer));
+
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_native_executable_flatbuffer_verify(
-              executable_params->executable_data, &limits));
+              executable_flatbuffer, &limits));
 
   iree_hal_cuda_ExecutableDef_table_t executable_def =
-      iree_hal_cuda_ExecutableDef_as_root(
-          executable_params->executable_data.data);
+      iree_hal_cuda_ExecutableDef_as_root(executable_flatbuffer.data);
 
   iree_hal_cuda_ModuleDef_vec_t modules_vec =
       iree_hal_cuda_ExecutableDef_modules_get(executable_def);
@@ -415,7 +452,8 @@ static void iree_hal_cuda_native_executable_destroy(
 }
 
 iree_status_t iree_hal_cuda_native_executable_lookup_kernel_params(
-    iree_hal_executable_t* base_executable, int32_t ordinal,
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t ordinal,
     const iree_hal_cuda_kernel_params_t** out_params) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
@@ -430,7 +468,57 @@ iree_status_t iree_hal_cuda_native_executable_lookup_kernel_params(
   return iree_ok_status();
 }
 
+static iree_host_size_t iree_hal_cuda_native_executable_export_count(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  // TODO(cuda): return the total number of exports in the executable.
+  (void)executable;
+  return 0;
+}
+
+static iree_status_t iree_hal_cuda_native_executable_export_info(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(cuda): return export information from kernel metadata.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
+static iree_status_t iree_hal_cuda_native_executable_export_parameters(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(cuda): return export parameter information from kernel metadata.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "parameter reflection not implemented");
+}
+
+static iree_status_t iree_hal_cuda_native_executable_lookup_export_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(cuda): lookup the export ordinal by name.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
 static const iree_hal_executable_vtable_t
     iree_hal_cuda_native_executable_vtable = {
         .destroy = iree_hal_cuda_native_executable_destroy,
+        .export_count = iree_hal_cuda_native_executable_export_count,
+        .export_info = iree_hal_cuda_native_executable_export_info,
+        .export_parameters = iree_hal_cuda_native_executable_export_parameters,
+        .lookup_export_by_name =
+            iree_hal_cuda_native_executable_lookup_export_by_name,
 };

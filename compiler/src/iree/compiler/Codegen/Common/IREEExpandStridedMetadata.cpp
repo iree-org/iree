@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
@@ -44,6 +43,27 @@ static AffineMap getMulMap(MLIRContext *context) {
   AffineExpr s0, s1;
   bindSymbols(context, s0, s1);
   return AffineMap::get(0, 2, s0 * s1);
+}
+
+/// Walks up the def-use chain to find the HAL interface binding subspan
+/// that a memref value derives from, passing through transparent wrapper ops.
+static std::optional<IREE::HAL::InterfaceBindingSubspanOp>
+getSourceInterfaceBinding(Value memrefValue) {
+  Value source = memrefValue;
+  // Walk through transparent wrapper operations.
+  while (source) {
+    if (auto binding =
+            source.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>()) {
+      return binding;
+    }
+    if (auto assumeAlign = source.getDefiningOp<memref::AssumeAlignmentOp>()) {
+      source = assumeAlign.getOperand();
+      continue;
+    }
+    // No more transparent ops to pass through.
+    break;
+  }
+  return std::nullopt;
 }
 
 /// Returns the strides based on the sizes assuming that the `memref`
@@ -129,23 +149,39 @@ replaceOffsetSizesAndStridesWith(RewriterBase &rewriter, OpTy op,
 
 namespace {
 
-struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
+/// Converts memref.extract_strided_metadata to
+/// iree_codegen.extract_strided_metadata when the source derives from a HAL
+/// interface binding. This preserves SSA links through buffer binding
+/// optimizations that update offsets.
+struct ConvertMemRefExtractMetadataToIREECodegen
     : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
-    auto binding =
-        op.getSource()
-            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!getSourceInterfaceBinding(op.getSource()))
+      return failure();
+    // Replace with iree_codegen version which doesn't fold.
+    rewriter.replaceOpWithNewOp<IREE::Codegen::ExtractStridedMetadataOp>(
+        op, op.getSource());
+    return success();
+  }
+};
+
+struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
+    : public OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::Codegen::ExtractStridedMetadataOp op,
+                                PatternRewriter &rewriter) const override {
+    auto binding = getSourceInterfaceBinding(op.getSource());
     if (!binding)
       return failure();
-    auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
+    auto memRefType = llvm::cast<MemRefType>(binding->getResult().getType());
 
     auto loc = op.getLoc();
     OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(binding);
+    rewriter.setInsertionPoint(*binding);
     FailureOr<DescriptorInfo> resultDescriptor =
-        resolveBufferDescriptorForInterfaceBinding(binding, rewriter, loc);
+        resolveBufferDescriptorForInterfaceBinding(*binding, rewriter, loc);
     if (failed(resultDescriptor)) {
       return rewriter.notifyMatchFailure(
           op, "failed to resolve descriptor with source being binding op");
@@ -197,16 +233,16 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     IREE::HAL::InterfaceBindingSubspanOp newBinding;
     if (bindsBasePointer) {
       newBufferType = memRefType;
-      newBinding = binding;
+      newBinding = *binding;
     } else {
       newBufferType = MemRefType::get(
           staticLinearShape, memRefType.getElementType(),
           MemRefLayoutAttrInterface(), memRefType.getMemorySpace());
-      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-      newBinding = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          loc, newBufferType, binding.getLayoutAttr(), binding.getBindingAttr(),
-          zero, dynamicLinearShape, binding.getAlignmentAttr(),
-          binding.getDescriptorFlagsAttr());
+      Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+      newBinding = IREE::HAL::InterfaceBindingSubspanOp::create(
+          rewriter, loc, newBufferType, binding->getLayoutAttr(),
+          binding->getBindingAttr(), zero, dynamicLinearShape,
+          binding->getAlignmentAttr(), binding->getDescriptorFlagsAttr());
     }
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() * 2 + 2);
@@ -215,8 +251,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
       if (newBufferType == baseBufferType) {
         results.push_back(newBinding);
       } else {
-        Value reinterpretCast = rewriter.create<memref::ReinterpretCastOp>(
-            loc, baseBufferType, newBinding, /*offset=*/0,
+        Value reinterpretCast = memref::ReinterpretCastOp::create(
+            rewriter, loc, baseBufferType, newBinding, /*offset=*/0,
             /*sizes=*/ArrayRef<int64_t>(),
             /*strides=*/ArrayRef<int64_t>());
         results.push_back(reinterpretCast);
@@ -237,14 +273,24 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
   }
 };
 
-// Converts IREE::Codegen::ExtractStridedMetadataOp to
-// MemRef::ExtractStridedMetadataOp
-struct ConvertCodegenIREEExtractMetadataToMemRef
+/// Converts iree_codegen.extract_strided_metadata to
+/// memref.extract_strided_metadata. Only applies when the source is NOT from
+/// a HAL binding (those are resolved by
+/// ResolveExtractMetadataFromHalInterfaceBindingSubspan).
+struct ConvertIREECodegenExtractMetadataToMemRef
     : public OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
   using OpRewritePattern<
       IREE::Codegen::ExtractStridedMetadataOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Codegen::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
+    // GUARD: Don't convert back to memref if source is still from HAL binding.
+    // Pattern ResolveExtractMetadataFromHalInterfaceBindingSubspan must
+    // resolve these first to preserve SSA links through buffer binding
+    // optimizations.
+    if (getSourceInterfaceBinding(op.getSource()))
+      return failure();
+
+    // Only convert ops that don't have HAL bindings (or are already resolved).
     rewriter.replaceOpWithNewOp<memref::ExtractStridedMetadataOp>(
         op, op.getSource());
     return success();
@@ -253,8 +299,7 @@ struct ConvertCodegenIREEExtractMetadataToMemRef
 
 struct IREEExpandStridedMetadataPass final
     : impl::IREEExpandStridedMetadataPassBase<IREEExpandStridedMetadataPass> {
-  using impl::IREEExpandStridedMetadataPassBase<
-      IREEExpandStridedMetadataPass>::IREEExpandStridedMetadataPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,
@@ -273,10 +318,24 @@ void populateIREEResolveExtractStridedMetadataPatterns(
     memref::populateResolveExtractStridedMetadataPatterns(patterns);
   }
   amdgpu::populateAmdgpuResolveStridedMetadataPatterns(patterns);
+
+  // NOTE: the pattern benefits below are a secondary defense: each pattern
+  // guards itself and only runs if required so they shouldn't be required but
+  // since we're doing the back-and-forth this helps make it explicit. Ideally
+  // we'd do this in two passes (fully resolve -> convert back to memref for
+  // subsequent passes expecting it).
+
+  // Convert memref extract ops to iree_codegen version to preserve SSA links.
+  patterns.insert<ConvertMemRefExtractMetadataToIREECodegen>(
+      patterns.getContext(), PatternBenefit(1));
+  // Resolve iree_codegen extract ops from HAL bindings to concrete values.
+  // Highest benefit ensures this runs before the fallback conversion.
   patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
-      patterns.getContext());
-  patterns.insert<ConvertCodegenIREEExtractMetadataToMemRef>(
-      patterns.getContext());
+      patterns.getContext(), PatternBenefit(3));
+  // Convert remaining iree_codegen extract ops to memref for upstream
+  // resolution. Lowest benefit ensures HAL binding resolution happens first.
+  patterns.insert<ConvertIREECodegenExtractMetadataToMemRef>(
+      patterns.getContext(), PatternBenefit(0));
 }
 
 void IREEExpandStridedMetadataPass::runOnOperation() {
@@ -291,7 +350,8 @@ void IREEExpandStridedMetadataPass::runOnOperation() {
   if (!allowUnresolved) {
     SmallVector<Operation *> remaining;
     getOperation()->walk([&](Operation *op) {
-      if (isa<memref::ExtractStridedMetadataOp>(op)) {
+      if (isa<memref::ExtractStridedMetadataOp,
+              IREE::Codegen::ExtractStridedMetadataOp>(op)) {
         remaining.push_back(op);
       }
     });

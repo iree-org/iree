@@ -16,9 +16,6 @@ include "mlir/IR/EnumAttr.td"
 // Data layout encoding attributes
 //===---------------------------------------------------------------------===//
 
-class IREEEncoding_Attr<string name, list<Trait> traits = []>
-  : AttrDef<IREEEncoding_Dialect, name, traits>;
-
 class IREEEncoding_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
     : I32EnumAttr<name, summary, cases> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
@@ -30,11 +27,13 @@ class IREEEncoding_EnumAttr<EnumAttrInfo enumInfo, string name = "">
 
 // Enums for tagging operand operation in an EncodingAttr
 def MATMUL : I32EnumAttrCase<"matmul", 0>;
-def CONV   : I32EnumAttrCase<"conv", 1>;
+def SCALED_MATMUL : I32EnumAttrCase<"scaled_matmul", 1>;
+def CONV   : I32EnumAttrCase<"conv", 2>;
 
 def EncodingOpType : IREEEncoding_I32EnumAttr<"EncodingOpType",
     "Tracks the type of operation of the operand.", [
       MATMUL,
+      SCALED_MATMUL,
       CONV,
     ]>;
 
@@ -46,7 +45,7 @@ def EncodingOpTypeAttr:
 //===---------------------------------------------------------------------===//
 
 def LayoutAttr :
-    IREEEncoding_Attr<"Layout", [
+    IREEEncoding_AttrDef<"Layout", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "isIdentityLayout",
@@ -83,7 +82,7 @@ def LayoutAttr :
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
 
-def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
+def PackedStorageAttr : IREEEncoding_AttrDef<"PackedStorage"> {
   let mnemonic = "packed_storage";
   let summary = [{Indicates packed storage data type.}];
   let description = [{
@@ -98,7 +97,7 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 //===---------------------------------------------------------------------===//
 
 def EncodingAttr :
-    IREEEncoding_Attr<"Encoding", [
+    IREEEncoding_AttrDef<"Encoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
@@ -185,71 +184,10 @@ def EncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.matmul_k
-//===---------------------------------------------------------------------===//
-
-def MatmulKAttr : IREEEncoding_Attr<"MatmulK", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
-        "isSerialized",
-        "cloneWithLayouts",
-      ]>,
-      DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
-        "getReductionDims",
-      ]>,
-    ]> {
-  let mnemonic = "matmul_k";
-  let summary = [{An attribute that tracks reduction dimensions for matmul.}];
-  let description = [{
-    The attribute is specialized for tracking the matmul reduction dimensions
-    only. The encoded dimensions are the reduction dimensions that will be
-    further used in a matmul.
-
-    Example: linalg.matmul ins(%lhs, %rhs) outs(%acc), where the indexing maps
-             are:
-
-      lhs: (M, N, K) -> (M, K)
-      rhs: (M, N, K) -> (K, N)
-      acc: (M, N, K) -> (M, N)
-
-    The encoding for the lhs is iree_encoding.matmul_k<k_dims = [1]>.
-    The encoding for the rhs is iree_encoding.matmul_k<k_dims = [0]>.
-    The encoding for the acc is iree_encoding.matmul_k<k_dims = []>.
-
-    Example: linalg.matmul_transpose_b ins(%lhs, %rhs) outs(%acc), where the
-             indexing maps are:
-
-      lhs: (M, N, K) -> (M, K)
-      rhs: (M, N, K) -> (N, K)
-      acc: (M, N, K) -> (M, N)
-
-    The encoding for the lhs is iree_encoding.matmul_k<k_dims = [1]>.
-    The encoding for the rhs is iree_encoding.matmul_k<k_dims = [1]>.
-    The encoding for the acc is iree_encoding.matmul_k<k_dims = []>.
-
-    There is no difference between static cases and dynamic cases because the
-    dimension sizes are not encoded.
-
-    Any encoding propagation that transforms reduction dimensions could result
-    in undefined behavior, because it does not encode the transformations. The
-    information is missing in this context.
-  }];
-
-  let assemblyFormat = "`<` struct(params) `>`";
-
-  let parameters = (ins
-    "DenseI32ArrayAttr":$k_dims
-  );
-
-  let builders = [
-    AttrBuilder<(ins "ArrayRef<int32_t>":$k_dims)>
-  ];
-}
-
-//===---------------------------------------------------------------------===//
 // iree_encoding.padding
 //===---------------------------------------------------------------------===//
 
-def PaddingAttr : IREEEncoding_Attr<"Padding", [
+def PaddingAttr : IREEEncoding_AttrDef<"Padding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "calculateStorageSizeInBytes",
         "cloneWithLayouts",
@@ -301,7 +239,7 @@ def PaddingAttr : IREEEncoding_Attr<"Padding", [
 // iree_encoding.identity
 //===---------------------------------------------------------------------===//
 
-def IdentityAttr : IREEEncoding_Attr<"Identity", [
+def IdentityAttr : IREEEncoding_AttrDef<"Identity", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "calculateStorageSizeInBytes",
         "isIdentityLayout",
@@ -324,10 +262,15 @@ def IdentityAttr : IREEEncoding_Attr<"Identity", [
 //===---------------------------------------------------------------------===//
 
 def IdentityResolverAttr :
-    IREEEncoding_Attr<"IdentityResolver", [
+    IREEEncoding_AttrDef<"IdentityResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutMaterializerAttr, [
+        "convertType",
+        "getOffsetsSizesStrides",
+        "lowerOp",
       ]>
     ]> {
   let mnemonic = "identity_resolver";
@@ -345,7 +288,7 @@ def IdentityResolverAttr :
 //===---------------------------------------------------------------------===//
 
 def UnsupportedResolverAttr :
-    IREEEncoding_Attr<"UnsupportedResolver", [
+    IREEEncoding_AttrDef<"UnsupportedResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
@@ -367,7 +310,7 @@ def UnsupportedResolverAttr :
 //===---------------------------------------------------------------------===//
 
 def TestingAttr :
-    IREEEncoding_Attr<"Testing", [
+    IREEEncoding_AttrDef<"Testing", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
@@ -390,7 +333,7 @@ def TestingAttr :
   let genVerifyDecl = 0;
 }
 
-def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
+def UnknownAttr : IREEEncoding_AttrDef<"Unknown"> {
   let mnemonic = "unknown";
   let summary = [{A pure encoding attribute for testing purpose.}];
 
@@ -402,7 +345,7 @@ def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
 }
 
 def SpecializationResolverAttr :
-    IREEEncoding_Attr<"SpecializationResolver", [
+    IREEEncoding_AttrDef<"SpecializationResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
@@ -430,7 +373,7 @@ def SpecializationResolverAttr :
 }
 
 def SpecializedAttr :
-    IREEEncoding_Attr<"Specialized", [
+    IREEEncoding_AttrDef<"Specialized", [
       IREEEncoding_SerializableAttr
     ]> {
   let mnemonic = "specialized";

@@ -135,7 +135,7 @@ do_build_mlir() {
 
 print_iree_config() {
   llvm_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/llvm"
-  lld_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/lld"
+  lld_cmake_dir="${IREE_BYOLLVM_BUILD_DIR}/llvm/lib/cmake/lld"
   clang_cmake_dir="${IREE_BYOLLVM_INSTALL_DIR}/llvm/lib/cmake/clang"
   mlir_cmake_dir="${IREE_BYOLLVM_BUILD_DIR}/mlir/lib/cmake/mlir"
 

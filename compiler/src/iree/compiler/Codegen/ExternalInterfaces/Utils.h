@@ -65,7 +65,7 @@ public:
   Type convertType(Attribute attr, Type type) const {
     EncodingLayoutAttr layoutAttr = cast<EncodingLayoutAttr>(attr);
     return TypeSwitch<Type, Type>(type)
-        .template Case<RankedTensorType>([&](auto type) {
+        .Case([&](RankedTensorType type) {
           // For a given tensor type with an encoding, return the materialized
           // type to use for it. If no encoding is set, then return the tensor
           // type itself.
@@ -108,16 +108,15 @@ public:
           newShape.append(swizzledTileShape);
           return RankedTensorType::get(newShape, packedType.getElementType());
         })
-        .template Case<IREE::TensorExt::DispatchTensorType>(
-            [&](auto dispatchTensorType) {
-              Type boundType = dispatchTensorType.getBoundType();
-              Type convertedBoundType = convertType(attr, boundType);
-              if (convertedBoundType == boundType) {
-                return dispatchTensorType;
-              }
-              return IREE::TensorExt::DispatchTensorType::get(
-                  dispatchTensorType.getAccess(), convertedBoundType);
-            })
+        .Case([&](IREE::TensorExt::DispatchTensorType dispatchTensorType) {
+          Type boundType = dispatchTensorType.getBoundType();
+          Type convertedBoundType = convertType(attr, boundType);
+          if (convertedBoundType == boundType) {
+            return dispatchTensorType;
+          }
+          return IREE::TensorExt::DispatchTensorType::get(
+              dispatchTensorType.getAccess(), convertedBoundType);
+        })
         .Default([&](auto concreteType) { return concreteType; });
   }
 
@@ -128,17 +127,22 @@ public:
       ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
       SmallVectorImpl<OpFoldResult> &newSizes,
       SmallVectorImpl<OpFoldResult> &newStrides) const {
-    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(attr);
+    auto boundType = dyn_cast<RankedTensorType>(type.getBoundType());
+    if (!boundType || !boundType.getEncoding()) {
+      return failure();
+    }
+
     // Only handle cases where the slice spans the whole
     // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(jornt): Enable partial slices.
     if (!type.doesSliceSpanWholeTensor(dynamicDims, offsets, sizes, strides)) {
       return failure();
     }
-    auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
+
+    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(attr);
     IREE::Codegen::MaterializeEncodingInfo encodingInfo =
-        getEncodingInfoFromLayout(boundTensorType, layoutAttr);
-    newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
+        getEncodingInfoFromLayout(boundType, layoutAttr);
+    newSizes = getMixedValues(boundType.getShape(), dynamicDims, builder);
     FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
         getPackedDimsForDispatchTensorImpl(builder, loc, type, dynamicDims,
                                            layoutAttr, encodingInfo);
@@ -176,6 +180,22 @@ DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
 /// in the `dictAttr`.
 void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
                              DictionaryAttr dictAttr, StringRef name);
+
+/// Returns a `linalg.fill` operation with provided operands, which are assumed
+/// to have types without encodings.
+Operation *lowerFillOpWithResolvedLayouts(OpBuilder &builder,
+                                          linalg::FillOp fillOp,
+                                          TypeRange convertedResTypes,
+                                          ValueRange convertedOperands);
+
+/// Converts a linalg::GenericOp with encoded inputs into the packed domain,
+/// with an optional swizzle expansion and permutation if applicable. The
+/// `genericOp` must have all parallel iterator types and a single output with
+/// an identity indexing map.
+Operation *lowerGenericOpWithResolvedLayouts(
+    OpBuilder &builder, linalg::GenericOp genericOp,
+    TypeRange convertedResTypes, ValueRange convertedOperands,
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr);
 
 } // namespace mlir::iree_compiler::IREE
 

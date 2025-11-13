@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -32,15 +33,16 @@ namespace mlir::iree_compiler {
 
 static bool accGemmToGemmPrecondition(Operation *op) {
   if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
-    return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr>(
-        innerTiledOp.getKind());
+    return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr,
+               IREE::GPU::DataTiledMMAInterfaceAttr>(innerTiledOp.getKind());
   }
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) {
     return false;
   }
   if (!linalg::isaContractionOpInterface(linalgOp) &&
-      !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
+      !isa<linalg::ConvolutionOpInterface>(*linalgOp) &&
+      !IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
     return false;
   }
   if (!linalgOp.hasPureTensorSemantics()) {
@@ -80,27 +82,28 @@ static void convertAccGemmToGemm(RewriterBase &rewriter,
   // contraction op.
   SmallVector<OpFoldResult> mixedSizes =
       tensor::getMixedSizes(rewriter, loc, outputOperand);
-  Value initOp = rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
-  Value zero = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(elementType));
-  Value fill = rewriter.create<linalg::FillOp>(loc, zero, initOp).result();
+  Value initOp =
+      tensor::EmptyOp::create(rewriter, loc, mixedSizes, elementType);
+  Value zero = arith::ConstantOp::create(rewriter, loc,
+                                         rewriter.getZeroAttr(elementType));
+  Value fill = linalg::FillOp::create(rewriter, loc, zero, initOp).result();
 
   // Update the contraction op to use the new zero tensor as output operand.
   rewriter.modifyOpInPlace(dpsOp, [&]() { dpsOp.setDpsInitOperand(0, fill); });
 
   // Create a generic op to add back the original output tensor operand.
   rewriter.setInsertionPointAfter(dpsOp);
-  auto genericOp = rewriter.create<linalg::GenericOp>(
-      loc, outputType, ValueRange{dpsOp->getResult(0), outputOperand},
+  auto genericOp = linalg::GenericOp::create(
+      rewriter, loc, outputType, ValueRange{dpsOp->getResult(0), outputOperand},
       ValueRange{initOp}, maps, iterators,
       [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
         Value result;
         if (llvm::isa<FloatType>(elementType)) {
-          result = b.create<arith::AddFOp>(nestedLoc, args[0], args[1]);
+          result = arith::AddFOp::create(b, nestedLoc, args[0], args[1]);
         } else {
-          result = b.create<arith::AddIOp>(nestedLoc, args[0], args[1]);
+          result = arith::AddIOp::create(b, nestedLoc, args[0], args[1]);
         }
-        b.create<linalg::YieldOp>(nestedLoc, result);
+        linalg::YieldOp::create(b, nestedLoc, result);
       });
   dpsOp->getResult(0).replaceAllUsesExcept(genericOp->getResult(0), genericOp);
 }

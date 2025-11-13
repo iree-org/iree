@@ -92,3 +92,91 @@ func.func @tensor_barrier_multiple_inputs(%input: tensor<?xf16>) -> (tensor<?xf1
 // CHECK-LABEL: func @tensor_barrier_multiple_inputs
 //  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: tensor<?xf16>
 //       CHECK:   iree_gpu.value_barrier %[[INPUT]], %[[INPUT]] : tensor<?xf16>, tensor<?xf16>
+
+// -----
+
+// Test basic coalesced_gather_dma with static shapes
+// indices: 64x32 = 2048 elements, dest: 64x32xf32 = 2048 * 4 bytes = 8192 bytes, ratio = 8192/2048 = 4
+func.func @coalesced_gather_dma_static(%indices: tensor<64x32xindex>, %source: tensor<1024x64xf32>, %dest: tensor<64x32xf32>) -> tensor<64x32xf32> {
+  %c1 = arith.constant 1 : index
+  %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64x32xf32>) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
+    }
+  }
+  return %result : tensor<64x32xf32>
+}
+
+// CHECK-LABEL: func @coalesced_gather_dma_static
+//  CHECK-SAME:   %[[INDICES:[A-Za-z0-9]+]]: tensor<64x32xindex>
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: tensor<1024x64xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<64x32xf32>
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[INDICES]], %[[SOURCE]] into %{{.+}} : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
+
+// -----
+
+// Test coalesced_gather_dma with dynamic shapes
+func.func @coalesced_gather_dma_dynamic(%indices: tensor<?x?xindex>, %source: tensor<?x?xf32>, %dest: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c1 = arith.constant 1 : index
+  %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<?x?xf32>) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<?x?xindex>, tensor<?x?xf32>, tensor<?x?xf32> -> tensor<?x?xf32>
+    }
+  }
+  return %result : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func @coalesced_gather_dma_dynamic
+//  CHECK-SAME:   %[[INDICES:[A-Za-z0-9]+]]: tensor<?x?xindex>
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<?x?xf32>
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[INDICES]], %[[SOURCE]] into %{{.+}} : tensor<?x?xindex>, tensor<?x?xf32>, tensor<?x?xf32> -> tensor<?x?xf32>
+
+// -----
+
+func.func @coalesced_gather_dma_f16(%indices: tensor<128x64xindex>, %source: tensor<2048x64xf16>, %dest: tensor<128x64xf16>) -> tensor<128x64xf16> {
+  %c1 = arith.constant 1 : index
+  %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<128x64xf16>) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<128x64xindex>, tensor<2048x64xf16>, tensor<128x64xf16> -> tensor<128x64xf16>
+    }
+  }
+  return %result : tensor<128x64xf16>
+}
+
+// CHECK-LABEL: func @coalesced_gather_dma_f16
+//  CHECK-SAME:   %[[INDICES:[A-Za-z0-9]+]]: tensor<128x64xindex>
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: tensor<2048x64xf16>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<128x64xf16>
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[INDICES]], %[[SOURCE]] into %{{.+}} : tensor<128x64xindex>, tensor<2048x64xf16>, tensor<128x64xf16> -> tensor<128x64xf16>
+
+// -----
+
+func.func @coalesced_gather_dma_1d(%indices: tensor<32xindex>, %source: tensor<1024xf32>, %dest: tensor<1024xf32>) -> tensor<1024xf32> {
+  %c32 = arith.constant 32 : index
+  %result = scf.forall (%i) in (%c32) shared_outs(%out = %dest) -> (tensor<1024xf32>) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<32xindex>, tensor<1024xf32>, tensor<1024xf32> -> tensor<1024xf32>
+    }
+  }
+  return %result : tensor<1024xf32>
+}
+
+// CHECK-LABEL: func @coalesced_gather_dma_1d
+//  CHECK-SAME:   %[[INDICES:[A-Za-z0-9]+]]: tensor<32xindex>
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: tensor<1024xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<1024xf32>
+//       CHECK:   %[[C32:.+]] = arith.constant 32 : index
+//       CHECK:   scf.forall (%{{.+}}) in (%[[C32]])
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[INDICES]], %[[SOURCE]] into %{{.+}} : tensor<32xindex>, tensor<1024xf32>, tensor<1024xf32> -> tensor<1024xf32>

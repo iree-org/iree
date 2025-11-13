@@ -1,33 +1,31 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-propagate-encodings))" --split-input-file %s | FileCheck %s
 
-#encoding = #iree_encoding.matmul_k<k_dims = [1]>
-util.func public @propagate_encoding_through_collapse_shape(%src: tensor<2x4096x640xf16>) -> tensor<8192x640xf16, #encoding> {
-  %collapsed = tensor.collapse_shape %src [[0, 1], [2]] : tensor<2x4096x640xf16> into tensor<8192x640xf16>
-  %0 = iree_encoding.set_encoding %collapsed : tensor<8192x640xf16> -> tensor<8192x640xf16, #encoding>
-  util.return %0 : tensor<8192x640xf16, #encoding>
+#encoding = #iree_encoding.layout<[#iree_encoding.testing<[]>]>
+util.func @propagate_encoding_through_tensor_cast(%src: tensor<1024x?xf16>) -> tensor<?x512xf16, #encoding> {
+  %cast = tensor.cast %src : tensor<1024x?xf16> to tensor<?x512xf16>
+  %0 = iree_encoding.set_encoding %cast : tensor<?x512xf16> -> tensor<?x512xf16, #encoding>
+  util.return %0 : tensor<?x512xf16, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
-// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.matmul_k<k_dims = [2]>
-// CHECK-LABEL: @propagate_encoding_through_collapse_shape(
+
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.layout{{.*}}
+// CHECK-LABEL: @propagate_encoding_through_tensor_cast(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
-// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]] : tensor<2x4096x640xf16> -> tensor<2x4096x640xf16, #[[$ENCODING1]]>
-// CHECK:         %[[COLLAPSED:.+]] = tensor.collapse_shape %[[SET_ENCODING]] {{\[}}[0, 1], [2]] : tensor<2x4096x640xf16, #[[$ENCODING1]]> into tensor<8192x640xf16, #[[$ENCODING0]]>
-// CHECK:         util.return %[[COLLAPSED]]
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]] : tensor<1024x?xf16> -> tensor<1024x?xf16, #[[$ENCODING]]>
+// CHECK:         %[[CAST:.+]] = tensor.cast %[[SET_ENCODING]] : tensor<1024x?xf16, #[[$ENCODING]]> to tensor<?x512xf16, #[[$ENCODING]]>
+// CHECK:         util.return %[[CAST]]
 
 // -----
 
-#encoding = #iree_encoding.matmul_k<k_dims = [1]>
-util.func public @propagate_encoding_through_collapse_shape_chain(%src: tensor<2x4096x64x10xf16>) -> tensor<8192x640xf16, #encoding> {
-  %collapsed = tensor.collapse_shape %src [[0], [1], [2, 3]] : tensor<2x4096x64x10xf16> into tensor<2x4096x640xf16>
-  %collapsed_0 = tensor.collapse_shape %collapsed [[0, 1], [2]] : tensor<2x4096x640xf16> into tensor<8192x640xf16>
-  %0 = iree_encoding.set_encoding %collapsed_0 : tensor<8192x640xf16> -> tensor<8192x640xf16, #encoding>
-  util.return %0 : tensor<8192x640xf16, #encoding>
+#encoding = #iree_encoding.layout<[#iree_encoding.testing<>]>
+util.func @dont_propagate_unserialized_layout(%src: tensor<1024x?xf16>) -> tensor<?x512xf16, #encoding> {
+  %cast = tensor.cast %src : tensor<1024x?xf16> to tensor<?x512xf16>
+  %0 = iree_encoding.set_encoding %cast : tensor<?x512xf16> -> tensor<?x512xf16, #encoding>
+  util.return %0 : tensor<?x512xf16, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING0:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
-// CHECK-DAG:   #[[$ENCODING1:.+]] = #iree_encoding.matmul_k<k_dims = [2]>
-// CHECK-LABEL: @propagate_encoding_through_collapse_shape_chain(
+
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.layout{{.*}}
+// CHECK-LABEL: @dont_propagate_unserialized_layout(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
-// CHECK:         %[[COLLAPSED_0:.+]] = tensor.collapse_shape %[[SRC]] {{\[}}[0], [1], [2, 3]] : tensor<2x4096x64x10xf16> into tensor<2x4096x640xf16>
-// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[COLLAPSED_0]] : tensor<2x4096x640xf16> -> tensor<2x4096x640xf16, #[[$ENCODING1]]>
-// CHECK:         %[[COLLAPSED_1:.+]] = tensor.collapse_shape %[[SET_ENCODING]] {{\[}}[0, 1], [2]] : tensor<2x4096x640xf16, #[[$ENCODING1]]> into tensor<8192x640xf16, #[[$ENCODING0]]>
-// CHECK:         util.return %[[COLLAPSED_1]]
+// CHECK:         %[[CAST:.+]] = tensor.cast %[[SRC]] : tensor<1024x?xf16> to tensor<?x512xf16>
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[CAST]] : tensor<?x512xf16> -> tensor<?x512xf16, #[[$ENCODING]]>
+// CHECK:         util.return %[[SET_ENCODING]]

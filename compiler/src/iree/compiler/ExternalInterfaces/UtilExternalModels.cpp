@@ -190,15 +190,14 @@ struct GlobalOpInterfaceExternalModel
     auto globalOp = cast<ml_program::GlobalOp>(op);
     if (globalOp.getIsMutable()) {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadOp::create(builder, loc, globalOp.getType(),
+                                           FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     } else {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadConstOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadConstOp::create(
+              builder, loc, globalOp.getType(),
+              FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     }
   }
@@ -208,9 +207,8 @@ struct GlobalOpInterfaceExternalModel
                                                    OpBuilder &builder) const {
     auto globalOp = cast<ml_program::GlobalOp>(op);
     return cast<IREE::Util::GlobalStoreOpInterface>(
-        builder
-            .create<ml_program::GlobalStoreOp>(
-                loc, FlatSymbolRefAttr::get(globalOp), value)
+        ml_program::GlobalStoreOp ::create(
+            builder, loc, FlatSymbolRefAttr::get(globalOp), value)
             .getOperation());
   }
 };
@@ -448,33 +446,12 @@ void registerUtilExternalModels(DialectRegistry &registry) {
             >::registerOpInterface(context);
       });
 
-  // TODO(matthias-springer): Use a helper instead of listing all ops. This is
-  // tricky because LinalgExtOps.td includes YieldOp.
   registry.addExtension(+[](MLIRContext *context,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-    IREE::LinalgExt::ScatterOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::ScatterOp>>(*context);
-    IREE::LinalgExt::SortOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::SortOp>>(*context);
-    IREE::LinalgExt::FftOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::FftOp>>(*context);
-    IREE::LinalgExt::ScanOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::ScanOp>>(*context);
-    IREE::LinalgExt::TopkOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::TopkOp>>(*context);
-    IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(
-        *context);
-    IREE::LinalgExt::WinogradFilterTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradFilterTransformOp>>(
-        *context);
-    IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(
-        *context);
-    IREE::LinalgExt::Im2colOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::Im2colOp>>(*context);
-    IREE::LinalgExt::AttentionOp::attachInterface<
-        LinalgOpTiedOpInterface<IREE::LinalgExt::AttentionOp>>(*context);
+    LinalgOpTiedOpInterfaceHelper<
+#define GET_OP_LIST
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
+        >::registerOpInterface(context);
   });
 
   // Hoistable Op Interface registration.

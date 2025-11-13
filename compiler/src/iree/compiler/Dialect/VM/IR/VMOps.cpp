@@ -11,6 +11,7 @@
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/MD5.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -423,56 +424,56 @@ Block *InitializerOp::addBlock() {
 
 IREE::Util::GlobalLoadOpInterface
 GlobalI32Op::createLoadOp(Location loc, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalLoadI32Op>(loc, builder.getI32Type(),
-                                                   getGlobalName());
+  return IREE::VM::GlobalLoadI32Op::create(builder, loc, builder.getI32Type(),
+                                           getGlobalName());
 }
 IREE::Util::GlobalStoreOpInterface
 GlobalI32Op::createStoreOp(Location loc, Value value, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalStoreI32Op>(loc, value,
-                                                    getGlobalName());
+  return IREE::VM::GlobalStoreI32Op::create(builder, loc, value,
+                                            getGlobalName());
 }
 
 IREE::Util::GlobalLoadOpInterface
 GlobalI64Op::createLoadOp(Location loc, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalLoadI64Op>(loc, builder.getI64Type(),
-                                                   getGlobalName());
+  return IREE::VM::GlobalLoadI64Op::create(builder, loc, builder.getI64Type(),
+                                           getGlobalName());
 }
 IREE::Util::GlobalStoreOpInterface
 GlobalI64Op::createStoreOp(Location loc, Value value, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalStoreI64Op>(loc, value,
-                                                    getGlobalName());
+  return IREE::VM::GlobalStoreI64Op::create(builder, loc, value,
+                                            getGlobalName());
 }
 
 IREE::Util::GlobalLoadOpInterface
 GlobalF32Op::createLoadOp(Location loc, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalLoadF32Op>(loc, builder.getF32Type(),
-                                                   getGlobalName());
+  return IREE::VM::GlobalLoadF32Op::create(builder, loc, builder.getF32Type(),
+                                           getGlobalName());
 }
 IREE::Util::GlobalStoreOpInterface
 GlobalF32Op::createStoreOp(Location loc, Value value, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalStoreF32Op>(loc, value,
-                                                    getGlobalName());
+  return IREE::VM::GlobalStoreF32Op::create(builder, loc, value,
+                                            getGlobalName());
 }
 
 IREE::Util::GlobalLoadOpInterface
 GlobalF64Op::createLoadOp(Location loc, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalLoadF64Op>(loc, builder.getF64Type(),
-                                                   getGlobalName());
+  return IREE::VM::GlobalLoadF64Op::create(builder, loc, builder.getF64Type(),
+                                           getGlobalName());
 }
 IREE::Util::GlobalStoreOpInterface
 GlobalF64Op::createStoreOp(Location loc, Value value, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalStoreF64Op>(loc, value,
-                                                    getGlobalName());
+  return IREE::VM::GlobalStoreF64Op::create(builder, loc, value,
+                                            getGlobalName());
 }
 
 IREE::Util::GlobalLoadOpInterface
 GlobalRefOp::createLoadOp(Location loc, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalLoadRefOp>(loc, getType(),
-                                                   getSymName());
+  return IREE::VM::GlobalLoadRefOp::create(builder, loc, getType(),
+                                           getSymName());
 }
 IREE::Util::GlobalStoreOpInterface
 GlobalRefOp::createStoreOp(Location loc, Value value, OpBuilder &builder) {
-  return builder.create<IREE::VM::GlobalStoreRefOp>(loc, value, getSymName());
+  return IREE::VM::GlobalStoreRefOp::create(builder, loc, value, getSymName());
 }
 
 template <typename T>
@@ -826,9 +827,11 @@ void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 // This is not uniqued and may need uniquing before being added to the symbol
 // table.
 //
+// Uses MD5 to ensure the hash suffix is stable across builds.
+//
 // For example:
-//   'Some string!' -> '_utf8_some_string'
-//   'I'm a really long'... -> '_utf8_im_a_really_long'
+//   'Some string!' -> '_utf8_some_string_<MD5>'
+//   'I'm a really long'... -> '_utf8_im_a_really_long_<MD5>'
 static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
   std::string result = "_utf8_";
   llvm::raw_string_ostream os(result);
@@ -848,8 +851,11 @@ static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
   if (!StringRef(prefix).ends_with("_")) {
     prefix += "_";
   }
-  return prefix + llvm::utohexstr(static_cast<uint64_t>(
-                      llvm::hash_value(unsafeIdentifier)));
+  // Use MD5 for a stable hash across builds.
+  llvm::MD5 hasher;
+  hasher.update(unsafeIdentifier);
+  llvm::MD5::MD5Result hash = hasher.final();
+  return prefix + llvm::utohexstr(hash.low());
 }
 
 void RodataInlineOp::build(OpBuilder &builder, OperationState &result,

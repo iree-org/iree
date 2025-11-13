@@ -15,7 +15,6 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
@@ -199,7 +198,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
     }
     numWorkgroups.push_back(numTileAlongDim);
   }
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
   numWorkgroups.resize(workgroupCountOp.getNumResults(), one);
   rewriter.replaceOp(workgroupCountOp, numWorkgroups);
   return success();
@@ -268,8 +267,7 @@ namespace {
 struct TileAndDistributeToWorkgroupsPass final
     : impl::TileAndDistributeToWorkgroupsPassBase<
           TileAndDistributeToWorkgroupsPass> {
-  using impl::TileAndDistributeToWorkgroupsPassBase<
-      TileAndDistributeToWorkgroupsPass>::TileAndDistributeToWorkgroupsPassBase;
+  using Base::Base;
 
   TileAndDistributeToWorkgroupsPass(
       int32_t maxWorkgroupParallelDims,
@@ -291,7 +289,7 @@ struct TileAndDistributeToWorkgroupsPass final
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   {
     RewritePatternSet patterns(context);
@@ -366,7 +364,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // Check if tile sizes are deduced from the configuration. If so use
     // those.
     return llvm::map_to_vector(tileSizes, [&](int64_t ts) -> Value {
-      return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
+      return arith::ConstantIndexOp::create(builder, op->getLoc(), ts);
     });
   };
 

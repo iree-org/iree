@@ -30,7 +30,8 @@ def IREEGPU_LoweringConfigAttr :
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
         "getLoweringStrategy",
-      ]>
+        "getWorkgroupReorderingStrategy"
+    ]>
     ]> {
   let mnemonic = "lowering_config";
   let summary = [{Drive lowering of an operation for gpu compilation.}];
@@ -110,14 +111,14 @@ def IREEGPU_PromoteWithCacheSwizzle :
     swizzle inserted if possible. For example,
 
     ```
-    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
     %1 = linalg.matmul ins(%0, ...)
     ```
 
     Becomes with `#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>`
 
     ```
-    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
     %1 = iree_gpu.buffer_resource_cast cache_swizzle(8192)
     %2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
     %3 = linalg.matmul ins(%2, ...)
@@ -160,6 +161,33 @@ def IREEGPU_DotProductOpsAttr : EnumAttr<
   IREEGPU_Dialect, IREEGPU_DotProductOps, "dotproduct_ops"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
   let assemblyFormat = "$value";
+}
+
+//===----------------------------------------------------------------------===//
+// InnerTiledSemantics
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_InnerTiledSemanticsAttr
+    : AttrDef<
+          IREEGPU_Dialect, "InnerTiledSemantics",
+          [DeclareAttrInterfaceMethods<
+               IREECodegen_InnerTiledSemanticsAttrInterface, ["getTileShapes",
+                                                              "getOpaque"]>,
+]> {
+  let mnemonic = "mma_semantics";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    Attribute describing aspects of MMA semantics that are orthogonal to the
+    aspects described in the mma_layout attrs, and that may change during
+    lowerings while the mma_layout's typically stay constant. This includes:
+    1. Expanded vs opaque tile shapes.
+    2. Distributed vs undistributed tile shapes.
+  }];
+
+  let parameters = (ins "bool":$distributed, "bool":$opaque);
+
+  let assemblyFormat = "`<` struct(params) `>`";
 }
 
 //===----------------------------------------------------------------------===//
@@ -231,8 +259,83 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// DataTiled MMA Attributes
+//===----------------------------------------------------------------------===//
+
+/// Helper class to define common interface method implementations for the
+/// InnerTileDescAttrInterface based on the DataTiledMMAInterfaceAttr.
+class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits = []> :
+    AttrDef<IREEGPU_Dialect, mnemonic, !listconcat(traits, [
+      DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+        "getUndistributedTileTypes",
+        "getDistributedTileTypes",
+        "getUndistributedTileDimExpansion",
+        "populateOperandOffsetsSizesStrides",
+        "getDistributionMappingKind",
+        "getDistributionWorkerCount",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEGPU_DataTiledMMAInterfaceAttr, [
+        "getTileSwizzle",
+        "getTileMNK",
+        "getElementTypes",
+        "getSubgroupSize",
+        "getFlatWorkgroupSize",
+      ]>
+  ])> {
+
+  let extraClassDefinition = [{
+    //========================================================================//
+    // Define interface methods for InnerTileDescAttrInterface with shared
+    // implementation among DataTiledMMAInterfaceAttr. The implementations
+    // are defined in IREEGPUInterfaces.cpp.
+    //========================================================================//
+
+    void $cppClass::getUndistributedTileTypes(
+        SmallVectorImpl<VectorType>& result) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getUndistributedTileTypes(result);
+    }
+
+    void $cppClass::getDistributedTileTypes(
+        SmallVectorImpl<VectorType>& result) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getDistributedTileTypes(result);
+    }
+
+    std::optional<::mlir::SmallVector<int64_t, 2>>
+    $cppClass::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                                int64_t logicalDim) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getUndistributedTileDimExpansion(operandIndex, logicalDim);
+    }
+
+    LogicalResult $cppClass::populateOperandOffsetsSizesStrides(
+        OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+        ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+        SmallVectorImpl<OpFoldResult> &sizes,
+        SmallVectorImpl<OpFoldResult> &strides) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .populateOperandOffsetsSizesStrides(builder, loc, operandIndex,
+                                              laneId, permutation, offsets,
+                                              sizes, strides);
+    }
+
+    Attribute $cppClass::getDistributionMappingKind() const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getDistributionMappingKind();
+    }
+
+    OpFoldResult $cppClass::getDistributionWorkerCount(
+        OpBuilder &builder, Location loc, Operation *opToDistribute) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getDistributionWorkerCount(builder, loc, opToDistribute);
+    }
+  }];
+}
+
 def IREEGPU_DataTiledMMAAttr :
-    AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
+    IREEGPU_DataTiledMMAInnerTileDescAttr<"DataTiledMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getSubgroupSize",
   ]>,
@@ -240,11 +343,6 @@ def IREEGPU_DataTiledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
-    "getUndistributedTileTypes",
-    "getDistributedTileTypes",
-    "populateOperandOffsetsSizesStrides",
-    "getDistributionMappingKind",
-    "getDistributionWorkerCount",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -261,18 +359,93 @@ def IREEGPU_DataTiledMMAAttr :
     wider "kernels" consisting of multiple intrinsics, with the data layout
     already swizzled into a tile layout that allows each intrinsic to access
     data at an offset that's as simple as possible a mapping from the thread ID.
+
+    For intrinsics_k, the extra unrolling dimension is interleaved along the
+    innermost non-internal dimension of the swizzled shape. This means the
+    unrolled K dimension will be the innermost non-internal dimension of the
+    swizzled shape.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
 
-  let parameters = (ins
-    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
-  );
+  let parameters = (ins EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Intrinsic count along the M dimension.">:$intrinsics_m,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the M dimension.">:$subgroups_m,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Intrinsic count along the N dimension.">:$intrinsics_n,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the N dimension.">:$subgroups_n,
+      DefaultValuedParameter<"int64_t", "1",
+                             "Intrinsic count along the K dimension, with "
+                             "interleaved layout.">:$intrinsics_k,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the K dimension.">:$subgroups_k);
+}
+
+def IREEGPU_DataTiledScaledMMAAttr :
+    IREEGPU_DataTiledMMAInnerTileDescAttr<"DataTiledScaledMMA", [
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "getExpectedNumOutputs",
+    "verifyIndexingMaps",
+    "buildUnderlyingOperations"
+  ]>
+]> {
+  let mnemonic = "data_tiled_scaled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    This mma variant represents scaled MMA ops with data-tiling details. The
+    |intrinsic| field specifies which particular scaled MMA intrinsic is
+    targeted by the data-tiling.
+
+    The |lhs_elem_type|, |rhs_elem_type|, and |acc_elem_type| fields specify the
+    element types of the LHS, RHS, and ACC operands respectively. The element
+    types for the scales operands are always Float8E8M0FNUType, so they are not
+    specified on the attribute.
+
+    The other fields default to one, and that default results in a single
+    intrinsic, while values greater than one result in wider "kernels"
+    consisting of multiple intrinsic instructions, with the data layout already
+    swizzled into a tile layout that allows each intrinsic to access data at an
+    offset that's as simple as possible a mapping from the thread ID.
+
+    For intrinsics_k, the extra unrolling dimension is interleaved along the
+    innermost dimension for the scales operands, meaning this dimension will
+    become the innermost dimension of the swizzled shape. For non-scales
+    operands, the intrinsics_k dimension is not interleaved at all.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
+      "::mlir::Type":$lhs_elem_type, "::mlir::Type":$rhs_elem_type,
+      "::mlir::Type":$acc_elem_type,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Intrinsic count along the M dimension.">:$intrinsics_m,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the M dimension.">:$subgroups_m,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Intrinsic count along the N dimension.">:$intrinsics_n,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the N dimension.">:$subgroups_n,
+      DefaultValuedParameter<"int64_t", "1",
+                             "Intrinsic count along the K dimension, with "
+                             "interleaved layout.">:$intrinsics_k,
+      DefaultValuedParameter<
+                        "int64_t", "1",
+                        "Subgroup count along the K dimension.">:$subgroups_k);
 }
 
 def IREEGPU_VirtualMMAIntrinsicAttr
@@ -391,6 +564,13 @@ def IREEGPU_ScaledMMAAttr :
     static SmallVector<Type> getSupportedInputTypes(MLIRContext *ctx);
     static SmallVector<Type> getSupportedOutputTypes(MLIRContext *ctx);
 
+    /// For scaled MFMA intrinsics, the scales are packed into a 32 bit register.
+    /// Since scales are 8 bits, the intrinsic takes a vector of 4 scales, along
+    /// with a selector to indicate which scale is used.
+    int64_t getScalesVectorSize() const {
+      return 4;
+    }
+
     // Return the number of elements per shared scale.
     int64_t getBlockSize() const;
 
@@ -412,28 +592,6 @@ def IREEGPU_ScaledMMAAttr :
       return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};
     }
   }];
-}
-
-//===----------------------------------------------------------------------===//
-// MMA schedule
-//===----------------------------------------------------------------------===//
-
-def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
-  let mnemonic = "mma_schedule";
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-
-  string description = [{
-    A schedule of MMA intrinsic instruction and various levels of tile sizes
-    to solve a specific contraction problem.
-  }];
-
-  let parameters = (ins
-    "::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface":$intrinsic,
-    "int64_t":$subgroup_m_count,
-    "int64_t":$subgroup_n_count
-  );
-
-  let assemblyFormat = "`<` struct(params) `>`";
 }
 
 //===----------------------------------------------------------------------===//
@@ -531,6 +689,8 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     OptionalParameter<"std::optional<int32_t>">:$simds_per_wgp,
     // VGPR register space size in bits. TODO(#18849): populate on all GPUs.
     OptionalParameter<"std::optional<int32_t>">:$vgpr_space_bits,
+    // Available bit-widths for direct load from global to LDS memory.
+    OptionalParameter<"DenseI64ArrayAttr">:$dma_sizes,
 
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
@@ -678,23 +838,54 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
 }
 
 //===---------------------------------------------------------------------===//
-// iree_gpu.ukernel_config
+// Conditional Transpose Workgroup Reordering
 //===---------------------------------------------------------------------===//
 
-def IREEGPU_UKernelConfigAttr  :
-    AttrDef<IREEGPU_Dialect, "UKernelConfig", []> {
-  let mnemonic = "ukernel_config";
-  let summary = [{An attribute specifying a ukernel that an op can lower to.}];
+def IREEGPU_ConditionalTransposeAttr  :
+    AttrDef<IREEGPU_Dialect, "ConditionalTranspose", [
+    DeclareAttrInterfaceMethods<IREECodegen_WorkgroupReorderingAttrInterface, [
+        "generateLoopHeaderFn",
+        "generateLoopTerminatorFn"
+      ]>
+    ]> {
+  let mnemonic = "conditional_transpose";
+  let summary = [{Enable or disable transposed workgroup reordering based on the workload.}];
   let description = [{
-    An attribute that can be applied to any operation to specify that it has
-    been matched with a ukernel that is a legal lowering for it.
+    This attribute controls conditional transposed workgroup reordering, determined by tile size and
+    the number of CUs. This strategy is specifically designed to optimize the ping-pong matmul specialization.
+    At each iteration over the K dimension, `X` distinct tiles for RHS and 'Y' distinct tiles for LHS are loaded.
+    The strategy compares the sum of X and Y for the default ordering versus the transposed ordering, and selects
+    the configuration with the minimum value.
+    Calculation breakdown:
+     - LHS shape: (M, K)
+     - RHS shape: (N, K)
+     - Tile dimension: (tileM, tileN)
+     - numTileLoadsDefault = min(numCUS, ceildiv(N, tileN)) + ceildiv(numCUS, min(numCUS, ceildiv(N, tileN)))
+     - numTileLoadsTransposed = min(numCUS, ceildiv(M, tileM)) + ceildiv(numCUS, min(numCUS, ceildiv(M, tileM)))
+
+     Examples for gfx942 (304 CUs):
+     - (M=8192, N=128256, K=4096) (tileM=256, tileN=256)
+      - numTileLoadsDefault = 304 + ceildiv(304, 304) = 305
+      - numTileLoadsTransposed = 32 + ceildiv(304, 32) = 42
+      => numTileLoadsTransposed < numTileLoadsDefault => enable transpose
+
+     - (M=16384, N=8192, K=4096) (tileM=256, tileN=256)
+      - numTileLoadsDefault = 32 + ceildiv(304, 32) = 42
+      - numTileLoadsTransposed = 64 + ceildiv(304, 64) = 69
+      numTileLoadsTransposed > numTileLoadsDefault => disable transpose
+
+      Parameters:
+        - numXCDs: Number of XCDs.
+        - numCUs: Number of CUs per XCD.
   }];
-  let assemblyFormat = "`<` struct(params) `>`";
   let parameters = (ins
-       "StringAttr":$name,
-       "DictionaryAttr":$def_attrs,
-       DefaultValuedParameter<"int64_t", "0", "Size in bytes of shared memory workspace">:$shared_memory_bytes
+    AttrParameter<"int64_t", "">:$numXCDs,
+    AttrParameter<"int64_t", "">:$numCUs
   );
+  let assemblyFormat = [{
+    `<` $numXCDs `,` $numCUs `>`
+  }];
+  let genVerifyDecl = 1;
 }
 
 //===----------------------------------------------------------------------===//

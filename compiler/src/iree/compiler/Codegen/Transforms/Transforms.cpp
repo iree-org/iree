@@ -22,7 +22,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/Presburger/IntegerRelation.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -131,11 +130,11 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     OpBuilder::InsertionGuard g(builder);
     builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
     Value allocation =
-        builder.create<AllocLikeOpType>(loc, allocLikeType, alignmentAttr);
+        AllocLikeOpType::create(builder, loc, allocLikeType, alignmentAttr);
     if (std::is_same<AllocLikeOpType, memref::AllocOp>::value) {
       builder.setInsertionPoint(
           funcOp.getFunctionBody().front().getTerminator());
-      builder.create<memref::DeallocOp>(loc, allocation);
+      memref::DeallocOp::create(builder, loc, allocation);
     }
     return allocation;
   }
@@ -164,7 +163,7 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
       }
 
       if (!vscale)
-        vscale = builder.create<vector::VectorScaleOp>(loc);
+        vscale = vector::VectorScaleOp::create(builder, loc);
       return affine::materializeComputedBound(
           builder, loc, ub->map, {std::make_pair(vscale, std::nullopt)});
     }
@@ -217,26 +216,26 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     dispatchIndexOpFoldResults(allocSizes, dynamicSizes, staticShape);
     auto allocationType = allocLikeType.clone(staticShape);
 
-    allocation = builder.create<AllocLikeOpType>(loc, allocationType,
-                                                 dynamicSizes, alignmentAttr);
+    allocation = AllocLikeOpType::create(builder, loc, allocationType,
+                                         dynamicSizes, alignmentAttr);
   }
 
   SmallVector<OpFoldResult> offsets(allocLikeType.getRank(),
                                     builder.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(allocLikeType.getRank(),
                                     builder.getIndexAttr(1));
-  Value subviewOp = builder.create<memref::SubViewOp>(loc, allocation, offsets,
-                                                      subviewSizes, strides);
+  Value subviewOp = memref::SubViewOp::create(builder, loc, allocation, offsets,
+                                              subviewSizes, strides);
 
   // Cast it back to the original types to prevent consumer op's verification
   // error. It could happen when the consumer op is a memref.subview op.
   if (subviewOp.getType() != allocLikeType) {
-    subviewOp = builder.create<memref::CastOp>(loc, allocLikeType, subviewOp);
+    subviewOp = memref::CastOp::create(builder, loc, allocLikeType, subviewOp);
   }
 
   if (std::is_same<AllocLikeOpType, memref::AllocOp>::value) {
     builder.setInsertionPoint(funcOp.getFunctionBody().front().getTerminator());
-    builder.create<memref::DeallocOp>(loc, allocation);
+    memref::DeallocOp::create(builder, loc, allocation);
   }
 
   return subviewOp;
@@ -402,7 +401,7 @@ FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
     // time might make these go away.
     if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
       Value constVal =
-          rewriter.create<arith::ConstantIndexOp>(op->getLoc(), 16);
+          arith::ConstantIndexOp::create(rewriter, op->getLoc(), 16);
       for (auto result : op->getResults()) {
         map.map(result, constVal);
       }
@@ -574,7 +573,7 @@ static SmallVector<Attribute> appendSplitReductionMappingToWorkgroupMapping(
 // loop also has workgroup mapping.
 struct FoldSplitReductionForallWithWorkgroupForall
     : public OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
@@ -633,9 +632,10 @@ struct FoldSplitReductionForallWithWorkgroupForall
             workgroupMapping->getValue(), mappingAttr->getValue());
 
     auto newMappingAttr = rewriter.getArrayAttr(newMapping);
-    auto newForallOp = rewriter.create<scf::ForallOp>(
-        forallOp.getLoc(), newLbs, newUbs, newSteps, /*outputs=*/ValueRange{},
-        newMappingAttr, [](OpBuilder &, Location, ValueRange) {});
+    auto newForallOp = scf::ForallOp::create(
+        rewriter, forallOp.getLoc(), newLbs, newUbs, newSteps,
+        /*outputs=*/ValueRange{}, newMappingAttr,
+        [](OpBuilder &, Location, ValueRange) {});
     Block *oldBlock = forallOp.getBody();
     Block *newForallBody = newForallOp.getBody();
     SmallVector<Value> newInductionVars = newForallOp.getInductionVars();
@@ -852,16 +852,16 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
   MemRefType allocType = MemRefType::get({maxAlloc}, builder.getI8Type(),
                                          AffineMap(), memorySpace);
   Value packedAlloc =
-      builder.create<memref::AllocOp>(funcOp.getLoc(), allocType);
+      memref::AllocOp::create(builder, funcOp.getLoc(), allocType);
   for (size_t i = 0; i < aliasGroups.size(); i++) {
     int64_t offset = 0;
     for (Operation *alloc : aliasGroups[i]) {
       Location loc = alloc->getLoc();
       builder.setInsertionPoint(alloc);
-      Value offsetValue = builder.create<arith::ConstantIndexOp>(loc, offset);
-      Value newAlloc = builder.create<memref::ViewOp>(
-          packedAlloc.getLoc(), alloc->getResultTypes()[0], packedAlloc,
-          offsetValue, ArrayRef<Value>({}));
+      Value offsetValue = arith::ConstantIndexOp::create(builder, loc, offset);
+      Value newAlloc = memref::ViewOp::create(
+          builder, packedAlloc.getLoc(), alloc->getResultTypes()[0],
+          packedAlloc, offsetValue, ArrayRef<Value>({}));
       offset += getAllocSize(alloc, dataLayout);
       alloc->replaceAllUsesWith(ArrayRef<Value>({newAlloc}));
       alloc->erase();
@@ -940,7 +940,7 @@ distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
 
 namespace {
 struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::ForOp loop,
                                 PatternRewriter &rewriter) const final {
     if (loop.getBody()->getOperations().size() == 1) {
@@ -1135,9 +1135,10 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
 
     // Step 3. Create the ForallOp.
     Location loc = forallOp.getLoc();
-    scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
-        loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
-        forallOp.getMixedStep(), loop.getInitArgs(), forallOp.getMappingAttr());
+    scf::ForallOp newForallOp = scf::ForallOp::create(
+        rewriter, loc, forallOp.getMixedLowerBound(),
+        forallOp.getMixedUpperBound(), forallOp.getMixedStep(),
+        loop.getInitArgs(), forallOp.getMappingAttr());
 
     {
       // RAII guard, inserting within forallOp, before terminator.
@@ -1156,10 +1157,10 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
       }
       // Step 4. Create a new for loop with new inits for the result of the
       // extracted slices.
-      auto newLoop = rewriter.create<scf::ForOp>(
-          loop.getLoc(), loop.getLowerBound(), loop.getUpperBound(),
-          loop.getStep(), newInits,
-          [](OpBuilder &, Location, Value, ValueRange) {});
+      auto newLoop =
+          scf::ForOp::create(rewriter, loop.getLoc(), loop.getLowerBound(),
+                             loop.getUpperBound(), loop.getStep(), newInits,
+                             [](OpBuilder &, Location, Value, ValueRange) {});
 
       {
         // Step 5. Inline the body of the original forall into the new for loop.
@@ -1195,7 +1196,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
           newYields.push_back(parallelSlice.getSource());
         }
         rewriter.setInsertionPointToEnd(newLoop.getBody());
-        rewriter.create<scf::YieldOp>(loop.getLoc(), newYields);
+        scf::YieldOp::create(rewriter, loop.getLoc(), newYields);
       }
 
       // Move all producers for the indices of the slices outside of the body
@@ -1215,11 +1216,11 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
       for (auto [parallelSlice, source, dest] :
            llvm::zip_equal(terminators, newLoop.getResults(),
                            newForallOp.getRegionIterArgs())) {
-        rewriter.create<tensor::ParallelInsertSliceOp>(
-            parallelSlice.getLoc(), source, dest, parallelSlice.getOffsets(),
-            parallelSlice.getSizes(), parallelSlice.getStrides(),
-            parallelSlice.getStaticOffsets(), parallelSlice.getStaticSizes(),
-            parallelSlice.getStaticStrides());
+        tensor::ParallelInsertSliceOp::create(
+            rewriter, parallelSlice.getLoc(), source, dest,
+            parallelSlice.getOffsets(), parallelSlice.getSizes(),
+            parallelSlice.getStrides(), parallelSlice.getStaticOffsets(),
+            parallelSlice.getStaticSizes(), parallelSlice.getStaticStrides());
       }
     }
 
@@ -1237,6 +1238,60 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
 
 void populateForallLoopHoistingPattern(RewritePatternSet &patterns) {
   patterns.insert<HoistForallFromFor>(patterns.getContext());
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyFoldFillIntoPadPatternsOp
+//===---------------------------------------------------------------------===//
+
+namespace {
+/// Fold `tensor.pad(cst, tensor.extract*(linalg.fill(cst)))` into
+/// `linalg.fill(cst, empty)` when the padding constant and the fill constant
+/// are the same.
+/// This seems generally desirable as a folding but may be too intrusive, so we
+/// only apply it selectively for now.
+// TODO: atm hardcoded on linalg.fill but we could take any result of any
+// generic that yields a constant in that result.
+struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const final {
+    Operation *currentOp = padOp.getSource().getDefiningOp();
+    auto maybeExtractSlice =
+        dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+    while (currentOp && maybeExtractSlice) {
+      currentOp = maybeExtractSlice.getSource().getDefiningOp();
+      maybeExtractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+    }
+    auto fillOp = dyn_cast_or_null<linalg::FillOp>(currentOp);
+    if (!fillOp) {
+      return rewriter.notifyMatchFailure(
+          padOp, "not coming from a linalg.fill op via tensor.extract_slice*");
+    }
+
+    Value padValue = padOp.getConstantPaddingValue();
+    RankedTensorType resultType = padOp.getResultType();
+    if (!padValue ||
+        getAsOpFoldResult(padValue) !=
+            getAsOpFoldResult(fillOp.getDpsInputOperand(0)->get())) {
+      return rewriter.notifyMatchFailure(
+          padOp, "not a constant value matching the fill value");
+    }
+
+    Location loc = padOp.getLoc();
+    auto emptyOp = tensor::EmptyOp::create(
+        rewriter, loc, tensor::getMixedSizes(rewriter, loc, padOp),
+        resultType.getElementType());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
+                                                emptyOp.getResult());
+
+    return success();
+  }
+};
+} // namespace
+
+void populateFoldFillIntoPadPattern(RewritePatternSet &patterns) {
+  patterns.insert<FoldFillIntoPad>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler

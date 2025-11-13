@@ -370,7 +370,8 @@ def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-tr
   let summary =
       "Fission transfer read and write ops in control flow to allow prefetching.";
   let dependentDialects = [
-      "memref::MemRefDialect"
+      "memref::MemRefDialect",
+      "affine::AffineDialect"
   ];
   let options = [
     Option<"FissionMultiTrip", "fission-multi-trip",
@@ -445,10 +446,6 @@ def GenericVectorizationPass :
       "Control whether the op lowering config represents a set of masked vector sizes">,
     Option<"vectorizeCopies", "vectorize-copies", "bool", /*default=*/"true",
       "Enable vectorization of linalg.copy operations.">,
-    Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
-      "Rewrite all tensor.pad ops in the function to vector form.">,
-    Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
-      "Enable vectorizaiton of operations that may generate vector.gather operations.">,
     Option<"vectorizeToTransferGather", "vectorize-to-transfer-gather", "bool", /*default=*/"false",
       "Enables vectorization of gather-like operations that may generate iree_vector_ext.transfer_gather">,
     Option<"enableCleanup", "enable-cleanup", "bool",/*default=*/"true",
@@ -619,8 +616,18 @@ def MaterializeDeviceEncodingPass :
     InterfacePass<"iree-codegen-materialize-device-encoding", "mlir::FunctionOpInterface"> {
   let summary = "Materialize the encoding for tensor as specified by the backend.";
   let options = [
-    Option<"testCLGPUTarget", "test-cl-gpu-target", "bool", /*default=*/"false",
-           "Flag used for lit-testing GPU target only. Not for general usage">,
+    Option<"testGPUEncodingResolver", "test-gpu-encoding-resolver", "detail::TestingResolverKind",
+           /*default=*/"detail::TestingResolverKind::kNone",
+           "Flag used for lit-testing GPU target only. Not for general usage",
+           [{llvm::cl::values(
+             clEnumValN(detail::TestingResolverKind::kGPUDataTiling, "gpu_data_tiling",
+                        "Use iree_gpu.gpu_encoding_resolver<>."),
+             clEnumValN(detail::TestingResolverKind::kGPUPadding, "gpu_padding",
+                        "Use iree_gpu.gpu_padding_resolver<>."),
+             clEnumValN(detail::TestingResolverKind::kNone, "none",
+                        "Ignore testing resolvers and fall back to identity resolver.")
+      )}]>,
+
   ];
 }
 
@@ -628,17 +635,6 @@ def MaterializeDeviceEncodingPass :
 def MaterializeEncodingIntoNopPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-nop", "mlir::FunctionOpInterface"> {
   let summary = "Drop the encodings from tensor types with encodings.";
-}
-
-def MaterializeEncodingIntoPaddingPass :
-    InterfacePass<"iree-codegen-materialize-encoding-into-padding", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize `#iree_encoding.padding` attributes.";
-  let description = [{
-    Handles padding introduced by `padding` encoding layouts, which
-    requires `iree_tensor_ext.dispatch.tensor.load`/`.store` to be adjusted to account for
-    padding regions.
-    Materializes any other encoding layouts into nop.
-  }];
 }
 
 def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "ModuleOp"> {
@@ -834,6 +830,14 @@ def TestExecutablePreprocessingPass :
 def TestPartitionableLoopsInterfacePass :
     Pass<"iree-codegen-test-partitionable-loops-interface", ""> {
   let summary = "Test the PartitionableLoopsInterface";
+}
+
+def TestVectorLayoutAnalysisPass : Pass<"iree-codegen-test-vector-layout-analysis", ""> {
+  let summary = "Test the vector layout analysis.";
+  let description = [{
+    Run VectorLayoutAnalysis on the root operation. The analysis emits remarks
+    for the layout for each SSA value infered on it's owning operation.
+  }];
 }
 
 def TileAndDistributeToWorkgroupsPass :

@@ -30,6 +30,9 @@
 #   TEST_DEFINED: Whether to define a test target.
 #   TEST_DISABLED: The test target will be skipped and its status will be
 #       'Not Run'.
+#   REMARKS_FILTER: Emit all remarks whose category matches the given regex pattern. If empty, no remarks are emitted.
+#       Only applied to the test module, not the calls module.
+#   CHECK_REMARKS_PATTERN: Pattern to search for in the emitted remarks.
 function(iree_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -43,7 +46,7 @@ function(iree_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;VARIANT_NAME;TESTS_SRC;TESTS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED"
+    "NAME;TEST_TYPE;VARIANT_NAME;TESTS_SRC;TESTS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED;REMARKS_FILTER;CHECK_REMARKS_PATTERN"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
@@ -60,6 +63,18 @@ function(iree_e2e_runner_test)
     "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
   )
 
+  # Emit remarks if REMARKS_FILTER is specified.
+  # Only enable remarks for the test module, not the calls module.
+  set(_REMARKS_FILE "")
+  set(_REMARKS_FLAGS "")
+  if(_RULE_REMARKS_FILTER)
+    set(_REMARKS_FILE "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_${_RULE_TEST_TYPE}_remarks.yaml")
+    set(_REMARKS_FLAGS
+      "--remarks-filter=${_RULE_REMARKS_FILTER}"
+      "--remarks-output-file=${_REMARKS_FILE}"
+    )
+  endif()
+
   if(NOT TARGET "${_NAME}_${_RULE_TEST_TYPE}_module")
     iree_bytecode_module(
       NAME
@@ -71,6 +86,7 @@ function(iree_e2e_runner_test)
       FLAGS
         "${_BASE_COMPILER_FLAGS}"
         "${_RULE_COMPILER_FLAGS}"
+        "${_REMARKS_FLAGS}"
     )
   endif()
 
@@ -97,6 +113,19 @@ function(iree_e2e_runner_test)
     "${_NAME}_calls_module"
     "${_RULE_TEST_RUNNER}"
   )
+
+  # Add POST_BUILD command to check remarks if CHECK_REMARKS_PATTERN is specified
+  if(_RULE_CHECK_REMARKS_PATTERN)
+    add_custom_command(
+      TARGET "${_NAME}${_RULE_VARIANT_NAME}"
+      POST_BUILD
+      COMMAND "${Python3_EXECUTABLE}"
+              "${PROJECT_SOURCE_DIR}/build_tools/scripts/check_remarks_pattern.py"
+              "${_REMARKS_FILE}"
+              "${_RULE_CHECK_REMARKS_PATTERN}"
+      VERBATIM
+    )
+  endif()
 
   add_dependencies(iree-test-deps "${_NAME}${_RULE_VARIANT_NAME}")
 
@@ -145,6 +174,9 @@ endfunction()
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   TEST_RUNNER: trace-runner program to run.
+#   REMARKS_FILTER: Emit all remarks whose category matches the given regex pattern. If empty, no remarks are emitted.
+#       Only applied to the test module, not the calls module.
+#   CHECK_REMARKS_PATTERN: Pattern to search for in the emitted remarks.
 function(iree_single_backend_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -157,7 +189,7 @@ function(iree_single_backend_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER"
+    "NAME;TEST_TYPE;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER;REMARKS_FILTER;CHECK_REMARKS_PATTERN"
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
@@ -253,8 +285,13 @@ function(iree_single_backend_e2e_runner_test)
     return()
   endif()
 
+  # The generator file might itself depend on other *.py files in the same dir.
+  # Just err on the side of more dependencies.
+  file(GLOB _LOCAL_PY_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.py")
+
   add_custom_command(
     COMMAND
+      "${CMAKE_COMMAND}" -E env "PYTHONPATH=${PROJECT_SOURCE_DIR}"
       "${Python3_EXECUTABLE}"
       "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_GENERATOR}"
       ${_GENERATOR_STANDARD_FLAGS}
@@ -264,6 +301,7 @@ function(iree_single_backend_e2e_runner_test)
       ${_CALLS_SRC}
     DEPENDS
       ${_RULE_GENERATOR}
+      ${_LOCAL_PY_FILES}
   )
 
   add_custom_target(
@@ -300,6 +338,8 @@ function(iree_single_backend_e2e_runner_test)
       LABELS ${_RULE_LABELS}
       TEST_DEFINED ${_TEST_DEFINED}
       TEST_DISABLED ${_TEST_DISABLED}
+      REMARKS_FILTER ${_RULE_REMARKS_FILTER}
+      CHECK_REMARKS_PATTERN ${_RULE_CHECK_REMARKS_PATTERN}
     )
     # Note we are relying on the fact that the target created by
     # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
@@ -333,6 +373,8 @@ function(iree_single_backend_e2e_runner_test)
         LABELS ${_RULE_LABELS}
         TEST_DEFINED ${_TEST_DEFINED}
         TEST_DISABLED ${_TEST_DISABLED}
+        REMARKS_FILTER ${_RULE_REMARKS_FILTER}
+        CHECK_REMARKS_PATTERN ${_RULE_CHECK_REMARKS_PATTERN}
       )
       # Note we are relying on the fact that the target created by
       # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
@@ -346,6 +388,7 @@ function(iree_single_backend_e2e_runner_test)
       list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=thread")
       iree_e2e_runner_test(
         NAME ${_RULE_NAME}
+        TEST_TYPE ${_RULE_TEST_TYPE}
         VARIANT_NAME "_tsan"
         TESTS_SRC ${_TESTS_SRC}
         TESTS_VMFB ${_TESTS_VMFB}
@@ -359,6 +402,8 @@ function(iree_single_backend_e2e_runner_test)
         LABELS ${_RULE_LABELS}
         TEST_DEFINED ${_TEST_DEFINED}
         TEST_DISABLED ${_TEST_DISABLED}
+        REMARKS_FILTER ${_RULE_REMARKS_FILTER}
+        CHECK_REMARKS_PATTERN ${_RULE_CHECK_REMARKS_PATTERN}
       )
       # Note we are relying on the fact that the target created by
       # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
@@ -409,6 +454,9 @@ endfunction()
 #       and cpu_features is a comma-separated list of LLVM target attributes
 #       to enable. Example:
 #         x86_64:avx2_fma:+avx,+avx2,+fma
+#   REMARKS_FILTER: Emit all remarks whose category matches the given regex pattern. If empty, no remarks are emitted.
+#       Only applied to the test module, not the calls module.
+#   CHECK_REMARKS_PATTERN: Pattern to search for in the emitted remarks.
 function(iree_generated_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -417,7 +465,7 @@ function(iree_generated_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;GENERATOR;TEST_RUNNER"
+    "NAME;TEST_TYPE;GENERATOR;TEST_RUNNER;REMARKS_FILTER;CHECK_REMARKS_PATTERN"
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
@@ -488,6 +536,10 @@ function(iree_generated_e2e_runner_test)
           ${_RULE_RUNNER_ARGS}
         LABELS
           ${_LABELS}
+        REMARKS_FILTER
+          ${_RULE_REMARKS_FILTER}
+        CHECK_REMARKS_PATTERN
+          ${_RULE_CHECK_REMARKS_PATTERN}
       )
     endforeach()
   endforeach()

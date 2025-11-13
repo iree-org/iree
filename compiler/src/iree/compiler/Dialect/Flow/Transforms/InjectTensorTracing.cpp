@@ -53,16 +53,16 @@ static void injectTracingOnOp(Operation *op, StringRef traceKey) {
   OpBuilder builder(op);
   auto inputTensors = getTensorOperands(op);
   if (!inputTensors.empty()) {
-    builder.create<IREE::Flow::TensorTraceOp>(
-        op->getLoc(), builder.getStringAttr(traceKey + " inputs"),
+    IREE::Flow::TensorTraceOp::create(
+        builder, op->getLoc(), builder.getStringAttr(traceKey + " inputs"),
         inputTensors);
   }
 
   builder.setInsertionPointAfter(op);
   auto outputTensors = filterTensorValues(op->getResults());
   if (!outputTensors.empty()) {
-    builder.create<IREE::Flow::TensorTraceOp>(
-        op->getLoc(), builder.getStringAttr(traceKey + " outputs"),
+    IREE::Flow::TensorTraceOp::create(
+        builder, op->getLoc(), builder.getStringAttr(traceKey + " outputs"),
         outputTensors);
   }
 }
@@ -72,7 +72,7 @@ struct InjectTensorTracingPass
           InjectTensorTracingPass> {
   void runOnOperation() override {
     auto attrName = StringAttr::get(&getContext(), "iree.tensor.trace");
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     funcOp.walk([&](Operation *op) {
       if (auto attr = op->getAttr(attrName)) {
         std::string traceKey;

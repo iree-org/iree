@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -106,9 +107,10 @@ public:
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<IREE::Codegen::IREECodegenDialect, IREE::CPU::IREECPUDialect,
-                IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
-                IREE::LinalgExt::IREELinalgExtDialect>();
+        .insert<IREE::CPU::IREECPUDialect, IREE::Codegen::IREECodegenDialect,
+                IREE::Encoding::IREEEncodingDialect,
+                IREE::LinalgExt::IREELinalgExtDialect, IREE::VM::VMDialect,
+                IREE::VMVX::VMVXDialect>();
   }
 
   IREE::VM::TargetOptions
@@ -174,6 +176,13 @@ public:
                                    executableBuilder.getI8IntegerAttr(
                                        static_cast<uint8_t>(bindingCount)));
         }
+        // TODO(benvanik): logical parameters and reflection information.
+        size_t paramCount = 0;
+        if (paramCount > 0) {
+          funcOp.setReflectionAttr("parameter_count",
+                                   executableBuilder.getI16IntegerAttr(
+                                       static_cast<uint16_t>(paramCount)));
+        }
       }
     }
 
@@ -206,8 +215,8 @@ public:
     // Add the binary data to the target executable.
     // NOTE: this snapshots the FlatBuffer builder data at the time it is called
     // and future changes to the target op will not be observed.
-    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(), bufferAttr);
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));

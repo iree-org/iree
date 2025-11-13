@@ -14,7 +14,6 @@
 #include <memory>
 #include <utility>
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
@@ -51,11 +50,11 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
     return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
-    return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
+    return arith::TruncFOp::create(builder, loc, type, inputs[0]);
   }
 
   if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
-    return builder.create<arith::ExtFOp>(loc, type, inputs[0]);
+    return arith::ExtFOp::create(builder, loc, type, inputs[0]);
   }
 
   return nullptr;
@@ -238,8 +237,7 @@ struct PromoteBF16ToF32Converter
 
 struct ConvertBf16ArithToF32Pass final
     : impl::ConvertBf16ArithToF32PassBase<ConvertBf16ArithToF32Pass> {
-  using impl::ConvertBf16ArithToF32PassBase<
-      ConvertBf16ArithToF32Pass>::ConvertBf16ArithToF32PassBase;
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);

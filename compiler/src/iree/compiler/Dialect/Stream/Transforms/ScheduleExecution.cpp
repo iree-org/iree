@@ -105,9 +105,9 @@ struct ExecutePartitionBuilder {
 
     // TODO(benvanik): tie operands, or leave to canonicalization.
     SmallVector<int64_t> tiedOperands;
-    executeOp = parentBuilder.create<IREE::Stream::AsyncExecuteOp>(
-        fusedLoc, resultTypes, resultSizes, /*awaitTimepoint=*/Value{},
-        operands, operandSizes, tiedOperands);
+    executeOp = IREE::Stream::AsyncExecuteOp::create(
+        parentBuilder, fusedLoc, resultTypes, resultSizes,
+        /*awaitTimepoint=*/Value{}, operands, operandSizes, tiedOperands);
     if (partition->affinity) {
       executeOp.setAffinityAttr(partition->affinity);
     }
@@ -154,8 +154,8 @@ struct ExecutePartitionBuilder {
       if (transferOp.getSourceAffinityAttr() == partition->affinity) {
         transferOp.setSourceAffinityAttr(nullptr);
       }
-      if (transferOp.getResultAffinityAttr() == partition->affinity) {
-        transferOp.setResultAffinityAttr(nullptr);
+      if (transferOp.getTargetAffinityAttr() == partition->affinity) {
+        transferOp.setTargetAffinityAttr(nullptr);
       }
     } else if (auto affinityOp =
                    dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
@@ -181,8 +181,8 @@ struct ExecutePartitionBuilder {
       if (resultSize)
         resultSizes.push_back(resultSize);
     }
-    builder.create<IREE::Stream::YieldOp>(executeOp.getLoc(), results,
-                                          resultSizes);
+    IREE::Stream::YieldOp::create(builder, executeOp.getLoc(), results,
+                                  resultSizes);
     return executeOp;
   }
 
@@ -279,8 +279,8 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
         // prematurely tie their lifetimes together. By having unique awaits
         // we allow propagation to move the waits further to where the values
         // are used (including right into other execution regions).
-        auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
-            executeOp.getLoc(), newResult, newResultSize,
+        auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
+            builder, executeOp.getLoc(), newResult, newResultSize,
             executeOp.getResultTimepoint());
 
         // Explicitly copy the Value since it is marked as const.
@@ -323,7 +323,7 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
 //===----------------------------------------------------------------------===//
 
 struct RemoveBarriers : public OpRewritePattern<IREE::Stream::AsyncBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::AsyncBarrierOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOp(op, op.getOperand(0));
@@ -336,7 +336,7 @@ struct ScheduleExecutionPass
           ScheduleExecutionPass> {
   void runOnOperation() override {
     auto *context = &getContext();
-    auto parentOp = getOperation();
+    mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;

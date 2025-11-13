@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/IR/PatternMatch.h"
@@ -69,8 +68,7 @@ struct ConfigTrackingCanonicalizerPass final
     : impl::ConfigTrackingCanonicalizerPassBase<
           ConfigTrackingCanonicalizerPass> {
 public:
-  using impl::ConfigTrackingCanonicalizerPassBase<
-      ConfigTrackingCanonicalizerPass>::ConfigTrackingCanonicalizerPassBase;
+  using Base::Base;
   /// Initialize the canonicalizer by building the set of patterns used during
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {

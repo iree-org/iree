@@ -34,7 +34,7 @@ namespace {
 /// not common in practice, so it is not supported now.
 struct SinkDownCollapsingUnitDimsAcrossUnpack final
     : public OpRewritePattern<linalg::UnPackOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::UnPackOp op,
                                 PatternRewriter &rewriter) const override {
     if (!isIdentityPermutation(op.getOuterDimsPerm())) {
@@ -126,10 +126,10 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
     }
 
     Location loc = op.getLoc();
-    auto newDestOp = rewriter.create<tensor::EmptyOp>(
-        loc, destShape, emptyOp.getType().getElementType());
-    auto newUnpackOp = rewriter.create<linalg::UnPackOp>(
-        loc, collapseOp.getSrc(), newDestOp, innerDimPos, innerTiles);
+    auto newDestOp = tensor::EmptyOp::create(
+        rewriter, loc, destShape, emptyOp.getType().getElementType());
+    auto newUnpackOp = linalg::UnPackOp::create(
+        rewriter, loc, collapseOp.getSrc(), newDestOp, innerDimPos, innerTiles);
     SmallVector<ReassociationIndices> newRi;
     for (int64_t i = 0, e = op.getDestRank(); i < e; ++i) {
       if (i == outerRi[0]) {

@@ -4,6 +4,7 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=partial_reduction}, canonicalize, cse))" %s | FileCheck %s --check-prefix=PARTRED
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{normalize-loops}, canonicalize, cse))" %s | FileCheck %s --check-prefix=NORM-REDUCTION
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=serial}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SERIAL
 
 #config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
@@ -228,6 +229,7 @@ module {
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+      semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>,
       lowering_config = #config
     } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
     return %0 : tensor<?x?x4xf32>
@@ -548,15 +550,41 @@ func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
 
 // -----
 
+#config = #iree_gpu.lowering_config<{reduction = [0, 1]}>
+func.func @swap_collapse_shape_with_extract_slice_block_arg(%arg0: tensor<16x1x1x16xf32>) -> tensor<16x16xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<16x1x1x16xf32> into tensor<16x16xf32>
+  %empty = tensor.empty() : tensor<16x16xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<16x16xf32>) outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
+  return %0: tensor<16x16xf32>
+}
+
+// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice_block_arg
+//   NORM-REDUCTION-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   NORM-REDUCTION-DAG:   %[[C16:.+]] = arith.constant 16 : index
+//   NORM-REDUCTION-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       NORM-REDUCTION:   scf.for %[[ARG1:.+]] = %[[C0]] to %[[C16]] step %[[C1]]
+//       NORM-REDUCTION:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[0, 0, 0, %[[ARG1]]] [16, 1, 1, 1] [1, 1, 1, 1] : tensor<16x1x1x16xf32> to tensor<16x1x1x1xf32>
+//       NORM-REDUCTION:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0], [1, 2, 3]] : tensor<16x1x1x1xf32> into tensor<16x1xf32>
+//       NORM-REDUCTION:     linalg.copy {{.*}} ins(%[[COLLAPSE]]
+
+// Without loop normalization, no swap would happen.
+//                CHECK:   tensor.collapse_shape
+//                CHECK:   scf.for
+//                CHECK:     tensor.extract_slice
+//            CHECK-NOT:     tensor.collapse_shape
+//                CHECK:     linalg.copy
+
+// -----
+
 #config = #iree_gpu.lowering_config<{reduction = [0, 32]}>
-func.func @swap_collapse_shape_with_extract_slice(%arg0: tensor<32x3x3x288xf32>) -> tensor<32x2592xf32> {
+func.func @swap_collapse_shape_with_extract_slice_apply_op(%arg0: tensor<32x3x3x288xf32>) -> tensor<32x2592xf32> {
   %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<32x3x3x288xf32> into tensor<32x2592xf32>
   %empty = tensor.empty() : tensor<32x2592xf32>
   %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<32x2592xf32>) outs(%empty : tensor<32x2592xf32>) -> tensor<32x2592xf32>
   return %0: tensor<32x2592xf32>
 }
 
-// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice
+// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice_apply_op
 //   NORM-REDUCTION-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   NORM-REDUCTION-DAG:   %[[C81:.+]] = arith.constant 81 : index
 //   NORM-REDUCTION-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -609,3 +637,78 @@ func.func @no_swap_collapse_shape_with_extract_slice_2(%arg0: tensor<32x2x2x16xf
 //       NORM-REDUCTION:     tensor.extract_slice
 //   NORM-REDUCTION-NOT:     tensor.collapse_shape
 //       NORM-REDUCTION:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 30]}>
+func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf32>) -> tensor<2592x32xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0, 1, 2], [3]] : tensor<288x3x3x32xf32> into tensor<2592x32xf32>
+  %empty = tensor.empty() : tensor<2592x32xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<2592x32xf32>) outs(%empty : tensor<2592x32xf32>) -> tensor<2592x32xf32>
+  return %0: tensor<2592x32xf32>
+}
+
+// No swap would happen when both the collapsed size and offset are dynamic after tiling.
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice
+//       NORM-REDUCTION:   tensor.collapse_shape
+//       NORM-REDUCTION:   scf.for
+//       NORM-REDUCTION:     tensor.extract_slice {{.*}} tensor<2592x32xf32> to tensor<2592x?xf32>
+//   NORM-REDUCTION-NOT:     tensor.collapse_shape
+//       NORM-REDUCTION:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{serial = [0, 16]}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @serial_tiling(%3: tensor<4x256xf32>, %4: tensor<4x256xf32>, %5: tensor<4x256xf32>) -> tensor<4x256xf32> {
+    %6 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]
+      } ins(%3, %4 : tensor<4x256xf32>, tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %7 = arith.addf %in, %in_0 : f32
+      linalg.yield %7 : f32
+    } -> tensor<4x256xf32>
+    return %6 : tensor<4x256xf32>
+  }
+}
+
+// SERIAL-LABEL: func.func @serial_tiling
+// SERIAL: scf.forall ({{.*}}) = (0) to (256) step (16)
+// SERIAL: linalg.generic
+// SERIAL: scf.forall.in_parallel
+// SERIAL-NOT: mapping
+
+// -----
+
+#config = #iree_gpu.lowering_config<{serial = [0, 16]}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @serial_tiling_consumer_fusion(%3: tensor<4x256xf32>, %4: tensor<4x256xf32>, %5: tensor<4x256xf32>) -> tensor<4x256xf32> {
+    %6 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]
+      } ins(%3, %4 : tensor<4x256xf32>, tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %7 = arith.addf %in, %in_0 : f32
+      linalg.yield %7 : f32
+    } -> tensor<4x256xf32>
+    %out = linalg.generic {
+      indexing_maps = [#map, #map],
+      iterator_types = ["parallel", "parallel"]
+    } ins(%6 : tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %8 = arith.mulf %in, %in : f32
+      linalg.yield %8 : f32
+    }-> tensor<4x256xf32>
+    return %out : tensor<4x256xf32>
+  }
+}
+
+// SERIAL-LABEL: func.func @serial_tiling
+// SERIAL: scf.forall ({{.*}}) = (0) to (256) step (16)
+// SERIAL: linalg.generic
+// SERIAL: linalg.generic
+// SERIAL: scf.forall.in_parallel
+// SERIAL-NOT: mapping

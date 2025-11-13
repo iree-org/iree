@@ -76,9 +76,9 @@ function(iree_lit_test)
   list(APPEND _RULE_LABELS "test-type=lit-test")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
-  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
-    "LIT_OPTS=-v"
-    "FILECHECK_OPTS=--enable-var-scope")
+  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT_MODIFICATION
+    "LIT_OPTS=string_prepend:-v "
+    "FILECHECK_OPTS=string_prepend:--enable-var-scope ")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
   iree_configure_test(${_NAME_PATH})
 

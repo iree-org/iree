@@ -12,7 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"

@@ -13,12 +13,8 @@
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-remove-single-iteration"
 
@@ -44,11 +40,11 @@ static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
   Block *block = op.getBody();
   ValueRange initArgs = op.getInitArgs();
   Value count =
-      rewriter.create<arith::CmpIOp>(op->getLoc(), arith::CmpIPredicate::sgt,
-                                     op.getUpperBound(), op.getLowerBound());
+      arith::CmpIOp::create(rewriter, op->getLoc(), arith::CmpIPredicate::sgt,
+                            op.getUpperBound(), op.getLowerBound());
   auto ifOp =
-      rewriter.create<scf::IfOp>(op->getLoc(), op.getResultTypes(), count,
-                                 /*withElseRegion=*/initArgs.size() != 0);
+      scf::IfOp::create(rewriter, op->getLoc(), op.getResultTypes(), count,
+                        /*withElseRegion=*/initArgs.size() != 0);
   Operation *terminator = block->getTerminator();
   rewriter.inlineBlockBefore(block, &ifOp.getThenRegion().front(),
                              ifOp.getThenRegion().front().begin(), blockArgs);
@@ -56,7 +52,7 @@ static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
     rewriter.eraseOp(terminator);
   } else {
     rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-    rewriter.create<scf::YieldOp>(ifOp.getLoc(), initArgs);
+    scf::YieldOp::create(rewriter, ifOp.getLoc(), initArgs);
   }
   rewriter.replaceOp(op, ifOp);
 }
@@ -64,17 +60,22 @@ static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
 namespace {
 /// Rewriting pattern that replaces single-iteration loops with their bodies.
 struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern::OpRewritePattern;
+
+  SimplifyTrivialLoops(MLIRContext *context, ForControlFnRef controlFn)
+      : OpRewritePattern(context), controlFn(controlFn) {}
 
   LogicalResult matchAndRewrite(scf::ForOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!(neverRunsSecondIteration(op))) {
-      return failure();
+    if (controlFn && !controlFn(op)) {
+      return rewriter.notifyMatchFailure(
+          op, "doesn't match according to the the control function");
     }
-
-    // The second iteration is never run
-    // so the loop atmost can have 1 iteration. Inline its body and remove the
-    // loop.
+    if (!neverRunsSecondIteration(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "is not a single-iteration for loop");
+    }
+    // The second iteration is never run so the loop atmost can have 1
+    // iteration. Inline its body and remove the loop.
     SmallVector<Value> blockArgs;
     blockArgs.reserve(op.getInitArgs().size() + 1);
     blockArgs.push_back(op.getLowerBound());
@@ -86,12 +87,16 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     }
     return success();
   }
+
+private:
+  ForControlFnRef controlFn;
 };
 
 } // namespace
 
-void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns) {
-  patterns.add<SimplifyTrivialLoops>(patterns.getContext());
+void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
+                                              ForControlFnRef controlFn) {
+  patterns.add<SimplifyTrivialLoops>(patterns.getContext(), controlFn);
 }
 
 } // namespace mlir::iree_compiler

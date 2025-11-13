@@ -55,7 +55,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 static SmallVector<Range> getLoopRangesImpl(TilingInterface tilableOp,
                                             Location loc, OpBuilder &builder) {
   SmallVector<Range> loopRanges = tilableOp.getIterationDomain(builder);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
   for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
     if (iteratorType.value() == utils::IteratorType::reduction) {
       loopRanges[iteratorType.index()].size = one;
@@ -78,8 +78,8 @@ static SmallVector<Range> getLoopRangesFromValue(Value source, Location loc,
 static SmallVector<Range>
 getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
                   OpBuilder &builder) {
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
   ReifiedRankedShapedTypeDims resultDims;
   LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
@@ -143,8 +143,8 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
     Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
     Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
     Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
-    return builder.create<affine::AffineApplyOp>(
-        rootOp->getLoc(), workload, ValueRange{offset, size, stride});
+    return affine::AffineApplyOp::create(builder, rootOp->getLoc(), workload,
+                                         ValueRange{offset, size, stride});
   });
 }
 
@@ -212,10 +212,9 @@ static void createWorkgroupCountFromDagRootRegion(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(body);
   Location loc = regionOp.getLoc();
-  auto countOp =
-      rewriter.create<IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp>(
-          loc, args);
-  rewriter.create<IREE::Flow::ReturnOp>(loc, countOp->getResults());
+  auto countOp = IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp::create(
+      rewriter, loc, args);
+  IREE::Flow::ReturnOp::create(rewriter, loc, countOp->getResults());
 }
 
 /// Return `true` if the given type is a ShapedType and has at least one
@@ -245,7 +244,7 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
   auto emitTensorDimOps = [&]() {
     for (int64_t i = 0; i < shapedType.getRank(); ++i) {
       if (shapedType.isDynamicDim(i)) {
-        Value dim = b.create<tensor::DimOp>(value.getLoc(), value, i);
+        Value dim = tensor::DimOp::create(b, value.getLoc(), value, i);
         dynamicDims.push_back(dim);
       }
     }
@@ -371,8 +370,8 @@ FailureOr<IREE::Flow::DispatchRegionOp> appendDispatchRegionResults(
   rewriter.setInsertionPoint(regionOp);
 
   // Create new DispatchRegionOp and move over the body.
-  auto newRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      regionOp->getLoc(), resultTypes, regionDynamicDims,
+  auto newRegionOp = IREE::Flow::DispatchRegionOp::create(
+      rewriter, regionOp->getLoc(), resultTypes, regionDynamicDims,
       regionOp.getWorkload());
   rewriter.inlineRegionBefore(regionOp.getBody(), newRegionOp.getBody(),
                               newRegionOp.getBody().begin());
@@ -394,11 +393,12 @@ makeEmptyDispatchRegion(OpBuilder &builder, Location loc, ValueRange workload) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
-  auto regionOp = builder.create<IREE::Flow::DispatchRegionOp>(
-      loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(), workload);
+  auto regionOp = IREE::Flow::DispatchRegionOp::create(
+      builder, loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(),
+      workload);
   Block &body = regionOp.getBody().emplaceBlock();
   builder.setInsertionPointToStart(&body);
-  builder.create<IREE::Flow::ReturnOp>(loc, ValueRange());
+  IREE::Flow::ReturnOp::create(builder, loc, ValueRange());
   return regionOp;
 }
 
@@ -749,9 +749,9 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
       llvm::map_to_vector(newDispatchReturnOperands,
                           [](Value operand) { return operand.getType(); });
   rewriter.setInsertionPoint(dispatchRegionOp);
-  auto newDispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      dispatchRegionOp->getLoc(), newResultTypes, newDispatchResultDynamicDims,
-      dispatchRegionOp.getWorkload());
+  auto newDispatchRegionOp = IREE::Flow::DispatchRegionOp::create(
+      rewriter, dispatchRegionOp->getLoc(), newResultTypes,
+      newDispatchResultDynamicDims, dispatchRegionOp.getWorkload());
   rewriter.inlineRegionBefore(dispatchRegionOp.getBody(),
                               newDispatchRegionOp.getBody(),
                               newDispatchRegionOp.getBody().begin());

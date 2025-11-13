@@ -134,7 +134,7 @@ void InnerTiledOp::build(
     OpBuilder &builder, OperationState &result, ValueRange inputs,
     ValueRange outputs, ArrayRef<AffineMap> indexingMaps,
     ArrayRef<utils::IteratorType> iteratorTypes,
-    InnerTileDescAttrInterface kind,
+    InnerTileDescAttrInterface kind, InnerTiledSemanticsAttrInterface semantics,
     std::optional<SmallVector<SmallVector<int64_t>>> permutations) {
   ArrayAttr indexingMapsAttr = builder.getAffineMapArrayAttr(indexingMaps);
   ArrayAttr iteratorTypesAttr = builder.getArrayAttr(llvm::map_to_vector(
@@ -149,25 +149,26 @@ void InnerTiledOp::build(
         }));
   }
   build(builder, result, inputs, outputs, indexingMapsAttr, iteratorTypesAttr,
-        kind, permutationsAttr);
+        kind, semantics, permutationsAttr);
 }
 
 void InnerTiledOp::build(
     OpBuilder &builder, OperationState &result, ValueRange inputs,
     ValueRange outputs, ArrayRef<ArrayRef<AffineExpr>> indexingExprs,
     ArrayRef<utils::IteratorType> iteratorTypes,
-    InnerTileDescAttrInterface kind,
+    InnerTileDescAttrInterface kind, InnerTiledSemanticsAttrInterface semantics,
     std::optional<SmallVector<SmallVector<int64_t>>> permutations) {
   SmallVector<AffineMap> indexingMaps =
       AffineMap::inferFromExprList(indexingExprs, builder.getContext());
   build(builder, result, inputs, outputs, indexingMaps, iteratorTypes, kind,
-        permutations);
+        semantics, permutations);
 }
 
 void InnerTiledOp::build(OpBuilder &builder, OperationState &result,
                          ValueRange inputs, ValueRange outputs,
                          ArrayAttr indexingMaps, ArrayAttr iteratorTypes,
                          InnerTileDescAttrInterface kind,
+                         InnerTiledSemanticsAttrInterface semantics,
                          std::optional<ArrayAttr> permutations) {
   result.addOperands(inputs);
   result.addOperands(outputs);
@@ -178,6 +179,7 @@ void InnerTiledOp::build(OpBuilder &builder, OperationState &result,
   inherentAttrs.setIndexingMaps(indexingMaps);
   inherentAttrs.setIteratorTypes(iteratorTypes);
   inherentAttrs.setKind(kind);
+  inherentAttrs.setSemantics(semantics);
   if (permutations) {
     inherentAttrs.setPermutations(*permutations);
   }
@@ -194,28 +196,70 @@ InnerTiledOp::inferReturnTypes(MLIRContext *, std::optional<Location>,
   return success();
 }
 
-static int64_t multiplyAcc(ArrayRef<int64_t> shape) {
-  return std::accumulate(shape.begin(), shape.end(), 1,
-                         std::multiplies<int64_t>());
-}
-
-static bool countsMatchTileTypes(ArrayRef<int64_t> innerElemCounts,
-                                 ArrayRef<VectorType> tileTypes) {
-  return llvm::all_of_zip(
-      innerElemCounts, tileTypes,
-      [](int64_t ec, VectorType tt) { return ec == tt.getNumElements(); });
-}
-
-static SmallVector<int64_t> getInnerElemCounts(InnerTiledOp tiledOp) {
-  SmallVector<int64_t> result;
-  result.reserve(tiledOp.getNumOperands());
-  for (auto [opType, map] : llvm::zip_equal(
-           tiledOp.getOperandTypes(),
-           tiledOp.getIndexingMapsAttr().getAsValueRange<AffineMapAttr>())) {
-    ArrayRef<int64_t> shape = cast<ShapedType>(opType).getShape();
-    result.push_back(multiplyAcc(shape.drop_front(map.getNumResults())));
+static bool tileShapesMatch(ArrayRef<int64_t> operandTile,
+                            ArrayRef<int64_t> mmaTile, bool opaque) {
+  if (opaque) {
+    // Opaque tiles: only compare element counts.
+    return llvm::product_of(operandTile) == llvm::product_of(mmaTile);
   }
-  return result;
+  // Compare tile shapes for equality modulo unit dims.
+  auto nonUnitDim = [](int64_t n) { return n != 1; };
+  return llvm::filter_to_vector(operandTile, nonUnitDim) ==
+         llvm::filter_to_vector(mmaTile, nonUnitDim);
+}
+
+static LogicalResult verifyOperandTypes(InnerTiledOp tiledOp) {
+  SmallVector<VectorType> mmaVectorTypes;
+  tiledOp.getSemantics().getTileTypes(tiledOp.getKind(), mmaVectorTypes);
+
+  for (auto [index, tuple] : llvm::enumerate(llvm::zip_equal(
+           tiledOp.getOperandTypes(),
+           tiledOp.getIndexingMapsAttr().getAsValueRange<AffineMapAttr>(),
+           mmaVectorTypes))) {
+    auto [opType, map, mmaVectorType] = tuple;
+    ShapedType operandShapedType = cast<ShapedType>(opType);
+    Type operandElemType = operandShapedType.getElementType();
+    Type mmaElemType = mmaVectorType.getElementType();
+    if (operandElemType != mmaElemType) {
+      return tiledOp.emitOpError(
+          llvm::formatv("operand element type {} does not match expected MMA "
+                        "tile element type {}",
+                        operandElemType, mmaElemType));
+    }
+    ArrayRef<int64_t> operandShape = cast<ShapedType>(opType).getShape();
+    ArrayRef<int64_t> operandTileShape(
+        operandShape.drop_front(map.getNumResults()));
+    ArrayRef<int64_t> mmaTileShape = mmaVectorType.getShape();
+    SmallVector<int64_t> permutedMmaTileShape(mmaTileShape);
+    std::optional<ArrayAttr> permutations = tiledOp.getPermutations();
+    bool opaque = tiledOp.getSemantics().getOpaque();
+    if (permutations && !opaque) {
+      ArrayRef<int64_t> perm =
+          cast<DenseI64ArrayAttr>(permutations.value()[index]).asArrayRef();
+      applyPermutationToVector(permutedMmaTileShape, perm);
+    }
+    if (!tileShapesMatch(operandTileShape, permutedMmaTileShape, opaque)) {
+      VectorType operandTileType =
+          VectorType::get(operandTileShape, operandElemType);
+      VectorType permutedMmaTileType =
+          VectorType::get(permutedMmaTileShape, operandElemType);
+
+      std::string permutationNote;
+      if (permutations) {
+        permutationNote = llvm::formatv(
+            " Note: the permuted InnerTiledDescAttr tile type {} comes from "
+            "applying the permutation {} to the original InnerTiledDescAttr "
+            "tile type {}.",
+            permutedMmaTileType, permutations.value()[index], mmaVectorType);
+      }
+      return tiledOp->emitOpError(llvm::formatv(
+          "operand type {}, implying tile type {}, is incompatible with "
+          "permuted InnerTiledDescAttr tile type {} under semantics {}.{}",
+          opType, operandTileType, permutedMmaTileType, tiledOp.getSemantics(),
+          permutationNote));
+    }
+  }
+  return success();
 }
 
 LogicalResult InnerTiledOp::verify() {
@@ -228,20 +272,8 @@ LogicalResult InnerTiledOp::verify() {
   int64_t expectedNumOuts = getKind().getExpectedNumOutputs();
   if (expectedNumOuts != getNumOutputs()) {
     return emitOpError("number of outputs (" + Twine(getNumOutputs()) +
-                       ")doesn't match expected number from kind (" +
+                       ") doesn't match expected number from kind (" +
                        Twine(expectedNumOuts) + ")");
-  }
-
-  if (getNumResults() != expectedNumOuts) {
-    return emitOpError("number of results (" + Twine(getNumResults()) +
-                       ") does't match expected number from kind (" +
-                       Twine(expectedNumOuts) + ")");
-  }
-
-  if (!llvm::equal(getResultTypes(), getOutputs().getTypes())) {
-    return emitOpError("output types '")
-           << getOutputs().getTypes() << "' do not match result type '"
-           << getResultTypes() << "'";
   }
 
   SmallVector<ShapedType> opTypes = llvm::map_to_vector(
@@ -268,15 +300,15 @@ LogicalResult InnerTiledOp::verify() {
     // This also correctly accounts for (..) -> () for rank-0 results.
     if (map.getNumDims() != numIterators) {
       return emitOpError("expected indexing map ")
-             << index << " to have " << numIterators << " number of inputs";
+             << index << " to have " << numIterators << " input dims";
     }
     if (map.getNumResults() >= rank) {
       return emitOpError("expected indexing map ")
-             << index << " to have fewer than " << rank << " number of outputs";
+             << index << " to have fewer than " << rank << " results";
     }
     if (!map.isProjectedPermutation()) {
       return emitOpError("expected indexing map ")
-             << index << " to be a projected permutation of its inputs";
+             << index << " to be a projected permutation";
     }
 
     for (int64_t size :
@@ -303,53 +335,37 @@ LogicalResult InnerTiledOp::verify() {
         return emitOpError("shape does not match iteration bounds");
       }
     }
-    return success();
-  };
-
-  SmallVector<VectorType> preThreadTypes;
-  getKind().getUndistributedTileTypes(preThreadTypes);
-  SmallVector<VectorType> threadTypes;
-  getKind().getDistributedTileTypes(threadTypes);
-
-  SmallVector<int64_t> innerElemCounts = getInnerElemCounts(*this);
-  for (auto [opNum, opType, tileType] :
-       llvm::enumerate(opTypes, preThreadTypes)) {
-    if (opType.getElementType() != tileType.getElementType()) {
-      return emitOpError("operand " + Twine(opNum) + " element type ")
-             << opType.getElementType() << " does not match expected tile type "
-             << tileType << " for operator";
-    }
-  }
-
-  bool hasUndistributedSemantics =
-      countsMatchTileTypes(innerElemCounts, preThreadTypes);
-  bool hasDistributedSemantics =
-      countsMatchTileTypes(innerElemCounts, threadTypes);
-  if (!hasUndistributedSemantics && !hasDistributedSemantics) {
-    return emitOpError("operation parallel semantics can't be inferred as "
-                       "either distributed or undistributed");
-  }
-  if (hasDistributedSemantics) {
-    if (getPermutations()) {
-      return emitOpError("permutations require undistributed semantics");
-    }
   }
 
   if (getPermutations()) {
-    for (auto permAttr : getPermutations()->getAsRange<DenseI64ArrayAttr>()) {
-      if (!isPermutationVector(permAttr.asArrayRef()))
-        return emitOpError("invalid permutation");
+    auto permRange = getPermutations()->getAsRange<DenseI64ArrayAttr>();
+    int permCount = permRange.end() - permRange.begin();
+    if (permCount != opTypes.size()) {
+      return emitOpError(
+          llvm::formatv("mismatch between the number of permutations ({}) and "
+                        "the number of operands ({})",
+                        permCount, opTypes.size()));
+    }
+    for (auto [index, permAttr] : llvm::enumerate(permRange)) {
+      ArrayRef<int64_t> perm = permAttr.asArrayRef();
+      ShapedType operandType = getOperandShapedTypes()[index];
+      int64_t rank = operandType.getRank();
+      int64_t outerRank = getOperandOuterRank(index);
+      int64_t innerRank = rank - outerRank;
+      if (perm.size() != innerRank) {
+        return emitOpError(
+            llvm::formatv("permutation #{} length {} does not match the inner "
+                          "rank {} of the corresponding operand of type {}",
+                          index, perm.size(), innerRank, operandType));
+      }
+      if (!isPermutationVector(perm)) {
+        return emitOpError(llvm::formatv(
+            "permutation #{} is not a permutation vector", index));
+      }
     }
   }
 
-  return success();
-}
-
-bool InnerTiledOp::hasThreadSemantics() {
-  SmallVector<int64_t> innerElemCounts = getInnerElemCounts(*this);
-  SmallVector<VectorType> preThreadTiles;
-  getKind().getUndistributedTileTypes(preThreadTiles);
-  return !countsMatchTileTypes(innerElemCounts, preThreadTiles);
+  return verifyOperandTypes(*this);
 }
 
 static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {

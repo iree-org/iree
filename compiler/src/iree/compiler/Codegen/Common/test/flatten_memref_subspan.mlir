@@ -632,4 +632,4 @@ func.func @reinterpret_cast_lowering_dynamic_zero_offset() -> f32 {
 }
 // CHECK-LABEL: func @reinterpret_cast_lowering_dynamic_zero_offset()
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:   memref.reinterpret_cast %{{.+}} to offset: [%[[C0]]], sizes: [], strides: [] : memref<?xf32> to memref<f32, strided<[], offset: ?>>
+//       CHECK:   memref.reinterpret_cast %{{.+}} to offset: [0], sizes: [], strides: [] : memref<?xf32> to memref<f32, strided<[]>>

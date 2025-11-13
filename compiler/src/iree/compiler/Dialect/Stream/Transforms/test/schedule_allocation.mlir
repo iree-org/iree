@@ -142,6 +142,49 @@ util.func public @extractConstantsMultiAffinity(%wait_timepoint: !stream.timepoi
 
 // -----
 
+// Tests that constants only used in the local region are allocated separately
+// from constants that escape it. This splits the lifetime at execution at a
+// very coarse level but ideally we'd have a more global analysis for this that
+// runs earlier.
+
+// CHECK-LABEL: @extractConstantsSplitLifetimes
+// CHECK-SAME: (%[[OPERAND_TIMEPOINT:.+]]: !stream.timepoint,
+// CHECK-SAME:  %[[OPERAND:.+]]: !stream.resource<transient>,
+// CHECK-SAME   %[[SIZE:.+]]: index)
+util.func public @extractConstantsSplitLifetimes(%timepoint: !stream.timepoint, %operand: !stream.resource<transient>, %size: index) {
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+  %c255_i32 = arith.constant 255 : i32
+
+  // Escaping constant.
+  // CHECK: %[[CST0:.+]], %[[CST0_TIMEPOINT:.+]] = stream.resource.constants :
+  // CHECK-NEXT: !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
+
+  // Non-escaping constant.
+  // CHECK: %[[CST1:.+]], %[[CST1_TIMEPOINT:.+]] = stream.resource.constants :
+  // CHECK-NEXT: !stream.resource<constant>{%c16} = dense<4> : tensor<16xi8>
+
+  // CHECK: %[[RESULT:.+]], %[[RESULT_TIMEPOINT:.+]] = stream.resource.alloca uninitialized await(%[[OPERAND_TIMEPOINT]])
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[OPERAND_TIMEPOINT]], %[[CST0_TIMEPOINT]], %[[CST1_TIMEPOINT]], %[[RESULT_TIMEPOINT]])
+
+  // Remaining ops run in a normal execution region.
+  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute await(%[[JOIN]])
+  %results:2, %result_timepoint = stream.async.execute await(%timepoint) => with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<constant>{%c8}, !stream.resource<transient>{%size}) {
+    %cst0 = stream.async.constant : !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
+    %cst1 = stream.async.constant : !stream.resource<constant>{%c16} = dense<4> : tensor<16xi8>
+    // CHECK-NEXT: stream.cmd.dispatch
+    %dispatch = stream.async.dispatch @executable::@dispatch(%cst0[%c0 to %c8 for %c8], %cst1[%c0 to %c16 for %c16]) : (!stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}) -> !stream.resource<transient>{%size}
+    stream.yield %cst0, %dispatch : !stream.resource<constant>{%c8}, !stream.resource<transient>{%size}
+  } => !stream.timepoint
+
+  util.optimization_barrier %results#0 : !stream.resource<constant>
+  util.optimization_barrier %results#1 : !stream.resource<transient>
+  util.return
+}
+
+// -----
+
 // Tests that execution regions in initializers are marked as `once` indicating
 // that they are one-shot. The analysis today only checks for ops within the
 // first block of an initializer and treats all others as reusable.

@@ -6,8 +6,10 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
@@ -31,12 +33,12 @@ static LogicalResult padToStaticSizes(RewriterBase &rewriter,
                      .setPaddingValues(paddingValues)
                      .setPadToMultipleOf(true);
 
-  SmallVector<tensor::PadOp> padOps;
-  FailureOr<TilingInterface> maybePaddedOp =
-      linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options, padOps);
-  if (failed(maybePaddedOp)) {
+  FailureOr<linalg::PadTilingInterfaceResult> maybePadResult =
+      linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options);
+  if (failed(maybePadResult)) {
     return tilingInterfaceOp->emitOpError("failed to pad op");
   }
+  rewriter.replaceOp(tilingInterfaceOp, maybePadResult->replacements);
 
   return success();
 }
@@ -72,6 +74,14 @@ struct GPUPadConvsPass final : impl::GPUPadConvsPassBase<GPUPadConvsPass> {
         return signalPassFailure();
       }
     });
+    MLIRContext *context = &getContext();
+    RewritePatternSet cleanupPatterns(context);
+    populateFoldFillIntoPadPattern(cleanupPatterns);
+    linalg::populateExtractSliceSinkingPatterns(
+        cleanupPatterns, [](OpOperand *opOperand) { return true; });
+    if (failed(applyPatternsGreedily(funcOp, std::move(cleanupPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

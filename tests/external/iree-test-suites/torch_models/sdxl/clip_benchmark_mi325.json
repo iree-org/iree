@@ -1,0 +1,40 @@
+{
+    "type": "benchmark",
+    "markers": [
+        "hip",
+        "mi325"
+    ],
+    "modules": [
+        "sdxl/modules/clip_gfx942"
+    ],
+    "weights": [
+        {
+            "type": "url",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
+            "scope": "model"
+        }
+    ],
+    "run_args": [
+        "--function=encode_prompts",
+        "--device=hip",
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0",
+        "--device_allocator=caching"
+    ],
+
+    "inputs": [
+      {
+        "value": "1x64xi64"
+      },
+      {
+        "value": "1x64xi64"
+      },
+      {
+        "value": "1x64xi64"
+      },
+      {
+        "value": "1x64xi64"
+      }
+    ],
+    "golden_time_ms": 8.0
+}

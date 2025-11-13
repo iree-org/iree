@@ -11,6 +11,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -49,11 +51,11 @@ Value buildIfElseTree(
   for (size_t i = 0; i < count; ++i) {
     caseValues.push_back(caseBuilder(loc, i, builder));
   }
-  Value result = builder.create<arith::ConstantIndexOp>(loc, -1);
+  Value result = arith::ConstantIndexOp::create(builder, loc, -1);
   for (int i = count - 1; i >= 0; --i) {
-    result = builder.create<arith::SelectOp>(
-        loc, caseValues[i], builder.create<arith::ConstantIndexOp>(loc, i),
-        result);
+    result = arith::SelectOp::create(
+        builder, loc, caseValues[i],
+        arith::ConstantIndexOp::create(builder, loc, i), result);
   }
   return result;
 }
@@ -1413,26 +1415,6 @@ void OptimizationBarrierOp::build(OpBuilder &builder, OperationState &state,
   state.addAttributes(attributes);
 }
 
-LogicalResult OptimizationBarrierOp::verify() {
-  Operation *op = getOperation();
-  if (op->getNumOperands() != op->getNumResults()) {
-    return op->emitOpError()
-           << "must have same number of operands and results, but has "
-           << op->getNumOperands() << " and " << op->getNumResults()
-           << ", respectively";
-  }
-
-  for (int i = 0, e = op->getNumOperands(); i < e; ++i) {
-    if (op->getOperand(i).getType() != op->getResult(i).getType()) {
-      op->emitOpError() << "must have same operand and result types, but they "
-                           "differ at index "
-                        << i;
-    }
-  }
-
-  return success();
-}
-
 //===----------------------------------------------------------------------===//
 // util.unfoldable_constant
 //===----------------------------------------------------------------------===//
@@ -1911,10 +1893,10 @@ IREE::Util::CallOp IREE::Util::CallOp::cloneAndExpand(
                            IREE::Util::TiedOpInterface::kUntiedIndex);
   }
 
-  return builder.create<IREE::Util::CallOp>(
-      getLoc(), newResultTypes, getCallee(), newOperands,
-      builder.getIndexArrayAttr(newTiedOperands), getArgAttrsAttr(),
-      getResAttrsAttr());
+  return IREE::Util::CallOp::create(builder, getLoc(), newResultTypes,
+                                    getCallee(), newOperands,
+                                    builder.getIndexArrayAttr(newTiedOperands),
+                                    getArgAttrsAttr(), getResAttrsAttr());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2013,12 +1995,13 @@ IREE::Util::GlobalLoadOpInterface GlobalOp::createLoadOp(Location loc,
   // TODO(benvanik): create with the immutable flag if the global is immutable.
   // Today we avoid this and let analysis add the immutable flag when safe
   // (not in initializers/etc).
-  return builder.create<IREE::Util::GlobalLoadOp>(loc, getType(), getSymName());
+  return IREE::Util::GlobalLoadOp::create(builder, loc, getType(),
+                                          getSymName());
 }
 
 IREE::Util::GlobalStoreOpInterface
 GlobalOp::createStoreOp(Location loc, Value value, OpBuilder &builder) {
-  return builder.create<IREE::Util::GlobalStoreOp>(loc, value, getSymName());
+  return IREE::Util::GlobalStoreOp::create(builder, loc, value, getSymName());
 }
 
 void GlobalAddressOp::getAsmResultNames(
@@ -2086,6 +2069,38 @@ LogicalResult GlobalStoreIndirectOp::verify() {
 //===----------------------------------------------------------------------===//
 // !util.list<T>
 //===----------------------------------------------------------------------===//
+
+static ParseResult
+parseValueTypeList(OpAsmParser &parser,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+                   SmallVectorImpl<Type> &types) {
+  if (parser.parseLSquare()) {
+    return failure();
+  }
+  if (succeeded(parser.parseOptionalRSquare())) {
+    return success(); // empty list
+  }
+  do {
+    OpAsmParser::UnresolvedOperand value;
+    Type type;
+    if (parser.parseOperand(value) || parser.parseColon() ||
+        parser.parseType(type)) {
+      return failure();
+    }
+    values.push_back(value);
+    types.push_back(type);
+  } while (succeeded(parser.parseOptionalComma()));
+  return parser.parseRSquare();
+}
+
+static void printValueTypeList(OpAsmPrinter &p, Operation *,
+                               OperandRange values, TypeRange types) {
+  p << "[";
+  llvm::interleaveComma(llvm::zip(values, types), p, [&](auto pair) {
+    p << std::get<0>(pair) << " : " << std::get<1>(pair);
+  });
+  p << "]";
+}
 
 static ParseResult parseListTypeGet(OpAsmParser &parser, Type &listType,
                                     Type &elementType) {
@@ -2156,6 +2171,21 @@ static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
   } else {
     printer.printType(listType);
   }
+}
+
+LogicalResult ListConstructOp::verify() {
+  Operation *op = getOperation();
+  auto listType = cast<IREE::Util::ListType>(getResult().getType());
+  Type elementType = listType.getElementType();
+  for (auto [idx, value] : llvm::enumerate(getValues())) {
+    Type valueType = value.getType();
+    if (!ListType::canImplicitlyCast(valueType, elementType)) {
+      return op->emitError()
+             << "list[" << idx << "] type " << valueType
+             << " cannot be be cast to list type " << elementType;
+    }
+  }
+  return success();
 }
 
 LogicalResult ListGetOp::verify() {
@@ -2447,6 +2477,57 @@ void BufferHashOp::setSubrangeOperand(unsigned operandIndex,
   getSourceSizeMutable().assign(operand.resourceSize);
   getSourceOffsetMutable().assign(operand.offset);
   getLengthMutable().assign(operand.length);
+}
+
+//===----------------------------------------------------------------------===//
+// util.scf.unreachable
+//===----------------------------------------------------------------------===//
+
+// static
+SmallVector<Value> SCFUnreachableOp::createPoisonValues(OpBuilder &builder,
+                                                        Location loc,
+                                                        TypeRange resultTypes) {
+  SmallVector<Value> poisonValues;
+  for (Type type : resultTypes) {
+    poisonValues.push_back(
+        mlir::ub::PoisonOp::create(builder, loc, type, nullptr).getResult());
+  }
+  return poisonValues;
+}
+
+// static
+scf::YieldOp SCFUnreachableOp::createRegionTerminator(OpBuilder &builder,
+                                                      Location loc,
+                                                      TypeRange resultTypes,
+                                                      StringAttr message) {
+  SCFUnreachableOp::create(builder, loc, message);
+  return mlir::scf::YieldOp::create(
+      builder, loc, createPoisonValues(builder, loc, resultTypes));
+}
+
+// static
+scf::YieldOp SCFUnreachableOp::createRegionTerminator(OpBuilder &builder,
+                                                      Location loc,
+                                                      TypeRange resultTypes,
+                                                      StringRef message) {
+  return createRegionTerminator(
+      builder, loc, resultTypes,
+      message.empty() ? StringAttr{} : builder.getStringAttr(message));
+}
+
+// static
+Operation *SCFUnreachableOp::createWithTerminator(OpBuilder &builder,
+                                                  Location loc,
+                                                  TypeRange resultTypes,
+                                                  StringAttr message) {
+  // Create scf.yield with poison values for SCF regions.
+  auto *parentOp = builder.getInsertionPoint()->getParentOp();
+  if (parentOp && isa<scf::SCFDialect>(parentOp->getDialect())) {
+    return createRegionTerminator(builder, loc, resultTypes, message);
+  }
+
+  // For non-SCF regions, convert to util.unreachable terminator.
+  return IREE::Util::UnreachableOp::create(builder, loc, message);
 }
 
 } // namespace mlir::iree_compiler::IREE::Util

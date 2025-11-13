@@ -67,7 +67,6 @@ iree_cc_library(
     "ConvertToLLVM.h"
     "KernelConfig.h"
     "Passes.h"
-    "ROCDLKernelConfig.h"
     "ROCDLPasses.h"
   SRCS
     "AMDGPUEmulateNarrowType.cpp"
@@ -93,11 +92,8 @@ iree_cc_library(
     "ROCDLAnnotateKernelForTranslation.cpp"
     "ROCDLBufferInstructionsOptimization.cpp"
     "ROCDLConfigureBufferInstructions.cpp"
-    "ROCDLKernelConfig.cpp"
     "ROCDLLowerExecutableTarget.cpp"
     "ROCDLPrefetching.cpp"
-    "ROCDLSelectLoweringStrategy.cpp"
-    "TestLLVMGPUQueryMMAPass.cpp"
     "Verifiers.cpp"
   DEPS
     ::PassHeaders
@@ -179,7 +175,6 @@ iree_cc_library(
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
-    iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::ConfigUtils

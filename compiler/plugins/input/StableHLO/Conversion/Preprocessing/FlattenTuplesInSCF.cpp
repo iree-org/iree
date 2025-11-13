@@ -50,8 +50,8 @@ void recursiveUntuple(Value value, ImplicitLocOpBuilder b, IRMapping &mapping,
   }
 
   for (auto [idx, subType] : llvm::enumerate(tupleType.getTypes())) {
-    auto elementOp = b.create<mlir::stablehlo::GetTupleElementOp>(
-        subType, value, b.getI32IntegerAttr(idx));
+    auto elementOp = mlir::stablehlo::GetTupleElementOp::create(
+        b, subType, value, b.getI32IntegerAttr(idx));
     recursiveUntuple(elementOp.getResult(), b, mapping, newValues);
   }
 }
@@ -70,7 +70,7 @@ Value recursiveRetuple(Type oldType, ArrayRef<Value> *values,
     subValues.push_back(recursiveRetuple(subType, values, b));
   }
 
-  return b.create<mlir::stablehlo::TupleOp>(tupleType, subValues).getResult();
+  return mlir::stablehlo::TupleOp::create(b, tupleType, subValues).getResult();
 }
 
 void DetupleRegion(Region &srcRegion, Region &destRegion, ArrayRef<Type> types,
@@ -100,7 +100,7 @@ void DetupleRegion(Region &srcRegion, Region &destRegion, ArrayRef<Type> types,
 }
 
 class DetupleYieldOp : public OpRewritePattern<scf::YieldOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::scf::YieldOp op,
                                 PatternRewriter &rewriter) const override {
@@ -123,7 +123,7 @@ class DetupleYieldOp : public OpRewritePattern<scf::YieldOp> {
 };
 
 class DetupleConditionOp : public OpRewritePattern<scf::ConditionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::scf::ConditionOp op,
                                 PatternRewriter &rewriter) const override {
@@ -147,7 +147,7 @@ class DetupleConditionOp : public OpRewritePattern<scf::ConditionOp> {
 };
 
 class DetupleIfOp : public OpRewritePattern<scf::IfOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::scf::IfOp op,
                                 PatternRewriter &rewriter) const override {
@@ -165,7 +165,7 @@ class DetupleIfOp : public OpRewritePattern<scf::IfOp> {
     llvm::SmallVector<Type> types;
     untupleTypes(op.getResultTypes(), types);
 
-    auto newOp = b.create<mlir::scf::IfOp>(types, op.getOperand());
+    auto newOp = mlir::scf::IfOp::create(b, types, op.getOperand());
 
     DetupleRegion(op.getThenRegion(), newOp.getThenRegion(), {}, mapping, b);
     DetupleRegion(op.getElseRegion(), newOp.getElseRegion(), {}, mapping, b);
@@ -190,7 +190,7 @@ class DetupleIfOp : public OpRewritePattern<scf::IfOp> {
 };
 
 class DetupleWhileOp : public OpRewritePattern<scf::WhileOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::scf::WhileOp op,
                                 PatternRewriter &rewriter) const override {
@@ -210,7 +210,7 @@ class DetupleWhileOp : public OpRewritePattern<scf::WhileOp> {
     llvm::SmallVector<Type> types;
     untupleTypes(op.getResultTypes(), types);
 
-    auto newOp = b.create<mlir::scf::WhileOp>(types, operands);
+    auto newOp = mlir::scf::WhileOp::create(b, types, operands);
 
     DetupleRegion(op.getBefore(), newOp.getBefore(), types, mapping, b);
     DetupleRegion(op.getAfter(), newOp.getAfter(), types, mapping, b);
@@ -243,8 +243,7 @@ struct FlattenTuplesInSCF final
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
-    MLIRContext *ctx = module.getContext();
+    MLIRContext *ctx = &getContext();
     Builder b(ctx);
 
     // Run canonicalization patterns to cancel out remaining tuple ops. We need

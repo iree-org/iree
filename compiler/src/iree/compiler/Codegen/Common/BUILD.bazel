@@ -71,26 +71,6 @@ iree_gentbl_cc_library(
 )
 
 iree_compiler_cc_library(
-    name = "VectorLayoutAnalysis",
-    srcs = [
-        "VectorLayoutAnalysis.cpp",
-    ],
-    hdrs = [
-        "VectorLayoutAnalysis.h",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Analysis",
-        "@llvm-project//mlir:DialectUtils",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:UBDialect",
-        "@llvm-project//mlir:VectorDialect",
-    ],
-)
-
-iree_compiler_cc_library(
     name = "Common",
     srcs = [
         "AddFastMathFlags.cpp",
@@ -147,7 +127,6 @@ iree_compiler_cc_library(
         "LoweringConfigInterpreter.cpp",
         "MaterializeEncoding.cpp",
         "MaterializeEncodingIntoNop.cpp",
-        "MaterializeEncodingIntoPadding.cpp",
         "MaterializeEncodingPatterns.cpp",
         "MaterializeTuningSpecsPass.cpp",
         "MathTransformPass.cpp",
@@ -185,6 +164,7 @@ iree_compiler_cc_library(
         "TypePropagationPass.cpp",
         "UnrollAnnotatedLoops.cpp",
         "UserConfig.cpp",
+        "VectorLayoutAnalysis.cpp",
         "VectorTransferLowering.cpp",
         "VectorizeMemrefCopy.cpp",
         "VerifyWorkgroupDistribution.cpp",

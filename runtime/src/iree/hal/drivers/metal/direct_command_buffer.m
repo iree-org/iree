@@ -357,7 +357,10 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
   iree_arena_initialize(block_pool, &command_buffer->arena);
   command_buffer->staging_buffer = staging_buffer;
   command_buffer->host_allocator = host_allocator;
-  iree_status_t status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+    status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+  }
   if (iree_status_is_ok(status)) {
     iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
@@ -842,8 +845,9 @@ static iree_status_t iree_hal_metal_command_buffer_collective(
 // Prepares kernels and argument buffers needed for kernel dispatches.
 static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
+    iree_hal_executable_export_ordinal_t export_ordinal, const iree_hal_dispatch_config_t config,
+    iree_const_byte_span_t constants, iree_hal_buffer_ref_list_t bindings,
+    iree_hal_dispatch_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -865,7 +869,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
 
   const iree_hal_metal_pipeline_t* pipeline = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_executable_lookup_pipeline(executable, entry_point, &pipeline));
+      z0, iree_hal_metal_executable_lookup_pipeline(executable, export_ordinal, &pipeline));
 
   // Allocate the command segment and keep track of all necessary API data.
   uint8_t* storage_base = NULL;
@@ -911,9 +915,9 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
   }
 
   // Copy push constants to the end of the current segment for later access.
-  segment->dispatch.constant_count = constants.data_length / sizeof(uint32_t);
+  segment->dispatch.constant_count = constants.data_length / sizeof(int32_t);
   uint8_t* constant_ptr = storage_base + sizeof(*segment) + descriptor_length;
-  segment->dispatch.constants = (uint32_t*)constant_ptr;
+  segment->dispatch.constants = (int32_t*)constant_ptr;
   memcpy(constant_ptr, constants.data, constants.data_length);
 
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {

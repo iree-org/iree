@@ -67,7 +67,7 @@ getSPIRVTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel) {
   linalg::TileSizeComputationFunction computeFn =
       [tileSizes](OpBuilder &builder, Operation *op) {
         auto range = llvm::map_range(*tileSizes, [&](int64_t size) -> Value {
-          return builder.create<arith::ConstantIndexOp>(op->getLoc(), size);
+          return arith::ConstantIndexOp::create(builder, op->getLoc(), size);
         });
         return llvm::to_vector(range);
       };
@@ -101,8 +101,8 @@ getGPUProcessorIdAndCountImpl(OpBuilder &builder, Location loc, unsigned dim) {
   std::array<gpu::Dimension, kNumGPUDims> dimAttr{
       gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
   Type indexType = builder.getIndexType();
-  return {builder.create<GPUIdOp>(loc, indexType, dimAttr[dim]),
-          builder.create<GPUCountOp>(loc, indexType, dimAttr[dim]),
+  return {GPUIdOp::create(builder, loc, indexType, dimAttr[dim]),
+          GPUCountOp::create(builder, loc, indexType, dimAttr[dim]),
           linalg::DistributionMethod::Cyclic};
 }
 

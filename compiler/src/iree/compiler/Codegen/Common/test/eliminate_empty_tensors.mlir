@@ -56,3 +56,30 @@ func.func @eliminate_empty_tensors_with_store_to_buffer_op() {
 // CHECK-DAG: %[[INIT:.+]] = iree_codegen.load_from_buffer %[[RESULT_SPAN]]
 //     CHECK: %[[COPY:.+]] = linalg.copy ins(%[[INPUT]] : tensor<128xf32>) outs(%[[INIT]] : tensor<128xf32>)
 //     CHECK: iree_codegen.store_to_buffer %[[COPY]], %[[RESULT_SPAN]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @eliminate_empty_tensors_store_to_buffer_op_with_reshape() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128xf32>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<4x32xf32>
+  %2 = iree_codegen.load_from_buffer %0 : memref<128xf32> -> tensor<128xf32>
+  %3 = tensor.empty() : tensor<128xf32>
+  %copy = linalg.copy ins(%2 : tensor<128xf32>) outs(%3 : tensor<128xf32>) -> tensor<128xf32>
+  %4 = memref.collapse_shape %1 [[0, 1]] : memref<4x32xf32> into memref<128xf32>
+  iree_codegen.store_to_buffer %copy, %4 : tensor<128xf32> into memref<128xf32>
+  return
+}
+
+// CHECK-LABEL: @eliminate_empty_tensors_store_to_buffer_op_with_reshape
+//     CHECK: %[[INPUT_SPAN:.+]] = hal.interface.binding.subspan{{.*}}binding(0)
+//     CHECK: %[[RESULT_SPAN:.+]] = hal.interface.binding.subspan{{.*}}binding(1)
+// CHECK-DAG: %[[RESULT_RESHAPE:.+]] = memref.collapse_shape %[[RESULT_SPAN]]
+// CHECK-DAG: %[[INPUT:.+]] = iree_codegen.load_from_buffer %[[INPUT_SPAN]]
+// CHECK-DAG: %[[INIT:.+]] = iree_codegen.load_from_buffer %[[RESULT_RESHAPE]]
+//     CHECK: %[[COPY:.+]] = linalg.copy ins(%[[INPUT]] : tensor<128xf32>) outs(%[[INIT]] : tensor<128xf32>)
+//     CHECK: iree_codegen.store_to_buffer %[[COPY]], %[[RESULT_RESHAPE]]

@@ -113,21 +113,4 @@ def IREECodegen_Dialect : Dialect {
     let hasOperationAttrVerify = 1;
   }
 
-  //===----------------------------------------------------------------------===//
-  // Type definitions
-  //===----------------------------------------------------------------------===//
-
-  def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
-
-class RankedTensorOrMemRefType<list<Type> allowedTypes, list<int> ranks>
-    : AnyTypeOf<[TensorRankOf<allowedTypes, ranks>,
-        MemRefRankOf<allowedTypes, ranks>]>;
-
-class RankedTensorOrVectorOf<list<Type> allowedTypes> :
-  ShapedContainerType<allowedTypes,
-      Or<[IsVectorOfNonZeroRankTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
-  "ranked tensor or vector", "::mlir::ShapedType">;
-
-def AnyRankedTensorOrVector : RankedTensorOrVectorOf<[AnyType]>;
-
 #endif // IREE_CODEGEN_DIALECT_IREECODEGEN_DIALECT

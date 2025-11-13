@@ -4,13 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <memory>
-#include <utility>
-
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -64,8 +60,8 @@ static Value createChunkHeader(Location loc, iree_idbts_chunk_type_t type,
       VectorType::get({sizeof(header)}, builder.getI8Type()),
       ArrayRef<char>(reinterpret_cast<const char *>(&header), sizeof(header)));
 
-  return builder.create<IREE::Util::BufferConstantOp>(
-      loc, /*name=*/nullptr, dataAttr, builder.getIndexAttr(16),
+  return IREE::Util::BufferConstantOp::create(
+      builder, loc, /*name=*/nullptr, dataAttr, builder.getIndexAttr(16),
       /*mimeType=*/nullptr);
 }
 
@@ -79,22 +75,23 @@ static Value createPadding(Location loc, uint64_t unalignedLength,
   auto zeroAttr = IntegerAttr::get(i8Type, 0);
   auto dataAttr = DenseElementsAttr::get(
       VectorType::get({(int64_t)padding}, i8Type), zeroAttr);
-  return builder.create<IREE::Util::BufferConstantOp>(
-      loc, /*name=*/nullptr, dataAttr, builder.getIndexAttr(16),
+  return IREE::Util::BufferConstantOp::create(
+      builder, loc, /*name=*/nullptr, dataAttr, builder.getIndexAttr(16),
       /*mimeType=*/nullptr);
 }
 
 static void appendListItems(Location loc, Value list, ArrayRef<Value> items,
                             OpBuilder &builder) {
-  Value oldLength = builder.create<IREE::Util::ListSizeOp>(loc, list);
-  Value newLength = builder.create<arith::AddIOp>(
-      loc, oldLength,
-      builder.create<arith::ConstantIndexOp>(loc, items.size()));
-  builder.create<IREE::Util::ListResizeOp>(loc, list, newLength);
+  Value oldLength = IREE::Util::ListSizeOp::create(builder, loc, list);
+  Value newLength = arith::AddIOp::create(
+      builder, loc, oldLength,
+      arith::ConstantIndexOp::create(builder, loc, items.size()));
+  IREE::Util::ListResizeOp::create(builder, loc, list, newLength);
   for (size_t i = 0; i < items.size(); ++i) {
-    Value idx = builder.create<arith::AddIOp>(
-        loc, oldLength, builder.create<arith::ConstantIndexOp>(loc, i));
-    builder.create<IREE::Util::ListSetOp>(loc, list, idx, items[i]);
+    Value idx =
+        arith::AddIOp::create(builder, loc, oldLength,
+                              arith::ConstantIndexOp::create(builder, loc, i));
+    IREE::Util::ListSetOp::create(builder, loc, list, idx, items[i]);
   }
 }
 
@@ -109,7 +106,7 @@ struct MaterializeDispatchInstrumentationPass
       MaterializeDispatchInstrumentationPass>::
       MaterializeDispatchInstrumentationPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
       return;
 
@@ -135,22 +132,26 @@ struct MaterializeDispatchInstrumentationPass
     auto bufferType = MemRefType::get({totalBufferSize}, i8Type);
 
     // Create global device-side instrumentation resource.
-    auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-        loc, "__dispatch_instrumentation",
+    auto globalOp = IREE::Util::GlobalOp::create(
+        moduleBuilder, loc, "__dispatch_instrumentation",
         /*isMutable=*/false,
         moduleBuilder.getType<IREE::Stream::ResourceType>(
             IREE::Stream::Lifetime::External));
     {
-      auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+      // Ensure initializer comes after the global.
+      OpBuilder::InsertionGuard moduleGuard(moduleBuilder);
+      moduleBuilder.setInsertionPointAfter(globalOp);
+      auto initializerOp =
+          IREE::Util::InitializerOp::create(moduleBuilder, loc);
       auto initializerBuilder =
           OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
       Value bufferSize =
-          initializerBuilder.create<arith::ConstantOp>(loc, bufferSizeAttr);
-      Value buffer = initializerBuilder.create<IREE::Stream::ResourceAllocOp>(
-          loc, globalOp.getType(), bufferSize,
+          arith::ConstantOp::create(initializerBuilder, loc, bufferSizeAttr);
+      Value buffer = IREE::Stream::ResourceAllocOp::create(
+          initializerBuilder, loc, globalOp.getType(), bufferSize,
           /*uninitialized=*/true, /*affinity=*/nullptr);
       globalOp.createStoreOp(loc, buffer, initializerBuilder);
-      initializerBuilder.create<IREE::Util::ReturnOp>(loc);
+      IREE::Util::ReturnOp::create(initializerBuilder, loc);
     }
 
     FlatbufferBuilder metadataBuilder;
@@ -199,11 +200,12 @@ struct MaterializeDispatchInstrumentationPass
         // capturing workgroup ID yet with this instrumentation op and instead
         // leave that until late in the codegen pipeline.
         auto funcBuilder = OpBuilder::atBlockBegin(&funcOp.front());
-        Value zero = funcBuilder.create<arith::ConstantIndexOp>(loc, 0);
-        auto subspanOp = funcBuilder.create<IREE::Stream::BindingSubspanOp>(
-            loc, bufferType, bindingArg, /*byteOffset=*/zero, ValueRange{});
-        funcBuilder.create<IREE::HAL::InstrumentWorkgroupOp>(
-            loc, indexType, subspanOp.getResult(), dispatchIdArg);
+        Value zero = arith::ConstantIndexOp::create(funcBuilder, loc, 0);
+        auto subspanOp = IREE::Stream::BindingSubspanOp::create(
+            funcBuilder, loc, bufferType, bindingArg, /*byteOffset=*/zero,
+            ValueRange{});
+        IREE::HAL::InstrumentWorkgroupOp::create(
+            funcBuilder, loc, indexType, subspanOp.getResult(), dispatchIdArg);
 
         // Build function metadata.
         auto nameRef = metadataBuilder.createString(exportOp.getName());
@@ -232,9 +234,9 @@ struct MaterializeDispatchInstrumentationPass
         // Load the ringbuffer and capture it for use within the execute region.
         auto loadedValue =
             globalOp.createLoadOp(loc, parentBuilder).getLoadedGlobalValue();
-        Value zero = parentBuilder.create<arith::ConstantIndexOp>(loc, 0);
+        Value zero = arith::ConstantIndexOp::create(parentBuilder, loc, 0);
         Value bufferSize =
-            parentBuilder.create<arith::ConstantOp>(loc, bufferSizeAttr);
+            arith::ConstantOp::create(parentBuilder, loc, bufferSizeAttr);
         executeOp.getResourceOperandsMutable().append(loadedValue);
         executeOp.getResourceOperandSizesMutable().append(bufferSize);
         auto bufferArg =
@@ -263,8 +265,8 @@ struct MaterializeDispatchInstrumentationPass
           // deduplication.
           uint32_t dispatchSiteId = dispatchSiteCount++;
           dispatchOp.getUniformOperandsMutable().append(
-              parentBuilder
-                  .create<arith::ConstantIntOp>(loc, dispatchSiteId, 32)
+              arith::ConstantIntOp::create(parentBuilder, loc, dispatchSiteId,
+                                           32)
                   .getResult());
 
           // Record dispatch site to the host-side metadata.
@@ -309,8 +311,8 @@ struct MaterializeDispatchInstrumentationPass
     // Create query function for getting the instrumentation data.
     auto listType = moduleBuilder.getType<IREE::Util::ListType>(
         moduleBuilder.getType<IREE::Util::VariantType>());
-    auto queryOp = moduleBuilder.create<IREE::Util::FuncOp>(
-        loc, "__query_instruments",
+    auto queryOp = IREE::Util::FuncOp::create(
+        moduleBuilder, loc, "__query_instruments",
         moduleBuilder.getFunctionType({listType}, {}));
     {
       queryOp.setPublic();
@@ -325,9 +327,10 @@ struct MaterializeDispatchInstrumentationPass
                             metadataAttr.size(), queryBuilder));
 
       // Grab the read-only dispatch metadata.
-      iovecs.push_back(queryBuilder.create<IREE::Util::BufferConstantOp>(
-          loc, queryBuilder.getStringAttr("dispatch_instrument.fb"),
-          metadataAttr, queryBuilder.getIndexAttr(16),
+      iovecs.push_back(IREE::Util::BufferConstantOp::create(
+          queryBuilder, loc,
+          queryBuilder.getStringAttr("dispatch_instrument.fb"), metadataAttr,
+          queryBuilder.getIndexAttr(16),
           queryBuilder.getStringAttr("application/x-flatbuffers")));
 
       if (Value metadataPadding =
@@ -343,10 +346,10 @@ struct MaterializeDispatchInstrumentationPass
       Value buffer =
           globalOp.createLoadOp(loc, queryBuilder).getLoadedGlobalValue();
       Value bufferSize =
-          queryBuilder.create<arith::ConstantOp>(loc, bufferSizeAttr);
+          arith::ConstantOp::create(queryBuilder, loc, bufferSizeAttr);
       auto bufferViewType = moduleBuilder.getType<IREE::HAL::BufferViewType>();
-      auto exportOp = queryBuilder.create<IREE::Stream::TensorExportOp>(
-          loc, bufferViewType, buffer,
+      auto exportOp = IREE::Stream::TensorExportOp::create(
+          queryBuilder, loc, bufferViewType, buffer,
           RankedTensorType::get({totalBufferSize}, queryBuilder.getI8Type()),
           ValueRange{}, bufferSize,
           /*affinity=*/nullptr);
@@ -358,7 +361,7 @@ struct MaterializeDispatchInstrumentationPass
       }
 
       appendListItems(loc, listArg, iovecs, queryBuilder);
-      queryBuilder.create<IREE::Util::ReturnOp>(loc);
+      IREE::Util::ReturnOp::create(queryBuilder, loc);
     }
   }
 };

@@ -272,10 +272,21 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
   }
 #elif defined(IREE_ARCH_RISCV_64)
   iree_uk_uint64_t v = IREE_CPU_DATA0_RISCV_64_V;
+  iree_uk_uint64_t zvfhmin = IREE_CPU_DATA0_RISCV_64_ZVFHMIN;
+  iree_uk_uint64_t zvfh = IREE_CPU_DATA0_RISCV_64_ZVFH;
   if (!strcmp(cpu_features, "v")) {
     out_cpu_data_fields[0] = v;
     return;
   }
+  if (!strcmp(cpu_features, "zvfhmin")) {
+    out_cpu_data_fields[0] = zvfhmin;
+    return;
+  }
+  if (!strcmp(cpu_features, "zvfh")) {
+    out_cpu_data_fields[0] = zvfh;
+    return;
+  }
+
 #endif  // defined(IREE_ARCH_X86_64)
 
   // Fall back to interpreting cpu_features as a comma-separated list of LLVM

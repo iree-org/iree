@@ -23,10 +23,10 @@
 //  CHECK:                   tensor.pad %arg0 low[0, 0] high[0, %[[CEIL]]
 //  CHECK:                   linalg.generic
 //  CHECK:                   ^bb0(
-//  CHECK:                   arith.subf
-//  CHECK:  %[[EXP:.+]]    = math.exp
 //  CHECK:  %[[INDEX1:.+]] = linalg.index 1 : index
 //  CHECK:  %[[CMP:.+]]    = arith.cmpi ult, %[[INDEX1]], %[[DIMARG0]] : index
+//  CHECK:                   arith.subf
+//  CHECK:  %[[EXP:.+]]    = math.exp
 //  CHECK:  %[[SELECT:.+]] = arith.select %[[CMP]], %[[EXP:.+]], %[[ZEROF32]] : f32
 //  CHECK:  %[[ADD:.+]]   = arith.addf %[[SELECT]], %out : f32
 //  CHECK:  linalg.yield %[[ADD]] : f32
@@ -123,9 +123,9 @@ func.func @min_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>) -> tensor
 //   CHECK-DAG: %[[DIMARG0:.+]] = tensor.dim %arg0, %[[C1]] : tensor<1x?xf16>
 //       CHECK: linalg.generic
 //       CHECK: ^bb0(
-//       CHECK: %[[MUL:.+]] = arith.mulf
 //       CHECK: %[[INDEX1:.+]]  = linalg.index 1 : index
 //       CHECK: %[[CMP:.+]]     = arith.cmpi ult, %[[INDEX1]], %[[DIMARG0]] : index
+//       CHECK: %[[MUL:.+]] = arith.mulf
 //       CHECK: %[[SELECT:.+]]  = arith.select %[[CMP]], %[[MUL]], %[[ZERO]] : f16
 //       CHECK: %[[ADD:.+]]    = arith.addf %out, %[[SELECT]] : f16
 //       CHECK: linalg.yield %[[ADD]] : f16
@@ -159,10 +159,10 @@ func.func @standard_inner_product(%arg0 : tensor<1x?xf16>, %arg1 : tensor<1x?xf1
 //   CHECK-NOT:                   tensor.pad
 //       CHECK:                   linalg.generic
 //       CHECK:                   ^bb0(
-//       CHECK: %[[MUL:.+]]     = arith.mulf
-//       CHECK: %[[TRUNC:.+]]   = arith.truncf %[[MUL]] : f32 to f16
 //       CHECK: %[[INDEX1:.+]]  = linalg.index 1 : index
 //       CHECK: %[[CMP:.+]]     = arith.cmpi ult, %[[INDEX1]], %[[DIMARG0]] : index
+//       CHECK: %[[MUL:.+]]     = arith.mulf
+//       CHECK: %[[TRUNC:.+]]   = arith.truncf %[[MUL]] : f32 to f16
 //       CHECK: %[[SELECT:.+]]  = arith.select %[[CMP]], %[[TRUNC]], %[[ZERO]] : f16
 //       CHECK: %[[ADD:.+]]     = arith.addf %out, %[[SELECT]] : f16
 //       CHECK: linalg.yield %[[ADD]] : f16
@@ -191,8 +191,8 @@ func.func @standard_inner_product_with_trunc(%arg0 : tensor<1x?xf32>, %arg1 : te
 
 // CHECK-LABEL: product_of_sum_reduction
 //       CHECK: %[[ONE:.+]] = arith.constant 1.000000e+00 : f16
-//       CHECK: %[[ADD:.+]] = arith.addf
 //       CHECK: %[[CMP:.+]] = arith.cmpi
+//       CHECK: %[[ADD:.+]] = arith.addf
 //       CHECK: arith.select %[[CMP]], %[[ADD]], %[[ONE]] : f16
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
@@ -223,12 +223,12 @@ func.func @product_of_sum_reduction(%arg0 : tensor<1x?xf16>, %arg1 : tensor<1x?x
 //   CHECK-DAG: %[[DIM0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?xf16>
 //   CHECK-DAG: %[[DIM1:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xf16>
 //       CHECK: linalg.generic
-//   CHECK-DAG: %[[MUL:.+]] = arith.mulf
 //   CHECK-DAG: %[[INDEX0:.+]] = linalg.index 0 : index
 //   CHECK-DAG: %[[INDEX1:.+]] = linalg.index 1 : index
 //   CHECK-DAG: %[[CMP0:.+]] = arith.cmpi ult, %[[INDEX0]], %[[DIM1]] : index
 //   CHECK-DAG: %[[CMP1:.+]] = arith.cmpi ult, %[[INDEX1]], %[[DIM0]] : index
 //       CHECK: %[[AND:.+]] = arith.andi %[[CMP0]], %[[CMP1]] : i1
+//   CHECK-DAG: %[[MUL:.+]] = arith.mulf
 //       CHECK: %[[SELECT:.+]] = arith.select %[[AND]], %[[MUL]], %[[ZEROF16]] : f16
 //       CHECK: %[[ADD:.+]] = arith.addf %out, %[[SELECT]] : f16
 #map = affine_map<(d0, d1) -> (d1, d0)>
@@ -272,4 +272,48 @@ func.func @minmax_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>, %arg2 
      linalg.yield %1, %2 : f32, f32
    } -> (tensor<1xf32>, tensor<1xf32>)
   return %0#0, %0#1: tensor<1xf32>, tensor<1xf32>
+}
+
+
+// -----
+
+// The reduction dimension is perfectly tiled by the partial reduction (1024 % 128 == 0).
+// We confirm that we directly optimize this case, where the arith.select condition is always true.
+
+// CHECK-LABEL: reduction_static_complete_tile
+//   CHECK-NOT: arith.select
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @reduction_static_complete_tile(%arg0: tensor<1x1024xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1],
+                       iterator_types = ["parallel", "reduction"]}
+                       ins(%arg0 : tensor<1x1024xf32>) outs(%arg1 : tensor<1xf32>)
+   attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 128]}>}
+   {
+   ^bb0(%in: f32, %out: f32):
+     %1 = arith.maxnumf %in, %out : f32
+     linalg.yield %1 : f32
+   } -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+
+// -----
+
+// The reduction dimension is not perfectly tiled by the partial reduction (1024 % 100 != 0).
+
+// CHECK-LABEL: reduction_static_incomplete_tile
+//       CHECK: arith.select
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @reduction_static_incomplete_tile(%arg0: tensor<1x1024xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1],
+                       iterator_types = ["parallel", "reduction"]}
+                       ins(%arg0 : tensor<1x1024xf32>) outs(%arg1 : tensor<1xf32>)
+   attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 100]}>}
+   {
+   ^bb0(%in: f32, %out: f32):
+     %1 = arith.maxnumf %in, %out : f32
+     linalg.yield %1 : f32
+   } -> tensor<1xf32>
+  return %0 : tensor<1xf32>
 }

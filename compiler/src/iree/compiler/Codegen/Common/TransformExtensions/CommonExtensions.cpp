@@ -11,9 +11,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
@@ -123,59 +121,9 @@ void transform_dialect::ApplyIREELinalgElementwiseGreedyFusionPatternsOp::
                                                setFusedOpOperandLimit<3>);
 }
 
-//===---------------------------------------------------------------------===//
-// ApplyFoldFillIntoPadPatternsOp
-//===---------------------------------------------------------------------===//
-
-namespace {
-/// Fold `tensor.pad(cst, tensor.extract*(linalg.fill(cst)))` into
-/// `linalg.fill(cst, empty)` when the padding constant and the fill constant
-/// are the same.
-/// This seems generally desirable as a folding but may be too intrusive, so we
-/// only apply it selectively for now.
-// TODO: atm hardcoded on linalg.fill but we could take any result of any
-// generic that yields a constant in that result.
-struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::PadOp padOp,
-                                PatternRewriter &rewriter) const final {
-    Operation *currentOp = padOp.getSource().getDefiningOp();
-    auto maybeExtractSlice =
-        dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
-    while (currentOp && maybeExtractSlice) {
-      currentOp = maybeExtractSlice.getSource().getDefiningOp();
-      maybeExtractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
-    }
-    auto fillOp = dyn_cast_or_null<linalg::FillOp>(currentOp);
-    if (!fillOp) {
-      return rewriter.notifyMatchFailure(
-          padOp, "not coming from a linalg.fill op via tensor.extract_slice*");
-    }
-
-    Value padValue = padOp.getConstantPaddingValue();
-    RankedTensorType resultType = padOp.getResultType();
-    if (!padValue ||
-        getAsOpFoldResult(padValue) !=
-            getAsOpFoldResult(fillOp.getDpsInputOperand(0)->get())) {
-      return rewriter.notifyMatchFailure(
-          padOp, "not a constant value matching the fill value");
-    }
-
-    Location loc = padOp.getLoc();
-    auto emptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, tensor::getMixedSizes(rewriter, loc, padOp),
-        resultType.getElementType());
-    rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
-                                                emptyOp.getResult());
-
-    return success();
-  }
-};
-} // namespace
-
 void transform_dialect::ApplyFoldFillIntoPadPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
-  patterns.insert<FoldFillIntoPad>(patterns.getContext());
+  iree_compiler::populateFoldFillIntoPadPattern(patterns);
 }
 
 //===---------------------------------------------------------------------===//
@@ -290,12 +238,12 @@ DiagnosedSilenceableFailure transform_dialect::CopyTensorOperandOp::applyToOne(
                                      "Non tensor type operand to copy");
   }
   rewriter.setInsertionPoint(target);
-  Value empty = rewriter.create<tensor::EmptyOp>(
-      target->getLoc(),
+  Value empty = tensor::EmptyOp::create(
+      rewriter, target->getLoc(),
       tensor::getMixedSizes(rewriter, target->getLoc(), operand),
       tensorType.getElementType());
   Operation *copy =
-      rewriter.create<linalg::CopyOp>(target->getLoc(), operand, empty);
+      linalg::CopyOp::create(rewriter, target->getLoc(), operand, empty);
   target->setOperand(operandIndex, copy->getResult(0));
   results.push_back(copy);
   return DiagnosedSilenceableFailure::success();
@@ -395,17 +343,17 @@ static FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
   OpFoldResult one = rewriter.getIndexAttr(1);
 
   // Step 3. Create a new parallel loop with a single mapping id.
-  auto newForallOp = rewriter.create<scf::ForallOp>(
-      loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{newUpperBound},
-      ArrayRef<OpFoldResult>{one}, forallOp.getOutputs(),
-      rewriter.getArrayAttr({flatMapping}));
+  auto newForallOp = scf::ForallOp::create(
+      rewriter, loc, ArrayRef<OpFoldResult>{zero},
+      ArrayRef<OpFoldResult>{newUpperBound}, ArrayRef<OpFoldResult>{one},
+      forallOp.getOutputs(), rewriter.getArrayAttr({flatMapping}));
 
   rewriter.setInsertionPointToStart(newForallOp.getBody());
   Value linearId = newForallOp.getInductionVar(0);
 
   // Step 4. Delinearize the flat ID to the original basis.
-  auto ids = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, linearId, forallOp.getMixedUpperBound());
+  auto ids = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, linearId, forallOp.getMixedUpperBound());
 
   // Step 5. Inline the region of the original forall op.
   SmallVector<Value> newArgs(ids.getResults());
@@ -481,7 +429,7 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   for (auto attr : {bX, bY, bZ}) {
     if (!llvm::is_contained(blockMapping, attr)) {
       blockMapping.push_back(attr);
-      one = one ? one : rewriter.create<arith::ConstantIndexOp>(loc, 1);
+      one = one ? one : arith::ConstantIndexOp::create(rewriter, loc, 1);
       numBlocks.push_back(one);
     }
   }
@@ -502,9 +450,9 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
     auto idx = static_cast<int64_t>(
         llvm::cast<gpu::GPUBlockMappingAttr>(attr).getBlock());
     workgroupIdOps.push_back(
-        rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, idx));
+        HAL::InterfaceWorkgroupIDOp::create(rewriter, loc, idx));
     workgroupCountOps.push_back(
-        rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, idx));
+        HAL::InterfaceWorkgroupCountOp::create(rewriter, loc, idx));
   }
   bvm.map(forallOp.getInductionVars(), workgroupIdOps);
   bvm.map(forallOp.getUpperBound(rewriter), workgroupCountOps);
@@ -818,9 +766,8 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
 static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
-  return builder
-      .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
-                                builder.getI64IntegerAttr(alignment))
+  return memref::AllocaOp::create(builder, loc, memRefType, dynamicSizes,
+                                  builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 
@@ -831,7 +778,7 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
   // post-bufferization copies do not trigger properly.
   // So we keep using `createLinalgCopyOp` which builds a GenericOp.
-  // builder.create<linalg::CopyOp>(loc, from, to);
+  // linalg::CopyOp::create(builder, loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
 }
@@ -845,9 +792,8 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
   MemRefType allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpaceAttr);
-  return builder
-      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
-                               builder.getI64IntegerAttr(alignment))
+  return memref::AllocOp::create(builder, loc, allocType, dynamicSizes,
+                                 builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 
@@ -861,15 +807,15 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
     needsBarrier = true;
   }
   if (needsBarrier)
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   // TODO: ideally we should use linalg.copy which was recently reintroduced
   // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
   // post-bufferization copies do not trigger properly.
   // So we keep using `createLinalgCopyOp` which builds a GenericOp.
-  // builder.create<linalg::CopyOp>(loc, from, to);
+  // linalg::CopyOp::create(builder, loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   if (needsBarrier)
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   return success();
 }
 
@@ -904,7 +850,7 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 namespace {
 /// Pattern to rewrite tensor.empty to tensor.alloc.
 struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::EmptyOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1131,11 +1077,13 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   //
   // lane_id = (tid_x + tid_y * dim_x + tid_z * dim_y * dim_x) % subgroup_size;
   Value laneId =
-      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+      gpu::ThreadIdOp::create(rewriter, target.getLoc(), gpu::Dimension::x);
   int64_t subgroupSize = getSubgroupSize();
+  ArrayRef<int64_t> workgroupSize = getWorkgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
+                                                workgroupSize);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);
@@ -1144,52 +1092,6 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
 }
 
 void transform_dialect::TestGpuVectorDistribution::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTargetMutable(), effects);
-  transform::modifiesPayload(effects);
-}
-
-//===----------------------------------------------------------------------===//
-// TestVectorLayoutAnalysisOp
-//===----------------------------------------------------------------------===//
-
-static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
-                              mlir::FunctionOpInterface funcOp) {
-  funcOp.walk([&](Operation *op) {
-    // Do not emit remarks for conflict operations.
-    if (isa<VectorExt::ToLayoutOp>(op)) {
-      return;
-    }
-
-    for (OpResult result : op->getOpResults()) {
-      if (auto layout = analysis.getLayout<Attribute>(result)) {
-        // Print layout attr to a string.
-        std::string layoutStr;
-        llvm::raw_string_ostream s(layoutStr);
-        s << layout;
-        // Emit remark.
-        op->emitRemark("layout of result #" + Twine(result.getResultNumber()) +
-                       " is " + s.str());
-      }
-    }
-  });
-}
-
-DiagnosedSilenceableFailure
-transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
-    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  VectorLayoutAnalysis analysis(target);
-  if (failed(analysis.run())) {
-    target.emitError("layout analysis failed");
-    return emitDefaultSilenceableFailure(target);
-  }
-  emitLayoutRemarks(analysis, target);
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);

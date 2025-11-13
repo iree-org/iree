@@ -26,15 +26,16 @@ public:
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
       funcOp.walk([&](IREE::HAL::Loader::ExecutableExportOrdinalOp ordinalOp) {
         auto exportOp =
             symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
                 ordinalOp, ordinalOp.getEntryPointAttr());
-        Value value = OpBuilder(ordinalOp).create<arith::ConstantIndexOp>(
-            ordinalOp.getLoc(), exportOp.getOrdinalAttr().getInt());
+        OpBuilder builder(ordinalOp);
+        Value value = arith::ConstantIndexOp::create(
+            builder, ordinalOp.getLoc(), exportOp.getOrdinalAttr().getInt());
         ordinalOp.replaceAllUsesWith(value);
         ordinalOp.erase();
       });

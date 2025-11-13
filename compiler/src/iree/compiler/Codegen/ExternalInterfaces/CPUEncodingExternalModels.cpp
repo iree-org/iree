@@ -43,7 +43,6 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/DebugLog.h"
@@ -158,16 +157,15 @@ static Value createElementWiseExtUIOp(OpBuilder &builder, Value input,
   SmallVector<OpFoldResult> inputMixedSizes =
       tensor::getMixedSizes(builder, loc, input);
   Value init =
-      builder.create<tensor::EmptyOp>(loc, inputMixedSizes, outElemType);
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, input, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                b.create<arith::ExtUIOp>(nestedLoc, outElemType, args[0])
-                    ->getResult(0);
-            b.create<linalg::YieldOp>(nestedLoc, castRes);
-          })
+      tensor::EmptyOp::create(builder, loc, inputMixedSizes, outElemType);
+  return linalg::GenericOp::create(
+             builder, loc, castedType, input, init, maps, iteratorTypes,
+             [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+               Value castRes =
+                   arith::ExtUIOp::create(b, nestedLoc, outElemType, args[0])
+                       ->getResult(0);
+               linalg::YieldOp::create(b, nestedLoc, castRes);
+             })
       .getResult(0);
 }
 
@@ -195,7 +193,7 @@ static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
         type, /*isBatched=*/!cDims->batch.empty(),
         /*isTransposed=*/operandIdx == 2 && (transpose ^ cDims->n.empty()), ri);
     expandedValue =
-        builder.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
+        tensor::ExpandShapeOp::create(builder, loc, newType, value, ri);
   }
   if (elemTypes[operandIdx].isUnsignedInteger()) {
     return createElementWiseExtUIOp(builder, expandedValue, loc,
@@ -285,11 +283,11 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   return bestRatedTile;
 }
 
-FailureOr<Operation *> lowerContractionOpWithEncoding(
+Operation *lowerContractionOpWithEncoding(
     OpBuilder &builder, linalg::LinalgOp linalgOp, ValueRange operands,
     IREE::Encoding::LayoutMaterializerAttr layoutAttr) {
   if (!linalgOp.hasPureTensorSemantics()) {
-    return failure();
+    return nullptr;
   }
 
   auto inputs = linalgOp.getDpsInputOperands();
@@ -302,14 +300,14 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
   auto rhsEncoding = IREE::Encoding::getEncodingAttr(rhsType);
   auto resultEncoding = IREE::Encoding::getEncodingAttr(resultType);
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
-    return failure();
+    return nullptr;
   }
 
   if (lhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_LHS ||
       rhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RHS ||
       resultEncoding.getOperandIndex().getValue() !=
           IREE::Encoding::MATMUL_RESULT) {
-    return failure();
+    return nullptr;
   }
 
   MaterializeEncodingInfo encodingInfo = {};
@@ -341,17 +339,18 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
   auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
   Operation *result;
   if (cDims->batch.empty()) {
-    result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
-                                             ValueRange{newLhs, newRhs},
-                                             ValueRange{newResult});
+    result = linalg::Mmt4DOp::create(builder, linalgOp.getLoc(), newResultType,
+                                     ValueRange{newLhs, newRhs},
+                                     ValueRange{newResult});
   } else {
-    result = builder.create<linalg::BatchMmt4DOp>(
-        linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
+    result = linalg::BatchMmt4DOp::create(
+        builder, linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
         ValueRange{newResult});
   }
   if (!ri.empty()) {
-    result = builder.create<tensor::CollapseShapeOp>(
-        linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
+    result = tensor::CollapseShapeOp::create(builder, linalgOp->getLoc(),
+                                             operands[2].getType(),
+                                             result->getResult(0), ri);
   }
   return result;
 }
@@ -435,6 +434,23 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
         TileMxNxK{2, N0, 1}, // Truncation of the above.
         TileMxNxK{1, N0, 1}, // Truncation of the above.
     };
+  }
+  if (lhs.isF16() && rhs.isF16()) {
+    int N0 = vlen / 8;
+    if (hasFeature(config, "+zvfh")) {
+      return {
+          TileMxNxK{7, N0, 1}, TileMxNxK{4, N0, 1}, // Truncation of the above.
+          TileMxNxK{2, N0, 1},                      // Truncation of the above.
+          TileMxNxK{1, N0, 1},                      // Truncation of the above.
+      };
+    }
+    if (hasFeature(config, "+zvfhmin")) {
+      return {
+          TileMxNxK{6, N0, 1}, TileMxNxK{4, N0, 1}, // Truncation of the above.
+          TileMxNxK{2, N0, 1},                      // Truncation of the above.
+          TileMxNxK{1, N0, 1},                      // Truncation of the above.
+      };
+    }
   }
   // Fallback - no architecture-optimized tile size for this case.
   return {};
@@ -725,11 +741,21 @@ struct CPUEncodingResolverMaterializerAttr final
     if (!linalgOp) {
       return nullptr;
     }
-
-    FailureOr<Operation *> newOp = lowerContractionOpWithEncoding(
-        b, linalgOp, convertedOperands,
-        cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
-    return newOp.value_or(nullptr);
+    if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
+      return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
+                                            convertedOperands);
+    }
+    if (linalg::isaContractionOpInterface(linalgOp)) {
+      return lowerContractionOpWithEncoding(
+          b, linalgOp, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      return lowerGenericOpWithResolvedLayouts(
+          b, genericOp, convertedResTypes, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(attr));
+    }
+    return nullptr;
   }
 };
 
@@ -760,6 +786,10 @@ struct CPULayoutResolverAttr final
 struct CPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<CPUSerializableAttr,
                                                       CPUEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration = cast<CPUEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -865,11 +895,21 @@ struct VMVXEncodingResolverMaterializerAttr final
     if (!linalgOp) {
       return nullptr;
     }
-
-    FailureOr<Operation *> newOp = lowerContractionOpWithEncoding(
-        b, linalgOp, convertedOperands,
-        cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
-    return newOp.value_or(nullptr);
+    if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
+      return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
+                                            convertedOperands);
+    }
+    if (linalg::isaContractionOpInterface(linalgOp)) {
+      return lowerContractionOpWithEncoding(
+          b, linalgOp, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      return lowerGenericOpWithResolvedLayouts(
+          b, genericOp, convertedResTypes, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(attr));
+    }
+    return nullptr;
   }
 };
 
@@ -895,6 +935,12 @@ struct VMVXLayoutResolverAttr final
 struct VMVXSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<
           VMVXSerializableAttr, VMVXEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration =
+        cast<VMVXEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
+
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {

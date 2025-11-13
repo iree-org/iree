@@ -312,3 +312,149 @@ util.func @collapse_of_expand_to_scalar(%arg0: tensor<1x1xf16>, %arg1: index, %a
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
 //  CHECK-SAME:     tensor<1x1xf16> into tensor<f16>
 //       CHECK:   util.return %[[COLLAPSED]] : tensor<f16>
+
+// -----
+
+util.func @collapse_of_expand_trailing_unit_dims(%arg0: tensor<23040x1xbf16>) -> tensor<4x5760xbf16> {
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2, 3]] output_shape [4, 5760, 1, 1] : tensor<23040x1xbf16> into tensor<4x5760x1x1xbf16>
+  %collapsed = tensor.collapse_shape %expanded [[0], [1, 2, 3]] : tensor<4x5760x1x1xbf16> into tensor<4x5760xbf16>
+  util.return %collapsed : tensor<4x5760xbf16>
+}
+// CHECK-LABEL: util.func public @collapse_of_expand_trailing_unit_dims
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<23040x1xbf16>
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//  CHECK-SAME:     tensor<23040x1xbf16> into tensor<4x5760x1xbf16>
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXPAND]]
+//  CHECK-SAME:     tensor<4x5760x1xbf16> into tensor<4x5760xbf16>
+//       CHECK:   util.return %[[COLLAPSE]] : tensor<4x5760xbf16>
+
+// -----
+
+// This test considers the case where we have multiple trailing unit dims but must preserve one for the output,
+// as well as an isolated unit dim that must be preserved for the collapse's reassociation dims.
+util.func @collapse_of_expand_preserved_trailing_unit_dims(%arg0: tensor<1x23040xbf16>) -> tensor<4x5760x1xbf16> {
+  %expanded = tensor.expand_shape %arg0 [[0], [1, 2, 3, 4, 5]] output_shape [1, 4, 5760, 1, 1, 1] : tensor<1x23040xbf16> into tensor<1x4x5760x1x1x1xbf16>
+  %collapsed = tensor.collapse_shape %expanded [[0, 1], [2], [3, 4, 5]] : tensor<1x4x5760x1x1x1xbf16> into tensor<4x5760x1xbf16>
+  util.return %collapsed : tensor<4x5760x1xbf16>
+}
+// CHECK-LABEL: util.func public @collapse_of_expand_preserved_trailing_unit_dims
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<1x23040xbf16>
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//  CHECK-SAME:     tensor<1x23040xbf16> into tensor<1x4x5760x1xbf16>
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXPAND]]
+//  CHECK-SAME:     tensor<1x4x5760x1xbf16> into tensor<4x5760x1xbf16>
+//       CHECK:   util.return %[[COLLAPSE]] : tensor<4x5760x1xbf16>
+
+// -----
+
+util.func @fold_unit_dims_from_extract_leading(%arg0: tensor<1x4x8xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<1x4x8xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_leading
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x4x8xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1], [2]{{\]}}
+//  CHECK-SAME:     tensor<1x4x8xf32> into tensor<4x8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX1]], %[[IDX2]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_from_extract_trailing(%arg0: tensor<4x8x1xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<4x8x1xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_trailing
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x8x1xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2]{{\]}}
+//  CHECK-SAME:     tensor<4x8x1xf32> into tensor<4x8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX0]], %[[IDX1]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_from_extract_middle(%arg0: tensor<4x1x8xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<4x1x8xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_middle
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1x8xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2]{{\]}}
+//  CHECK-SAME:     tensor<4x1x8xf32> into tensor<4x8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX0]], %[[IDX2]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_from_extract_multiple(%arg0: tensor<1x4x1x8x1xf32>, %idx0: index, %idx1: index, %idx2: index, %idx3: index, %idx4: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2, %idx3, %idx4] : tensor<1x4x1x8x1xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_multiple
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x4x1x8x1xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX3:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX4:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1], [2, 3, 4]{{\]}}
+//  CHECK-SAME:     tensor<1x4x1x8x1xf32> into tensor<4x8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+// Test folding consecutive unit dims from tensor.extract
+util.func @fold_unit_dims_from_extract_consecutive(%arg0: tensor<1x1x1x8xf32>, %idx0: index, %idx1: index, %idx2: index, %idx3: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2, %idx3] : tensor<1x1x1x8xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_consecutive
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x1x1x8xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX3:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1, 2, 3]{{\]}}
+//  CHECK-SAME:     tensor<1x1x1x8xf32> into tensor<8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX3]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+// Test folding unit dims with dynamic dimensions
+util.func @fold_unit_dims_from_extract_dynamic(%arg0: tensor<1x?x1xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<1x?x1xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_dynamic
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?x1xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1, 2]{{\]}}
+//  CHECK-SAME:     tensor<1x?x1xf32> into tensor<?xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX1]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_from_extract_all_unit(%arg0: tensor<1x1x1xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<1x1x1xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_all_unit
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x1x1xf32>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] []
+//  CHECK-SAME:     tensor<1x1x1xf32> into tensor<f32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]]
+//  CHECK-SAME:     tensor<f32>
+//       CHECK:   util.return %[[EXTRACT]] : f32

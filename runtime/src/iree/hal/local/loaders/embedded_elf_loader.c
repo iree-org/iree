@@ -12,6 +12,7 @@
 
 #include "iree/hal/api.h"
 #include "iree/hal/local/elf/elf_module.h"
+#include "iree/hal/local/executable_format.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/executable_library_util.h"
 #include "iree/hal/local/executable_plugin_manager.h"
@@ -211,11 +212,53 @@ static iree_status_t iree_hal_elf_executable_issue_call(
                         ret);
 }
 
+static iree_host_size_t iree_hal_elf_executable_export_count(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_elf_executable_t* executable =
+      (iree_hal_elf_executable_t*)base_executable;
+  return iree_hal_executable_library_export_count(executable->library.v0);
+}
+
+static iree_status_t iree_hal_elf_executable_export_info(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  iree_hal_elf_executable_t* executable =
+      (iree_hal_elf_executable_t*)base_executable;
+  return iree_hal_executable_library_export_info(executable->library.v0,
+                                                 export_ordinal, out_info);
+}
+
+static iree_status_t iree_hal_elf_executable_export_parameters(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  iree_hal_elf_executable_t* executable =
+      (iree_hal_elf_executable_t*)base_executable;
+  return iree_hal_executable_library_export_parameters(
+      executable->library.v0, export_ordinal, capacity, out_parameters);
+}
+
+static iree_status_t iree_hal_elf_executable_lookup_export_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  iree_hal_elf_executable_t* executable =
+      (iree_hal_elf_executable_t*)base_executable;
+  return iree_hal_executable_library_lookup_export_by_name(
+      executable->library.v0, name, out_export_ordinal);
+}
+
 static const iree_hal_local_executable_vtable_t iree_hal_elf_executable_vtable =
     {
         .base =
             {
                 .destroy = iree_hal_elf_executable_destroy,
+                .export_count = iree_hal_elf_executable_export_count,
+                .export_info = iree_hal_elf_executable_export_info,
+                .export_parameters = iree_hal_elf_executable_export_parameters,
+                .lookup_export_by_name =
+                    iree_hal_elf_executable_lookup_export_by_name,
             },
         .issue_call = iree_hal_elf_executable_issue_call,
 };
@@ -273,6 +316,20 @@ static void iree_hal_embedded_elf_loader_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t iree_hal_embedded_elf_loader_infer_format(
+    iree_hal_executable_loader_t* base_executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_hal_executable_infer_elf_format(
+      executable_data, executable_format_capacity, executable_format,
+      out_inferred_size);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static bool iree_hal_embedded_elf_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -301,6 +358,7 @@ static iree_status_t iree_hal_embedded_elf_loader_try_load(
 static const iree_hal_executable_loader_vtable_t
     iree_hal_embedded_elf_loader_vtable = {
         .destroy = iree_hal_embedded_elf_loader_destroy,
+        .infer_format = iree_hal_embedded_elf_loader_infer_format,
         .query_support = iree_hal_embedded_elf_loader_query_support,
         .try_load = iree_hal_embedded_elf_loader_try_load,
 };

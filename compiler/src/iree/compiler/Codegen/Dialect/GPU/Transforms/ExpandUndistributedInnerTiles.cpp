@@ -101,7 +101,7 @@ static LogicalResult materializeOperandExpandedShape(
 
 namespace {
 struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   ExpandInnerTileShapes(MLIRContext *context, bool expandInputs,
                         bool expandOutputs)
@@ -111,7 +111,21 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
   LogicalResult matchAndRewrite(Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (!tiledOp.hasTensorSemantics()) {
-      return failure();
+      return rewriter.notifyMatchFailure(tiledOp, "requires tensor semantics");
+    }
+    auto semantics =
+        dyn_cast<IREE::GPU::InnerTiledSemanticsAttr>(tiledOp.getSemantics());
+    if (!semantics) {
+      return rewriter.notifyMatchFailure(
+          tiledOp, "unexpected tiled op semantics attribute type");
+    }
+    if (semantics.getDistributed()) {
+      return rewriter.notifyMatchFailure(tiledOp,
+                                         "only applies to undistributed ops");
+    }
+    if (!semantics.getOpaque()) {
+      return rewriter.notifyMatchFailure(
+          tiledOp, "non-opaque ops are already expanded by definition");
     }
     Location loc = tiledOp.getLoc();
 
@@ -147,8 +161,8 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
               permutation, reassociations, expandedType))) {
         continue;
       }
-      auto expandOp = rewriter.create<tensor::ExpandShapeOp>(
-          loc, expandedType, operand, reassociations);
+      auto expandOp = tensor::ExpandShapeOp::create(rewriter, loc, expandedType,
+                                                    operand, reassociations);
       maybeExpands[opIndex] = expandOp;
       newOperands[opIndex] = expandOp.getResult();
 
@@ -187,11 +201,15 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
       newPermutationsAttr = rewriter.getArrayAttr(newPermutations);
     }
     // Create the new inner_tiled op with the expanded type.
-    auto expandedTiledOp = rewriter.create<Codegen::InnerTiledOp>(
-        loc, /*inputs=*/ValueRange{newOperands}.take_front(numInputs),
+    // Note on preserving existing semantics without trying to set opaque=false:
+    // Even in the cases where all operands and results have been expanded, when
+    // the target MMA vector type is flattened as in MMAAttr's vector type
+    // accessors, the opaque verifier semantics remain necessary.
+    auto expandedTiledOp = Codegen::InnerTiledOp::create(
+        rewriter, loc, /*inputs=*/ValueRange{newOperands}.take_front(numInputs),
         /*inits=*/ValueRange{newOperands}.drop_front(numInputs),
         tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
-        tiledOp.getKind(), newPermutationsAttr);
+        tiledOp.getKind(), tiledOp.getSemantics(), newPermutationsAttr);
 
     if (auto config = getLoweringConfig(tiledOp)) {
       setLoweringConfig(expandedTiledOp, config);
@@ -205,8 +223,8 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
       if (!tiedInitExpand) {
         continue;
       }
-      result = rewriter.create<tensor::CollapseShapeOp>(
-          loc, tiledOp.getResultTypes()[resIndex], result,
+      result = tensor::CollapseShapeOp::create(
+          rewriter, loc, tiledOp.getResultTypes()[resIndex], result,
           tiedInitExpand.getReassociation());
     }
 

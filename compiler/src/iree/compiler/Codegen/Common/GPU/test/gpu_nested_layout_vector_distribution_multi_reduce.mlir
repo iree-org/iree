@@ -150,14 +150,12 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @inter_subgroup_reduction
-// CHECK-DAG: %[[CST1:.+]] = arith.constant dense<0.000000e+00> : vector<2xf32>
 // Local reduction
 // CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<2x1x1x1x1x4xf32> to vector<2x1x1xf32>
 // Thread reduction
 // CHECK: %[[THREAD_RED0:.+]] = gpu.subgroup_reduce  maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
-// CHECK: %[[THREAD_RED1:.+]] = vector.insert %[[THREAD_RED0]], %[[CST1]] [0] : f32 into vector<2xf32>
 // CHECK: %[[THREAD_RED2:.+]] = gpu.subgroup_reduce  maximumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
-// CHECK: %[[THREAD_RED3:.+]] = vector.insert %[[THREAD_RED2]], %[[THREAD_RED1]] [1] : f32 into vector<2xf32>
+// CHECK: %[[THREAD_RED3:.+]] = vector.from_elements %[[THREAD_RED0]], %[[THREAD_RED2]] : vector<2xf32>
 // CHECK: %[[THREAD_RED4:.+]] = vector.shape_cast %[[THREAD_RED3]] : vector<2xf32> to vector<2x1x1xf32>
 // Subgroup reduction
 // CHECK-DAG: %[[ALLOC:.+]] = memref.alloc() : memref<32x2xf32, #gpu.address_space<workgroup>>
@@ -177,11 +175,10 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<2x1x1xf32>
 // CHECK-DAG: %[[DISTR0:.+]] = vector.extract %[[SG_READ0]][0, 0] : f32 from vector<1x1xf32>
 // CHECK-DAG: %[[RED0:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR0]] cluster(size = 2, stride = 16) : (f32) -> f32
-// CHECK-DAG: %[[INS0:.+]] = vector.insert %[[RED0]], %[[CST1]] [0] : f32 into vector<2xf32>
 // CHECK-DAG: %[[DISTR1:.+]] = vector.extract %[[SG_READ1]][0, 0] : f32 from vector<1x1xf32>
 // CHECK-DAG: %[[RED1:.+]] = gpu.subgroup_reduce  maximumf %[[DISTR1]] cluster(size = 2, stride = 16) : (f32) -> f32
-// CHECK-DAG: %[[INS1:.+]] = vector.insert %[[RED1]], %[[INS0]] [1] : f32 into vector<2xf32>
-// CHECK-DAG: %[[CAST:.+]] = vector.shape_cast %[[INS1]] : vector<2xf32> to vector<2x1x1xf32>
+// CHECK-DAG: %[[INS:.+]] = vector.from_elements %[[RED0]], %[[RED1]] : vector<2xf32>
+// CHECK-DAG: %[[CAST:.+]] = vector.shape_cast %[[INS]] : vector<2xf32> to vector<2x1x1xf32>
 // CHECK-DAG: arith.maximumf %[[CAST]], %[[ACC]] : vector<2x1x1xf32>
 
 // -----

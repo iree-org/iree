@@ -1408,9 +1408,9 @@ ResourceAllocOp::createSuballocations(
   if (locs.empty())
     return {};
   if (locs.size() == 1) {
-    auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
-        locs.front(), resourceType, storageSizes.front(), uninitialized,
-        affinityAttr);
+    auto allocOp = IREE::Stream::ResourceAllocOp::create(
+        builder, locs.front(), resourceType, storageSizes.front(),
+        uninitialized, affinityAttr);
     return {allocOp, {allocOp.getResult()}};
   }
   auto fusedLoc = builder.getFusedLoc(locs);
@@ -1430,13 +1430,13 @@ ResourceAllocOp::createSuballocations(
   // pack op.
   auto indexType = builder.getIndexType();
   SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
-  auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
-      fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
+  auto packOp = IREE::Stream::ResourcePackOp::create(
+      builder, fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
       builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
 
   // Create the new alloca based on the total required size.
-  auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
-      fusedLoc, resourceType, packOp.getTotalLength(), uninitialized,
+  auto allocOp = IREE::Stream::ResourceAllocOp::create(
+      builder, fusedLoc, resourceType, packOp.getTotalLength(), uninitialized,
       affinityAttr);
   auto slab = allocOp.getResult();
   auto slabSize = packOp.getTotalLength();
@@ -1445,10 +1445,10 @@ ResourceAllocOp::createSuballocations(
   SmallVector<Value> results;
   for (auto [loc, subviewOffset, subviewLength] :
        llvm::zip_equal(locs, packOp.getPackedOffsets(), storageSizes)) {
-    results.push_back(builder
-                          .create<IREE::Stream::ResourceSubviewOp>(
-                              loc, slab, slabSize, subviewOffset, subviewLength)
-                          .getResult());
+    results.push_back(
+        IREE::Stream::ResourceSubviewOp::create(builder, loc, slab, slabSize,
+                                                subviewOffset, subviewLength)
+            .getResult());
   }
   return {allocOp, results};
 }
@@ -1470,8 +1470,9 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   if (locs.empty())
     return {};
   if (locs.size() == 1) {
-    auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
-        locs.front(), resourceType, timepointType, storageSizes.front(),
+    auto allocaOp = IREE::Stream::ResourceAllocaOp::create(
+        builder, locs.front(), resourceType, timepointType,
+        storageSizes.front(),
         /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
     return {allocaOp, {allocaOp.getResult()}};
   }
@@ -1495,13 +1496,13 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   // pack op.
   auto indexType = builder.getIndexType();
   SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
-  auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
-      fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
+  auto packOp = IREE::Stream::ResourcePackOp::create(
+      builder, fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
       builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
 
   // Create the new alloca based on the total required size.
-  auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
-      fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
+  auto allocaOp = IREE::Stream::ResourceAllocaOp::create(
+      builder, fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
       /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
   auto slab = allocaOp.getResult();
   auto slabSize = packOp.getTotalLength();
@@ -1510,10 +1511,10 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   SmallVector<Value> results;
   for (auto [loc, subviewOffset, subviewLength] :
        llvm::zip_equal(locs, packOp.getPackedOffsets(), storageSizes)) {
-    results.push_back(builder
-                          .create<IREE::Stream::ResourceSubviewOp>(
-                              loc, slab, slabSize, subviewOffset, subviewLength)
-                          .getResult());
+    results.push_back(
+        IREE::Stream::ResourceSubviewOp::create(builder, loc, slab, slabSize,
+                                                subviewOffset, subviewLength)
+            .getResult());
   }
   return {allocaOp, results};
 }
@@ -1687,85 +1688,6 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
     }
   }
   return {};
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.load
-//===----------------------------------------------------------------------===//
-
-LogicalResult ParameterLoadOp::verify() {
-  ParameterLoadOp op = *this;
-  size_t expectedCount = op.getSourceKeys().size();
-  if (op.getSourceOffsets().size() != expectedCount ||
-      op.getResultSizes().size() != expectedCount) {
-    return op.emitOpError() << "requires that the source keys, source offsets, "
-                               "and result sizes are all 1:1";
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.read
-//===----------------------------------------------------------------------===//
-
-LogicalResult ParameterReadOp::verify() {
-  ParameterReadOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.write
-//===----------------------------------------------------------------------===//
-
-LogicalResult ParameterWriteOp::verify() {
-  ParameterWriteOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.gather
-//===----------------------------------------------------------------------===//
-
-LogicalResult ParameterGatherOp::verify() {
-  ParameterGatherOp op = *this;
-  size_t expectedCount = op.getSourceKeys().size();
-  if (op.getSourceOffsets().size() != expectedCount ||
-      op.getTargetOffsets().size() != expectedCount ||
-      op.getTargetLengths().size() != expectedCount) {
-    return op.emitOpError()
-           << "requires that the source keys, source offsets, target offsets, "
-              "and target lengths are all 1:1";
-  }
-  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.parameter.scatter
-//===----------------------------------------------------------------------===//
-
-LogicalResult ParameterScatterOp::verify() {
-  ParameterScatterOp op = *this;
-  size_t expectedCount = op.getTargetKeys().size();
-  if (op.getSourceOffsets().size() != expectedCount ||
-      op.getSourceLengths().size() != expectedCount ||
-      op.getTargetOffsets().size() != expectedCount) {
-    return op.emitOpError()
-           << "requires that the source offsets, source lengths, target keys, "
-              "and target offsets are all 1:1";
-  }
-  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
-    return failure();
-  }
-  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2586,7 +2508,7 @@ IREE::Stream::AffinityAttr AsyncTransferOp::getAffinityAttr() {
     // If result is staging then the op should execute on the producer.
     return getSourceAffinityAttr();
   } else {
-    // Default to result affinity.
+    // Default to source affinity (today we transfer from sources).
     return getSourceAffinityAttr();
   }
 }
@@ -2605,9 +2527,9 @@ void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
   } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
     // If source is staging then the op should execute on the consumer.
     if (value) {
-      setResultAffinityAttr(value);
+      setTargetAffinityAttr(value);
     } else {
-      removeResultAffinityAttr();
+      removeTargetAffinityAttr();
     }
   } else if (resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
     // If result is staging then the op should execute on the producer.
@@ -2619,11 +2541,15 @@ void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
   } else {
     // Default to result affinity.
     if (value) {
-      setResultAffinityAttr(value);
+      setTargetAffinityAttr(value);
     } else {
-      removeResultAffinityAttr();
+      removeTargetAffinityAttr();
     }
   }
+}
+
+IREE::Stream::AffinityAttr AsyncTransferOp::getResultAffinityAttr() {
+  return getTargetAffinityAttr();
 }
 
 void AsyncTransferOp::getAsyncAccessRanges(
@@ -3080,8 +3006,8 @@ std::pair<unsigned, unsigned> AsyncExecuteOp::getTiedResultsIndexAndLength() {
 }
 
 OperandRange
-AsyncExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
-  assert(point.getRegionOrNull() == &getBody() && "invalid region index");
+AsyncExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+  assert(successor.getSuccessor() == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
@@ -3091,7 +3017,7 @@ void AsyncExecuteOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor(getResults()));
+    regions.push_back(RegionSuccessor(getOperation(), getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
@@ -3176,8 +3102,8 @@ AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
   assert(getTiedOperandsIndexAndLength().first == 0 &&
          "operands must be the first ODS group");
 
-  auto newOp = rewriter.create<AsyncExecuteOp>(
-      getLoc(), newResultTypes, newResultSizes, getAwaitTimepoint(),
+  auto newOp = AsyncExecuteOp::create(
+      rewriter, getLoc(), newResultTypes, newResultSizes, getAwaitTimepoint(),
       newOperandsValues, newOperandSizes, newTiedOperandIndices,
       getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
@@ -3235,8 +3161,8 @@ LogicalResult AsyncConcurrentOp::verify() {
 }
 
 OperandRange
-AsyncConcurrentOp::getEntrySuccessorOperands(RegionBranchPoint point) {
-  assert(point == &getBody() && "invalid region index");
+AsyncConcurrentOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+  assert(successor.getSuccessor() == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
@@ -3246,7 +3172,7 @@ void AsyncConcurrentOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor(getResults()));
+    regions.push_back(RegionSuccessor(getOperation(), getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
@@ -3297,8 +3223,8 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
   assert(getTiedOperandsIndexAndLength().first == 0 &&
          "operands must be the first ODS group");
 
-  auto newOp = rewriter.create<AsyncConcurrentOp>(
-      getLoc(), newResultTypes, newResultSizes, newOperandsValues,
+  auto newOp = AsyncConcurrentOp::create(
+      rewriter, getLoc(), newResultTypes, newResultSizes, newOperandsValues,
       newOperandSizes, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
@@ -4044,8 +3970,9 @@ LogicalResult CmdExecuteOp::verify() {
   return success();
 }
 
-OperandRange CmdExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
-  assert(point == &getBody() && "invalid region index");
+OperandRange
+CmdExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+  assert(successor.getSuccessor() == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
@@ -4055,7 +3982,8 @@ void CmdExecuteOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor({}));
+    regions.push_back(
+        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
   }
@@ -4092,9 +4020,9 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
 
-  auto newOp = rewriter.create<CmdExecuteOp>(getLoc(), getAwaitTimepoint(),
-                                             newOperandsValues, newOperandSizes,
-                                             getOperation()->getAttrs());
+  auto newOp = CmdExecuteOp::create(rewriter, getLoc(), getAwaitTimepoint(),
+                                    newOperandsValues, newOperandSizes,
+                                    getOperation()->getAttrs());
   newOp.setOnce(getOnce());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
@@ -4125,7 +4053,8 @@ void CmdSerialOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor({}));
+    regions.push_back(
+        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
   }
@@ -4150,10 +4079,90 @@ void CmdConcurrentOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor({}));
+    regions.push_back(
+        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
   }
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult CmdParameterLoadOp::verify() {
+  CmdParameterLoadOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getResultSizes().size() != expectedCount) {
+    return op.emitOpError() << "requires that the source keys, source offsets, "
+                               "and result sizes are all 1:1";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.read
+//===----------------------------------------------------------------------===//
+
+LogicalResult CmdParameterReadOp::verify() {
+  CmdParameterReadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.write
+//===----------------------------------------------------------------------===//
+
+LogicalResult CmdParameterWriteOp::verify() {
+  CmdParameterWriteOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.gather
+//===----------------------------------------------------------------------===//
+
+LogicalResult CmdParameterGatherOp::verify() {
+  CmdParameterGatherOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount ||
+      op.getTargetLengths().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source keys, source offsets, target offsets, "
+              "and target lengths are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.parameter.scatter
+//===----------------------------------------------------------------------===//
+
+LogicalResult CmdParameterScatterOp::verify() {
+  CmdParameterScatterOp op = *this;
+  size_t expectedCount = op.getTargetKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getSourceLengths().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source offsets, source lengths, target keys, "
+              "and target offsets are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -4173,8 +4182,8 @@ Value TimepointJoinOp::join(Location loc, ValueRange timepoints,
   assert(!timepoints.empty() && "must have at least one timepoint");
   if (timepoints.size() == 1)
     return timepoints.front();
-  return builder.create<IREE::Stream::TimepointJoinOp>(
-      loc, builder.getType<IREE::Stream::TimepointType>(), timepoints);
+  return IREE::Stream::TimepointJoinOp::create(
+      builder, loc, builder.getType<IREE::Stream::TimepointType>(), timepoints);
 }
 
 // static
@@ -4421,7 +4430,7 @@ LogicalResult DispatchWorkgroupSizeOp::verify() {
 //===----------------------------------------------------------------------===//
 
 MutableOperandRange
-YieldOp::getMutableSuccessorOperands(RegionBranchPoint point) {
+YieldOp::getMutableSuccessorOperands(RegionSuccessor successor) {
   return getResourceOperandsMutable();
 }
 

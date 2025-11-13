@@ -8,15 +8,13 @@
 #define IREE_DIALECT_MODULES_HAL_LOADER_OPS
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
+include "iree/compiler/Dialect/HAL/IR/HALTypes.td"
 include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-
-class HALLoader_PureOp<string mnemonic, list<Trait> traits = []> :
-    HALLoader_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // !hal.executable / iree_hal_executable_t

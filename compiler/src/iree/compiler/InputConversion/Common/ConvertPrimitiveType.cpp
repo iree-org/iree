@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/Transforms/StructuralTypeConversions.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -46,11 +47,11 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
     return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
-    return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
+    return arith::TruncFOp::create(builder, loc, type, inputs[0]);
   }
 
   if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
-    return builder.create<arith::ExtFOp>(loc, type, inputs[0]);
+    return arith::ExtFOp::create(builder, loc, type, inputs[0]);
   }
 
   return nullptr;
@@ -68,15 +69,15 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
   int64_t outBitwidth = eTy.getIntOrFloatBitWidth();
 
   if (inBitwidth > outBitwidth) {
-    return builder.create<arith::TruncIOp>(loc, type, inputs[0]);
+    return arith::TruncIOp::create(builder, loc, type, inputs[0]);
   }
 
   if (inBitwidth < outBitwidth && isUnsigned) {
-    return builder.create<arith::ExtUIOp>(loc, type, inputs[0]);
+    return arith::ExtUIOp::create(builder, loc, type, inputs[0]);
   }
 
   if (inBitwidth < outBitwidth && !isUnsigned) {
-    return builder.create<arith::ExtSIOp>(loc, type, inputs[0]);
+    return arith::ExtSIOp::create(builder, loc, type, inputs[0]);
   }
 
   return nullptr;
@@ -292,6 +293,8 @@ struct ConvertTypesPass : public Base {
         patterns, typeConverter);
     populateFunctionOpInterfaceTypeConversionPattern<IREE::Util::FuncOp>(
         patterns, typeConverter);
+    cf::populateCFStructuralTypeConversionsAndLegality(typeConverter, patterns,
+                                                       target);
 
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
@@ -313,10 +316,6 @@ struct ConvertTypesPass : public Base {
       }
       for (Type type : op->getOperandTypes()) {
         if (!typeConverter.isLegal(type))
-          return false;
-      }
-      for (auto &region : op->getRegions()) {
-        if (!typeConverter.isLegal(&region))
           return false;
       }
       return true;

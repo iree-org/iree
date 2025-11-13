@@ -20,6 +20,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -37,8 +38,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-hoist-encoding-ops"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_HOISTENCODINGOPSPASS
@@ -110,16 +109,16 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
     auto operandType = cast<RankedTensorType>(operand->get().getType());
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
-    Value encodedInput = rewriter.create<IREE::Encoding::SetEncodingOp>(
-        loc, resType, operand->get());
+    Value encodedInput = IREE::Encoding::SetEncodingOp::create(
+        rewriter, loc, resType, operand->get());
     encodedOperands.push_back(encodedInput);
   }
 
   // Create encoded generic op.
   SmallVector<OpFoldResult> mixedSizes =
       tensor::getMixedSizes(rewriter, loc, encodingOp.getSource());
-  Value encodedInit = rewriter.create<tensor::EmptyOp>(
-      loc, mixedSizes, encodedType.getElementType(), encoding);
+  Value encodedInit = tensor::EmptyOp::create(
+      rewriter, loc, mixedSizes, encodedType.getElementType(), encoding);
   encodedOperands.push_back(encodedInit);
   auto encodedGenericOp =
       clone(rewriter, genericOp, encodingOp.getResultType(), encodedOperands);
@@ -176,7 +175,7 @@ struct HoistEncodingOpsPass
 /// of a dispatch.
 struct BubbleUpSetEncodingOp
     : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
@@ -202,7 +201,7 @@ struct BubbleUpSetEncodingOp
 /// Pattern to sink UnsetEncoding ops down through consumers.
 struct SinkUnsetEncodingOp
     : public OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
@@ -245,9 +244,8 @@ struct SinkUnsetEncodingOp
     // Propagate the set encoding and generate the new encoding operations.
     rewriter.setInsertionPointAfter(encodingOp);
     FailureOr<IREE::Encoding::PropagationResult> maybeResult =
-        propagationResult.propagateEncoding(
-            rewriter, *propagationEncodings,
-            cast<OpResult>(encodingOp.getResult()));
+        propagationResult.propagateEncoding(rewriter, *propagationEncodings,
+                                            consumerOperand);
     if (failed(maybeResult)) {
       return rewriter.notifyMatchFailure(
           encodingOp, "not able to propagate encodings and find replacement");
@@ -331,7 +329,7 @@ void HoistEncodingOpsPass::runOnOperation() {
     const IREE::Util::ConstExprAnalysis::ConstValueInfo *constInfo =
         constExprs.lookup(setEncodingOp.getSource());
     if (!constInfo) {
-      LDBG("Non-hoistable op (failed to get constInfo): " << setEncodingOp);
+      LDBG() << "Non-hoistable op (failed to get constInfo): " << setEncodingOp;
       return;
     }
     if (policy.getDecision(constInfo)->getOutcome() ==
@@ -339,12 +337,12 @@ void HoistEncodingOpsPass::runOnOperation() {
       candidates.push_back(llvm::to_vector(llvm::reverse(opsWithinDispatch)));
       return;
     }
-    LDBG("Non-hoistable op: " << setEncodingOp);
+    LDBG() << "Non-hoistable op: " << setEncodingOp;
   });
 
   IRRewriter rewriter(ctx);
   for (ArrayRef<Operation *> hoistableOps : candidates) {
-    LDBG("Hoisting the ops for " << *hoistableOps.back());
+    LDBG() << "Hoisting the ops for " << *hoistableOps.back();
     for (Operation *op : hoistableOps) {
       if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, op))) {
         op->emitOpError("failed to hoist the op out of dispatch");

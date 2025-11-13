@@ -37,7 +37,7 @@ namespace {
 class TransposeUnitDimToShapeCast
     : public OpRewritePattern<vector::TransposeOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransposeOp op,
                                 PatternRewriter &rewriter) const override {
@@ -62,11 +62,10 @@ static void loopInvariantCodeMotion(mlir::FunctionOpInterface funcOp) {
 
 struct OptimizeVectorTransferPass final
     : impl::OptimizeVectorTransferPassBase<OptimizeVectorTransferPass> {
-  using impl::OptimizeVectorTransferPassBase<
-      OptimizeVectorTransferPass>::OptimizeVectorTransferPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     LDBG() << "before optimize vector transfer\n" << funcOp;
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes

@@ -10,10 +10,25 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
+
+//===---------------------------------------------------------------------===//
+// Utilities for testing purpose.
+//===---------------------------------------------------------------------===//
+
+namespace detail {
+/// Kinds of testing resolvers for MaterializeDeviceEncodingPass.
+enum class TestingResolverKind {
+  // iree_gpu.gpu_encoding_resolver<>
+  kGPUDataTiling,
+  // iree_gpu.gpu_padding_resolver<>
+  kGPUPadding,
+  // Do not create any GPU specific resolver, so fallback to identity resolver.
+  kNone
+};
+} // namespace detail
 
 //===---------------------------------------------------------------------===//
 // TypeConverter
@@ -83,6 +98,12 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
 FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter);
+
+/// Populates the set of patterns that decompose load/store ops that have
+/// mismatched layout types.
+void populateDecomposeMismatchedLayoutLoadStoreOpsPatterns(
+    RewritePatternSet &patterns,
+    MaterializeEncodingTypeConverter &typeConverter);
 
 /// Populates the set of patterns that lowers operations with encoding types to
 /// operations without encodings.

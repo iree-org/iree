@@ -97,7 +97,7 @@ static bool transposeOpFilter(Operation *op) {
 /// ```
 struct SwapAllocTensorPattern final
     : OpRewritePattern<bufferization::AllocTensorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(bufferization::AllocTensorOp allocOp,
                                 PatternRewriter &rewriter) const override {
@@ -116,8 +116,9 @@ struct SwapAllocTensorPattern final
 
     rewriter.setInsertionPoint(linalgOp);
     std::optional<Attribute> memorySpace = allocOp.getMemorySpace();
-    auto newAllocOp = rewriter.create<bufferization::AllocTensorOp>(
-        allocOp.getLoc(), allocOp.getType(), allocOp.getDynamicSizes(),
+    auto newAllocOp = bufferization::AllocTensorOp::create(
+        rewriter, allocOp.getLoc(), allocOp.getType(),
+        allocOp.getDynamicSizes(),
         /*copy=*/Value(),
         memorySpace ? cast<IntegerAttr>(*memorySpace) : IntegerAttr());
     rewriter.modifyOpInPlace(linalgOp, [&]() {

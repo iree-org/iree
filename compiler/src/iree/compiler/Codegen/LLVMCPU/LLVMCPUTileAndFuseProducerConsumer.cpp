@@ -46,7 +46,7 @@ static Operation *getRootOp(ArrayRef<Operation *> computeOps,
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
     if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel() &&
-        loweringConfig.hasTilingLevel(level)) {
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       if (rootOp) {
         return nullptr;
       }
@@ -63,7 +63,8 @@ static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
   for (Operation *op : llvm::reverse(computeOps)) {
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
-    if (loweringConfig && loweringConfig.hasTilingLevel(level)) {
+    if (loweringConfig &&
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       return op;
     }
   }
@@ -77,7 +78,7 @@ static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
 /// operands.
 static FailureOr<Operation *>
 tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
-                                int64_t tilingLevel,
+                                IREE::CPU::TilingLevel tilingLevel,
                                 bool onlyFuseProducerInputOperands) {
   auto *context = rewriter.getContext();
   mlir::DominanceInfo dominanceInfo(rootOp);
@@ -107,7 +108,8 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   int64_t numLoops = rootOp.getLoopIteratorTypes().size();
   auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-      getLoweringConfig(rootOp).getTilingLevelAttr(tilingLevel));
+      getLoweringConfig(rootOp).getTilingLevelAttr(
+          static_cast<unsigned>(tilingLevel)));
   SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
   SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
   tileSizes.resize(numLoops, 0);
@@ -166,7 +168,12 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   // Perform the replacement of tiled and fused values.
   for (auto [origValue, replacement] : tiledResults->replacements) {
-    rewriter.replaceAllUsesWith(origValue, replacement);
+    Value replacementCopy = replacement;
+    rewriter.replaceUsesWithIf(origValue, replacement, [&](OpOperand &use) {
+      Operation *user = use.getOwner();
+      return !isa<tensor::DimOp>(user) &&
+             dominanceInfo.dominates(replacementCopy, user);
+    });
   }
 
   FailureOr<Operation *> rootTiledOp = tiledResults->tiledAndFusedOps.front();
@@ -223,7 +230,7 @@ struct LLVMCPUTileAndFuseProducerConsumer
 
 void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp);
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);

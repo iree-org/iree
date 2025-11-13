@@ -660,44 +660,8 @@ def TestGpuVectorDistribution :
 
     let arguments = (ins TransformHandleTypeInterface:$target,
                          DefaultValuedOptionalAttr<BoolAttr, "false">:$experimental,
+                         DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_size,
                          DefaultValuedOptionalAttr<I64Attr, "64">:$subgroup_size);
-    let results = (outs);
-
-    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
-    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-    let extraClassDeclaration = [{
-      ::mlir::DiagnosedSilenceableFailure applyToOne(
-          ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::FunctionOpInterface funcOp,
-          ::mlir::transform::ApplyToEachResultList &results,
-          ::mlir::transform::TransformState &state);
-    }];
-}
-
-def TestVectorLayoutAnalysisOp :
-  Op<Transform_Dialect, "iree.test_vector_layout_analysis",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Run VectorLayoutAnalysis on the target as the root.
-
-    The anchor points are set by using the attribute
-    "__vector_layout_test_anchor_operand_x" and
-    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
-    number.
-
-    The analysis emits remarks for the layout for each SSA value infered
-    on it's owning operation.
-
-    #### Return modes
-
-    This transform does not consume the target handle and always return success.
-    }];
-
-    let arguments = (ins TransformHandleTypeInterface:$target);
     let results = (outs);
 
     let assemblyFormat = [{ $target attr-dict `:` type($target)}];

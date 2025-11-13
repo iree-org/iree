@@ -21,7 +21,6 @@ VER_0 {
     ireeGPUGetSingleSubgroupLayout;
     ireeCodegenGetTunerRootOps;
     ireeCodegenGetAttentionOpDetail;
-    ireeCodegenQueryMMAIntrinsics;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;
@@ -80,7 +79,7 @@ VER_0 {
     ireeGPULoweringConfigAttrGet;
     ireeGPULoweringConfigAttrGetAttributes;
     ireeGPULoweringConfigAttrGetMmaKind;
-    ireeGPULoweringConfigAttrGetSubgroupCount;
+    ireeGPULoweringConfigAttrGetSubgroupBasis;
     ireeGPULoweringConfigAttrGetTileSizes;
     ireeGPULoweringConfigAttrGetTypeID;
     ireeGPUMMAAttrGet;
@@ -104,6 +103,10 @@ VER_0 {
     ireeGPUReorderWorkgroupsStrategyAttrGet;
     ireeGPUReorderWorkgroupsStrategyAttrGetTypeID;
     ireeGPUReorderWorkgroupsStrategyAttrGetValue;
+    ireeGPUTargetInfoGet;
+    ireeGPUTargetInfoGetMMAIntrinsics;
+    ireeHALExecutableTargetAttrGetGPUTargetInfo;
+    ireeLinkRunMain;
     ireeMlirLspServerRunMain;
     ireeOptRunMain;
     ireeReduceRunMain;

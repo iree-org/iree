@@ -48,7 +48,7 @@ struct SerializeTargetExecutablesPass
   }
 
   void runOnOperation() override {
-    auto executableOp = getOperation();
+    IREE::HAL::ExecutableOp executableOp = getOperation();
     auto moduleOp = executableOp->getParentOfType<mlir::ModuleOp>();
 
     auto targetBackend = targetRegistry->getTargetBackend(target);
@@ -105,7 +105,7 @@ struct SerializeAllExecutablesPass
   using IREE::HAL::impl::SerializeAllExecutablesPassBase<
       SerializeAllExecutablesPass>::SerializeAllExecutablesPassBase;
   void runOnOperation() override {
-    auto executableOp = getOperation();
+    IREE::HAL::ExecutableOp executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
       passManager.addPass(IREE::HAL::createSerializeTargetExecutablesPass(

@@ -110,8 +110,16 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
-  // Start of Flow pipeline, verify input legality.
+  // Start of Flow pipeline: verify semantics legality of the input.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
+
+  // Verify module initialization order - subsequent passes and pipelines rely
+  // on it being correct (and we maintain it as correct from this point on, so
+  // this is our gate).
+  passManager.addPass(IREE::Util::createVerifyInitializationOrderPass());
+
+  // Propagate attributes from callees to call sites for local analysis.
+  passManager.addPass(IREE::Util::createAttributeCallGraphPass());
 
   FunctionLikeNest(passManager)
       .addPass([&]() {

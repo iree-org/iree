@@ -14,18 +14,6 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
-//===----------------------------------------------------------------------===//
-// Base class.
-//===----------------------------------------------------------------------===//
-
-class IREETensorExt_Op<string mnemonic, list<Trait> traits = []> :
-    Op<IREETensorExt_Dialect, mnemonic, traits> {
-  // let hasCustomAssemblyFormat = 1;
-}
-
-class IREETensorExt_PureOp<string mnemonic, list<Trait> traits = []> :
-    IREETensorExt_Op<mnemonic, !listconcat(traits, [Pure])>;
-
 def IREETensorExt_BitCastOp : IREETensorExt_PureOp<"bitcast", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
@@ -98,7 +86,7 @@ def IREETensorExt_BitCastOp : IREETensorExt_PureOp<"bitcast", [
 def IREETensorExt_DispatchTensorLoadOp : IREETensorExt_PureOp<"dispatch.tensor.load", [
   AttrSizedOperandSegments,
   OffsetSizeAndStrideOpInterface,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
       "getTiedResult",
       "getTiedResultOperandIndex",
@@ -453,6 +441,88 @@ def IREETensorExt_DispatchWorkloadOrdinalOp :
   let hasCanonicalizer = 1;
 
   let hasFolder = 1;
+}
+
+//===---------------------------------------------------------------------===//
+// Barrier Ops
+//===---------------------------------------------------------------------===//
+
+def IREETensorExt_ComputeBarrierStartOp : IREETensorExt_PureOp<"compute_barrier.start", [
+  Util_ShapeAwareOp,
+]> {
+  let summary = "Tensor compute barrier start operation";
+  let description = [{
+    This barrier prevents certain transformations (like reshape propagation)
+    from moving operations down across this boundary.
+    The operand is returned as the result with identical type.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$value,
+    IREETensorExt_ShapeDynamicDims:$value_dims
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $value `:` type($value) (`{` $value_dims^ `}`)? `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$value), [{
+      build($_builder, $_state, value.getType(), value,
+            IREE::Util::buildDynamicDimsForValue($_state.location, value, $_builder));
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getValueDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getValueDims(); }
+  }];
+
+  let hasVerifier = 1;
+}
+
+def IREETensorExt_ComputeBarrierEndOp : IREETensorExt_PureOp<"compute_barrier.end", [
+  Util_ShapeAwareOp,
+]> {
+  let summary = "Tensor compute barrier end operation";
+  let description = [{
+    This barrier prevents certain transformations (like reshape propagation)
+    from moving operations up across this boundary.
+    The operand is returned as the result with identical type.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$value,
+    IREETensorExt_ShapeDynamicDims:$value_dims
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $value `:` type($value) (`{` $value_dims^ `}`)? `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$value), [{
+      build($_builder, $_state, value.getType(), value,
+            IREE::Util::buildDynamicDimsForValue($_state.location, value, $_builder));
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getValueDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getValueDims(); }
+  }];
+
+  let hasVerifier = 1;
 }
 
 #endif  // IREE_DIALECT_TENSOR_EXT_OPS

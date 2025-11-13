@@ -126,3 +126,83 @@ func.func @keep_swizzle_cast() -> tensor<1xf32> {
 //       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[LOAD]]
 //       CHECK:   %[[CAST:.+]] = iree_gpu.buffer_resource_cast %[[EXTRACT]]
 //       CHECK:   return %[[CAST]] : tensor<1xf32>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+func.func @bufferized_subspan_drop_buffer_cast() -> (tensor<2xf32>, tensor<2xf32>) {
+  %c0 = arith.constant 0 : index
+  %c4096 = arith.constant 4096 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly") : memref<2xf32, #hal.descriptor_type<storage_buffer>>
+  %1 = amdgpu.fat_raw_buffer_cast %0 : memref<2xf32, #hal.descriptor_type<storage_buffer>> to memref<2xf32, #amdgpu.address_space<fat_raw_buffer>>
+  %2 = iree_codegen.load_from_buffer %1 : memref<2xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<2xf32>
+  %3 = iree_gpu.buffer_resource_cast %2 cacheSwizzleStride(%c4096) : tensor<2xf32>
+  return %2, %3 : tensor<2xf32>, tensor<2xf32>
+}
+
+// CHECK-LABEL: func.func @bufferized_subspan_drop_buffer_cast
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan
+//   CHECK-NOT:   amdgpu.fat_raw_buffer_cast
+//       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[BINDING]]
+//       CHECK:   %[[CAST:.+]] = iree_gpu.buffer_resource_cast %[[LOAD]]
+//       CHECK:   return %[[LOAD]], %[[CAST]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+func.func @bufferized_subspan_multiple_buffer_casts() -> (tensor<2xf32>, tensor<2xf32>) {
+  %c0 = arith.constant 0 : index
+  %c4096 = arith.constant 4096 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly") : memref<2xf32, #hal.descriptor_type<storage_buffer>>
+  %1 = amdgpu.fat_raw_buffer_cast %0 : memref<2xf32, #hal.descriptor_type<storage_buffer>> to memref<2xf32, #amdgpu.address_space<fat_raw_buffer>>
+  %2 = amdgpu.fat_raw_buffer_cast %0 : memref<2xf32, #hal.descriptor_type<storage_buffer>> to memref<2xf32, #amdgpu.address_space<fat_raw_buffer>>
+  %3 = iree_codegen.load_from_buffer %1 : memref<2xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<2xf32>
+  %4 = iree_codegen.load_from_buffer %2 : memref<2xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<2xf32>
+  %5 = iree_gpu.buffer_resource_cast %4 cacheSwizzleStride(%c4096) : tensor<2xf32>
+  return %3, %5 : tensor<2xf32>, tensor<2xf32>
+}
+
+// CHECK-LABEL: func.func @bufferized_subspan_multiple_buffer_casts
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan
+//       CHECK:   %[[CAST0:.+]] = amdgpu.fat_raw_buffer_cast %[[BINDING]]
+//       CHECK:   %[[CAST1:.+]] = amdgpu.fat_raw_buffer_cast %[[BINDING]]
+//       CHECK:   %[[LOAD0:.+]] = iree_codegen.load_from_buffer %[[CAST0]]
+//       CHECK:   %[[LOAD1:.+]] = iree_codegen.load_from_buffer %[[CAST1]]
+//       CHECK:   return %[[LOAD0]], %[[LOAD1]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+func.func @bufferized_subspan_not_readonly() -> (tensor<2xf32>, tensor<2xf32>) {
+  %c0 = arith.constant 0 : index
+  %c4096 = arith.constant 4096 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("Indirect") : memref<2xf32, #hal.descriptor_type<storage_buffer>>
+  %1 = amdgpu.fat_raw_buffer_cast %0 : memref<2xf32, #hal.descriptor_type<storage_buffer>> to memref<2xf32, #amdgpu.address_space<fat_raw_buffer>>
+  %2 = iree_codegen.load_from_buffer %1 : memref<2xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<2xf32>
+  %3 = iree_gpu.buffer_resource_cast %2 cacheSwizzleStride(%c4096) : tensor<2xf32>
+  return %2, %3 : tensor<2xf32>, tensor<2xf32>
+}
+
+// CHECK-LABEL: func.func @bufferized_subspan_not_readonly
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan
+//       CHECK:   %[[BUFFER_CAST:.+]] = amdgpu.fat_raw_buffer_cast %[[BINDING]]
+//       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[BUFFER_CAST]]
+//       CHECK:   return %[[LOAD]], %[[LOAD]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+func.func @bufferized_subspan_no_buffer_cast() -> (tensor<2xf32>, tensor<2xf32>) {
+  %c0 = arith.constant 0 : index
+  %c4096 = arith.constant 4096 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly") : memref<2xf32, #hal.descriptor_type<storage_buffer>>
+  %1 = iree_codegen.load_from_buffer %0 : memref<2xf32, #hal.descriptor_type<storage_buffer>> -> tensor<2xf32>
+  %2 = iree_gpu.buffer_resource_cast %1 cacheSwizzleStride(%c4096) : tensor<2xf32>
+  return %1, %2 : tensor<2xf32>, tensor<2xf32>
+}
+
+// CHECK-LABEL: func.func @bufferized_subspan_no_buffer_cast
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan
+//       CHECK:   %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[BINDING]]
+//       CHECK:   %[[CAST:.+]] = iree_gpu.buffer_resource_cast %[[LOAD]]
+//       CHECK:   return %[[LOAD]], %[[CAST]]

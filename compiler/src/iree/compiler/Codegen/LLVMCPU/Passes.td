@@ -137,11 +137,39 @@ def LLVMCPUTilePass :
     given level is found in the operation's lowering config.
   }];
   let options = [
-    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Tiling level used to retrieve the configuration from lowering_config.">,
+    Option<"tilingLevel", "tiling-level", "IREE::CPU::TilingLevel",
+      /*default=*/"IREE::CPU::TilingLevel::InvalidLevel",
+      "Tiling level used to retrieve the configuration from lowering_config.",
+      [{llvm::cl::values(
+        clEnumValN(IREE::CPU::TilingLevel::DistributionTiles, "distribution",
+                   "Use `distribution` tile sizes."),
+        clEnumValN(IREE::CPU::TilingLevel::CacheParallelTiles, "cache_parallel",
+                   "Use `cache_parallel` tile sizes."),
+        clEnumValN(IREE::CPU::TilingLevel::CacheReductionTiles, "cache_reduction",
+                   "Use `cache_reduction` tile sizes."),
+        clEnumValN(IREE::CPU::TilingLevel::VectorCommonParallelTiles, "vector_common_parallel",
+                   "Use `vector_common_parallel` tile sizes."),
+        clEnumValN(IREE::CPU::TilingLevel::VectorReductionTiles, "vector_reduction",
+                   "Use `vector_reduction` tile sizes."),
+        clEnumValN(IREE::CPU::TilingLevel::VectorInnerParallelTiles, "vector_inner_parallel",
+                   "Use `vector_inner_parallel` tile sizes.")
+      )}]>,
     Option<"skipRootOp", "skip-root-op", "bool", /*default=*/"false",
       "Do not tile the root op if the option is true.">
   ];
+}
+
+def LLVMCPUTileToVectorSizePass :
+    InterfacePass<"iree-llvmcpu-tile-to-vector-size", "mlir::FunctionOpInterface"> {
+  let summary = "Tile TilingInterface operations to target vector size.";
+  let description = [{
+    Walk through all the TilingInterface operations and tiling the dimensions to
+    target vector sizes, if the lowering config is present and the dimension is
+    known as greater than the vector size.
+
+    It is intended to be used before vectorization that avoids big vectors and
+    stack buffers.
+  }];
 }
 
 def LLVMCPUTileAndFuseProducerConsumerPass

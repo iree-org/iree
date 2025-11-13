@@ -6,14 +6,6 @@
 
 cmake_minimum_required(VERSION 3.21...3.24)
 
-# LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
-# CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
-# New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
-set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
-if(POLICY CMP0116)
-  cmake_policy(SET CMP0116 OLD)
-endif()
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # NOTE: ASM is at the end of the list so CMake can test whether the C/CXX
@@ -69,10 +61,7 @@ if(IREE_ENABLE_COMPILER_TRACING AND NOT IREE_ENABLE_RUNTIME_TRACING)
 endif()
 
 # TODO(#8469): remove the dependency on cpuinfo entirely.
-set(IREE_ENABLE_CPUINFO_DEFAULT ON)
-if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Emscripten|Windows|WindowsStore")
-  set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
-endif()
+set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
@@ -251,18 +240,6 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
-# HIP Default Target Configuration.
-#
-# HIP does not have a stable instruction set like NVIDIA PTX; it requires
-# binaries specific to a target chip. We have tests that generate and run
-# deployable code which need to specify the proper target chip.
-#-------------------------------------------------------------------------------
-
-set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
-  "Target chip for HIP tests that need to compile device code. \
-   Defaults to empty string to disable tests.")
-
-#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:
@@ -420,6 +397,44 @@ endif()
 if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
   message(STATUS "  - system-library")
 endif()
+
+#-------------------------------------------------------------------------------
+# HIP Default Target Configuration.
+#
+# HIP does not have a stable instruction set like NVIDIA PTX; it requires
+# binaries specific to a target chip. We have tests that generate and run
+# deployable code which need to specify the proper target chip.
+#-------------------------------------------------------------------------------
+
+# When ROCm is detected on the build host and a corresponding HAL driver is enabled,
+# force the user to make a conscious decision to enable or disable ROCm testing.
+# It's hard to enable automatically for a given target
+# chip because that would rely too much on guessing what the target chip is.
+# But silently continuing with ROCm testing disabled by default has also been
+# surprising.
+if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_HIP_TEST_TARGET_CHIP})
+  find_program(_ROCMINFO_COMMAND rocminfo)
+  if (_ROCMINFO_COMMAND)
+    execute_process(COMMAND ${_ROCMINFO_COMMAND} OUTPUT_VARIABLE _ROCMINFO_OUTPUT)
+    string(REGEX MATCH "Name:[ ]*gfx[0-9]+" _ROCMINFO_OUTPUT_NAME_LINE "${_ROCMINFO_OUTPUT}")
+    string(REGEX MATCH "gfx[0-9]+" _ROCMINFO_GFX_NAME "${_ROCMINFO_OUTPUT_NAME_LINE}")
+    if (_ROCMINFO_GFX_NAME)
+      # This needs to be FATAL_ERROR not SEND_ERROR, else the set(CACHE) below
+      # will prematurely hide this error in case cmake is run again without
+      # addressing the issue.
+      # Also note that in the unusual case of multiple devices with distinct
+      # architectures, we only detected one of them, so the message needs to
+      # be conservative.
+      message(FATAL_ERROR "At least one ROCm device detected, with architecture: ${_ROCMINFO_GFX_NAME}.\n"
+                      "Explicitly either enable or disable ROCm testing.\n"
+                      "To enable ROCm testing for ${_ROCMINFO_GFX_NAME}:\n    cmake -DIREE_HIP_TEST_TARGET_CHIP=${_ROCMINFO_GFX_NAME}\n"
+                      "To disable ROCm testing:\n    cmake -DIREE_HIP_TEST_TARGET_CHIP=\n" )
+    endif()
+  endif()
+endif()
+set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
+  "Target chip for HIP tests that need to compile device code. \
+   Defaults to empty string to disable tests.")
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
@@ -843,7 +858,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
     FetchContent_Declare(
         nanobind
         GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-        GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
+        GIT_TAG        cc860b2b771a0003ce70415fc56ea18f61b0a153 # v2.9.0
     )
     FetchContent_MakeAvailable(nanobind)
   endif()
@@ -897,7 +912,7 @@ else()
   if(IREE_INPUT_STABLEHLO)
     message(STATUS "Configuring third_party/stablehlo")
     list(APPEND CMAKE_MESSAGE_INDENT "  ")
-    iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
+    iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo SILENCE_DEPRECATIONS)
     list(POP_BACK CMAKE_MESSAGE_INDENT)
   endif()
 
@@ -960,10 +975,23 @@ if(IREE_ENABLE_THREADING)
     COMPONENT IREEBundledLibraries
     EXPORT_SET Runtime
   )
+endif()
 
-  if(IREE_ENABLE_CPUINFO)
+# TODO(#8469): remove the dependency on cpuinfo entirely.
+if(IREE_ENABLE_CPUINFO)
+  if(IREE_USE_SYSTEM_DEPS)
+    message(STATUS "Using system cpuinfo (requires: sudo apt install libcpuinfo-dev or equivalent)...")
+    find_package(cpuinfo REQUIRED)
+  else()
+    message(STATUS "Using fetched cpuinfo...")
     iree_set_cpuinfo_cmake_options()
-    add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+    include(FetchContent)
+    FetchContent_Declare(
+      cpuinfo
+      GIT_REPOSITORY https://github.com/pytorch/cpuinfo.git
+      GIT_TAG        3c8b1533ac03dd6531ab6e7b9245d488f13a82a5
+    )
+    FetchContent_MakeAvailable(cpuinfo)
     iree_install_targets(
       TARGETS cpuinfo
       COMPONENT IREEBundledLibraries

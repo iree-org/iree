@@ -1007,6 +1007,10 @@ iree_hal_hip_device_query_semaphore_compatibility(
 static void iree_hal_hip_async_buffer_release(
     void* user_data, struct iree_hal_buffer_t* buffer) {
   iree_hal_hip_device_t* device = (iree_hal_hip_device_t*)user_data;
+  if (buffer->allocation_size == 0) {
+    // No allocation to free.
+    return;
+  }
   void* ptr = iree_hal_hip_buffer_device_pointer(buffer);
   if (ptr) {
     if (device->params.async_caching) {

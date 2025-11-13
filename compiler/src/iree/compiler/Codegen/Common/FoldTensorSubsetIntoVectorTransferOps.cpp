@@ -53,7 +53,7 @@ namespace {
 class FoldExtractSliceIntoTransferRead final
     : public OpRewritePattern<vector::TransferReadOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp xferOp,
                                 PatternRewriter &rewriter) const override {
@@ -105,10 +105,10 @@ public:
     for (const auto &it : llvm::enumerate(xferOp.getIndices())) {
       OpFoldResult offset =
           extractOp.getMixedOffsets()[it.index() + rankReduced];
-      newIndices.push_back(rewriter.create<arith::AddIOp>(
-          xferOp->getLoc(), it.value(),
-          getValueOrCreateConstantIndexOp(rewriter, extractOp.getLoc(),
-                                          offset)));
+      newIndices.push_back(
+          arith::AddIOp::create(rewriter, xferOp->getLoc(), it.value(),
+                                getValueOrCreateConstantIndexOp(
+                                    rewriter, extractOp.getLoc(), offset)));
     }
     SmallVector<bool> inBounds(xferOp.getTransferRank(), true);
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
@@ -195,7 +195,7 @@ static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
 class FoldInsertSliceIntoTransferWrite final
     : public OpRewritePattern<tensor::InsertSliceOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
@@ -280,7 +280,7 @@ public:
 class FoldExtractSliceIntoTransferWrite final
     : public OpRewritePattern<tensor::ExtractSliceOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -316,8 +316,8 @@ public:
 
     Location loc = extractSliceOp.getLoc();
     SmallVector<OpFoldResult> mixedSizes = extractSliceOp.getMixedSizes();
-    auto init = rewriter.create<tensor::EmptyOp>(
-        loc, mixedSizes, extractSliceOp.getType().getElementType());
+    auto init = tensor::EmptyOp::create(
+        rewriter, loc, mixedSizes, extractSliceOp.getType().getElementType());
 
     auto indices = xferOp.getIndices();
 
