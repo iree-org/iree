@@ -34,6 +34,8 @@ iree_lit_test_suite(
             "dispatch_linalg_ext_fusion.mlir",
             "hoist_encoding_ops.mlir",
             "hoist_uniform_scalar_compute.mlir",
+            "insert_tensor_barriers.mlir",
+            "remove_tensor_barriers.mlir",
             "dispatch_linalg_on_tensors_default.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
             "form_scalar_dispatches.mlir",

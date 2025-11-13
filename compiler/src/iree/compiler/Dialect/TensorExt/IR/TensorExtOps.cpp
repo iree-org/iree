@@ -383,11 +383,11 @@ void DispatchWorkloadOrdinalOp::inferResultRanges(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_tensor_ext.barrier.start
+// iree_tensor_ext.compute_barrier.start
 //===----------------------------------------------------------------------===//
 
-LogicalResult BarrierStartOp::verify() {
-  BarrierStartOp op = *this;
+LogicalResult ComputeBarrierStartOp::verify() {
+  ComputeBarrierStartOp op = *this;
   if (failed(verifyOpDynamicDims(op, {op.getValue()}, op.getValueDims()))) {
     return failure();
   }
@@ -399,11 +399,11 @@ LogicalResult BarrierStartOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// iree_tensor_ext.barrier.end
+// iree_tensor_ext.compute_barrier.end
 //===----------------------------------------------------------------------===//
 
-LogicalResult BarrierEndOp::verify() {
-  BarrierEndOp op = *this;
+LogicalResult ComputeBarrierEndOp::verify() {
+  ComputeBarrierEndOp op = *this;
   if (failed(verifyOpDynamicDims(op, {op.getValue()}, op.getValueDims()))) {
     return failure();
   }
