@@ -152,6 +152,18 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
                          "generating compile-to or VM MLIR output."),
           llvm::cl::init(std::nullopt));
 
+  // Remark options.
+  llvm::cl::opt<std::string> remarksFilter(
+      "remarks-filter",
+      llvm::cl::desc("Emit all remarks whose category matches the given regex "
+                     "pattern. If empty, no remarks are emitted."),
+      llvm::cl::init(""));
+
+  llvm::cl::opt<std::string> remarksOutputFile(
+      "remarks-output-file",
+      llvm::cl::desc("Output file for remarks in YAML format."),
+      llvm::cl::init("mlir-remarks.yaml"));
+
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
       "split-input-file",
@@ -245,6 +257,13 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     ireeCompilerInvocationSetDumpCompilationPhasesTo(
         r.inv, dumpCompilationPhasesTo.c_str());
     ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
+
+    // Setup remarks.
+    if (!remarksFilter.empty()) {
+      ireeCompilerInvocationSetupRemarks(r.inv, remarksFilter.c_str(),
+                                         remarksOutputFile.c_str());
+    }
+
     if (!ireeCompilerInvocationParseSource(r.inv, source))
       return false;
 

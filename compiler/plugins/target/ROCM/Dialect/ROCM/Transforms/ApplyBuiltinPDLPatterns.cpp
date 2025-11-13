@@ -25,6 +25,7 @@
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Remarks.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Parser/Parser.h"
@@ -396,6 +397,10 @@ public:
       if (!builtinName || !ukernelDesc) {
         return WalkResult::advance();
       }
+      // Emit remark using structured API.
+      remark::analysis(op->getLoc(),
+                       remark::RemarkOpts::name("UKernel").category(getName()))
+          << ukernelDesc.getUkernelName().str();
       if (ukernelSymbols.contains(ukernelDesc.getUkernelName())) {
         return WalkResult::advance();
       }
