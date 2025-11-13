@@ -147,9 +147,8 @@ typedef struct iree_vm_wait_result_t {
 // registers.
 static inline void* iree_vm_stack_frame_storage(iree_vm_stack_frame_t* frame) {
   IREE_ASSERT(frame);
-  IREE_ASSERT_ALIGNED(frame, 16);
-  return (void*)iree_host_align(
-      (uintptr_t)frame + sizeof(iree_vm_stack_frame_t), 16);
+  IREE_ASSERT_ALIGNED(frame, sizeof(iree_max_align_t));
+  return (void*)((uintptr_t)frame + sizeof(iree_vm_stack_frame_t));
 }
 
 // Callback for cleaning up stack frame storage before a frame is left or the

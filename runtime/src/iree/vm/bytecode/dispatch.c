@@ -689,9 +689,9 @@ static iree_status_t iree_vm_bytecode_dispatch(
           .bytecode_offset;
 
   int32_t* IREE_RESTRICT regs_i32 = regs.i32;
-  IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+  IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
   iree_vm_ref_t* IREE_RESTRICT regs_ref = regs.ref;
-  IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+  IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
 
   iree_vm_source_offset_t pc = current_frame->pc;
   BEGIN_DISPATCH_CORE() {
@@ -1719,9 +1719,9 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // Restore the local dispatch variables that may have changed during the
       // function call due to stack growth.
       regs_i32 = regs.i32;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
       regs_ref = regs.ref;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
       pc = current_frame->pc;
     });
 
@@ -1755,9 +1755,9 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // Restore the local dispatch variables that may have changed during the
       // function call due to stack growth.
       regs_i32 = regs.i32;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
       regs_ref = regs.ref;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
       pc = current_frame->pc;
     });
 
@@ -1785,9 +1785,9 @@ static iree_status_t iree_vm_bytecode_dispatch(
           module->function_descriptor_table[current_frame->function.ordinal]
               .bytecode_offset;
       regs_i32 = regs.i32;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
       regs_ref = regs.ref;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
       pc = current_frame->pc;
     });
 
