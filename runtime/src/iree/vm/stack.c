@@ -433,7 +433,6 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
   iree_host_size_t frame_size = iree_host_align(
       sizeof(iree_vm_wait_frame_t) + wait_count * sizeof(iree_wait_source_t),
       16);
-  IREE_ASSERT_ALIGNED(frame_size, sizeof(iree_max_align_t));
 
   // Allocate stack space and grow stack, if required.
   iree_host_size_t header_size = sizeof(iree_vm_stack_frame_header_t);
