@@ -131,3 +131,65 @@ util.func public @argmax_no_split(%arg0: tensor<?x512xbf16>, %arg1: index) -> te
 
 // CHECK-LABEL:   util.func public @argmax_no_split
 // CHECK-NOT:     tensor.expand_shape
+
+// -----
+
+util.func public @argmax_extf(%input: tensor<151936xf16>) -> (tensor<f32>, tensor<i64>) {
+  %c0_i64 = arith.constant 0 : i64
+  %cst = arith.constant 0xFF800000 : f32
+  %0 = tensor.empty() : tensor<i64>
+  %init_idx = linalg.fill ins(%c0_i64 : i64) outs(%0 : tensor<i64>) -> tensor<i64>
+  %2 = tensor.empty() : tensor<f32>
+  %init_val = linalg.fill ins(%cst : f32) outs(%2 : tensor<f32>) -> tensor<f32>
+  %result:2 = linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>,
+                     affine_map<(d0) -> ()>,
+                     affine_map<(d0) -> ()>],
+    iterator_types = ["reduction"]}
+    ins(%input : tensor<151936xf16>)
+    outs(%init_val, %init_idx : tensor<f32>, tensor<i64>) {
+  ^bb0(%in: f16, %out: f32, %out_idx: i64):
+    %extf = arith.extf %in : f16 to f32
+    %i = linalg.index 0 : index
+    %i_cast = arith.index_cast %i : index to i64
+    %max = arith.maximumf %extf, %out : f32
+    %cmp = arith.cmpf ogt, %extf, %out : f32
+    %sel = arith.select %cmp, %i_cast, %out_idx : i64
+    linalg.yield %max, %sel : f32, i64
+  } -> (tensor<f32>, tensor<i64>)
+  util.return %result#0, %result#1 : tensor<f32>, tensor<i64>
+}
+
+// CHECK-LABEL:   util.func public @argmax_extf
+// CHECK:         arith.extf
+
+// -----
+
+util.func public @argmax_truncf(%input: tensor<151936xf64>) -> (tensor<f32>, tensor<i64>) {
+  %c0_i64 = arith.constant 0 : i64
+  %cst = arith.constant 0xFF800000 : f32
+  %0 = tensor.empty() : tensor<i64>
+  %init_idx = linalg.fill ins(%c0_i64 : i64) outs(%0 : tensor<i64>) -> tensor<i64>
+  %2 = tensor.empty() : tensor<f32>
+  %init_val = linalg.fill ins(%cst : f32) outs(%2 : tensor<f32>) -> tensor<f32>
+  %result:2 = linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>,
+                     affine_map<(d0) -> ()>,
+                     affine_map<(d0) -> ()>],
+    iterator_types = ["reduction"]}
+    ins(%input : tensor<151936xf64>)
+    outs(%init_val, %init_idx : tensor<f32>, tensor<i64>) {
+  ^bb0(%in: f64, %out: f32, %out_idx: i64):
+    %truncf = arith.truncf %in : f64 to f32
+    %i = linalg.index 0 : index
+    %i_cast = arith.index_cast %i : index to i64
+    %max = arith.maximumf %truncf, %out : f32
+    %cmp = arith.cmpf ogt, %truncf, %out : f32
+    %sel = arith.select %cmp, %i_cast, %out_idx : i64
+    linalg.yield %max, %sel : f32, i64
+  } -> (tensor<f32>, tensor<i64>)
+  util.return %result#0, %result#1 : tensor<f32>, tensor<i64>
+}
+
+// CHECK-LABEL:   util.func public @argmax_truncf
+// CHECK:         arith.truncf
