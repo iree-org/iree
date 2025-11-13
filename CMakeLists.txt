@@ -1069,8 +1069,19 @@ endif()
 
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
-  iree_set_spirv_cross_cmake_options()
-  add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
+  function(iree_add_spirv_cross_subdirectory)
+    if(IREE_ENABLE_UBSAN)
+      # Disable vptr sanitizer for spirv_cross to avoid UBSan warnings.
+      # Modification is in function scope only, so parent scope is unaffected.
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-sanitize=vptr")
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-sanitize=vptr")
+    endif()
+
+    iree_set_spirv_cross_cmake_options()
+    add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
+  endfunction()
+
+  iree_add_spirv_cross_subdirectory()
 endif()
 
 #-------------------------------------------------------------------------------

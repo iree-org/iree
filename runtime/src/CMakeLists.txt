@@ -33,4 +33,12 @@ if(IREE_ENABLE_RUNTIME_COVERAGE)
   )
 endif(IREE_ENABLE_RUNTIME_COVERAGE)
 
+if(IREE_ENABLE_UBSAN)
+  # Disable UBSan warnings about calls through function pointer of incompatible
+  # type. We rely on these for dynamic dispatch in the runtime code.
+  add_compile_options(
+    "-fno-sanitize=function"
+  )
+endif(IREE_ENABLE_UBSAN)
+
 add_subdirectory(iree)
