@@ -18,7 +18,7 @@ class SparseOpInterface;
 // interface constraints.
 LogicalResult verifySparseOpInterface(SparseOpInterface sparseOp);
 
-}
+} // namespace mlir::iree_compiler::IREE::TensorExt
 
 // clang-format off: must be included after all LLVM/MLIR headers
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOpInterfaces.h.inc" // IWYU pragma: keep
