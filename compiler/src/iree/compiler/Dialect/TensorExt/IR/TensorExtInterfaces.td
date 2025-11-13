@@ -18,9 +18,9 @@ def IREETensorExt_SparseShapeAttrInterface :
   let description = [{
     Attribute interface to annotate sparse layouts.
 
-    Operations that create shaped types with sparse layouts, encodings
-    are used to represent that the created shaped type has a logical shape + sparse
-    layout. The interface here is to allow for different sparse
+    For operations that cast a source tensor/memref type to a sparse layouts, these
+    attributes are used to represent that the created shaped type has a logical shape
+    + sparse layout. The interface here is to allow for different sparse
     representations that are opaque to the transformations.
   }];
 
@@ -41,9 +41,11 @@ def IREETensorExt_SparseCastOpInterface :
   let description = [{
     Interface for operations that create shaped types with sparse layout.
 
-    Operations that implement this interface create a shaped type with a
-    given logical shape with encoding which implements the
-    `SparseShapeAttrInterface`.
+    Operations that implement this interface e cast a source operand of tensor/memref type
+    to a shaped type with a logical shape with an sparse layout. The sparsity information
+    is represented using a `SparseShapeAttrInterface` on the type. For `tensor` type this
+    is recorded as an `EncodingAttr`. For `memref` type this is represented using the
+    `MemrefLayoutAttrInterface`.
   }];
 
   let verify = [{
