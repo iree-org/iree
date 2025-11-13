@@ -52,7 +52,6 @@ iree_lit_test_suite(
     "specialize_dispatches.mlir"
     "specialize_encodings.mlir"
     "sync_initializers.mlir"
-    "transfer_globals_per_affinity.mlir"
     "verify_affinities.mlir"
     "verify_async_access_ranges.mlir"
   TOOLS
