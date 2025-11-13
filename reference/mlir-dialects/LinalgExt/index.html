@@ -6176,7 +6176,7 @@ corresponding dimension (i.e., block arg <code>i</code> represents the index alo
 dimension <code>i</code> of the <code>input</code> value). The block is terminated by an
 iree_linalg_ext.yield op, which yields one index for each dimension in
 the <code>output</code>, and an additional <code>i1</code> Value, which represents a mask on
-whether or not to write to the <code>output</code> at the yielded set of indices. Iff
+whether or not to write to the <code>output</code> at the yielded set of indices. If
 the mask value is true, the input value will be written.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>TilingInterface</code></p>
