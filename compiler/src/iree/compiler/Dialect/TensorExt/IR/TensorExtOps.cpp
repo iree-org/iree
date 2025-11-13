@@ -443,10 +443,10 @@ LogicalResult CastToRaggedShapeOp::verify() {
            << ", i.e. one more than the source rank, but got "
            << resultType.getRank();
   }
-  RaggedTensorAttr raggedTensorAttr = getResultSparseEncoding();
+  RaggedShapeAttr raggedTensorAttr = getResultSparseEncoding();
   if (!raggedTensorAttr) {
     return emitOpError("expected result type to have an encoding of type "
-                       "`RaggedTensorAttr`");
+                       "`RaggedShapeAttr`");
   }
   if (raggedTensorAttr.getRaggedRow() != raggedDim) {
     return emitOpError("mismatch in specified `ragged_dim` value of ")

@@ -28,21 +28,21 @@ void IREETensorExtDialect::initializeAttrs() {
 }
 
 //===---------------------------------------------------------------------===//
-// iree_tensor_ext.ragged_tensor
+// iree_tensor_ext.ragged_shape
 //===---------------------------------------------------------------------===//
 
-SmallVector<int64_t> RaggedTensorAttr::getSparseDimensions() const {
+SmallVector<int64_t> RaggedShapeAttr::getSparseDimensions() const {
   int64_t raggedRow = getRaggedRow();
   return {raggedRow, raggedRow + 1};
 }
 
 /// MemRefLayoutAttrInterface methods.
 
-AffineMap RaggedTensorAttr::getAffineMap() const { return AffineMap(); }
+AffineMap RaggedShapeAttr::getAffineMap() const { return AffineMap(); }
 
-bool RaggedTensorAttr::isIdentity() const { return false; }
+bool RaggedShapeAttr::isIdentity() const { return false; }
 
-LogicalResult RaggedTensorAttr::verifyLayout(
+LogicalResult RaggedShapeAttr::verifyLayout(
     ArrayRef<int64_t> shape,
     function_ref<InFlightDiagnostic()> emitError) const {
   SmallVector<int64_t> sparseDimensions = getSparseDimensions();
@@ -75,9 +75,9 @@ getDefaultStrides(ArrayRef<int64_t> shape,
 }
 
 LogicalResult
-RaggedTensorAttr::getStridesAndOffset(ArrayRef<int64_t> shape,
-                                      SmallVectorImpl<int64_t> &strides,
-                                      int64_t &offset) const {
+RaggedShapeAttr::getStridesAndOffset(ArrayRef<int64_t> shape,
+                                     SmallVectorImpl<int64_t> &strides,
+                                     int64_t &offset) const {
   // This should only be required on the first "subview" of the
   // ragged tensor. So we can assume that there are no strides to begin with
   // and set all strides starting from the least significant sparse dimension

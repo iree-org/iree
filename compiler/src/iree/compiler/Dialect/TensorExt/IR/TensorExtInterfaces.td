@@ -10,16 +10,16 @@
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def IREETensorExt_SparseTensorAttrInterface :
-  AttrInterface<"SparseTensorAttrInterface"> {
+def IREETensorExt_SparseShapeAttrInterface :
+  AttrInterface<"SparseShapeAttrInterface"> {
 
   let cppNamespace = "::mlir::iree_compiler::IREE::TensorExt";
 
   let description = [{
     Attribute interface to annotate sparse layouts.
 
-    Operations that create tensors with sparse layouts, tensor encodings
-    are used to represent that the created tensor has a logical shape + sparse
+    Operations that create shaped types with sparse layouts, encodings
+    are used to represent that the created shaped type has a logical shape + sparse
     layout. The interface here is to allow for different sparse
     representations that are opaque to the transformations.
   }];
@@ -33,22 +33,22 @@ def IREETensorExt_SparseTensorAttrInterface :
   ];
 }
 
-def IREETensorExt_SparseOpInterface :
-  OpInterface<"SparseOpInterface"> {
+def IREETensorExt_SparseCastOpInterface :
+  OpInterface<"SparseCastOpInterface"> {
 
   let cppNamespace = "::mlir::iree_compiler::IREE::TensorExt";
 
   let description = [{
-    Interface for operations that create tensors with sparse layout.
+    Interface for operations that create shaped types with sparse layout.
 
-    Operations that implement this interface create a tensor type with a
-    given logical shape with tensor encoding which implements the
-    `SparseTensorAttrInterface`.
+    Operations that implement this interface create a shaped type with a
+    given logical shape with encoding which implements the
+    `SparseShapeAttrInterface`.
   }];
 
   let verify = [{
-   return ::mlir::iree_compiler::IREE::TensorExt::verifySparseOpInterface(
-     ::mlir::cast<::mlir::iree_compiler::IREE::TensorExt::SparseOpInterface>($_op));
+   return ::mlir::iree_compiler::IREE::TensorExt::verifySparseCastOpInterface(
+     ::mlir::cast<::mlir::iree_compiler::IREE::TensorExt::SparseCastOpInterface>($_op));
   }];
 }
 

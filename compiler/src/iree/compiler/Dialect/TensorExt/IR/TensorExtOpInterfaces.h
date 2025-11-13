@@ -13,10 +13,10 @@
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
-class SparseOpInterface;
+class SparseCastOpInterface;
 // Interface verification method to verify the sparse op satisfies
 // interface constraints.
-LogicalResult verifySparseOpInterface(SparseOpInterface sparseOp);
+LogicalResult verifySparseCastOpInterface(SparseCastOpInterface sparseOp);
 
 } // namespace mlir::iree_compiler::IREE::TensorExt
 

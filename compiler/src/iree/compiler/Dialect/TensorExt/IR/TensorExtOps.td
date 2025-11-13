@@ -533,23 +533,23 @@ def IREETensorExt_ComputeBarrierEndOp : IREETensorExt_PureOp<"compute_barrier.en
 def IREETensorExt_CastToRaggedShapeOp :
     IREETensorExt_PureOp<"cast_to_ragged_shape", [
       AttrSizedOperandSegments,
-      DeclareOpInterfaceMethods<IREETensorExt_SparseOpInterface>
+      DeclareOpInterfaceMethods<IREETensorExt_SparseCastOpInterface>
     ]> {
   let summary = [{
-    Create a tensor with ragged rows.
+    Create a shaped type with ragged rows.
   }];
 
   let description = [{
-    The op takes a tensor and reinterprets its contents as a ragged tensor. The
+    The op takes a shaped type and reinterprets its contents as a ragged shaped type. The
     dimensions specified by `ragged_dim` in the source is interpreted as two
-    dimensions at `ragged_dim` and `ragged_dim + 1` in the result tensor. The
-    result tensor has a rank of one more than that of the `source`. The result
-    type also has the encoding set to an attribute of type `RaggedTensorAttr`
+    dimensions at `ragged_dim` and `ragged_dim + 1` in the result shaped type. The
+    result shaped type has a rank of one more than that of the `source`. The result
+    type also has the encoding set to an attribute of type `RaggedShapeAttr`
     with the specified `ragged_dim` used to specify the `raggedRow` in the
-    encoding attribute. (See description of `RaggedTensorAttr`). The number of
+    encoding attribute. (See description of `RaggedShapeAttr`). The number of
     ragged rows is specified using `num_ragged_rows` argument. The size of each
     row is specified using `column_lengths` argument, which is a single rank
-    tensor of size `num_rows + 1` and where size of the `i`-th row of the result
+    shaped type of size `num_rows + 1` and where size of the `i`-th row of the result
     is computed using
 
     ```
@@ -560,7 +560,7 @@ def IREETensorExt_CastToRaggedShapeOp :
     represetation (https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)).
     An optional argument `max_ragged_column_length` allows specifying the dynamic
     upper bound for the number of columns (for static upper bounds the shape of the
-    dimension in the result tensor encodes this value)
+    dimension in the result shaped type encodes this value)
 
     Contraints are
     1. `ragged_dim` < rank(`source`)
@@ -598,13 +598,13 @@ def IREETensorExt_CastToRaggedShapeOp :
     ShapedType getResultType() {
       return cast<ShapedType>(getResult().getType());
     }
-    RaggedTensorAttr getResultSparseEncoding() {
+    RaggedShapeAttr getResultSparseEncoding() {
       if (auto tensorType = dyn_cast<RankedTensorType>(getResultType())) {
-        return dyn_cast_or_null<RaggedTensorAttr>(tensorType.getEncoding());
+        return dyn_cast_or_null<RaggedShapeAttr>(tensorType.getEncoding());
       } else if (auto memrefType = dyn_cast<MemRefType>(getResultType())) {
-        return dyn_cast_or_null<RaggedTensorAttr>(memrefType.getLayout());
+        return dyn_cast_or_null<RaggedShapeAttr>(memrefType.getLayout());
       }
-      return RaggedTensorAttr();
+      return RaggedShapeAttr();
     }
     OpFoldResult getNumRaggedRowsAsOfr();
   }];

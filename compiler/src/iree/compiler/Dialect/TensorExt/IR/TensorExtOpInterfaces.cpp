@@ -14,7 +14,7 @@
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
-LogicalResult verifySparseOpInterface(SparseOpInterface sparseOp) {
+LogicalResult verifySparseCastOpInterface(SparseCastOpInterface sparseOp) {
   // Check that the operation has only one result.
   if (sparseOp->getNumResults() != 1) {
     return sparseOp.emitOpError("sparse operations can only have result");
@@ -23,22 +23,22 @@ LogicalResult verifySparseOpInterface(SparseOpInterface sparseOp) {
   // The sparse operation needs to return a shaped type that has an attribute
   // specifying the sparsity.
   Type resultType = sparseOp->getResult(0).getType();
-  SparseTensorAttrInterface sparseAttr;
+  SparseShapeAttrInterface sparseAttr;
   if (auto tensorType = dyn_cast<RankedTensorType>(resultType)) {
     sparseAttr =
-        dyn_cast_or_null<SparseTensorAttrInterface>(tensorType.getEncoding());
+        dyn_cast_or_null<SparseShapeAttrInterface>(tensorType.getEncoding());
     if (!sparseAttr) {
       return sparseOp.emitOpError(
           "expected result type to have an encoding attribute that implements "
-          "the `SparseTensorAttrInterface`");
+          "the `SparseShapeAttrInterface`");
     }
   } else if (auto memrefType = dyn_cast<MemRefType>(resultType)) {
     sparseAttr =
-        dyn_cast_or_null<SparseTensorAttrInterface>(memrefType.getLayout());
+        dyn_cast_or_null<SparseShapeAttrInterface>(memrefType.getLayout());
     if (!sparseAttr) {
       return sparseOp.emitOpError(
           "expected result type to have a layout attribute that implements "
-          "the `SparseTensorAttrInterface`");
+          "the `SparseShapeAttrInterface`");
     }
   } else {
     return sparseOp->emitOpError("unhandled return type for sparse operation");
