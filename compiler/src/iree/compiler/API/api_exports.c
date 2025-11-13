@@ -31,6 +31,8 @@ extern void ireeGPUGetSingleSubgroupLayout();
 extern void ireeCodegenGetTunerRootOps();
 extern void ireeCodegenGetAttentionOpDetail();
 extern void ireeCodegenMlirOperationIsACodegenAttentionOp();
+extern void ireeCodegenHasIGEMMGenericConvDetails();
+extern void ireeCodegenGetIGEMMGenericConvDetails();
 extern void ireeCodegenTranslationInfoAttrGet();
 extern void ireeCodegenTranslationInfoAttrGetParameters();
 extern void ireeCodegenTranslationInfoAttrGetTypeID();
@@ -948,6 +950,8 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenGetTunerRootOps;
   x += (uintptr_t)&ireeCodegenGetAttentionOpDetail;
   x += (uintptr_t)&ireeCodegenMlirOperationIsACodegenAttentionOp;
+  x += (uintptr_t)&ireeCodegenHasIGEMMGenericConvDetails;
+  x += (uintptr_t)&ireeCodegenGetIGEMMGenericConvDetails;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGet;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGetParameters;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGetTypeID;

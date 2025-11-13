@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cassert>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -693,4 +694,80 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "isa_attention_op", &ireeCodegenMlirOperationIsACodegenAttentionOp,
       "Checks if the given operation is an IREE LinalgExt attention op.",
       py::arg("op"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenGetIGEMMGenericConvDetails
+  //===-------------------------------------------------------------------===//
+  py::class_<ireeCodegenIGEMMGenericConvDetails>(iree_codegen_module,
+                                                 "IGEMMGenericConvDetails")
+      .def_prop_ro("igemm_contraction_maps",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return self.igemmContractionMaps;
+                   })
+      .def_prop_ro("igemm_loop_bounds",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.igemmLoopBounds);
+                   })
+      .def_prop_ro("igemm_loop_iterators",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return self.igemmLoopIterators;
+                   })
+      .def_prop_ro("im2col_output_perm",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return getIntArrayAttrValues(self.im2colOutputPerm);
+                   })
+      .def_prop_ro(
+          "filter_reassoc_indices",
+          [](const ireeCodegenIGEMMGenericConvDetails &self)
+              -> std::vector<std::vector<int64_t>> {
+            MlirAttribute attr = self.filterReassocIndices;
+            assert(!mlirAttributeIsNull(attr) && mlirAttributeIsAArray(attr) &&
+                   "filterReassocIndices should be a valid ArrayAttr");
+            size_t n = mlirArrayAttrGetNumElements(attr);
+            std::vector<std::vector<int64_t>> result;
+            result.reserve(n);
+            for (size_t i = 0; i < n; ++i) {
+              MlirAttribute innerArrayAttr = mlirArrayAttrGetElement(attr, i);
+              result.push_back(getIntArrayAttrValues(innerArrayAttr));
+            }
+            return result;
+          })
+      .def_prop_ro("is_output_channel_first",
+                   [](const ireeCodegenIGEMMGenericConvDetails &self) {
+                     return self.isOutputChannelFirst;
+                   })
+      .def_prop_ro(
+          "conv_to_igemm_dim_map",
+          [](const ireeCodegenIGEMMGenericConvDetails &self) -> py::dict {
+            py::dict result;
+            MlirAttribute attr = self.convToIgemmDimMap;
+            assert(!mlirAttributeIsNull(attr) && mlirAttributeIsAArray(attr) &&
+                   "convToIgemmDimMap should be a valid ArrayAttr");
+            size_t n = mlirArrayAttrGetNumElements(attr);
+            for (size_t i = 0; i < n; ++i) {
+              MlirAttribute pairAttr = mlirArrayAttrGetElement(attr, i);
+              assert(mlirAttributeIsAArray(pairAttr) &&
+                     mlirArrayAttrGetNumElements(pairAttr) == 2 &&
+                     "Each pair should be [conv_dim, igemm_dim]");
+              MlirAttribute keyAttr = mlirArrayAttrGetElement(pairAttr, 0);
+              MlirAttribute valueAttr = mlirArrayAttrGetElement(pairAttr, 1);
+              int64_t key = mlirIntegerAttrGetValueInt(keyAttr);
+              int64_t value = mlirIntegerAttrGetValueInt(valueAttr);
+              result[py::int_(key)] = py::int_(value);
+            }
+            return result;
+          });
+
+  iree_codegen_module.def(
+      "get_igemm_generic_conv_details",
+      [](MlirOperation op)
+          -> std::optional<ireeCodegenIGEMMGenericConvDetails> {
+        if (!ireeCodegenHasIGEMMGenericConvDetails(op)) {
+          return std::nullopt;
+        }
+        return ireeCodegenGetIGEMMGenericConvDetails(op);
+      },
+      "Gets IGEMM details for a linalg operation. "
+      "Returns None if failed to infer IGEMM convolution details.",
+      py::arg("linalg_op"));
 }
