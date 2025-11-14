@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "llvm/ADT/APFloat.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -179,29 +180,26 @@ struct FlexAttentionOpConversion
     Location loc = op.getLoc();
     MLIRContext *ctx = getContext();
     // Extract operands (new order: query, key, value, 8 block_mask tensors,
-    // scale, return_lse)
+    // scale, return_lse).
     Value query = op.getQuery();
     Value key = op.getKey();
     Value value = op.getValue();
     Value scaleValue = op.getScale();
     Value returnLseValue = op.getReturnLse();
 
-    // Get tensor types
     auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
     auto keyType = cast<torch::Torch::ValueTensorType>(key.getType());
     auto valueType = cast<torch::Torch::ValueTensorType>(value.getType());
 
-    // TODO: See if this check is necessary (Op assertations)
     if (!queryType.hasSizes() || !keyType.hasSizes() || !valueType.hasSizes()) {
-      return rewriter.notifyMatchFailure(op,
-                                         "expected tensors with known sizes");
+      return rewriter.notifyMatchFailure(
+          op, "expected input(s) types having sizes");
     }
 
     ArrayRef<int64_t> queryShape = queryType.getSizes();
     ArrayRef<int64_t> valueShape = valueType.getSizes();
 
-    // TODO: See if this check is necessary (Op assertations)
-    // Query shape: [B, H, M, E]
+    // Query shape: [B, H, M, E].
     if (queryShape.size() != 4) {
       return rewriter.notifyMatchFailure(op, "expected 4D query tensor");
     }
@@ -217,38 +215,26 @@ struct FlexAttentionOpConversion
       return rewriter.notifyMatchFailure(op, "NYI: dynamic head dimension");
     }
 
-    // Get element type
+    // Check if the element type is a float.
     Type elementType = queryType.getOptionalDtype();
-    if (!elementType || !isa<FloatType>(elementType)) {
+    auto floatType = dyn_cast<FloatType>(elementType);
+    if (!floatType) {
       return rewriter.notifyMatchFailure(op, "expected float element type");
     }
-    FloatType floatType = cast<FloatType>(elementType);
 
-    // Handle scale parameter
-    // Default scale: 1.0 / sqrt(head_dim)
+    // Default scale: 1.0 / sqrt(head_dim).
     double scaleVal;
     if (!matchPattern(scaleValue,
-                      torch::Torch::m_TorchConstantFloat(&scaleVal)))
-      // Fallback to default scale
+                      torch::Torch::m_TorchConstantFloat(&scaleVal))) {
       scaleVal = 1.0 / std::sqrt(static_cast<double>(headDim));
+    }
 
     Value scale = arith::ConstantOp::create(
         rewriter, loc, floatType, rewriter.getFloatAttr(floatType, scaleVal));
 
-    // TODO: See if this check is necessary (Op assertations)
-    // Check return_lse flag
-    bool returnLse = false;
-    if (!matchPattern(returnLseValue,
-                      torch::Torch::m_TorchConstantBool(&returnLse)))
-      return rewriter.notifyMatchFailure(op,
-                                         "expected constant return_lse value");
-
-    // Get function symbols from op attributes (now properly declared in
-    // TableGen)
     auto scoreModeSymbol = op.getScoreModFn();
     auto maskModSymbol = op.getMaskModFn();
 
-    // Convert torch tensors to builtin tensors
     auto toBuiltinTensor = [&](Value torchTensor) -> Value {
       auto torchType =
           cast<torch::Torch::ValueTensorType>(torchTensor.getType());
@@ -260,7 +246,7 @@ struct FlexAttentionOpConversion
     Value builtinKey = toBuiltinTensor(key);
     Value builtinValue = toBuiltinTensor(value);
 
-    // Declare common types for mask and score modification regions
+    // Declare common types for mask and score modification regions.
     Type i32Type = rewriter.getI32Type();
     Type si32Type =
         IntegerType::get(rewriter.getContext(), 32, IntegerType::Signed);
@@ -274,24 +260,20 @@ struct FlexAttentionOpConversion
     auto torchBoolScalarType = rewriter.getType<torch::Torch::ValueTensorType>(
         ArrayRef<int64_t>{}, rewriter.getI1Type());
 
-    // Create mask if mask_mod_fn is provided
     Value mask;
     if (maskModSymbol) {
-      // Create mask tensor [B, H, M, N] with values 0.0 (attend) or -inf (mask)
+      // Create mask tensor [B, H, M, N] with values 0.0 (attend) or -inf
+      // (mask).
       SmallVector<int64_t> maskShape = {batch, numHeads, seqLenQ, seqLenKV};
       SmallVector<Value> maskDynSizes;
 
       // Handling dynamic dimensions
       for (int i = 0; i < 4; ++i) {
         if (maskShape[i] == torch::Torch::kUnknownSize) {
-          Value idx = arith::ConstantIndexOp::create(rewriter, loc, i);
-          Value dim =
-              (i < 2) ? tensor::DimOp::create(rewriter, loc, builtinQuery, idx)
-              : (i == 2)
-                  ? tensor::DimOp::create(rewriter, loc, builtinQuery, idx)
-                  : tensor::DimOp::create(
-                        rewriter, loc, builtinKey,
-                        arith::ConstantIndexOp::create(rewriter, loc, 2));
+          Value idx =
+              arith::ConstantIndexOp::create(rewriter, loc, std::min(i, 2));
+          Value dim = tensor::DimOp::create(
+              rewriter, loc, i <= 2 ? builtinQuery : builtinKey, idx);
           maskDynSizes.push_back(dim);
         }
       }
@@ -300,25 +282,24 @@ struct FlexAttentionOpConversion
                                                  floatType, maskDynSizes);
       // Create linalg.generic to materialize mask
       SmallVector<AffineMap> maskMaps;
-      maskMaps.push_back(
-          AffineMap::getMultiDimIdentityMap(4, ctx)); // output map
+      maskMaps.push_back(AffineMap::getMultiDimIdentityMap(4, ctx));
 
       SmallVector<utils::IteratorType> iteratorTypes(
           4, utils::IteratorType::parallel);
 
-      Value zero = arith::ConstantOp::create(
-          rewriter, loc, floatType, rewriter.getFloatAttr(floatType, 0.0));
-      Value negInf = arith::ConstantOp::create(
+      Value zero = arith::ConstantFloatOp::create(
           rewriter, loc, floatType,
-          rewriter.getFloatAttr(floatType,
-                                -std::numeric_limits<double>::infinity()));
+          llvm::APFloat::getZero(floatType.getFloatSemantics()));
+      Value negInf = arith::ConstantFloatOp::create(
+          rewriter, loc, floatType,
+          llvm::APFloat::getInf(floatType.getFloatSemantics(),
+                                /*Negative=*/true));
 
       auto maskGeneric = linalg::GenericOp::create(
           rewriter, loc, TypeRange{maskTensor.getType()}, ValueRange{},
           ValueRange{maskTensor}, maskMaps, iteratorTypes,
           [&](OpBuilder &b, Location loc, ValueRange args) {
-            // Get indices and convert to torch tensors
-
+            // Get indices and convert to torch tensors.
             SmallVector<Value> torchIndices;
             for (unsigned i = 0; i < 4; ++i) {
               Value idx = linalg::IndexOp::create(b, loc, i);
@@ -331,22 +312,20 @@ struct FlexAttentionOpConversion
               torchIndices.push_back(torchIdx);
             }
 
-            // Call mask_mod_fn(b, h, q_idx, kv_idx)
+            // Call mask_mod_fn(b, h, q_idx, kv_idx).
             auto callOp =
                 func::CallOp::create(b, loc, TypeRange{torchBoolScalarType},
                                      *maskModSymbol, ValueRange(torchIndices));
             Value torchMaskResult = callOp.getResult(0);
 
-            // Convert result back to builtin tensor
             Value maskResult =
                 torch::TorchConversion::ToBuiltinTensorOp::create(
                     b, loc, boolScalarTensorType, torchMaskResult);
 
-            // Extract scalar from 0-d tensor
             Value maskBool =
                 tensor::ExtractOp::create(b, loc, maskResult, ValueRange{});
 
-            // Select: mask ? 0.0 : -inf
+            // Select: mask ? 0.0 : -inf.
             Value maskValue =
                 arith::SelectOp::create(b, loc, maskBool, zero, negInf);
 
@@ -363,22 +342,21 @@ struct FlexAttentionOpConversion
     for (int i = 0; i < 4; ++i) {
       if (outputShape[i] == torch::Torch::kUnknownSize) {
         Value idx = arith::ConstantIndexOp::create(rewriter, loc, i);
-        Value dim =
-            (i == 3) ? tensor::DimOp::create(rewriter, loc, builtinValue, idx)
-                     : tensor::DimOp::create(rewriter, loc, builtinQuery, idx);
+        Value dim = tensor::DimOp::create(
+            rewriter, loc, i < 3 ? builtinQuery : builtinValue, idx);
         outputDynSizes.push_back(dim);
       }
     }
 
-    // Initialize output tensor with identity value (0.0 for addition)
+    // Initialize output tensor with identity value (0.0 for addition).
     Value outputInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
                                                floatType, rewriter, loc,
                                                /*useOnlyFiniteValue=*/true);
     Value outputTensor = tensor::SplatOp::create(rewriter, loc, outputInit,
                                                  outputShape, outputDynSizes);
 
-    // Build indexing maps for attention
-    // Standard maps: Q, K, V, scale, [mask], output
+    // Build indexing maps for attention.
+    // Standard maps: Q, K, V, scale, [mask], output.
     AffineExpr b, h, m, n, k1, k2;
     bindDims(ctx, b, h, m, n, k1, k2);
 
@@ -389,38 +367,27 @@ struct FlexAttentionOpConversion
     auto oMap = AffineMap::get(6, 0, {b, h, m, k2}, ctx);
 
     SmallVector<AffineMap> indexingMaps = {qMap, kMap, vMap, sMap};
-    // Mask map is optional
-    if (mask)
+    if (mask) {
       indexingMaps.push_back(AffineMap::get(6, 0, {b, h, m, n}, ctx));
+    }
 
     indexingMaps.push_back(oMap);
 
-    // Create decomposition config with use_exp2 flag
-    // PyTorch's compiled kernels use exp2 for performance, so we match that
-    SmallVector<NamedAttribute> decompositionConfigAttrs;
-    decompositionConfigAttrs.push_back(
-        rewriter.getNamedAttr("use_exp2", rewriter.getBoolAttr(false)));
-    DictionaryAttr decompositionConfig =
-        rewriter.getDictionaryAttr(decompositionConfigAttrs);
-
-    // Create attention op
+    // Create attention op.
     auto attentionOp = IREE::LinalgExt::AttentionOp::create(
         rewriter, loc, outputTensor.getType(), builtinQuery, builtinKey,
         builtinValue, scale, outputTensor,
         rewriter.getAffineMapArrayAttr(indexingMaps), mask);
 
-    // Set decomposition config
-    attentionOp.setDecompositionConfigAttr(decompositionConfig);
-
     {
       OpBuilder::InsertionGuard g(rewriter);
       Block *block = rewriter.createBlock(&attentionOp.getRegion());
 
-      // Add block arguments: score (floatType), b, h, m, n (all index type)
+      // Add block arguments: score (floatType), b, h, m, n (all index type).
       Type indexType = rewriter.getIndexType();
-      block->addArgument(floatType, loc); // score
+      block->addArgument(floatType, loc);
       for (int i = 0; i < 4; ++i) {
-        block->addArgument(indexType, loc); // b (batch index)
+        block->addArgument(indexType, loc);
       }
       rewriter.setInsertionPointToStart(block);
 
@@ -431,17 +398,14 @@ struct FlexAttentionOpConversion
       }
       Value modifiedScore = score;
 
-      // If score_mod_fn is provided, call it with indices
       if (scoreModeSymbol) {
-        // The score_mod_fn takes (score, b, h, m, n) where m=q_idx, n=kv_idx
+        // The score_mod_fn takes (score, b, h, m, n) where m=q_idx, n=kv_idx.
 
-        // Convert score to torch tensor
         Value scoreTensor = tensor::FromElementsOp::create(
             rewriter, loc, scalarTensorType, ValueRange{score});
         Value torchScore = torch::TorchConversion::FromBuiltinTensorOp::create(
             rewriter, loc, torchScalarType, scoreTensor);
 
-        // Build arguments: score first, then indices (b, h, m, n)
         SmallVector<Value> callArgs;
         callArgs.push_back(torchScore);
 
@@ -456,50 +420,46 @@ struct FlexAttentionOpConversion
           callArgs.push_back(torchIdx);
         }
 
-        // Call score_mod_fn(score, b, h, q_idx, kv_idx)
         auto callOp =
             func::CallOp::create(rewriter, loc, TypeRange{torchScalarType},
                                  *scoreModeSymbol, ValueRange(callArgs));
         Value torchResult = callOp.getResult(0);
 
-        // Convert result back to builtin tensor
         Value resultTensor = torch::TorchConversion::ToBuiltinTensorOp::create(
             rewriter, loc, scalarTensorType, torchResult);
 
-        // Extract scalar from 0-d tensor
         modifiedScore = tensor::ExtractOp::create(rewriter, loc, resultTensor,
                                                   ValueRange{});
       }
 
-      // Yield modified score
       IREE::LinalgExt::YieldOp::create(rewriter, loc, modifiedScore);
     }
 
-    // Set insertion point after the attention op
     rewriter.setInsertionPointAfter(attentionOp);
 
-    // Extract result from attention (already normalized)
     Value normalizedOutput = attentionOp.getResult(0);
 
-    // Convert back to torch tensors
     auto outputTorchType =
         queryType.getWithSizesAndDtype(outputShape, elementType);
     Value torchOutput = torch::TorchConversion::FromBuiltinTensorOp::create(
         rewriter, loc, outputTorchType, normalizedOutput);
 
-    // Handle logsumexp
-    // Note: AttentionOp doesn't expose intermediate max/sum values needed for
-    // LSE calculation Return a dummy tensor - logsumexp shape is
-    // output_shape[:-1] (remove last dim)
+    // Handle logsumexp. Note: AttentionOp doesn't expose intermediate max/sum
+    // values needed for LSE calculation. Return a dummy tensor - logsumexp
+    // shape is output_shape[:-1] (remove last dim). Note: OnlineAttention does
+    // compute the logsumexp.
+    if (returnLseValue) {
+      op.emitWarning("FlexAttention: logsumexp output is a dummy (zeros), "
+                     "actual values are not available from AttentionOp");
+    }
     SmallVector<int64_t> lseShape = outputShape;
-    lseShape.pop_back(); // Remove last dimension (valueDim)
+    lseShape.pop_back();
 
     SmallVector<Value> lseDynSizes = outputDynSizes;
     if (!outputDynSizes.empty()) {
-      lseDynSizes.pop_back(); // Remove last dynamic size if it exists
+      lseDynSizes.pop_back();
     }
 
-    // Initialize logsumexp tensor with zeros (dummy values)
     Value zeroInit = arith::ConstantOp::create(
         rewriter, loc, floatType, rewriter.getFloatAttr(floatType, 0.0));
     Value lseTensor =
