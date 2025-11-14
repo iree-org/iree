@@ -257,3 +257,98 @@ util.func private @slice_dispatch_fold(%producer: !stream.resource<*>) -> !strea
   %consumer = stream.async.dispatch @ex::@dispatch(%c123_i32, %slice[%c10 to %c30 for %c20]) : (i32, !stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
   util.return %consumer : !stream.resource<*>
 }
+
+// -----
+
+// Tests that clones performing lifetime conversions are NOT elided.
+// When a clone changes the resource lifetime (e.g., * -> variable, * -> external),
+// it must be preserved even if it's the last use of the source.
+// This is critical for correctness when the specific lifetime is required by
+// consumers like util.global.store or function boundaries.
+
+util.global private mutable @global_var : !stream.resource<variable>
+
+stream.executable private @dispatch {
+  stream.executable.export public @entry workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+  builtin.module {
+    func.func @entry() {
+      return
+    }
+  }
+}
+
+// CHECK-LABEL: @cloneToVariable
+util.func public @cloneToVariable() -> !stream.resource<variable> {
+  %c4 = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+
+  // Dispatch produces a generic resource.
+  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch
+  %dispatch = stream.async.dispatch @dispatch::@entry() : () -> !stream.resource<*>{%c4}
+
+  // Clone to variable lifetime for storing in global.
+  // This clone MUST NOT be elided even though dispatch is only used here,
+  // because it changes lifetime from * to variable.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[DISPATCH]]
+  // CHECK-SAME: !stream.resource<*>{%c4} -> !stream.resource<variable>{%c4}
+  %clone = stream.async.clone %dispatch : !stream.resource<*>{%c4} -> !stream.resource<variable>{%c4}
+
+  // Global store requires exact variable type.
+  // CHECK: util.global.store %[[CLONE]], @global_var
+  util.global.store %clone, @global_var : !stream.resource<variable>
+
+  util.return %clone : !stream.resource<variable>
+}
+
+// -----
+
+// Tests that clones to external lifetime are preserved.
+// External resources cross module boundaries and require the specific lifetime.
+
+// CHECK-LABEL: @cloneToExternal
+util.func public @cloneToExternal() -> !stream.resource<external> {
+  %c4 = arith.constant 4 : index
+  %c123_i32 = arith.constant 123 : i32
+
+  // Splat produces a generic resource.
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c4}
+
+  // Clone to external lifetime for export.
+  // This clone MUST NOT be elided even though splat is only used here,
+  // because it changes lifetime from * to external.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SPLAT]]
+  // CHECK-SAME: !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
+  %clone = stream.async.clone %splat : !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
+
+  util.return %clone : !stream.resource<external>
+}
+
+// -----
+
+// Tests that clones with the same lifetime CAN still be elided (baseline
+// behavior). This ensures we don't break existing optimizations.
+
+// CHECK-LABEL: @cloneSameLifetimePreserved
+util.func public @cloneSameLifetimePreserved() -> !stream.resource<*> {
+  %c4 = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  %c456_i32 = arith.constant 456 : i32
+
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat %c123
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c4}
+
+  // Clone with same lifetime (* -> *) and last use CAN be elided.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %splat : !stream.resource<*>{%c4} -> !stream.resource<*>{%c4}
+
+  // CHECK: stream.async.fill %c456_i32, %[[SPLAT]]
+  %fill = stream.async.fill %c456_i32, %clone[%c0 to %c4 for %c4] : i32 -> %0 as !stream.resource<*>{%c4}
+
+  util.return %fill : !stream.resource<*>
+}
