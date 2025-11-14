@@ -21,6 +21,7 @@
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 static const char* IREE_HAL_HIP_ALLOCATOR_ID = "HIP unpooled";
+static const char* IREE_HAL_HIP_CACHED_ID = "HIP cached";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 #define IREE_HAL_HIP_ASYNC_ALLOCATION_DEFAULT_QUEUE_SIZE 8
@@ -169,7 +170,8 @@ static void iree_hal_hip_allocator_destroy(
       while (!iree_hal_hip_async_allocation_queue_empty(&queue_item->queue)) {
         iree_hal_hip_async_allocation_t allocation =
             iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
-
+        IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_CACHED_ID, (void*)allocation.pointer);
+        
         iree_status_ignore(IREE_HIP_CALL_TO_STATUS(
             allocator->symbols, hipFree(allocation.pointer), "hipFree"));
         iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
@@ -220,7 +222,7 @@ static iree_status_t iree_hal_hip_allocator_trim(
       while (!iree_hal_hip_async_allocation_queue_empty(&queue_item->queue)) {
         iree_hal_hip_async_allocation_t allocation =
             iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
-
+        IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_CACHED_ID, (void*)allocation.pointer);
         status = IREE_HIP_CALL_TO_STATUS(
             allocator->symbols, hipFree(allocation.pointer), "hipFree");
         iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
@@ -830,6 +832,8 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
         iree_hal_hip_async_allocation_t allocation =
             iree_hal_hip_async_allocation_queue_at(&queue_item->queue, 0);
         ptr = allocation.pointer;
+        IREE_TRACE_FREE_NAMED(IREE_HAL_HIP_CACHED_ID, (void*)ptr);
+
         iree_hal_hip_async_allocation_queue_pop_front(&queue_item->queue, 1);
         if (iree_hal_hip_async_allocation_queue_empty(&queue_item->queue)) {
           iree_hal_hip_async_allocation_queue_deinitialize(&queue_item->queue);
@@ -895,6 +899,10 @@ iree_status_t iree_hal_hip_allocator_free_async(
   IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
       &allocator->statistics, iree_hal_buffer_memory_type(buffer),
       iree_hal_buffer_allocation_size(buffer)));
+
+  IREE_TRACE_ALLOC_NAMED(IREE_HAL_HIP_CACHED_ID,
+      (void*)device_ptr,
+      (iree_host_size_t)iree_hal_buffer_allocation_size(buffer));
 
   int device_ordinal = 0;
   device_ordinal =
