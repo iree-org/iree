@@ -277,3 +277,101 @@ func.func @inner_parallel_SSA_violation_error(%3 : tensor<123x456xf32>) -> (tens
 }
 // Just checking that there is no failure here.
 // INNER-PARALLEL-LABEL: func @inner_parallel_SSA_violation_error
+
+// -----
+
+#config = #iree_cpu.lowering_config<vector_inner_parallel = [0, 20, 0]>
+#config1 = #iree_cpu.lowering_config<vector_inner_parallel = [16, 0, 0]>
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+func.func @ukernel_generic_with_broadcast(%arg0: tensor<1x192x1x16xf32>, %arg1: tensor<1x768x1x1xf32>, %arg2: tensor<768x16x1xf32>, %arg3: tensor<1x192x1x16xf32>) -> tensor<1x192x1x16xf32> {
+  %c1 = arith.constant 1 : index
+  %c192 = arith.constant 192 : index
+  %c768 = arith.constant 768 : index
+  %c1_i32 = arith.constant 1 : i32
+  %c16_i32 = arith.constant 16 : i32
+  %c1025_i32 = arith.constant 1025 : i32
+  %0 = tensor.empty() : tensor<192x768x16x1xf32>
+  %1 = linalg.generic {indexing_maps = [#map1, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%arg2 : tensor<768x16x1xf32>)
+    outs(%0 : tensor<192x768x16x1xf32>)
+    attrs = {lowering_config = #config1} {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<192x768x16x1xf32>
+  %2 = tensor.empty() : tensor<1x192x1x16xf32>
+  %3 = iree_codegen.ukernel.generic "iree_uk_mmt4d" ins(%arg1, %1 : tensor<1x768x1x1xf32>, tensor<192x768x16x1xf32>) outs(%2 : tensor<1x192x1x16xf32>) (%c1, %c192, %c768, %c1_i32, %c16_i32, %c1_i32, %c1025_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.fields = ["processor_data"]} strided_dims([[0], [0], [0]]) -> tensor<1x192x1x16xf32>
+  %4 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%3, %arg3 : tensor<1x192x1x16xf32>, tensor<1x192x1x16xf32>)
+    outs(%arg0 : tensor<1x192x1x16xf32>)
+    attrs = {lowering_config = #config} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %5 = arith.addf %in, %in_0 : f32
+    linalg.yield %5 : f32
+  } -> tensor<1x192x1x16xf32>
+  return %4 : tensor<1x192x1x16xf32>
+}
+// INNER-PARALLEL-LABEL: func.func @ukernel_generic_with_broadcast
+// INNER-PARALLEL-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// INNER-PARALLEL-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// INNER-PARALLEL-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// INNER-PARALLEL-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
+// INNER-PARALLEL:         scf.forall
+// INNER-PARALLEL:           linalg.generic
+// INNER-PARALLEL-SAME:        ins(%[[ARG2]]
+// INNER-PARALLEL:           scf.forall.in_parallel
+// INNER-PARALLEL:         %[[UK:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+// INNER-PARALLEL:         scf.forall {{.+}} shared_outs(%[[ITER:.+]] = %[[ARG0]])
+// INNER-PARALLEL:           %[[UK_SLICE:.+]] = tensor.extract_slice %[[UK]]
+// INNER-PARALLEL:           %[[ARG3_SLICE:.+]] = tensor.extract_slice %[[ARG3]]
+// INNER-PARALLEL:           %[[ITER_SLICE:.+]] = tensor.extract_slice %[[ITER]]
+// INNER-PARALLEL:           linalg.generic
+// INNER-PARALLEL-SAME:        ins(%[[UK_SLICE]], %[[ARG3_SLICE]]
+// INNER-PARALLEL-SAME:        outs(%[[ITER_SLICE]]
+
+// -----
+
+#config = #iree_cpu.lowering_config<vector_common_parallel = [16, 0]>
+#config1 = #iree_cpu.lowering_config<vector_inner_parallel = [16, 1]>
+#config2 = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16, 16]>
+#config3 = #iree_cpu.lowering_config<distribution = [16, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 16, 16, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+#map = affine_map<(d0, d1, d2) -> (d0 + d1 + d2)>
+func.func @unpack_pack_fill_mmt4d_map_scatter(%arg0: tensor<1x128x16x1xf32>, %arg1: tensor<1x128x16x1xf32>) -> tensor<16x128xf32> {
+  %c128 = arith.constant 128 : index
+  %c16 = arith.constant 16 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<16x128xf32>
+  %1 = linalg.unpack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %0 {lowering_config = #config1} : tensor<1x128x16x1xf32> -> tensor<16x128xf32>
+  %2 = tensor.empty() : tensor<16x128x1x1xf32>
+  %pack = linalg.pack %1 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %2 : tensor<16x128xf32> -> tensor<16x128x1x1xf32>
+  %3 = tensor.empty() : tensor<16x128xf32>
+  %4 = scf.forall (%arg2) in (16) shared_outs(%arg3 = %3) -> (tensor<16x128xf32>) {
+    %5 = tensor.empty() : tensor<1x1x1x16xf32>
+    %6 = linalg.fill {lowering_config = #config2} ins(%cst : f32) outs(%5 : tensor<1x1x1x16xf32>) -> tensor<1x1x1x16xf32>
+    %extracted_slice = tensor.extract_slice %pack[%arg2, 0, 0, 0] [1, 128, 1, 1] [1, 1, 1, 1] : tensor<16x128x1x1xf32> to tensor<1x128x1x1xf32>
+    %7 = linalg.mmt4d {lowering_config = #config3} ins(%extracted_slice, %arg1 : tensor<1x128x1x1xf32>, tensor<1x128x16x1xf32>) outs(%6 : tensor<1x1x1x16xf32>) -> tensor<1x1x1x16xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg3[0, 0] [16, 128] [1, 1] : tensor<16x128xf32> to tensor<16x128xf32>
+    %8 = iree_linalg_ext.map_scatter {lowering_config = #config} %7 into %extracted_slice_0 {
+    ^bb0(%arg4: index, %arg5: index, %arg6: index, %arg7: index):
+      %9 = affine.apply #map(%c0, %arg4, %arg2)
+      %10 = arith.cmpi ult, %9, %c16 : index
+      %11 = arith.cmpi ult, %arg5, %c128 : index
+      %12 = arith.andi %10, %11 : i1
+      iree_linalg_ext.yield %9, %arg5, %12 : index, index, i1
+    } : tensor<1x1x1x16xf32> into tensor<16x128xf32> -> tensor<16x128xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %8 into %arg3[0, 0] [16, 128] [1, 1] : tensor<16x128xf32> into tensor<16x128xf32>
+    }
+  }
+  return %4 : tensor<16x128xf32>
+}
+// INNER-PARALLEL-LABEL: func.func @unpack_pack_fill_mmt4d_map_scatter
+// INNER-PARALLEL:         scf.forall
+// INNER-PARALLEL:           linalg.unpack
+// INNER-PARALLEL:           linalg.pack
+// INNER-PARALLEL:           scf.forall.in_parallel
+// INNER-PARALLEL:         scf.forall
+// INNER-PARALLEL:           linalg.fill
+// INNER-PARALLEL:           linalg.mmt4d
+// INNER-PARALLEL:           iree_linalg_ext.map_scatter
