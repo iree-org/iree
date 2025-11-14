@@ -1,0 +1,378 @@
+# IREE CI Error Pattern Co-occurrence Rules
+#
+# This file defines rules for grouping co-occurring error patterns into
+# single root causes. When multiple patterns appear together in a log,
+# these rules determine if they should be treated as a single fixable issue.
+#
+# Rule structure:
+#   - name: Human-readable name for this root cause
+#   - primary_pattern: The pattern that indicates the actual error
+#   - secondary_patterns: Patterns that commonly co-occur but are symptoms
+#   - description: Explanation of why these patterns appear together
+#   - priority: When multiple rules match, higher priority wins
+#
+# Data based on co-occurrence analysis of 563 CI failure logs.
+
+root_cause_rules:
+  # ==========================================================================
+  # ROCm Runtime Issues
+  # ==========================================================================
+
+  - name: "rocm_cleanup_crash"
+    primary_pattern: "rocclr_memobj"
+    secondary_patterns:
+      - "aborted"
+      - "core_dumped"
+      - "process_exit_error"  # Exit code 134 (SIGABRT)
+    description: >
+      ROCm memory object cleanup crash in rocclr/device/device.cpp.
+      Tests often PASS before this crash occurs during teardown.
+      This creates false CI failures and should not fail PRs.
+    priority: 100
+    actionable: false  # Infrastructure/driver issue
+    category: "infrastructure"
+
+  - name: "hip_device_enumeration_failure"
+    primary_pattern: "hip_file_not_found"
+    secondary_patterns:
+      - "hip_error"
+      - "python_exception"
+    description: >
+      HIP runtime cannot find device libraries or bitcode files.
+      Usually indicates missing ROCm installation or incorrect paths.
+    priority: 90
+    actionable: true
+    category: "configuration"
+
+  - name: "rocm_driver_crash"
+    primary_pattern: "hip_device_lost"
+    secondary_patterns:
+      - "rocm_error"
+      - "aborted"
+      - "core_dumped"
+      - "timeout"
+    description: >
+      AMD GPU driver lost device during execution.
+      Hardware or driver issue, not code bug.
+    priority: 95
+    actionable: false
+    category: "infrastructure"
+
+  # ==========================================================================
+  # Build Failures
+  # ==========================================================================
+
+  - name: "compilation_failure"
+    primary_pattern: "compile_error"
+    secondary_patterns:
+      - "process_exit_error"
+      - "fatal_error"
+    description: >
+      C++ compilation error. The primary error is the compile_error,
+      other patterns are just consequences of the build failing.
+    priority: 80
+    actionable: true
+    category: "code"
+
+  - name: "linker_failure"
+    primary_pattern: "undefined_reference"
+    secondary_patterns:
+      - "linker_error"
+      - "process_exit_error"
+    description: >
+      Undefined symbol during linking. Need to add missing library
+      or fix symbol visibility.
+    priority: 80
+    actionable: true
+    category: "code"
+
+  - name: "cmake_configuration_failure"
+    primary_pattern: "cmake_error"
+    secondary_patterns:
+      - "process_exit_error"
+    description: >
+      CMake failed to configure the build. Check dependencies
+      and CMakeLists.txt syntax.
+    priority: 75
+    actionable: true
+    category: "configuration"
+
+  # ==========================================================================
+  # Test Failures
+  # ==========================================================================
+
+  - name: "test_timeout"
+    primary_pattern: "timeout"
+    secondary_patterns:
+      - "test_failed"
+      - "process_exit_error"
+      - "python_exception"
+    description: >
+      Test exceeded time limit. May indicate infinite loop,
+      deadlock, or test infrastructure issue.
+    priority: 50
+    actionable: false  # Could be flake or infrastructure
+    category: "test_infrastructure"
+
+  - name: "python_test_failure"
+    primary_pattern: "python_exception"
+    secondary_patterns:
+      - "test_failed"
+      - "process_exit_error"
+    description: >
+      Python test threw an exception. The traceback in python_exception
+      contains the actual error details.
+    priority: 70
+    actionable: true
+    category: "code"
+
+  - name: "filecheck_mismatch"
+    primary_pattern: "filecheck_failed"
+    secondary_patterns:
+      - "test_failed"
+      - "process_exit_error"
+    description: >
+      LLVM FileCheck found output that doesn't match CHECK patterns.
+      Usually means compiler transformation changed IR output.
+    priority: 85
+    actionable: true
+    category: "code"
+
+  - name: "assertion_failure"
+    primary_pattern: "assertion_failed"
+    secondary_patterns:
+      - "aborted"
+      - "test_failed"
+      - "core_dumped"
+    description: >
+      Assertion failed in test or runtime code.
+      The assertion message contains the actual invariant violation.
+    priority: 90
+    actionable: true
+    category: "code"
+
+  # ==========================================================================
+  # Memory Issues
+  # ==========================================================================
+
+  - name: "segmentation_fault"
+    primary_pattern: "segfault"
+    secondary_patterns:
+      - "core_dumped"
+      - "aborted"
+      - "test_failed"
+    description: >
+      Null pointer dereference or invalid memory access.
+      Core dump may provide stack trace for debugging.
+    priority: 95
+    actionable: true
+    category: "code"
+
+  - name: "out_of_memory"
+    primary_pattern: "oom"
+    secondary_patterns:
+      - "bad_alloc"
+      - "cuda_oom"
+      - "vk_oom"
+      - "aborted"
+    description: >
+      System ran out of memory (CPU or GPU).
+      May need to reduce batch size or optimize memory usage.
+    priority: 60
+    actionable: false  # Often infrastructure issue
+    category: "infrastructure"
+
+  - name: "stack_overflow_error"
+    primary_pattern: "stack_overflow"
+    secondary_patterns:
+      - "segfault"
+      - "aborted"
+    description: >
+      Stack exhausted, usually from infinite recursion or
+      very deep call stacks.
+    priority: 85
+    actionable: true
+    category: "code"
+
+  # ==========================================================================
+  # GPU Driver Issues
+  # ==========================================================================
+
+  - name: "vulkan_device_lost"
+    primary_pattern: "vk_device_lost"
+    secondary_patterns:
+      - "vulkan_error"
+      - "aborted"
+      - "test_failed"
+    description: >
+      Vulkan driver lost the device. Usually GPU hang or driver crash.
+      Not a code bug.
+    priority: 90
+    actionable: false
+    category: "infrastructure"
+
+  - name: "cuda_device_lost"
+    primary_pattern: "cuda_device_lost"
+    secondary_patterns:
+      - "cuda_error"
+      - "aborted"
+      - "test_failed"
+    description: >
+      CUDA driver lost the device. Usually GPU hang or driver crash.
+      Not a code bug.
+    priority: 90
+    actionable: false
+    category: "infrastructure"
+
+  - name: "vulkan_initialization_failure"
+    primary_pattern: "vk_initialization_failed"
+    secondary_patterns:
+      - "vulkan_error"
+      - "python_exception"
+    description: >
+      Failed to initialize Vulkan device.
+      Check driver installation and device availability.
+    priority: 75
+    actionable: true
+    category: "configuration"
+
+  # ==========================================================================
+  # Build System Issues
+  # ==========================================================================
+
+  - name: "bazel_build_failure"
+    primary_pattern: "bazel_failed"
+    secondary_patterns:
+      - "compile_error"
+      - "process_exit_error"
+    description: >
+      Bazel build failed. Check the actual compilation errors
+      in the compile_error pattern matches.
+    priority: 70
+    actionable: true
+    category: "code"
+
+  - name: "bazel_timeout_failure"
+    primary_pattern: "bazel_timeout"
+    secondary_patterns:
+      - "timeout"
+      - "process_exit_error"
+    description: >
+      Bazel build exceeded time limit.
+      May indicate infrastructure issue or very slow build.
+    priority: 50
+    actionable: false
+    category: "infrastructure"
+
+  - name: "ctest_failure"
+    primary_pattern: "ctest_failed"
+    secondary_patterns:
+      - "test_failed"
+      - "process_exit_error"
+    description: >
+      CTest reported test failures. Look at individual test
+      failure patterns for root cause.
+    priority: 60
+    actionable: true
+    category: "code"
+
+  # ==========================================================================
+  # Infrastructure Issues
+  # ==========================================================================
+
+  - name: "network_download_failure"
+    primary_pattern: "download_failed"
+    secondary_patterns:
+      - "network_error"
+      - "process_exit_error"
+    description: >
+      Failed to download artifact or dependency.
+      Network or repository availability issue.
+    priority: 30
+    actionable: false
+    category: "infrastructure"
+
+  - name: "docker_container_failure"
+    primary_pattern: "docker_error"
+    secondary_patterns:
+      - "process_exit_error"
+    description: >
+      Docker container failed to start or execute.
+      Container infrastructure issue.
+    priority: 40
+    actionable: false
+    category: "infrastructure"
+
+  - name: "git_operation_failure"
+    primary_pattern: "git_error"
+    secondary_patterns:
+      - "process_exit_error"
+    description: >
+      Git command failed. May be network issue, authentication,
+      or repository state problem.
+    priority: 40
+    actionable: true
+    category: "configuration"
+
+  - name: "permission_error"
+    primary_pattern: "permission_denied"
+    secondary_patterns:
+      - "file_not_found"
+      - "process_exit_error"
+    description: >
+      File system permission issue.
+      Check file permissions or runner configuration.
+    priority: 50
+    actionable: true
+    category: "configuration"
+
+  # ==========================================================================
+  # Performance Issues
+  # ==========================================================================
+
+  - name: "benchmark_regression_failure"
+    primary_pattern: "benchmark_regression"
+    secondary_patterns:
+      - "test_failed"
+    description: >
+      Performance benchmark exceeded golden time.
+      May indicate performance regression or infrastructure variance.
+    priority: 60
+    actionable: true
+    category: "performance"
+
+# Pattern groups that should NOT be merged into a single root cause.
+# These patterns co-occur but represent independent issues.
+independent_patterns:
+  - patterns:
+      - "compile_error"
+      - "python_exception"
+    reason: "Build failures trigger Python test exceptions, but both need fixing"
+
+  - patterns:
+      - "python_exception"
+      - "timeout"
+    reason: "Python exception may cause timeout, but exception is the root cause"
+
+  - patterns:
+      - "compile_error"
+      - "timeout"
+    reason: "Build may timeout while failing, but compile error is primary"
+
+# Pattern prioritization when multiple primary patterns match.
+# Higher priority patterns take precedence for root cause assignment.
+pattern_priorities:
+  rocclr_memobj: 100  # Always prioritize - creates false failures
+  segfault: 95
+  hip_device_lost: 95
+  vk_device_lost: 95
+  cuda_device_lost: 95
+  assertion_failed: 90
+  filecheck_failed: 85
+  stack_overflow: 85
+  compile_error: 80
+  undefined_reference: 80
+  python_exception: 70
+  cmake_error: 75
+  test_failed: 60
+  timeout: 50

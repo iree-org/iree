@@ -1,0 +1,58 @@
+# Test error patterns for CI triage tool unit tests.
+# Minimal subset to test pattern matching logic.
+
+patterns:
+  filecheck_failed:
+    pattern: 'CHECK.*expected string not found'
+    severity: high
+    actionable: true
+    context_lines: 2
+    description: "FileCheck test failure - expected pattern not found in output"
+    extract:
+      - name: file_path
+        regex: '(\S+\.mlir):(\d+):'
+      - name: error_message
+        regex: 'error: (.+)'
+
+  rocclr_memobj:
+    pattern: 'rocclr/device/(device|memory)\.cpp'
+    severity: critical
+    actionable: false
+    context_lines: 3
+    description: "ROCm memory object cleanup crash"
+
+  aborted:
+    pattern: 'Aborted \(core dumped\)|signal SIGABRT'
+    severity: critical
+    actionable: false
+    context_lines: 1
+    description: "Process aborted with SIGABRT"
+
+  compile_error:
+    pattern: 'error:.*|fatal error:.*|compilation terminated'
+    severity: critical
+    actionable: true
+    context_lines: 3
+    description: "C++ compilation error"
+    extract:
+      - name: file_path
+        regex: '(\S+\.\w+):(\d+):(\d+):'
+      - name: error_message
+        regex: '(?:fatal )?error: (.+)'
+
+  timeout:
+    pattern: 'TIMEOUT:|exceeded maximum time limit|Killing process group'
+    severity: high
+    actionable: true
+    context_lines: 2
+    description: "Test timeout"
+
+  lit_test_failed:
+    pattern: '\*+ TEST .* FAILED \*+'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "LIT test framework failure"
+    extract:
+      - name: test_name
+        regex: "TEST '([^']+)' FAILED"
