@@ -30,6 +30,18 @@ repos:
       - id: black
         name: Run Black to format Python files
 
+  # Optional but recommended: fast Python linting and import checks just for utils.
+  # Configuration is in tools/utils/pyproject.toml to avoid duplication.
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: Run Ruff on utils Python files
+        args:
+          - --config=tools/utils/pyproject.toml
+          - --fix
+        files: ^tools/utils/.*\.py$
+
   - repo: https://github.com/pre-commit/mirrors-clang-format
     # Loosely track the most recent versions in
     #   * Runner images: https://github.com/actions/runner-images/
@@ -59,9 +71,16 @@ repos:
     rev: f2d115a052860b09b2888b4f104be614bf3b4779
     hooks:
       - id: do-not-submit
+        exclude: "^tools/utils/test/"
 
   - repo: local
     hooks:
+      - id: utils-validate
+        name: IREE utils validation (scoped)
+        language: system
+        entry: python tools/utils/scripts/precommit_utils.py
+        files: ^tools/utils/.*
+        pass_filenames: false
       - id: buildifier
         name: Run buildifier
         entry: buildifier
@@ -114,5 +133,13 @@ repos:
         entry: Files should be named BUILD.bazel instead of BUILD
         language: fail
         files: "BUILD$"
+
+      - id: iree-utils-lint
+        name: IREE utils lint (console/cli/exit-codes/fs)
+        language: python
+        entry: python tools/utils/scripts/lint_hooks.py
+        pass_filenames: true
+        files: ^tools/utils/.*\.py$
+        types: [python]
 
     # TODO(scotttodd): mypy type checking for Python (https://mypy-lang.org/)

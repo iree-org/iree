@@ -1,0 +1,37 @@
+# Test co-occurrence rules for CI triage tool unit tests.
+# Minimal subset to test root cause grouping logic.
+
+root_cause_rules:
+  - name: "rocm_cleanup_crash"
+    primary_pattern: "rocclr_memobj"
+    secondary_patterns:
+      - "aborted"
+    description: "ROCm memory object cleanup crash during teardown - false CI failure"
+    priority: 100
+    actionable: false
+    category: "infrastructure"
+
+  - name: "compilation_failure"
+    primary_pattern: "compile_error"
+    secondary_patterns: []
+    description: "C++ compilation error - code bug"
+    priority: 80
+    actionable: true
+    category: "code"
+
+  - name: "test_timeout"
+    primary_pattern: "timeout"
+    secondary_patterns:
+      - "lit_test_failed"
+    description: "Test exceeded time limit"
+    priority: 70
+    actionable: true
+    category: "test_failure"
+
+pattern_priorities:
+  filecheck_failed: 80
+  rocclr_memobj: 100
+  aborted: 50
+  compile_error: 80
+  timeout: 70
+  lit_test_failed: 75
