@@ -59,7 +59,7 @@ findSmallestFactorWithLowerBound(int64_t x, int64_t lowerBound) {
   assert(lowerBound > 0);
   // We expect all numbers here to be relatively small, so just do trial
   // division (with a limit just to be safe).
-  static constexpr int64_t kMaxIterations = 1 << 22;
+  static constexpr int64_t kMaxIterations = 1 << 15;
   int64_t upperBound = std::min(x, kMaxIterations);
   for (int64_t i = lowerBound; i <= upperBound; i++) {
     if (x % i == 0) {
