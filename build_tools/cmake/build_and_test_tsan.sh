@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 # Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -24,16 +24,18 @@ IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${OFF_IF_DARWIN}}"
 IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${OFF_IF_DARWIN}}"
 IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${OFF_IF_DARWIN}}"
 IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
+IREE_HIP_TEST_TARGET_CHIP="${IREE_HIP_TEST_TARGET_CHIP:-}"
 
 source build_tools/cmake/setup_build.sh
 
 CMAKE_ARGS=(
   "-G" "Ninja"
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
-  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   # The debug information will help get more helpful TSan reports (stacks).
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  "-DIREE_ENABLE_SPLIT_DWARF=ON"
+  "-DIREE_ENABLE_THIN_ARCHIVES=ON"
 
   # Let's make linking fast. Also, there's the off chance that TSan might be
   # better supported with LLD.
@@ -47,30 +49,33 @@ CMAKE_ARGS=(
   "-DIREE_HAL_DRIVER_HIP=${IREE_HAL_DRIVER_HIP}"
   "-DIREE_TARGET_BACKEND_CUDA=${IREE_TARGET_BACKEND_CUDA}"
   "-DIREE_TARGET_BACKEND_ROCM=${IREE_TARGET_BACKEND_ROCM}"
+  "-DIREE_HIP_TEST_TARGET_CHIP=${IREE_HIP_TEST_TARGET_CHIP}"
 
   # Workaround for this weird issue:
   # https://github.com/google/benchmark/issues/773#issuecomment-616067912
   "-DRUN_HAVE_STD_REGEX=0"
   "-DRUN_HAVE_POSIX_REGEX=0"
   "-DCOMPILE_HAVE_GNU_POSIX_REGEX=0"
-  "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
-  "-DCMAKE_C_COMPILER_LAUNCHER=sccache"
+
+  "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
 )
 
+echo "::group::Configuring CMake"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]?}"
+echo "::endgroup::"
 
-echo "Building all"
-echo "------------"
+echo "::group::Building all"
 "$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
+echo "::endgroup::"
 
-echo "Building test deps"
-echo "------------------"
+echo "::group::Building test deps"
 "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+echo "::endgroup::"
 
 # Disable actually running GPU tests. This tends to yield TSan reports that are
 # specific to one's particular GPU driver and therefore hard to reproduce across
-# machines and often un-actionable anyway.
-# See e.g. https://github.com/iree-org/iree/issues/9393
+# machines and often non-actionable anyway.
+# See, e.g., https://github.com/iree-org/iree/issues/9393.
 export IREE_VULKAN_DISABLE=1
 export IREE_METAL_DISABLE=1
 export IREE_CUDA_DISABLE=1
@@ -79,7 +84,7 @@ export IREE_HIP_DISABLE=1
 # Honor the "notsan" label on tests.
 export IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE=notsan
 
-# Run all tests, once
+# Run all tests, once.
 build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
 # Re-run many times certain tests that are cheap and prone to nondeterministic
