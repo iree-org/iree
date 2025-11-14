@@ -15,16 +15,34 @@ include "mlir/Pass/PassBase.td"
 
 def ReplicateGlobalsPerAffinityPass :
     Pass<"iree-stream-replicate-globals-per-affinity", "mlir::ModuleOp"> {
-  let summary = "Replicates globals for each unique affinity and rewires their uses.";
+  let summary = "Handles globals used on multiple affinities by replicating or inserting transfers.";
   let description = [{
-    Replicates IREE::Util::GlobalOps that are used on multiple affinities
-    and rewires their uses to the associated global. This allows for
-    specialization of globals for each affinity instead of having unspecialized
-    and a copy each use.
+    Handles IREE::Util::GlobalOps that are used on multiple affinities by either
+    replicating them (creating a separate global per affinity) or inserting
+    flow.tensor.transfer operations to move data between affinities.
+
+    When use-transfers=false (default):
+      Replicates globals for each unique affinity and rewires their uses to the
+      associated global. This allows for specialization of globals for each
+      affinity instead of having unspecialized globals and a copy at each use.
+
+    When use-transfers=true:
+      Inserts flow.tensor.transfer operations at global load sites to transfer
+      the global data to the required affinity. This avoids replicating the
+      global storage but may introduce runtime transfer overhead.
   }];
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
     "IREE::Util::UtilDialect",
+  ];
+
+  let options = [
+    Option<
+      "useTransfers", "use-transfers",
+      "bool",
+      /*default=*/"false",
+      "Use transfers instead of replicating globals"
+    >,
   ];
 }
 
