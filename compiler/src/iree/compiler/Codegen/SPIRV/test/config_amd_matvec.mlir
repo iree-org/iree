@@ -13,21 +13,12 @@
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0)>
-func.func @i4_dequant_matvec_f32() {
+func.func @i4_dequant_matvec_f32(%arg0: tensor<4096x86x128xi4>, %arg1: tensor<4096x86xf32>, %arg2: tensor<4096x86xf32>, %arg3: tensor<86x128xf32>) -> tensor<4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x128xi4>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86xf32>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<86x128xf32>>
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096xf32>>
-  %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4096, 86, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x128xi4>> -> tensor<4096x86x128xi4>
-  %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [4096, 86], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86xf32>> -> tensor<4096x86xf32>
-  %7 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [4096, 86], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86xf32>> -> tensor<4096x86xf32>
-  %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [86, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<86x128xf32>> -> tensor<86x128xf32>
   %9 = tensor.empty() : tensor<4096xf32>
   %10 = tensor.empty() : tensor<4096x86x128xf32>
   %11 = linalg.fill ins(%cst : f32) outs(%9 : tensor<4096xf32>) -> tensor<4096xf32>
-  %12 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%5, %6, %7 : tensor<4096x86x128xi4>, tensor<4096x86xf32>, tensor<4096x86xf32>) outs(%10 : tensor<4096x86x128xf32>) {
+  %12 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg1, %arg2 : tensor<4096x86x128xi4>, tensor<4096x86xf32>, tensor<4096x86xf32>) outs(%10 : tensor<4096x86x128xf32>) {
   ^bb0(%in: i4, %in_0: f32, %in_1: f32, %out: f32):
     %14 = arith.extui %in : i4 to i32
     %15 = arith.uitofp %14 : i32 to f32
@@ -35,19 +26,18 @@ func.func @i4_dequant_matvec_f32() {
     %17 = arith.mulf %16, %in_0 : f32
     linalg.yield %17 : f32
   } -> tensor<4096x86x128xf32>
-  %13 = linalg.generic {indexing_maps = [#map2, #map, #map3], iterator_types = ["parallel", "reduction", "reduction"]} ins(%8, %12 : tensor<86x128xf32>, tensor<4096x86x128xf32>) outs(%11 : tensor<4096xf32>) {
+  %13 = linalg.generic {indexing_maps = [#map2, #map, #map3], iterator_types = ["parallel", "reduction", "reduction"]} ins(%arg3, %12 : tensor<86x128xf32>, tensor<4096x86x128xf32>) outs(%11 : tensor<4096xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %14 = arith.mulf %in, %in_0 : f32
     %15 = arith.addf %14, %out : f32
     linalg.yield %15 : f32
   } -> tensor<4096xf32>
-  iree_tensor_ext.dispatch.tensor.store %13, %4, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096xf32>>
-  return
+  return %13 : tensor<4096xf32>
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
-//       CHECK: func.func @i4_dequant_matvec_f32()
+//      CHECK: func.func @i4_dequant_matvec_f32(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
@@ -64,23 +54,14 @@ func.func @i4_dequant_matvec_f32() {
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-func.func @i4_dequant_matvec_f32() {
+func.func @i4_dequant_matvec_f32(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<4096x32x1xf32>, %arg2: tensor<4096x32x1xf32>, %arg3: tensor<1x1x32x128xf32>) -> tensor<1x1x4096xf32> {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f32
   %c4294967296_i64 = arith.constant 4294967296 : i64
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x32x128xi4>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x32x1xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x32x1xf32>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1x32x128xf32>>
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1x4096xf32>>
-  %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4096, 32, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x32x128xi4>> -> tensor<4096x32x128xi4>
-  %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4096, 32, 1], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x32x1xf32>> -> tensor<4096x32x1xf32>
-  %7 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [4096, 32, 1], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x32x1xf32>> -> tensor<4096x32x1xf32>
-  %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0, 0], sizes = [1, 1, 32, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1x32x128xf32>> -> tensor<1x1x32x128xf32>
   %9 = tensor.empty() : tensor<1x1x4096xf32>
   %10 = tensor.empty() : tensor<4096x32x128xf32>
   %11 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x1x4096xf32>) -> tensor<1x1x4096xf32>
-  %12 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%5, %6, %7 : tensor<4096x32x128xi4>, tensor<4096x32x1xf32>, tensor<4096x32x1xf32>) outs(%10 : tensor<4096x32x128xf32>) {
+  %12 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg1, %arg2 : tensor<4096x32x128xi4>, tensor<4096x32x1xf32>, tensor<4096x32x1xf32>) outs(%10 : tensor<4096x32x128xf32>) {
   ^bb0(%in: i4, %in_0: f32, %in_1: f32, %out: f32):
     %14 = arith.extui %in : i4 to i32
     %15 = arith.uitofp %14 : i32 to f32
@@ -88,19 +69,18 @@ func.func @i4_dequant_matvec_f32() {
     %17 = arith.mulf %16, %in_0 : f32
     linalg.yield %17 : f32
   } -> tensor<4096x32x128xf32>
-  %13 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%8, %12 : tensor<1x1x32x128xf32>, tensor<4096x32x128xf32>) outs(%11 : tensor<1x1x4096xf32>) {
+  %13 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%arg3, %12 : tensor<1x1x32x128xf32>, tensor<4096x32x128xf32>) outs(%11 : tensor<1x1x4096xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %14 = arith.mulf %in, %in_0 : f32
     %15 = arith.addf %14, %out : f32
     linalg.yield %15 : f32
   } -> tensor<1x1x4096xf32>
-  iree_tensor_ext.dispatch.tensor.store %13, %4, offsets = [0, 0, 0], sizes = [1, 1, 4096], strides = [1, 1, 1] : tensor<1x1x4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1x4096xf32>>
-  return
+  return %13 : tensor<1x1x4096xf32>
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 4, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [128, 1, 1]>
-//       CHECK: func.func @i4_dequant_matvec_f32()
+//      CHECK: func.func @i4_dequant_matvec_f32(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
@@ -181,7 +161,7 @@ func.func @i4_dequant_matvec_f32() {
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
-//       CHECK: func.func @i4_dequant_matvec_f32()
+//      CHECK: func.func @i4_dequant_matvec_f32(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
@@ -200,22 +180,13 @@ func.func @i4_dequant_matvec_f32() {
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-func.func @i4_dequant_matvec_f16() {
+func.func @i4_dequant_matvec_f16(%arg0: tensor<4096x86x128xi4>, %arg1: tensor<4096x86x1xf16>, %arg2: tensor<4096x86x1xf16>, %arg3: tensor<1x1x86x128xf16>) -> tensor<1x1x4096xf16> {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x128xi4>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x1xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x1xf16>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1x86x128xf16>>
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1x4096xf16>>
-  %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4096, 86, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x128xi4>> -> tensor<4096x86x128xi4>
-  %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4096, 86, 1], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x1xf16>> -> tensor<4096x86x1xf16>
-  %7 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [4096, 86, 1], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x1xf16>> -> tensor<4096x86x1xf16>
-  %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0, 0], sizes = [1, 1, 86, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1x86x128xf16>> -> tensor<1x1x86x128xf16>
   %9 = tensor.empty() : tensor<1x1x4096xf16>
   %10 = tensor.empty() : tensor<4096x86x128xf16>
   %11 = linalg.fill ins(%cst : f16) outs(%9 : tensor<1x1x4096xf16>) -> tensor<1x1x4096xf16>
-  %12 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%5, %6, %7 : tensor<4096x86x128xi4>, tensor<4096x86x1xf16>, tensor<4096x86x1xf16>) outs(%10 : tensor<4096x86x128xf16>) {
+  %12 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg1, %arg2 : tensor<4096x86x128xi4>, tensor<4096x86x1xf16>, tensor<4096x86x1xf16>) outs(%10 : tensor<4096x86x128xf16>) {
   ^bb0(%in: i4, %in_0: f16, %in_1: f16, %out: f16):
     %14 = arith.extui %in : i4 to i32
     %15 = arith.uitofp %14 : i32 to f16
@@ -223,19 +194,18 @@ func.func @i4_dequant_matvec_f16() {
     %17 = arith.mulf %16, %in_0 : f16
     linalg.yield %17 : f16
   } -> tensor<4096x86x128xf16>
-  %13 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%8, %12 : tensor<1x1x86x128xf16>, tensor<4096x86x128xf16>) outs(%11 : tensor<1x1x4096xf16>) {
+  %13 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%arg3, %12 : tensor<1x1x86x128xf16>, tensor<4096x86x128xf16>) outs(%11 : tensor<1x1x4096xf16>) {
   ^bb0(%in: f16, %in_0: f16, %out: f16):
     %14 = arith.mulf %in, %in_0 : f16
     %15 = arith.addf %14, %out : f16
     linalg.yield %15 : f16
   } -> tensor<1x1x4096xf16>
-  iree_tensor_ext.dispatch.tensor.store %13, %4, offsets = [0, 0, 0], sizes = [1, 1, 4096], strides = [1, 1, 1] : tensor<1x1x4096xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1x4096xf16>>
-  return
+  return %13 : tensor<1x1x4096xf16>
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
-//       CHECK: func.func @i4_dequant_matvec_f16()
+//      CHECK: func.func @i4_dequant_matvec_f16(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
@@ -317,7 +287,7 @@ func.func @i4_dequant_matvec() {
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
-//       CHECK: func.func @i4_dequant_matvec()
+//      CHECK: func.func @i4_dequant_matvec(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
@@ -391,7 +361,7 @@ func.func @i4_dequant_matvec() {
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 4, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
-//       CHECK: func.func @i4_dequant_matvec()
+//      CHECK: func.func @i4_dequant_matvec(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
@@ -432,7 +402,7 @@ func.func @dynamic_batch_matvec() {
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 64]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
-//       CHECK: func.func @dynamic_batch_matvec()
+//      CHECK: func.func @dynamic_batch_matvec(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
