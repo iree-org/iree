@@ -14,7 +14,7 @@ include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 // !util.buffer
 //===----------------------------------------------------------------------===//
 
-def Util_BufferType : Util_TypeDef<"Buffer", [
+def Util_BufferType : TypeDef<Util_Dialect, "Buffer", [
   Util_ReferenceType,
   Util_SizeAwareType,
   DeclareTypeInterfaceMethods<Util_GlobalType, [
@@ -45,7 +45,7 @@ def Util_BufferType : Util_TypeDef<"Buffer", [
 // !util.list<T>
 //===----------------------------------------------------------------------===//
 
-def Util_ListType : Util_TypeDef<"List"> {
+def Util_ListType : TypeDef<Util_Dialect, "List"> {
   let mnemonic = "list";
 
   let summary = [{Dense list container type.}];
@@ -96,7 +96,7 @@ class Util_ListOf<Type type> :
 // !util.ptr<T>
 //===----------------------------------------------------------------------===//
 
-def Util_PtrType : Util_TypeDef<"Ptr"> {
+def Util_PtrType : TypeDef<Util_Dialect, "Ptr"> {
   let mnemonic = "ptr";
 
   let summary = [{A pointer-like reference.}];
@@ -162,7 +162,7 @@ class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtrType> {
 // !util.object
 //===----------------------------------------------------------------------===//
 
-def Util_ObjectType : Util_TypeDef<"Object"> {
+def Util_ObjectType : TypeDef<Util_Dialect, "Object"> {
   let mnemonic = "object";
 
   let summary = [{A placeholder for an unspecified object type.}];
@@ -187,7 +187,7 @@ def Util_ObjectType : Util_TypeDef<"Object"> {
 // !util.unused
 //===----------------------------------------------------------------------===//
 
-def Util_UnusedType : Util_TypeDef<"Unused"> {
+def Util_UnusedType : TypeDef<Util_Dialect, "Unused"> {
   let mnemonic = "unused";
 
   let summary = [{A placeholder for unused types.}];
@@ -207,7 +207,7 @@ def Util_UnusedType : Util_TypeDef<"Unused"> {
 // !util.variant
 //===----------------------------------------------------------------------===//
 
-def Util_VariantType : Util_TypeDef<"Variant"> {
+def Util_VariantType : TypeDef<Util_Dialect, "Variant"> {
   let mnemonic = "variant";
 
   let summary = [{A placeholder for a variant type (`?`).}];

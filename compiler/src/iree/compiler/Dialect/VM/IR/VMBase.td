@@ -8,7 +8,6 @@
 #define IREE_DIALECT_VM_BASE
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
-include "iree/compiler/Utils/DocMetadata.td"
 
 //===----------------------------------------------------------------------===//
 // IREE VM (Virtual Machine) dialect
@@ -156,68 +155,19 @@ def VM_SerializableOpInterface : OpInterface<"VMSerializableOp"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Base dialect op/type/attr/interface classes
+// Base VM op classes
 //===----------------------------------------------------------------------===//
 
-class VM_Op<string mnemonic, list<Trait> traits = []> :
-    Op<VM_Dialect, mnemonic, traits> {
-  let hasCustomAssemblyFormat = 1;
+def VM_OpInterface : OpInterface<"VMOp"> {
+  let description = [{
+    Interface used for VM ops to provide consistent ordinal assignment and
+    register allocation.
+  }];
 
-  list<VM_EncEncodeExpr> encoding = ?;
-
-  // Optional documentation metadata for rich doc generation.
-  Util_OpDocMetadata docMetadata = ?;
+  let methods = [];
 }
 
-// Trivial ops do not have any memory effects but may invoke undefined behavior
-// on some inputs. This makes them conditionally speculatable/hoistable.
-class VM_TrivialOp<string mnemonic, list<Trait> traits = []> :
-    VM_Op<mnemonic, !listconcat(traits, [NoMemoryEffect])>;
-
-// Pure ops do not have any memory effects, do not invoke undefined behavior,
-// and are always safe to speculate/hoist.
-//
-// TODO(https://github.com/iree-org/iree/issues/11179): More VM ops should be
-// made pure.
-class VM_PureOp<string mnemonic, list<Trait> traits = []> :
-    VM_TrivialOp<mnemonic, !listconcat(traits, [AlwaysSpeculatable])>;
-
-class VM_TypeDef<string name, list<Trait> traits = []> :
-    TypeDef<VM_Dialect, name, traits> {
-  // Optional documentation metadata for rich doc generation.
-  Util_TypeDocMetadata docMetadata = ?;
-}
-
-class VM_AttrDef<string name, list<Trait> traits = []> :
-    AttrDef<VM_Dialect, name, traits> {
-  // Optional documentation metadata for rich doc generation.
-  Util_AttrDocMetadata docMetadata = ?;
-}
-
-class VM_TypeInterface<string name, list<Interface> baseInterfaces = []> :
-    TypeInterface<name, baseInterfaces> {
-  // Optional documentation metadata for rich doc generation.
-  Util_InterfaceDocMetadata docMetadata = ?;
-}
-
-class VM_AttrInterface<string name, list<Interface> baseInterfaces = []> :
-    AttrInterface<name, baseInterfaces> {
-  // Optional documentation metadata for rich doc generation.
-  Util_InterfaceDocMetadata docMetadata = ?;
-}
-
-class VM_OpInterface<string name, list<Interface> baseInterfaces = []> :
-    OpInterface<name, baseInterfaces> {
-  // Optional documentation metadata for rich doc generation.
-  Util_InterfaceDocMetadata docMetadata = ?;
-}
-
-//===----------------------------------------------------------------------===//
-// VM interfaces
-//===----------------------------------------------------------------------===//
-
-def VM_ImportInterface :
-    VM_OpInterface<"ImportInterface", []> {
+def VM_ImportInterface : OpInterface<"ImportInterface"> {
   let description = [{
     Interface used for ops in other dialects to expose additional ABI
     information for better marshaling and versioning.
@@ -243,9 +193,14 @@ def VM_ImportInterface :
     }],
     "bool", "hasSideEffects", (ins)>,
   ];
+}
 
-  // Optional documentation metadata for rich doc generation.
-  Util_InterfaceDocMetadata docMetadata = ?;
+class VM_Op<string mnemonic, list<Trait> traits = []> :
+    Op<VM_Dialect, mnemonic,
+       !listconcat(traits, [VM_OpInterface])> {
+  let hasCustomAssemblyFormat = 1;
+
+  list<VM_EncEncodeExpr> encoding = ?;
 }
 
 //===----------------------------------------------------------------------===//
@@ -418,7 +373,7 @@ class VM_ConstantFloatValueAttr<F type> :
 // VM structs
 //===----------------------------------------------------------------------===//
 
-def VM_OrdinalCountsAttr : VM_AttrDef<"OrdinalCounts"> {
+def VM_OrdinalCountsAttr : AttrDef<VM_Dialect, "OrdinalCounts"> {
   let mnemonic = "ordinal_counts";
   let parameters = (ins
     AttrParameter<"int32_t", "">:$import_funcs,

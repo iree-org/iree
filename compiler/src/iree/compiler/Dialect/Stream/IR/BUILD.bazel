@@ -17,12 +17,9 @@ iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "StreamAttrs.td",
             "StreamBase.td",
-            "StreamDialect.td",
             "StreamInterfaces.td",
             "StreamOps.td",
-            "StreamTypes.td",
         ],
         include = ["*.td"],
     ),
@@ -94,22 +91,16 @@ iree_gentbl_cc_library(
     name = "StreamEnumsGen",
     tbl_outs = [
         (
-            [
-                "--gen-enum-decls",
-                "--dialect=stream",
-            ],
+            ["--gen-enum-decls"],
             "StreamEnums.h.inc",
         ),
         (
-            [
-                "--gen-enum-defs",
-                "--dialect=stream",
-            ],
+            ["--gen-enum-defs"],
             "StreamEnums.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "StreamTypes.td",
+    td_file = "StreamBase.td",
     deps = [":td_files"],
 )
 
@@ -196,7 +187,7 @@ iree_gentbl_cc_library(
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "StreamTypes.td",
+    td_file = "StreamBase.td",
     deps = [":td_files"],
 )
 

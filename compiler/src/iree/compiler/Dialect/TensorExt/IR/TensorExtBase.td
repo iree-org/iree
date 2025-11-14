@@ -7,11 +7,9 @@
 #ifndef IREE_DIALECT_TENSOREXT_BASE
 #define IREE_DIALECT_TENSOREXT_BASE
 
-include "iree/compiler/Utils/DocMetadata.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Dialect definition
@@ -40,51 +38,6 @@ def IREETensorExt_Dialect : Dialect {
 
 def IREETensorExt_Dim : TypeAlias<Index>;
 def IREETensorExt_ShapeDynamicDims : Variadic<IREETensorExt_Dim>;
-
-//===----------------------------------------------------------------------===//
-// Base dialect op/type/attr/interface classes
-//===----------------------------------------------------------------------===//
-
-class IREETensorExt_Op<string mnemonic, list<Trait> traits = []> :
-    Op<IREETensorExt_Dialect, mnemonic, traits> {
-  let hasCustomAssemblyFormat = 1;
-
-  // Optional documentation metadata for rich doc generation.
-  Util_OpDocMetadata docMetadata = ?;
-}
-
-class IREETensorExt_PureOp<string mnemonic, list<Trait> traits = []> :
-    IREETensorExt_Op<mnemonic, !listconcat(traits, [Pure])>;
-
-class IREETensorExt_TypeDef<string name, list<Trait> traits = []> :
-    TypeDef<IREETensorExt_Dialect, name, traits> {
-  // Optional documentation metadata for rich doc generation.
-  Util_TypeDocMetadata docMetadata = ?;
-}
-
-class IREETensorExt_AttrDef<string name, list<Trait> traits = []> :
-    AttrDef<IREETensorExt_Dialect, name, traits> {
-  // Optional documentation metadata for rich doc generation.
-  Util_AttrDocMetadata docMetadata = ?;
-}
-
-class IREETensorExt_OpInterface<string name, list<Interface> baseInterfaces = []> :
-    OpInterface<name, baseInterfaces> {
-  // Optional documentation metadata for rich doc generation.
-  Util_InterfaceDocMetadata docMetadata = ?;
-}
-
-class IREETensorExt_TypeInterface<string name, list<Interface> baseInterfaces = []> :
-    TypeInterface<name, baseInterfaces> {
-  // Optional documentation metadata for rich doc generation.
-  Util_InterfaceDocMetadata docMetadata = ?;
-}
-
-class IREETensorExt_AttrInterface<string name, list<Interface> baseInterfaces = []> :
-    AttrInterface<name, baseInterfaces> {
-  // Optional documentation metadata for rich doc generation.
-  Util_InterfaceDocMetadata docMetadata = ?;
-}
 
 //===----------------------------------------------------------------------===//
 // Dispatch types

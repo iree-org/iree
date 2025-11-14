@@ -26,7 +26,6 @@ iree_td_library(
     deps = [
         "//compiler/src/iree/compiler/Dialect/TensorExt/IR:td_files",
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
-        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
@@ -97,17 +96,11 @@ iree_gentbl_cc_library(
     name = "FlowEnumsGen",
     tbl_outs = [
         (
-            [
-                "--gen-enum-decls",
-                "--dialect=flow",
-            ],
+            ["--gen-enum-decls"],
             "FlowEnums.h.inc",
         ),
         (
-            [
-                "--gen-enum-defs",
-                "--dialect=flow",
-            ],
+            ["--gen-enum-defs"],
             "FlowEnums.cpp.inc",
         ),
     ],

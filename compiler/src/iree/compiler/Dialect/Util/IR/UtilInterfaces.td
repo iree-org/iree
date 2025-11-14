@@ -7,15 +7,14 @@
 #ifndef IREE_DIALECT_UTIL_IR_UTIL_INTERFACES
 #define IREE_DIALECT_UTIL_IR_UTIL_INTERFACES
 
-include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "mlir/IR/OpBase.td"
-include "mlir/IR/SymbolInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::ClosureOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_ClosureOpInterface : Util_OpInterface<"ClosureOpInterface"> {
+def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface for ops that follow the util dialect closure semantics (explicit
@@ -113,7 +112,8 @@ def Util_ClosureOpInterface : Util_OpInterface<"ClosureOpInterface"> {
   ];
 }
 
-def Util_ClosureYieldOpInterface : Util_OpInterface<"ClosureYieldOpInterface"> {
+def Util_ClosureYieldOpInterface : OpInterface<"ClosureYieldOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface for ops that yield results from a closure. These also generally
@@ -142,7 +142,8 @@ def Util_ClosureYieldOpInterface : Util_OpInterface<"ClosureYieldOpInterface"> {
 //===----------------------------------------------------------------------===//
 
 def InferIntDivisibilityOpInterface :
-    Util_OpInterface<"InferIntDivisibilityOpInterface"> {
+    OpInterface<"InferIntDivisibilityOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Allows operations to participate in integer divisibility analysis.
@@ -166,7 +167,8 @@ def InferIntDivisibilityOpInterface :
 // IREE::Util::InitializerOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_InitializerOpInterface : Util_OpInterface<"InitializerOpInterface"> {
+def Util_InitializerOpInterface : OpInterface<"InitializerOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface for ops that behave as module-wide initializers.
@@ -196,7 +198,8 @@ def Util_InitializerOpInterface : Util_OpInterface<"InitializerOpInterface"> {
 // IREE::Util::Global*OpInterface[]
 //===----------------------------------------------------------------------===//
 
-def Util_GlobalOpInterface : Util_OpInterface<"GlobalOpInterface"> {
+def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface for ops that define global values.
@@ -384,7 +387,9 @@ def Util_GlobalOpInterface : Util_OpInterface<"GlobalOpInterface"> {
   }];
 }
 
-class Util_GlobalAccessorOpInterface<string name> : Util_OpInterface<name> {
+class Util_GlobalAccessorOpInterface<string name> : OpInterface<name> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
   let extraClassDeclaration = [{
     // Returns the global name accessed by the op.
     StringRef getGlobalName() {
@@ -574,7 +579,8 @@ def Util_GlobalStoreOpInterface : Util_GlobalAccessorOpInterface<"GlobalStoreOpI
   ];
 }
 
-class Util_GlobalIndirectAccessorOpInterface<string name> : Util_OpInterface<name> {
+class Util_GlobalIndirectAccessorOpInterface<string name> : OpInterface<name> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 }
 
 def Util_GlobalLoadIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface<"GlobalLoadIndirectOpInterface"> {
@@ -651,7 +657,8 @@ def Util_GlobalStoreIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface
 // IREE::Util::NumericCastOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_NumericCastOpInterface : Util_OpInterface<"NumericCastOpInterface"> {
+def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Applied to numeric casting ops which can convert between different numeric
@@ -745,7 +752,8 @@ def Util_NumericCastOpInterface : Util_OpInterface<"NumericCastOpInterface"> {
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
+def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     An operation that "ties" one or more results to its operands indicating
@@ -981,7 +989,8 @@ def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
 // IREE::Util::ShapeAware* interfaces
 //===----------------------------------------------------------------------===//
 
-def Util_ShapeAwareOp : Util_OpInterface<"ShapeAwareOpInterface"> {
+def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     An operation that is able to provide dynamic shape dimensions for all
@@ -1062,7 +1071,8 @@ def Util_ShapeAwareOp : Util_OpInterface<"ShapeAwareOpInterface"> {
 // IREE::Util::SizeAware* interfaces
 //===----------------------------------------------------------------------===//
 
-def Util_InferTypeSize : Util_TypeInterface<"InferTypeSizeInterface"> {
+def Util_InferTypeSize : TypeInterface<"InferTypeSizeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Allows types to be queried for their size by inserting the required logic.
@@ -1078,7 +1088,8 @@ def Util_InferTypeSize : Util_TypeInterface<"InferTypeSizeInterface"> {
   ];
 }
 
-def Util_SizeAwareType : Util_TypeInterface<"SizeAwareTypeInterface"> {
+def Util_SizeAwareType : TypeInterface<"SizeAwareTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Denotes that a type is size-aware and must always have a size value
@@ -1099,7 +1110,8 @@ def Util_SizeAwareType : Util_TypeInterface<"SizeAwareTypeInterface"> {
   }];
 }
 
-def Util_SizeAwareOp : Util_OpInterface<"SizeAwareOpInterface"> {
+def Util_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     An operation that is able to provide size values for all size-aware operands
@@ -1128,7 +1140,8 @@ def Util_SizeAwareOp : Util_OpInterface<"SizeAwareOpInterface"> {
   ];
 }
 
-def Util_SizedStorageAttr : Util_AttrInterface<"SizedStorageAttr"> {
+def Util_SizedStorageAttr : AttrInterface<"SizedStorageAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used to query storage requirements for an attribute that is backed
@@ -1153,7 +1166,8 @@ def Util_SizedStorageAttr : Util_AttrInterface<"SizedStorageAttr"> {
 // IREE::Util::ReferenceTypeInterface
 //===----------------------------------------------------------------------===//
 
-def Util_ReferenceType : Util_TypeInterface<"ReferenceTypeInterface"> {
+def Util_ReferenceType : TypeInterface<"ReferenceTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used to mark types as passed by-reference. These types may have
@@ -1166,7 +1180,8 @@ def Util_ReferenceType : Util_TypeInterface<"ReferenceTypeInterface"> {
 // IREE::Util::GlobalTypeInterface
 //===----------------------------------------------------------------------===//
 
-def Util_GlobalType : Util_TypeInterface<"GlobalTypeInterface"> {
+def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used to mark types as supported for global variables.
@@ -1200,7 +1215,8 @@ def Util_GlobalType : Util_TypeInterface<"GlobalTypeInterface"> {
 // IREE::Util::Hoistable*Interface
 //===----------------------------------------------------------------------===//
 
-def Util_HoistableAttrInterface : Util_AttrInterface<"HoistableAttrInterface"> {
+def Util_HoistableAttrInterface : AttrInterface<"HoistableAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used to control hoisting of dialect attributes associated with
@@ -1240,7 +1256,8 @@ def Util_HoistableAttrInterface : Util_AttrInterface<"HoistableAttrInterface"> {
   }];
 }
 
-def Util_HoistableOpInterface : Util_OpInterface<"HoistableOpInterface"> {
+def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used to control hoisting of ops into globals.
@@ -1302,7 +1319,8 @@ def Util_HoistableOpInterface : Util_OpInterface<"HoistableOpInterface"> {
   ];
 }
 
-def Util_HoistableType : Util_TypeInterface<"HoistableTypeInterface"> {
+def Util_HoistableType : TypeInterface<"HoistableTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used to control hoisting of variables into globals. It can be
@@ -1393,7 +1411,8 @@ def Util_HoistableType : Util_TypeInterface<"HoistableTypeInterface"> {
 // IREE::Util::Subrange*Interface
 //===----------------------------------------------------------------------===//
 
-def Util_SubrangeType : Util_TypeInterface<"SubrangeTypeInterface"> {
+def Util_SubrangeType : TypeInterface<"SubrangeTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used on size-aware types that can represent linear subranges as an
@@ -1420,7 +1439,8 @@ def Util_SubrangeType : Util_TypeInterface<"SubrangeTypeInterface"> {
   ];
 }
 
-def Util_SubrangeOp : Util_OpInterface<"SubrangeOpInterface"> {
+def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     A size-aware operation taking a subrange on a resource.
@@ -1476,7 +1496,8 @@ def Util_SubrangeOp : Util_OpInterface<"SubrangeOpInterface"> {
   ];
 }
 
-def Util_SubrangeOperandOpInterface : Util_OpInterface<"SubrangeOperandOpInterface"> {
+def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface for operations that consume subranges of size-aware resources.
@@ -1536,7 +1557,8 @@ def Util_CallAnnotationAttrInterface : Util_AttrInterface<"CallAnnotationAttrInt
 // IREE::Util::InliningPolicyAttrInterface
 //===----------------------------------------------------------------------===//
 
-def Util_InliningPolicyAttrInterface : Util_AttrInterface<"InliningPolicyAttrInterface"> {
+def Util_InliningPolicyAttrInterface : AttrInterface<"InliningPolicyAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface allowing attributes to control the inlining behavior of functions
@@ -1565,9 +1587,10 @@ def Util_InliningPolicyAttrInterface : Util_AttrInterface<"InliningPolicyAttrInt
 //===----------------------------------------------------------------------===//
 
 def Util_SerializableAttrInterface :
-  Util_AttrInterface<"SerializableAttrInterface", [
+  AttrInterface<"SerializableAttrInterface", [
     Util_SizedStorageAttr,
   ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used to serialize constant values in binary format.
@@ -1645,7 +1668,8 @@ def Util_SerializableAttrInterface :
 // IREE::Util::StoredModuleAttrInterface
 //===----------------------------------------------------------------------===//
 
-def Util_StoredModuleAttrInterface : Util_AttrInterface<"StoredModuleAttrInterface"> {
+def Util_StoredModuleAttrInterface : AttrInterface<"StoredModuleAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface allowing attributes to store a reference to an underlying readonly

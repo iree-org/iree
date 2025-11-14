@@ -14,6 +14,18 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
+//===----------------------------------------------------------------------===//
+// Base class.
+//===----------------------------------------------------------------------===//
+
+class IREETensorExt_Op<string mnemonic, list<Trait> traits = []> :
+    Op<IREETensorExt_Dialect, mnemonic, traits> {
+  // let hasCustomAssemblyFormat = 1;
+}
+
+class IREETensorExt_PureOp<string mnemonic, list<Trait> traits = []> :
+    IREETensorExt_Op<mnemonic, !listconcat(traits, [Pure])>;
+
 def IREETensorExt_BitCastOp : IREETensorExt_PureOp<"bitcast", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,

@@ -28,7 +28,6 @@ iree_td_library(
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/IR:td_files",
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
-        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
@@ -93,17 +92,11 @@ iree_gentbl_cc_library(
     name = "VMVXEnumsGen",
     tbl_outs = [
         (
-            [
-                "--gen-enum-decls",
-                "--dialect=vmvx",
-            ],
+            ["--gen-enum-decls"],
             "VMVXEnums.h.inc",
         ),
         (
-            [
-                "--gen-enum-defs",
-                "--dialect=vmvx",
-            ],
+            ["--gen-enum-defs"],
             "VMVXEnums.cpp.inc",
         ),
     ],

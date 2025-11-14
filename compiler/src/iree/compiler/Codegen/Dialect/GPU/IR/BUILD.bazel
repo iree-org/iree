@@ -139,17 +139,11 @@ iree_gentbl_cc_library(
     name = "IREEGPUEnums",
     tbl_outs = [
         (
-            [
-                "--gen-enum-decls",
-                "--dialect=iree_gpu",
-            ],
+            ["--gen-enum-decls"],
             "IREEGPUEnums.h.inc",
         ),
         (
-            [
-                "--gen-enum-defs",
-                "--dialect=iree_gpu",
-            ],
+            ["--gen-enum-defs"],
             "IREEGPUEnums.cpp.inc",
         ),
     ],

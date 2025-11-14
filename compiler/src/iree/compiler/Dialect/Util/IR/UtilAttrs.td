@@ -17,7 +17,8 @@ include "mlir/IR/OpBase.td"
 // #util.int.assumptions
 //===----------------------------------------------------------------------===//
 
-def Util_IntAssumptionAttr : Util_AttrDef<"IntAssumption"> {
+def Util_IntAssumptionAttr : AttrDef<Util_Dialect, "IntAssumption", []
+> {
   let mnemonic = "int.assumption";
   let summary = [{Specifies assumptions that can be made about an integer's value.}];
   let description = [{
@@ -59,7 +60,7 @@ def Util_MultiValueIntAssumptionAttrArray : ArrayOfAttr<
 // #util.byte_pattern
 //===----------------------------------------------------------------------===//
 
-def Util_BytePatternAttr : Util_AttrDef<"BytePattern", [
+def Util_BytePatternAttr : AttrDef<Util_Dialect, "BytePattern", [
   TypedAttrInterface,
   DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
     "getStorageSize",
@@ -89,7 +90,7 @@ def Util_BytePatternAttr : Util_AttrDef<"BytePattern", [
 // #util.byte_range
 //===----------------------------------------------------------------------===//
 
-def Util_ByteRangeAttr : Util_AttrDef<"ByteRange"> {
+def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
   let mnemonic = "byte_range";
   let summary = [{Defines a range of bytes.}];
   let description = [{
@@ -108,7 +109,7 @@ def Util_ByteRangeAttr : Util_AttrDef<"ByteRange"> {
 // #util.composite
 //===----------------------------------------------------------------------===//
 
-def Util_CompositeAttr : Util_AttrDef<"Composite", [
+def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
   DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
     "getStorageSize",
   ]>,
@@ -156,7 +157,7 @@ def Util_CompositeAttr : Util_AttrDef<"Composite", [
 // #util.inline.*
 //===----------------------------------------------------------------------===//
 
-def Util_InlineNeverAttr : Util_AttrDef<"InlineNever", [
+def Util_InlineNeverAttr : AttrDef<Util_Dialect, "InlineNever", [
   Util_InliningPolicyAttrInterface,
 ]> {
   let mnemonic = "inline.never";
@@ -174,7 +175,7 @@ def Util_InlineNeverAttr : Util_AttrDef<"InlineNever", [
   }];
 }
 
-def Util_InlineAlwaysAttr : Util_AttrDef<"InlineAlways", [
+def Util_InlineAlwaysAttr : AttrDef<Util_Dialect, "InlineAlways", [
   Util_InliningPolicyAttrInterface,
 ]> {
   let mnemonic = "inline.always";
@@ -198,7 +199,7 @@ def Util_InlineAlwaysAttr : Util_AttrDef<"InlineAlways", [
 // #util.null
 //===----------------------------------------------------------------------===//
 
-def Util_NullAttr : Util_AttrDef<"Null", [
+def Util_NullAttr : AttrDef<Util_Dialect, "Null", [
   TypedAttrInterface,
 ]> {
   let mnemonic = "null";
@@ -218,7 +219,8 @@ def Util_NullAttr : Util_AttrDef<"Null", [
 // #util.uninitialized
 //===----------------------------------------------------------------------===//
 
-def Util_PreprocessingPipelineAttr : Util_AttrDef<"PreprocessingPassPipeline"> {
+def Util_PreprocessingPipelineAttr : AttrDef<Util_Dialect,
+    "PreprocessingPassPipeline"> {
   let mnemonic = "preprocessing_pipeline";
   let summary = "[{Preprocessing pass-pipeline to run on the function.}]";
   let description = [{
@@ -244,7 +246,7 @@ def Util_PreprocessingPipelineAttr : Util_AttrDef<"PreprocessingPassPipeline"> {
 // #util.uninitialized
 //===----------------------------------------------------------------------===//
 
-def Util_UninitializedAttr : Util_AttrDef<"Uninitialized", [
+def Util_UninitializedAttr : AttrDef<Util_Dialect, "Uninitialized", [
   TypedAttrInterface,
   DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
     "getStorageSize",
