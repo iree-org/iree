@@ -30,7 +30,11 @@ def IREETensorExt_Dialect : Dialect {
   let dependentDialects = [
     "arith::ArithDialect" // For materializeConstant()
   ];
+  let extraClassDeclaration = [{
+    void initializeAttrs();
+  }];
   let useDefaultTypePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
   let hasConstantMaterializer = 1;
 }
 
