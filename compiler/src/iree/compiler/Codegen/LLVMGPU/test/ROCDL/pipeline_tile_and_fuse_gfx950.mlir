@@ -60,7 +60,7 @@ hal.executable public @main {
           kind = #iree_gpu.data_tiled_scaled_mma_layout<
             intrinsic = MFMA_SCALE_F32_16x16x128_B32,
             lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32,
-            intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4>,
+            intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>,
           semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
           : tensor<9x9x1x8x4x4x16x32xf4E2M1FN>, tensor<9x9x1x4x2x4x4x16x32xf4E2M1FN>, tensor<9x9x8x4x16x4xf8E8M0FNU>, tensor<9x9x4x2x4x16x4xf8E8M0FNU> into tensor<9x9x4x8x2x4x16x4xf32>
         iree_tensor_ext.dispatch.tensor.store %10, %4, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<9x9x4x8x2x4x16x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<9x9x4x8x2x4x16x4xf32>>

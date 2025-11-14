@@ -489,7 +489,7 @@ module attributes {
     %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1){
           indexing_maps = [#map1, #map2, #map3],
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-          kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,  intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 8, intrinsics_k = 2>,
+          kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,  intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 8, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>,
           semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
         } : tensor<1x64x8x4x16x2x8xf8E4M3FNUZ>, tensor<4x64x8x2x4x16x2x8xf8E4M3FNUZ> into tensor<1x4x8x8x2x4x16x4xf32>
     return %2 : tensor<1x4x8x8x2x4x16x4xf32>
