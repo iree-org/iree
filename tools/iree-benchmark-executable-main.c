@@ -328,10 +328,12 @@ static iree_status_t iree_benchmark_executable_from_flags(
   // Create the HAL device we'll be using during execution.
   // Devices can be very expensive to create and we want to avoid doing it
   // multiple times throughout the benchmark execution.
-  iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
+  iree_hal_device_list_t* device_list = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_create_devices_from_flags(
       iree_hal_available_driver_registry(), iree_hal_default_device_uri(),
-      host_allocator, &device));
+      host_allocator, &device_list));
+
+  iree_hal_device_t* device = iree_hal_device_list_at(device_list, 0);
 
   // We'll reuse the same executable cache so that once we load the executable
   // we'll be able to reuse any driver-side optimizations.
@@ -354,7 +356,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
                             parsed_params.binding_count),
       (iree_string_view_list_t){parsed_params.binding_count,
                                 parsed_params.binding_specs},
-      device, device_allocator, host_allocator, &binding_list));
+      device_list, device_allocator, host_allocator, &binding_list));
   iree_hal_buffer_ref_t bindings[IREE_HAL_MAX_BINDING_COUNT];
   for (iree_host_size_t i = 0; i < parsed_params.binding_count; ++i) {
     iree_vm_ref_t value = iree_vm_ref_null();
