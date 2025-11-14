@@ -75,7 +75,7 @@ echo "::endgroup::"
 # Disable actually running GPU tests. This tends to yield TSan reports that are
 # specific to one's particular GPU driver and therefore hard to reproduce across
 # machines and often non-actionable anyway.
-# See e.g., https://github.com/iree-org/iree/issues/9393.
+# See, e.g., https://github.com/iree-org/iree/issues/9393.
 export IREE_VULKAN_DISABLE=1
 export IREE_METAL_DISABLE=1
 export IREE_CUDA_DISABLE=1
