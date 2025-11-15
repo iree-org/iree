@@ -45,7 +45,7 @@ namespace {
 static bool doesOperationNeedWrapping(Operation *op) {
   return llvm::any_of(op->getOperands(),
                       [](Value operand) {
-                        if (!llvm::isa<TensorType>(operand.getType()))
+                        if (!isa<TensorType>(operand.getType()))
                           return false;
                         return !isa_and_nonnull<TensorExportOp>(
                             operand.getDefiningOp());
@@ -244,10 +244,10 @@ struct ConvertToStreamPass final
     // Allow unknown types to pass through; these come from custom dialects that
     // may be mixed into the IR we are converting.
     typeConverter.addConversion([=](Type type) -> Type {
-      if (llvm::isa<IREE::Flow::ChannelType>(type)) {
+      if (isa<IREE::Flow::ChannelType>(type)) {
         return IREE::Stream::ChannelType::get(context);
       }
-      return !llvm::isa<TensorType>(type) ? type : Type{};
+      return !isa<TensorType>(type) ? type : Type{};
     });
 
     // Disallow tensor dialects; the goal here is to remove all tensors and
