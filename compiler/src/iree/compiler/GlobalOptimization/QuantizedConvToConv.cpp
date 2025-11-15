@@ -53,7 +53,7 @@ Value emptyZero(ImplicitLocOpBuilder &builder, RankedTensorType ty,
 Value applyZeroPoint(ImplicitLocOpBuilder &builder, Value conv, Value sum,
                      Value zp, ArrayRef<int> affine_map) {
   auto context = builder.getContext();
-  auto convTy = llvm::cast<RankedTensorType>(conv.getType());
+  auto convTy = cast<RankedTensorType>(conv.getType());
 
   llvm::SmallVector<AffineExpr> sumExprs;
   for (auto i : affine_map) {
@@ -82,7 +82,7 @@ Value applyZeroPoint(ImplicitLocOpBuilder &builder, Value conv, Value sum,
 
 // Add the scalar value to the tensor.
 Value addScalar(ImplicitLocOpBuilder &builder, Value value, Value scalar) {
-  auto ty = llvm::cast<RankedTensorType>(value.getType());
+  auto ty = cast<RankedTensorType>(value.getType());
   SmallVector<utils::IteratorType> iterators(ty.getRank(),
                                              utils::IteratorType::parallel);
   auto map = builder.getMultiDimIdentityMap(ty.getRank());
@@ -101,7 +101,7 @@ void GetDynamicDym(ImplicitLocOpBuilder &builder,
                    llvm::SmallVector<int64_t> &dims,
                    llvm::SmallVector<Value> &dynDims, Value value,
                    int64_t dim) {
-  ShapedType ty = llvm::cast<ShapedType>(value.getType());
+  ShapedType ty = cast<ShapedType>(value.getType());
   dims.push_back(ty.getDimSize(dim));
   if (ty && ty.isDynamicDim(dim))
     dynDims.push_back(tensor::DimOp::create(builder, value, dim));
@@ -134,8 +134,8 @@ struct QuantizedConvToConv
     auto filter = op.getInputs()[1];
     auto iZp = op.getInputs()[2];
     auto fZp = op.getInputs()[3];
-    auto inputTy = llvm::cast<RankedTensorType>(input.getType());
-    auto resultTy = llvm::cast<ShapedType>(op.getType(0));
+    auto inputTy = cast<RankedTensorType>(input.getType());
+    auto resultTy = cast<ShapedType>(op.getType(0));
     auto accETy = resultTy.getElementType();
 
     auto strides = op.getStrides();
@@ -253,7 +253,7 @@ struct QuantizedDepthwiseConvToDepthwiseConv
     auto filter = op.getInputs()[1];
     auto iZp = op.getInputs()[2];
     auto fZp = op.getInputs()[3];
-    auto resultTy = llvm::cast<ShapedType>(op.getType(0));
+    auto resultTy = cast<ShapedType>(op.getType(0));
     auto accETy = resultTy.getElementType();
 
     auto strides = op.getStrides();

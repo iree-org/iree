@@ -43,7 +43,7 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type)))
     return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
@@ -61,7 +61,7 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
                            Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type)))
     return nullptr;
   bool isUnsigned = eTy.isUnsignedInteger();
 
