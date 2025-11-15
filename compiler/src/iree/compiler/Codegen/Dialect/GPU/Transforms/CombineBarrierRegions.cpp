@@ -101,7 +101,7 @@ struct CombineAdjacentBarrierRegions final
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierOp,
                                 PatternRewriter &rewriter) const override {
-    auto prevBarrier = llvm::dyn_cast_if_present<IREE::GPU::BarrierRegionOp>(
+    auto prevBarrier = dyn_cast_if_present<IREE::GPU::BarrierRegionOp>(
         barrierOp->getPrevNode());
     if (!prevBarrier) {
       return failure();

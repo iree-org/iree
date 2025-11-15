@@ -724,7 +724,7 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
                          MMAIntrinsic intrinsic, Type resultType, Value lhs,
                          Value rhs, Value acc, bool colMajor = false) {
   auto getVecOrSingleElem = [&](Value vec) -> Value {
-    bool one = llvm::cast<VectorType>(vec.getType()).getNumElements() == 1;
+    bool one = cast<VectorType>(vec.getType()).getNumElements() == 1;
     return one ? vector::ExtractOp::create(builder, loc, vec, 0) : vec;
   };
   auto layout = getOpaqueMMALayout(builder.getContext(), intrinsic);
@@ -917,7 +917,7 @@ static bool incrementIndices(MutableArrayRef<int64_t> indices,
 /// that it returns the value directly if it is a 0-D vector.
 static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
   Type type = value.getType();
-  VectorType vectorType = llvm::dyn_cast<VectorType>(type);
+  VectorType vectorType = dyn_cast<VectorType>(type);
   assert(vectorType);
   if (vectorType.getRank() <= 1) {
     return value;

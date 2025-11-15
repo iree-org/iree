@@ -40,7 +40,7 @@ LogicalResult ExtractStridedMetadataOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location,
     ExtractStridedMetadataOp::Adaptor adaptor,
     SmallVectorImpl<Type> &inferredReturnTypes) {
-  auto sourceType = llvm::dyn_cast<MemRefType>(adaptor.getSource().getType());
+  auto sourceType = dyn_cast<MemRefType>(adaptor.getSource().getType());
   if (!sourceType)
     return failure();
 
