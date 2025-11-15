@@ -137,7 +137,7 @@ struct ConvertUtilAssumeIntOp final
 
 // Tries to flatten `type` to a 1-D vector type. Returns `nullptr` on failure.
 static VectorType flattenVectorType(Type type) {
-  auto vecTy = llvm::dyn_cast<VectorType>(type);
+  auto vecTy = dyn_cast<VectorType>(type);
   if (!vecTy)
     return nullptr;
 

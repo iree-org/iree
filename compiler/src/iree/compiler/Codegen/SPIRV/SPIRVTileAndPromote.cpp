@@ -298,7 +298,7 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   auto genericOp = cast<linalg::GenericOp>(*linalgOps.back());
 
   auto matmulType =
-      llvm::cast<MemRefType>(matmulOp.getDpsInitOperand(0)->get().getType());
+      cast<MemRefType>(matmulOp.getDpsInitOperand(0)->get().getType());
   if (hasSharedMemoryAddressSpace(matmulType)) {
     // The matmul output is already in shared memory. This can happen when
     // bufferization decides an allocation is needed, e.g., matmul + arith.extf,
