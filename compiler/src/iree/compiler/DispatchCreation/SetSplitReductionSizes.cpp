@@ -94,9 +94,11 @@ struct SetSplitReductionSizesPass final
       }
 
       // --- Case 1: Outer reduction ---
-      if (auto tileSizes = getOuterReductionSizes(tilingOp)) {
-        IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
-        return;
+      if (enableSplitOuterReduction) {
+        if (auto tileSizes = getOuterReductionSizes(tilingOp)) {
+          IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
+          return;
+        }
       }
 
       // --- Case 2: Generic weight backward convolution ---
@@ -398,6 +400,15 @@ private:
     // The constants below are determined based on empirical data.
     const int64_t ratioThreshold = 384;
     const int64_t largeKSize = 24576;
+    const int64_t largeMNSize = 4096;
+
+    // When the M or N size is large, the workload tends to distributed across
+    // many workgroups, making split reduction little to no effect.
+    if (mSize >= largeMNSize || nSize >= largeMNSize) {
+      LDBG() << "skipping op; large M or N size";
+      return std::nullopt;
+    }
+
     int64_t ratio = kSize / std::sqrt(mSize * nSize) / batchSize;
     if (ratio <= ratioThreshold && kSize < largeKSize) {
       LDBG() << "skipping op; small reduction size";
