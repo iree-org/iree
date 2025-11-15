@@ -32,7 +32,7 @@ static SmallVector<TensorValue> filterTensorValues(ValueRange &&range,
                                                    ValueRange &&dynamicDims) {
   SmallVector<TensorValue> result;
   for (auto [idx, value] : llvm::enumerate(range)) {
-    if (llvm::isa<TensorType>(value.getType())) {
+    if (isa<TensorType>(value.getType())) {
       SmallVector<Value> dims =
           IREE::Util::findDynamicDimsInList(idx, range, dynamicDims);
       result.push_back({value, dims});

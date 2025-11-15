@@ -483,9 +483,9 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   Value input = linalgOp.getDpsInputs()[0];
   Value filter = linalgOp.getDpsInputs()[1];
   Value output = linalgOp.getDpsInits()[0];
-  auto inputType = llvm::cast<ShapedType>(input.getType());
-  auto filterType = llvm::cast<ShapedType>(filter.getType());
-  auto outputType = llvm::cast<ShapedType>(output.getType());
+  auto inputType = cast<ShapedType>(input.getType());
+  auto filterType = cast<ShapedType>(filter.getType());
+  auto outputType = cast<ShapedType>(output.getType());
 
   if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
     LDBG() << "[unimplemented] expected 'filterType' and 'inputType' to have "
