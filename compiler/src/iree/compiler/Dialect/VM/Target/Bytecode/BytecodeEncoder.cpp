@@ -72,7 +72,7 @@ public:
   }
 
   LogicalResult encodeType(Value value) override {
-    auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(value.getType());
+    auto refPtrType = dyn_cast<IREE::VM::RefType>(value.getType());
     if (!refPtrType) {
       return currentOp_->emitOpError()
              << "type " << value.getType()
@@ -83,8 +83,8 @@ public:
 
   LogicalResult encodeType(Type type) override {
     // HACK: it'd be nice to remove the implicit ref wrapper hiding.
-    if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
-      if (llvm::isa<IREE::VM::ListType>(refType.getObjectType())) {
+    if (auto refType = dyn_cast<IREE::VM::RefType>(type)) {
+      if (isa<IREE::VM::ListType>(refType.getObjectType())) {
         type = refType.getObjectType();
       }
     }
@@ -100,7 +100,7 @@ public:
 
   LogicalResult encodePrimitiveAttr(TypedAttr attr) override {
     unsigned int bitWidth = attr.getType().getIntOrFloatBitWidth();
-    if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
+    if (auto integerAttr = dyn_cast<IntegerAttr>(attr)) {
       uint64_t limitedValue =
           integerAttr.getValue().extractBitsAsZExtValue(bitWidth, 0);
       switch (bitWidth) {
@@ -116,7 +116,7 @@ public:
         return currentOp_->emitOpError()
                << "attribute of bitwidth " << bitWidth << " not supported";
       }
-    } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
+    } else if (auto floatAttr = dyn_cast<FloatAttr>(attr)) {
       switch (bitWidth) {
       case 32: {
         union {

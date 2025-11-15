@@ -235,7 +235,7 @@ createVmTypeDefPtr(ConversionPatternRewriter &rewriter, Location loc,
             /*callee=*/"iree_vm_make_ref_type_def",
             /*operands=*/ArrayRef<Value>{refType})
             .getResult(0);
-  } else if (llvm::isa<IREE::VM::OpaqueType>(elementType)) {
+  } else if (isa<IREE::VM::OpaqueType>(elementType)) {
     elementTypeValue =
         emitc::CallOpaqueOp::create(
             rewriter,
@@ -1172,8 +1172,8 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
 
     // Rodata ops.
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-      auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
-          rodataOp.getValue());
+      auto value =
+          dyn_cast<IREE::Util::SerializableAttrInterface>(rodataOp.getValue());
       assert(value && "expected a serializable rodata value");
       SmallVector<char> byteBuffer;
       if (failed(value.serializeToVector(
@@ -1955,7 +1955,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
       assert(argumentStruct.value.has_value());
       auto value = argumentStruct.value.value();
 
-      if (llvm::isa<IREE::VM::RefType>(input.value())) {
+      if (isa<IREE::VM::RefType>(input.value())) {
         auto ptrType = emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
         std::string memberName = "arg" + std::to_string(input.index());
@@ -2489,7 +2489,7 @@ private:
                                     /*callee=*/"iree_vm_ref_move",
                                     /*operands=*/ArrayRef<Value>{refPtr, arg});
       } else {
-        Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
+        Type valueType = cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
@@ -2499,7 +2499,7 @@ private:
 
       // Skip the addition in the last iteration.
       if (i < resultTypes.size() - 1) {
-        Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
+        Type valueType = cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
         uint8Ptr =
@@ -2567,7 +2567,7 @@ private:
 
     SmallVector<Type> result;
     auto expandType = [&result](Type type) {
-      if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
+      if (auto tupleType = dyn_cast<TupleType>(type)) {
         for (Type inner : tupleType) {
           result.push_back(inner);
         }
@@ -2773,8 +2773,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         updatedOperands.push_back(segmentSize);
 
         Type type = importOp.getFunctionType().getInput(i);
-        int numOps =
-            llvm::isa<TupleType>(type) ? llvm::cast<TupleType>(type).size() : 1;
+        int numOps = isa<TupleType>(type) ? cast<TupleType>(type).size() : 1;
         for (int i = 0; i < size; i++) {
           for (int j = 0; j < numOps; j++) {
             FailureOr<Value> updatedOperand =
@@ -2800,7 +2799,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     // Create a variable for every result and a pointer to it as output
     // parameter to the call.
     for (OpResult result : op->getResults()) {
-      if (llvm::isa<IREE::VM::RefType>(result.getType())) {
+      if (isa<IREE::VM::RefType>(result.getType())) {
         Value ref = this->getModuleAnalysis().lookupRef(result);
 
         resultOperands.push_back(ref);
@@ -2823,7 +2822,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     assert(operand.getType() != emitc::PointerType::get(emitc::OpaqueType::get(
                                     ctx, "iree_vm_ref_t")));
-    if (!llvm::isa<IREE::VM::RefType>(operand.getType())) {
+    if (!isa<IREE::VM::RefType>(operand.getType())) {
       return operand;
     }
 
@@ -3159,7 +3158,7 @@ class BranchOpConversion : public EmitCConversionPattern<IREE::VM::BranchOp> {
     assert(op.getOperands().size() == adaptor.getOperands().size());
 
     auto isNotRefOperand = [](Value operand) {
-      return !llvm::isa<IREE::VM::RefType>(operand.getType());
+      return !isa<IREE::VM::RefType>(operand.getType());
     };
 
     SmallVector<Value> nonRefOperands;
@@ -3255,7 +3254,7 @@ class CondBranchOpConversion
     assert(op.getOperands().size() == adaptor.getOperands().size());
 
     auto isNotRefOperand = [](Value operand) {
-      return !llvm::isa<IREE::VM::RefType>(operand.getType());
+      return !isa<IREE::VM::RefType>(operand.getType());
     };
 
     SmallVector<Value> nonRefOperands;
@@ -3373,7 +3372,7 @@ class ReturnOpConversion : public EmitCConversionPattern<IREE::VM::ReturnOp> {
       unsigned int argumentIndex = firstOutputArgumentIndex + index;
       BlockArgument resultArgument = funcOp.getArgument(argumentIndex);
 
-      if (llvm::isa<IREE::VM::RefType>(operand.getType())) {
+      if (isa<IREE::VM::RefType>(operand.getType())) {
         assert(operand.getType() !=
                emitc::PointerType::get(
                    emitc::OpaqueType::get(op.getContext(), "iree_vm_ref_t")));
@@ -3807,8 +3806,7 @@ private:
 
         assert(isa<IREE::VM::RefType>(originalType) && "expected ref type");
 
-        Type objectType =
-            llvm::cast<IREE::VM::RefType>(originalType).getObjectType();
+        Type objectType = cast<IREE::VM::RefType>(originalType).getObjectType();
 
         std::optional<std::pair<StringRef, StringRef>> vmNames =
             TypeSwitch<Type, std::optional<std::pair<StringRef, StringRef>>>(
@@ -3893,7 +3891,7 @@ private:
     auto loc = op->getLoc();
 
     for (OpResult result : op->getResults()) {
-      if (llvm::isa<IREE::VM::RefType>(result.getType())) {
+      if (isa<IREE::VM::RefType>(result.getType())) {
         Value ref = this->getModuleAnalysis().lookupRef(result);
 
         results.push_back(ref);
@@ -3938,8 +3936,7 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    Type objectType =
-        llvm::cast<IREE::VM::RefType>(op.getType()).getObjectType();
+    Type objectType = cast<IREE::VM::RefType>(op.getType()).getObjectType();
     std::optional<Type> elementType = extractElementType(ctx, objectType);
     std::optional<CNames> cNames = extractCNames(op);
 
@@ -4009,9 +4006,9 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
   }
 
   std::optional<Type> extractElementType(MLIRContext *ctx, Type t) const {
-    if (auto listType = llvm::dyn_cast<IREE::VM::ListType>(t)) {
+    if (auto listType = dyn_cast<IREE::VM::ListType>(t)) {
       return listType.getElementType();
-    } else if (auto bufferType = llvm::dyn_cast<IREE::VM::BufferType>(t)) {
+    } else if (auto bufferType = dyn_cast<IREE::VM::BufferType>(t)) {
       return NoneType::get(ctx);
     }
     return std::nullopt;

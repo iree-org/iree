@@ -32,8 +32,7 @@ static void reifyRodataTable(RewriterBase &rewriter,
   size_t dataAlignment =
       tableOp.getDataAlignment() ? *tableOp.getDataAlignment() : 1;
   for (auto value : tableOp.getDataArray().getValue()) {
-    auto serializableAttr =
-        llvm::cast<IREE::Util::SerializableAttrInterface>(value);
+    auto serializableAttr = cast<IREE::Util::SerializableAttrInterface>(value);
     size_t storageSize = serializableAttr.getStorageSize();
     dataAttrs.push_back(value);
 

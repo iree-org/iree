@@ -75,7 +75,7 @@ struct QuantizedMatmulToMatmul
       // return matmul;
     }
     // Create the result. No need to zero-fill it as we will overwrite it.
-    ShapedType accType = llvm::cast<ShapedType>(acc.getType());
+    ShapedType accType = cast<ShapedType>(acc.getType());
     Value initResult = tensor::EmptyOp::create(
         builder, tensor::getMixedSizes(builder, loc, acc),
         accType.getElementType());
