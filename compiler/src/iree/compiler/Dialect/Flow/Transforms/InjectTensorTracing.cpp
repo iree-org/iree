@@ -34,7 +34,7 @@ static std::string inferTraceKey(Operation *op) {
 static SmallVector<Value> filterTensorValues(ValueRange &&range) {
   SmallVector<Value> result;
   for (auto value : range) {
-    if (llvm::isa<TensorType>(value.getType()))
+    if (isa<TensorType>(value.getType()))
       result.push_back(value);
   }
   return result;

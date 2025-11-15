@@ -23,7 +23,7 @@ namespace {
 /// Compute the dynamic dims of the given value and add them to the vector.
 static void appendDynamicDims(OpBuilder &b, Location loc,
                               SmallVector<Value> &argumentDims, Value tensor) {
-  auto tensorType = llvm::cast<RankedTensorType>(tensor.getType());
+  auto tensorType = cast<RankedTensorType>(tensor.getType());
 
   // Fast-path for if the value comes from ops that support our dynamic
   // shape interfaces. Otherwise we have to insert tensor.dim ops.
@@ -106,7 +106,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   // Compute dimensions of tensor args.
   SmallVector<Value> argumentDims;
   for (Value tensor : argumentsSet) {
-    auto tensorType = llvm::dyn_cast<RankedTensorType>(tensor.getType());
+    auto tensorType = dyn_cast<RankedTensorType>(tensor.getType());
     if (!tensorType)
       continue;
     appendDynamicDims(rewriter, loc, argumentDims, tensor);
@@ -184,7 +184,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   rewriter.setInsertionPointToStart(newBodyEntry);
   SmallVector<Value> argValues;
   for (const auto &it : llvm::enumerate(arguments)) {
-    auto tensorType = llvm::dyn_cast<RankedTensorType>(it.value().getType());
+    auto tensorType = dyn_cast<RankedTensorType>(it.value().getType());
     if (!tensorType) {
       argValues.push_back(it.value());
       continue;

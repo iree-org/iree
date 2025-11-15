@@ -38,11 +38,10 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
                                          ValueRange dynamicDims) {
   unsigned requiredCount = 0;
   for (auto value : values) {
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(value.getType())) {
+    if (auto shapedType = dyn_cast<ShapedType>(value.getType())) {
       requiredCount += shapedType.getNumDynamicDims();
-    } else if (auto tensorType =
-                   llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
-                       value.getType())) {
+    } else if (auto tensorType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
+                   value.getType())) {
       requiredCount += tensorType.getNumDynamicDims();
     }
   }
@@ -139,7 +138,7 @@ static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
       staticValues.push_back(dynamicIndexValue);
     } else {
       auto operandValue =
-          llvm::cast<IntegerAttr>(dyn_cast<Attribute>(valueOrAttr)).getInt();
+          cast<IntegerAttr>(dyn_cast<Attribute>(valueOrAttr)).getInt();
       staticValues.push_back(operandValue);
     }
   }
@@ -178,7 +177,7 @@ RankedTensorType DispatchTensorLoadOp::inferResultType(
   auto shape =
       llvm::map_to_vector(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
         if (auto attr = dyn_cast<Attribute>(valueOrAttr)) {
-          return llvm::cast<IntegerAttr>(attr).getInt();
+          return cast<IntegerAttr>(attr).getInt();
         }
         return ShapedType::kDynamic;
       });
@@ -195,8 +194,7 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  ArrayRef<NamedAttribute> attributes) {
   SmallVector<OpFoldResult> offsets, strides, sizes;
   getDefaultOffsetSizeAndStrides(
-      builder,
-      llvm::cast<IREE::TensorExt::DispatchTensorType>(source.getType()),
+      builder, cast<IREE::TensorExt::DispatchTensorType>(source.getType()),
       sourceDynamicDims, offsets, sizes, strides);
   build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
         strides, attributes);
@@ -234,8 +232,7 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  ArrayRef<OpFoldResult> mixedStrides,
                                  ArrayRef<NamedAttribute> attributes) {
   auto returnType = inferResultType(
-      llvm::cast<IREE::TensorExt::DispatchTensorType>(source.getType()),
-      mixedSizes);
+      cast<IREE::TensorExt::DispatchTensorType>(source.getType()), mixedSizes);
   build(builder, state, returnType, source, sourceDynamicDims, mixedOffsets,
         mixedSizes, mixedStrides);
 }
@@ -313,8 +310,7 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
                                   ArrayRef<NamedAttribute> attributes) {
   SmallVector<OpFoldResult> offsets, sizes, strides;
   getDefaultOffsetSizeAndStrides(
-      builder,
-      llvm::cast<IREE::TensorExt::DispatchTensorType>(target.getType()),
+      builder, cast<IREE::TensorExt::DispatchTensorType>(target.getType()),
       targetDynamicDims, offsets, sizes, strides);
   build(builder, state, value, target, targetDynamicDims, offsets, sizes,
         strides, attributes);
@@ -341,7 +337,7 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
 }
 
 llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
-  return getDroppedDimsImpl(llvm::cast<RankedTensorType>(getValue().getType()),
+  return getDroppedDimsImpl(cast<RankedTensorType>(getValue().getType()),
                             getMixedSizes());
 }
 
