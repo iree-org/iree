@@ -21,7 +21,7 @@ struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
   LogicalResult
   matchAndRewrite(tensor::DimOp dimOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!llvm::isa<IREE::HAL::BufferViewType>(adaptor.getSource().getType())) {
+    if (!isa<IREE::HAL::BufferViewType>(adaptor.getSource().getType())) {
       return failure();
     }
     std::optional<int64_t> index = dimOp.getConstantIndex();
@@ -38,7 +38,7 @@ struct BufferViewRankPattern : public OpConversionPattern<tensor::RankOp> {
   LogicalResult
   matchAndRewrite(tensor::RankOp rankOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!llvm::isa<IREE::HAL::BufferViewType>(adaptor.getTensor().getType())) {
+    if (!isa<IREE::HAL::BufferViewType>(adaptor.getTensor().getType())) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewRankOp>(

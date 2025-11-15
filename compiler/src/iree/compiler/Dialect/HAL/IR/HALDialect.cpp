@@ -37,13 +37,13 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
   /// end with a numeric digit([0-9]+). Returns success if an alias was
   /// provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (auto targetAttr = llvm::dyn_cast<DeviceTargetAttr>(attr)) {
+    if (auto targetAttr = dyn_cast<DeviceTargetAttr>(attr)) {
       os << "device_target_" << targetAttr.getSymbolNameFragment();
       return AliasResult::OverridableAlias;
-    } else if (auto targetAttr = llvm::dyn_cast<ExecutableTargetAttr>(attr)) {
+    } else if (auto targetAttr = dyn_cast<ExecutableTargetAttr>(attr)) {
       os << "executable_target_" << targetAttr.getSymbolNameFragment();
       return AliasResult::OverridableAlias;
-    } else if (auto layoutAttr = llvm::dyn_cast<PipelineLayoutAttr>(attr)) {
+    } else if (auto layoutAttr = dyn_cast<PipelineLayoutAttr>(attr)) {
       os << "pipeline_layout";
       return AliasResult::OverridableAlias;
     }
@@ -99,13 +99,12 @@ public:
       const function_ref<void(Attribute elementAttr)> &fn) const override {
     MLIRContext *context = attr.getContext();
     // TODO(benvanik): remove this interface or make it an attr interface.
-    if (auto bindingAttr =
-            llvm::dyn_cast<IREE::HAL::PipelineBindingAttr>(attr)) {
+    if (auto bindingAttr = dyn_cast<IREE::HAL::PipelineBindingAttr>(attr)) {
       fn(IREE::HAL::DescriptorTypeAttr::get(context, bindingAttr.getType()));
       fn(IREE::HAL::DescriptorFlagsAttr::get(context, bindingAttr.getFlags()));
       return success();
     }
-    if (auto dtAttr = llvm::dyn_cast<IREE::HAL::DescriptorTypeAttr>(attr)) {
+    if (auto dtAttr = dyn_cast<IREE::HAL::DescriptorTypeAttr>(attr)) {
       // Repack as a normal integer attribute.
       fn(IntegerAttr::get(IntegerType::get(context, 32),
                           APInt(32, static_cast<uint32_t>(dtAttr.getValue()))));
@@ -201,11 +200,11 @@ HALDialect::HALDialect(MLIRContext *context)
 
 Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                            Type type, Location loc) {
-  if (llvm::isa<IndexType>(type)) {
+  if (isa<IndexType>(type)) {
     // Some folders materialize raw index types, which just become std
     // constants.
     return mlir::arith::ConstantIndexOp::create(
-        builder, loc, llvm::cast<IntegerAttr>(value).getValue().getSExtValue());
+        builder, loc, cast<IntegerAttr>(value).getValue().getSExtValue());
   }
   return nullptr;
 }
