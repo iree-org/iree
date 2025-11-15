@@ -2632,6 +2632,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-flow-replicate-globals-per-affinity" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-flow-replicate-globals-per-affinity
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-top-level-scf-to-cfg" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-top-level-scf-to-cfg
@@ -5087,6 +5096,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-flow-replicate-globals-per-affinity" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-flow-replicate-globals-per-affinity
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-top-level-scf-to-cfg" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-top-level-scf-to-cfg
@@ -5224,6 +5242,12 @@ with stream ops.</p>
 <p><em>Outlines external dispatches into executables.</em></p>
 <h3 id="-iree-flow-outline-dispatch-regions"><code>-iree-flow-outline-dispatch-regions</code><a class="headerlink" href="#-iree-flow-outline-dispatch-regions" title="Permanent link">link</a></h3>
 <p><em>Outlines dispatch regions into executables.</em></p>
+<h3 id="-iree-flow-replicate-globals-per-affinity"><code>-iree-flow-replicate-globals-per-affinity</code><a class="headerlink" href="#-iree-flow-replicate-globals-per-affinity" title="Permanent link">link</a></h3>
+<p><em>Replicates globals for each unique affinity and rewires their uses.</em></p>
+<p>Replicates IREE::Util::GlobalOps that are used on multiple affinities
+and rewires their uses to the associated global. This allows for
+specialization of globals for each affinity instead of having unspecialized
+and a copy each use.</p>
 <h3 id="-iree-top-level-scf-to-cfg"><code>-iree-top-level-scf-to-cfg</code><a class="headerlink" href="#-iree-top-level-scf-to-cfg" title="Permanent link">link</a></h3>
 <p><em>Converts non-nested SCF constructs to CFG (not traversing into opaque operations).</em></p>
 <h3 id="-iree-verify-input-legality"><code>-iree-verify-input-legality</code><a class="headerlink" href="#-iree-verify-input-legality" title="Permanent link">link</a></h3>
