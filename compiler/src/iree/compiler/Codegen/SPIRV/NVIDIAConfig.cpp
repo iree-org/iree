@@ -36,8 +36,7 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
   const int subgroupSize = target.getPreferredSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
   std::array<int64_t, 3> threadMNK;
-  auto inputType =
-      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
+  auto inputType = cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
     threadMNK = {8, 8, 32};
   } else {

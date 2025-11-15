@@ -43,7 +43,7 @@ void collectLoopsToPeel(Operation *op,
                               .Default([](auto) { return 0; });
   for (int i = 0; i < maxNumLoopsToPeel; ++i) {
     op = op->getParentOfType<scf::ForOp>();
-    auto loop = llvm::cast_or_null<scf::ForOp>(op);
+    auto loop = cast_or_null<scf::ForOp>(op);
     if (!loop || iree_compiler::isTiledAndDistributedLoop(loop))
       break;
 

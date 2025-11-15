@@ -117,7 +117,7 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
 
   LogicalResult matchAndRewrite(MathOpTy mathOp,
                                 PatternRewriter &rewriter) const override {
-    auto vecType = llvm::dyn_cast<VectorType>(mathOp.getType());
+    auto vecType = dyn_cast<VectorType>(mathOp.getType());
     if (!vecType)
       return failure();
     Location loc = mathOp.getLoc();
@@ -164,7 +164,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     } else {
       // If no alignment specified align at least to the size of an element.
       Type elType = allocOp.getType().getElementType();
-      if (auto shapeType = llvm::dyn_cast<ShapedType>(elType))
+      if (auto shapeType = dyn_cast<ShapedType>(elType))
         alignement =
             shapeType.getNumElements() * shapeType.getElementTypeBitWidth() / 8;
       else if (elType.isIndex()) {
@@ -391,7 +391,7 @@ struct ConvertIREEBindingSubspanOp final
     Location loc = op->getLoc();
     auto subspanOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
     MemRefType memrefType =
-        llvm::dyn_cast<MemRefType>(subspanOp.getResult().getType());
+        dyn_cast<MemRefType>(subspanOp.getResult().getType());
     mlir::BlockArgument llvmBufferArg =
         llvmFuncOp.getArgument(subspanOp.getBinding().getZExtValue());
     // Add the byte offset.

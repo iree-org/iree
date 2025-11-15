@@ -23,7 +23,7 @@ LogicalResult verifyLLVMGPUVectorDistributePipeline(
   }
 
   unsigned reduction = static_cast<uint32_t>(IREE::GPU::TilingLevel::Reduction);
-  unsigned numLoops = llvm::cast<linalg::LinalgOp>(op).getNumLoops();
+  unsigned numLoops = cast<linalg::LinalgOp>(op).getNumLoops();
   size_t size = 0;
 
   SmallVector<int64_t> reductionTileSizes =
@@ -37,7 +37,7 @@ LogicalResult verifyLLVMGPUVectorDistributePipeline(
   }
   for (size_t i = 0; i < size; ++i) {
     if (reductionTileSizes[i] > 0 &&
-        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
+        cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
             utils::IteratorType::reduction) {
       return op->emitOpError(
           "expected to non-zero reduction tile has reduction iterator");
@@ -49,7 +49,7 @@ LogicalResult verifyLLVMGPUVectorDistributePipeline(
   size = workgroupTileSizes.size();
   for (size_t i = 0; i < size; ++i) {
     if (workgroupTileSizes[i] > 0 &&
-        llvm::cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
+        cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
             utils::IteratorType::parallel) {
       return op->emitOpError(
           "expected to non-zero workgroup tile has parallel iterator");
