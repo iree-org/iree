@@ -112,3 +112,138 @@ util.func public @tensorBarrier(%tensor0: tensor<3xf32>, %tensor1: tensor<?xf32>
   // CHECK: util.return %[[TENSOR0_AFTER]], %[[SIZE0]], %[[TENSOR1_AFTER]], %[[SIZE1]]
   util.return %0#0, %0#1 : tensor<3xf32>, tensor<?xf32>
 }
+
+// -----
+
+// Tests import on dev_a while function affinity is dev_b.
+// A clone happens on dev_a (same-affinity lifetime change) but no transfer is inserted yet.
+
+// CHECK-LABEL: @importBufferViewCrossDevice
+// CHECK-SAME: (%[[VIEW:.+]]: !hal.buffer_view)
+// CHECK-SAME: -> (!stream.resource<*>, index)
+util.func public @importBufferViewCrossDevice(%view: !hal.buffer_view) -> tensor<4xf32> attributes {
+  stream.affinity = #hal.device.promise<@dev_b>
+} {
+  //  CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof on(#hal.device.promise<@dev_a>) tensor<4xf32>
+  //      CHECK: %[[RESOURCE:.+]] = stream.tensor.import on(#hal.device.promise<@dev_a>) %[[VIEW]] : !hal.buffer_view ->
+  // CHECK-SAME:     tensor<4xf32> in !stream.resource<external>{%[[SIZE]]}
+  // CHECK-NEXT: %[[TRANSFER:.+]] = stream.async.transfer
+  // CHECK-SAME:     %[[RESOURCE]] : !stream.resource<external>{%[[SIZE]]} from(#hal.device.promise<@dev_a>) ->
+  // CHECK-SAME:     to(#hal.device.promise<@dev_a>) !stream.resource<*>{%[[SIZE]]}
+  %0 = hal.tensor.import on(#hal.device.promise<@dev_a>) %view : !hal.buffer_view -> tensor<4xf32>
+  // CHECK: util.return %[[TRANSFER]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// Tests export on dev_b while function affinity is dev_a.
+// A transfer happens to convert lifetime from * to external.
+
+// CHECK-LABEL: @exportBufferViewCrossDevice
+// CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func public @exportBufferViewCrossDevice(%tensor: tensor<4xf32>) -> !hal.buffer_view attributes {
+  stream.affinity = #hal.device.promise<@dev_a>
+} {
+  //      CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[TENSOR]] :
+  // CHECK-SAME:     !stream.resource<*>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  // CHECK-NEXT: %[[VIEW:.+]] = stream.tensor.export %[[TRANSFER]] :
+  // CHECK-SAME:     tensor<4xf32> in !stream.resource<external>{%[[SIZE]]}
+  // CHECK-SAME:     -> !hal.buffer_view
+  %0 = hal.tensor.export on(#hal.device.promise<@dev_b>) %tensor : tensor<4xf32> -> !hal.buffer_view
+  // CHECK: util.return %[[VIEW]]
+  util.return %0 : !hal.buffer_view
+}
+
+// -----
+
+// Tests aliasing storage on dev_b while function affinity is dev_a.
+// This generates a transfer from dev_a to dev_b, operations on dev_b, but no transfer back.
+
+// CHECK-LABEL: @aliasStorageCrossDevice
+// CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[STORAGE:.+]]: !hal.buffer)
+// CHECK-SAME: -> (!stream.resource<*>, index)
+util.func public @aliasStorageCrossDevice(%tensor: tensor<4xf32>, %storage: !hal.buffer) -> tensor<4xf32> attributes {
+  stream.affinity = #hal.device.promise<@dev_a>
+} {
+  //      CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[TENSOR]] : !stream.resource<*>{%[[SIZE]]}
+  // CHECK-SAME:     -> to(#hal.device.promise<@dev_b>) !stream.resource<*>{%[[SIZE]]}
+  //  CHECK-DAG: %[[STORAGE_SIZE:.+]] = stream.tensor.sizeof on(#hal.device.promise<@dev_b>) tensor<4xf32>
+  //      CHECK: %[[STORAGE_RESOURCE:.+]] = stream.tensor.import on(#hal.device.promise<@dev_b>) %[[STORAGE]] :
+  // CHECK-SAME:     !hal.buffer -> tensor<4xf32> in !stream.resource<external>{%[[STORAGE_SIZE]]}
+  //      CHECK: %[[UPDATE:.+]] = stream.async.update on(#hal.device.promise<@dev_b>) %[[TRANSFER]], %[[STORAGE_RESOURCE]][%c0 to %[[SIZE]]] :
+  // CHECK-SAME:     !stream.resource<*>{%[[SIZE]]} -> %[[STORAGE_RESOURCE]] as !stream.resource<external>{%[[STORAGE_SIZE]]}
+  //      CHECK: %[[SLICE:.+]] = stream.async.slice on(#hal.device.promise<@dev_b>) %[[UPDATE]][%c0 to %[[SIZE]]] :
+  // CHECK-SAME:     !stream.resource<external>{%[[STORAGE_SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  //      CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[SLICE]] :
+  // CHECK-SAME:     !stream.resource<external>{%[[SIZE]]} from(#hal.device.promise<@dev_b>) -> to(#hal.device.promise<@dev_b>) !stream.resource<*>{%[[SIZE]]}
+  %0 = hal.tensor.alias on(#hal.device.promise<@dev_b>) %tensor : tensor<4xf32> to %storage : !hal.buffer
+  // CHECK: util.return %[[TRANSFER]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorTransients
+// CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[STORAGE:.+]]: !hal.buffer)
+// CHECK-SAME: -> (!stream.resource<*>, index)
+util.func public @tensorTransients(%tensor: tensor<4xf32>, %storage: !hal.buffer) -> tensor<4xf32> {
+  // CHECK: %[[BARRIER_RESULT:.+]], %[[BARRIER_TP:.+]] = stream.timepoint.barrier %[[TENSOR]] : !stream.resource<*>{%[[SIZE]]} => !stream.timepoint
+  // CHECK: %[[BUFFER_LENGTH:.+]] = hal.buffer.length<%[[STORAGE]] : !hal.buffer> : index
+  // CHECK: %[[IMPORTED:.+]] = stream.tensor.import %[[STORAGE]] : !hal.buffer -> tensor<?xi8>{%[[BUFFER_LENGTH]]} in !stream.resource<transient>{%[[BUFFER_LENGTH]]}
+  // CHECK: %[[TRANSIENTS_RESULT:.+]], %[[TRANSIENTS_TP:.+]] = stream.resource.transients await(%[[BARRIER_TP]]) => %[[BARRIER_RESULT]] : !stream.resource<*>{%[[SIZE]]} from %[[IMPORTED]] : !stream.resource<transient>{%[[BUFFER_LENGTH]]} => !stream.timepoint
+  // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[TRANSIENTS_TP]] => %[[TRANSIENTS_RESULT]] : !stream.resource<*>{%[[SIZE]]}
+  %0 = hal.tensor.transients %tensor : tensor<4xf32> from %storage : !hal.buffer
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorTransientsDynamic
+// CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[DIM:.+]]: index, %[[STORAGE:.+]]: !hal.buffer)
+// CHECK-SAME: -> (!stream.resource<*>, index)
+util.func public @tensorTransientsDynamic(%tensor: tensor<?x4xf32>, %dim: index, %storage: !hal.buffer) -> tensor<?x4xf32> {
+  // CHECK: %[[BARRIER_RESULT:.+]], %[[BARRIER_TP:.+]] = stream.timepoint.barrier %[[TENSOR]] : !stream.resource<*>{%[[SIZE]]} => !stream.timepoint
+  // CHECK: %[[BUFFER_LENGTH:.+]] = hal.buffer.length<%[[STORAGE]] : !hal.buffer> : index
+  // CHECK: %[[IMPORTED:.+]] = stream.tensor.import %[[STORAGE]] : !hal.buffer -> tensor<?xi8>{%[[BUFFER_LENGTH]]} in !stream.resource<transient>{%[[BUFFER_LENGTH]]}
+  // CHECK: %[[TRANSIENTS_RESULT:.+]], %[[TRANSIENTS_TP:.+]] = stream.resource.transients await(%[[BARRIER_TP]]) => %[[BARRIER_RESULT]] : !stream.resource<*>{%[[SIZE]]} from %[[IMPORTED]] : !stream.resource<transient>{%[[BUFFER_LENGTH]]} => !stream.timepoint
+  // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[TRANSIENTS_TP]] => %[[TRANSIENTS_RESULT]] : !stream.resource<*>{%[[SIZE]]}
+  %0 = hal.tensor.transients %tensor : tensor<?x4xf32>{%dim} from %storage : !hal.buffer
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<?x4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorTransientsWithAffinity
+// CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[STORAGE:.+]]: !hal.buffer)
+// CHECK-SAME: -> (!stream.resource<*>, index)
+util.func public @tensorTransientsWithAffinity(%tensor: tensor<4xf32>, %storage: !hal.buffer) -> tensor<4xf32> {
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[TENSOR]] : !stream.resource<*>{%[[SIZE]]} -> to(#hal.device.promise<@dev>) !stream.resource<*>{%[[SIZE]]}
+  // CHECK: %[[BARRIER_RESULT:.+]], %[[BARRIER_TP:.+]] = stream.timepoint.barrier on(#hal.device.promise<@dev>) %[[TRANSFER]] : !stream.resource<*>{%[[SIZE]]} => !stream.timepoint
+  // CHECK: %[[BUFFER_LENGTH:.+]] = hal.buffer.length<%[[STORAGE]] : !hal.buffer> : index
+  // CHECK: %[[IMPORTED:.+]] = stream.tensor.import on(#hal.device.promise<@dev>) %[[STORAGE]] : !hal.buffer -> tensor<?xi8>{%[[BUFFER_LENGTH]]} in !stream.resource<transient>{%[[BUFFER_LENGTH]]}
+  // CHECK: %[[TRANSIENTS_RESULT:.+]], %[[TRANSIENTS_TP:.+]] = stream.resource.transients on(#hal.device.promise<@dev>) await(%[[BARRIER_TP]]) => %[[BARRIER_RESULT]] : !stream.resource<*>{%[[SIZE]]} from %[[IMPORTED]] : !stream.resource<transient>{%[[BUFFER_LENGTH]]} => !stream.timepoint
+  // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[TRANSIENTS_TP]] => %[[TRANSIENTS_RESULT]] : !stream.resource<*>{%[[SIZE]]}
+  %0 = hal.tensor.transients on(#hal.device.promise<@dev>) %tensor : tensor<4xf32> from %storage : !hal.buffer
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorTransientsBufferView
+// CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[STORAGE:.+]]: !hal.buffer_view)
+// CHECK-SAME: -> (!stream.resource<*>, index)
+util.func public @tensorTransientsBufferView(%tensor: tensor<4xf32>, %storage: !hal.buffer_view) -> tensor<4xf32> {
+  // CHECK: %[[BARRIER_RESULT:.+]], %[[BARRIER_TP:.+]] = stream.timepoint.barrier %[[TENSOR]] : !stream.resource<*>{%[[SIZE]]} => !stream.timepoint
+  // CHECK: %[[BUFFER:.+]] = hal.buffer_view.buffer<%[[STORAGE]] : !hal.buffer_view> : !hal.buffer
+  // CHECK: %[[BUFFER_LENGTH:.+]] = hal.buffer.length<%[[BUFFER]] : !hal.buffer> : index
+  // CHECK: %[[IMPORTED:.+]] = stream.tensor.import %[[BUFFER]] : !hal.buffer -> tensor<?xi8>{%[[BUFFER_LENGTH]]} in !stream.resource<transient>{%[[BUFFER_LENGTH]]}
+  // CHECK: %[[TRANSIENTS_RESULT:.+]], %[[TRANSIENTS_TP:.+]] = stream.resource.transients await(%[[BARRIER_TP]]) => %[[BARRIER_RESULT]] : !stream.resource<*>{%[[SIZE]]} from %[[IMPORTED]] : !stream.resource<transient>{%[[BUFFER_LENGTH]]} => !stream.timepoint
+  // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[TRANSIENTS_TP]] => %[[TRANSIENTS_RESULT]] : !stream.resource<*>{%[[SIZE]]}
+  %0 = hal.tensor.transients %tensor : tensor<4xf32> from %storage : !hal.buffer_view
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4xf32>
+}
