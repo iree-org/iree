@@ -302,15 +302,20 @@ struct CoalescedGatherDMAOpBufferizationInterface
           IREE::GPU::CoalescedGatherDMAOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    // This op reads from the source and indices tensors.
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
-    return opOperand.get() == gatherOp.getIndices() ||
-           opOperand.get() == gatherOp.getSource();
+    if (opOperand.get() == gatherOp.getSource()) {
+      return true;
+    }
+    for (Value index : gatherOp.getIndices()) {
+      if (opOperand.get() == index && isa<TensorType>(index.getType())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
-    // This op writes to the init/destination tensor.
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
     return opOperand.get() == gatherOp.getInit();
   }
@@ -319,12 +324,10 @@ struct CoalescedGatherDMAOpBufferizationInterface
   getAliasingValues(Operation *op, OpOperand &opOperand,
                     const AnalysisState &state) const {
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
-    SmallVector<bufferization::AliasingValue> alist;
-    // The result aliases with the init operand.
     if (opOperand.get() == gatherOp.getInit()) {
-      alist.push_back({gatherOp.getResult(), BufferRelation::Equivalent});
+      return {{gatherOp.getResult(), BufferRelation::Equivalent}};
     }
-    return alist;
+    return {};
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -332,36 +335,39 @@ struct CoalescedGatherDMAOpBufferizationInterface
                           bufferization::BufferizationState &state) const {
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
 
-    // Get the bufferized operands.
-    FailureOr<Value> indicesBuffer =
-        getBuffer(rewriter, gatherOp.getIndices(), options, state);
     FailureOr<Value> sourceBuffer =
         getBuffer(rewriter, gatherOp.getSource(), options, state);
     FailureOr<Value> initBuffer =
         getBuffer(rewriter, gatherOp.getInit(), options, state);
 
-    if (failed(indicesBuffer) || failed(sourceBuffer) || failed(initBuffer)) {
+    if (failed(sourceBuffer) || failed(initBuffer)) {
       return failure();
     }
 
-    // Check if we're inside an scf.forall.in_parallel block.
-    // If so, we need to move the op outside of it.
-    Operation *parentOp = gatherOp->getParentOp();
-    if (isa_and_nonnull<scf::InParallelOp>(parentOp)) {
-      // Get the forall op containing the in_parallel.
-      auto forallOp = parentOp->getParentOfType<scf::ForallOp>();
-      if (forallOp) {
-        // Insert the memref version before the in_parallel block.
-        rewriter.setInsertionPoint(parentOp);
-        IREE::GPU::CoalescedGatherDMAOp::create(
-            rewriter, gatherOp.getLoc(), initBuffer->getType(), *indicesBuffer,
-            *sourceBuffer, *initBuffer);
-        // The result is the same as the init buffer.
-        bufferization::replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
-        return success();
+    // Bufferize tensor indices to memrefs, keep vector indices as-is.
+    SmallVector<Value> bufferizedIndices;
+    for (Value index : gatherOp.getIndices()) {
+      if (isa<TensorType>(index.getType())) {
+        FailureOr<Value> indexBuffer =
+            getBuffer(rewriter, index, options, state);
+        if (failed(indexBuffer)) {
+          return failure();
+        }
+        bufferizedIndices.push_back(*indexBuffer);
+      } else {
+        bufferizedIndices.push_back(index);
       }
     }
-    return failure();
+
+    rewriter.setInsertionPoint(gatherOp);
+
+    IREE::GPU::CoalescedGatherDMAOp::create(
+        rewriter, gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
+        bufferizedIndices, *initBuffer, gatherOp.getLane());
+
+    replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
+
+    return success();
   }
 };
 
