@@ -499,7 +499,7 @@ public:
       }
 
       // Read the PTX from the object file.
-      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
+      auto objectAttr = cast<IREE::HAL::ExecutableObjectAttr>(
           variantOp.getObjects()->getValue().front());
       if (auto data = objectAttr.loadData()) {
         targetPTX = data.value();
