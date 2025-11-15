@@ -346,6 +346,9 @@ util.func public @cmdDispatch(%arg_resource: !stream.resource<external>) -> !str
       ro %constant_capture[%c0 for %c128] : !stream.resource<constant>{%constant_size},
       wo %arg_capture[%c0 for %c128] : !stream.resource<external>{%arg_size}
     }
+    // CHECK:         default {
+    // CHECK-NEXT:       util.scf.unreachable
+    // CHECK-NEXT:    }
     // CHECK: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
