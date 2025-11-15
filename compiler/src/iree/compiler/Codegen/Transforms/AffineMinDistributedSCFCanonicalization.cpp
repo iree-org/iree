@@ -39,7 +39,7 @@ static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
   Value step;
   // Check if any of the dimensions is a ForOp or ParallelOp induction variable.
   for (auto dim : minOp.getDimOperands()) {
-    auto ivArg = llvm::dyn_cast<BlockArgument>(dim);
+    auto ivArg = dyn_cast<BlockArgument>(dim);
     if (!ivArg)
       continue;
     Operation *containingOp = ivArg.getOwner()->getParentOp();

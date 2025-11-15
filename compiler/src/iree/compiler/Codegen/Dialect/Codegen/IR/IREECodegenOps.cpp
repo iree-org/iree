@@ -40,7 +40,7 @@ LogicalResult ExtractStridedMetadataOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location,
     ExtractStridedMetadataOp::Adaptor adaptor,
     SmallVectorImpl<Type> &inferredReturnTypes) {
-  auto sourceType = llvm::dyn_cast<MemRefType>(adaptor.getSource().getType());
+  auto sourceType = dyn_cast<MemRefType>(adaptor.getSource().getType());
   if (!sourceType)
     return failure();
 
@@ -277,7 +277,7 @@ LogicalResult InnerTiledOp::verify() {
   }
 
   SmallVector<ShapedType> opTypes = llvm::map_to_vector(
-      getOperandTypes(), [](auto t) { return llvm::cast<ShapedType>(t); });
+      getOperandTypes(), [](auto t) { return cast<ShapedType>(t); });
   SmallVector<AffineMap, 4> indexingMaps = getIndexingMapsArray();
 
   // Verify that an indexing map was specified for each operand.
