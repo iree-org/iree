@@ -104,7 +104,7 @@ serializeEmbeddedData(Location loc, Attribute valueAttr, uint64_t alignment,
     return {};
   }
 
-  auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(valueAttr);
+  auto value = dyn_cast<IREE::Util::SerializableAttrInterface>(valueAttr);
   assert(value && "expected a serializable rodata value");
 
   // Reserve memory in the FlatBuffer for the data.
@@ -649,8 +649,8 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   SmallVector<RodataRef> rodataRefs;
   rodataRefs.resize(rodataOps.size());
   for (auto &rodataOp : rodataOps) {
-    auto rodataValue = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
-        rodataOp.getValue());
+    auto rodataValue =
+        dyn_cast<IREE::Util::SerializableAttrInterface>(rodataOp.getValue());
     assert(rodataValue && "expected a serializable rodata value");
 
     // Split large rodata out of the FlatBuffer to avoid going over 2GB.

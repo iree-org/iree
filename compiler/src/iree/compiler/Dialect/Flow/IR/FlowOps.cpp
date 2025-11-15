@@ -79,11 +79,10 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
                                          ValueRange dynamicDims) {
   unsigned requiredCount = 0;
   for (auto value : values) {
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(value.getType())) {
+    if (auto shapedType = dyn_cast<ShapedType>(value.getType())) {
       requiredCount += shapedType.getNumDynamicDims();
-    } else if (auto tensorType =
-                   llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
-                       value.getType())) {
+    } else if (auto tensorType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
+                   value.getType())) {
       requiredCount += tensorType.getNumDynamicDims();
     }
   }
@@ -398,7 +397,7 @@ LogicalResult DispatchRegionOp::verify() {
 
   // Make sure that all returned values are ranked tensors.
   for (Type t : getResultTypes()) {
-    if (!llvm::isa<RankedTensorType>(t)) {
+    if (!isa<RankedTensorType>(t)) {
       return emitOpError() << "only ranked tensor results are allowed";
     }
   }
@@ -434,7 +433,7 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
         parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, [&]() {
           if (parser.parseType(resultTypes.emplace_back()))
             return failure();
-          auto shapedType = llvm::dyn_cast<ShapedType>(resultTypes.back());
+          auto shapedType = dyn_cast<ShapedType>(resultTypes.back());
           if (!shapedType)
             return success();
           if (shapedType.hasStaticShape())
@@ -490,7 +489,7 @@ void DispatchRegionOp::print(OpAsmPrinter &p) {
   for (const auto &it : llvm::enumerate(getResult().getTypes())) {
     Type type = it.value();
     p << type;
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+    if (auto shapedType = dyn_cast<ShapedType>(type)) {
       if (!shapedType.hasStaticShape()) {
         p << "{";
         p << getResultDims().slice(resultDimCounter,
@@ -521,9 +520,9 @@ void DispatchRegionOp::print(OpAsmPrinter &p) {
 ValueRange DispatchRegionOp::getResultDynamicDims(unsigned idx) {
   unsigned counter = 0;
   for (unsigned i = 0; i < idx; ++i)
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(getResultTypes()[i]))
+    if (auto shapedType = dyn_cast<ShapedType>(getResultTypes()[i]))
       counter += shapedType.getNumDynamicDims();
-  auto shapedType = llvm::dyn_cast<ShapedType>(getResultTypes()[idx]);
+  auto shapedType = dyn_cast<ShapedType>(getResultTypes()[idx]);
   return getResultDims().slice(counter,
                                shapedType ? shapedType.getNumDynamicDims() : 0);
 }
@@ -533,7 +532,7 @@ LogicalResult DispatchRegionOp::reifyResultShapes(
   SmallVector<Type> resultTypes(getResultTypes());
   unsigned counter = 0;
   for (Type resultType : resultTypes) {
-    auto shapedType = llvm::dyn_cast<ShapedType>(resultType);
+    auto shapedType = dyn_cast<ShapedType>(resultType);
     if (!shapedType) {
       reifiedReturnShapes.push_back({});
       continue;
@@ -572,7 +571,7 @@ bool dropUnusedAndRedundantDispatchRegionResults(
       cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
   for (const auto &[index, value] : llvm::enumerate(regionOp.getResults())) {
     Type type = value.getType();
-    auto shapedType = llvm::dyn_cast<ShapedType>(type);
+    auto shapedType = dyn_cast<ShapedType>(type);
     OpOperand &yieldedVal = returnOp->getOpOperand(index);
     if (value.use_empty()) {
       droppedResultValues[value] = std::nullopt;
@@ -660,7 +659,7 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
   SmallVector<OpFoldResult> shape;
   unsigned dynamicIdx = 0;
   auto tensorType =
-      llvm::cast<IREE::TensorExt::DispatchTensorType>(getResult().getType());
+      cast<IREE::TensorExt::DispatchTensorType>(getResult().getType());
   for (int64_t dim : tensorType.getShape()) {
     if (ShapedType::isDynamic(dim)) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
@@ -683,7 +682,7 @@ static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
       staticValues.push_back(dynamicIndexValue);
     } else {
       auto operandValue =
-          llvm::cast<IntegerAttr>(dyn_cast<Attribute>(valueOrAttr)).getInt();
+          cast<IntegerAttr>(dyn_cast<Attribute>(valueOrAttr)).getInt();
       staticValues.push_back(operandValue);
     }
   }
@@ -764,7 +763,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   }
   for (auto operand : llvm::enumerate(arguments)) {
     Type type = operand.value().getType();
-    if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
+    if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
       type = IREE::TensorExt::DispatchTensorType::get(
           operandAliases[operand.index()]
               ? IREE::TensorExt::TensorAccess::ReadWrite
@@ -779,7 +778,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
       continue;
     }
     Type type = resultType.value();
-    if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
+    if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
       type = IREE::TensorExt::DispatchTensorType::get(
           IREE::TensorExt::TensorAccess::WriteOnly, tensorType);
     }
@@ -841,7 +840,7 @@ LogicalResult DispatchWorkgroupsOp::verify() {
   }
 
   auto verifyIOType = [&](Type type) -> LogicalResult {
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+    if (auto shapedType = dyn_cast<ShapedType>(type)) {
       if (shapedType.getElementType().isIndex()) {
         return op->emitOpError() << "I/O type " << type
                                  << " is invalid: index types must not cross "
@@ -879,14 +878,14 @@ BlockArgument DispatchWorkgroupsOp::getOutputBlockArgument(unsigned idx) {
 
   // Some outputs are tied to inputs and share their block arguments.
   int64_t tiedOperand =
-      llvm::cast<IntegerAttr>((*tiedOperands)[idx]).getValue().getSExtValue();
+      cast<IntegerAttr>((*tiedOperands)[idx]).getValue().getSExtValue();
   if (tiedOperand != IREE::Util::TiedOpInterface::kUntiedIndex)
     // This output is tied to an input.
     return getInputBlockArgument(tiedOperand);
 
   unsigned nextOutArgIdx = getArguments().size();
   for (unsigned i = 0; i < idx; ++i)
-    if (llvm::cast<IntegerAttr>((*tiedOperands)[i]).getValue().getSExtValue() ==
+    if (cast<IntegerAttr>((*tiedOperands)[i]).getValue().getSExtValue() ==
         IREE::Util::TiedOpInterface::kUntiedIndex)
       nextOutArgIdx++;
   return getWorkgroupBody().getArguments()[nextOutArgIdx];
@@ -967,7 +966,7 @@ IREE::Util::ValueAccess
 DispatchWorkgroupsOp::getOperandAccess(unsigned operandIndex) {
   BlockArgument arg = getWorkgroupBody().front().getArgument(operandIndex);
   if (auto tensorType =
-          llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(arg.getType())) {
+          dyn_cast<IREE::TensorExt::DispatchTensorType>(arg.getType())) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
     return IREE::Util::ValueAccess(
         /*isRead=*/(tensorAccess == IREE::TensorExt::TensorAccess::ReadOnly) ||
@@ -990,7 +989,7 @@ DispatchWorkgroupsOp::getResultAccess(unsigned resultIndex) {
   BlockArgument arg =
       getWorkgroupBody().front().getArgument(startIndex + resultIndex);
   if (auto tensorType =
-          llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(arg.getType())) {
+          dyn_cast<IREE::TensorExt::DispatchTensorType>(arg.getType())) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);
     return IREE::Util::ValueAccess(
         /*isRead=*/(tensorAccess == IREE::TensorExt::TensorAccess::ReadOnly) ||
@@ -1097,7 +1096,7 @@ SmallVector<int64_t> DispatchWorkgroupsOp::getTiedOperandsAsIntegerList() {
   if (!attr)
     return {};
   return llvm::map_to_vector(attr, [](Attribute intAttr) {
-    return llvm::cast<IntegerAttr>(intAttr).getInt();
+    return cast<IntegerAttr>(intAttr).getInt();
   });
 }
 
@@ -1454,7 +1453,7 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   SmallVector<OpFoldResult> shape;
   unsigned dynamicIdx = 0;
-  auto tensorType = llvm::cast<RankedTensorType>(getResult().getType());
+  auto tensorType = cast<RankedTensorType>(getResult().getType());
   for (int64_t dim : tensorType.getShape()) {
     if (ShapedType::isDynamic(dim)) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
@@ -1472,8 +1471,8 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
 
 LogicalResult TensorReshapeOp::verify() {
   // The element types don't need to match but the bit widths need to.
-  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
-  auto resultType = llvm::cast<ShapedType>(getResult().getType());
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto resultType = cast<ShapedType>(getResult().getType());
   if (IREE::Util::getTypeBitWidth(sourceType.getElementType()) !=
       IREE::Util::getTypeBitWidth(resultType.getElementType())) {
     return emitOpError() << "element bit widths must match";

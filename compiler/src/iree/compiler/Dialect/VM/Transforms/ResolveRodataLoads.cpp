@@ -127,9 +127,9 @@ class ResolveRodataLoadsPass
     // loads/stores to the globals and leaves the globals for SymbolDCE.
     DenseSet<Operation *> deadOps;
     explorer.forEachGlobal([&](const Explorer::GlobalInfo *globalInfo) {
-      if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(
-              globalInfo->op.getGlobalType())) {
-        if (llvm::isa<IREE::VM::BufferType>(refType.getObjectType())) {
+      if (auto refType =
+              dyn_cast<IREE::VM::RefType>(globalInfo->op.getGlobalType())) {
+        if (isa<IREE::VM::BufferType>(refType.getObjectType())) {
           processBufferGlobal(explorer, globalInfo, deadOps);
         }
       }

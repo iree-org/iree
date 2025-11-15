@@ -182,7 +182,7 @@ getExtOpVectorShape(ExtOpTy op, ArrayRef<int64_t> nativeShape) {
     auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
     if (!extract)
       return std::nullopt;
-    auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
+    auto vecType = cast<VectorType>(extract.getResult().getType());
     if (!llvm::equal(sliceType.getShape(), vecType.getShape()))
       return std::nullopt;
   }
@@ -201,7 +201,7 @@ getCooperativeOpVectorShape(Operation *op, ArrayRef<int64_t> nativeShape) {
 
   // Unroll elementwise ops according to native cooperative matrix size.
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
-    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0]))
+    if (auto vecType = dyn_cast<VectorType>(op->getResultTypes()[0]))
       return llvm::to_vector(nativeShape.drop_back()); // Drop K dim size
   }
 
@@ -240,7 +240,7 @@ getCooperativeOpVectorShape(Operation *op, ArrayRef<int64_t> nativeShape) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
       if (!extract)
         return std::nullopt;
-      auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
+      auto vecType = cast<VectorType>(extract.getResult().getType());
       if (sliceType && sliceType != vecType)
         return std::nullopt;
       sliceType = vecType;

@@ -87,7 +87,7 @@ static int64_t computeSharedMemoryUsage(mlir::FunctionOpInterface funcOp) {
       return WalkResult::interrupt();
     }
 
-    MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
+    MemRefType allocType = cast<MemRefType>(allocOp.getType());
     unsigned byteWidth =
         allocType.getElementType().isIndex()
             ? 8 // IREE's default byteWidth for indexes
@@ -122,7 +122,7 @@ static unsigned computeEffectiveExtraBytes(mlir::FunctionOpInterface funcOp,
   funcOp.walk([&](memref::AllocOp allocOp) {
     if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
         allocOp.getType().hasStaticShape()) {
-      MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
+      MemRefType allocType = cast<MemRefType>(allocOp.getType());
 
       ArrayRef<int64_t> shape = allocType.getShape();
       if (shape.empty())

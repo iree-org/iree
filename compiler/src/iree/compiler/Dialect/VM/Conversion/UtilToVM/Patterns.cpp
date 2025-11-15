@@ -75,7 +75,7 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
   matchAndRewrite(IREE::Util::CmpEQOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getLhs().getType();
-    if (llvm::isa<IREE::VM::RefType>(operandType)) {
+    if (isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::CmpEQRefOp>(
           op, rewriter.getI32Type(), adaptor.getLhs(), adaptor.getRhs());
       return success();
@@ -94,7 +94,7 @@ struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
   matchAndRewrite(IREE::Util::CmpNEOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getLhs().getType();
-    if (llvm::isa<IREE::VM::RefType>(operandType)) {
+    if (isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::CmpNERefOp>(
           op, rewriter.getI32Type(), adaptor.getLhs(), adaptor.getRhs());
       return success();

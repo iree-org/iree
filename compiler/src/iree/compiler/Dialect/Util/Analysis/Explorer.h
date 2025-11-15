@@ -177,13 +177,8 @@ public:
       assert(!isIndirect && "indirect loads not yet tracked");
       return llvm::map_range(
           llvm::make_filter_range(
-              uses,
-              [](Operation *op) {
-                return isa<IREE::Util::GlobalLoadOpInterface>(op);
-              }),
-          [](Operation *op) {
-            return cast<IREE::Util::GlobalLoadOpInterface>(op);
-          });
+              uses, llvm::IsaPred<IREE::Util::GlobalLoadOpInterface>),
+          llvm::CastTo<IREE::Util::GlobalLoadOpInterface>);
     }
 
     // Returns a range of all direct stores to the global.
@@ -191,13 +186,8 @@ public:
       assert(!isIndirect && "indirect stores not yet tracked");
       return llvm::map_range(
           llvm::make_filter_range(
-              uses,
-              [](Operation *op) {
-                return isa<IREE::Util::GlobalStoreOpInterface>(op);
-              }),
-          [](Operation *op) {
-            return cast<IREE::Util::GlobalStoreOpInterface>(op);
-          });
+              uses, llvm::IsaPred<IREE::Util::GlobalStoreOpInterface>),
+          llvm::CastTo<IREE::Util::GlobalStoreOpInterface>);
     }
   };
 

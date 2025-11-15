@@ -19,18 +19,18 @@
 namespace mlir::iree_compiler {
 
 std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
-  if (auto loc = llvm::dyn_cast<FileLineColLoc>(baseLoc)) {
+  if (auto loc = dyn_cast<FileLineColLoc>(baseLoc)) {
     return loc;
   }
 
-  if (auto loc = llvm::dyn_cast<FusedLoc>(baseLoc)) {
+  if (auto loc = dyn_cast<FusedLoc>(baseLoc)) {
     // Recurse through fused locations.
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
       if (childResult)
         return childResult;
     }
-  } else if (auto loc = llvm::dyn_cast<CallSiteLoc>(baseLoc)) {
+  } else if (auto loc = dyn_cast<CallSiteLoc>(baseLoc)) {
     // First check caller...
     auto callerResult = findFirstFileLoc(loc.getCaller());
     if (callerResult)
@@ -39,13 +39,13 @@ std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
     auto calleeResult = findFirstFileLoc(loc.getCallee());
     if (calleeResult)
       return calleeResult;
-  } else if (auto loc = llvm::dyn_cast<NameLoc>(baseLoc)) {
+  } else if (auto loc = dyn_cast<NameLoc>(baseLoc)) {
     auto childResult = findFirstFileLoc(loc.getChildLoc());
     if (childResult)
       return childResult;
-  } else if (auto loc = llvm::dyn_cast<OpaqueLoc>(baseLoc)) {
+  } else if (auto loc = dyn_cast<OpaqueLoc>(baseLoc)) {
     // TODO(scotttodd): Use loc.fallbackLocation()?
-  } else if (auto loc = llvm::dyn_cast<UnknownLoc>(baseLoc)) {
+  } else if (auto loc = dyn_cast<UnknownLoc>(baseLoc)) {
     // ¯\_(ツ)_/¯
   }
 

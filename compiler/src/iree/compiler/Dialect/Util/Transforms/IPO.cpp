@@ -242,7 +242,7 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
 
       // If the result value is an argument track that here.
       // We'll only use this value if all return sites are uniform.
-      if (auto arg = llvm::dyn_cast<BlockArgument>(value)) {
+      if (auto arg = dyn_cast<BlockArgument>(value)) {
         if (arg.getParentBlock()->isEntryBlock()) {
           analysis.passthroughResultArgs[i] =
               static_cast<int>(arg.getArgNumber());

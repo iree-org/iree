@@ -244,7 +244,7 @@ static Value recomposeFromI32sAndConvert(
   }
 
   // i16 -> bf16, i32 -> f32, i64 -> f64 ...
-  if (auto floatType = llvm::dyn_cast<FloatType>(oldArgType)) {
+  if (auto floatType = dyn_cast<FloatType>(oldArgType)) {
     value = arith::BitcastOp::create(builder, loc, oldArgType, value);
   }
 

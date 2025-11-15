@@ -100,8 +100,8 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
 }; // namespace
 
 OpFoldResult BitCastOp::fold(FoldAdaptor operands) {
-  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
-  auto resultType = llvm::cast<ShapedType>(getResult().getType());
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto resultType = cast<ShapedType>(getResult().getType());
   if (sourceType.getElementType() != resultType.getElementType()) {
     // Element type mismatch, this is a bitcast.
     return {};
@@ -177,7 +177,7 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
-    if (!llvm::isa<RankedTensorType>(loadOp.getSource().getType())) {
+    if (!isa<RankedTensorType>(loadOp.getSource().getType())) {
       return failure();
     }
     // If the offsets are empty rely on folding to take care of it.
@@ -289,8 +289,7 @@ void DispatchTensorLoadOp::getCanonicalizationPatterns(
 // verification. Fold such uses of the offsets, size and strides are emtpy.
 // i.e, flow.dispatch.input.load %v -> %v
 OpFoldResult DispatchTensorLoadOp::fold(FoldAdaptor operands) {
-  if (getSource().getType() &&
-      llvm::isa<RankedTensorType>(getSource().getType()) &&
+  if (getSource().getType() && isa<RankedTensorType>(getSource().getType()) &&
       getMixedOffsets().empty() && getMixedSizes().empty() &&
       getMixedStrides().empty()) {
     return getSource();

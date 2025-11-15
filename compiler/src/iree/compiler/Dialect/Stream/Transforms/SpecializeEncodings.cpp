@@ -189,7 +189,7 @@ getBindingLayoutAttrs(IREE::Stream::TensorDispatchOp dispatchOp) {
           dispatchOp.getTiedOperands()) {
     tiedOperands =
         llvm::map_to_vector(tiedOperandsAttr.value(), [](Attribute intAttr) {
-          return llvm::cast<IntegerAttr>(intAttr).getInt();
+          return cast<IntegerAttr>(intAttr).getInt();
         });
   }
 
@@ -458,7 +458,7 @@ namespace {
 // Adds the resolved layouts to all tensor types on stream tensor ops, if
 // encodings are present. Most of stream tensor ops implement
 // AffinityOpInterface, where a stream affinity indicates the kind of
-// enviroment the ops are expected run in. When an encoding is present in the
+// environment the ops are expected run in. When an encoding is present in the
 // tensor type, the method resolves the layouts, strips outdated information,
 // and adds the resolved layouts to the encodings. The updated encodings should
 // have enough information for other lowering transformations.
@@ -483,7 +483,7 @@ public:
     return llvm::map_to_vector(
         llvm::filter_to_vector(streamOps,
                                llvm::IsaPred<IREE::Stream::TensorDispatchOp>),
-        [](Operation *op) { return cast<IREE::Stream::TensorDispatchOp>(op); });
+        llvm::CastTo<IREE::Stream::TensorDispatchOp>);
   }
 
 private:
@@ -504,7 +504,7 @@ private:
       cachedLayoutAttrs;
 
   // Input moduleOp. The op is not expected to be updated during the query.
-  // Because data flow analaysis can be involved. Modifying the IR invalidates
+  // Because data flow analysis can be involved. Modifying the IR invalidates
   // the state and may lead to crashes as pointer references into the IR
   // structure are retained.
   ModuleOp moduleOp;

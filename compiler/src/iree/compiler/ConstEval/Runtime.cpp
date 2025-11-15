@@ -34,7 +34,7 @@ LogicalResult handleRuntimeError(Location loc, iree_status_t status,
 LogicalResult convertToElementType(Location loc, Type baseType,
                                    iree_hal_element_type_t *outElementType) {
   Builder builder(loc.getContext());
-  if (auto t = llvm::dyn_cast<IntegerType>(baseType)) {
+  if (auto t = dyn_cast<IntegerType>(baseType)) {
     switch (t.getWidth()) {
     case 32:
       *outElementType = IREE_HAL_ELEMENT_TYPE_INT_32;
@@ -253,8 +253,8 @@ LogicalResult FunctionCall::addBufferViewArgumentAttr(
 }
 
 static ShapedType getAttrShapedType(Attribute attr) {
-  if (auto typedAttr = llvm::dyn_cast<TypedAttr>(attr)) {
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(typedAttr.getType())) {
+  if (auto typedAttr = dyn_cast<TypedAttr>(attr)) {
+    if (auto shapedType = dyn_cast<ShapedType>(typedAttr.getType())) {
       return shapedType;
     }
   }
@@ -262,18 +262,18 @@ static ShapedType getAttrShapedType(Attribute attr) {
 }
 
 LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
-  if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(attr)) {
+  if (auto elementsAttr = dyn_cast<ElementsAttr>(attr)) {
     return addBufferViewArgumentAttr(
         loc, elementsAttr.getShapedType(),
         cast<IREE::Util::SerializableAttrInterface>(attr));
   } else if (auto serializableAttr =
-                 llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(attr)) {
+                 dyn_cast<IREE::Util::SerializableAttrInterface>(attr)) {
     if (auto shapedType = getAttrShapedType(attr)) {
       return addBufferViewArgumentAttr(loc, shapedType, serializableAttr);
     } else {
       return addBufferArgumentAttr(loc, serializableAttr);
     }
-  } else if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
+  } else if (auto integerAttr = dyn_cast<IntegerAttr>(attr)) {
     iree_vm_value_t value;
     APInt apValue = integerAttr.getValue();
     switch (apValue.getBitWidth()) {
@@ -300,7 +300,7 @@ LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
     }
     return handleRuntimeError(loc,
                               iree_vm_list_push_value(inputs.get(), &value));
-  } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
+  } else if (auto floatAttr = dyn_cast<FloatAttr>(attr)) {
     iree_vm_value_t value;
     APFloat apValue = floatAttr.getValue();
     // Note that there are many floating point semantics that LLVM knows

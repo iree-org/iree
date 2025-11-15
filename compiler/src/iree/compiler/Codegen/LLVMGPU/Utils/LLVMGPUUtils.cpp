@@ -93,7 +93,7 @@ static MaskResult getMask(Operation *op) {
           : transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
   if (maybeExtractOp) {
     if (maybeExtractOp.getStaticPosition().size() + 1 !=
-        llvm::cast<VectorType>(maskOp->getResultTypes().front()).getRank()) {
+        cast<VectorType>(maskOp->getResultTypes().front()).getRank()) {
       LDBG() << "----mask through extract unexpected position size -> Skip: "
              << maybeExtractOp;
       return MaskResult{};
@@ -200,13 +200,13 @@ void createAsyncGroups(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
       return WalkResult::advance();
     LDBG() << "--candidate writeOp: " << *writeOp;
     Value vectorVal = getValueStored(writeOp);
-    if (llvm::cast<VectorType>(vectorVal.getType()).getRank() != 1) {
+    if (cast<VectorType>(vectorVal.getType()).getRank() != 1) {
       LDBG() << "----writeOp is not an inbounds 1-D minor identity -> Skip";
       return WalkResult::advance();
     }
     Value memrefOperand = getMemrefOperand(writeOp);
     if (!hasSharedMemoryAddressSpace(
-            llvm::cast<MemRefType>(memrefOperand.getType()))) {
+            cast<MemRefType>(memrefOperand.getType()))) {
       LDBG() << "----address space is not workgroup -> Skip";
       return WalkResult::advance();
     }
@@ -236,7 +236,7 @@ void createAsyncGroups(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
 
     // Check whether both accesses are supported before we emit: this is
     // necessary to ensure the correctness of DeviceAsyncCopyOp.
-    VectorType vecType = llvm::cast<VectorType>(vectorVal.getType());
+    VectorType vecType = cast<VectorType>(vectorVal.getType());
     Value storeBase = getMemrefOperand(writeOp);
     Value loadBase = getMemrefOperand(readOp);
     if (!resultsInSupportedAsyncCopy(cast<MemRefType>(loadBase.getType()),
@@ -270,7 +270,7 @@ void createAsyncGroups(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
         Operation *readOp = nextNode;
         Value memrefOperand = getMemrefOperand(readOp);
         if (!hasSharedMemoryAddressSpace(
-                llvm::cast<MemRefType>(memrefOperand.getType()))) {
+                cast<MemRefType>(memrefOperand.getType()))) {
           continue;
         }
       }
@@ -289,13 +289,13 @@ void createAsyncGroups(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
     for (Operation *writeOp : group) {
       rewriter.setInsertionPoint(writeOp);
       Value vectorVal = getValueStored(writeOp);
-      auto vectorType = llvm::cast<VectorType>(vectorVal.getType());
+      auto vectorType = cast<VectorType>(vectorVal.getType());
       int64_t numElements = vectorType.getNumElements();
       Operation *readOp = vectorVal.getDefiningOp();
       Value storeBase = getMemrefOperand(writeOp);
       Value loadBase = getMemrefOperand(readOp);
       Value mask = getMaskValue(rewriter, readOp);
-      auto dstMemref = llvm::cast<MemRefType>(storeBase.getType());
+      auto dstMemref = cast<MemRefType>(storeBase.getType());
       int64_t sizeInBytes =
           (dstMemref.getElementTypeBitWidth() * numElements) / 8;
       UnitAttr bypassL1 =

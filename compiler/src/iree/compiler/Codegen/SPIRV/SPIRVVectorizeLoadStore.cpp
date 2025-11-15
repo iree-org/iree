@@ -160,8 +160,8 @@ static unsigned isMemRefVectorizable(Value value,
   auto memrefType = dyn_cast<MemRefType>(value.getType());
 
   // Require scalar element type
-  if (!memrefType || (!llvm::isa<IntegerType>(memrefType.getElementType()) &&
-                      !llvm::isa<FloatType>(memrefType.getElementType()))) {
+  if (!memrefType || (!isa<IntegerType>(memrefType.getElementType()) &&
+                      !isa<FloatType>(memrefType.getElementType()))) {
     LLVM_DEBUG(llvm::dbgs() << "failed: not (scalar) memref\n");
     return 0;
   }
@@ -554,7 +554,7 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   // If the vector we need to generate is bigger than the the max vector size
   // allowed for loads use a larger element type.
   if (vectorNumElements > kMaxVectorNumElements) {
-    scalarType = llvm::isa<IntegerType>(scalarType)
+    scalarType = isa<IntegerType>(scalarType)
                      ? cast<Type>(rewriter.getI32Type())
                      : cast<Type>(rewriter.getF32Type());
     scalarNumBits = scalarType.getIntOrFloatBitWidth();

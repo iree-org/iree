@@ -63,7 +63,7 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp,
   // Gather all of the resource globals in the root.
   for (auto &region : rootOp->getRegions()) {
     for (auto globalOp : region.getOps<IREE::Util::GlobalOp>()) {
-      if (!llvm::isa<IREE::Stream::ResourceType>(globalOp.getType()))
+      if (!isa<IREE::Stream::ResourceType>(globalOp.getType()))
         continue;
       expandedGlobals[globalOp.getName()].resourceOp = globalOp;
     }
@@ -93,7 +93,7 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp,
 //===----------------------------------------------------------------------===//
 
 static bool isResourceType(Type type) {
-  return llvm::isa<IREE::Stream::ResourceType>(type);
+  return isa<IREE::Stream::ResourceType>(type);
 }
 
 // Returns true if an operands or results of |op| use !stream.resources.
@@ -217,7 +217,7 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
       // Size value found and implicitly captured; we can reuse (could be
       // a parent block argument, a constant, computed, etc).
       return sizeValue;
-    } else if (auto blockArg = llvm::dyn_cast<BlockArgument>(sizeValue)) {
+    } else if (auto blockArg = dyn_cast<BlockArgument>(sizeValue)) {
       if (blockArg.getParentBlock()->isEntryBlock()) {
         // Dynamic dimension passed in to the entry block; safe to use.
         return sizeValue;

@@ -61,7 +61,7 @@ struct DetachElementwisePattern
       // If not linalg op, or is a fill op, do nothing.
       return failure();
     }
-    auto outputType = llvm::cast<RankedTensorType>(outputOperand.getType());
+    auto outputType = cast<RankedTensorType>(outputOperand.getType());
     if (!outputType.getElementType().isIntOrFloat())
       return failure();
     auto elementType = outputType.getElementType();
@@ -102,7 +102,7 @@ struct DetachElementwisePattern
         ValueRange{linalgOp->getResult(0), outputOperand}, fill, maps,
         iterators, [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
           Value result;
-          if (llvm::isa<FloatType>(elementType)) {
+          if (isa<FloatType>(elementType)) {
             result = arith::AddFOp::create(b, nestedLoc, args[0], args[1]);
           } else {
             result = arith::AddIOp::create(b, nestedLoc, args[0], args[1]);
@@ -143,11 +143,11 @@ struct DetachSplatConstantOutsOperands
         continue;
 
       auto resultType =
-          llvm::dyn_cast<RankedTensorType>(constOp.getResult().getType());
+          dyn_cast<RankedTensorType>(constOp.getResult().getType());
       if (!resultType || !resultType.getElementType().isIntOrFloat())
         continue;
 
-      auto attr = llvm::dyn_cast<ElementsAttr>(constOp.getValue());
+      auto attr = dyn_cast<ElementsAttr>(constOp.getValue());
       if (!attr || !attr.isSplat())
         continue;
 
@@ -156,7 +156,7 @@ struct DetachSplatConstantOutsOperands
       Value emptyTensorOp = tensor::EmptyOp::create(
           rewriter, loc, resultType.getShape(), elementType);
       TypedAttr constValue;
-      if (llvm::isa<IntegerType>(elementType)) {
+      if (isa<IntegerType>(elementType)) {
         constValue = rewriter.getIntegerAttr(
             elementType, attr.template getSplatValue<APInt>());
       } else {

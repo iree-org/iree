@@ -816,7 +816,7 @@ struct ConvertDispatchOp
     for (auto [oldOperand, convertedOperands] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
       Value newOperand;
-      if (llvm::isa<ShapedType>(oldOperand.getType())) {
+      if (isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             transferTensorOperands(op.getLoc(), oldOperand, convertedOperands,
                                    executionAffinityAttr, rewriter);
@@ -840,7 +840,7 @@ struct ConvertDispatchOp
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
-      if (!llvm::isa<ShapedType>(oldResultType)) {
+      if (!isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
         resultEncodings.push_back(rewriter.getType<IREE::Util::UnusedType>());
         continue;
@@ -890,7 +890,7 @@ struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
   matchAndRewrite(IREE::Flow::FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto convertType = [&](Type type) -> Type {
-      if (llvm::isa<TensorType>(type)) {
+      if (isa<TensorType>(type)) {
         // Tensors become resources without sizes. The default type converter
         // adds the size so we bypass that here. We may want to allow the user
         // to override the lifetime with attributes, too.
@@ -938,7 +938,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
     for (auto [oldOperand, convertedOperand] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
       Value newOperand;
-      if (llvm::isa<ShapedType>(oldOperand.getType())) {
+      if (isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             transferTensorOperands(op.getLoc(), oldOperand, convertedOperand,
                                    executionAffinityAttr, rewriter);
@@ -962,7 +962,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
-      if (!llvm::isa<ShapedType>(oldResultType)) {
+      if (!isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
         resultSizes.push_back(nullptr);
         continue;
@@ -1139,8 +1139,7 @@ struct ConvertExecutableOp
         for (auto arg : funcOp.front().getArguments()) {
           auto oldType = arg.getType();
           if (auto tensorType =
-                  llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
-                      oldType)) {
+                  dyn_cast<IREE::TensorExt::DispatchTensorType>(oldType)) {
             // Now a binding - insert the stream.binding.subspan op to slice it.
             auto newType = rewriter.getType<IREE::Stream::BindingType>();
             newTypes.push_back(newType);

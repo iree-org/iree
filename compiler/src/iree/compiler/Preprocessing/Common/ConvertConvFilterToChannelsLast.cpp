@@ -133,11 +133,11 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     Value outputVal = output->get();
 
     ArrayRef<int64_t> inputShape =
-        llvm::cast<ShapedType>(inputVal.getType()).getShape();
+        cast<ShapedType>(inputVal.getType()).getShape();
     ArrayRef<int64_t> filterShape =
-        llvm::cast<ShapedType>(filterVal.getType()).getShape();
+        cast<ShapedType>(filterVal.getType()).getShape();
     ArrayRef<int64_t> outputShape =
-        llvm::cast<ShapedType>(outputVal.getType()).getShape();
+        cast<ShapedType>(outputVal.getType()).getShape();
 
     // TODO(vivian): Once the matmul shape check below is dropped, the
     // dynamic-shape check can also be removed.

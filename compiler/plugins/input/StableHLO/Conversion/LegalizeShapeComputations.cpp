@@ -95,7 +95,7 @@ struct ConcatenateConverter final
     elements.reserve(resultTy.getNumElements());
 
     for (Value operand : op->getOperands()) {
-      ShapedType operandTy = llvm::cast<ShapedType>(operand.getType());
+      ShapedType operandTy = cast<ShapedType>(operand.getType());
       if (operandTy.getRank() == 0) {
         Value extract =
             tensor::ExtractOp::create(rewriter, loc, operand, ValueRange({}));

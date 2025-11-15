@@ -62,14 +62,14 @@ static void getEffectsImpl(
         &effects,
     ArrayRef<OpOperand *> inputOperands, MutableOperandRange outputOperands) {
   for (OpOperand *operand : inputOperands) {
-    if (!llvm::isa<MemRefType>(operand->get().getType())) {
+    if (!isa<MemRefType>(operand->get().getType())) {
       continue;
     }
     effects.emplace_back(MemoryEffects::Read::get(), operand,
                          SideEffects::DefaultResource::get());
   }
   for (OpOperand &operand : outputOperands) {
-    if (!llvm::isa<MemRefType>(operand.get().getType())) {
+    if (!isa<MemRefType>(operand.get().getType())) {
       continue;
     }
     effects.emplace_back(MemoryEffects::Read::get(), &operand,
@@ -253,7 +253,7 @@ static void populateMap(OpTy op, MutableArrayRef<OpOperand> operands,
       continue;
     }
     Value src = opOperand.get();
-    auto sourceType = llvm::cast<RankedTensorType>(src.getType());
+    auto sourceType = cast<RankedTensorType>(src.getType());
     auto sourceMap = op.getMatchingIndexingMap(&opOperand);
 
     // Get the `sourceShape` of the `sourceType`. If the operand is a result of
@@ -295,7 +295,7 @@ static void createNewOperandWithStaticSizes(
   if (op.isScalar(opOperand)) {
     return;
   }
-  auto sourceType = llvm::cast<RankedTensorType>(src.getType());
+  auto sourceType = cast<RankedTensorType>(src.getType());
   Type resultType = sourceType;
   ArrayRef<int64_t> sourceShape = sourceType.getShape();
   AffineMap sourceMap = op.getMatchingIndexingMap(opOperand);
@@ -1133,7 +1133,7 @@ LogicalResult TopkOp::verify() {
       block.getArgument(1).getType() != inputValuesType.getElementType()) {
     return op->emitOpError("region block types must match input");
   }
-  auto terminatorOp = llvm::dyn_cast<YieldOp>(block.getTerminator());
+  auto terminatorOp = dyn_cast<YieldOp>(block.getTerminator());
   if (!terminatorOp || !terminatorOp.getOperand(0).getType().isInteger(1)) {
     return op->emitOpError("region block must end with a linalg_ext.yield i1!");
   }

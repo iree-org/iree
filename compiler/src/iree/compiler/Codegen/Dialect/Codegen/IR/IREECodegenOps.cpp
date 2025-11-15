@@ -276,8 +276,8 @@ LogicalResult InnerTiledOp::verify() {
                        Twine(expectedNumOuts) + ")");
   }
 
-  SmallVector<ShapedType> opTypes = llvm::map_to_vector(
-      getOperandTypes(), [](auto t) { return cast<ShapedType>(t); });
+  SmallVector<ShapedType> opTypes =
+      llvm::map_to_vector(getOperandTypes(), llvm::CastTo<ShapedType>);
   SmallVector<AffineMap, 4> indexingMaps = getIndexingMapsArray();
 
   // Verify that an indexing map was specified for each operand.

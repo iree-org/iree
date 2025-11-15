@@ -147,7 +147,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
   Value zeroTensor =
       linalg::FillOp::create(b, loc, zero, emptyTensor).getResult(0);
 
-  switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
+  switch (cast<RankedTensorType>(lhs.getType()).getRank()) {
   case 1:
     return linalg::VecmatOp::create(b, loc, TypeRange{resultType},
                                     ValueRange{lhs, rhs},
@@ -188,9 +188,9 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
     Location loc = op.getLoc();
     auto matrixType =
         RankedTensorType::get({n, fftLength}, inputType.getElementType());
-    auto resultType = RankedTensorType::get(
-        llvm::cast<RankedTensorType>(op.getType()).getShape(),
-        inputType.getElementType());
+    auto resultType =
+        RankedTensorType::get(cast<RankedTensorType>(op.getType()).getShape(),
+                              inputType.getElementType());
 
     Value realMatrix =
         getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/true);
@@ -271,7 +271,7 @@ static void rewriteFuncAttrs(func::FuncOp funcOp) {
         newAttrs.push_back({
             abiOutputName,
             IntegerAttr::get(indexType,
-                             llvm::cast<IntegerAttr>(attr.getValue()).getInt()),
+                             cast<IntegerAttr>(attr.getValue()).getInt()),
         });
       } else {
         newAttrs.push_back(attr);

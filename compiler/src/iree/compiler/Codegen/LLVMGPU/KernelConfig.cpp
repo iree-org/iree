@@ -568,11 +568,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Infer if lhs or rhs is transposed to help generate better schedule.
   SmallVector<AffineMap> maps = op.getIndexingMapsArray();
   bool transposedLhs =
-      kDim !=
-      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+      kDim != cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
   bool transposedRhs =
-      nDim !=
-      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+      nDim != cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   std::optional<int64_t> wgpCount = std::nullopt;
   if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
@@ -823,15 +821,15 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   LDBG() << "Attention Vector Distribution Config";
 
   // Infer if Q, K and V are transposed to help generate better schedule.
-  bool transposedQ = k1Dims.back() != llvm::cast<AffineDimExpr>(
-                                          op.getQueryMap().getResults().back())
-                                          .getPosition();
-  bool transposedK = k1Dims.back() != llvm::cast<AffineDimExpr>(
-                                          op.getKeyMap().getResults().back())
-                                          .getPosition();
-  bool transposedV = k2Dims.back() != llvm::cast<AffineDimExpr>(
-                                          op.getValueMap().getResults().back())
-                                          .getPosition();
+  bool transposedQ =
+      k1Dims.back() !=
+      cast<AffineDimExpr>(op.getQueryMap().getResults().back()).getPosition();
+  bool transposedK =
+      k1Dims.back() !=
+      cast<AffineDimExpr>(op.getKeyMap().getResults().back()).getPosition();
+  bool transposedV =
+      k2Dims.back() !=
+      cast<AffineDimExpr>(op.getValueMap().getResults().back()).getPosition();
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
   // First try to find a schedule with an exactly matching intrinsic.
@@ -1521,11 +1519,9 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
   };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
-      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType())
-          .getShape();
+      cast<ShapedType>(op.getDpsInputOperand(0)->get().getType()).getShape();
   auto rhsShape =
-      llvm::cast<ShapedType>(op.getDpsInputOperand(1)->get().getType())
-          .getShape();
+      cast<ShapedType>(op.getDpsInputOperand(1)->get().getType()).getShape();
   int64_t sizeM = ShapedType::kDynamic;
   int64_t sizeN = ShapedType::kDynamic;
   int64_t sizeK = ShapedType::kDynamic;
@@ -1762,7 +1758,7 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
         break;
       }
       ArrayRef<int64_t> shape =
-          llvm::cast<ShapedType>(outputOperand.get().getType()).getShape();
+          cast<ShapedType>(outputOperand.get().getType()).getShape();
       if (ShapedType::isDynamicShape(shape)) {
         vectorSize = 1;
         break;
@@ -2114,9 +2110,9 @@ static LogicalResult setConvolutionConfig(
   const int ocIndex = isNHWC ? 3 : 1;
 
   Type inputType = linalgOp.getDpsInputOperand(0)->get().getType();
-  ArrayRef<int64_t> inputShape = llvm::cast<ShapedType>(inputType).getShape();
+  ArrayRef<int64_t> inputShape = cast<ShapedType>(inputType).getShape();
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
-  ArrayRef<int64_t> outputShape = llvm::cast<ShapedType>(outputType).getShape();
+  ArrayRef<int64_t> outputShape = cast<ShapedType>(outputType).getShape();
   if (ShapedType::isDynamic(inputShape[3]) ||
       ShapedType::isDynamicShape(outputShape.drop_front())) {
     return failure();

@@ -57,8 +57,8 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   // SSA value pair.
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
   auto captureTensorDims = [&](Value externalValue, Value internalValue) {
-    auto tensorType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
-        internalValue.getType());
+    auto tensorType =
+        dyn_cast<IREE::TensorExt::DispatchTensorType>(internalValue.getType());
     if (!tensorType)
       return;
     if (tensorType.hasStaticShape())
@@ -79,7 +79,7 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     unsigned insertionPosition = entryBlock->getNumArguments();
     for (auto argType : llvm::reverse(entryBlock->getArgumentTypes())) {
       auto flowTensorType =
-          llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(argType);
+          dyn_cast<IREE::TensorExt::DispatchTensorType>(argType);
       if (!flowTensorType || flowTensorType.getAccess() !=
                                  IREE::TensorExt::TensorAccess::WriteOnly) {
         break;
