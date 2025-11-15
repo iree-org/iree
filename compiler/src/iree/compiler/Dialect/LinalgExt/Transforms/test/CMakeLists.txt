@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "conv_to_im2col.mlir"
     "convert_to_loops.mlir"
     "convert_to_online_attention.mlir"
+    "decompose_exp_reduction.mlir"
     "decompose_im2col.mlir"
     "decompose_map_scatter.mlir"
     "decompose_winograd.mlir"

@@ -1043,4 +1043,66 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
   return customOpReplacements;
 }
 
+//===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
+  Location loc = getLoc();
+  IRRewriter rewriter(b);
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(*this);
+
+  // Split the op into:
+  // curr_max = max(s, old_max)
+  // ex = e^{x - curr_max}
+  // norm = e^{curr_max - old_max}
+  // for each outs in exp_reduction:
+  //     norm_outs = outs * norm
+  // linalg.generic ins(ex, ...) outs(norm_outs)
+
+  SmallVector<Value> inputs = getDpsInputs();
+  SmallVector<Value> normOuts(getNumDpsInits());
+
+  const int reducingOpIndex = 0;
+  OpOperand *sValue = getDpsInputOperand(reducingOpIndex);
+  OpOperand *prevMax = getDpsInitOperand(reducingOpIndex);
+  AffineMap normValMap = getMatchingIndexingMap(sValue);
+  AffineMap prevMaxMap = getMatchingIndexingMap(prevMax);
+
+  // curr_max =  max(sValue, prev_max)
+  Value currMax = reduce<arith::MaximumFOp>(
+      rewriter, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
+  // ex = e^{sValue - curr_max}
+  Value ex = computeSubAndExp2(rewriter, loc, prevMaxMap, normValMap, currMax,
+                               sValue->get());
+  // norm = e^(prev_max - curr_max)
+  Value norm = computeSubAndExp2(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
+                                 prevMax->get());
+
+  inputs[reducingOpIndex] = ex;
+  normOuts[reducingOpIndex] = currMax;
+
+  for (int64_t oldIndex : getExpReducedOperands()) {
+    OpOperand *oldOut = getDpsInitOperand(oldIndex);
+    AffineMap oldOutMap = getMatchingIndexingMap(oldOut);
+    Value normOut = elementwiseValueInPlace<arith::MulFOp>(
+        rewriter, loc, oldOutMap, prevMaxMap, oldOut->get(), norm);
+    normOuts[oldIndex] = normOut;
+  }
+
+  auto expRedGeneric = linalg::GenericOp::create(
+      rewriter, loc, TypeRange(normOuts), inputs, normOuts,
+      getIndexingMapsArray(), getLoopIteratorTypes());
+  expRedGeneric->setDiscardableAttrs(
+      getOperation()->getDiscardableAttrDictionary());
+  rewriter.cloneRegionBefore(getRegion(), expRedGeneric.getRegion(),
+                             expRedGeneric.getRegion().begin());
+  rewriter.setInsertionPointAfter(expRedGeneric.getBody()->getTerminator());
+  auto yieldOp =
+      cast<IREE::LinalgExt::YieldOp>(expRedGeneric.getBody()->getTerminator());
+  rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp, yieldOp.getOperands());
+  return SmallVector<Value>(expRedGeneric->getResults());
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
