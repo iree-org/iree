@@ -254,7 +254,7 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   // For gather operations with indices, all index vectors should have the same
   // length equal to the batch size (first dimension of destination).
   if (!indices.empty()) {
-    // Verify all index vectors are 1D and have the same length
+    // Verify all index vectors are 1D and have the same length.
     auto firstIndexShape = cast<ShapedType>(indices[0].getType()).getShape();
     if (firstIndexShape.size() != 1) {
       return emitOpError("expected index 0 to be a 1-D tensor or vector");
@@ -275,7 +275,7 @@ LogicalResult CoalescedGatherDMAOp::verify() {
       }
     }
 
-    // The batch size should match the first dimension of the destination
+    // The batch size should match the first dimension of the destination.
     if (!initShape.empty() && batchSize != initShape[0]) {
       return emitOpError("expected batch size (length of index vectors: ")
              << batchSize << ") to match first destination dimension ("
@@ -284,7 +284,7 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   // Verify the contiguous (non-indexed) dimensions match between source and
-  // dest
+  // dest.
   for (auto [dim, size] : llvm::enumerate(initShape)) {
     if (dim >= sourceShape.size()) {
       return emitOpError("expected source to have at least ")
@@ -292,7 +292,7 @@ LogicalResult CoalescedGatherDMAOp::verify() {
              << initShape.size();
     }
 
-    // Skip indexed dimensions - they're validated above
+    // Skip indexed dimensions - they're validated above.
     if (dim < indices.size()) {
       continue;
     }

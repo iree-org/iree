@@ -363,7 +363,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    // Get the rank of the init tensor/memref
+    // Get the rank of the init tensor/memref.
     unsigned getResultRank() {
       Type type = getInit().getType();
       if (auto tensorType = ::llvm::dyn_cast<RankedTensorType>(type))

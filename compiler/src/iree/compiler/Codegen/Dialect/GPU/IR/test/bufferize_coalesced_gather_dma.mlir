@@ -2,7 +2,7 @@
 
 
 
-// Test bufferization without indices (contiguous gather)
+// Test bufferization without indices (contiguous gather).
 func.func @bufferize_coalesced_gather_dma_no_indices(%source: tensor<4x32xf32>,
                                                       %dest: tensor<4x32xf32>,
                                                       %lane: index) -> tensor<4x32xf32> {
@@ -16,7 +16,7 @@ func.func @bufferize_coalesced_gather_dma_no_indices(%source: tensor<4x32xf32>,
 
 // -----
 
-// Test bufferization with vector indices
+// Test bufferization with vector indices.
 func.func @bufferize_coalesced_gather_dma_with_indices(%idx0: vector<4xi32>,
                                                          %source: tensor<4x64xf32>,
                                                          %dest: tensor<4x64xf32>,
@@ -31,7 +31,7 @@ func.func @bufferize_coalesced_gather_dma_with_indices(%idx0: vector<4xi32>,
 
 // -----
 
-// Test bufferization with tensor indices
+// Test bufferization with tensor indices.
 func.func @bufferize_coalesced_gather_dma_tensor_indices(%idx0: tensor<4xi32>,
                                                           %source: tensor<4x64xf32>,
                                                           %dest: tensor<4x64xf32>,

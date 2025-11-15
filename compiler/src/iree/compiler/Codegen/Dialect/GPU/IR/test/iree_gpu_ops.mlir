@@ -95,8 +95,8 @@ func.func @tensor_barrier_multiple_inputs(%input: tensor<?xf16>) -> (tensor<?xf1
 
 // -----
 
-// Test basic coalesced_gather_dma with static shapes
-// One 1D index for a 1D source gathering into a 1D result
+// Test basic coalesced_gather_dma with static shapes.
+// One 1D index for a 1D source gathering into a 1D result.
 func.func @coalesced_gather_dma_static(%idx0: vector<64xi32>, %source: tensor<4096xf32>, %dest: tensor<64xf32>, %lane: index) -> tensor<64xf32> {
   %c1 = arith.constant 1 : index
   %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64xf32>) {
@@ -115,7 +115,7 @@ func.func @coalesced_gather_dma_static(%idx0: vector<64xi32>, %source: tensor<40
 
 // -----
 
-// Test coalesced_gather_dma with different element types
+// Test coalesced_gather_dma with different element types.
 func.func @coalesced_gather_dma_f16(%idx0: vector<128xi32>, %source: tensor<8192xf16>, %dest: tensor<128xf16>, %lane: index) -> tensor<128xf16> {
   %c1 = arith.constant 1 : index
   %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<128xf16>) {

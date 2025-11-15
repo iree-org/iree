@@ -52,8 +52,8 @@ static SmallVector<Attribute> getWarpMapping(MLIRContext *ctx, int64_t rank) {
 static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx,
                                                int64_t numLoops) {
   SmallVector<Attribute> mapping;
-  // Since we only tile the innermost dimension, we only have one loop
-  // Map it to gpu.lane_id<0>
+  // Since we only tile the innermost dimension, we only have one loop.
+  // Map it to gpu.lane_id<0>.
   mapping.push_back(IREE::GPU::LaneIdAttr::get(ctx, 0));
   return mapping;
 }
@@ -123,10 +123,10 @@ tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
   SmallVector<OpFoldResult> tileSizes;
   for (int64_t i = 0; i < rank; ++i) {
     if (i == rank - 1) {
-      // Innermost dimension: tile with the given num threads
+      // Innermost dimension: tile with the given num threads.
       tileSizes.push_back(rewriter.getIndexAttr(1));
     } else {
-      // Other dimensions: don't tile (size = 0)
+      // Other dimensions: don't tile (size = 0).
       tileSizes.push_back(rewriter.getIndexAttr(0));
     }
   }
@@ -137,7 +137,7 @@ tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
       [tileSizes](OpBuilder &b, Operation *op) { return tileSizes; });
   threadOptions.setNumThreadsComputationFunction(
       [threadNumThreads, rank](OpBuilder &b, Operation *op) {
-        // Create numThreads array with zeros for all dims except innermost
+        // Create numThreads array with zeros for all dims except innermost.
         SmallVector<OpFoldResult> fullNumThreads;
         for (int64_t i = 0; i < rank; ++i) {
           if (i == rank - 1) {
@@ -234,7 +234,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
       Type elementType = indicesType.getElementType();
 
       // First, read the indices tensor as a vector with the original element
-      // type
+      // type.
       VectorType vectorTypeOriginal =
           VectorType::get(indicesType.getShape(), elementType);
 
@@ -243,7 +243,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
         readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
       }
 
-      // Create padding value - use i32 for index type
+      // Create padding value - use i32 for index type.
       Type paddingType = elementType;
       if (elementType.isIndex()) {
         paddingType = rewriter.getI32Type();
@@ -254,7 +254,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
       Value indicesVec = vector::TransferReadOp::create(
           rewriter, loc, vectorTypeOriginal, indices, readIndices, zeroPad);
 
-      // Convert to i32 type if needed
+      // Convert to i32 type if needed.
       Type i32Type = rewriter.getI32Type();
       if (elementType != i32Type) {
         VectorType i32VectorType =
@@ -275,7 +275,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
   }
 
   // When used in forall.in_parallel, the op doesn't return a result
-  // as it performs an in-place update to the shared_outs tensor
+  // as it performs an in-place update to the shared_outs tensor.
   IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, Type(), source,
                                           indicesVec, sharedOut, laneId);
 
@@ -346,7 +346,7 @@ struct ConvertGatherToCoalescedDMA
     }
 
     // For gather ops, tile only the innermost dimension to distribute across
-    // threads
+    // threads.
     auto dmaConfig =
         getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(gatherOp);
     if (!dmaConfig) {
@@ -374,8 +374,8 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    // Create DMA ops directly without relying on the template version
-    // Find the tiled gather op
+    // Create DMA ops directly without relying on the template version.
+    // Find the tiled gather op.
     IREE::LinalgExt::GatherOp tiledGatherOp = nullptr;
     threadForallOp->walk([&](IREE::LinalgExt::GatherOp foundOp) {
       tiledGatherOp = foundOp;
@@ -396,19 +396,19 @@ struct ConvertGatherToCoalescedDMA
 
     Location loc = tiledGatherOp.getLoc();
 
-    // Get source - need to find the source from before thread-level tiling
-    // The tiledGatherOp.getSource() is already sliced by thread-level tiling
-    // We need to trace back to get the original warp-level source
+    // Get source - need to find the source from before thread-level tiling.
+    // The tiledGatherOp.getSource() is already sliced by thread-level tiling.
+    // We need to trace back to get the original warp-level source.
     Value source = tiledGatherOp.getSource();
 
-    // If source comes from an extract_slice, get its source (from warp-level)
+    // If source comes from an extract_slice, get its source (from warp-level).
     if (auto extractOp = source.getDefiningOp<tensor::ExtractSliceOp>()) {
       source = extractOp.getSource();
     }
 
     Value indices = tiledGatherOp.getIndices();
 
-    // Create the DMA op with properly extracted indices (keeping tensor type)
+    // Create the DMA op with properly extracted indices (keeping tensor type).
     rewriter.setInsertionPoint(inParallelOp);
     SmallVector<Value> indicesVec;
 
@@ -416,7 +416,7 @@ struct ConvertGatherToCoalescedDMA
       auto indicesType = cast<RankedTensorType>(indices.getType());
 
       if (indicesType.getRank() == 1) {
-        // For 1D indices, use directly as tensor
+        // For 1D indices, use directly as tensor.
         indicesVec.push_back(indices);
       } else {
         int64_t batchSize = indicesType.getShape()[0];
@@ -434,7 +434,7 @@ struct ConvertGatherToCoalescedDMA
           Value extractedSlice = tensor::ExtractSliceOp::create(
               rewriter, loc, indices, offsets, sizes, strides);
 
-          // Collapse from [N, 1] to [N]
+          // Collapse from [N, 1] to [N].
           SmallVector<ReassociationIndices> reassociation = {{0, 1}};
           auto collapsedType = RankedTensorType::get({batchSize}, elementType);
           Value collapsedSlice = tensor::CollapseShapeOp::create(
@@ -445,13 +445,13 @@ struct ConvertGatherToCoalescedDMA
       }
     }
 
-    // Create the DMA op
+    // Create the DMA op.
     rewriter.setInsertionPointToStart(&inParallelBlock);
 
     IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, Type(), source,
                                             indicesVec, sharedOut, laneId);
 
-    // Erase parallel_insert_slice ops and gather op
+    // Erase parallel_insert_slice ops and gather op.
     SmallVector<tensor::ParallelInsertSliceOp> toErase;
     for (auto &op : inParallelBlock) {
       if (auto insertOp = dyn_cast<tensor::ParallelInsertSliceOp>(&op)) {
