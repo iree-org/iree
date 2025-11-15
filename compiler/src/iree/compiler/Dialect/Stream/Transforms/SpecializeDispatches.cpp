@@ -135,8 +135,8 @@ static TypedAttr buildConstantSetAttr(ConstantSet &set, OpBuilder &builder) {
     for (int64_t value = 0; value < valueCount; ++value) {
       auto valueAttr = set.values[value].second[site];
       if (storageType != valueAttr.getType()) {
-        valueAttr = IntegerAttr::get(
-            storageType, llvm::cast<IntegerAttr>(valueAttr).getInt());
+        valueAttr = IntegerAttr::get(storageType,
+                                     cast<IntegerAttr>(valueAttr).getInt());
       }
       flattenedAttrs.push_back(valueAttr);
     }

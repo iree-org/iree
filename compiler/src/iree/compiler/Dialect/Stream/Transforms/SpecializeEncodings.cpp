@@ -189,7 +189,7 @@ getBindingLayoutAttrs(IREE::Stream::TensorDispatchOp dispatchOp) {
           dispatchOp.getTiedOperands()) {
     tiedOperands =
         llvm::map_to_vector(tiedOperandsAttr.value(), [](Attribute intAttr) {
-          return llvm::cast<IntegerAttr>(intAttr).getInt();
+          return cast<IntegerAttr>(intAttr).getInt();
         });
   }
 

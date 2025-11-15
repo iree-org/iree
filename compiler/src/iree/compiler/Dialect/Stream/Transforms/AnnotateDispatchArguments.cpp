@@ -201,8 +201,8 @@ void GlobalPVS::initializeOperation(IREE::Util::GlobalOp globalOp,
     // Cannot perform analysis.
     indicatePessimisticFixpoint();
   } else if (globalInfo) {
-    if (auto initialValue = llvm::dyn_cast_if_present<IntegerAttr>(
-            globalOp.getInitialValueAttr())) {
+    if (auto initialValue =
+            dyn_cast_if_present<IntegerAttr>(globalOp.getInitialValueAttr())) {
       // Initial value is available for use; stored values from the rest of the
       // program will come during iteration.
       unionAssumed(initialValue.getValue());
@@ -504,8 +504,8 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
         potentialValues.push_back(IntegerAttr::get(argType, value));
       }
       llvm::sort(potentialValues, [](Attribute lhs, Attribute rhs) {
-        auto lhsInt = llvm::dyn_cast<IntegerAttr>(lhs);
-        auto rhsInt = llvm::dyn_cast<IntegerAttr>(rhs);
+        auto lhsInt = dyn_cast<IntegerAttr>(lhs);
+        auto rhsInt = dyn_cast<IntegerAttr>(rhs);
         if (!lhsInt || !rhsInt)
           return false;
         return lhsInt.getValue().ult(rhsInt.getValue());

@@ -100,7 +100,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Updates the |arg| type to the lifetime derived by analysis, if needed.
   // Returns true if a change was made.
   bool applyArgTransition(BlockArgument arg, PatternRewriter &rewriter) const {
-    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(arg.getType());
+    auto oldType = dyn_cast<IREE::Stream::ResourceType>(arg.getType());
     if (!oldType)
       return false;
     auto newUsage = analysis.lookupResourceUsage(arg);
@@ -123,7 +123,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Returns true if a change was made.
   bool applyResultTransition(Operation *op, Value result,
                              PatternRewriter &rewriter) const {
-    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(result.getType());
+    auto oldType = dyn_cast<IREE::Stream::ResourceType>(result.getType());
     if (!oldType)
       return false;
     auto newUsage = analysis.lookupResourceUsage(result);
@@ -161,7 +161,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   bool applyResultTransition(Value result, Value resultSize,
                              IREE::Stream::AffinityAttr affinityAttr,
                              PatternRewriter &rewriter) const {
-    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(result.getType());
+    auto oldType = dyn_cast<IREE::Stream::ResourceType>(result.getType());
     if (!oldType)
       return false;
     auto newUsage = analysis.lookupResourceUsage(result);
@@ -179,7 +179,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
         auto consumerOp =
             dyn_cast<IREE::Stream::AsyncTransferOp>(*result.getUsers().begin());
         if (consumerOp) {
-          auto finalType = llvm::cast<IREE::Stream::ResourceType>(
+          auto finalType = cast<IREE::Stream::ResourceType>(
               consumerOp.getResult().getType());
           if (finalType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
             // Already have a transfer to the new lifetime.
@@ -254,8 +254,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
     // Arguments:
     SmallVector<Type> newInputs;
     for (auto inputType : llvm::enumerate(op.getFunctionType().getInputs())) {
-      auto oldType =
-          llvm::dyn_cast<IREE::Stream::ResourceType>(inputType.value());
+      auto oldType = dyn_cast<IREE::Stream::ResourceType>(inputType.value());
       if (!oldType) {
         newInputs.push_back(inputType.value());
       } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
@@ -274,8 +273,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
     SmallVector<Type> newOutputs;
     auto anyReturnOp = getAnyReturnLikeOp(op);
     for (auto outputType : llvm::enumerate(op.getFunctionType().getResults())) {
-      auto oldType =
-          llvm::dyn_cast<IREE::Stream::ResourceType>(outputType.value());
+      auto oldType = dyn_cast<IREE::Stream::ResourceType>(outputType.value());
       if (!oldType) {
         newOutputs.push_back(outputType.value());
       } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
@@ -320,7 +318,7 @@ struct ApplyScfIfOp : public UsageRefinementPattern<mlir::scf::IfOp> {
     bool didChange = this->applyRegionTransitions(op, rewriter);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
         if (this->applyResultTransition(op, result, rewriter))
           didChange |= true;
       }
@@ -337,7 +335,7 @@ struct ApplyScfForOp : public UsageRefinementPattern<mlir::scf::ForOp> {
     bool didChange = this->applyRegionTransitions(op, rewriter);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
         if (this->applyResultTransition(op, result, rewriter))
           didChange |= true;
       }
@@ -353,7 +351,7 @@ struct ApplyScfWhileOp : public UsageRefinementPattern<mlir::scf::WhileOp> {
     bool didChange = this->applyRegionTransitions(op, rewriter);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
         if (this->applyResultTransition(op, result, rewriter))
           didChange |= true;
       }
@@ -376,7 +374,7 @@ struct ApplyGenericOp : public UsageRefinementPattern<Op> {
     rewriter.setInsertionPointAfter(op);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
         if (this->applyResultTransition(op, result, rewriter))
           didChange = true;
       }
@@ -410,7 +408,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
         cast<IREE::Util::SizeAwareOpInterface>(op.getOperation());
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (!llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (!isa<IREE::Stream::ResourceType>(result.getType())) {
         continue;
       }
       auto resultSize = sizeAwareOp.getResultSize(i);
