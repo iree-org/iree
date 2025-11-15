@@ -491,7 +491,7 @@ lowerSplitReductionModifierOp(RewriterBase &rewriter,
 
   SmallVector<OpFoldResult> replacement =
       llvm::map_to_vector(splitReduceModifier.getSourceWorkgroupCount(),
-                          [](Value v) -> OpFoldResult { return v; });
+                          llvm::StaticCastTo<OpFoldResult>);
   replacement[static_cast<uint64_t>(delinearizeFrom)] =
       IREE::LinalgExt::mulOfrs(
           rewriter, splitReduceModifier.getLoc(),
