@@ -203,8 +203,7 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
 
   LogicalResult distributeYield(PatternRewriter &rewriter,
                                 scf::ForOp forOp) const {
-    scf::YieldOp yieldOp =
-        llvm::cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+    scf::YieldOp yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
     std::optional<DistributionSignature> maybeSignature =
         getOpSignature(yieldOp);
     if (!maybeSignature) {

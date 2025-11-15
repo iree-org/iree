@@ -62,7 +62,7 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
     // type memory space; that's runtime allocations. So erase and fallback to
     // the default 0 memory space. It is fine given this is just the default
     // allocator; backends are expected to control by themselves.
-    if (llvm::isa<IREE::HAL::DescriptorTypeAttr>(storage))
+    if (isa<IREE::HAL::DescriptorTypeAttr>(storage))
       type = MemRefType::get(type.getShape(), type.getElementType(),
                              type.getLayout());
   }

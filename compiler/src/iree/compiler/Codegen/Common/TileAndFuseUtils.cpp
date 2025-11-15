@@ -224,7 +224,7 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
       for (auto operand : tiledOp->getOperands()) {
         if (auto sliceProducer =
                 operand.getDefiningOp<tensor::ExtractSliceOp>()) {
-          if (llvm::isa_and_present<TilingInterface>(
+          if (isa_and_present<TilingInterface>(
                   sliceProducer.getSource().getDefiningOp())) {
             newFusionOpportunities.push(sliceProducer);
           }

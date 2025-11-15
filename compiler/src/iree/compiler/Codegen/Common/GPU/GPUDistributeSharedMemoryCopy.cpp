@@ -63,10 +63,10 @@ static LogicalResult tileCopyToWorkgroupMem(mlir::FunctionOpInterface funcOp,
         // distribution.
         SmallVector<Value> tileSizesVal;
         MemRefType dstMemRefType =
-            llvm::cast<MemRefType>(cast<linalg::GenericOp>(operation)
-                                       .getDpsInitOperand(0)
-                                       ->get()
-                                       .getType());
+            cast<MemRefType>(cast<linalg::GenericOp>(operation)
+                                 .getDpsInitOperand(0)
+                                 ->get()
+                                 .getType());
 
         unsigned rank = dstMemRefType.getRank();
         // Return empty tile size for zero dim tensor.
@@ -109,7 +109,7 @@ static LogicalResult tileCopyToWorkgroupMem(mlir::FunctionOpInterface funcOp,
 static int getBaseVectorSize(linalg::GenericOp genericOp) {
   assert(genericOp.getNumDpsInits() == 1);
   unsigned resultBW =
-      llvm::cast<MemRefType>(genericOp.getDpsInitOperand(0)->get().getType())
+      cast<MemRefType>(genericOp.getDpsInitOperand(0)->get().getType())
           .getElementTypeBitWidth();
   // Check the operand element types. If we have some sub-byte types there, make
   // sure we at least read a full byte for the sub-byte-element operands.
@@ -195,9 +195,9 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
     auto stride = dyn_cast<Attribute>(r.stride);
     auto size = dyn_cast<Attribute>(r.size);
     assert(offset && stride && size);
-    int64_t numThreadsDim = (llvm::cast<IntegerAttr>(size).getInt() -
-                             llvm::cast<IntegerAttr>(offset).getInt()) /
-                            llvm::cast<IntegerAttr>(stride).getInt();
+    int64_t numThreadsDim = (cast<IntegerAttr>(size).getInt() -
+                             cast<IntegerAttr>(offset).getInt()) /
+                            cast<IntegerAttr>(stride).getInt();
     delinSizes.push_back(numThreadsDim);
   }
   ValueRange dims =
@@ -392,8 +392,8 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
       workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   bool isAligned = llvm::all_of(
       copiesToWorkgroupMem, [flatWorkgroupSize](linalg::GenericOp copyOp) {
-        MemRefType dstMemRefType = llvm::cast<MemRefType>(
-            copyOp.getDpsInitOperand(0)->get().getType());
+        MemRefType dstMemRefType =
+            cast<MemRefType>(copyOp.getDpsInitOperand(0)->get().getType());
         auto shape = dstMemRefType.getShape();
         int targetVectorSize =
             copyVectorNumBits / dstMemRefType.getElementTypeBitWidth();

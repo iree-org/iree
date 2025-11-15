@@ -56,7 +56,7 @@ static Operation *replaceOpWithPredicatedOp(RewriterBase &rewriter,
       return op;
     // Return/execute the op if it is a shared memory load.
     if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
-      auto loadBaseType = llvm::cast<MemRefType>(loadOp.getBase().getType());
+      auto loadBaseType = cast<MemRefType>(loadOp.getBase().getType());
       if (hasSharedMemoryAddressSpace(loadBaseType))
         return op;
     }
@@ -214,13 +214,13 @@ static bool setPipeliningMarkers(scf::ForOp forOp, bool pipelineStoreStage) {
     auto ld = dyn_cast<vector::TransferReadOp>(op);
     if (!ld)
       continue;
-    auto ldSrcType = llvm::cast<MemRefType>(ld.getBase().getType());
+    auto ldSrcType = cast<MemRefType>(ld.getBase().getType());
     if (!hasGlobalMemoryAddressSpace(ldSrcType) || !ld->hasOneUse())
       continue;
     auto st = dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
     if (!st)
       continue;
-    auto stSrcType = llvm::cast<MemRefType>(st.getBase().getType());
+    auto stSrcType = cast<MemRefType>(st.getBase().getType());
     if (!hasSharedMemoryAddressSpace(stSrcType))
       continue;
     copyToWorkgroupMemory = true;

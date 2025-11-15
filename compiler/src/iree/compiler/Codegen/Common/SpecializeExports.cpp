@@ -189,7 +189,7 @@ static void specializeExportedFunction(
         requiresSpecialization = true;
 
         // Infer the range/divisor of the dim based on the tied assumption.
-        if (auto assumeOp = llvm::dyn_cast<IREE::Util::AssumeIntOp>(
+        if (auto assumeOp = dyn_cast<IREE::Util::AssumeIntOp>(
                 assumedSize.assumptionOrOrdinal.getOwner())) {
           std::pair<std::optional<int64_t>, std::optional<int64_t>>
               dynamicRange = assumeOp.getUnionedUnsignedRange(
@@ -328,7 +328,7 @@ static void specializeExportedFunction(
               arith::AndIOp::create(builder, loc, cmp, exportCondition);
         }
 
-        if (auto originalAssumeOp = llvm::dyn_cast<IREE::Util::AssumeIntOp>(
+        if (auto originalAssumeOp = dyn_cast<IREE::Util::AssumeIntOp>(
                 assumedSize.assumptionOrOrdinal.getOwner())) {
           auto clonedAssumeOp =
               cast<IREE::Util::AssumeIntOp>(mapping.lookup(originalAssumeOp));
@@ -448,7 +448,7 @@ public:
     }
 
     for (auto exportOp : exports) {
-      auto exportedFunc = llvm::dyn_cast_if_present<func::FuncOp>(
+      auto exportedFunc = dyn_cast_if_present<func::FuncOp>(
           SymbolTable::lookupNearestSymbolFrom(innerModule,
                                                exportOp.getSymNameAttr()));
       if (!exportedFunc || exportedFunc.isExternal()) {

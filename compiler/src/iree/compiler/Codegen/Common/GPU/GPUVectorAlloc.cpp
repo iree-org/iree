@@ -60,7 +60,7 @@ static bool contractOpFilter(Operation *op) {
 // where this is used.
 static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
                                                 Value vector) {
-  VectorType vectorType = llvm::cast<VectorType>(vector.getType());
+  VectorType vectorType = cast<VectorType>(vector.getType());
   if (vectorType.isScalable()) {
     return failure();
   }
