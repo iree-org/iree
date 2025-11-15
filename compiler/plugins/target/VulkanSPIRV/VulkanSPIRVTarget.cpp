@@ -412,7 +412,7 @@ public:
     }
 
     // Load .spv object file.
-    auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
+    auto objectAttr = cast<IREE::HAL::ExecutableObjectAttr>(
         variantOp.getObjects()->getValue().front());
     std::string spirvBinary;
     if (auto data = objectAttr.loadData()) {

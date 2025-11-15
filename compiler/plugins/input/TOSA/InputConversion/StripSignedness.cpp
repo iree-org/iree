@@ -26,7 +26,7 @@ public:
 class IntegerTypeConverter : public TypeConverter {
 public:
   static Type convertType(Type type) {
-    if (auto iType = llvm::dyn_cast<IntegerType>(type)) {
+    if (auto iType = dyn_cast<IntegerType>(type)) {
       if (!iType.isSignless()) {
         return IntegerType::get(type.getContext(),
                                 iType.getIntOrFloatBitWidth());
@@ -78,9 +78,9 @@ public:
 };
 
 static bool isIllegalType(Type type) {
-  if (IntegerType ity = llvm::dyn_cast<IntegerType>(type))
+  if (IntegerType ity = dyn_cast<IntegerType>(type))
     return !ity.isSignless();
-  if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+  if (auto shapedType = dyn_cast<ShapedType>(type)) {
     return isIllegalType(shapedType.getElementType());
   }
   return false;
