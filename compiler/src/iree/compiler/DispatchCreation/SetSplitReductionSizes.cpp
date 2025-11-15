@@ -193,11 +193,11 @@ private:
     Value outputVal = output->get();
 
     ArrayRef<int64_t> inputShape =
-        llvm::cast<ShapedType>(inputVal.getType()).getShape();
+        cast<ShapedType>(inputVal.getType()).getShape();
     ArrayRef<int64_t> filterShape =
-        llvm::cast<ShapedType>(filterVal.getType()).getShape();
+        cast<ShapedType>(filterVal.getType()).getShape();
     ArrayRef<int64_t> outputShape =
-        llvm::cast<ShapedType>(outputVal.getType()).getShape();
+        cast<ShapedType>(outputVal.getType()).getShape();
 
     if (ShapedType::isDynamicShape(inputShape) ||
         ShapedType::isDynamicShape(filterShape) ||
