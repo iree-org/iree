@@ -1037,6 +1037,7 @@ func.func @producer_broadcasted_and_stored_to_buffer(%arg0: tensor<4xi64>, %arg1
 // -----
 
 func.func @producer_broadcasted_and_stored_to_buffer2(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>) -> tensor<4x8xi64> {
+  %arg2 = hal.interface.binding.subspan layout(<bindings=[#hal.pipeline.binding<storage_buffer>]>) binding(0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi64>>
   %c59_i64 = arith.constant 59 : i64
   %c2_i64 = arith.constant 2 : i64
   %c8_i64 = arith.constant 8 : i64
@@ -1066,6 +1067,7 @@ func.func @producer_broadcasted_and_stored_to_buffer2(%arg0: tensor<4xi64>, %arg
     %9 = arith.addi %8, %in_0 : i64
     linalg.yield %9 : i64
   } -> tensor<4x8xi64>
+  iree_tensor_ext.dispatch.tensor.store %2, %arg2, offsets = [0], sizes = [4], strides = [1] :
    tensor<4xi64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi64>>
   return %3 : tensor<4x8xi64>
 }
