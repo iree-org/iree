@@ -37,11 +37,6 @@ See instructions in the following links
 * [QEMU](https://gitlab.com/qemu-project/qemu)
 * [RISC-V Linux QEMU](https://risc-v-getting-started-guide.readthedocs.io/en/latest/linux-qemu.html)
 
-!!! note
-    The `RISCV_TOOLCHAIN_ROOT` environment variable needs
-    to be set to the root directory of the installed GNU toolchain when building
-    the RISC-V compiler target and the runtime library.
-
 #### Install prebuilt RISC-V tools (RISC-V 64-bit Linux toolchain)
 
 Execute the following script to download the prebuilt RISC-V toolchain and QEMU

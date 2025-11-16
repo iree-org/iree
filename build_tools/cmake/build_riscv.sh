@@ -39,6 +39,7 @@ args=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}"
+  "-DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT}"
   "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
   "-DRISCV_CPU=${RISCV_PLATFORM_ARCH}"
   "-DIREE_ENABLE_ASSERTIONS=ON"
@@ -49,14 +50,12 @@ args=(
 
 if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
   args+=(
-    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
     -DRISCV_TOOLCHAIN_PREFIX="riscv64-unknown-linux-gnu-"
   )
 elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
-    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT}"
     -DRISCV_TOOLCHAIN_PREFIX="riscv32-unknown-elf"
   )
 else
