@@ -1250,11 +1250,11 @@ pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m64_n64_k512 : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
   pdl.apply_native_constraint "hasAttr"(%inner_tiled_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
-  %lhs_cast_type = pdl.type : tensor<?x?x1x2x2x4x4x16x32xf4E2M1FN>
+  %lhs_cast_type = pdl.type : tensor<?x?x1x4x4x4x16x32xf4E2M1FN>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
   %rhs_cast_type = pdl.type : tensor<?x?x1x4x4x4x16x32xf4E2M1FN>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
-  %lhs_scale_cast_type = pdl.type : tensor<?x?x2x2x4x16x4xf8E8M0FNU>
+  %lhs_scale_cast_type = pdl.type : tensor<?x?x4x4x16x4xf8E8M0FNU>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs_scale, %lhs_scale_cast_type : !pdl.value, !pdl.type)
   %rhs_scale_cast_type = pdl.type : tensor<?x?x4x4x16x4xf8E8M0FNU>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs_scale, %rhs_scale_cast_type : !pdl.value, !pdl.type)

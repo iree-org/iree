@@ -46,8 +46,8 @@
 !lhs_scale_buffer_ty = memref<1x?x4x4x16x4xi8, strided<[?, 1024, 256, 64, 4, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 !rhs_scale_buffer_ty = memref<1x?x4x2x4x16x4xi8, strided<[?, 2048, 512, 256, 64, 4, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 
-!lhs_scale_copy_vec_ty = vector<4xi8>
-!rhs_scale_copy_vec_ty = vector<4xi8>
+!lhs_scale_copy_vec_ty = vector<16xi8>
+!rhs_scale_copy_vec_ty = vector<16xi8>
 
 // 2 = double buffer
 // 64 = m tile
@@ -160,7 +160,10 @@ util.func @dt_scaled_matmul_f4f4f32_m64_n128_k512(
     scf.if %cmp {
       %id = arith.subi %base_id, %c256 : index
       %ids:3 = affine.delinearize_index %id into (4, 4, 16) : index, index, index
-
+      %ls_ids:4 = affine.delinearize_index %id into (4, 4, 4, 4) : index, index, index, index
+      %rs_ids:5 = affine.delinearize_index %id into (2, 4, 2, 4, 4) : index, index, index, index, index
+      %ls_inner = arith.muli %ls_ids#3, %c4 : index
+      %rs_inner = arith.muli %rs_ids#4, %c4 : index
       scf.for %i = %c0 to %k step %c1 {
         %buffer_num = arith.andi %i, %c1 : index
 
@@ -169,8 +172,7 @@ util.func @dt_scaled_matmul_f4f4f32_m64_n128_k512(
           amdgpu.gather_to_lds %lhs[%c0, %i, %c0, %j, %ids#0, %ids#1, %ids#2, %c0], %lhs_shared_base[%buffer_num, %j, %ids#0, %ids#1, %ids#2, %c0]
             : !lhs_copy_vec_ty, !lhs_buffer_ty, !lhs_shared_ty
         }
-
-        amdgpu.gather_to_lds %lhs_scale[%c0, %i, %ids#0, %ids#1, %ids#2, %c0], %lhs_scale_shared[%buffer_num, %ids#0, %ids#1, %ids#2, %c0]
+        amdgpu.gather_to_lds %lhs_scale[%c0, %i, %ls_ids#1, %ls_ids#2, %ls_inner, %c0], %lhs_scale_shared[%buffer_num, %ls_ids#1, %ls_ids#2, %ls_inner, %c0]
           : !lhs_scale_copy_vec_ty, !lhs_scale_buffer_ty, !lhs_scale_shared_ty
 
 
@@ -184,17 +186,11 @@ util.func @dt_scaled_matmul_f4f4f32_m64_n128_k512(
           amdgpu.gather_to_lds %rhs[%c0, %i, %c0, %outers#0, %outers#1, %ids#0, %ids#1, %ids#2, %c0], %rhs_shared_base[%buffer_num, %outers#0, %outers#1, %ids#0, %ids#1, %ids#2, %c0]
             : !rhs_copy_vec_ty, !rhs_buffer_ty, !rhs_shared_ty
         }
-        %outers:2 = affine.delinearize_index %ids#0 into (2, 2) : index, index
-        scf.for %j = %c0 to %c2 step %c1 {
-          %outer_base = arith.muli %j, %c2 : index
-          %outer = arith.addi %outer_base, %outers#0 : index
-          amdgpu.gather_to_lds %rhs_scale[%c0, %i, %outer, %outers#1, %ids#1, %ids#2, %c0], %rhs_scale_shared[%buffer_num, %outer, %outers#1, %ids#1, %ids#2, %c0]
-            : !rhs_scale_copy_vec_ty, !rhs_scale_buffer_ty, !rhs_scale_shared_ty
-        }
-
+        amdgpu.gather_to_lds %rhs_scale[%c0, %i, %rs_ids#1, %rs_ids#2, %rs_ids#3, %rs_inner, %c0], %rhs_scale_shared[%buffer_num, %rs_ids#1, %rs_ids#2, %rs_ids#3, %rs_inner, %c0]
+          : !rhs_scale_copy_vec_ty, !rhs_scale_buffer_ty, !rhs_scale_shared_ty
 
         // Wait on previous group.
-        rocdl.s.waitcnt 10
+        rocdl.s.waitcnt 9
         rocdl.s.barrier
 
         scf.yield
@@ -233,7 +229,7 @@ util.func @dt_scaled_matmul_f4f4f32_m64_n128_k512(
       %lhs_scale_byte_vec_t = vector.shape_cast %lhs_scale_byte_vec : vector<1x4x1x1x4xi8> to !lhs_scale_byte_vec_ty
       %lhs_scale_vec = vector.bitcast %lhs_scale_byte_vec_t : !lhs_scale_byte_vec_ty to !lhs_scale_vec_ty
 
-      amdgpu.lds_barrier
+      rocdl.sched.barrier 0
 
       %rhs_byte_vec = vector.transfer_read %rhs_shared_base[%buffer_num, %ids#0, %c0, %c0, %ids#1, %ids#2, %c0],
         %cst_rhs {in_bounds = [true, true, true, true, true, true, true]} : !rhs_shared_ty, vector<1x1x2x4x1x1x16xi8>
@@ -244,6 +240,9 @@ util.func @dt_scaled_matmul_f4f4f32_m64_n128_k512(
         %cst_scale {in_bounds = [true, true, true, true, true, true]} : !rhs_scale_shared_ty, vector<1x1x2x1x1x4xi8>
       %rhs_scale_byte_vec_t = vector.shape_cast %rhs_scale_byte_vec : vector<1x1x2x1x1x4xi8> to !rhs_scale_byte_vec_ty
       %rhs_scale_vec = vector.bitcast %rhs_scale_byte_vec_t : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
+
+      amdgpu.lds_barrier
+      rocdl.sched.barrier 0
 
       %dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%iter) {
         indexing_maps = #contraction_accesses,
