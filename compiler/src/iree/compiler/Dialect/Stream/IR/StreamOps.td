@@ -7,10 +7,8 @@
 #ifndef IREE_DIALECT_STREAM_OPS
 #define IREE_DIALECT_STREAM_OPS
 
-include "iree/compiler/Dialect/Stream/IR/StreamAttrs.td"
 include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
-include "iree/compiler/Dialect/Stream/IR/StreamTypes.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
@@ -21,6 +19,9 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
+
+class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
+    Stream_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // Execution context ops

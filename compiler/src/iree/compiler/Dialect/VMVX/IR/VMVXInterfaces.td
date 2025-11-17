@@ -10,10 +10,10 @@
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
-// IREE::VMVX::VMVXLoweringOpInterface
+// IREE::VMVX::VMVXOpInterface
 //===----------------------------------------------------------------------===//
 
-def VMVX_LoweringOpInterface : OpInterface<"VMVXLoweringOp"> {
+def VMVX_OpInterface : OpInterface<"VMVXOp"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::VMVX";
 
   let description = [{

@@ -7,14 +7,15 @@
 #ifndef IREE_DIALECT_STREAM_INTERFACES
 #define IREE_DIALECT_STREAM_INTERFACES
 
-include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE::Stream::AffinityAttrInterface
 //===----------------------------------------------------------------------===//
 
-def Stream_AffinityAttr : Stream_AttrInterface<"AffinityAttr"> {
+def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let summary = [{Defines execution context affinity.}];
   let description = [{
     WIP; see [#10765](https://github.com/iree-org/iree/issues/10765).
@@ -131,7 +132,9 @@ def Stream_AffinityAttr : Stream_AttrInterface<"AffinityAttr"> {
 // IREE::Stream::AffinityTypeInterface
 //===----------------------------------------------------------------------===//
 
-def Stream_AffinityType : Stream_TypeInterface<"AffinityTypeInterface"> {
+def Stream_AffinityType : TypeInterface<"AffinityTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Indicates a type represents a resource that has its affinity tracked.
   }];
@@ -141,7 +144,9 @@ def Stream_AffinityType : Stream_TypeInterface<"AffinityTypeInterface"> {
 // IREE::Stream::AffinityOpInterface
 //===----------------------------------------------------------------------===//
 
-def Stream_AffinityOp : Stream_OpInterface<"AffinityOpInterface"> {
+def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     TBD. Used to denote a stream affinity for ops and specify the kind of
     environment the ops are expected run in.
@@ -220,7 +225,9 @@ def Stream_AffinityOp : Stream_OpInterface<"AffinityOpInterface"> {
 // IREE::Stream::StreamableOpInterface
 //===----------------------------------------------------------------------===//
 
-def Stream_StreamableOp : Stream_OpInterface<"StreamableOpInterface"> {
+def Stream_StreamableOp : OpInterface<"StreamableOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Interface for ops that can be asynchronous executed in a streaming context.
   }];
@@ -259,7 +266,9 @@ def Stream_StreamableOp : Stream_OpInterface<"StreamableOpInterface"> {
 // IREE::Stream::AsyncAccessOpInterface
 //===----------------------------------------------------------------------===//
 
-def Stream_AsyncAccessOp : Stream_OpInterface<"AsyncAccessOpInterface"> {
+def Stream_AsyncAccessOp : OpInterface<"AsyncAccessOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Interface for stream.async.* ops that access subviews of resources.
     This allows for some basic analysis and is only valid prior to allocation.
@@ -287,7 +296,9 @@ def Stream_AsyncAccessOp : Stream_OpInterface<"AsyncAccessOpInterface"> {
 // IREE::Stream::SubviewEffectOpInterface
 //===----------------------------------------------------------------------===//
 
-def Stream_SubviewEffectOp : Stream_OpInterface<"SubviewEffectOpInterface"> {
+def Stream_SubviewEffectOp : OpInterface<"SubviewEffectOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Interface for ops that operate on subviews of resources used to query the
     memory effects for subviews on operands.
@@ -305,7 +316,9 @@ def Stream_SubviewEffectOp : Stream_OpInterface<"SubviewEffectOpInterface"> {
 // IREE::Stream::TimelineOpInterface
 //===----------------------------------------------------------------------===//
 
-def Stream_TimelineOp : Stream_OpInterface<"TimelineOpInterface"> {
+def Stream_TimelineOp : OpInterface<"TimelineOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let description = [{
     Interface for ops that operate in an ordered sequence defined by timepoints.
   }];
@@ -337,7 +350,9 @@ def Stream_TimelineOp : Stream_OpInterface<"TimelineOpInterface"> {
 // IREE::Stream::AffinityTopologyAttrInterface
 //===----------------------------------------------------------------------===//
 
-def Stream_AffinityTopologyAttr : Stream_AttrInterface<"AffinityTopologyAttrInterface"> {
+def Stream_AffinityTopologyAttr : AttrInterface<"AffinityTopologyAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
   let summary = [{Defines device-device link topology for transfer elision.}];
   let description = [{
     Implementations can use this to query the connection topology between devices.

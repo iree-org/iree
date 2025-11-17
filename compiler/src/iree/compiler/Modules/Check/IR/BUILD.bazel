@@ -16,10 +16,7 @@ package(
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
-        [
-            "CheckBase.td",
-            "CheckOps.td",
-        ],
+        ["CheckOps.td"],
         include = ["*.td"],
     ),
     deps = [

@@ -107,17 +107,11 @@ iree_gentbl_cc_library(
     name = "IREEVectorExtEnumsGen",
     tbl_outs = [
         (
-            [
-                "--gen-enum-decls",
-                "--dialect=iree_vector_ext",
-            ],
+            ["--gen-enum-decls"],
             "VectorExtEnums.h.inc",
         ),
         (
-            [
-                "--gen-enum-defs",
-                "--dialect=iree_vector_ext",
-            ],
+            ["--gen-enum-defs"],
             "VectorExtEnums.cpp.inc",
         ),
     ],

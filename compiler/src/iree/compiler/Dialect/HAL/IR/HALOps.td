@@ -10,7 +10,6 @@
 include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
-include "iree/compiler/Dialect/HAL/IR/HALTypes.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
@@ -24,6 +23,11 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
+class HAL_PureOp<string mnemonic, list<Trait> traits = []> :
+    HAL_Op<mnemonic, !listconcat(traits, [Pure])>;
+
+class HAL_MakeTupleOp<string mnemonic, list<Trait> traits = []> :
+    HAL_PureOp<mnemonic, traits>;
 
 //===----------------------------------------------------------------------===//
 // Magic temporary hacks

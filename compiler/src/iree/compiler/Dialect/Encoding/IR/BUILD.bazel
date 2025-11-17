@@ -25,7 +25,6 @@ iree_td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -87,17 +86,11 @@ iree_gentbl_cc_library(
     name = "EncodingEnumsGen",
     tbl_outs = [
         (
-            [
-                "--gen-enum-decls",
-                "--dialect=iree_encoding",
-            ],
+            ["--gen-enum-decls"],
             "EncodingEnums.h.inc",
         ),
         (
-            [
-                "--gen-enum-defs",
-                "--dialect=iree_encoding",
-            ],
+            ["--gen-enum-defs"],
             "EncodingEnums.cpp.inc",
         ),
     ],
