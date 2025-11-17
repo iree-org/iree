@@ -1,0 +1,6 @@
+# LSAN suppressions for ROCm library leaks
+# These are external library issues in AMD's ROCm runtime, not IREE bugs
+
+leak:libamdhip64.so
+leak:libhsa-runtime64.so
+leak:libamd_comgr.so
