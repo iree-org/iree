@@ -1061,9 +1061,6 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   //     norm_outs = outs * norm
   // linalg.generic ins(ex, ...) outs(norm_outs)
 
-  SmallVector<Value> inputs = getDpsInputs();
-  SmallVector<Value> normOuts(getNumDpsInits());
-
   const int reducingOpIndex = 0;
   OpOperand *sValue = getDpsInputOperand(reducingOpIndex);
   OpOperand *prevMax = getDpsInitOperand(reducingOpIndex);
@@ -1080,9 +1077,10 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   Value norm = computeSubAndExp2(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
                                  prevMax->get());
 
+  SmallVector<Value> inputs = getDpsInputs();
+  SmallVector<Value> normOuts(getNumDpsInits());
   inputs[reducingOpIndex] = ex;
   normOuts[reducingOpIndex] = currMax;
-
   for (int64_t oldIndex : getExpReducedOperands()) {
     OpOperand *oldOut = getDpsInitOperand(oldIndex);
     AffineMap oldOutMap = getMatchingIndexingMap(oldOut);
@@ -1096,8 +1094,9 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
       getIndexingMapsArray(), getLoopIteratorTypes());
   expRedGeneric->setDiscardableAttrs(
       getOperation()->getDiscardableAttrDictionary());
-  rewriter.cloneRegionBefore(getRegion(), expRedGeneric.getRegion(),
-                             expRedGeneric.getRegion().begin());
+
+  IRMapping mapper;
+  getBodyRegion().cloneInto(&expRedGeneric.getBodyRegion(), mapper);
   rewriter.setInsertionPointAfter(expRedGeneric.getBody()->getTerminator());
   auto yieldOp =
       cast<IREE::LinalgExt::YieldOp>(expRedGeneric.getBody()->getTerminator());
