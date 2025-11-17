@@ -206,6 +206,7 @@ private:
       return std::nullopt;
     }
 
+    AffineMap inputMap = linalgOp.getMatchingIndexingMap(input);
     AffineMap filterMap = linalgOp.getMatchingIndexingMap(filter);
     AffineMap outputMap = linalgOp.getMatchingIndexingMap(output);
 
@@ -270,33 +271,36 @@ private:
     int64_t depthSize = getSizeAt(outputShape, depthPos);
 
     // The constants below are determined based on empirical data.
-    const int64_t largeParallelSize = 512;
-    const int64_t largeReductionSize = 8192;
-    const int64_t ratioThreshold = 64;
+    const int64_t largeDimSize = 512;
+    const int64_t mediumDimSize = 128;
+    const int64_t smallDimSize = 32;
 
     // When the batch and output channel sizes are large, the workload tends
     // to distributed across many workgroups, making split reduction little to
     // no effect.
-    if (outputChannelSize >= largeParallelSize &&
-        batchSize >= largeParallelSize) {
+    if (outputChannelSize >= largeDimSize && batchSize >= largeDimSize) {
       LDBG() << "skipping op; large output channel or batch size";
       return std::nullopt;
     }
 
-    // When the reduction size is small relative to the output sizes, split
-    // reduction often has no effect or even degrades performance.
-    SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
-    int64_t reductionSize = llvm::product_of(tileSizes);
-    int64_t ratio = reductionSize / std::sqrt(outputChannelSize * batchSize);
-    if (ratio <= ratioThreshold && reductionSize < largeReductionSize) {
-      LDBG() << "skipping op; small reduction size";
-      return std::nullopt;
+    // When the input spatial sizes are small while the batch and output channel
+    // sizes are relatively larger, split reduction often has no effect or even
+    // degrades performance.
+    for (auto dim : convDims->filterLoop) {
+      for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+        if (e.isFunctionOfDim(dim) && inputShape[idx] < smallDimSize &&
+            outputChannelSize > mediumDimSize && batchSize > mediumDimSize) {
+          LDBG() << "skipping op; small input spatial size";
+          return std::nullopt;
+        }
+      }
     }
 
     // Tile sizes are determined based on output (parallel dimension) sizes.
     // For larger outputs, the workload tends to be distributed across more
     // workgroups, thereby reducing the need for extensive splitting along the
     // reduction dimensions.
+    SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
     int64_t outputSize = outputChannelSize * batchSize * imageSize * depthSize;
     int64_t limitParallelLoops;
     if (outputSize < 32 * 32) {
@@ -383,10 +387,8 @@ private:
     // empty, return 1.
     auto getSizeAt = [&shapes](ArrayRef<unsigned> idx) {
       int64_t totalSize = 1;
-      for (unsigned i : idx) {
-        assert(!ShapedType::isDynamic(shapes[i]));
+      for (unsigned i : idx)
         totalSize *= shapes[i];
-      }
       return totalSize;
     };
 
