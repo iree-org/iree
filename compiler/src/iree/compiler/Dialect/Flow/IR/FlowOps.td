@@ -34,7 +34,7 @@ def OpGroupPartitionedRegionOps : OpDocGroup {
 let opDocGroup = OpGroupPartitionedRegionOps in {
 
 def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
-    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
     Util_ShapeAwareOp,
     AttrSizedOperandSegments]> {
   let summary = [{A grouping of ops with implicit capture.}];
@@ -353,7 +353,7 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
 
 def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
   AllTypesMatch<["operand", "result"]>,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{Ties a runtime shape to a dispatch I/O argument.}];
@@ -883,7 +883,7 @@ def FLOW_TensorDynamicConstantOp : FLOW_Op<"tensor.dynamic_constant"> {
 
 def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
   AllTypesMatch<["operand", "result"]>,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{Ties a runtime shape to a tensor value.}];

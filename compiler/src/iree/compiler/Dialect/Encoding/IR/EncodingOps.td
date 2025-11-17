@@ -16,7 +16,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 //===----------------------------------------------------------------------===//
 
 def IREEEncoding_SetEncodingOp : IREEEncoding_PureOp<"set_encoding",[
-   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>, Pure
+   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
   ]> {
   let summary = [{Perform pack and pad operation on source.}];
   let description = [{
@@ -49,7 +49,7 @@ def IREEEncoding_SetEncodingOp : IREEEncoding_PureOp<"set_encoding",[
 //===----------------------------------------------------------------------===//
 
 def IREEEncoding_UnsetEncodingOp : IREEEncoding_PureOp<"unset_encoding", [
-    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>, Pure
+    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
   ]> {
   let summary = [{Perform unpack and extract operation on source.}];
   let description = [{

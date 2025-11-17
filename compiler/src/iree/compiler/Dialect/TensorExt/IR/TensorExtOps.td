@@ -86,7 +86,7 @@ def IREETensorExt_BitCastOp : IREETensorExt_PureOp<"bitcast", [
 def IREETensorExt_DispatchTensorLoadOp : IREETensorExt_PureOp<"dispatch.tensor.load", [
   AttrSizedOperandSegments,
   OffsetSizeAndStrideOpInterface,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
       "getTiedResult",
       "getTiedResultOperandIndex",
