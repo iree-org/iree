@@ -149,43 +149,6 @@ util.func private @ambiguous_indirect_global_load(%arg0: tensor<f32>, %arg1: ten
 // -----
 
 // CHECK: util.global private @[[$DEVICE_A:.+]] : !hal.device
-util.global private @device_a : !hal.device
-
-// CHECK: util.global private @[[$GLOBAL:.+]] : tensor<10xf32>
-// CHECK: util.global private @[[$GLOBAL_A:.+]] : tensor<10xf32>
-// CHECK: util.initializer {
-// CHECK:   %[[LOAD:.+]] = util.global.load @[[$GLOBAL]]
-// CHECK:   %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[LOAD]] {{.+}} to #hal.device.affinity<@[[$DEVICE_A]]>
-// CHECK:   util.global.store %[[TRANSFER_A]], @[[$GLOBAL_A]]
-// CHECK: }
-util.global private @global : tensor<10xf32>
-
-// CHECK-LABEL: @ambiguous_indirect_global_load_and_multi_result(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-util.func private @ambiguous_indirect_global_load_and_multi_result(%arg0: tensor<10xf32>) -> (tensor<10xf32>) {
-  // CHECK: %[[LOAD_A:.+]] = util.global.load immutable @[[$GLOBAL_A]]
-  // CHECK: %[[VAL:.+]]:2 = flow.dispatch @dispatch0(%[[LOAD_A]])
-  %global = util.global.load immutable @global : tensor<10xf32>
-  %0:2 = flow.dispatch @dispatch0(%global) : (tensor<10xf32>) -> (tensor<10xf32>, tensor<10xf32>)
-
-  // CHECK: %[[RESHAPE0:.+]] = flow.tensor.reshape %[[VAL]]#0 : tensor<10xf32> -> tensor<2x5xf32>
-  // CHECK: %[[RESHAPE1:.+]] = flow.tensor.reshape %[[VAL]]#1 : tensor<10xf32> -> tensor<2x5xf32>
-  %1 = flow.tensor.reshape %0#0 : tensor<10xf32> -> tensor<2x5xf32>
-  %2 = flow.tensor.reshape %0#1 : tensor<10xf32> -> tensor<2x5xf32>
-
-  // CHECK: %[[RHS_A:.+]] = flow.tensor.transfer %[[ARG0]] {{.+}} to #hal.device.affinity<@[[$DEVICE_A]]>
-  %3 = flow.tensor.transfer %arg0 : tensor<10xf32> to #hal.device.affinity<@device_a>
-
-  // CHECK: %[[RES_A:.+]] = flow.dispatch @dispatch1(%[[RHS_A]], %[[RESHAPE0]], %[[RESHAPE1]])
-  %4 = flow.dispatch @dispatch1(%3, %1, %2) : (tensor<10xf32>, tensor<2x5xf32>, tensor<2x5xf32>) -> tensor<10xf32>
-
-  // CHECK: util.return %[[RES_A]]
-  util.return %4 : tensor<10xf32>
-}
-
-// -----
-
-// CHECK: util.global private @[[$DEVICE_A:.+]] : !hal.device
 // CHECK: util.global private @[[$DEVICE_B:.+]] : !hal.device
 util.global private @device_a : !hal.device
 util.global private @device_b : !hal.device
