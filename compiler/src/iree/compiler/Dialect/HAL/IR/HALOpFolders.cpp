@@ -181,7 +181,7 @@ struct FoldBufferViewCreateSubspan
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = cast<Value>(op.getSourceOffset());
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
     if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
@@ -269,7 +269,7 @@ struct FoldCommandBufferFillBufferSubspans
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newTargetBuffer = op.getTargetBuffer();
-    auto newTargetOffset = cast<Value>(op.getTargetOffset());
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
     if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
@@ -309,7 +309,7 @@ struct FoldCommandBufferUpdateBufferSubspans
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newTargetBuffer = op.getTargetBuffer();
-    auto newTargetOffset = cast<Value>(op.getTargetOffset());
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
     if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
@@ -349,7 +349,7 @@ struct FoldCommandBufferCopyBufferSubspans
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = cast<Value>(op.getSourceOffset());
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
     if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
@@ -359,7 +359,7 @@ struct FoldCommandBufferCopyBufferSubspans
       needsUpdate = true;
     }
     auto newTargetBuffer = op.getTargetBuffer();
-    auto newTargetOffset = cast<Value>(op.getTargetOffset());
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
     if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();

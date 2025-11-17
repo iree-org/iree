@@ -130,27 +130,27 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (isa<AllocatorType>(type)) {
+  if (llvm::isa<AllocatorType>(type)) {
     p << "allocator";
-  } else if (isa<BufferType>(type)) {
+  } else if (llvm::isa<BufferType>(type)) {
     p << "buffer";
-  } else if (isa<BufferViewType>(type)) {
+  } else if (llvm::isa<BufferViewType>(type)) {
     p << "buffer_view";
-  } else if (isa<ChannelType>(type)) {
+  } else if (llvm::isa<ChannelType>(type)) {
     p << "channel";
-  } else if (isa<CommandBufferType>(type)) {
+  } else if (llvm::isa<CommandBufferType>(type)) {
     p << "command_buffer";
-  } else if (isa<DeviceType>(type)) {
+  } else if (llvm::isa<DeviceType>(type)) {
     p << "device";
-  } else if (isa<EventType>(type)) {
+  } else if (llvm::isa<EventType>(type)) {
     p << "event";
-  } else if (isa<ExecutableType>(type)) {
+  } else if (llvm::isa<ExecutableType>(type)) {
     p << "executable";
-  } else if (isa<FenceType>(type)) {
+  } else if (llvm::isa<FenceType>(type)) {
     p << "fence";
-  } else if (isa<FileType>(type)) {
+  } else if (llvm::isa<FileType>(type)) {
     p << "file";
-  } else if (isa<SemaphoreType>(type)) {
+  } else if (llvm::isa<SemaphoreType>(type)) {
     p << "semaphore";
   } else {
     assert(false && "unknown HAL type");

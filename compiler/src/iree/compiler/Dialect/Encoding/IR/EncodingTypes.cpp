@@ -21,8 +21,8 @@ bool SerializableAttr::areCompatible(Attribute lhs, Attribute rhs) {
   if (lhs == rhs) {
     return true;
   }
-  auto lhsEncoding = dyn_cast_or_null<SerializableAttr>(lhs);
-  auto rhsEncoding = dyn_cast_or_null<SerializableAttr>(rhs);
+  auto lhsEncoding = llvm::dyn_cast_or_null<SerializableAttr>(lhs);
+  auto rhsEncoding = llvm::dyn_cast_or_null<SerializableAttr>(rhs);
   if (!lhsEncoding || !rhsEncoding) {
     return false;
   }
@@ -50,7 +50,7 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
   linalg::ContractionDimensions cDims =
       linalg::inferContractionDims(linalgOp).value();
   AffineMap map = linalgOp.getIndexingMapsArray().back();
-  auto outType = cast<ShapedType>(linalgOp.getDpsInits()[0].getType());
+  auto outType = llvm::cast<ShapedType>(linalgOp.getDpsInits()[0].getType());
   auto getOutputSizeAtDimPos = [=](unsigned dimPos) -> int64_t {
     return outType.getDimSize(
         map.getResultPosition(getAffineDimExpr(dimPos, linalgOp->getContext()))

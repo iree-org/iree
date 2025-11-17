@@ -84,7 +84,7 @@ public:
     }
 
     // i32 -> f32, etc
-    if (isa<FloatType>(targetType)) {
+    if (llvm::isa<FloatType>(targetType)) {
       value =
           arith::BitcastOp::create(rewriter, op.getLoc(), targetType, value);
     }
@@ -126,7 +126,7 @@ public:
 
     // f32 -> i32, etc
     auto value = adaptor.getValue();
-    if (isa<FloatType>(elementType)) {
+    if (llvm::isa<FloatType>(elementType)) {
       value = rewriter.createOrFold<arith::BitcastOp>(
           op.getLoc(),
           rewriter.getIntegerType(value.getType().getIntOrFloatBitWidth()),

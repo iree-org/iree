@@ -620,7 +620,7 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            TypeAttr targetEncoding, bool consume,
                            Value waitFence, StringAttr name,
                            Attribute affinity) {
-  auto shapedType = cast<ShapedType>(resultType);
+  auto shapedType = llvm::cast<ShapedType>(resultType);
   assert((isa<IREE::HAL::BufferViewType>(source.getType()) ||
           shapedType.hasStaticShape()) &&
          "can only use this constructor for buffer views when shape "
@@ -643,8 +643,8 @@ static LogicalResult verifyTypeStorageCompatibility(Operation *op,
                                                     Type storageType) {
   if (encodingType == storageType)
     return success();
-  auto encodingShapedType = dyn_cast<ShapedType>(encodingType);
-  auto storageShapedType = dyn_cast<ShapedType>(storageType);
+  auto encodingShapedType = llvm::dyn_cast<ShapedType>(encodingType);
+  auto storageShapedType = llvm::dyn_cast<ShapedType>(storageType);
   if (!encodingShapedType || !storageShapedType)
     return success();
 
@@ -688,7 +688,7 @@ static LogicalResult verifyTypeStorageCompatibility(Operation *op,
 
 LogicalResult TensorImportOp::verify() {
   TensorImportOp op = *this;
-  auto targetType = cast<TensorType>(op.getTarget().getType());
+  auto targetType = llvm::cast<TensorType>(op.getTarget().getType());
   if (targetType.getNumDynamicDims() != op.getTargetDims().size()) {
     return op->emitOpError() << "number of target_dims must match number of "
                                 "dynamic dims in target type";
@@ -708,7 +708,7 @@ void TensorExportOp::build(OpBuilder &builder, OperationState &result,
 
 LogicalResult TensorExportOp::verify() {
   TensorExportOp op = *this;
-  auto sourceType = cast<TensorType>(op.getSource().getType());
+  auto sourceType = llvm::cast<TensorType>(op.getSource().getType());
   if (sourceType.getNumDynamicDims() != op.getSourceDims().size()) {
     return op->emitOpError() << "number of source_dims must match number of "
                                 "dynamic dims in source type";
@@ -736,7 +736,7 @@ SmallVector<int64_t> TensorAliasOp::getTiedResultOperandIndices() {
 
 LogicalResult TensorAliasOp::verify() {
   TensorAliasOp op = *this;
-  auto type = cast<TensorType>(op.getSource().getType());
+  auto type = llvm::cast<TensorType>(op.getSource().getType());
   if (type.getNumDynamicDims() != op.getSourceDims().size()) {
     return op->emitOpError()
            << "number of dynamic dims must match the operand type";
@@ -815,7 +815,7 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
                                          ValueRange dynamicDims) {
   unsigned requiredCount = 0;
   for (auto value : values) {
-    if (auto shapedType = dyn_cast<ShapedType>(value.getType())) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(value.getType())) {
       requiredCount += shapedType.getNumDynamicDims();
     }
   }
@@ -866,13 +866,14 @@ static LogicalResult verifyWorkgroupCountRegion(Operation *op, Region &region) {
   if (region.getNumArguments() == 0) {
     // Need at least a !hal.device.
     validArguments = false;
-  } else if (!isa<IREE::HAL::DeviceType>(region.getArgument(0).getType())) {
+  } else if (!llvm::isa<IREE::HAL::DeviceType>(
+                 region.getArgument(0).getType())) {
     // !hal.device must come first.
     validArguments = false;
   } else {
     // All remaining arguments need to be of type index (today).
     for (BlockArgument &blockArg : region.getArguments().drop_front(1)) {
-      if (!isa<IndexType>(blockArg.getType())) {
+      if (!llvm::isa<IndexType>(blockArg.getType())) {
         validArguments = false;
         break;
       }
@@ -909,7 +910,7 @@ LogicalResult DispatchExternOp::verify() {
   }
 
   auto verifyIOType = [&](Type type) -> LogicalResult {
-    if (auto shapedType = dyn_cast<ShapedType>(type)) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
       if (shapedType.getElementType().isIndex()) {
         return op->emitOpError() << "I/O type " << type
                                  << " is invalid: index types must not cross "
@@ -1118,7 +1119,7 @@ constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
 
 // static
 std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
-  if (auto intType = dyn_cast_if_present<IntegerType>(type)) {
+  if (auto intType = llvm::dyn_cast_if_present<IntegerType>(type)) {
     NumericalType numericalType;
     if (intType.isInteger(1)) {
       return makeElementTypeValue(NumericalType::kBoolean, 8);
@@ -1134,7 +1135,7 @@ std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
       numericalType = NumericalType::kInteger;
     }
     return makeElementTypeValue(numericalType, intType.getWidth());
-  } else if (auto floatType = dyn_cast_if_present<FloatType>(type)) {
+  } else if (auto floatType = llvm::dyn_cast_if_present<FloatType>(type)) {
     switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
     case APFloat::S_Float8E5M2:
       return makeElementTypeValue(NumericalType::kFloat8E5M2, 8);
@@ -1158,7 +1159,7 @@ std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
     default:
       return std::nullopt;
     }
-  } else if (auto complexType = dyn_cast_if_present<ComplexType>(type)) {
+  } else if (auto complexType = llvm::dyn_cast_if_present<ComplexType>(type)) {
     return makeElementTypeValue(
         NumericalType::kFloatComplex,
         complexType.getElementType().getIntOrFloatBitWidth() * 2);
@@ -1649,13 +1650,14 @@ static LogicalResult verifyExportConditionRegion(Operation *op,
   if (region.getNumArguments() == 0) {
     // Need at least a !hal.device.
     validArguments = false;
-  } else if (!isa<IREE::HAL::DeviceType>(region.getArgument(0).getType())) {
+  } else if (!llvm::isa<IREE::HAL::DeviceType>(
+                 region.getArgument(0).getType())) {
     // !hal.device must come first.
     validArguments = false;
   } else {
     // All remaining arguments need to be of type index (today).
     for (BlockArgument &blockArg : region.getArguments().drop_front(1)) {
-      if (!isa<IndexType>(blockArg.getType())) {
+      if (!llvm::isa<IndexType>(blockArg.getType())) {
         validArguments = false;
         break;
       }
@@ -2130,7 +2132,7 @@ LogicalResult ExecutableConstantBlockOp::verify() {
   // Verify the function takes either nothing or a device.
   auto argTypes = op.getArgumentTypes();
   if (!argTypes.empty() &&
-      (argTypes.size() > 1 || !isa<IREE::HAL::DeviceType>(argTypes[0]))) {
+      (argTypes.size() > 1 || !llvm::isa<IREE::HAL::DeviceType>(argTypes[0]))) {
     return op->emitOpError()
            << "initializer must take a !hal.device or nothing";
   }
@@ -2243,7 +2245,7 @@ void InterfaceBindingSubspanOp::build(OpBuilder &builder,
 
 LogicalResult InterfaceBindingSubspanOp::verify() {
   InterfaceBindingSubspanOp op = *this;
-  if (ShapedType shapedType = dyn_cast<ShapedType>(op.getType())) {
+  if (ShapedType shapedType = llvm::dyn_cast<ShapedType>(op.getType())) {
     if (shapedType.getNumDynamicDims() != op.getDynamicDims().size()) {
       return op.emitOpError("result type ")
              << op.getType() << " has " << shapedType.getNumDynamicDims()
@@ -2282,7 +2284,7 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   // 4-byte aligned).
   llvm::Align naturalAlignment(1);
   auto resultType = getType();
-  if (auto shapedType = dyn_cast<ShapedType>(resultType)) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
     naturalAlignment = llvm::Align(
         IREE::Util::getRoundedElementByteWidth(shapedType.getElementType()));
   }

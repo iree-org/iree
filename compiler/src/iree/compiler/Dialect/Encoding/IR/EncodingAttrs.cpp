@@ -105,10 +105,10 @@ static FailureOr<AffineMap> getComposedAffineMap(Attribute attr) {
   if (!attr) {
     return AffineMap();
   }
-  if (auto mapAttr = dyn_cast<AffineMapAttr>(attr)) {
+  if (auto mapAttr = llvm::dyn_cast<AffineMapAttr>(attr)) {
     return mapAttr.getAffineMap();
   }
-  if (auto mapsAttr = dyn_cast<ArrayAttr>(attr)) {
+  if (auto mapsAttr = llvm::dyn_cast<ArrayAttr>(attr)) {
     if (mapsAttr.empty()) {
       return AffineMap();
     }
@@ -119,9 +119,9 @@ static FailureOr<AffineMap> getComposedAffineMap(Attribute attr) {
       return failure();
     }
     AffineMap map =
-        cast<AffineMapAttr>(mapsAttr[mapsAttr.size() - 1]).getAffineMap();
+        llvm::cast<AffineMapAttr>(mapsAttr[mapsAttr.size() - 1]).getAffineMap();
     for (ssize_t i = mapsAttr.size() - 2; i >= 0; i--) {
-      map = map.compose(cast<AffineMapAttr>(mapsAttr[i]).getAffineMap());
+      map = map.compose(llvm::cast<AffineMapAttr>(mapsAttr[i]).getAffineMap());
     }
     return map;
   }
@@ -254,13 +254,13 @@ AffineMap EncodingAttr::getMapForOperandIndex() const {
 SmallVector<AffineMap> EncodingAttr::getRootMaps() const {
   return llvm::map_to_vector(
       getUserIndexingMaps(), [](Attribute m) -> AffineMap {
-        if (auto mapAttr = dyn_cast<AffineMapAttr>(m)) {
-          return cast<AffineMapAttr>(m).getAffineMap();
+        if (auto mapAttr = llvm::dyn_cast<AffineMapAttr>(m)) {
+          return llvm::cast<AffineMapAttr>(m).getAffineMap();
         }
-        if (auto mapsAttr = dyn_cast<ArrayAttr>(m)) {
+        if (auto mapsAttr = llvm::dyn_cast<ArrayAttr>(m)) {
           if (mapsAttr.empty())
             return AffineMap();
-          return cast<AffineMapAttr>(mapsAttr[0]).getAffineMap();
+          return llvm::cast<AffineMapAttr>(mapsAttr[0]).getAffineMap();
         }
         return AffineMap();
       });
@@ -273,13 +273,14 @@ AffineMap EncodingAttr::getLastMapForOperandIndex() const {
     return AffineMap();
   }
   Attribute indexingMap = userIndexingMaps[index];
-  if (auto mapAttr = dyn_cast<AffineMapAttr>(indexingMap)) {
+  if (auto mapAttr = llvm::dyn_cast<AffineMapAttr>(indexingMap)) {
     return mapAttr.getAffineMap();
   }
-  if (auto mapsAttr = dyn_cast<ArrayAttr>(indexingMap)) {
+  if (auto mapsAttr = llvm::dyn_cast<ArrayAttr>(indexingMap)) {
     if (mapsAttr.empty())
       return AffineMap();
-    return cast<AffineMapAttr>(mapsAttr[mapsAttr.size() - 1]).getAffineMap();
+    return llvm::cast<AffineMapAttr>(mapsAttr[mapsAttr.size() - 1])
+        .getAffineMap();
   }
   return AffineMap();
 }
@@ -296,13 +297,13 @@ SmallVector<int64_t> EncodingAttr::getIterationSizesArray() const {
     return {};
   }
   return llvm::map_to_vector(iterationSizes, [](Attribute attr) {
-    return cast<IntegerAttr>(attr).getInt();
+    return llvm::cast<IntegerAttr>(attr).getInt();
   });
 }
 
 SmallVector<Type> EncodingAttr::getElementTypesArray() {
   return llvm::map_to_vector(getElementTypes().getValue(), [](Attribute a) {
-    return cast<TypeAttr>(a).getValue();
+    return llvm::cast<TypeAttr>(a).getValue();
   });
 }
 
@@ -316,9 +317,10 @@ EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
                                  userIndexingMaps.end());
   unsigned operandIndex = getOperandIndex().getValue().getZExtValue();
   SmallVector<Attribute> maps;
-  if (auto mapForIndex = dyn_cast<AffineMapAttr>(newMaps[operandIndex])) {
+  if (auto mapForIndex = llvm::dyn_cast<AffineMapAttr>(newMaps[operandIndex])) {
     maps.push_back(AffineMapAttr::get(mapForIndex.getAffineMap()));
-  } else if (auto mapForIndex = dyn_cast<ArrayAttr>(newMaps[operandIndex])) {
+  } else if (auto mapForIndex =
+                 llvm::dyn_cast<ArrayAttr>(newMaps[operandIndex])) {
     maps.assign(mapForIndex.begin(), mapForIndex.end());
   }
   maps.push_back(AffineMapAttr::get(newIndexingMap));
