@@ -304,7 +304,7 @@ static Value buildParameterLoad(Value awaitTimepoint,
 
   // Load all in a batch. One resource is returned per parameter but they may
   // alias depending on the runtime implementation.
-  auto loadOp = IREE::Stream::CmdParameterLoadOp::create(
+  auto loadOp = IREE::Stream::ParameterLoadOp::create(
       builder, builder.getFusedLoc(spanLocs), targetTypes,
       builder.getType<IREE::Stream::TimepointType>(), scope,
       builder.getArrayAttr(sourceKeys), sourceOffsets, targetLengths,
@@ -361,7 +361,7 @@ static TimepointResource buildParameterGather(
       targetOffsets.push_back(indexSet.get(packedSpan.offset));
       targetLengths.push_back(indexSet.get(packedSpan.length));
     }
-    auto gatherOp = IREE::Stream::CmdParameterGatherOp::create(
+    auto gatherOp = IREE::Stream::ParameterGatherOp::create(
         builder, loc, builder.getType<IREE::Stream::TimepointType>(), scope,
         builder.getArrayAttr(sourceKeys), sourceOffsets, allocOp.getResult(),
         allocOp.getResultSize(0), targetOffsets, targetLengths, awaitTimepoint,

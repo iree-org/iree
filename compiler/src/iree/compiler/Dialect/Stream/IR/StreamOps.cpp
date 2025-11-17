@@ -1691,6 +1691,85 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.parameter.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterLoadOp::verify() {
+  ParameterLoadOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getResultSizes().size() != expectedCount) {
+    return op.emitOpError() << "requires that the source keys, source offsets, "
+                               "and result sizes are all 1:1";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.read
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterReadOp::verify() {
+  ParameterReadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.write
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterWriteOp::verify() {
+  ParameterWriteOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.gather
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterGatherOp::verify() {
+  ParameterGatherOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount ||
+      op.getTargetLengths().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source keys, source offsets, target offsets, "
+              "and target lengths are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.scatter
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterScatterOp::verify() {
+  ParameterScatterOp op = *this;
+  size_t expectedCount = op.getTargetKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getSourceLengths().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source offsets, source lengths, target keys, "
+              "and target offsets are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // stream.file.constant
 //===----------------------------------------------------------------------===//
 
@@ -4084,85 +4163,6 @@ void CmdConcurrentOp::getSuccessorRegions(
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
   }
-}
-
-//===----------------------------------------------------------------------===//
-// stream.cmd.parameter.load
-//===----------------------------------------------------------------------===//
-
-LogicalResult CmdParameterLoadOp::verify() {
-  CmdParameterLoadOp op = *this;
-  size_t expectedCount = op.getSourceKeys().size();
-  if (op.getSourceOffsets().size() != expectedCount ||
-      op.getResultSizes().size() != expectedCount) {
-    return op.emitOpError() << "requires that the source keys, source offsets, "
-                               "and result sizes are all 1:1";
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.cmd.parameter.read
-//===----------------------------------------------------------------------===//
-
-LogicalResult CmdParameterReadOp::verify() {
-  CmdParameterReadOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.cmd.parameter.write
-//===----------------------------------------------------------------------===//
-
-LogicalResult CmdParameterWriteOp::verify() {
-  CmdParameterWriteOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.cmd.parameter.gather
-//===----------------------------------------------------------------------===//
-
-LogicalResult CmdParameterGatherOp::verify() {
-  CmdParameterGatherOp op = *this;
-  size_t expectedCount = op.getSourceKeys().size();
-  if (op.getSourceOffsets().size() != expectedCount ||
-      op.getTargetOffsets().size() != expectedCount ||
-      op.getTargetLengths().size() != expectedCount) {
-    return op.emitOpError()
-           << "requires that the source keys, source offsets, target offsets, "
-              "and target lengths are all 1:1";
-  }
-  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// stream.cmd.parameter.scatter
-//===----------------------------------------------------------------------===//
-
-LogicalResult CmdParameterScatterOp::verify() {
-  CmdParameterScatterOp op = *this;
-  size_t expectedCount = op.getTargetKeys().size();
-  if (op.getSourceOffsets().size() != expectedCount ||
-      op.getSourceLengths().size() != expectedCount ||
-      op.getTargetOffsets().size() != expectedCount) {
-    return op.emitOpError()
-           << "requires that the source offsets, source lengths, target keys, "
-              "and target offsets are all 1:1";
-  }
-  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
-    return failure();
-  }
-  return success();
 }
 
 //===----------------------------------------------------------------------===//

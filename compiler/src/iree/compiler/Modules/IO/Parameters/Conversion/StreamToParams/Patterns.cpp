@@ -22,11 +22,11 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct CmdParameterLoadOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterLoadOp> {
+struct ParameterLoadOpPattern
+    : public OpConversionPattern<IREE::Stream::ParameterLoadOp> {
   using Base::Base;
   LogicalResult
-  matchAndRewrite(IREE::Stream::CmdParameterLoadOp loadOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Stream::ParameterLoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = loadOp.getLoc();
 
@@ -66,11 +66,11 @@ struct CmdParameterLoadOpPattern
   }
 };
 
-struct CmdParameterReadOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterReadOp> {
+struct ParameterReadOpPattern
+    : public OpConversionPattern<IREE::Stream::ParameterReadOp> {
   using Base::Base;
   LogicalResult
-  matchAndRewrite(IREE::Stream::CmdParameterReadOp readOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Stream::ParameterReadOp readOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = readOp.getLoc();
     auto [device, queueAffinity] =
@@ -96,11 +96,11 @@ struct CmdParameterReadOpPattern
   }
 };
 
-struct CmdParameterWriteOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterWriteOp> {
+struct ParameterWriteOpPattern
+    : public OpConversionPattern<IREE::Stream::ParameterWriteOp> {
   using Base::Base;
   LogicalResult
-  matchAndRewrite(IREE::Stream::CmdParameterWriteOp writeOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Stream::ParameterWriteOp writeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = writeOp.getLoc();
     auto [device, queueAffinity] =
@@ -125,12 +125,11 @@ struct CmdParameterWriteOpPattern
   }
 };
 
-struct CmdParameterGatherOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterGatherOp> {
+struct ParameterGatherOpPattern
+    : public OpConversionPattern<IREE::Stream::ParameterGatherOp> {
   using Base::Base;
   LogicalResult
-  matchAndRewrite(IREE::Stream::CmdParameterGatherOp gatherOp,
-                  OpAdaptor adaptor,
+  matchAndRewrite(IREE::Stream::ParameterGatherOp gatherOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = gatherOp.getLoc();
     auto [device, queueAffinity] =
@@ -154,12 +153,11 @@ struct CmdParameterGatherOpPattern
   }
 };
 
-struct CmdParameterScatterOpPattern
-    : public OpConversionPattern<IREE::Stream::CmdParameterScatterOp> {
+struct ParameterScatterOpPattern
+    : public OpConversionPattern<IREE::Stream::ParameterScatterOp> {
   using Base::Base;
   LogicalResult
-  matchAndRewrite(IREE::Stream::CmdParameterScatterOp scatterOp,
-                  OpAdaptor adaptor,
+  matchAndRewrite(IREE::Stream::ParameterScatterOp scatterOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = scatterOp.getLoc();
     auto [device, queueAffinity] =
@@ -189,9 +187,9 @@ void populateStreamToIOParametersPatterns(MLIRContext *context,
                                           ConversionTarget &conversionTarget,
                                           TypeConverter &typeConverter,
                                           RewritePatternSet &patterns) {
-  patterns.insert<CmdParameterLoadOpPattern, CmdParameterReadOpPattern,
-                  CmdParameterWriteOpPattern, CmdParameterGatherOpPattern,
-                  CmdParameterScatterOpPattern>(typeConverter, context);
+  patterns.insert<ParameterLoadOpPattern, ParameterReadOpPattern,
+                  ParameterWriteOpPattern, ParameterGatherOpPattern,
+                  ParameterScatterOpPattern>(typeConverter, context);
 }
 
 } // namespace mlir::iree_compiler
