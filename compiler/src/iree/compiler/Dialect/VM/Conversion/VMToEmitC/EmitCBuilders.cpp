@@ -90,7 +90,7 @@ Value asRValue(OpBuilder builder, Location loc,
 void asRValues(OpBuilder builder, Location location,
                SmallVector<Value> &values) {
   for (auto &value : values) {
-    if (auto lvalue = dyn_cast<TypedValue<emitc::LValueType>>(value)) {
+    if (auto lvalue = llvm::dyn_cast<TypedValue<emitc::LValueType>>(value)) {
       value = emitc_builders::asRValue(builder, location, lvalue);
     }
   }
@@ -122,7 +122,7 @@ Value contentsOf(OpBuilder builder, Location location, Value operand) {
   return emitc::ApplyOp::create(
              builder,
              /*location=*/location,
-             /*result=*/cast<emitc::PointerType>(type).getPointee(),
+             /*result=*/llvm::cast<emitc::PointerType>(type).getPointee(),
              /*applicableOperator=*/StringAttr::get(ctx, "*"),
              /*operand=*/operand)
       .getResult();
@@ -246,8 +246,9 @@ structMemberAddress(OpBuilder builder, Location location,
                     TypedValue<emitc::LValueType> operand) {
   auto member = emitc::MemberOp::create(builder, location, type.getPointee(),
                                         memberName, operand);
-  return addressOf(builder, location,
-                   cast<TypedValue<emitc::LValueType>>(member.getResult()));
+  return addressOf(
+      builder, location,
+      llvm::cast<TypedValue<emitc::LValueType>>(member.getResult()));
 }
 
 void structMemberAssign(OpBuilder builder, Location location,
@@ -274,8 +275,9 @@ structPtrMemberAddress(OpBuilder builder, Location location,
   auto member = emitc::MemberOfPtrOp::create(
       builder, location, emitc::LValueType::get(type.getPointee()), memberName,
       operand);
-  return addressOf(builder, location,
-                   cast<TypedValue<emitc::LValueType>>(member.getResult()));
+  return addressOf(
+      builder, location,
+      llvm::cast<TypedValue<emitc::LValueType>>(member.getResult()));
 }
 
 void structPtrMemberAssign(OpBuilder builder, Location location,

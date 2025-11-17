@@ -280,7 +280,7 @@ public:
       for (int i = 0, e = transposedMap.getNumDims(); i < e; ++i) {
         if (transposedMap.isFunctionOfDim(i)) {
           interchange.push_back(
-              cast<AffineDimExpr>(transposedMap.getResult(permIdx))
+              llvm::cast<AffineDimExpr>(transposedMap.getResult(permIdx))
                   .getPosition());
           permIdx++;
           continue;
@@ -1146,7 +1146,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
           // Only propagate if the immediate consumer of the reshape is a
           // transpose.
           return consumer->hasOneUse() &&
-                 isa<linalg::TransposeOp>(*(consumer->user_begin()));
+                 llvm::isa<linalg::TransposeOp>(*(consumer->user_begin()));
         };
     RewritePatternSet bubblingPatterns(context);
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubblingPatterns,

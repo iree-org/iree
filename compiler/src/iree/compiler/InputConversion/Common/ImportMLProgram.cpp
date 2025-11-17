@@ -104,7 +104,7 @@ public:
     bool isExtern = srcOpAttr && isa<ml_program::ExternAttr>(*srcOpAttr);
     auto srcOpTypedAttr =
         (srcOpAttr && !isExtern)
-            ? std::optional<TypedAttr>(cast<TypedAttr>(srcOpAttr.value()))
+            ? std::optional<TypedAttr>(llvm::cast<TypedAttr>(srcOpAttr.value()))
             : std::nullopt;
     const SymbolTable::Visibility visibility = srcOp.getVisibility();
     // Create util Global which is mutable if the ML program global was or if
@@ -154,14 +154,15 @@ public:
         "ml_program.public_global_accessors");
     // TODO(jpienaar): The attribute should be verified before here.
     StringAttr get =
-        v ? dyn_cast_if_present<StringAttr>(v.get("get")) : nullptr;
+        v ? llvm::dyn_cast_if_present<StringAttr>(v.get("get")) : nullptr;
     {
       const std::string getFormat = get ? get.str() : "global${0}$get";
       if (failed(verifyFormat(getFormat)))
         return failure();
       getterName = llvm::formatv(getFormat.c_str(), globalOp.getSymName());
     }
-    auto set = v ? dyn_cast_if_present<StringAttr>(v.get("set")) : nullptr;
+    auto set =
+        v ? llvm::dyn_cast_if_present<StringAttr>(v.get("set")) : nullptr;
     {
       const std::string setFormat = set ? set.str() : "global${0}$set";
       if (failed(verifyFormat(setFormat)))

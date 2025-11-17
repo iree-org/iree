@@ -140,13 +140,15 @@ static LogicalResult isGroupedDequantizationOp(linalg::GenericOp genericOp) {
   // Ensure that the dequantization increases the
   // bitwidth from the input to the output
   auto elementTypeOut =
-      cast<ShapedType>(genericOp.getOutputs()[0].getType()).getElementType();
+      llvm::cast<ShapedType>(genericOp.getOutputs()[0].getType())
+          .getElementType();
   if (!elementTypeOut.isIntOrFloat()) {
     return failure();
   }
   unsigned bitWidthOut = elementTypeOut.getIntOrFloatBitWidth();
   auto elementTypeIn =
-      cast<ShapedType>(genericOp.getInputs()[0].getType()).getElementType();
+      llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
+          .getElementType();
   if (!elementTypeIn.isIntOrFloat()) {
     return failure();
   }
@@ -284,7 +286,7 @@ LogicalResult QuantizedMatmulRewriter::precondition() {
   OpOperand *unquantizedInputOperand = ins[1];
   Value unquantizedInput = ins[1]->get();
   RankedTensorType unquantizedInputType =
-      cast<RankedTensorType>(unquantizedInput.getType());
+      llvm::cast<RankedTensorType>(unquantizedInput.getType());
   SmallVector<int64_t> unquantizedInputShape(unquantizedInputType.getShape());
   AffineMap indexingMap =
       matmul.getMatchingIndexingMap(unquantizedInputOperand);
@@ -320,8 +322,8 @@ LogicalResult QuantizedMatmulRewriter::precondition() {
   OpOperand *matmulDequantizedOperand = ins[4];
   auto matmulDequantizedInputExprs =
       matmul.getMatchingIndexingMap(matmulDequantizedOperand).getResults();
-  auto scalesType = dyn_cast<RankedTensorType>(scales.getType());
-  auto zpsType = dyn_cast<RankedTensorType>(zps.getType());
+  auto scalesType = llvm::dyn_cast<RankedTensorType>(scales.getType());
+  auto zpsType = llvm::dyn_cast<RankedTensorType>(zps.getType());
   if (!scalesType || !zpsType) {
     return rewriter.notifyMatchFailure(
         dequant, "expected scales and zero points to have RankedTensorType");
@@ -346,7 +348,7 @@ std::pair<SmallVector<AffineMap>, SmallVector<utils::IteratorType>>
 QuantizedMatmulRewriter::getGroupReductionMapsAndIterators(
     OpOperand *inputOperand) {
   Value input = inputOperand->get();
-  RankedTensorType inputType = cast<RankedTensorType>(input.getType());
+  RankedTensorType inputType = llvm::cast<RankedTensorType>(input.getType());
   SmallVector<int64_t> inputShape(inputType.getShape());
   AffineMap indexingMap = matmul.getMatchingIndexingMap(inputOperand);
   SmallVector<utils::IteratorType> matmulIteratorTypes =
@@ -380,7 +382,7 @@ QuantizedMatmulRewriter::getGroupReductionMapsAndIterators(
 
 // Helper to create an init Value for reductions along the group dimension.
 Value QuantizedMatmulRewriter::getGroupReductionInit(Value input) {
-  RankedTensorType inputType = cast<RankedTensorType>(input.getType());
+  RankedTensorType inputType = llvm::cast<RankedTensorType>(input.getType());
   assert(isa<FloatType>(inputType.getElementType()) && "expected float type");
   Value zero = arith::ConstantOp::create(
       rewriter, loc, rewriter.getFloatAttr(inputType.getElementType(), 0.0));
@@ -417,7 +419,7 @@ Value QuantizedMatmulRewriter::generateGroupMaxGeneric() {
 // Creates a generic that computes the scales for each group, and
 // returns the result.
 Value QuantizedMatmulRewriter::generateScalesGeneric(Value groupMax) {
-  auto groupMaxType = cast<RankedTensorType>(groupMax.getType());
+  auto groupMaxType = llvm::cast<RankedTensorType>(groupMax.getType());
   assert(isa<FloatType>(groupMaxType.getElementType()) &&
          "expected float type");
   Value cst = arith::ConstantOp::create(
@@ -466,7 +468,8 @@ SmallVector<Value> QuantizedMatmulRewriter::generateQuantizationGenerics() {
   OpOperand *unquantizedInputOperand = ins[1];
   Value unquantizedInput = unquantizedInputOperand->get();
 
-  auto unquantizedType = cast<RankedTensorType>(unquantizedInput.getType());
+  auto unquantizedType =
+      llvm::cast<RankedTensorType>(unquantizedInput.getType());
   SmallVector<int64_t> unquantizedShape(unquantizedType.getShape());
 
   IntegerType quantizedElementType = rewriter.getIntegerType(quantizedBitWidth);
@@ -526,11 +529,12 @@ linalg::GenericOp QuantizedMatmulRewriter::generateQuantizedMatmulGeneric(
                                 outputExprs.front().getContext()));
 
   SmallVector<int64_t> newQuantizedInputShape(
-      cast<RankedTensorType>(newQuantizedInput.getType()).getShape());
+      llvm::cast<RankedTensorType>(newQuantizedInput.getType()).getShape());
   assert(newQuantizedInputShape.size() >= 2 &&
          "expected new quantized input to have a rank of at least 2");
   SmallVector<int64_t> outputShape(
-      cast<RankedTensorType>(matmulOutputOperand->get().getType()).getShape());
+      llvm::cast<RankedTensorType>(matmulOutputOperand->get().getType())
+          .getShape());
   outputShape.push_back(
       newQuantizedInputShape[newQuantizedInputShape.size() - 2]);
   Value zero = arith::ConstantOp::create(rewriter, loc,
@@ -598,8 +602,9 @@ QuantizedMatmulRewriter::generateReassociatedDequantizationGeneric(
     auto exprsRef =
         matmul.getMatchingIndexingMap(matmulDequantizedOperand).getResults();
     SmallVector<AffineExpr> exprs(exprsRef.slice(0, exprsRef.size() - 1));
-    RankedTensorType scalesType = cast<RankedTensorType>(scales.getType());
-    RankedTensorType zpsType = cast<RankedTensorType>(zps.getType());
+    RankedTensorType scalesType =
+        llvm::cast<RankedTensorType>(scales.getType());
+    RankedTensorType zpsType = llvm::cast<RankedTensorType>(zps.getType());
     if (exprs.size() < scalesType.getShape().size() &&
         scalesType.getShape().back() == 1 && zpsType.getShape().back() == 1) {
       exprs.push_back(rewriter.getAffineConstantExpr(0));
@@ -792,11 +797,11 @@ void FuseDequantizationMatmulPass::runOnOperation() {
     OpOperand *rhs = genericOp.getDpsInputOperand(1);
     auto lhsOp = lhs->get().getDefiningOp<linalg::GenericOp>();
     auto rhsOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-    if (!cast<ShapedType>(genericOp.getInputs()[0].getType())
+    if (!llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
              .hasStaticShape() ||
-        !cast<ShapedType>(genericOp.getInputs()[1].getType())
+        !llvm::cast<ShapedType>(genericOp.getInputs()[1].getType())
              .hasStaticShape() ||
-        !cast<ShapedType>(genericOp.getResults()[0].getType())
+        !llvm::cast<ShapedType>(genericOp.getResults()[0].getType())
              .hasStaticShape()) {
       // Codegen can't handle the dynamic case yet.
       continue;

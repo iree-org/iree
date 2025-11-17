@@ -200,7 +200,7 @@ struct ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
     auto signatureAttr = srcOp->getAttrOfType<TypeAttr>("vm.signature");
     if (signatureAttr) {
       // Directly use the signature from the user.
-      newSignature = dyn_cast<FunctionType>(signatureAttr.getValue());
+      newSignature = llvm::dyn_cast<FunctionType>(signatureAttr.getValue());
       if (!newSignature) {
         return rewriter.notifyMatchFailure(srcOp, "invalid vm.signature");
       }

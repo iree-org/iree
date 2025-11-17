@@ -91,13 +91,13 @@ protected:
 
   std::string getTypedTypeStr(Type type, bool forceUnsigned = false) const {
     Type elementType = type;
-    auto shapedType = dyn_cast<ShapedType>(type);
+    auto shapedType = llvm::dyn_cast<ShapedType>(type);
     if (shapedType) {
       elementType = shapedType.getElementType();
     }
 
     std::string typePrefix = "x";
-    if (isa<FloatType>(elementType)) {
+    if (llvm::isa<FloatType>(elementType)) {
       typePrefix = "f";
     } else if (elementType.isSignlessInteger()) {
       typePrefix = forceUnsigned ? "u" : "i";

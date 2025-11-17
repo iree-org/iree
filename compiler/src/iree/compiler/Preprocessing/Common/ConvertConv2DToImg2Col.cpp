@@ -84,9 +84,9 @@ public:
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputType = cast<ShapedType>(convOp.getInputs()[0].getType());
-    auto filterType = cast<ShapedType>(convOp.getInputs()[1].getType());
-    auto outputType = cast<ShapedType>(convOp.getOutputs()[0].getType());
+    auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
+    auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
+    auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
@@ -209,7 +209,7 @@ public:
       auto resultMap = AffineMap::get(4, 0, {bDim, mDim, nDim}, getContext());
       SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
                                                            parallel, reduction};
-      bool isInt = isa<IntegerType>(outputType.getElementType());
+      bool isInt = llvm::isa<IntegerType>(outputType.getElementType());
       auto genericOp = linalg::GenericOp::create(
           rewriter, loc, reshapedOutputType,
           /*inputs=*/ValueRange{reshapedImg2ColTensor, reshapedFilter},
@@ -243,9 +243,12 @@ public:
 
   LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputType = cast<RankedTensorType>(convOp.getInputs()[0].getType());
-    auto filterType = cast<RankedTensorType>(convOp.getInputs()[1].getType());
-    auto outputType = cast<RankedTensorType>(convOp.getOutputs()[0].getType());
+    auto inputType =
+        llvm::cast<RankedTensorType>(convOp.getInputs()[0].getType());
+    auto filterType =
+        llvm::cast<RankedTensorType>(convOp.getInputs()[1].getType());
+    auto outputType =
+        llvm::cast<RankedTensorType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
@@ -264,7 +267,7 @@ public:
     auto loc = convOp.getLoc();
 
     auto transposeOperand = [&](Value operand, ArrayRef<int64_t> indices) {
-      auto operandTensorType = cast<RankedTensorType>(operand.getType());
+      auto operandTensorType = llvm::cast<RankedTensorType>(operand.getType());
       auto nloops = indices.size();
       auto inputShape = operandTensorType.getShape();
 
@@ -305,7 +308,8 @@ public:
     // Transpose input, filter so channels are outermost
     auto inputT = transposeOperand(input, {0, 3, 1, 2});
     auto filterT = transposeOperand(filter, {2, 0, 1});
-    auto filterTShape = cast<RankedTensorType>(filterT.getType()).getShape();
+    auto filterTShape =
+        llvm::cast<RankedTensorType>(filterT.getType()).getShape();
     auto outputShape = outputType.getShape();
 
     const int n = outputShape[0];
@@ -403,9 +407,9 @@ public:
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputType = cast<ShapedType>(convOp.getInputs()[0].getType());
-    auto filterType = cast<ShapedType>(convOp.getInputs()[1].getType());
-    auto outputType = cast<ShapedType>(convOp.getOutputs()[0].getType());
+    auto inputType = llvm::cast<ShapedType>(convOp.getInputs()[0].getType());
+    auto filterType = llvm::cast<ShapedType>(convOp.getInputs()[1].getType());
+    auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
@@ -526,7 +530,7 @@ public:
       auto resultMap = AffineMap::get(4, 0, {bDim, mDim, nDim}, getContext());
       SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
                                                            parallel, reduction};
-      bool isInt = isa<IntegerType>(outputType.getElementType());
+      bool isInt = llvm::isa<IntegerType>(outputType.getElementType());
       auto genericOp = linalg::GenericOp::create(
           rewriter, loc, reshapedOutputType,
           /*inputs=*/ValueRange{reshapedFilter, reshapedImg2ColTensor},
