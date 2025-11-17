@@ -1500,6 +1500,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_medium_f8E4M3FNUZ_expanded"
 )
 
 iree_generated_e2e_runner_test(
@@ -1532,6 +1536,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_large_f8E4M3FNUZ_expanded"
 )
 
 iree_generated_e2e_runner_test(
@@ -1589,6 +1597,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_dt_medium_f8E4M3FNUZ"
 )
 
 iree_generated_e2e_runner_test(
@@ -1619,6 +1631,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_dt_large_f8E4M3FNUZ"
 )
 
 iree_generated_e2e_runner_test(
@@ -1737,6 +1753,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_medium_f16_expanded"
 )
 
 iree_generated_e2e_runner_test(
@@ -1769,6 +1789,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_large_f16"
 )
 
 iree_generated_e2e_runner_test(
@@ -1801,6 +1825,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_large_f16_expanded"
 )
 
 
@@ -1832,6 +1860,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_dt_large_f16"
 )
 
 iree_generated_e2e_runner_test(
@@ -1864,6 +1896,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_medium_bf16_expanded"
 )
 
 iree_generated_e2e_runner_test(
@@ -1896,6 +1932,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_large_bf16"
 )
 
 
@@ -1929,6 +1969,10 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-${_CDNA_ARCH}"
+  REMARKS_FILTER
+    "ApplyBuiltinPDLPatternsDriverPass"
+  CHECK_REMARKS_PATTERN
+    "pingpong_large_bf16_expanded"
 )
 
 endif()
