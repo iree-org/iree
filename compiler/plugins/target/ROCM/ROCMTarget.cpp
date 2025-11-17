@@ -960,17 +960,12 @@ protected:
     }
     auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
 
-    auto isaRef = builder.createString(variantOp.getTarget().getFormat());
-    iree_hal_amdgpu_ExecutableDef_isa_add(builder, isaRef);
     iree_hal_amdgpu_ExecutableDef_exports_add(builder, exportsRef);
     iree_hal_amdgpu_ExecutableDef_modules_add(builder, modulesRef);
     iree_hal_amdgpu_ExecutableDef_source_files_add(builder, sourceFilesRef);
     iree_hal_amdgpu_ExecutableDef_end_as_root(builder);
 
-    return builder.getHeaderPrefixedBufferAttr(
-        variantOp.getContext(),
-        /*magic=*/iree_hal_amdgpu_ExecutableDef_file_identifier,
-        /*version=*/0);
+    return builder.getBufferAttr(variantOp.getContext());
   }
 
   FailureOr<DenseIntElementsAttr>
@@ -1054,10 +1049,7 @@ protected:
     iree_hal_hip_ExecutableDef_source_files_add(builder, sourceFilesRef);
     iree_hal_hip_ExecutableDef_end_as_root(builder);
 
-    return builder.getHeaderPrefixedBufferAttr(
-        variantOp.getContext(),
-        /*magic=*/iree_hal_hip_ExecutableDef_file_identifier,
-        /*version=*/0);
+    return builder.getBufferAttr(variantOp.getContext());
   }
 
 private:

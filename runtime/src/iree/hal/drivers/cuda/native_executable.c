@@ -12,7 +12,6 @@
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
 #include "iree/hal/utils/executable_debug_info.h"
-#include "iree/hal/utils/executable_header.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
@@ -82,38 +81,6 @@ static iree_status_t iree_hal_cuda_query_limits(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_cuda_native_executable_infer_format(
-    iree_const_byte_span_t executable_data,
-    iree_host_size_t executable_format_capacity, char* executable_format,
-    iree_host_size_t* out_inferred_size) {
-  // Read the header prefix (with unsafe inference if size is unknown).
-  const bool unsafe_infer_size = (executable_data.data_length == 0);
-  iree_const_byte_span_t flatbuffer_data = iree_const_byte_span_empty();
-  IREE_RETURN_IF_ERROR(iree_hal_read_executable_flatbuffer_header(
-      executable_data, unsafe_infer_size,
-      iree_hal_cuda_ExecutableDef_file_identifier, &flatbuffer_data));
-
-  // Verify the flatbuffer structure.
-  if (!iree_hal_cuda_ExecutableDef_verify_as_root(
-          flatbuffer_data.data, flatbuffer_data.data_length)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "failed to verify executable flatbuffer structure");
-  }
-
-  // Write the format string.
-  iree_string_view_t format = IREE_SV("PTXE");
-  if (format.size >= executable_format_capacity) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "executable format buffer too small");
-  }
-  memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
-
-  // Return the total size (header + flatbuffer).
-  *out_inferred_size =
-      sizeof(iree_flatbuffer_file_header_t) + flatbuffer_data.data_length;
-  return iree_ok_status();
-}
-
 // Verifies the structure of the flatbuffer so that we can avoid doing so during
 // runtime.
 //
@@ -123,7 +90,10 @@ iree_status_t iree_hal_cuda_native_executable_infer_format(
 static iree_status_t iree_hal_cuda_native_executable_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data,
     const iree_hal_cuda_limits_t* limits) {
-  IREE_ASSERT(flatbuffer_data.data && flatbuffer_data.data_length >= 16);
+  if (!flatbuffer_data.data) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "flatbuffer data is not present");
+  }
 
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
@@ -252,20 +222,13 @@ iree_status_t iree_hal_cuda_native_executable_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_query_limits(symbols, device, &limits));
 
-  // Read and strip the flatbuffer header prefix.
-  iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_hal_read_executable_flatbuffer_header(
-          executable_params->executable_data, /*unsafe_infer_size=*/false,
-          iree_hal_cuda_ExecutableDef_file_identifier, &executable_flatbuffer));
-
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_native_executable_flatbuffer_verify(
-              executable_flatbuffer, &limits));
+              executable_params->executable_data, &limits));
 
   iree_hal_cuda_ExecutableDef_table_t executable_def =
-      iree_hal_cuda_ExecutableDef_as_root(executable_flatbuffer.data);
+      iree_hal_cuda_ExecutableDef_as_root(
+          executable_params->executable_data.data);
 
   iree_hal_cuda_ModuleDef_vec_t modules_vec =
       iree_hal_cuda_ExecutableDef_modules_get(executable_def);
