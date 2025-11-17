@@ -59,7 +59,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
     SmallVector<int64_t> staticShape;
     staticShape.reserve(rank);
 
-    auto sourceIfxOp = dyn_cast_or_null<OffsetSizeAndStrideOpInterface>(
+    auto sourceIfxOp = dyn_cast_if_present<OffsetSizeAndStrideOpInterface>(
         padOp.getSource().getDefiningOp());
     if (!sourceIfxOp)
       return failure();

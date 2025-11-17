@@ -21,8 +21,8 @@ bool SerializableAttr::areCompatible(Attribute lhs, Attribute rhs) {
   if (lhs == rhs) {
     return true;
   }
-  auto lhsEncoding = dyn_cast_or_null<SerializableAttr>(lhs);
-  auto rhsEncoding = dyn_cast_or_null<SerializableAttr>(rhs);
+  auto lhsEncoding = dyn_cast_if_present<SerializableAttr>(lhs);
+  auto rhsEncoding = dyn_cast_if_present<SerializableAttr>(rhs);
   if (!lhsEncoding || !rhsEncoding) {
     return false;
   }

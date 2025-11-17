@@ -737,9 +737,9 @@ struct LLVMGPUConfigureTensorLayoutsPass final
       return signalPassFailure();
     }
 
-    auto attentionQKMatmul = dyn_cast_or_null<linalg::LinalgOp>(
+    auto attentionQKMatmul = dyn_cast_if_present<linalg::LinalgOp>(
         getOpWithAttr(funcOp, "attention_qk_matmul"));
-    auto attentionPVMatmul = dyn_cast_or_null<linalg::LinalgOp>(
+    auto attentionPVMatmul = dyn_cast_if_present<linalg::LinalgOp>(
         getOpWithAttr(funcOp, "attention_pv_matmul"));
 
     if (attentionQKMatmul && !attentionPVMatmul) {

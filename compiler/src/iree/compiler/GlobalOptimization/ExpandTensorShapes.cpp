@@ -153,7 +153,7 @@ static ExpandedValue consumeExpandedValue(Location loc, Value value,
   // If the value comes from a tie shape we can bypass the slower checks.
   // This happens a lot during expansion as we'll expand function and block args
   // and insert ties before processing nested ops that consume them.
-  if (auto tieShapeOp = dyn_cast_or_null<IREE::Flow::TensorTieShapeOp>(
+  if (auto tieShapeOp = dyn_cast_if_present<IREE::Flow::TensorTieShapeOp>(
           value.getDefiningOp())) {
     ExpandedValue expandedValue;
     expandedValue.tensor = tieShapeOp.getOperand();

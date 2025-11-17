@@ -392,7 +392,7 @@ public:
     llvm::SmallDenseSet<StringRef> ukernelSymbols;
     auto res = moduleOp.walk([&](Operation *op) {
       auto builtinName =
-          dyn_cast_or_null<StringAttr>(op->getAttr(kBuiltinName));
+          dyn_cast_if_present<StringAttr>(op->getAttr(kBuiltinName));
       auto ukernelDesc = getUKernelDescriptor(op);
       if (!builtinName || !ukernelDesc) {
         return WalkResult::advance();

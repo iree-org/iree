@@ -175,7 +175,7 @@ void SinkReshapesPass::runOnOperation() {
 
   auto collapsingControlFn = [](OpOperand *opOperand) {
     auto collapseOp =
-        dyn_cast_or_null<tensor::CollapseShapeOp>(opOperand->getOwner());
+        dyn_cast_if_present<tensor::CollapseShapeOp>(opOperand->getOwner());
     if (collapseOp) {
       return shouldBubbleCollapseShapeOp(collapseOp, opOperand);
     }

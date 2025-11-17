@@ -235,7 +235,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   if (failed(tilingInfo)) {
     return signalPassFailure();
   }
-  auto tilableOp = dyn_cast_or_null<TilingInterface>(tilingInfo->tilableOp);
+  auto tilableOp = dyn_cast_if_present<TilingInterface>(tilingInfo->tilableOp);
   if (!tilableOp) {
     // Did not find a tileable op. So do nothing.
     return;

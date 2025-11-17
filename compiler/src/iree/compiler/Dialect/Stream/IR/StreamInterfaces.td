@@ -184,7 +184,7 @@ def Stream_AffinityOp : Stream_OpInterface<"AffinityOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return dyn_cast_or_null<IREE::Stream::AffinityAttr>($_op->getAttr("affinity"));
+        return dyn_cast_if_present<IREE::Stream::AffinityAttr>($_op->getAttr("affinity"));
       }]
     >,
     InterfaceMethod<

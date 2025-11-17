@@ -137,7 +137,7 @@ static std::pair<Value, Value> consumeTimepoint(Location loc, Value value,
     return std::make_pair(timepoint, value);
   }
 
-  if (auto awaitOp = dyn_cast_or_null<IREE::Stream::TimepointAwaitOp>(
+  if (auto awaitOp = dyn_cast_if_present<IREE::Stream::TimepointAwaitOp>(
           value.getDefiningOp())) {
     // We can only consume asynchronous timepoints. If the await is a sync point
     // then we know that know result can be used without the host synchronizing
@@ -150,7 +150,7 @@ static std::pair<Value, Value> consumeTimepoint(Location loc, Value value,
       return std::make_pair(awaitOp.getAwaitTimepoint(),
                             awaitOp.getTiedResultOperand(value));
     }
-  } else if (auto executeOp = dyn_cast_or_null<IREE::Stream::AsyncExecuteOp>(
+  } else if (auto executeOp = dyn_cast_if_present<IREE::Stream::AsyncExecuteOp>(
                  value.getDefiningOp())) {
     return std::make_pair(executeOp.getResultTimepoint(), value);
   } else {
@@ -195,7 +195,7 @@ static void expandTimepoints(Operation *op, SymbolTable &symbolTable,
 static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
                                       OpBuilder &builder) {
   // We can take any implicitly captured SSA values.
-  if (auto sizeAwareOp = dyn_cast_or_null<IREE::Util::SizeAwareOpInterface>(
+  if (auto sizeAwareOp = dyn_cast_if_present<IREE::Util::SizeAwareOpInterface>(
           resourceValue.getDefiningOp())) {
     auto sizeValue = sizeAwareOp.getResultSizeFromValue(resourceValue);
     if (sizeValue)

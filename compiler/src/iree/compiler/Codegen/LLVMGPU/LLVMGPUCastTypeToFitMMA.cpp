@@ -102,8 +102,9 @@ static void inferMmaKind(vector::ContractionOp contract) {
     return;
   }
 
-  auto intrinsic = dyn_cast_or_null<IREE::Codegen::InnerTileDescAttrInterface>(
-      toLayout.getMmaKindAttr());
+  auto intrinsic =
+      dyn_cast_if_present<IREE::Codegen::InnerTileDescAttrInterface>(
+          toLayout.getMmaKindAttr());
   if (!intrinsic) {
     return;
   }

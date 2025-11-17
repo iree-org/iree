@@ -60,7 +60,7 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   // For now, this assumes that we only pull in constants.
   // TODO: Iteratively pull operations that are only consuming IndexType.
   for (Value v : forallOp.getUpperBound(rewriter)) {
-    auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
+    auto op = dyn_cast_if_present<arith::ConstantIndexOp>(v.getDefiningOp());
     if (!op)
       return failure();
     results.push_back(

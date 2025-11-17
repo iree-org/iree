@@ -1215,8 +1215,8 @@ struct FuseWidenOperands final : OpRewritePattern<Op> {
                                 PatternRewriter &rewriter) const override {
     llvm::SmallVector<Value> operands;
     for (Value operand : op->getOperands()) {
-      auto convertOp =
-          dyn_cast_or_null<mlir::stablehlo::ConvertOp>(operand.getDefiningOp());
+      auto convertOp = dyn_cast_if_present<mlir::stablehlo::ConvertOp>(
+          operand.getDefiningOp());
       if (convertOp) {
         auto inputType = getElementTypeOrSelf(convertOp.getOperand().getType());
         auto castedType = getElementTypeOrSelf(convertOp.getResult().getType());
@@ -1659,7 +1659,7 @@ struct CustomCallIsTopK final
 // broadcasts where the last dimension of the iota is preserved throughout.
 bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
   if (auto iotaOp =
-          dyn_cast_or_null<mlir::stablehlo::IotaOp>(input.getDefiningOp())) {
+          dyn_cast_if_present<mlir::stablehlo::IotaOp>(input.getDefiningOp())) {
     int64_t iotaDim = iotaOp.getIotaDimension();
     auto iotaLastDim = cast<ShapedType>(iotaOp.getType()).getRank() - 1;
     if (iotaDim == iotaLastDim) {
@@ -1670,7 +1670,7 @@ bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
     return false;
   }
 
-  if (auto broadcastOp = dyn_cast_or_null<mlir::stablehlo::BroadcastInDimOp>(
+  if (auto broadcastOp = dyn_cast_if_present<mlir::stablehlo::BroadcastInDimOp>(
           input.getDefiningOp())) {
     auto broadcastLastDim =
         cast<ShapedType>(broadcastOp.getType()).getRank() - 1;
@@ -1794,8 +1794,8 @@ struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
     auto input = op.getOperand(0);
     auto iota = op.getOperand(1);
 
-    if (auto iotaOp =
-            dyn_cast_or_null<mlir::stablehlo::IotaOp>(iota.getDefiningOp())) {
+    if (auto iotaOp = dyn_cast_if_present<mlir::stablehlo::IotaOp>(
+            iota.getDefiningOp())) {
       int64_t iotaDim = iotaOp.getIotaDimension();
       auto iotaLastDim = cast<ShapedType>(iotaOp.getType()).getRank() - 1;
       if (iotaDim != iotaLastDim) {

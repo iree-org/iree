@@ -121,7 +121,7 @@ struct ReplaceOpIfTensorOperandEmpty : public OpRewritePattern<Op> {
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op->getOperand(OperandIdx);
-    auto emptyOp = dyn_cast_or_null<TensorEmptyOp>(operand.getDefiningOp());
+    auto emptyOp = dyn_cast_if_present<TensorEmptyOp>(operand.getDefiningOp());
     if (!emptyOp)
       return failure();
     auto result = op->getResult(ResultIdx);
@@ -532,11 +532,11 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
     // intermediate reshapes.
     Value source;
     ValueRange sourceDims;
-    if (auto sourceOp = dyn_cast_or_null<TensorReshapeOp>(
+    if (auto sourceOp = dyn_cast_if_present<TensorReshapeOp>(
             reshapeOp.getSource().getDefiningOp())) {
       source = sourceOp.getSource();
       sourceDims = sourceOp.getSourceDims();
-    } else if (auto sourceOp = dyn_cast_or_null<TensorBitCastOp>(
+    } else if (auto sourceOp = dyn_cast_if_present<TensorBitCastOp>(
                    reshapeOp.getSource().getDefiningOp())) {
       source = sourceOp.getSource();
       sourceDims = sourceOp.getSourceDims();
@@ -678,7 +678,7 @@ struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
   LogicalResult matchAndRewrite(TensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp =
-        dyn_cast_or_null<TensorSplatOp>(loadOp.getSource().getDefiningOp());
+        dyn_cast_if_present<TensorSplatOp>(loadOp.getSource().getDefiningOp());
     if (!sourceOp)
       return failure();
     rewriter.replaceOp(loadOp, sourceOp.getValue());

@@ -120,8 +120,8 @@ static bool renameChainedGlobals(GlobalTable &globalTable) {
     for (auto storeOp : global.storeOps) {
       // Check to see if the stored value comes from another global.
       auto *definingOp = storeOp.getStoredGlobalValue().getDefiningOp();
-      if (auto loadOp =
-              dyn_cast_or_null<IREE::Util::GlobalLoadOpInterface>(definingOp)) {
+      if (auto loadOp = dyn_cast_if_present<IREE::Util::GlobalLoadOpInterface>(
+              definingOp)) {
         if (!aliasName) {
           aliasName = loadOp.getGlobalAttr();
         } else if (aliasName != loadOp.getGlobalAttr()) {

@@ -197,8 +197,9 @@ struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
-            op.getGlobal().getDefiningOp())) {
+    if (auto addressOp =
+            dyn_cast_if_present<IREE::Util::GlobalAddressOpInterface>(
+                op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DIRECT>(
           op, op.getValue().getType(), addressOp.getGlobalAttr(),
           addressOp.isGlobalImmutable() ? rewriter.getUnitAttr() : UnitAttr{});
@@ -252,8 +253,9 @@ struct PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
-            op.getGlobal().getDefiningOp())) {
+    if (auto addressOp =
+            dyn_cast_if_present<IREE::Util::GlobalAddressOpInterface>(
+                op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DIRECT>(op, op.getValue(),
                                           addressOp.getGlobalAttr());
       return success();
@@ -643,10 +645,11 @@ struct FuseFMAOp : public OpRewritePattern<AddOp> {
                      .getResult());
       return success();
     };
-    if (auto mulOp = dyn_cast_or_null<MulOp>(addOp.getLhs().getDefiningOp())) {
+    if (auto mulOp =
+            dyn_cast_if_present<MulOp>(addOp.getLhs().getDefiningOp())) {
       return fuse(mulOp, mulOp.getLhs(), mulOp.getRhs(), addOp.getRhs());
     } else if (auto mulOp =
-                   dyn_cast_or_null<MulOp>(addOp.getRhs().getDefiningOp())) {
+                   dyn_cast_if_present<MulOp>(addOp.getRhs().getDefiningOp())) {
       return fuse(mulOp, mulOp.getLhs(), mulOp.getRhs(), addOp.getLhs());
     }
     return failure();
@@ -663,12 +666,13 @@ static OpFoldResult foldAddOp(ADD op, Attribute lhs, Attribute rhs) {
     // x + 0 = x or 0 + y = y (commutative)
     return op.getLhs();
   }
-  if (auto subOp = dyn_cast_or_null<SUB>(op.getLhs().getDefiningOp())) {
+  if (auto subOp = dyn_cast_if_present<SUB>(op.getLhs().getDefiningOp())) {
     // t = vm.sub x, y
     //   = vm.add t, z
     if (subOp.getRhs() == op.getRhs()) // y == z:
       return subOp.getLhs();           // (x - y) + y = x
-  } else if (auto subOp = dyn_cast_or_null<SUB>(op.getRhs().getDefiningOp())) {
+  } else if (auto subOp =
+                 dyn_cast_if_present<SUB>(op.getRhs().getDefiningOp())) {
     // t = vm.sub x, y
     //   = vm.add z, t
     if (subOp.getRhs() == op.getLhs()) // y == z:
@@ -709,7 +713,7 @@ static OpFoldResult foldSubOp(SUB op, Attribute lhs, Attribute rhs) {
     // x - 0 = x
     return op.getLhs();
   }
-  if (auto addOp = dyn_cast_or_null<ADD>(op.getLhs().getDefiningOp())) {
+  if (auto addOp = dyn_cast_if_present<ADD>(op.getLhs().getDefiningOp())) {
     // t = vm.add x, y
     //   = vm.sub t, z
     if (addOp.getLhs() == op.getRhs()) // x == z:
@@ -762,7 +766,7 @@ struct FoldConstantMulOperand : public OpRewritePattern<T> {
     AttrElementT c1, c2;
     if (!matchPattern(op.getRhs(), m_Constant(&c1)))
       return failure();
-    if (auto mulOp = dyn_cast_or_null<T>(op.getLhs().getDefiningOp())) {
+    if (auto mulOp = dyn_cast_if_present<T>(op.getLhs().getDefiningOp())) {
       if (matchPattern(mulOp.getRhs(), m_Constant(&c2))) {
         auto c = rewriter.createOrFold<CONST_OP>(
             rewriter.getFusedLoc({mulOp.getLoc(), op.getLoc()}),
@@ -811,7 +815,7 @@ static OpFoldResult foldDivSOp(DivOpT op, Attribute lhs, Attribute rhs) {
     // x / 1 = x
     return op.getLhs();
   } else if (auto mulOp =
-                 dyn_cast_or_null<MulOpT>(op.getLhs().getDefiningOp())) {
+                 dyn_cast_if_present<MulOpT>(op.getLhs().getDefiningOp())) {
     // Only applies to signed divides (matches LLVM behavior).
     if (mulOp.getRhs() == op.getRhs()) {
       // c = mul a, b
@@ -1804,8 +1808,8 @@ struct FoldCastRefIntoOpResult : public OpRewritePattern<CastOp> {
   using OpRewritePattern<CastOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CastOp castOp,
                                 PatternRewriter &rewriter) const override {
-    auto zeroOp =
-        dyn_cast_or_null<ConstRefZeroOp>(castOp.getOperand().getDefiningOp());
+    auto zeroOp = dyn_cast_if_present<ConstRefZeroOp>(
+        castOp.getOperand().getDefiningOp());
     if (!zeroOp)
       return failure();
     rewriter.replaceOpWithNewOp<ConstRefZeroOp>(castOp,
@@ -1820,7 +1824,7 @@ OpFoldResult CastAnyRefOp::fold(FoldAdaptor operands) {
   if (getOperand().getType() == getResult().getType())
     return getOperand();
   if (auto castOp =
-          dyn_cast_or_null<CastRefAnyOp>(getOperand().getDefiningOp())) {
+          dyn_cast_if_present<CastRefAnyOp>(getOperand().getDefiningOp())) {
     if (castOp.getOperand().getType() == getResult().getType()) {
       return castOp.getOperand();
     }
@@ -1837,7 +1841,7 @@ OpFoldResult CastRefAnyOp::fold(FoldAdaptor operands) {
   if (getOperand().getType() == getResult().getType())
     return getOperand();
   if (auto castOp =
-          dyn_cast_or_null<CastAnyRefOp>(getOperand().getDefiningOp())) {
+          dyn_cast_if_present<CastAnyRefOp>(getOperand().getDefiningOp())) {
     if (castOp.getOperand().getType() == getResult().getType()) {
       return castOp.getOperand();
     }
@@ -1911,7 +1915,8 @@ struct SwapInvertedCmpOps : public OpRewritePattern<OP> {
       // Can't change if there are multiple users.
       return failure();
     }
-    if (auto xorOp = dyn_cast_or_null<XorI32Op>(*op.getResult().user_begin())) {
+    if (auto xorOp =
+            dyn_cast_if_present<XorI32Op>(*op.getResult().user_begin())) {
       Attribute rhs;
       if (xorOp.getLhs() == op.getResult() &&
           matchPattern(xorOp.getRhs(), m_Constant(&rhs)) &&
@@ -3130,7 +3135,8 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
     // We generate xor(cmp(...), 1) to flip conditions, so look for that pattern
     // so that we can do the swap here and remove the xor.
     // auto condValue = op.getCondition();
-    // if (auto xorOp = dyn_cast_or_null<XorI32Op>(condValue.getDefiningOp())) {
+    // if (auto xorOp =
+    // dyn_cast_if_present<XorI32Op>(condValue.getDefiningOp())) {
     //   Attribute rhs;
     //   if (matchPattern(xorOp.getRhs(), m_Constant(&rhs)) &&
     //       cast<IntegerAttr>(rhs).getInt() == 1) {
