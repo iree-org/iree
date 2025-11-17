@@ -64,7 +64,7 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
 
     // Detect whether assumptions need to be normalized or can fold to a single
     // value.
-    ArrayAttr assumptionRow = cast<ArrayAttr>(assumptions[idx]);
+    ArrayAttr assumptionRow = llvm::cast<ArrayAttr>(assumptions[idx]);
     if (assumptionRow.size() > 1) {
       bool allAssumptionsSame = true;
       for (unsigned i = 1; i < assumptionRow.size(); ++i) {
@@ -86,7 +86,7 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
 
   // Need to rewrite the assumption.
   auto normalizeAssumptions = [](Attribute row, bool &madeChange) {
-    auto rowArray = cast<ArrayAttr>(row);
+    auto rowArray = llvm::cast<ArrayAttr>(row);
     if (rowArray.size() <= 1)
       return rowArray;
 
@@ -423,7 +423,7 @@ static OpFoldResult foldRangeOp(Type type, ValueRange operands,
   // If all operands are constant then fold into a constant.
   int64_t value = initialValue;
   for (auto operand : attrOperands) {
-    auto intValue = dyn_cast_if_present<IntegerAttr>(operand);
+    auto intValue = llvm::dyn_cast_if_present<IntegerAttr>(operand);
     if (!intValue)
       return {};
     value = expr(value, intValue.getValue().getSExtValue());
@@ -782,7 +782,7 @@ OpFoldResult AlignOp::fold(FoldAdaptor operands) {
 
 OpFoldResult SizeOfOp::fold(FoldAdaptor operands) {
   Type t = getSizedType();
-  if (isa<IntegerType>(t) || isa<FloatType>(t)) {
+  if (llvm::isa<IntegerType>(t) || llvm::isa<FloatType>(t)) {
     return IntegerAttr::get(IndexType::get(getContext()),
                             getRoundedElementByteWidth(t));
   }
@@ -1192,7 +1192,7 @@ struct SinkSubspanAcrossSelectOps
   using Base::Base;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!isa<IREE::Util::BufferType>(op.getType()))
+    if (!llvm::isa<IREE::Util::BufferType>(op.getType()))
       return failure();
     auto trueSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
         op.getTrueValue().getDefiningOp());

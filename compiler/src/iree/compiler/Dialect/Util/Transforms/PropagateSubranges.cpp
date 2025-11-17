@@ -37,7 +37,7 @@ namespace {
 // This pass is paired with the subrange type. Any type implementing the
 // interface can be used.
 static bool isResourceType(Type type) {
-  return isa<IREE::Util::SubrangeTypeInterface>(type);
+  return llvm::isa<IREE::Util::SubrangeTypeInterface>(type);
 }
 
 //===----------------------------------------------------------------------===//
@@ -142,7 +142,7 @@ struct Subrange {
   Value subrangeOffset;
   Value subrangeLength;
   IREE::Util::SubrangeTypeInterface getResourceType() {
-    return cast<IREE::Util::SubrangeTypeInterface>(resource.getType());
+    return llvm::cast<IREE::Util::SubrangeTypeInterface>(resource.getType());
   }
 };
 using SubrangeMap = llvm::DenseMap<Value, Subrange>;
