@@ -200,67 +200,109 @@ static size_t getInnermostNonInternalDimIdx(
   return 0;
 }
 
-static void expandIfNonUnit(TileSwizzle &swizzle, size_t srcIdx,
-                            TileSwizzle::Dim dim, bool interleave = false) {
-  if (dim.size > 1) {
-    expand(swizzle, srcIdx, dim);
-    if (interleave) {
-      IREE::GPU::interleave(
-          swizzle, srcIdx,
-          getInnermostNonInternalDimIdx(swizzle.expandShape[srcIdx]));
-    }
-  }
-}
-
 /// Implementation of `getSwizzle` for both scaled and non-scaled matmuls.
 template <typename MMAAttrTy>
 static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
   TileSwizzle swizzle = getIntrinsicSwizzle(mma.getIntrinsic(), operandIdx);
   using MMAIntrinsicTy = decltype(mma.getIntrinsic());
+  const bool isScaled = std::is_same<MMAIntrinsicTy, ScaledMMAIntrinsic>::value;
   const bool isLhs = isIntrinsicLhs<MMAIntrinsicTy>(operandIdx);
   const bool isRhs = isIntrinsicRhs<MMAIntrinsicTy>(operandIdx);
   const bool isAcc = isIntrinsicAcc<MMAIntrinsicTy>(operandIdx);
   const bool isLhsScale = isIntrinsicLhsScale<MMAIntrinsicTy>(operandIdx);
   const bool isRhsScale = isIntrinsicRhsScale<MMAIntrinsicTy>(operandIdx);
-  auto contains = [](DenseI64ArrayAttr attr, int64_t val) {
-    return attr ? llvm::is_contained(attr.asArrayRef(), val) : false;
-  };
-  const bool interleaveM =
-      contains(mma.getOperandsInterleavingIntrinsicsM(), operandIdx);
-  const bool interleaveN =
-      contains(mma.getOperandsInterleavingIntrinsicsN(), operandIdx);
-  const bool interleaveK =
-      contains(mma.getOperandsInterleavingIntrinsicsK(), operandIdx);
-  TileSwizzle::Dim subgroupsM = {Kind::CrossThread, mma.getSubgroupsM()};
-  TileSwizzle::Dim subgroupsN = {Kind::CrossThread, mma.getSubgroupsN()};
-  TileSwizzle::Dim subgroupsK = {Kind::CrossThread, mma.getSubgroupsK()};
-  TileSwizzle::Dim intrinsicsM = {Kind::CrossIntrinsic, mma.getIntrinsicsM()};
-  TileSwizzle::Dim intrinsicsN = {Kind::CrossIntrinsic, mma.getIntrinsicsN()};
-  TileSwizzle::Dim intrinsicsK = {Kind::CrossIntrinsic, mma.getIntrinsicsK()};
   if (isLhs || isLhsScale) {
-    subgroupsM.distributionSize *= subgroupsN.size;
-    constexpr int M = 0, K = 1;
-    expandIfNonUnit(swizzle, K, intrinsicsK, interleaveK);
-    expandIfNonUnit(swizzle, M, intrinsicsM, interleaveM);
-    expandIfNonUnit(swizzle, K, subgroupsK);
-    expandIfNonUnit(swizzle, M, subgroupsM);
-  } else if (isRhs || isRhsScale) {
-    constexpr int N = 0, K = 1;
-    expandIfNonUnit(swizzle, K, intrinsicsK, interleaveK);
-    expandIfNonUnit(swizzle, N, intrinsicsN, interleaveN);
-    expandIfNonUnit(swizzle, K, subgroupsK);
-    expandIfNonUnit(swizzle, N, subgroupsN);
-  } else if (isAcc) {
-    if (subgroupsN.size > 1) {
-      subgroupsN.distributionSize *= subgroupsK.size;
-    } else if (subgroupsM.size > 1) {
-      subgroupsM.distributionSize *= subgroupsK.size;
+    // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
+    // Unroll on K with interleaving, then on M.
+    if (mma.getIntrinsicsK() > 1) {
+      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getIntrinsicsK()});
+      size_t interleavingIdx =
+          getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
+      // For scaled matmuls, interleaving happens because we want to load all
+      // the unrolled scales with each vector load, so we need to interleave at
+      // the very last dimension for the scales. For the LHS, we load in blocks,
+      // so we don't need to interleave.
+      if (isLhsScale) {
+        interleavingIdx = swizzle.expandShape[1].size() - 1;
+      }
+      if (!isScaled || isLhsScale) {
+        interleave(swizzle, 1, interleavingIdx);
+      }
     }
-    constexpr int M = 0, N = 1;
-    expandIfNonUnit(swizzle, N, intrinsicsN, interleaveN);
-    expandIfNonUnit(swizzle, M, intrinsicsM, interleaveM);
-    expandIfNonUnit(swizzle, N, subgroupsN);
-    expandIfNonUnit(swizzle, M, subgroupsM);
+    if (mma.getIntrinsicsM() > 1) {
+      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsM()});
+    }
+    if (mma.getSubgroupsK() > 1) {
+      expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsK()});
+    }
+    if (mma.getSubgroupsM() > 1) {
+      // The distribution size here is multiplied by subgroupsN because the
+      // subgroupsN dimension, which does not occur in the LHS swizzle, is more
+      // inner than the subgroupsM dimension.
+      // TODO(#22072): split subgroupsN into a separate "null" dimension.
+      TileSwizzle::Dim dim(Kind::CrossThread, mma.getSubgroupsM(),
+                           mma.getSubgroupsM() * mma.getSubgroupsN());
+      expand(swizzle, 0, dim);
+    }
+  } else if (isRhs || isRhsScale) {
+    // B-matrix (RHS). Since the pack ops already took care of transposing B,
+    // source dimensions are N (index 0) and K (index 1).
+    // Unroll on K with interleaving, then on N.
+    if (mma.getIntrinsicsK() > 1) {
+      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getIntrinsicsK()});
+      size_t interleavingIdx =
+          getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
+      // Like with the LHS above, we want to interleave such that we load all
+      // the unrolled scales with each vector load.
+      if (isRhsScale) {
+        interleavingIdx = swizzle.expandShape[1].size() - 1;
+      }
+      if (!isScaled || isRhsScale) {
+        interleave(swizzle, 1, interleavingIdx);
+      }
+    }
+    if (mma.getIntrinsicsN() > 1) {
+      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsN()});
+    }
+    if (mma.getSubgroupsK() > 1) {
+      expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsK()});
+    }
+    if (mma.getSubgroupsN() > 1) {
+      expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsN()});
+    }
+  } else if (isAcc) {
+    // C-matrix (accumulator). Source dimensions are M (index 0) and N (index
+    // 1). Unroll on N, then on M.
+    if (mma.getIntrinsicsN() > 1) {
+      expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getIntrinsicsN()});
+    }
+    if (mma.getIntrinsicsM() > 1) {
+      expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsM()});
+    }
+    // TODO(#22072): split subgroupsK into a separate "null" dimension.
+    // The current logic with alreadyAccountedForSubgroupsK is exactly the kind
+    // of complication that shows why we need #22072.
+    bool alreadyAccountedForSubgroupsK = false;
+    if (mma.getSubgroupsN() > 1) {
+      int64_t distributionSize = mma.getSubgroupsN();
+      if (!alreadyAccountedForSubgroupsK) {
+        distributionSize *= mma.getSubgroupsK();
+        alreadyAccountedForSubgroupsK = true;
+      }
+      TileSwizzle::Dim dim(Kind::CrossThread, mma.getSubgroupsN(),
+                           distributionSize);
+      expand(swizzle, 1, dim);
+    }
+    if (mma.getSubgroupsM() > 1) {
+      int64_t distributionSize = mma.getSubgroupsM();
+      if (!alreadyAccountedForSubgroupsK) {
+        distributionSize *= mma.getSubgroupsK();
+        alreadyAccountedForSubgroupsK = true;
+      }
+      TileSwizzle::Dim dim(Kind::CrossThread, mma.getSubgroupsM(),
+                           distributionSize);
+      expand(swizzle, 0, dim);
+    }
   }
   return swizzle;
 }
@@ -274,8 +316,8 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma, int operandIndex) {
   return getSwizzleImpl(mma, operandIndex);
 }
 
-/// Remove the expanded dimensions for this index and update the permutation
-/// by erasing the removed dimensions' indices and adjusting existing larger
+/// Remove the expanded dimensions for this index and update the permutation by
+/// erasing the removed dimensions' indices and adjusting existing larger
 /// indices accordingly.
 static void remove(TileSwizzle &swizzle, size_t idx) {
   assert(idx < swizzle.expandShape.size() && "idx out of bounds");
@@ -310,16 +352,15 @@ getEncodingSwizzle(IREE::Encoding::EncodingAttr encoding,
   // Remove any dimensions that are supposed to be present for the given
   // operand, but are not present for the encoding.
   // The swizzle.expandShape is an expansion of the packed inner tiles.
-  // The order of dimensions in the inner tiles follow the following
-  // priorities:
+  // The order of dimensions in the inner tiles follow the following priorities:
   //  - LHS: [M, K, Kb]
   //  - RHS: [N, K, Kb]
   //  - LHS Scales: [M, Kb]
   //  - RHS Scales: [N, Kb]
   //  - ACC: [M, N]
   // The order of dimensions for all operands is therefore: [M, N, K, Kb].
-  // Remove dimensions from outermost to innermost, so we can always just
-  // remove the outer dimension regardless of the operand.
+  // Remove dimensions from outermost to innermost, so we can always just remove
+  // the outer dimension regardless of the operand.
   if (dims->mDim.shouldHaveDim) {
     if (!dims->mDim.operandIdx.has_value()) {
       remove(swizzle, 0);

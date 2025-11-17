@@ -782,7 +782,7 @@ hal.executable public @main {
             intrinsics_m = 8,
             intrinsics_n = 2,
             subgroups_n = 4,
-            intrinsics_k = 4, operands_interleaving_intrinsics_k = [0, 1]>,
+            intrinsics_k = 4>,
           semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
           : tensor<4x1x8x4x16x4xf32>, tensor<4x1x4x2x4x16x4xf32> into tensor<4x4x4x8x2x4x16x4xf32>
         iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [4, 4, 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<4x4x4x8x2x4x16x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4x4x8x2x4x16x4xf32>>

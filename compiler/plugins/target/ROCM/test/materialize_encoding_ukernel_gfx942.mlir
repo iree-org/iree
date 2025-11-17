@@ -112,7 +112,7 @@ func.func @matmul_f8_f8_f32_medium_lowering_ukernel_provider(%arg0: tensor<?x?xf
 // CHECK-LABEL: matmul_f8_f8_f32_medium_lowering_ukernel_provider
 // CHECK:      iree_codegen.inner_tiled
 // CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 8, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 8, intrinsics_k = 2>
 
 // -----
 
@@ -169,4 +169,4 @@ func.func @matmul_f8_f8_f32_large_lowering_ukernel_provider(%arg0: tensor<?x?xf8
 // CHECK-LABEL: matmul_f8_f8_f32_large_lowering_ukernel_provider
 // CHECK:      iree_codegen.inner_tiled
 // CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,  intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4, operands_interleaving_intrinsics_k = [0, 1]>
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,  intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4>

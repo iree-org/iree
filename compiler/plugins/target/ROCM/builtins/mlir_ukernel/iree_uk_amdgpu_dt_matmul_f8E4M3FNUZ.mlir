@@ -44,7 +44,7 @@ util.func @pingpong_dt_large_f8E4M3FNUZ(%lhs_base: !lhs_base_ty, %rhs_base: !rhs
       subgroups_m = 2,
       intrinsics_n = 4,
       subgroups_n = 4,
-      intrinsics_k = 1, operands_interleaving_intrinsics_k = [0, 1]
+      intrinsics_k = 1
     >
   >
 } {
@@ -306,7 +306,7 @@ util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs
       subgroups_m = 1,
       intrinsics_n = 2,
       subgroups_n = 8,
-      intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]
+      intrinsics_k = 2
     >
   >
 } {
