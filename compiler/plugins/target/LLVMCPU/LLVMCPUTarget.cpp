@@ -372,8 +372,8 @@ public:
     if (auto importsAttr =
             variantOp->getAttrOfType<ArrayAttr>(importsAttrName)) {
       for (auto importAttr : importsAttr.getAsValueRange<ArrayAttr>()) {
-        auto nameAttr = cast<StringAttr>(importAttr[0]);
-        auto weakAttr = cast<BoolAttr>(importAttr[1]);
+        auto nameAttr = llvm::cast<StringAttr>(importAttr[0]);
+        auto weakAttr = llvm::cast<BoolAttr>(importAttr[1]);
         libraryBuilder.addImport(nameAttr.getValue(), weakAttr.getValue());
       }
       variantOp->removeAttr(importsAttrName);
@@ -680,7 +680,7 @@ public:
                                                    {".o", ".obj", ".a", ".lib"},
                                                    linkerObjectAttrs);
     for (auto [index, attr] : llvm::enumerate(linkerObjectAttrs)) {
-      auto objectAttr = cast<IREE::HAL::ExecutableObjectAttr>(attr);
+      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(attr);
       if (auto dataAttr = objectAttr.getData()) {
         objectFiles.push_back(Artifact::createTemporary(
             objectFiles.front().path + "_object_" + std::to_string(index),

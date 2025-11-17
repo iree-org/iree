@@ -199,7 +199,7 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   auto getString = [&](StringRef name, StringRef fallback,
                        bool required) -> StringRef {
     Attribute attr = config.get(name);
-    if (auto sattr = dyn_cast_if_present<StringAttr>(attr)) {
+    if (auto sattr = llvm::dyn_cast_if_present<StringAttr>(attr)) {
       return sattr.strref();
     } else {
       if (required) {
@@ -212,7 +212,7 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   };
   auto getOptionalString = [&](StringRef name) -> std::optional<StringRef> {
     Attribute attr = config.get(name);
-    if (auto sattr = dyn_cast_if_present<StringAttr>(attr)) {
+    if (auto sattr = llvm::dyn_cast_if_present<StringAttr>(attr)) {
       return sattr.strref();
     } else if (attr) {
       hasFailures = true;
@@ -223,7 +223,7 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   };
   auto getBool = [&](StringRef name, bool fallback) -> bool {
     Attribute attr = config.get(name);
-    if (auto battr = dyn_cast_if_present<BoolAttr>(attr)) {
+    if (auto battr = llvm::dyn_cast_if_present<BoolAttr>(attr)) {
       return battr.getValue();
     } else if (attr) {
       hasFailures = true;

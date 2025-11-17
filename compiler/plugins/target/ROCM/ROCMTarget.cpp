@@ -581,7 +581,7 @@ public:
       }
 
       // Read the HSACO from the object file.
-      auto objectAttr = cast<IREE::HAL::ExecutableObjectAttr>(
+      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
           variantOp.getObjects()->getValue().front());
       if (auto data = objectAttr.loadData()) {
         targetHSACO = data.value();
