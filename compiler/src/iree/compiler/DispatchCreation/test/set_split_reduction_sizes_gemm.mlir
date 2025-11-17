@@ -18,6 +18,16 @@ util.func public @split_matmul(%arg0: tensor<32x40960xf32>, %arg1: tensor<40960x
 
 // -----
 
+util.func public @split_very_large_k(%arg0: tensor<128x16800000xbf16>, %arg1: tensor<16800000x134xbf16>, %arg2: tensor<128x134xf32>) -> tensor<128x134xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<128x16800000xbf16>, tensor<16800000x134xbf16>) outs(%arg2 : tensor<128x134xf32>) -> tensor<128x134xf32>
+  util.return %0 : tensor<128x134xf32>
+}
+
+// CHECK-LABEL: @split_very_large_k
+//       CHECK: iree_linalg_ext.split_reduction = [8400 : index]
+
+// -----
+
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4, d1)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4, d0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
@@ -86,6 +96,24 @@ util.func public @no_split_dynamic_matmul(%arg0: tensor<?x40960xf32>, %arg1: ten
 }
 
 // CHECK-LABEL: @no_split_dynamic_matmul
+//   CHECK-NOT: iree_linalg_ext.split_reduction
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+util.func public @no_split_matmul_large_mn(%arg0: tensor<4096x150000xf32>, %arg1: tensor<150000x2048xf32>, %arg2: tensor<4096x2048xf32>) -> tensor<4096x2048xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<4096x150000xf32>, tensor<150000x2048xf32>) outs(%arg2 : tensor<4096x2048xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %1, %out : f32
+    linalg.yield %2 : f32
+  } -> tensor<4096x2048xf32>
+  util.return %0 : tensor<4096x2048xf32>
+}
+
+// CHECK-LABEL: @no_split_matmul_large_mn
 //   CHECK-NOT: iree_linalg_ext.split_reduction
 
 // -----
