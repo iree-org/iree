@@ -154,9 +154,6 @@ void buildGlobalOptimizationPassPipeline(
         return createGeneralizeLinalgNamedOpsPass(opt);
       });
 
-  FunctionLikeNest(mainPassManager)
-      .addPredicatedPass(!clEnableEdgeReshapePropagation,
-                         DispatchCreation::createInsertTensorBarriersPass);
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   FunctionLikeNest(mainPassManager)
       .addPass([&]() {

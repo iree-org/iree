@@ -152,11 +152,6 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //    producer-consumer fusion.
       .addPass(DispatchCreation::createSinkReshapesPass)
       .addPass(IREE::Flow::createCanonicalizePass)
-      .addPass(mlir::createCSEPass)
-
-      // 5. Remove tensor barriers after the preprocessing passes.
-      .addPass(DispatchCreation::createRemoveTensorBarriersPass)
-      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
   if (clEnableFuseHorizontalContractions) {
