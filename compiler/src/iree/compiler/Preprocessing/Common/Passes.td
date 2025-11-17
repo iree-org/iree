@@ -59,6 +59,7 @@ def ConvertConvFilterToChannelsLastPass:
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
 }
 

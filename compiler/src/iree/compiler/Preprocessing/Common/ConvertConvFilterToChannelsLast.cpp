@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -212,15 +213,28 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
 
     Location loc = linalgOp.getLoc();
 
+    // Insert compute_barrier.start before creating transpose op to avoid
+    // movements of reshape ops and undesirable fusion.
+    auto barrierStartOp = IREE::TensorExt::ComputeBarrierStartOp::create(
+        rewriter, loc, filterVal);
+
     AffineMap transposedFilterMap = applyPermutationToResults(filterMap, perm);
-    Value transposedFilter = createTransposeOp(rewriter, loc, filterVal, perm);
+    Value transposedFilter =
+        createTransposeOp(rewriter, loc, barrierStartOp.getResult(), perm);
+
+    // Insert compute_barrier.end after the tranpose op and replace its uses.
+    auto barrierEndOp = IREE::TensorExt::ComputeBarrierEndOp::create(
+        rewriter, loc, transposedFilter);
+    transposedFilter.replaceUsesWithIf(
+        barrierEndOp.getResult(),
+        [&](OpOperand &use) { return use.getOwner() == linalgOp; });
 
     SmallVector<utils::IteratorType> iterators =
         linalgOp.getIteratorTypesArray();
 
     auto genericOp = linalg::GenericOp::create(
         rewriter, loc, outputVal.getType(),
-        ValueRange{inputVal, transposedFilter}, outputVal,
+        ValueRange{inputVal, barrierEndOp.getResult()}, outputVal,
         ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
         iterators);
 
