@@ -41,7 +41,7 @@ namespace {
 static bool isSafeToElideCOW(Value operand, IREE::Stream::ResourceType type) {
   // Can't do anything with block args without analysis - we don't know if the
   // value they carry is the last user (move semantics).
-  if (isa<BlockArgument>(operand))
+  if (llvm::isa<BlockArgument>(operand))
     return false;
 
   // If our value is a constant then we need to ensure that we aren't
@@ -86,7 +86,8 @@ static Value materializeOperandCOW(Location loc, OpOperand &operand,
     return nullptr;
 
   // Materialize a clone operation just for the operand provided.
-  auto sizeAwareType = cast<IREE::Util::SizeAwareTypeInterface>(resourceType);
+  auto sizeAwareType =
+      llvm::cast<IREE::Util::SizeAwareTypeInterface>(resourceType);
   auto size = sizeAwareType.queryValueSize(loc, operand.get(), builder);
   return IREE::Stream::AsyncCloneOp::create(
       builder, loc, resourceType, operand.get(), size, size, affinity);

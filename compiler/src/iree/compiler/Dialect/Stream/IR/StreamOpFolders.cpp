@@ -395,7 +395,7 @@ struct TieRegionResults : public OpRewritePattern<Op> {
         }
         auto baseValue =
             IREE::Util::TiedOpInterface::findTiedBaseValue(result.value());
-        if (auto blockArg = dyn_cast<BlockArgument>(baseValue)) {
+        if (auto blockArg = llvm::dyn_cast<BlockArgument>(baseValue)) {
           unsigned operandIndex = blockArg.getArgNumber();
           rewriter.modifyOpInPlace(op, [&]() {
             op.setTiedResultOperandIndex(result.index(), operandIndex);
@@ -685,7 +685,7 @@ void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult ResourceSizeOp::fold(FoldAdaptor operands) {
   auto sizeAwareType =
-      cast<IREE::Util::SizeAwareTypeInterface>(getOperand().getType());
+      llvm::cast<IREE::Util::SizeAwareTypeInterface>(getOperand().getType());
   Operation *op = this->getOperation();
   return sizeAwareType.findSizeValue(getOperand(), op->getBlock(),
                                      Block::iterator(op));
@@ -1018,7 +1018,7 @@ struct SinkSubviewAcrossSelectOps
   using Base::Base;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!isa<IREE::Stream::ResourceType>(op.getType()))
+    if (!llvm::isa<IREE::Stream::ResourceType>(op.getType()))
       return failure();
     auto trueSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
         op.getTrueValue().getDefiningOp());
@@ -1130,7 +1130,8 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(TensorConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto shapedType = dyn_cast<ShapedType>(constantOp.getResultEncoding());
+    auto shapedType =
+        llvm::dyn_cast<ShapedType>(constantOp.getResultEncoding());
     if (!shapedType)
       return failure();
 
@@ -1172,7 +1173,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(TensorConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto splatAttr = dyn_cast<SplatElementsAttr>(constantOp.getValue());
+    auto splatAttr = llvm::dyn_cast<SplatElementsAttr>(constantOp.getValue());
     if (!splatAttr || !splatAttr.isSplat()) {
       return rewriter.notifyMatchFailure(
           constantOp,
@@ -1492,7 +1493,7 @@ struct ConvertSplatConstantsIntoSplats
       return failure();
     }
     auto splatElementAttr =
-        dyn_cast<SplatElementsAttr>(value).getSplatValue<TypedAttr>();
+        llvm::dyn_cast<SplatElementsAttr>(value).getSplatValue<TypedAttr>();
     auto splatValue =
         arith::ConstantOp::create(rewriter, constantOp.getLoc(),
                                   splatElementAttr.getType(), splatElementAttr);
@@ -2267,7 +2268,7 @@ struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
     }
     SmallVector<Value> newResults;
     for (auto operand : yieldOp->getResourceOperands()) {
-      auto arg = cast<BlockArgument>(operand);
+      auto arg = llvm::cast<BlockArgument>(operand);
       auto capture = op.getResourceOperands()[arg.getArgNumber()];
       assert(arg.getType() == capture.getType() &&
              "expect 1:1 types on captures to results");
@@ -2644,7 +2645,7 @@ struct FoldSubviewsIntoCmdCallOp : public OpRewritePattern<CmdCallOp> {
     bool anySubviewOps = false;
     for (auto [operandIndex, operand] :
          llvm::enumerate(op.getResourceOperands())) {
-      if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+      if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
         auto subviewOp = ResourceSubviewOp::findSubviewOp(operand);
         if (subviewOp)
           anySubviewOps = true;
@@ -2906,10 +2907,10 @@ struct FoldParameterReadTargetSubview
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
-    auto newSourceOffset = cast<Value>(op.getSourceOffset());
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
     auto newTargetResource = op.getTarget();
     auto newTargetSize = op.getTargetSize();
-    auto newTargetOffset = cast<Value>(op.getTargetOffset());
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
     if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
             newTargetResource.getDefiningOp())) {
       newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
@@ -2961,8 +2962,8 @@ struct FoldParameterWriteSourceSubview
     bool needsUpdate = false;
     auto newSourceResource = op.getSource();
     auto newSourceSize = op.getSourceSize();
-    auto newSourceOffset = cast<Value>(op.getSourceOffset());
-    auto newTargetOffset = cast<Value>(op.getTargetOffset());
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
     if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
             newSourceResource.getDefiningOp())) {
       newSourceResource = subviewOp.getSource();

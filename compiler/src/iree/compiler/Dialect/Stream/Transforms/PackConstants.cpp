@@ -472,7 +472,8 @@ static Value generateSerializedUpload(
   // subrange it so that we don't need so many files.
 
   auto anyResult = slices.front().result;
-  auto resourceType = cast<IREE::Stream::ResourceType>(anyResult.getType());
+  auto resourceType =
+      llvm::cast<IREE::Stream::ResourceType>(anyResult.getType());
 
   // Emit rodata storage for the constant values.
   // As our upload paths may vary this ensures that we are only emitting
@@ -523,7 +524,8 @@ static Value generateParameterUpload(
     ArrayRef<ConstantSlice> slices, IntegerSet<int64_t> &i64Set,
     IndexSet &indexSet, OpBuilder &builder) {
   auto anyResult = slices.front().result;
-  auto resourceType = cast<IREE::Stream::ResourceType>(anyResult.getType());
+  auto resourceType =
+      llvm::cast<IREE::Stream::ResourceType>(anyResult.getType());
 
   // Perform the packing of dense values to compute the storage resources we
   // will need and where each value will be placed unless we have a chance to

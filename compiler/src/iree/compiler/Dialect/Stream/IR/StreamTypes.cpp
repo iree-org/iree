@@ -273,7 +273,7 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
     if (attr)
       return attr;
     // See if the affinity specified provides a resource configuration.
-    if (auto affinityOp = dyn_cast<AffinityOpInterface>(op)) {
+    if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinityAttr = affinityOp.getAffinityAttr();
       if (affinityAttr) {
         auto attr = affinityAttr.getResourceConfigAttr();
@@ -297,7 +297,7 @@ int64_t NamedParameterAttr::getStorageSize() const {
       return lengthAttr.getInt();
     }
   }
-  if (auto shapedType = dyn_cast<ShapedType>(getType())) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
     return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
   } else {
     return IREE::Util::getTypePhysicalStorageBitWidth(getType());
@@ -339,7 +339,7 @@ void TimepointAttr::print(AsmPrinter &p) const {
 AffinityAttr AffinityAttr::lookup(Operation *fromOp) {
   auto attrId = StringAttr::get(fromOp->getContext(), "stream.affinity");
   while (fromOp) {
-    if (auto affinityOp = dyn_cast<AffinityOpInterface>(fromOp)) {
+    if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(fromOp)) {
       if (auto affinity = affinityOp.getAffinityAttr()) {
         return affinity;
       }
@@ -508,12 +508,12 @@ void ResourceType::print(AsmPrinter &p) const {
 }
 
 bool ResourceType::isAccessStorageCompatible(Type accessType) const {
-  if (auto resourceType = dyn_cast<ResourceType>(accessType)) {
+  if (auto resourceType = llvm::dyn_cast<ResourceType>(accessType)) {
     // We could allow widening loads or stores here but today we require
     // transfers to accomplish that.
     return accessType == resourceType;
   }
-  return isa<ShapedType>(accessType);
+  return llvm::isa<ShapedType>(accessType);
 }
 
 Value ResourceType::inferSizeFromValue(Location loc, Value value,

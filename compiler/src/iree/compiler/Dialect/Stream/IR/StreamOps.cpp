@@ -102,7 +102,7 @@ static LogicalResult verifyOpDynamicDims(Operation *op, TypeRange types,
                                          ValueRange dynamicDims) {
   unsigned requiredCount = 0;
   for (auto type : types) {
-    if (auto shapedType = dyn_cast_if_present<ShapedType>(type)) {
+    if (auto shapedType = llvm::dyn_cast_if_present<ShapedType>(type)) {
       requiredCount += shapedType.getNumDynamicDims();
     }
   }
@@ -123,7 +123,7 @@ static LogicalResult verifyOpDynamicDimsRange(Operation *op,
   unsigned requiredCount = 0;
   for (auto attr : typesAttr) {
     if (auto typeAttr = dyn_cast_if_present<TypeAttr>(attr)) {
-      if (auto shapedType = dyn_cast<ShapedType>(typeAttr.getValue())) {
+      if (auto shapedType = llvm::dyn_cast<ShapedType>(typeAttr.getValue())) {
         requiredCount += shapedType.getNumDynamicDims();
       }
     }
@@ -143,7 +143,7 @@ static LogicalResult verifyOpValueSizes(Operation *op, ValueRange values,
                                         ValueRange sizes) {
   unsigned requiredCount = 0;
   for (auto value : values) {
-    if (isa<IREE::Util::SizeAwareTypeInterface>(value.getType())) {
+    if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(value.getType())) {
       ++requiredCount;
     }
   }
@@ -169,7 +169,7 @@ static LogicalResult verifyAllResourcesCaptured(Region &region) {
     for (auto operand : op.getOperands()) {
       if (!operand)
         continue;
-      if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+      if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType()))
         continue;
       if (!availableResources.contains(operand)) {
         return op.emitOpError() << "used resource not listed in explicit "
@@ -1131,7 +1131,7 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
         p << arg;
         p << ": ";
         p << arg.getType();
-        if (isa<IREE::Util::SizeAwareTypeInterface>(arg.getType())) {
+        if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(arg.getType())) {
           p << "{" << operandSizes.front() << "}";
           operandSizes = operandSizes.drop_front(1);
         }
@@ -1214,7 +1214,7 @@ static void printExplicitResourceRegion(OpAsmPrinter &p, Operation *op,
         p << arg;
         p << ": ";
         p << arg.getType();
-        if (isa<IREE::Util::SizeAwareTypeInterface>(arg.getType())) {
+        if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(arg.getType())) {
           p << "{" << operandSizes.front() << "}";
           operandSizes = operandSizes.drop_front(1);
         }
@@ -1612,8 +1612,8 @@ SmallVector<ResourcePackOp::Slice> ResourcePackOp::getSlices() {
   auto offsets = getPackedOffsets();
   SmallVector<ResourcePackOp::Slice> slices(offsets.size());
   for (size_t i = 0; i < offsets.size(); ++i) {
-    int64_t start = cast<IntegerAttr>(intervalPairs[i * 2 + 0]).getInt();
-    int64_t end = cast<IntegerAttr>(intervalPairs[i * 2 + 1]).getInt();
+    int64_t start = llvm::cast<IntegerAttr>(intervalPairs[i * 2 + 0]).getInt();
+    int64_t end = llvm::cast<IntegerAttr>(intervalPairs[i * 2 + 1]).getInt();
     slices[i] = {start, end, sizes[i], offsets[i]};
   }
   return slices;
@@ -1874,8 +1874,8 @@ LogicalResult TensorCloneOp::verify() {
   TensorCloneOp op = *this;
   // Clones can't change encodings but they can change shape and element type
   // information.
-  auto sourceEncoding = cast<RankedTensorType>(op.getSourceEncoding());
-  auto resultEncoding = cast<RankedTensorType>(op.getResultEncoding());
+  auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
+  auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
   if (!IREE::Encoding::SerializableAttr::areCompatible(
           sourceEncoding.getEncoding(), resultEncoding.getEncoding())) {
     return op.emitOpError() << "clones changing tensor encoding from "
@@ -1926,7 +1926,7 @@ LogicalResult TensorSliceOp::verify() {
       failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
-  auto sourceType = cast<ShapedType>(op.getSourceEncoding());
+  auto sourceType = llvm::cast<ShapedType>(op.getSourceEncoding());
   if (op.getStartIndices().size() != sourceType.getRank() ||
       op.getLengths().size() != sourceType.getRank()) {
     return op.emitOpError() << "start_indices/lengths rank mismatch";
@@ -2002,7 +2002,7 @@ LogicalResult TensorLoadOp::verify() {
       failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
     return failure();
   }
-  auto sourceType = cast<ShapedType>(op.getSourceEncoding());
+  auto sourceType = llvm::cast<ShapedType>(op.getSourceEncoding());
   if (op.getIndices().size() != sourceType.getRank()) {
     return op.emitOpError() << "indices rank mismatch";
   }
@@ -2020,7 +2020,7 @@ LogicalResult TensorStoreOp::verify() {
       failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
     return failure();
   }
-  auto targetType = cast<ShapedType>(op.getTargetEncoding());
+  auto targetType = llvm::cast<ShapedType>(op.getTargetEncoding());
   if (op.getIndices().size() != targetType.getRank()) {
     return op.emitOpError() << "indices rank mismatch";
   }
@@ -2365,7 +2365,7 @@ void AsyncCopyOp::getAsyncAccessRanges(
 //===----------------------------------------------------------------------===//
 
 static const char *getCollectiveParamKeyword(Attribute opAttr) {
-  auto attr = cast<IREE::Stream::CollectiveAttr>(opAttr);
+  auto attr = llvm::cast<IREE::Stream::CollectiveAttr>(opAttr);
   switch (attr.getKind()) {
   case IREE::Stream::CollectiveKind::Broadcast:
     return "source";
@@ -2667,7 +2667,7 @@ static void printDispatchOperands(OpAsmPrinter &p, Operation *op,
   unsigned resourceIndex = 0;
   llvm::interleaveComma(resourceOperands, p, [&](Value operand) {
     p.printOperand(operand);
-    if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+    if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
       p << "[";
       p.printOperand(resourceOffsets[resourceIndex]);
       p << " to ";
@@ -2690,7 +2690,7 @@ LogicalResult AsyncDispatchOp::verify() {
   }
   unsigned requiredRangeCount = 0;
   for (auto value : op.getResourceOperands()) {
-    if (isa<IREE::Stream::ResourceType>(value.getType())) {
+    if (llvm::isa<IREE::Stream::ResourceType>(value.getType())) {
       ++requiredRangeCount;
     }
   }
@@ -2723,7 +2723,7 @@ void AsyncDispatchOp::getAsyncAccessRanges(
   unsigned rangeIndex = 0;
   unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
   for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType()))
       continue;
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
@@ -2806,7 +2806,7 @@ bool AsyncFuncOp::isResultTied(int resultIndex) {
   auto tiedOperandsAttr = getTiedOperandsAttr();
   if (!tiedOperandsAttr)
     return false;
-  auto indexAttr = dyn_cast_if_present<IntegerAttr>(
+  auto indexAttr = llvm::dyn_cast_if_present<IntegerAttr>(
       tiedOperandsAttr.getValue()[resultIndex]);
   if (!indexAttr)
     return false;
@@ -2828,7 +2828,7 @@ LogicalResult AsyncCallOp::verify() {
 
   unsigned requiredRangeCount = 0;
   for (auto value : op.getResourceOperands()) {
-    if (isa<IREE::Stream::ResourceType>(value.getType())) {
+    if (llvm::isa<IREE::Stream::ResourceType>(value.getType())) {
       ++requiredRangeCount;
     }
   }
@@ -2850,7 +2850,7 @@ LogicalResult AsyncCallOp::verify() {
   // to be able to return non-resource types as well and adjust partitioning
   // to set them up as return values. For now we just avoid this.
   for (auto resultType : op.getResultTypes()) {
-    if (!isa<IREE::Stream::ResourceType>(resultType)) {
+    if (!llvm::isa<IREE::Stream::ResourceType>(resultType)) {
       return op->emitOpError() << "non-resource return values are not yet "
                                   "supported on async calls";
     }
@@ -2881,8 +2881,8 @@ AsyncCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   auto typesCompatible = [](Type callee, Type call) {
     if (callee == call)
       return true;
-    auto calleeResource = dyn_cast<IREE::Stream::ResourceType>(callee);
-    auto callResource = dyn_cast<IREE::Stream::ResourceType>(call);
+    auto calleeResource = llvm::dyn_cast<IREE::Stream::ResourceType>(callee);
+    auto callResource = llvm::dyn_cast<IREE::Stream::ResourceType>(call);
     if (calleeResource && callResource) {
       if (calleeResource.getLifetime() == IREE::Stream::Lifetime::Unknown) {
         // Allow anything to match with an unknown lifetime on the async.func.
@@ -2926,7 +2926,7 @@ void AsyncCallOp::getAsyncAccessRanges(
   unsigned rangeIndex = 0;
   unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
   for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType()))
       continue;
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
@@ -3033,7 +3033,7 @@ getExecutionAsyncAccessRanges(Op op,
   for (auto [i, operand, operandSize] : llvm::zip_equal(
            llvm::seq<unsigned>(0, op.getResourceOperands().size()),
            op.getResourceOperands(), op.getResourceOperandSizes())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType()))
       continue;
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = op.getOperandTiedResults(tiedOperandBase + i);
@@ -3339,7 +3339,7 @@ LogicalResult CmdCollectiveOp::verify() {
            << " provided";
   }
   for (size_t i = 0; i < requiredCount; ++i) {
-    auto declaredAccess = cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+    auto declaredAccess = llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
                               op.getResourceAccesses()[i])
                               .getValue();
     if (!bitEnumContainsAll(declaredAccess, requiredAccess[i])) {
@@ -3495,9 +3495,9 @@ printDispatchResources(OpAsmPrinter &p, Operation *op, ValueRange resources,
     auto resourceSize = resourceSizes[i];
     auto resourceOffset = resourceOffsets[i];
     auto resourceLength = resourceLengths[i];
-    auto resourceAccess =
-        cast<IREE::Stream::ResourceAccessBitfieldAttr>(resourceAccesses[i])
-            .getValue();
+    auto resourceAccess = llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+                              resourceAccesses[i])
+                              .getValue();
     p.printNewline();
     p << "  ";
     if (bitEnumContainsAll(resourceAccess,
@@ -3532,14 +3532,14 @@ SmallVector<unsigned>
 CmdDispatchOp::makeOperandToArgMap(mlir::FunctionOpInterface funcOp) {
   unsigned operandCount =
       llvm::count_if(funcOp.getArgumentTypes(), [](Type type) {
-        return !isa<IREE::Stream::BindingType>(type);
+        return !llvm::isa<IREE::Stream::BindingType>(type);
       });
   SmallVector<unsigned> map(operandCount);
   unsigned operandIdx = 0;
   for (auto it : llvm::enumerate(funcOp.getArgumentTypes())) {
     unsigned argIdx = it.index();
     auto argType = it.value();
-    if (!isa<IREE::Stream::BindingType>(argType)) {
+    if (!llvm::isa<IREE::Stream::BindingType>(argType)) {
       map[operandIdx++] = argIdx;
     }
   }
@@ -3678,7 +3678,7 @@ static void printDispatchFunctionResultList(OpAsmPrinter &p, Operation *op,
     p.printType(resultType);
     if (resultAttrs) {
       auto attrs =
-          dyn_cast_if_present<DictionaryAttr>(resultAttrs.getValue()[i]);
+          llvm::dyn_cast_if_present<DictionaryAttr>(resultAttrs.getValue()[i]);
       if (attrs && !attrs.empty()) {
         p.printOptionalAttrDict(attrs.getValue());
       }
@@ -3726,7 +3726,7 @@ ParseResult parseDispatchFunctionSignature(OpAsmParser &parser,
 void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
                                     TypeAttr functionTypeAttr,
                                     ArrayAttr argAttrs, ArrayAttr resultAttrs) {
-  auto functionType = cast<FunctionType>(functionTypeAttr.getValue());
+  auto functionType = llvm::cast<FunctionType>(functionTypeAttr.getValue());
   p << "(";
   for (size_t argIndex = 0; argIndex < functionType.getNumInputs();) {
     if (argIndex)
@@ -3735,7 +3735,7 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
     auto type = functionType.getInput(baseArgIndex);
     p << "%arg";
     p << (baseArgIndex + 0);
-    if (isa<IREE::Stream::ResourceType>(type)) {
+    if (llvm::isa<IREE::Stream::ResourceType>(type)) {
       p << "[%arg" << (baseArgIndex + 1) << " for %arg" << (baseArgIndex + 2)
         << "]";
       argIndex += 3; // <resource, offset, length>
@@ -3745,7 +3745,7 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
     p << ": ";
     p.printType(type);
     if (argAttrs) {
-      auto attrs = dyn_cast_if_present<DictionaryAttr>(
+      auto attrs = llvm::dyn_cast_if_present<DictionaryAttr>(
           argAttrs.getValue()[baseArgIndex]);
       if (attrs && !attrs.empty()) {
         p.printOptionalAttrDict(attrs.getValue());
@@ -3779,7 +3779,7 @@ LogicalResult CmdCallOp::verify() {
 
   unsigned resourceCount = 0;
   for (auto value : op.getResourceOperands()) {
-    if (isa<IREE::Stream::ResourceType>(value.getType())) {
+    if (llvm::isa<IREE::Stream::ResourceType>(value.getType())) {
       ++resourceCount;
     }
   }
@@ -3879,13 +3879,14 @@ static void printCmdCallOperands(OpAsmPrinter &p, Operation *op,
   size_t resourceIndex = 0;
   for (size_t i = 0; i < resourceOperands.size(); ++i) {
     auto operand = resourceOperands[i];
-    if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+    if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
       // Resource type.
       auto resourceOffset = resourceOffsets[resourceIndex];
       auto resourceLength = resourceLengths[resourceIndex];
-      auto resourceAccess = cast<IREE::Stream::ResourceAccessBitfieldAttr>(
-                                resourceAccesses[resourceIndex])
-                                .getValue();
+      auto resourceAccess =
+          llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+              resourceAccesses[resourceIndex])
+              .getValue();
       if (bitEnumContainsAll(resourceAccess,
                              IREE::Stream::ResourceAccessBitfield::Read |
                                  IREE::Stream::ResourceAccessBitfield::Write)) {
@@ -4362,7 +4363,7 @@ mlir::FunctionOpInterface ExecutableExportOp::lookupFunctionRef() {
 
 LogicalResult BindingSubspanOp::verify() {
   BindingSubspanOp op = *this;
-  if (auto shapedType = dyn_cast<ShapedType>(op.getType())) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(op.getType())) {
     if (failed(verifyOpDynamicDims(op, shapedType, op.getDynamicDims()))) {
       return failure();
     }

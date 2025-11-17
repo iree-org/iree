@@ -91,7 +91,9 @@ public:
 
   template <typename TypeT>
   void addTypeVerifier(std::function<Legality(TypeT)> fn) {
-    auto wrapperFn = [=](Type baseType) { return fn(cast<TypeT>(baseType)); };
+    auto wrapperFn = [=](Type baseType) {
+      return fn(llvm::cast<TypeT>(baseType));
+    };
     if (typeVerifiers.insert({TypeID::get<TypeT>(), wrapperFn}).second ==
         false) {
       assert(false && "already registered for this type");

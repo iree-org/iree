@@ -216,7 +216,7 @@ private:
     // If the operand is a block argument then we need to ask for the argument
     // semantics first - if it's by reference then it's definitely not the last
     // use and we can short-circuit this.
-    if (auto arg = dyn_cast<BlockArgument>(operand.get())) {
+    if (auto arg = llvm::dyn_cast<BlockArgument>(operand.get())) {
       auto &argumentSemantics = solver.getElementFor<ArgumentSemantics>(
           *this, Position::forValue(operand.get()), DFX::Resolution::REQUIRED);
       LLVM_DEBUG(llvm::dbgs()
@@ -243,7 +243,7 @@ private:
     auto assumedBits = getAssumed();
     auto traversalResult = TraversalResult::COMPLETE;
 
-    auto arg = cast<BlockArgument>(value);
+    auto arg = llvm::cast<BlockArgument>(value);
     bool isEntryArg = arg.getParentBlock()->isEntryBlock();
     if (isEntryArg) {
       // Call argument.
@@ -318,7 +318,7 @@ public:
         continue;
       for (auto &block : *region) {
         for (auto arg : block.getArguments()) {
-          if (isa<IREE::Stream::ResourceType>(arg.getType())) {
+          if (llvm::isa<IREE::Stream::ResourceType>(arg.getType())) {
             solver.getOrCreateElementFor<ArgumentSemantics>(
                 Position::forValue(arg));
           }
@@ -402,9 +402,9 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   // values as "eventually constant" to allow us to promote to constant
   // lifetime.
   auto sourceType =
-      cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
+      llvm::cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
   auto targetType =
-      cast<IREE::Stream::ResourceType>(cloneOp.getResult().getType());
+      llvm::cast<IREE::Stream::ResourceType>(cloneOp.getResult().getType());
   if (sourceType != targetType &&
       sourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
     LLVM_DEBUG(llvm::dbgs()
@@ -417,7 +417,7 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   // to see if it's been classified as a last use/by-value move. If it isn't
   // then we cannot mutate it in-place as it could be used by the caller/another
   // branch and we need to respect the forking of the value.
-  if (auto arg = dyn_cast<BlockArgument>(cloneOp.getSource())) {
+  if (auto arg = llvm::dyn_cast<BlockArgument>(cloneOp.getSource())) {
     if (!analysis.isArgMoved(arg)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "  - clone source is a by-ref arg; cannot elide\n");
@@ -605,7 +605,7 @@ static void foldSliceIntoDispatch(IREE::Stream::AsyncSliceOp sliceOp,
   unsigned resourceIndex = llvm::count_if(
       dispatchOp.getResourceOperands().slice(0, operandIndex),
       [](Value operand) {
-        return isa<IREE::Stream::ResourceType>(operand.getType());
+        return llvm::isa<IREE::Stream::ResourceType>(operand.getType());
       });
   OpBuilder builder(dispatchOp);
   dispatchOp.getResourceOperandOffsetsMutable()[resourceIndex].set(addOffset(

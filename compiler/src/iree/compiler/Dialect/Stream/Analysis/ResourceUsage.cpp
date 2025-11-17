@@ -238,7 +238,7 @@ private:
 
   // Starts analysis of the |value| with known bits based on its resource type.
   void initializeValue(Value value, DFX::Solver &solver) override {
-    auto resourceType = cast<IREE::Stream::ResourceType>(value.getType());
+    auto resourceType = llvm::cast<IREE::Stream::ResourceType>(value.getType());
     initializeFromType(resourceType);
   }
 
@@ -247,7 +247,7 @@ private:
   // itself is under analysis.
   void updateFromDefiningOp(Value value, OpResult result, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!isa<IREE::Stream::ResourceType>(result.getType()))
+    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType()))
       return;
 
     TypeSwitch<Operation *, void>(result.getOwner())
@@ -300,7 +300,7 @@ private:
         })
         .Case([&](IREE::Stream::TensorImportOp op) {
           auto targetType =
-              cast<IREE::Stream::ResourceType>(op.getResult().getType());
+              llvm::cast<IREE::Stream::ResourceType>(op.getResult().getType());
           switch (targetType.getLifetime()) {
           default:
           case IREE::Stream::Lifetime::External:
@@ -513,7 +513,7 @@ private:
   // This walks through tied uses as well.
   void updateFromUse(Value value, OpOperand &operand, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!isa<IREE::Stream::ResourceType>(operand.get().getType()))
+    if (!llvm::isa<IREE::Stream::ResourceType>(operand.get().getType()))
       return;
 
     auto *userOp = operand.getOwner();
@@ -654,7 +654,7 @@ private:
         })
         .Case([&](IREE::Stream::TensorExportOp op) {
           auto sourceType =
-              cast<IREE::Stream::ResourceType>(op.getSource().getType());
+              llvm::cast<IREE::Stream::ResourceType>(op.getSource().getType());
           switch (sourceType.getLifetime()) {
           default:
           case IREE::Stream::Lifetime::External:
