@@ -250,9 +250,13 @@ MlirAttribute ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr) {
   llvm::SmallVector<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>
       virtualIntrinsics = mma.getVirtualIntrinsics();
 
-  auto rawValues =
-      llvm::map_to_vector(virtualIntrinsics, llvm::StaticCastTo<int64_t>);
-  mlir::Builder builder(mma.getContext());
+  llvm::SmallVector<int64_t> rawValues;
+  for (auto v : virtualIntrinsics) {
+    rawValues.push_back(static_cast<int64_t>(v));
+  }
+
+  mlir::MLIRContext *ctx = mma.getContext();
+  mlir::Builder builder(ctx);
   return wrap(builder.getI64ArrayAttr(rawValues));
 }
 

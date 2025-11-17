@@ -374,8 +374,9 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       linalg::LinalgTilingOptions()
           .setDistributionOptions(getIREELinalgLoopDistributionOptions(
               distributionMethodValue, maxWorkgroupParallelDims))
-          .setInterchange(
-              llvm::map_to_vector(interchange, llvm::StaticCastTo<unsigned>))
+          .setInterchange(llvm::map_to_vector(
+              interchange,
+              [](int64_t v) -> unsigned { return static_cast<unsigned>(v); }))
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(tileSizeFn);
 
