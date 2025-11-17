@@ -140,7 +140,7 @@ static void populateSwapSetPrioWithMFMAPatterns(RewritePatternSet &patterns) {
 template <typename... Floats>
 static bool containsAPred(Type type) {
   type = getElementTypeOrSelf(type);
-  return isa<Floats...>(type);
+  return llvm::isa<Floats...>(type);
 }
 
 // Function to check valid data types on the ROCm backend.

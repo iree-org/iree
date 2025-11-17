@@ -22,7 +22,8 @@ static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
                                           IREE::GPU::TargetAttr target) {
   const std::array<int64_t, 2> workgroupXY = {256, 1};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
+  auto inputType =
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
     threadMNK = {4, 8, 8};
   } else {

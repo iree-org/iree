@@ -69,9 +69,9 @@ struct LLVMGPUVectorDistributePass final
     std::array<int64_t, 3> workgroupSize;
     if (funcOp->hasAttr("workgroup_size")) {
       auto tmpSizes =
-          cast<ArrayAttr>(funcOp->getAttr("workgroup_size")).getValue();
+          llvm::cast<ArrayAttr>(funcOp->getAttr("workgroup_size")).getValue();
       for (auto [i, size] : llvm::enumerate(tmpSizes)) {
-        workgroupSize[i] = cast<IntegerAttr>(size).getInt();
+        workgroupSize[i] = llvm::cast<IntegerAttr>(size).getInt();
       }
     } else {
       std::optional<SmallVector<int64_t>> maybeWorkgroupSize =

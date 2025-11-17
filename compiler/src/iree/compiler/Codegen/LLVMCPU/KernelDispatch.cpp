@@ -392,7 +392,7 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
 
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
-        cast<ShapedType>(inputOutputOpOperands[index].get().getType());
+        llvm::cast<ShapedType>(inputOutputOpOperands[index].get().getType());
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
 
     minTileSizes[fastestVaryingDim] =
@@ -3149,7 +3149,7 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
       flags.resize(sizes.size(), false);
     } else if (level == IREE::CPU::TilingLevel::VectorCommonParallelTiles) {
       if (rootLoweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
-        auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        auto attr = llvm::cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
             rootLoweringConfig.getTilingLevelAttr(llvm::to_underlying(level)));
         sizes.assign(attr.getSizes());
         // Only `VectorCommonParallel` has scalable flags.
@@ -3279,7 +3279,7 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
   if (!resultTypes.empty()) {
     Type elementType = getElementTypeOrSelf(resultTypes[0]);
     unsigned int elementTypeSize;
-    if (auto complexType = dyn_cast<ComplexType>(elementType)) {
+    if (auto complexType = llvm::dyn_cast<ComplexType>(elementType)) {
       elementTypeSize =
           2 * complexType.getElementType().getIntOrFloatBitWidth();
     } else {

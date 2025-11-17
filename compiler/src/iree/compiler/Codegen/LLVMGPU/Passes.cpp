@@ -165,10 +165,10 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   bool needsBarrier = false;
-  if (hasSharedMemoryAddressSpace(cast<MemRefType>(from.getType()))) {
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(from.getType()))) {
     needsBarrier = true;
   }
-  if (hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
   if (needsBarrier)
@@ -335,7 +335,8 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
   // Bail out if the memref type specifies a nonnull memory space that is not
   // #gpu.address_space.
   if (memorySpace &&
-      !isa<gpu::AddressSpaceAttr, amdgpu::AddressSpaceAttr>(memorySpace)) {
+      !llvm::isa<gpu::AddressSpaceAttr, amdgpu::AddressSpaceAttr>(
+          memorySpace)) {
     return failure();
   }
 
@@ -724,11 +725,11 @@ void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
 static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
   bool needsBarrier = false;
-  MemRefType fromType = cast<MemRefType>(from.getType());
+  MemRefType fromType = llvm::cast<MemRefType>(from.getType());
   if (hasSharedMemoryAddressSpace(fromType)) {
     needsBarrier = true;
   }
-  if (hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
   if (needsBarrier)
