@@ -312,6 +312,11 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // generate much garbage and what it does (mostly around timepoints) will be
   // handled during the optimization pipeline below.
 
+  // If there are any external transient memory size query functions that folded
+  // into constants after our layout/propagation/cleanup then tag them now. This
+  // is a no-op if none of the functions exist.
+  passManager.addPass(IREE::Stream::createAnnotateConstantTransientSizePass());
+
   // Everything must now be in explicit stream.cmd.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());
 }

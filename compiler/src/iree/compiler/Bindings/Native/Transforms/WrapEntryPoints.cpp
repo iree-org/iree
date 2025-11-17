@@ -696,8 +696,9 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     asyncResults[resultIndex] = cast<OpResult>(aliasOp.getResult());
   }
 
-  // Annotate transient storage if provided.
-  // Create one transients op per tensor result.
+  // Annotate transient storage on produced results, if provided.
+  // The op indicates "any transient memory used for producing this value should
+  // be allocated from this storage."
   if (transientStorage) {
     for (auto [resultIndex, result] : llvm::enumerate(asyncResults)) {
       if (llvm::isa<TensorType>(result.getType())) {

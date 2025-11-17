@@ -53,34 +53,35 @@ util.func public @single_allocation_constant(
   %storage: !stream.resource<transient>, %storage_size: index,
   %input_timepoint: !stream.timepoint
 ) -> (!stream.resource<*>, index) {
-  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[ZERO_INDEX:.+]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[ZERO_I32:.+]] = arith.constant 0 : i32
   %c0_i32 = arith.constant 0 : i32
-  // CHECK-DAG: %[[C1024:.+]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[TRANSIENT_SIZE:.+]] = arith.constant 1024 : index
   %c1024 = arith.constant 1024 : index
 
   // Size hoisted for pack (shows transformation happening).
-  // CHECK-DAG: %[[SIZE_FOR_PACK:.+]] = arith.constant 1024 : index
+  // CHECK: %[[TRANSIENT_SIZE_FOR_PACK:.+]] = arith.constant 1024 : index
   //
   // Pack created with single slice - total size in #0, offset in #1.
-  // CHECK: %[[PACK:.+]]:2 = stream.resource.pack slices({
-  // CHECK-NEXT:   [0, 0] = %[[SIZE_FOR_PACK]]
+  // CHECK-NEXT: %[[PACK:.+]]:2 = stream.resource.pack slices({
+  // CHECK-NEXT:   [0, 0] = %[[TRANSIENT_SIZE_FOR_PACK]]
   // CHECK-NEXT: }) : index attributes {stream.experimental.transients}
   //
   // Storage subview at offset 0.
-  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%{{.+}}] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
+  // CHECK: %[[BASE_OFFSET:.+]] = arith.constant 0 : index
+  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%[[BASE_OFFSET]]] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
   //
   // Allocation replaced with subview from storage (uses pack offset #1).
-  // CHECK: %[[ALLOC_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE_SUBVIEW]][%[[PACK]]#1] : !stream.resource<transient>{%[[PACK]]#0} -> !stream.resource<transient>{%[[C1024]]}
+  // CHECK: %[[ALLOC_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE_SUBVIEW]][%[[PACK]]#1] : !stream.resource<transient>{%[[PACK]]#0} -> !stream.resource<transient>{%[[TRANSIENT_SIZE]]}
 
   // Allocate transient resource awaiting input timepoint.
   %transient, %alloca_timepoint = stream.resource.alloca uninitialized await(%input_timepoint) =>
       !stream.resource<transient>{%c1024} => !stream.timepoint
 
   // CRITICAL: Input timepoint threads through to execute (alloca removed, timeline preserved).
-  // CHECK: %[[EXEC_TP:.+]] = stream.cmd.execute await(%[[INPUT_TIMEPOINT]]) => with(%[[ALLOC_SUBVIEW]] as %{{.+}}: !stream.resource<transient>{%[[C1024]]}) {
-  // CHECK-NEXT:   stream.cmd.fill %[[C0_I32]], %{{.+}}[%[[C0]] for %[[C1024]]] : i32 -> !stream.resource<transient>{%[[C1024]]}
+  // CHECK: %[[EXEC_TP:.+]] = stream.cmd.execute await(%[[INPUT_TIMEPOINT]]) => with(%[[ALLOC_SUBVIEW]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[TRANSIENT_SIZE]]}) {
+  // CHECK-NEXT:   stream.cmd.fill %[[ZERO_I32]], %[[CAPTURE]][%[[ZERO_INDEX]] for %[[TRANSIENT_SIZE]]] : i32 -> !stream.resource<transient>{%[[TRANSIENT_SIZE]]}
   // CHECK-NEXT: } => !stream.timepoint
   %exec_timepoint = stream.cmd.execute
       await(%alloca_timepoint) => with(%transient as %transient_inner: !stream.resource<transient>{%c1024}) {
@@ -117,27 +118,29 @@ util.func public @single_allocation_dynamic(
   %storage: !stream.resource<transient>, %storage_size: index,
   %input_timepoint: !stream.timepoint
 ) -> (!stream.resource<*>, index) {
-  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[ZERO_INDEX:.+]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[ZERO_I32:.+]] = arith.constant 0 : i32
   %c0_i32 = arith.constant 0 : i32
-  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK-DAG: %[[BYTES_PER_ELEMENT:.+]] = arith.constant 4 : index
   %c4 = arith.constant 4 : index
 
   // Original size computation (preserved for execution).
-  // CHECK: %[[TRANSIENT_SIZE:.+]] = arith.muli %[[ARG0_SIZE]], %[[C4]] : index
+  // CHECK: %[[TRANSIENT_SIZE:.+]] = arith.muli %[[ARG0_SIZE]], %[[BYTES_PER_ELEMENT]] : index
   %transient_size = arith.muli %arg0_size, %c4 : index
 
   // Hoisted size computation for pack (cloned).
-  // CHECK: %[[SIZE_FOR_PACK:.+]] = arith.muli %[[ARG0_SIZE]], %{{.+}} : index
+  // CHECK: %[[BYTES_PER_ELEMENT_CLONE:.+]] = arith.constant 4 : index
+  // CHECK-NEXT: %[[TRANSIENT_SIZE_FOR_PACK:.+]] = arith.muli %[[ARG0_SIZE]], %[[BYTES_PER_ELEMENT_CLONE]] : index
   //
   // Pack created with hoisted size.
   // CHECK: %[[PACK:.+]]:2 = stream.resource.pack slices({
-  // CHECK-NEXT:   [0, 0] = %[[SIZE_FOR_PACK]]
+  // CHECK-NEXT:   [0, 0] = %[[TRANSIENT_SIZE_FOR_PACK]]
   // CHECK-NEXT: }) : index attributes {stream.experimental.transients}
   //
   // Storage subview at offset 0.
-  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%{{.+}}] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
+  // CHECK: %[[BASE_OFFSET:.+]] = arith.constant 0 : index
+  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%[[BASE_OFFSET]]] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
   //
   // Allocation replaced with subview (uses pack offset #1).
   // CHECK: %[[ALLOC_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE_SUBVIEW]][%[[PACK]]#1] : !stream.resource<transient>{%[[PACK]]#0} -> !stream.resource<transient>{%[[TRANSIENT_SIZE]]}
@@ -147,8 +150,8 @@ util.func public @single_allocation_dynamic(
       !stream.resource<transient>{%transient_size} => !stream.timepoint
 
   // CRITICAL: Input timepoint threads through to execute (alloca removed, timeline preserved).
-  // CHECK: %[[EXEC_TP:.+]] = stream.cmd.execute await(%[[INPUT_TIMEPOINT]]) => with(%[[ALLOC_SUBVIEW]] as %{{.+}}: !stream.resource<transient>{%[[TRANSIENT_SIZE]]}) {
-  // CHECK-NEXT:   stream.cmd.fill %[[C0_I32]], %{{.+}}[%[[C0]] for %[[TRANSIENT_SIZE]]] : i32 -> !stream.resource<transient>{%[[TRANSIENT_SIZE]]}
+  // CHECK: %[[EXEC_TP:.+]] = stream.cmd.execute await(%[[INPUT_TIMEPOINT]]) => with(%[[ALLOC_SUBVIEW]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[TRANSIENT_SIZE]]}) {
+  // CHECK-NEXT:   stream.cmd.fill %[[ZERO_I32]], %[[CAPTURE]][%[[ZERO_INDEX]] for %[[TRANSIENT_SIZE]]] : i32 -> !stream.resource<transient>{%[[TRANSIENT_SIZE]]}
   // CHECK-NEXT: } => !stream.timepoint
   %exec_timepoint = stream.cmd.execute
       await(%alloca_timepoint) => with(%transient as %transient_inner: !stream.resource<transient>{%transient_size}) {
@@ -185,29 +188,30 @@ util.func public @two_allocations(
   %storage: !stream.resource<transient>, %storage_size: index,
   %input_timepoint: !stream.timepoint
 ) -> (!stream.resource<*>, index) {
-  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[ZERO_INDEX:.+]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[ZERO_I32:.+]] = arith.constant 0 : i32
   %c0_i32 = arith.constant 0 : i32
-  // CHECK-DAG: %[[C512:.+]] = arith.constant 512 : index
+  // CHECK-DAG: %[[FIRST_BUFFER_SIZE:.+]] = arith.constant 512 : index
   %c512 = arith.constant 512 : index
-  // CHECK-DAG: %[[C1024:.+]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[SECOND_BUFFER_SIZE:.+]] = arith.constant 1024 : index
   %c1024 = arith.constant 1024 : index
-  // CHECK-DAG: %[[C1_I32:.+]] = arith.constant 1 : i32
+  // CHECK-DAG: %[[ONE_I32:.+]] = arith.constant 1 : i32
   %c1_i32 = arith.constant 1 : i32
 
   // Sizes hoisted for pack in program order.
-  // CHECK-DAG: %[[C512_FOR_PACK:.+]] = arith.constant 512 : index
-  // CHECK-DAG: %[[C1024_FOR_PACK:.+]] = arith.constant 1024 : index
+  // CHECK: %[[FIRST_BUFFER_SIZE_FOR_PACK:.+]] = arith.constant 512 : index
+  // CHECK-NEXT: %[[SECOND_BUFFER_SIZE_FOR_PACK:.+]] = arith.constant 1024 : index
   //
   // Pack with two slices in program order - both [0,0] means non-overlapping liveness.
-  // CHECK: %[[PACK:.+]]:3 = stream.resource.pack slices({
-  // CHECK-NEXT:   [0, 0] = %[[C512_FOR_PACK]],
-  // CHECK-NEXT:   [0, 0] = %[[C1024_FOR_PACK]]
+  // CHECK-NEXT: %[[PACK:.+]]:3 = stream.resource.pack slices({
+  // CHECK-NEXT:   [0, 0] = %[[FIRST_BUFFER_SIZE_FOR_PACK]],
+  // CHECK-NEXT:   [0, 0] = %[[SECOND_BUFFER_SIZE_FOR_PACK]]
   // CHECK-NEXT: }) : index attributes {stream.experimental.transients}
   //
   // Storage subview at offset 0.
-  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%{{.+}}] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
+  // CHECK: %[[BASE_OFFSET:.+]] = arith.constant 0 : index
+  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%[[BASE_OFFSET]]] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
 
   // First allocation awaiting input timepoint.
   %transient0, %alloca_timepoint0 = stream.resource.alloca uninitialized await(%input_timepoint) =>
@@ -215,10 +219,10 @@ util.func public @two_allocations(
 
   // CRITICAL: First allocation execution uses input timepoint (alloca removed, timeline preserved).
   // CRITICAL: First allocation (512) gets pack result #1, subview created where alloca was.
-  // CHECK: %[[ALLOC0_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE_SUBVIEW]][%[[PACK]]#1] : !stream.resource<transient>{%[[PACK]]#0} -> !stream.resource<transient>{%[[C512]]}
-  // CHECK: %[[EXEC0_TP:.+]] = stream.cmd.execute await(%[[INPUT_TIMEPOINT]]) => with(%[[ALLOC0_SUBVIEW]] as %{{.+}}: !stream.resource<transient>{%[[C512]]}) {
-  // CHECK-NEXT:   stream.cmd.fill %[[C0_I32]], %{{.+}}[%[[C0]] for %[[C512]]] : i32 -> !stream.resource<transient>{%[[C512]]}
-  // CHECK-NEXT: } => !stream.timepoint
+  // CHECK: %[[ALLOC0_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE_SUBVIEW]][%[[PACK]]#1] : !stream.resource<transient>{%[[PACK]]#0} -> !stream.resource<transient>{%[[FIRST_BUFFER_SIZE]]}
+  // CHECK: %[[EXEC0_TP:.+]] = stream.cmd.execute await(%[[INPUT_TIMEPOINT]]) => with(%[[ALLOC0_SUBVIEW]] as %[[CAPTURE0:.+]]: !stream.resource<transient>{%[[FIRST_BUFFER_SIZE]]}) {
+  // CHECK-NEXT:   stream.cmd.fill %[[ZERO_I32]], %[[CAPTURE0]][%[[ZERO_INDEX]] for %[[FIRST_BUFFER_SIZE]]] : i32 -> !stream.resource<transient>{%[[FIRST_BUFFER_SIZE]]}
+  // CHECK: } => !stream.timepoint
   %exec_timepoint0 = stream.cmd.execute
       await(%alloca_timepoint0) => with(%transient0 as %t0: !stream.resource<transient>{%c512}) {
     stream.cmd.fill %c0_i32, %t0[%c0 for %c512] : i32 -> !stream.resource<transient>{%c512}
@@ -231,10 +235,10 @@ util.func public @two_allocations(
       !stream.resource<transient>{%c1024} => !stream.timepoint
 
   // CRITICAL: Second allocation (1024) gets pack result #2, subview created where alloca was.
-  // CHECK: %[[ALLOC1_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE_SUBVIEW]][%[[PACK]]#2] : !stream.resource<transient>{%[[PACK]]#0} -> !stream.resource<transient>{%[[C1024]]}
+  // CHECK: %[[ALLOC1_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE_SUBVIEW]][%[[PACK]]#2] : !stream.resource<transient>{%[[PACK]]#0} -> !stream.resource<transient>{%[[SECOND_BUFFER_SIZE]]}
   // Second allocation execution awaits first dealloca (timeline threading).
-  // CHECK: %[[EXEC1_TP:.+]] = stream.cmd.execute await(%[[EXEC0_TP]]) => with(%[[ALLOC1_SUBVIEW]] as %{{.+}}: !stream.resource<transient>{%[[C1024]]}) {
-  // CHECK-NEXT:   stream.cmd.fill %[[C1_I32]], %{{.+}}[%[[C0]] for %[[C1024]]] : i32 -> !stream.resource<transient>{%[[C1024]]}
+  // CHECK: %[[EXEC1_TP:.+]] = stream.cmd.execute await(%[[EXEC0_TP]]) => with(%[[ALLOC1_SUBVIEW]] as %[[CAPTURE1:.+]]: !stream.resource<transient>{%[[SECOND_BUFFER_SIZE]]}) {
+  // CHECK-NEXT:   stream.cmd.fill %[[ONE_I32]], %[[CAPTURE1]][%[[ZERO_INDEX]] for %[[SECOND_BUFFER_SIZE]]] : i32 -> !stream.resource<transient>{%[[SECOND_BUFFER_SIZE]]}
   // CHECK-NEXT: } => !stream.timepoint
   %exec_timepoint1 = stream.cmd.execute
       await(%alloca_timepoint1) => with(%transient1 as %t1: !stream.resource<transient>{%c1024}) {
@@ -273,27 +277,28 @@ util.func public @many_allocations(
   %storage: !stream.resource<transient>, %storage_size: index,
   %input_timepoint: !stream.timepoint
 ) -> (!stream.resource<*>, index) {
-  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[ZERO_INDEX:.+]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[ZERO_I32:.+]] = arith.constant 0 : i32
   %c0_i32 = arith.constant 0 : i32
-  // CHECK-DAG: %[[C256:.+]] = arith.constant 256 : index
+  // CHECK-DAG: %[[ALLOCATION_SIZE:.+]] = arith.constant 256 : index
   %c256 = arith.constant 256 : index
 
   // Sizes hoisted for pack (3 allocations of 256 each).
-  // CHECK-DAG: %[[C256_FOR_PACK0:.+]] = arith.constant 256 : index
-  // CHECK-DAG: %[[C256_FOR_PACK1:.+]] = arith.constant 256 : index
-  // CHECK-DAG: %[[C256_FOR_PACK2:.+]] = arith.constant 256 : index
+  // CHECK: %[[ALLOCATION_SIZE_FOR_PACK0:.+]] = arith.constant 256 : index
+  // CHECK-NEXT: %[[ALLOCATION_SIZE_FOR_PACK1:.+]] = arith.constant 256 : index
+  // CHECK-NEXT: %[[ALLOCATION_SIZE_FOR_PACK2:.+]] = arith.constant 256 : index
   //
   // Pack with three slices - all [0,0] means non-overlapping.
-  // CHECK: %[[PACK:.+]]:4 = stream.resource.pack slices({
-  // CHECK-NEXT:   [0, 0] = %[[C256_FOR_PACK0]],
-  // CHECK-NEXT:   [0, 0] = %[[C256_FOR_PACK1]],
-  // CHECK-NEXT:   [0, 0] = %[[C256_FOR_PACK2]]
+  // CHECK-NEXT: %[[PACK:.+]]:4 = stream.resource.pack slices({
+  // CHECK-NEXT:   [0, 0] = %[[ALLOCATION_SIZE_FOR_PACK0]],
+  // CHECK-NEXT:   [0, 0] = %[[ALLOCATION_SIZE_FOR_PACK1]],
+  // CHECK-NEXT:   [0, 0] = %[[ALLOCATION_SIZE_FOR_PACK2]]
   // CHECK-NEXT: }) : index attributes {stream.experimental.transients}
   //
   // Storage subview.
-  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%{{.+}}] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
+  // CHECK: %[[BASE_OFFSET:.+]] = arith.constant 0 : index
+  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%[[BASE_OFFSET]]] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
 
   %t0, %tp0 = stream.resource.alloca uninitialized await(%input_timepoint) => !stream.resource<transient>{%c256} => !stream.timepoint
   // Subview created where alloca was (interleaved with executes in program order).
@@ -405,7 +410,7 @@ util.func public @dealloca_filtering(
 
   // CHECK-NEXT: stream.timepoint.immediate
   // Dealloca for %arg0 (not emplaced) - will be preserved.
-  // CHECK-NEXT: %[[DEALLOCA:.+]] = stream.resource.dealloca await({{.+}}) => %[[ARG0]] : !stream.resource<transient>{%[[ARG0_SIZE]]}
+  // CHECK-NEXT: %[[DEALLOCA:.+]] = stream.resource.dealloca await(%[[ALLOCA_TP:.+]]) => %[[ARG0]] : !stream.resource<transient>{%[[ARG0_SIZE]]}
   %dealloca_arg0_tp = stream.resource.dealloca await(%alloca_tp) => %arg0 : !stream.resource<transient>{%arg0_size} => !stream.timepoint
 
   // Dealloca for %transient (emplaced) - will be removed.
@@ -415,7 +420,7 @@ util.func public @dealloca_filtering(
       from %storage : !stream.resource<transient>{%storage_size}
       => !stream.timepoint
 
-  // CHECK-NEXT: %{{.+}} = stream.timepoint.await %[[DEALLOCA]] => %[[ARG0]]
+  // CHECK-NEXT: %[[AWAIT_RESULT:.+]] = stream.timepoint.await %[[DEALLOCA]] => %[[ARG0]]
   %final = stream.timepoint.await %result_tp => %result : !stream.resource<transient>{%arg0_size}
   // CHECK-NEXT: util.return
   util.return %final, %arg0_size : !stream.resource<transient>, index
@@ -438,41 +443,44 @@ util.func public @size_with_arith_ops(
   %storage: !stream.resource<transient>, %storage_size: index,
   %input_timepoint: !stream.timepoint
 ) -> (!stream.resource<*>, index) {
-  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[ZERO_INDEX:.+]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[ZERO_I32:.+]] = arith.constant 0 : i32
   %c0_i32 = arith.constant 0 : i32
-  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK-DAG: %[[BYTES_PER_ELEMENT:.+]] = arith.constant 4 : index
   %c4 = arith.constant 4 : index
-  // CHECK-DAG: %[[C1024:.+]] = arith.constant 1024 : index
+  // CHECK-DAG: %[[BASE_PADDING:.+]] = arith.constant 1024 : index
   %c1024 = arith.constant 1024 : index
 
   // Original size computation (preserved for execution).
-  // CHECK: %[[BASE_SIZE:.+]] = arith.muli %[[ARG0_SIZE]], %[[C4]] : index
+  // CHECK: %[[BASE_SIZE:.+]] = arith.muli %[[ARG0_SIZE]], %[[BYTES_PER_ELEMENT]] : index
   %base_size = arith.muli %arg0_size, %c4 : index
-  // CHECK: %[[TRANSIENT_SIZE:.+]] = arith.addi %[[BASE_SIZE]], %[[C1024]] : index
+  // CHECK: %[[TRANSIENT_SIZE:.+]] = arith.addi %[[BASE_SIZE]], %[[BASE_PADDING]] : index
   %transient_size = arith.addi %base_size, %c1024 : index
 
   // Hoisted size computation for pack (cloned).
-  // CHECK: %[[BASE_SIZE_FOR_PACK:.+]] = arith.muli %[[ARG0_SIZE]], %{{.+}} : index
-  // CHECK: %[[TRANSIENT_SIZE_FOR_PACK:.+]] = arith.addi %[[BASE_SIZE_FOR_PACK]], %{{.+}} : index
+  // CHECK: %[[BYTES_PER_ELEMENT_CLONE:.+]] = arith.constant 4 : index
+  // CHECK-NEXT: %[[BASE_SIZE_FOR_PACK:.+]] = arith.muli %[[ARG0_SIZE]], %[[BYTES_PER_ELEMENT_CLONE]] : index
+  // CHECK-NEXT: %[[BASE_PADDING_CLONE:.+]] = arith.constant 1024 : index
+  // CHECK-NEXT: %[[TRANSIENT_SIZE_FOR_PACK:.+]] = arith.addi %[[BASE_SIZE_FOR_PACK]], %[[BASE_PADDING_CLONE]] : index
   //
   // Pack uses hoisted computation.
-  // CHECK: %[[PACK:.+]]:2 = stream.resource.pack slices({
+  // CHECK-NEXT: %[[PACK:.+]]:2 = stream.resource.pack slices({
   // CHECK-NEXT:   [0, 0] = %[[TRANSIENT_SIZE_FOR_PACK]]
   // CHECK-NEXT: }) : index attributes {stream.experimental.transients}
   //
   // Storage and allocation subviews.
-  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%{{.+}}] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
+  // CHECK: %[[BASE_OFFSET:.+]] = arith.constant 0 : index
+  // CHECK: %[[STORAGE_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE]][%[[BASE_OFFSET]]] : !stream.resource<transient>{%[[STORAGE_SIZE]]} -> !stream.resource<transient>{%[[PACK]]#0}
   // CHECK: %[[ALLOC_SUBVIEW:.+]] = stream.resource.subview %[[STORAGE_SUBVIEW]][%[[PACK]]#1] : !stream.resource<transient>{%[[PACK]]#0} -> !stream.resource<transient>{%[[TRANSIENT_SIZE]]}
 
   %transient, %alloca_timepoint = stream.resource.alloca uninitialized await(%input_timepoint) =>
       !stream.resource<transient>{%transient_size} => !stream.timepoint
 
   // CRITICAL: Execute uses original size computation and input timepoint (alloca removed, timeline preserved).
-  // CHECK: %[[EXEC_TP:.+]] = stream.cmd.execute await(%[[INPUT_TIMEPOINT]]) => with(%[[ALLOC_SUBVIEW]] as %{{.+}}: !stream.resource<transient>{%[[TRANSIENT_SIZE]]}) {
-  // CHECK-NEXT:   stream.cmd.fill %[[C0_I32]], %{{.+}}[%[[C0]] for %[[TRANSIENT_SIZE]]] : i32 -> !stream.resource<transient>{%[[TRANSIENT_SIZE]]}
-  // CHECK-NEXT: } => !stream.timepoint
+  // CHECK: %[[EXEC_TP:.+]] = stream.cmd.execute await(%[[INPUT_TIMEPOINT]]) => with(%[[ALLOC_SUBVIEW]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[TRANSIENT_SIZE]]}) {
+  // CHECK-NEXT:   stream.cmd.fill %[[ZERO_I32]], %[[CAPTURE]][%[[ZERO_INDEX]] for %[[TRANSIENT_SIZE]]] : i32 -> !stream.resource<transient>{%[[TRANSIENT_SIZE]]}
+  // CHECK: } => !stream.timepoint
   %exec_timepoint = stream.cmd.execute
       await(%alloca_timepoint) => with(%transient as %t: !stream.resource<transient>{%transient_size}) {
     stream.cmd.fill %c0_i32, %t[%c0 for %transient_size] : i32 -> !stream.resource<transient>{%transient_size}
