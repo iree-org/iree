@@ -54,7 +54,7 @@ struct ArithConstantInferIntDivisibilityOpInterface
       Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
       IREE::Util::SetIntDivisibilityFn setResultDivs) const {
     auto constOp = cast<arith::ConstantOp>(op);
-    auto constAttr = dyn_cast_or_null<IntegerAttr>(constOp.getValue());
+    auto constAttr = llvm::dyn_cast_or_null<IntegerAttr>(constOp.getValue());
     if (constAttr) {
       const APInt &value = constAttr.getValue();
       uint64_t udiv = value.getZExtValue();
@@ -341,7 +341,7 @@ struct HoistableLinalgOpInterface
 
     // Hoist all non-generic linalg ops except for fill ops which should be
     // fused with their consumers.
-    auto genericOp = dyn_cast<linalg::GenericOp>(op);
+    auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op);
     if (!genericOp) {
       return !isa<linalg::FillOp>(op);
     }

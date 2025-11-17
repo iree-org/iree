@@ -27,7 +27,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   if (llvm::all_of(producerOp->getResultTypes(), [](Type t) {
         if (t.isInteger(1))
           return true;
-        if (auto shapedType = dyn_cast<ShapedType>(t)) {
+        if (auto shapedType = llvm::dyn_cast<ShapedType>(t)) {
           if (shapedType.getElementType().isInteger(1))
             return true;
         }

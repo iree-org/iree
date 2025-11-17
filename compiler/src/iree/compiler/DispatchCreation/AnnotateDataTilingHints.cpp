@@ -102,7 +102,7 @@ static bool dataTilablePreCondition(linalg::LinalgOp linalgOp) {
     return false;
   }
   auto hasEncoding = [](Value operand) -> bool {
-    auto type = dyn_cast<RankedTensorType>(operand.getType());
+    auto type = llvm::dyn_cast<RankedTensorType>(operand.getType());
     return type && type.getEncoding();
   };
   if (llvm::any_of(linalgOp.getDpsInputs(), hasEncoding) ||

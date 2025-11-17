@@ -20,40 +20,43 @@ struct LinalgFusionOpInterfaceAdapter
           LinalgFusionOpInterfaceAdapter<ConcreteType>, ConcreteType> {
 public:
   SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {
-    auto maps = cast<ConcreteType>(op)
+    auto maps = llvm::cast<ConcreteType>(op)
                     .getIndexingMaps()
                     .template getAsValueRange<AffineMapAttr>();
-    return {maps.begin(), maps.end() - cast<ConcreteType>(op).getNumResults()};
+    return {maps.begin(),
+            maps.end() - llvm::cast<ConcreteType>(op).getNumResults()};
   }
 
   SmallVector<AffineMap> getIndexingMapsForResults(mlir::Operation *op) const {
-    auto maps = cast<ConcreteType>(op)
+    auto maps = llvm::cast<ConcreteType>(op)
                     .getIndexingMaps()
                     .template getAsValueRange<AffineMapAttr>();
-    return {maps.end() - cast<ConcreteType>(op).getNumResults(), maps.end()};
+    return {maps.end() - llvm::cast<ConcreteType>(op).getNumResults(),
+            maps.end()};
   }
 
   // Forward all the interface methods to the corresponding linalg op.
   unsigned getNumParallelLoops(mlir::Operation *op) const {
-    return (cast<ConcreteType>(op).getNumParallelLoops());
+    return (llvm::cast<ConcreteType>(op).getNumParallelLoops());
   }
 
   unsigned getNumLoops(mlir::Operation *op) const {
-    return (cast<ConcreteType>(op).getNumLoops());
+    return (llvm::cast<ConcreteType>(op).getNumLoops());
   }
 
   SmallVector<int64_t> getStaticLoopRanges(mlir::Operation *op) const {
-    return SmallVector<int64_t>(cast<ConcreteType>(op).getStaticLoopRanges());
+    return SmallVector<int64_t>(
+        llvm::cast<ConcreteType>(op).getStaticLoopRanges());
   }
 
   AffineMap getIndexingMapMatchingResult(mlir::Operation *op,
                                          OpResult result) const {
-    return (cast<ConcreteType>(op).getIndexingMapMatchingResult(result));
+    return (llvm::cast<ConcreteType>(op).getIndexingMapMatchingResult(result));
   }
 
   AffineMap getMatchingIndexingMap(mlir::Operation *op,
                                    OpOperand *operand) const {
-    return (cast<ConcreteType>(op).getMatchingIndexingMap(operand));
+    return (llvm::cast<ConcreteType>(op).getMatchingIndexingMap(operand));
   }
 
   SmallVector<AffineMap> getIndexingMapsArray(mlir::Operation *op) const {
@@ -70,7 +73,7 @@ public:
   SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {
     Builder b(op->getContext());
     return llvm::to_vector(llvm::map_range(
-        cast<linalg::SoftmaxOp>(op).getDpsInputs(),
+        llvm::cast<linalg::SoftmaxOp>(op).getDpsInputs(),
         [&b](Value operand) -> AffineMap {
           auto rank = cast<ShapedType>(operand.getType()).getRank();
           return b.getMultiDimIdentityMap(rank);
@@ -80,7 +83,7 @@ public:
   SmallVector<AffineMap> getIndexingMapsForResults(mlir::Operation *op) const {
     Builder b(op->getContext());
     return llvm::to_vector(llvm::map_range(
-        cast<linalg::SoftmaxOp>(op).getDpsInits(),
+        llvm::cast<linalg::SoftmaxOp>(op).getDpsInits(),
         [&b](Value operand) -> AffineMap {
           auto rank = cast<ShapedType>(operand.getType()).getRank();
           return b.getMultiDimIdentityMap(rank);

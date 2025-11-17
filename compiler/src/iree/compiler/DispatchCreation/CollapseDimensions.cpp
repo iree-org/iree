@@ -107,8 +107,8 @@ collapseExtractSlice(tensor::ExtractSliceOp sliceOp,
 /// with "reduction" types. It is expected that the `op` has projected
 /// permutations only as indexing maps. (Checked using `isEligibleForCollapse`).
 static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
-  auto fusionInterfaceOp = cast<LinalgFusionOpInterface>(op);
-  auto tilingInterfaceOp = cast<TilingInterface>(op);
+  auto fusionInterfaceOp = llvm::cast<LinalgFusionOpInterface>(op);
+  auto tilingInterfaceOp = llvm::cast<TilingInterface>(op);
 
   SmallVector<ReassociationIndices> contiguousLoops;
   SmallVector<unsigned> pDims, rDims;

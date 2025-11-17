@@ -563,7 +563,7 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
       }
       return linalg::isElementwise(consumerLinalgOp) &&
              consumerLinalgOp.getNumLoops() ==
-                 cast<RankedTensorType>(producer->getResult(0).getType())
+                 llvm::cast<RankedTensorType>(producer->getResult(0).getType())
                      .getRank();
     }
     return false;
@@ -574,7 +574,7 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
         .Case<tensor::PadOp>([&](auto padOp) { return true; })
         .Case<linalg::LinalgOp>([&](auto linalgOp) {
           AffineMap producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
-              cast<OpResult>(fusedOperand.get()));
+              llvm::cast<OpResult>(fusedOperand.get()));
           // Make sure the producer op has an identity result indexing map. As
           // CPU backend currently can't handle transpose between fused ops.
           return producerIndexingMap.isIdentity();
@@ -776,7 +776,7 @@ static bool isFusableWithProducer(OpOperand &operand,
             }
           }
           AffineMap producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
-              cast<OpResult>(operand.get()));
+              llvm::cast<OpResult>(operand.get()));
           // Make sure the producer op has an identity result indexing map. As
           // CPU backend currently can't handle transpose between fused ops.
           return producerIndexingMap.isIdentity();
