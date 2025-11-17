@@ -101,7 +101,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp,
     Operation *userOp = *result.user_begin();
 
     // Check if the user is an update op we can merge.
-    auto updateOp = dyn_cast_or_null<IREE::Stream::AsyncUpdateOp>(userOp);
+    auto updateOp = dyn_cast_if_present<IREE::Stream::AsyncUpdateOp>(userOp);
     if (!updateOp || updateOp.getUpdate() != result) {
       continue; // not relevant
     }

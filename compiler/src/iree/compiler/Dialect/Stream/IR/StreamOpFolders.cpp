@@ -1020,9 +1020,9 @@ struct SinkSubviewAcrossSelectOps
                                 PatternRewriter &rewriter) const override {
     if (!isa<IREE::Stream::ResourceType>(op.getType()))
       return failure();
-    auto trueSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+    auto trueSubview = dyn_cast_if_present<IREE::Stream::ResourceSubviewOp>(
         op.getTrueValue().getDefiningOp());
-    auto falseSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+    auto falseSubview = dyn_cast_if_present<IREE::Stream::ResourceSubviewOp>(
         op.getFalseValue().getDefiningOp());
     if (!trueSubview || !falseSubview)
       return failure();
@@ -1640,7 +1640,7 @@ struct ElideRedundantFill : public OpRewritePattern<AsyncFillOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AsyncFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
-    auto splatOp = dyn_cast_or_null<IREE::Stream::AsyncSplatOp>(
+    auto splatOp = dyn_cast_if_present<IREE::Stream::AsyncSplatOp>(
         fillOp.getTarget().getDefiningOp());
     if (!splatOp)
       return failure();
@@ -1671,7 +1671,7 @@ struct CoalesceAdjacentFills : public OpRewritePattern<AsyncFillOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AsyncFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
-    auto sourceOp = dyn_cast_or_null<IREE::Stream::AsyncFillOp>(
+    auto sourceOp = dyn_cast_if_present<IREE::Stream::AsyncFillOp>(
         fillOp.getTarget().getDefiningOp());
     if (!sourceOp)
       return failure();
@@ -2051,7 +2051,7 @@ struct IntermediateTransferElision : public OpRewritePattern<AsyncTransferOp> {
     while (true) {
       auto source = originTransferOp.getSource();
       auto previousTransferOp =
-          dyn_cast_or_null<AsyncTransferOp>(source.getDefiningOp());
+          dyn_cast_if_present<AsyncTransferOp>(source.getDefiningOp());
       if (!previousTransferOp)
         break;
       originTransferOp = previousTransferOp;
@@ -2128,8 +2128,8 @@ struct FoldAsyncStoreBitcast : public OpRewritePattern<AsyncStoreOp> {
   LogicalResult matchAndRewrite(AsyncStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto storedValue = storeOp.getValue();
-    if (auto bitcastOp =
-            dyn_cast_or_null<arith::BitcastOp>(storedValue.getDefiningOp())) {
+    if (auto bitcastOp = dyn_cast_if_present<arith::BitcastOp>(
+            storedValue.getDefiningOp())) {
       rewriter.modifyOpInPlace(storeOp, [&]() {
         storeOp.getValueMutable().assign(bitcastOp.getOperand());
       });
@@ -2910,7 +2910,7 @@ struct FoldParameterReadTargetSubview
     auto newTargetResource = op.getTarget();
     auto newTargetSize = op.getTargetSize();
     auto newTargetOffset = cast<Value>(op.getTargetOffset());
-    if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+    if (auto subviewOp = dyn_cast_if_present<IREE::Stream::ResourceSubviewOp>(
             newTargetResource.getDefiningOp())) {
       newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
           subviewOp.getLoc(), newSourceOffset,
@@ -2963,7 +2963,7 @@ struct FoldParameterWriteSourceSubview
     auto newSourceSize = op.getSourceSize();
     auto newSourceOffset = cast<Value>(op.getSourceOffset());
     auto newTargetOffset = cast<Value>(op.getTargetOffset());
-    if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+    if (auto subviewOp = dyn_cast_if_present<IREE::Stream::ResourceSubviewOp>(
             newSourceResource.getDefiningOp())) {
       newSourceResource = subviewOp.getSource();
       newSourceSize = subviewOp.getSourceSize();
@@ -3034,7 +3034,7 @@ LogicalResult TimepointExportOp::fold(FoldAdaptor operands,
                                       SmallVectorImpl<OpFoldResult> &results) {
   // If the source timepoint comes from an import op we can fold - but only if
   // the types match.
-  if (auto importOp = dyn_cast_or_null<TimepointImportOp>(
+  if (auto importOp = dyn_cast_if_present<TimepointImportOp>(
           getAwaitTimepoint().getDefiningOp())) {
     if (llvm::equal(importOp.getOperandTypes(), getResultTypes())) {
       llvm::append_range(results, importOp.getOperands());
@@ -3069,7 +3069,7 @@ struct PassThroughChainExternal
   LogicalResult matchAndRewrite(TimepointChainExternalOp op,
                                 PatternRewriter &rewriter) const override {
     // Try to get the original external values that we want to chain.
-    auto importOp = dyn_cast_or_null<IREE::Stream::TimepointImportOp>(
+    auto importOp = dyn_cast_if_present<IREE::Stream::TimepointImportOp>(
         op.getAwaitTimepoint().getDefiningOp());
     if (!importOp) {
       return rewriter.notifyMatchFailure(
@@ -3096,7 +3096,7 @@ struct PassThroughChainExternal
     // TODO(benvanik): improve this to handle more external value types; for now
     // only !hal.fence is used in practice and that is MemAlloc.
     for (auto externalValue : op.getExternalValues()) {
-      auto definingOp = dyn_cast_or_null<MemoryEffectOpInterface>(
+      auto definingOp = dyn_cast_if_present<MemoryEffectOpInterface>(
           externalValue.getDefiningOp());
       if (!definingOp || !definingOp.hasEffect<MemoryEffects::Allocate>()) {
         return rewriter.notifyMatchFailure(
@@ -3196,7 +3196,7 @@ struct ExpandTimepointJoinOperands : public OpRewritePattern<TimepointJoinOp> {
     bool didExpand = false;
     for (auto timepoint : op.getAwaitTimepoints()) {
       if (auto sourceJoinOp =
-              dyn_cast_or_null<TimepointJoinOp>(timepoint.getDefiningOp())) {
+              dyn_cast_if_present<TimepointJoinOp>(timepoint.getDefiningOp())) {
         newTimepoints.insert(sourceJoinOp.getAwaitTimepoints().begin(),
                              sourceJoinOp.getAwaitTimepoints().end());
         didExpand = true;
@@ -3276,7 +3276,7 @@ struct ElideImmediateBarrier : public OpRewritePattern<TimepointBarrierOp> {
 static std::pair<IREE::Stream::TimepointAwaitOp, Value>
 findSourceAwaitOp(Value resource) {
   Value baseResource = resource;
-  while (auto definingOp = dyn_cast_or_null<IREE::Util::TiedOpInterface>(
+  while (auto definingOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
              baseResource.getDefiningOp())) {
     if (auto awaitOp = dyn_cast<IREE::Stream::TimepointAwaitOp>(
             baseResource.getDefiningOp())) {
@@ -3658,7 +3658,7 @@ void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult ChannelRankOp::fold(FoldAdaptor operands) {
-  if (auto createOp = dyn_cast_or_null<IREE::Stream::ChannelCreateOp>(
+  if (auto createOp = dyn_cast_if_present<IREE::Stream::ChannelCreateOp>(
           getChannel().getDefiningOp())) {
     return createOp.getRank();
   }
@@ -3670,7 +3670,7 @@ OpFoldResult ChannelRankOp::fold(FoldAdaptor operands) {
 //===----------------------------------------------------------------------===//
 
 OpFoldResult ChannelCountOp::fold(FoldAdaptor operands) {
-  if (auto createOp = dyn_cast_or_null<IREE::Stream::ChannelCreateOp>(
+  if (auto createOp = dyn_cast_if_present<IREE::Stream::ChannelCreateOp>(
           getChannel().getDefiningOp())) {
     return createOp.getCount();
   }

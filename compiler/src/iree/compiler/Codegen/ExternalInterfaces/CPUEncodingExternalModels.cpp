@@ -687,7 +687,7 @@ struct CPUEncodingPackedLayoutMaterializerAttr
     auto layoutAttr = cast<CPUEncodingResolverAttr>(attr);
 
     auto encoding =
-        dyn_cast_or_null<IREE::Encoding::EncodingAttr>(type.getEncoding());
+        dyn_cast_if_present<IREE::Encoding::EncodingAttr>(type.getEncoding());
 
     MaterializeEncodingInfo info;
     if (!encoding) {
@@ -846,7 +846,7 @@ struct VMVXEncodingPackedLayoutMaterializerAttr final
     auto layoutAttr = cast<VMVXEncodingResolverAttr>(attr);
 
     auto encoding =
-        dyn_cast_or_null<IREE::Encoding::EncodingAttr>(type.getEncoding());
+        dyn_cast_if_present<IREE::Encoding::EncodingAttr>(type.getEncoding());
 
     MaterializeEncodingInfo info;
     if (!encoding) {

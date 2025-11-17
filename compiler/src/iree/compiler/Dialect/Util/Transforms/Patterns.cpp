@@ -470,7 +470,8 @@ struct MergeIndexSwitchPattern : public OpRewritePattern<scf::IndexSwitchOp> {
   LogicalResult matchAndRewrite(scf::IndexSwitchOp nextOp,
                                 PatternRewriter &rewriter) const override {
     // Inspect the previous op to see if it's also a switch.
-    auto prevOp = dyn_cast_or_null<scf::IndexSwitchOp>(nextOp->getPrevNode());
+    auto prevOp =
+        dyn_cast_if_present<scf::IndexSwitchOp>(nextOp->getPrevNode());
     if (!prevOp)
       return failure();
 

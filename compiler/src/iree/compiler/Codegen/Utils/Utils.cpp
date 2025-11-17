@@ -876,13 +876,13 @@ isTiledAndDistributedLoop(scf::ForOp forOp) {
     // Try to see if this is a specical case where we have:
     //   scf.for %iv = %id to %ub step %count
     std::optional<unsigned> idDim;
-    if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(
+    if (auto ifx = dyn_cast_if_present<ProcessorIDInterface>(
             forOp.getLowerBound().getDefiningOp())) {
       idDim = ifx.getDimIndex();
     }
 
     std::optional<unsigned> countDim;
-    if (auto ifx = dyn_cast_or_null<ProcessorCountInterface>(
+    if (auto ifx = dyn_cast_if_present<ProcessorCountInterface>(
             forOp.getStep().getDefiningOp())) {
       countDim = ifx.getDimIndex();
     }
@@ -1573,7 +1573,7 @@ SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp) {
 
   for (unsigned i = 0; i < 3; ++i) {
     Operation *defOp = returnOp.getOperand(i).getDefiningOp();
-    if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
+    if (auto indexOp = dyn_cast_if_present<arith::ConstantIndexOp>(defOp)) {
       result.push_back(indexOp.value());
     } else {
       result.push_back(ShapedType::kDynamic);

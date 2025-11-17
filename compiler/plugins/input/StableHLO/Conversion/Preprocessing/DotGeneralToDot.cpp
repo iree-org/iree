@@ -305,8 +305,8 @@ struct GeneralDotConvert final
         rhs, loc, rhsContractingDims, /*outerDimsFirst=*/false, rewriter));
 
     // Accept only static shaped types.
-    auto lhsShapeType = dyn_cast_or_null<ShapedType>(lhs.getType());
-    auto rhsShapeType = dyn_cast_or_null<ShapedType>(rhs.getType());
+    auto lhsShapeType = dyn_cast_if_present<ShapedType>(lhs.getType());
+    auto rhsShapeType = dyn_cast_if_present<ShapedType>(rhs.getType());
     if (!lhsShapeType || !rhsShapeType)
       return failure();
 

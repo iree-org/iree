@@ -416,7 +416,7 @@ class BindSymbolicShapesPass final
           return;
         auto torchType =
             cast<Torch::ValueTensorType>(bindOp.getOperand().getType());
-        auto builtinType = dyn_cast_or_null<RankedTensorType>(
+        auto builtinType = dyn_cast_if_present<RankedTensorType>(
             typeConverter.convertType(torchType));
         if (!builtinType) {
           emitError(childOp->getLoc())

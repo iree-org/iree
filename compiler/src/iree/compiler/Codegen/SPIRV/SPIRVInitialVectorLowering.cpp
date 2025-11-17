@@ -132,9 +132,9 @@ bool mayExtI8ToI32(Value op) {
   Operation *def = stripElementBitPatternPreservingParents(op);
   Type inTy;
 
-  if (auto ext = dyn_cast_or_null<arith::ExtSIOp>(def)) {
+  if (auto ext = dyn_cast_if_present<arith::ExtSIOp>(def)) {
     inTy = getElementTypeOrSelf(ext.getIn().getType());
-  } else if (auto ext = dyn_cast_or_null<arith::ExtUIOp>(def)) {
+  } else if (auto ext = dyn_cast_if_present<arith::ExtUIOp>(def)) {
     inTy = getElementTypeOrSelf(ext.getIn().getType());
   } else {
     return false;

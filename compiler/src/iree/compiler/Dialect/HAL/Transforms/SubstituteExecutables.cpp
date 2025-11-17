@@ -110,7 +110,7 @@ replaceExecutableOpWithMLIR(IREE::HAL::ExecutableOp executableOp,
   if (auto moduleOp = dyn_cast<mlir::ModuleOp>(rootOpRef.get())) {
     // We expect a `hal.executable` with the same name as the one we are
     // replacing.
-    replacementOp = dyn_cast_or_null<IREE::HAL::ExecutableOp>(
+    replacementOp = dyn_cast_if_present<IREE::HAL::ExecutableOp>(
         SymbolTable::lookupSymbolIn(moduleOp, executableOp.getNameAttr()));
   } else {
     // Verify the name matches.

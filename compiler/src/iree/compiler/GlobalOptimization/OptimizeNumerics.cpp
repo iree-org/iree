@@ -71,8 +71,9 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
 
 struct NarrowParams {
   static std::optional<NarrowParams> forValue(Value value) {
-    if (auto narrowOp = dyn_cast_or_null<IREE::Util::NumericOptionalNarrowOp>(
-            value.getDefiningOp())) {
+    if (auto narrowOp =
+            dyn_cast_if_present<IREE::Util::NumericOptionalNarrowOp>(
+                value.getDefiningOp())) {
       NarrowParams params;
       params.producer = narrowOp.getOperand();
       params.fromType = value.getType();

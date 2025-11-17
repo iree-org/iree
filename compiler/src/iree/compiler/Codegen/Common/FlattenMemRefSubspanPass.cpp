@@ -224,7 +224,7 @@ struct FlattenGetGlobal final
     if (!oldType || !oldType.getLayout().isIdentity())
       return failure();
 
-    auto globalOp = dyn_cast_or_null<memref::GlobalOp>(
+    auto globalOp = dyn_cast_if_present<memref::GlobalOp>(
         SymbolTable::lookupNearestSymbolFrom(getOp, getOp.getNameAttr()));
     if (!globalOp)
       return failure();

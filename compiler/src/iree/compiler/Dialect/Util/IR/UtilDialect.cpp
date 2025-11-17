@@ -158,7 +158,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
       source = assumeAlignmentOp.getViewSource();
     }
     auto shapeAwareOp =
-        dyn_cast_or_null<ShapeAwareOpInterface>(source.getDefiningOp());
+        dyn_cast_if_present<ShapeAwareOpInterface>(source.getDefiningOp());
     if (!shapeAwareOp)
       return failure();
 

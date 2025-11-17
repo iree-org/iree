@@ -62,7 +62,7 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
                                 PatternRewriter &rewriter) const override {
     // Check if extractOp is inside a generic op
     auto consumerOp =
-        dyn_cast_or_null<linalg::GenericOp>(extractOp->getParentOp());
+        dyn_cast_if_present<linalg::GenericOp>(extractOp->getParentOp());
     if (!consumerOp) {
       return rewriter.notifyMatchFailure(
           extractOp, "expected extract op to be inside a generic op");

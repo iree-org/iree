@@ -514,7 +514,7 @@ struct GPUEncodingPackedLayoutMaterializerAttr
     DictionaryAttr config = resolver.getConfiguration();
 
     auto encoding =
-        dyn_cast_or_null<IREE::Encoding::EncodingAttr>(type.getEncoding());
+        dyn_cast_if_present<IREE::Encoding::EncodingAttr>(type.getEncoding());
 
     MaterializeEncodingInfo info;
     if (!encoding) {
@@ -638,7 +638,7 @@ getPadLayout(IREE::Encoding::LayoutResolverAttr layoutAttr,
     return nullptr;
   }
   auto encoding =
-      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
+      dyn_cast_if_present<IREE::Encoding::LayoutAttr>(type.getEncoding());
   if (encoding) {
     ArrayAttr layouts = encoding.getLayouts();
     if (layouts.size() != 1) {
@@ -759,7 +759,7 @@ struct GPUPadLayoutResolverAttr final
     }
 
     auto paddingEncodingAttr =
-        dyn_cast_or_null<IREE::Encoding::PaddingAttr>(type.getEncoding());
+        dyn_cast_if_present<IREE::Encoding::PaddingAttr>(type.getEncoding());
     if (!paddingEncodingAttr) {
       return nullptr;
     }

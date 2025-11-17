@@ -792,7 +792,7 @@ LogicalResult ModuleLinker::link(ModuleOp targetModule) {
     // Check if external declaration exists in target.
     Operation *existingDecl = targetSymbolTable.lookup(info->qualifiedName);
     if (auto existingFunc =
-            dyn_cast_or_null<FunctionOpInterface>(existingDecl)) {
+            dyn_cast_if_present<FunctionOpInterface>(existingDecl)) {
       if (auto sourceFunc = dyn_cast<FunctionOpInterface>(info->op)) {
         // Verify types match.
         if (existingFunc.getFunctionType() != sourceFunc.getFunctionType()) {

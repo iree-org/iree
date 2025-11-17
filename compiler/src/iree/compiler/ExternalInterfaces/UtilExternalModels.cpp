@@ -54,7 +54,7 @@ struct ArithConstantInferIntDivisibilityOpInterface
       Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
       IREE::Util::SetIntDivisibilityFn setResultDivs) const {
     auto constOp = cast<arith::ConstantOp>(op);
-    auto constAttr = dyn_cast_or_null<IntegerAttr>(constOp.getValue());
+    auto constAttr = dyn_cast_if_present<IntegerAttr>(constOp.getValue());
     if (constAttr) {
       const APInt &value = constAttr.getValue();
       uint64_t udiv = value.getZExtValue();
