@@ -42,8 +42,6 @@ jobs:
             -DIREE_BUILD_PYTHON_BINDINGS=ON \
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_ASSERTIONS=ON \
-            -DIREE_ENABLE_SPLIT_DWARF=ON \
-            -DIREE_ENABLE_THIN_ARCHIVES=ON \
             -DIREE_BUILD_DOCS=ON \
             -DIREE_TARGET_BACKEND_CUDA=ON \
             -DIREE_TARGET_BACKEND_ROCM=ON \
@@ -56,6 +54,8 @@ jobs:
           sccache --show-stats
       - name: Run CTest
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        env:
+          CTEST_PARALLEL_LEVEL: 32
       - name: Test iree-dialects
         run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 

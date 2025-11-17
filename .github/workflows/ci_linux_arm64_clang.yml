@@ -54,8 +54,6 @@ jobs:
             -DIREE_BUILD_PYTHON_BINDINGS=ON \
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_ASSERTIONS=ON \
-            -DIREE_ENABLE_SPLIT_DWARF=ON \
-            -DIREE_ENABLE_THIN_ARCHIVES=ON \
             -DIREE_BUILD_DOCS=ON \
             -DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
       - name: CMake - build

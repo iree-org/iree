@@ -56,9 +56,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DIREE_BUILD_PYTHON_BINDINGS=ON \
             -DIREE_ENABLE_LLD=ON \
-            -DIREE_ENABLE_ASSERTIONS=ON \
-            -DIREE_ENABLE_SPLIT_DWARF=ON \
-            -DIREE_ENABLE_THIN_ARCHIVES=ON
+            -DIREE_ENABLE_ASSERTIONS=ON
       - name: CMake - build
         run: |
           cmake --build ${BUILD_DIR} -- -k 0
