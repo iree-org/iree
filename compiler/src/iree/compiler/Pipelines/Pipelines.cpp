@@ -194,7 +194,7 @@ void buildIREEPrecompileTransformPassPipeline(
   // The pipeline option has higher priority.
   globalTransformOptions.dataTiling = globalOptimizationOptions.dataTiling;
   if (pipelineOptions.dataTiling) {
-    globalTransformOptions.dataTiling = false;
+    globalTransformOptions.dataTiling = true;
   }
   globalTransformOptions.constEval = globalOptimizationOptions.constEval;
   globalTransformOptions.numericPrecisionReduction =
@@ -315,7 +315,7 @@ void buildIREEVMTransformPassPipeline(
     // The pipeline option has higher priority.
     dispatchTransformOptions.dataTiling = dispatchCreationOptions.dataTiling;
     if (pipelineOptions.dataTiling) {
-      dispatchTransformOptions.dataTiling = true;
+      dispatchTransformOptions.dataTiling = false;
     }
     if (dispatchTransformOptions.dataTiling &&
         globalOptimizationOptions.dataTiling) {

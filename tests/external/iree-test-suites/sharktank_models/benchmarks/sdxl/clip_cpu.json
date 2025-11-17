@@ -16,12 +16,12 @@
         "cpu": 1.1
     },
     "golden_time_ms": {
-        "cpu": 165.0
+        "cpu": 170.0
     },
     "golden_dispatch": {
-        "cpu": 2130
+        "cpu": 2089
     },
     "golden_size": {
-        "cpu": 600000
+        "cpu": 640000
     }
 }
