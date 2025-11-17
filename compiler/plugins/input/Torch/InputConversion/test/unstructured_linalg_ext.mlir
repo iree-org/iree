@@ -100,6 +100,8 @@ func.func @fft_rfft.last(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torch.vtensor<
 // CHECK:             %[[VAR13:.*]] = torch.aten.view_as_complex %[[VAR12]] : !torch.vtensor<[3,8,9,2],f32> -> !torch.vtensor<[3,8,9],complex<f32>>
 // CHECK:             return %[[VAR13]] : !torch.vtensor<[3,8,9],complex<f32>>
 
+// -----
+
 func.func @main(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>,!torch.vtensor<[4,8,1024],f32>) attributes {torch.assume_strict_symbolic_shapes} {
   %float1.000000e00 = torch.constant.float 1.000000e+00
   %true = torch.constant.bool true
