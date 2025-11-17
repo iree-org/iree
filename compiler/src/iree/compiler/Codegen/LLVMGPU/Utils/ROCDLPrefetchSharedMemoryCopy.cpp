@@ -185,7 +185,7 @@ static LogicalResult computeBackwardSlice(ArrayRef<Operation *> roots,
     (void)getBackwardSlice(root, &rootSlice, options);
     // getBackwardSlice doesn't include the root itself, so add it explicitly
     slice.insert(root);
-    slice.insert(rootSlice.begin(), rootSlice.end());
+    slice.insert_range(rootSlice);
 
     // Also add any parent scf.if operations that contain this root
     // This is necessary because roots inside scf.if need the if to be scheduled
@@ -199,7 +199,7 @@ static LogicalResult computeBackwardSlice(ArrayRef<Operation *> roots,
         // Compute backward slice OF the scf.if itself to capture its condition
         SetVector<Operation *> ifSlice;
         (void)getBackwardSlice(ifOp.getOperation(), &ifSlice, options);
-        slice.insert(ifSlice.begin(), ifSlice.end());
+        slice.insert_range(ifSlice);
 
         // Compute backward slices of all nested operations to get dependencies
         // This approach ensures correctness by capturing all transitive
@@ -208,7 +208,7 @@ static LogicalResult computeBackwardSlice(ArrayRef<Operation *> roots,
           if (nestedOp != ifOp.getOperation()) {
             SetVector<Operation *> nestedSlice;
             (void)getBackwardSlice(nestedOp, &nestedSlice, options);
-            slice.insert(nestedSlice.begin(), nestedSlice.end());
+            slice.insert_range(nestedSlice);
           }
         });
       } else if (parent->getNumRegions() > 0) {
