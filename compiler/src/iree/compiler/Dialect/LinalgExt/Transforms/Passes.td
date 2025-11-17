@@ -103,6 +103,11 @@ def DecomposeAttentionPass :
     InterfacePass<"iree-linalg-ext-decompose-attention", "mlir::FunctionOpInterface"> {
   let summary =
       "Decomposes attention op into a sequence of linalg ops";
+  let options = [
+    Option<"useExp2", "use-exp2", "bool", /*default=*/"true",
+        "Use exp2 for computations; Tunable to allow for accuracte computations"
+        "in case of accuracy losses due to fp-reassociation.">,
+  ];
 }
 
 def ConvertAttentionToOnlineAttentionPass :

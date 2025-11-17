@@ -194,8 +194,6 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
   auto genericOp = linalg::GenericOp::create(
       builder, loc, value.getType(), ValueRange{}, value, indexingMaps,
       iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
-        // Get iteration indices (b, h, m, n) for 4D tensor
-        // The score value is the first block argument
         Value score = args[0];
 
         // If the region is empty (no score modification), just yield the score
@@ -227,12 +225,9 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
              llvm::zip_equal(regionArgs, region.front().getArguments())) {
           mapping.map(regionArg, arg);
         }
-
         for (Operation &op : region.front().without_terminator()) {
           b.clone(op, mapping);
         }
-
-        // Get the yield operand and yield it
         auto yieldOp =
             cast<IREE::LinalgExt::YieldOp>(region.front().getTerminator());
         Value result = mapping.lookup(yieldOp.getOperand(0));
@@ -448,12 +443,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   DictionaryAttr config = getDecompositionConfigAttr();
 
   DictionaryAttr qkAttrs, pvAttrs;
-  bool useExp2 = true; // Default to exp2 for backward compatibility
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
-    if (auto useExp2Attr = config.getAs<BoolAttr>(getUseExp2AttrStr()))
-      useExp2 = useExp2Attr.getValue();
   }
   Value output = getOutput();
 
@@ -478,7 +470,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   // ---- QK Matmul + elementwise math ----
   Value s = computeQKAndElementwise(
       loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
-      sizes, f32Type, getRegion(), qkAttrs, lowPrecision, useExp2);
+      sizes, f32Type, getRegion(), qkAttrs, lowPrecision, /*useExp2=*/true);
 
   // ---- Softmax ----
 
@@ -518,9 +510,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   // max = rowMax(S)
   Value max = reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, maxFill);
 
-  // P = exp2(S - max) or exp(S - max) depending on useExp2 flag
+  // P = exp2(S - max).
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp(b, loc, maxMap, sMap, max, s, useExp2);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, max, s, /*useExp2=*/true);
 
   // sum = rowSum(P)
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
@@ -558,6 +550,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
 
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
+
   Location loc = getLoc();
   Value query = getQuery();
   Value key = getKey();
@@ -570,14 +563,14 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   DictionaryAttr config = getDecompositionConfigAttr();
 
   DictionaryAttr qkAttrs, pvAttrs;
-  bool useExp2 = true; // Default to exp2 for backward compatibility
+  bool useExp2 = true;
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+    // Read use_exp2 from decomposition config
     if (auto useExp2Attr = config.getAs<BoolAttr>(getUseExp2AttrStr()))
       useExp2 = useExp2Attr.getValue();
   }
-
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   assert(succeeded(maybeOpInfo) && "Invalid attention indexing maps");

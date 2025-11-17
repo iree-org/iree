@@ -179,8 +179,6 @@ struct FlexAttentionOpConversion
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     MLIRContext *ctx = getContext();
-    // Extract operands (new order: query, key, value, 8 block_mask tensors,
-    // scale, return_lse).
     Value query = op.getQuery();
     Value key = op.getKey();
     Value value = op.getValue();
@@ -259,7 +257,9 @@ struct FlexAttentionOpConversion
         ArrayRef<int64_t>{}, si32Type);
     auto torchBoolScalarType = rewriter.getType<torch::Torch::ValueTensorType>(
         ArrayRef<int64_t>{}, rewriter.getI1Type());
-
+    Value zero = arith::ConstantFloatOp::create(
+        rewriter, loc, floatType,
+        llvm::APFloat::getZero(floatType.getFloatSemantics()));
     Value mask;
     if (maskModSymbol) {
       // Create mask tensor [B, H, M, N] with values 0.0 (attend) or -inf
@@ -287,9 +287,6 @@ struct FlexAttentionOpConversion
       SmallVector<utils::IteratorType> iteratorTypes(
           4, utils::IteratorType::parallel);
 
-      Value zero = arith::ConstantFloatOp::create(
-          rewriter, loc, floatType,
-          llvm::APFloat::getZero(floatType.getFloatSemantics()));
       Value negInf = arith::ConstantFloatOp::create(
           rewriter, loc, floatType,
           llvm::APFloat::getInf(floatType.getFloatSemantics(),
@@ -444,10 +441,10 @@ struct FlexAttentionOpConversion
     Value torchOutput = torch::TorchConversion::FromBuiltinTensorOp::create(
         rewriter, loc, outputTorchType, normalizedOutput);
 
-    // Handle logsumexp. Note: AttentionOp doesn't expose intermediate max/sum
+    // Handle logsumexp.
+    // Note: AttentionOp doesn't expose intermediate max/sum
     // values needed for LSE calculation. Return a dummy tensor - logsumexp
-    // shape is output_shape[:-1] (remove last dim). Note: OnlineAttention does
-    // compute the logsumexp.
+    // shape is output_shape[:-1] (remove last dim).
     if (returnLseValue) {
       op.emitWarning("FlexAttention: logsumexp output is a dummy (zeros), "
                      "actual values are not available from AttentionOp");
@@ -460,10 +457,8 @@ struct FlexAttentionOpConversion
       lseDynSizes.pop_back();
     }
 
-    Value zeroInit = arith::ConstantOp::create(
-        rewriter, loc, floatType, rewriter.getFloatAttr(floatType, 0.0));
     Value lseTensor =
-        tensor::SplatOp::create(rewriter, loc, zeroInit, lseShape, lseDynSizes);
+        tensor::SplatOp::create(rewriter, loc, zero, lseShape, lseDynSizes);
 
     auto lseTorchType = queryType.getWithSizesAndDtype(lseShape, elementType);
     Value torchLogsumexp = torch::TorchConversion::FromBuiltinTensorOp::create(
@@ -489,8 +484,7 @@ public:
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
 
-    patterns.add<FftRfftOpConversion>(context);
-    patterns.add<FlexAttentionOpConversion>(context);
+    patterns.add<FftRfftOpConversion, FlexAttentionOpConversion>(context);
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();

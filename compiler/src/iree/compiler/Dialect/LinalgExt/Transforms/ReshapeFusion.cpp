@@ -1056,11 +1056,6 @@ static Operation *createCollapsedOp(AttentionOp origOp,
       inputOperands[1], inputOperands[2], inputOperands[3], outputOperands[0],
       rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand);
 
-  // Preserve decomposition_config attribute from original op
-  if (auto config = origOp.getDecompositionConfigAttr()) {
-    collapsedOp.setDecompositionConfigAttr(config);
-  }
-
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
   return collapsedOp;
@@ -1158,11 +1153,6 @@ struct DropAttentionUnitDims final
           newOperands.take_front(attentionOp.getNumDpsInputs()),
           newOperands.take_back(attentionOp.getNumDpsInits()),
           b.getAffineMapArrayAttr(newIndexingMaps));
-
-      // Preserve decomposition_config attribute from original op
-      if (auto config = attentionOp.getDecompositionConfigAttr()) {
-        newOp.setDecompositionConfigAttr(config);
-      }
 
       b.cloneRegionBefore(attentionOp.getRegion(), newOp.getRegion(),
                           newOp.getRegion().begin());
