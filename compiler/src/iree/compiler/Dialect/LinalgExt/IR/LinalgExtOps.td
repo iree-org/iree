@@ -295,7 +295,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
     dimension `i` of the `input` value). The block is terminated by an
     iree_linalg_ext.yield op, which yields one index for each dimension in
     the `output`, and an additional `i1` Value, which represents a mask on
-    whether or not to write to the `output` at the yielded set of indices. If
+    whether or not to write to the `output` at the yielded set of indices. Iff
     the mask value is true, the input value will be written.
   }];
   let arguments = (ins
