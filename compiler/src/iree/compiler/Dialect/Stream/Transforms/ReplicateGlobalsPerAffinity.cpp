@@ -5,9 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -18,12 +18,12 @@
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::IREE::Stream {
 
-#define DEBUG_TYPE "iree-flow-replicate-globals-per-affinity"
+#define DEBUG_TYPE "iree-stream-replicate-globals-per-affinity"
 
 #define GEN_PASS_DEF_REPLICATEGLOBALSPERAFFINITYPASS
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
 
 namespace {
 // Helper class to manage the creation of operations per affinity.
@@ -498,7 +498,7 @@ void ReplicateGlobalsPerAffinityPass::runOnOperation() {
       continue;
     }
 
-    llvm::SmallSetVector<Stream::AffinityAttr, 4> affinityAttrs;
+    llvm::SmallSetVector<AffinityAttr, 4> affinityAttrs;
     for (auto [idx, operand] : llvm::enumerate(affinityOp->getOperands())) {
       if (!opOperandAffinityStateMap.isAvailableOperand(affinityOp, idx)) {
         continue;
@@ -554,4 +554,4 @@ void ReplicateGlobalsPerAffinityPass::runOnOperation() {
   }
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::IREE::Stream

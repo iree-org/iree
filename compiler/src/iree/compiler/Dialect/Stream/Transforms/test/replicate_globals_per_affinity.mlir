@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-replicate-globals-per-affinity --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-stream-replicate-globals-per-affinity --split-input-file %s | FileCheck %s
 
 // CHECK: util.global private @[[$DEVICE_A:.+]] : !hal.device
 // CHECK: util.global private @[[$DEVICE_B:.+]] : !hal.device

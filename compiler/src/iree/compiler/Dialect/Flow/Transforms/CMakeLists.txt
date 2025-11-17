@@ -49,7 +49,6 @@ iree_cc_library(
     "OutlineDispatchRegions.cpp"
     "Passes.cpp"
     "RegionOpUtils.cpp"
-    "ReplicateGlobalsPerAffinity.cpp"
     "TopLevelSCFToCFG.cpp"
     "VerifyInputLegality.cpp"
   DEPS
@@ -96,7 +95,6 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
-    iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::Analysis

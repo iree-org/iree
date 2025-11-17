@@ -45,6 +45,7 @@ iree_lit_test_suite(
     "propagate_subviews.mlir"
     "propagate_timepoints.mlir"
     "refine_usage.mlir"
+    "replicate_globals_per_affinity.mlir"
     "reuse_allocations.mlir"
     "schedule_allocation.mlir"
     "schedule_concurrency.mlir"
