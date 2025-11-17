@@ -22,8 +22,6 @@ VER_0 {
     ireeCodegenGetTunerRootOps;
     ireeCodegenGetAttentionOpDetail;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
-    ireeCodegenHasIGEMMGenericConvDetails;
-    ireeCodegenGetIGEMMGenericConvDetails;
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;
     ireeCodegenTranslationInfoAttrGetTypeID;
