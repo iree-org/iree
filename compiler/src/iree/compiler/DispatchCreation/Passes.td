@@ -51,8 +51,8 @@ def InsertTensorBarriersPass :
                   "mlir::FunctionOpInterface"> {
   let summary = "Insert tensor barrier markers around computation regions.";
   let description = [{
-    Walks from function boundaries and inserts iree_tensor_ext.compute_barrier.start
-    and iree_tensor_ext.compute_barrier.end operations at the boundaries of
+    Walks from function boundaries and inserts iree_tensor_ext.barrier.start
+    and iree_tensor_ext.barrier.end operations at the boundaries of
     computation regions (tensor/linalg/linalgext ops). These barriers allow
     controlling where certain transformations like reshape propagation can occur.
 
@@ -69,7 +69,7 @@ def RemoveTensorBarriersPass :
                   "mlir::FunctionOpInterface"> {
   let summary = "Remove tensor barrier markers from the program.";
   let description = [{
-    Removes iree_tensor_ext.compute_barrier.start and iree_tensor_ext.compute_barrier.end
+    Removes iree_tensor_ext.barrier.start and iree_tensor_ext.barrier.end
     operations from the program. These are identity operations that simply
     pass through their operands, so they can be safely removed by replacing
     all uses of their results with their operands.

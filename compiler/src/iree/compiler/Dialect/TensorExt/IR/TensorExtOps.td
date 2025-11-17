@@ -447,10 +447,10 @@ def IREETensorExt_DispatchWorkloadOrdinalOp :
 // Barrier Ops
 //===---------------------------------------------------------------------===//
 
-def IREETensorExt_ComputeBarrierStartOp : IREETensorExt_PureOp<"compute_barrier.start", [
+def IREETensorExt_BarrierStartOp : IREETensorExt_PureOp<"barrier.start", [
   Util_ShapeAwareOp,
 ]> {
-  let summary = "Tensor compute barrier start operation";
+  let summary = "Tensor barrier start operation";
   let description = [{
     This barrier prevents certain transformations (like reshape propagation)
     from moving operations down across this boundary.
@@ -486,10 +486,10 @@ def IREETensorExt_ComputeBarrierStartOp : IREETensorExt_PureOp<"compute_barrier.
   let hasVerifier = 1;
 }
 
-def IREETensorExt_ComputeBarrierEndOp : IREETensorExt_PureOp<"compute_barrier.end", [
+def IREETensorExt_BarrierEndOp : IREETensorExt_PureOp<"barrier.end", [
   Util_ShapeAwareOp,
 ]> {
-  let summary = "Tensor compute barrier end operation";
+  let summary = "Tensor barrier end operation";
   let description = [{
     This barrier prevents certain transformations (like reshape propagation)
     from moving operations up across this boundary.
