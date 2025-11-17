@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-decompose-map-scatter"
@@ -355,9 +356,10 @@ static LogicalResult decomposeToScatter(MapScatterOp mapScatterOp,
 
   SmallVector<Value> offsets = {
       arith::ConstantIndexOp::create(rewriter, loc, 0)};
-  rewriter.replaceOpWithNewOp<vector::ScatterOp>(mapScatterOp, flatOutputBuffer,
-                                                 offsets, indexVector,
-                                                 maskVector, inputVector);
+  SmallVector<Value> operands = {flatOutputBuffer, offsets[0], indexVector,
+                                 maskVector, inputVector};
+  rewriter.replaceOpWithNewOp<vector::ScatterOp>(
+      mapScatterOp, /*resultTypes=*/TypeRange{}, operands);
   return success();
 }
 
