@@ -32,10 +32,7 @@ class CMakeBuildPy(iree_pjrt_setup.BaseCMakeBuildPy):
         print("*****************************", file=sys.stderr)
         self.build_configuration(
             os.path.join(THIS_DIR, "build", "cmake"),
-            extra_cmake_args=(
-                "-DIREE_HAL_DRIVER_HIP=ON",
-                "-DIREE_HIP_TEST_TARGET_CHIP=",
-            ),
+            extra_cmake_args=("-DIREE_EXTERNAL_HAL_DRIVERS=rocm",),
         )
         print("Target populated.", file=sys.stderr)
 

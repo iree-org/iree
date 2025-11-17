@@ -32,11 +32,10 @@ jobs:
             pjrt_platform: cpu
           - runner: ubuntu-24.04
             pjrt_platform: cuda
-          - runner: [Linux, X64, gfx1100]
-            rocm-chip: gfx1100
-            pjrt_platform: rocm
-          # TODO: enable this AMD runner
-          # - runner: [Linux, X64, gfx1100]
+          # TODO: enable these AMD runners
+          # - runner: iree-w7900x2
+          #   pjrt_platform: rocm
+          # - runner: iree-w7900x2
           #   pjrt_platform: vulkan
     name: Build and test
     runs-on: ${{ matrix.runner }}
@@ -79,12 +78,10 @@ jobs:
           python -m pip install -v --no-deps -e integrations/pjrt/python_packages/iree_${{ matrix.pjrt_platform }}_plugin
           # install
           python -m pip install jax==0.6.1
-      # TODO: We can only run on CPU and AMD for now, as the CUDA runner
+      # TODO: We can only run on CPU for now, as the CUDA runner
       # is not available yet, refer to #18814.
       - name: Run tests
-        if: ${{ matrix.pjrt_platform == 'cpu' || matrix.pjrt_platform == 'rocm' }}
+        if: ${{ matrix.pjrt_platform == 'cpu' }}
         run: |
           source ${VENV_DIR}/bin/activate
           build_tools/testing/run_jax_tests.sh ${{ matrix.pjrt_platform }}
-        env:
-          IREE_PJRT_IREE_COMPILER_OPTIONS: "--iree-hip-target=${{ matrix.rocm-chip }}"
