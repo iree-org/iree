@@ -27,7 +27,6 @@ iree_cc_library(
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAffineDialect
-    MLIRAnalysis
     MLIRArithDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
