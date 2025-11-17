@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -91,6 +92,68 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
     res = arith::MaxUIOp::create(builder, loc, res, requestedSize);
   }
   return res;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
+
+bool PackedStorageAttr::isSerialized() const { return true; }
+
+static Type getExtendedType(Type ty) {
+  auto intTy = dyn_cast<IntegerType>(ty);
+  if (!intTy) {
+    return ty;
+  }
+  unsigned bitWidth = intTy.getWidth();
+  if (bitWidth < 8 || llvm::isPowerOf2_32(bitWidth)) {
+    return ty;
+  }
+  unsigned alignedBitWidth = IREE::Util::getRoundedElementByteWidth(intTy) * 8;
+  if (alignedBitWidth == bitWidth) {
+    return ty;
+  }
+  // For integer types that are bigger then 8 bits and are not byte-aligned, we
+  // need to extend them.
+  return IntegerType::get(ty.getContext(), alignedBitWidth,
+                          intTy.getSignedness());
+}
+
+Value PackedStorageAttr::calculateStorageSizeInBytes(
+    Location loc, OpBuilder &builder, RankedTensorType type,
+    ValueRange dynamicDims) const {
+  Type alignedElementType = getExtendedType(type.getElementType());
+  int64_t staticCount =
+      IREE::Util::getRoundedElementByteWidth(alignedElementType);
+
+  // Calculate static dimensions if there are any
+  for (unsigned i = 0; i < type.getRank(); ++i) {
+    if (!type.isDynamicDim(i)) {
+      staticCount *= type.getDimSize(i);
+    }
+  }
+
+  // Emit computation of dynamic dimensions.
+  auto value =
+      arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
+  for (auto dim : dynamicDims) {
+    value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
+  }
+
+  // For sub-byte element types we need to divide by the number of elements that
+  // can be packed into one byte.
+  unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
+  if (elementBits < 8) {
+    if (!llvm::isPowerOf2_32(elementBits)) {
+      // Sub-byte types that are not a power of two are currently not supported.
+      return nullptr;
+    }
+    unsigned elementsPerByte = 8 / elementBits;
+    auto divisor =
+        arith::ConstantIndexOp::create(builder, loc, elementsPerByte);
+    value = builder.createOrFold<arith::CeilDivUIOp>(loc, value, divisor);
+  }
+  return value;
 }
 
 //===---------------------------------------------------------------------===//

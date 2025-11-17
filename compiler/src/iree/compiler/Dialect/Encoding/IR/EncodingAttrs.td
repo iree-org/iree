@@ -41,7 +41,7 @@ def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.packed_storage
+// iree_encoding.layout
 //===---------------------------------------------------------------------===//
 
 def LayoutAttr :
@@ -82,7 +82,13 @@ def LayoutAttr :
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
 
-def PackedStorageAttr : IREEEncoding_AttrDef<"PackedStorage"> {
+def PackedStorageAttr :
+    IREEEncoding_AttrDef<"PackedStorage", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+          "isSerialized",
+          "calculateStorageSizeInBytes",
+      ]>
+    ]> {
   let mnemonic = "packed_storage";
   let summary = [{Indicates packed storage data type.}];
   let description = [{

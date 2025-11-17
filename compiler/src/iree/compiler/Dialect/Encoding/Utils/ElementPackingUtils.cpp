@@ -96,8 +96,7 @@ Value calculateStorageElementCountInBytes(Location loc,
         loc, builder, shapedType, dynamicDims);
   }
 
-  bool isPackedStorage =
-      IREE::Encoding::hasPackedStorageAttr(shapedType) || clEnableI1Support;
+  bool isPackedStorage = clEnableI1Support;
   Type alignedElementType = legalizeStorageElementTypeImpl(
       shapedType.getElementType(), isPackedStorage);
   unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
