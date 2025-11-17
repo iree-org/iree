@@ -172,7 +172,7 @@ struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
     auto yield = cast<gpu::YieldOp>(
         warpOp.getBodyRegion().getBlocks().begin()->getTerminator());
     Operation *lastNode = yield->getPrevNode();
-    auto barrierOp = dyn_cast_if_present<gpu::BarrierOp>(lastNode);
+    auto barrierOp = dyn_cast_or_null<gpu::BarrierOp>(lastNode);
     if (!barrierOp)
       return failure();
 

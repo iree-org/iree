@@ -580,7 +580,7 @@ LogicalResult ReturnOp::verify() {
   ReturnOp op = *this;
 
   auto parentFuncOp =
-      dyn_cast_if_present<mlir::FunctionOpInterface>(op->getParentOp());
+      dyn_cast_or_null<mlir::FunctionOpInterface>(op->getParentOp());
   if (parentFuncOp) {
     auto expectedTypes = parentFuncOp.getResultTypes();
     if (op.getNumOperands() != expectedTypes.size()) {

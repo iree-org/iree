@@ -547,7 +547,7 @@ transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
       return;
 
     auto destSpace =
-        dyn_cast_if_present<gpu::AddressSpaceAttr>(destType.getMemorySpace());
+        dyn_cast_or_null<gpu::AddressSpaceAttr>(destType.getMemorySpace());
     if (!destSpace)
       return;
 

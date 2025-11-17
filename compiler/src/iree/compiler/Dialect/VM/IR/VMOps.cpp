@@ -1424,7 +1424,7 @@ SuccessorOperands BranchTableOp::getSuccessorOperands(unsigned index) {
 
 Block *BranchTableOp::getSuccessorForOperands(ArrayRef<Attribute> operands) {
   SuccessorRange caseDestinations = getCaseDestinations();
-  if (auto valueAttr = dyn_cast_if_present<IntegerAttr>(operands.front())) {
+  if (auto valueAttr = dyn_cast_or_null<IntegerAttr>(operands.front())) {
     int64_t value = valueAttr.getValue().getSExtValue();
     if (value < 0 || value >= caseDestinations.size())
       return getDefaultDestination();

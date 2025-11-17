@@ -49,7 +49,7 @@ static bool isValidInterchange(ArrayRef<int64_t> interchange, int numLoops) {
 static LogicalResult verifyMultiTilingExpertPassPipelineConfig(
     Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig) {
 
-  auto interfaceOp = dyn_cast_if_present<TilingInterface>(op);
+  auto interfaceOp = dyn_cast_or_null<TilingInterface>(op);
   if (!interfaceOp) {
     return success();
   }

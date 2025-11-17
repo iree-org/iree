@@ -1256,13 +1256,12 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
                                 PatternRewriter &rewriter) const final {
     Operation *currentOp = padOp.getSource().getDefiningOp();
     auto maybeExtractSlice =
-        dyn_cast_if_present<tensor::ExtractSliceOp>(currentOp);
+        dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
     while (currentOp && maybeExtractSlice) {
       currentOp = maybeExtractSlice.getSource().getDefiningOp();
-      maybeExtractSlice =
-          dyn_cast_if_present<tensor::ExtractSliceOp>(currentOp);
+      maybeExtractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
     }
-    auto fillOp = dyn_cast_if_present<linalg::FillOp>(currentOp);
+    auto fillOp = dyn_cast_or_null<linalg::FillOp>(currentOp);
     if (!fillOp) {
       return rewriter.notifyMatchFailure(
           padOp, "not coming from a linalg.fill op via tensor.extract_slice*");

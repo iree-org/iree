@@ -162,7 +162,7 @@ static Subrange consumeSubrange(Location loc, Value value,
     return mapIt->second;
   }
 
-  if (auto subrangeOp = dyn_cast_if_present<IREE::Util::SubrangeOpInterface>(
+  if (auto subrangeOp = dyn_cast_or_null<IREE::Util::SubrangeOpInterface>(
           value.getDefiningOp())) {
     Subrange subrange;
     subrange.resource = subrangeOp.getSubrangeResource();

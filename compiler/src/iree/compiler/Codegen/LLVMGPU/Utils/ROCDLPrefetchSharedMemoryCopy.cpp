@@ -492,7 +492,7 @@ static bool hasSharedMemory(Value val) {
   if (!memrefType)
     return false;
   auto addrSpace =
-      dyn_cast_if_present<gpu::AddressSpaceAttr>(memrefType.getMemorySpace());
+      dyn_cast_or_null<gpu::AddressSpaceAttr>(memrefType.getMemorySpace());
   return addrSpace && addrSpace.getValue() == gpu::AddressSpace::Workgroup;
 }
 

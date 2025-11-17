@@ -621,8 +621,8 @@ struct ExtendFOpConversion : public OpConversionPattern<arith::ExtFOp> {
   LogicalResult
   matchAndRewrite(arith::ExtFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto srcType = dyn_cast_if_present<FloatType>(srcOp.getIn().getType());
-    auto resultType = dyn_cast_if_present<FloatType>(srcOp.getType());
+    auto srcType = dyn_cast_or_null<FloatType>(srcOp.getIn().getType());
+    auto resultType = dyn_cast_or_null<FloatType>(srcOp.getType());
     if (!srcType || !resultType)
       return failure();
     auto dstType = getTypeConverter()->convertType(resultType);

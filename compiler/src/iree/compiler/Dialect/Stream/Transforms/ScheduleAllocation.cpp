@@ -1549,7 +1549,7 @@ static SmallVector<IREE::Util::SubrangeOperand>
 gatherSubranges(Value derivedValue) {
   SmallVector<IREE::Util::SubrangeOperand> subrangeStack;
   Value baseValue = derivedValue;
-  while (auto definingOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
+  while (auto definingOp = dyn_cast_or_null<IREE::Util::TiedOpInterface>(
              baseValue.getDefiningOp())) {
     auto tiedValue = definingOp.getTiedResultOperand(baseValue);
     if (!tiedValue)

@@ -51,7 +51,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 //===----------------------------------------------------------------------===//
 
 static Type getComplexElementTypeOrSelf(Type ty) {
-  if (auto complex = dyn_cast_if_present<ComplexType>(ty)) {
+  if (auto complex = dyn_cast_or_null<ComplexType>(ty)) {
     return complex.getElementType();
   }
   return ty;

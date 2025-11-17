@@ -21,7 +21,7 @@ struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
   LogicalResult matchAndRewrite(BitCastOp op,
                                 PatternRewriter &rewriter) const override {
     auto emptyOp =
-        dyn_cast_if_present<tensor::EmptyOp>(op.getSource().getDefiningOp());
+        dyn_cast_or_null<tensor::EmptyOp>(op.getSource().getDefiningOp());
     if (!emptyOp)
       return failure();
     rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, op.getResult().getType(),
@@ -436,7 +436,7 @@ OpFoldResult DispatchWorkloadOrdinalOp::fold(FoldAdaptor operands) {
   //   %2 = iree_tensor_ext.dispatch.workload.ordinal %1, 2
   //
   // This can happen when the operands get deduped.
-  if (auto producerOrdinalOp = dyn_cast_if_present<DispatchWorkloadOrdinalOp>(
+  if (auto producerOrdinalOp = dyn_cast_or_null<DispatchWorkloadOrdinalOp>(
           getOperand().getDefiningOp())) {
     if (producerOrdinalOp.getOrdinal() == getOrdinal()) {
       return producerOrdinalOp.getOperand();

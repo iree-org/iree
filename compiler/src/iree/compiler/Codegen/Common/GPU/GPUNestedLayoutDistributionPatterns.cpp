@@ -984,8 +984,7 @@ struct DistributeMultiReduction final
     auto accVector = dyn_cast<VectorValue>(acc);
     auto resVector = dyn_cast<VectorValue>(res);
 
-    auto srcLayout =
-        dyn_cast_if_present<NestedLayoutAttr>(signature[srcVector]);
+    auto srcLayout = dyn_cast_or_null<NestedLayoutAttr>(signature[srcVector]);
     if (!srcLayout) {
       return rewriter.notifyMatchFailure(multiReduceOp,
                                          "expected nested layout attr");
@@ -1013,7 +1012,7 @@ struct DistributeMultiReduction final
 
     VectorValue mask = nullptr;
     if (maskOp) {
-      auto maskLayout = dyn_cast_if_present<NestedLayoutAttr>(
+      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
           maskSignature.value()[maskOp.getMask()]);
       if (!maskLayout) {
         return rewriter.notifyMatchFailure(maskOp,
@@ -1455,7 +1454,7 @@ struct DistributeContract final
 
     VectorValue mask = nullptr;
     if (maskOp) {
-      auto maskLayout = dyn_cast_if_present<NestedLayoutAttr>(
+      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
           maskSignature.value()[maskOp.getMask()]);
       if (!maskLayout) {
         return rewriter.notifyMatchFailure(maskOp,

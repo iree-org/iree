@@ -471,7 +471,7 @@ SmallVector<int64_t> detail::getTiedResultOperandIndices(Operation *op) {
 // static
 Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
   Value baseValue = derivedValue;
-  while (auto definingOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
+  while (auto definingOp = dyn_cast_or_null<IREE::Util::TiedOpInterface>(
              baseValue.getDefiningOp())) {
     auto tiedValue = definingOp.getTiedResultOperand(baseValue);
     if (!tiedValue)
@@ -796,9 +796,8 @@ SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
 
   // Slower path that materializes the entire shape for a result. Some
   // implementations may only support this (vs the fast find above).
-  if (auto shapeAwareOp =
-          dyn_cast_if_present<IREE::Util::ShapeAwareOpInterface>(
-              value.getDefiningOp())) {
+  if (auto shapeAwareOp = dyn_cast_or_null<IREE::Util::ShapeAwareOpInterface>(
+          value.getDefiningOp())) {
     return shapeAwareOp.buildResultValueShape(value, builder);
   }
 

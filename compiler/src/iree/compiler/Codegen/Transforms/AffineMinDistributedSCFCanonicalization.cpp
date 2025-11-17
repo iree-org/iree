@@ -43,7 +43,7 @@ static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
     if (!ivArg)
       continue;
     Operation *containingOp = ivArg.getOwner()->getParentOp();
-    auto forOp = dyn_cast_if_present<scf::ForOp>(containingOp);
+    auto forOp = dyn_cast_or_null<scf::ForOp>(containingOp);
     if (forOp && forOp.getInductionVar() == dim) {
       iv = dim;
       ub = forOp.getUpperBound();
@@ -51,7 +51,7 @@ static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
       step = forOp.getStep();
       break;
     }
-    auto parallelOp = dyn_cast_if_present<scf::ParallelOp>(containingOp);
+    auto parallelOp = dyn_cast_or_null<scf::ParallelOp>(containingOp);
     if (!parallelOp)
       continue;
     for (auto [index, inductionVar] :

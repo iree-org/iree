@@ -15,15 +15,15 @@
 namespace mlir::iree_compiler::IREE::Encoding {
 
 SerializableAttr getSerializableAttr(RankedTensorType type) {
-  return dyn_cast_if_present<SerializableAttr>(type.getEncoding());
+  return dyn_cast_or_null<SerializableAttr>(type.getEncoding());
 }
 
 EncodingAttr getEncodingAttr(RankedTensorType type) {
-  return dyn_cast_if_present<EncodingAttr>(type.getEncoding());
+  return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
 }
 
 bool hasPackedStorageAttr(RankedTensorType type) {
-  return dyn_cast_if_present<PackedStorageAttr>(type.getEncoding()) != nullptr;
+  return dyn_cast_or_null<PackedStorageAttr>(type.getEncoding()) != nullptr;
 }
 
 FailureOr<linalg::ContractionDimensions>

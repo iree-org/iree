@@ -765,9 +765,9 @@ isContractionOpSequence(Value yielded,
     return std::nullopt;
   }
 
-  auto elementwiseLHS = dyn_cast_if_present<BlockArgument>(
+  auto elementwiseLHS = dyn_cast_or_null<BlockArgument>(
       getSourceSkipUnary(elementwiseOp->getOperand(0)));
-  auto elementwiseRHS = dyn_cast_if_present<BlockArgument>(
+  auto elementwiseRHS = dyn_cast_or_null<BlockArgument>(
       getSourceSkipUnary(elementwiseOp->getOperand(1)));
   if (!elementwiseLHS || !elementwiseRHS) {
     return std::nullopt;
@@ -803,7 +803,7 @@ isContractionOpSequence(Value yielded) {
 /// TODO: The logic below is quite convoluted. Might be better
 /// off having a dedicated operation for this.
 bool isaHorizontallyFusedContraction(Operation *op) {
-  auto linalgOp = dyn_cast_if_present<linalg::LinalgOp>(op);
+  auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op);
   if (!linalgOp) {
     return false;
   }
@@ -1019,13 +1019,13 @@ bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {
 }
 
 bool isPureMatmul(Operation *op) {
-  auto matmulOp = dyn_cast_if_present<linalg::MatmulOp>(op);
+  auto matmulOp = dyn_cast_or_null<linalg::MatmulOp>(op);
   return matmulOp &&
          linalg::MatmulOp::isDefaultIndexingMaps(matmulOp.getIndexingMaps());
 }
 
 bool isPureBatchMatmul(Operation *op) {
-  auto batchMatmulOp = dyn_cast_if_present<linalg::BatchMatmulOp>(op);
+  auto batchMatmulOp = dyn_cast_or_null<linalg::BatchMatmulOp>(op);
   return batchMatmulOp && linalg::BatchMatmulOp::isDefaultIndexingMaps(
                               batchMatmulOp.getIndexingMaps());
 }

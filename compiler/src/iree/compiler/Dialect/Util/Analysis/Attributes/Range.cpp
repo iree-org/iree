@@ -133,7 +133,7 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
   if (auto valueBlockArg = dyn_cast<BlockArgument>(value)) {
     Block *ownerBlock = valueBlockArg.getOwner();
     if (auto linalgParent =
-            dyn_cast_if_present<linalg::LinalgOp>(ownerBlock->getParentOp())) {
+            dyn_cast_or_null<linalg::LinalgOp>(ownerBlock->getParentOp())) {
       value = linalgParent->getOperand(valueBlockArg.getArgNumber());
       LLVM_DEBUG(dbgs() << "  ++ REMAP LINALG BLOCK ARG TO: " << value << "\n");
     }

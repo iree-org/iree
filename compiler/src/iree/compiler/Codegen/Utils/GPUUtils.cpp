@@ -996,7 +996,7 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(DictionaryAttr attr) {
-  return dyn_cast_if_present<IREE::GPU::TargetAttr>(getConfigTargetInfo(attr));
+  return dyn_cast_or_null<IREE::GPU::TargetAttr>(getConfigTargetInfo(attr));
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,

@@ -182,7 +182,7 @@ struct FoldBufferViewCreateSubspan
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
     auto newSourceOffset = cast<Value>(op.getSourceOffset());
-    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
       newSourceOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -240,7 +240,7 @@ struct SkipCommandBufferDeviceOp
 
   LogicalResult matchAndRewrite(CommandBufferDeviceOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto createOp = dyn_cast_if_present<CommandBufferCreateOp>(
+    if (auto createOp = dyn_cast_or_null<CommandBufferCreateOp>(
             op.getCommandBuffer().getDefiningOp())) {
       rewriter.replaceOp(op, createOp.getDevice());
       return success();
@@ -270,7 +270,7 @@ struct FoldCommandBufferFillBufferSubspans
     bool needsUpdate = false;
     auto newTargetBuffer = op.getTargetBuffer();
     auto newTargetOffset = cast<Value>(op.getTargetOffset());
-    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
       newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -310,7 +310,7 @@ struct FoldCommandBufferUpdateBufferSubspans
     bool needsUpdate = false;
     auto newTargetBuffer = op.getTargetBuffer();
     auto newTargetOffset = cast<Value>(op.getTargetOffset());
-    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
       newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -350,7 +350,7 @@ struct FoldCommandBufferCopyBufferSubspans
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
     auto newSourceOffset = cast<Value>(op.getSourceOffset());
-    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
       newSourceOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -360,7 +360,7 @@ struct FoldCommandBufferCopyBufferSubspans
     }
     auto newTargetBuffer = op.getTargetBuffer();
     auto newTargetOffset = cast<Value>(op.getTargetOffset());
-    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
+    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
       newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -565,8 +565,8 @@ struct HoistDeviceQueueBarrierChain
                                 PatternRewriter &rewriter) const override {
     // See if we can observe the original fence creation in the local scope.
     auto waitFence = barrierOp.getWaitFence();
-    auto createOp = dyn_cast_if_present<IREE::HAL::FenceCreateOp>(
-        waitFence.getDefiningOp());
+    auto createOp =
+        dyn_cast_or_null<IREE::HAL::FenceCreateOp>(waitFence.getDefiningOp());
     if (!createOp) {
       return rewriter.notifyMatchFailure(barrierOp,
                                          "cannot analyze wait fence creation");
@@ -1103,7 +1103,7 @@ struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
                                 PatternRewriter &rewriter) const override {
     auto fence = signalOp.getFence();
     auto createOp =
-        dyn_cast_if_present<IREE::HAL::FenceCreateOp>(fence.getDefiningOp());
+        dyn_cast_or_null<IREE::HAL::FenceCreateOp>(fence.getDefiningOp());
     if (!createOp)
       return failure();
 

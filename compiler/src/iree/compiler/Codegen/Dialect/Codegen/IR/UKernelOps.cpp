@@ -42,7 +42,7 @@ createFunctionCall(RewriterBase &rewriter, Operation *op, StringRef fnName,
   Location loc = op->getLoc();
   auto moduleOp = SymbolTable::getNearestSymbolTable(op);
   // Check for duplicates.
-  auto fnDecl = dyn_cast_if_present<func::FuncOp>(
+  auto fnDecl = dyn_cast_or_null<func::FuncOp>(
       SymbolTable::lookupSymbolIn(moduleOp, fnName));
   if (!fnDecl) {
     OpBuilder::InsertionGuard g(rewriter);

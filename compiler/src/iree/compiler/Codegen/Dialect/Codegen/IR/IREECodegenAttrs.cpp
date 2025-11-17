@@ -416,7 +416,7 @@ LogicalResult WorkgroupMappingAttr::verifyAttrList(MLIRContext *context,
   auto emitError = mlir::detail::getDefaultDiagnosticEmitFn(loc);
   for (auto attr : attrs) {
     auto typedAttr =
-        dyn_cast_if_present<IREE::Codegen::WorkgroupMappingAttr>(attr);
+        dyn_cast_or_null<IREE::Codegen::WorkgroupMappingAttr>(attr);
     if (!typedAttr) {
       return emitError() << "expected all the mapping attribute to be of "
                             "`WorkgroupMappingAttr` type";

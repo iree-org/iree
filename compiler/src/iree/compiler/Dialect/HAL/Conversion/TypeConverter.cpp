@@ -63,7 +63,7 @@ HALTypeConverter::HALTypeConverter(
       // Look for the buffer view this buffer came from, if any.
       // If we don't have the origin buffer view then we can't know the shape
       // and can't materialize one here - it's too late.
-      if (auto bvbOp = dyn_cast_if_present<IREE::HAL::BufferViewBufferOp>(
+      if (auto bvbOp = dyn_cast_or_null<IREE::HAL::BufferViewBufferOp>(
               inputValue.getDefiningOp())) {
         return bvbOp.getBufferView();
       }

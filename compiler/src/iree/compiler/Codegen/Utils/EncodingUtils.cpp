@@ -20,7 +20,7 @@ namespace mlir::iree_compiler {
 static std::optional<IREE::Codegen::MaterializeEncodingInfo>
 getEncodingInfoFromType(RankedTensorType type) {
   auto layoutAttr =
-      dyn_cast_if_present<IREE::Encoding::LayoutAttr>(type.getEncoding());
+      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
   if (!layoutAttr) {
     return std::nullopt;
   }

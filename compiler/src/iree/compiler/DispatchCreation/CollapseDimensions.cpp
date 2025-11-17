@@ -682,7 +682,7 @@ findRootOps(IREE::Flow::DispatchRegionOp regionOp) {
       continue;
     }
 
-    if (auto forallOp = dyn_cast_if_present<scf::ForallOp>(collapsibleOp)) {
+    if (auto forallOp = dyn_cast_or_null<scf::ForallOp>(collapsibleOp)) {
       mlir::visitUsedValuesDefinedAbove(
           MutableArrayRef<Region>{forallOp.getTerminator().getRegion()},
           [&](OpOperand *operand) {
