@@ -60,7 +60,7 @@ LogicalResult BarrierRegionOp::verifyRegions() {
   }
 
   // Ensure that the region yields an element of the right type.
-  auto yieldOp = cast<GPU::YieldOp>(block.getTerminator());
+  auto yieldOp = llvm::cast<GPU::YieldOp>(block.getTerminator());
   if (yieldOp->getNumOperands() != getNumResults()) {
     return emitOpError(
         "expected body to yield same number of values as results");

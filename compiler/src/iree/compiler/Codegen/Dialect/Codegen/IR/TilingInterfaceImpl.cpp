@@ -31,7 +31,8 @@ SmallVector<Range> InnerTiledOp::getIterationDomain(OpBuilder &builder) {
   for (const auto &it : llvm::enumerate(getIteratorTypes())) {
     // Search input map results for 'targetExpr'.
     auto targetExpr = getAffineDimExpr(it.index(), builder.getContext());
-    auto iteratorType = cast<linalg::IteratorTypeAttr>(it.value()).getValue();
+    auto iteratorType =
+        llvm::cast<linalg::IteratorTypeAttr>(it.value()).getValue();
     ArrayRef<AffineMap> maps =
         iteratorType == utils::IteratorType::reduction ? inputMaps : outputMaps;
     ValueRange ops = iteratorType == utils::IteratorType::reduction

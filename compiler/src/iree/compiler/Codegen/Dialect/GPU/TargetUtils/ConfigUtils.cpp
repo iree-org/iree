@@ -622,10 +622,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // TODO: Drop this. This is only a consideration for other pipelines.
   bool transposedLhs =
       kDims.back() !=
-      cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
   bool transposedRhs =
       nDims.back() !=
-      cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
   bool couldNeedPadding = false;
 
   // Helper to pad bounds to a preferred alignment.
@@ -868,7 +868,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
 
   ConvToIgemmInfo convToIgemmInfo;
   if (padConv) {
-    auto inputType = cast<ShapedType>(op->getOperands()[0].getType());
+    auto inputType = llvm::cast<ShapedType>(op->getOperands()[0].getType());
     ArrayRef<int64_t> inputShape = inputType.getShape();
     AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
     SmallVector<int64_t> inputImagePos;

@@ -513,8 +513,8 @@ struct GPUEncodingPackedLayoutMaterializerAttr
     auto resolver = cast<GPUEncodingResolverAttr>(attr);
     DictionaryAttr config = resolver.getConfiguration();
 
-    auto encoding =
-        dyn_cast_or_null<IREE::Encoding::EncodingAttr>(type.getEncoding());
+    auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
+        type.getEncoding());
 
     MaterializeEncodingInfo info;
     if (!encoding) {
@@ -558,7 +558,7 @@ struct GPUEncodingResolverMaterializerAttr
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
     auto resolverAttr = cast<GPUEncodingResolverAttr>(attr);
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
     }

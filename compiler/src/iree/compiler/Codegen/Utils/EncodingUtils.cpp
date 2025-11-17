@@ -110,7 +110,7 @@ FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensorImpl(
     ValueRange dynamicDims, IREE::Encoding::LayoutMaterializerAttr layoutAttr,
     IREE::Codegen::MaterializeEncodingInfo encodingInfo) {
   auto boundTensorType =
-      dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+      llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
   if (!boundTensorType) {
     return failure();
   }

@@ -184,14 +184,14 @@ replaceEntryPointUses(mlir::ModuleOp moduleOp,
             if (attr == oldAttr) {
               // Found old->new replacement.
               return {newAttr, WalkResult::skip()};
-            } else if (isa<SymbolRefAttr>(attr)) {
+            } else if (llvm::isa<SymbolRefAttr>(attr)) {
               // Don't recurse into symbol refs - we only want to match roots.
               return {attr, WalkResult::skip()};
             }
             // Non-symbol ref attr.
             return {attr, WalkResult::advance()};
           });
-      use.getUser()->setAttrs(cast<DictionaryAttr>(newDict));
+      use.getUser()->setAttrs(llvm::cast<DictionaryAttr>(newDict));
     }
   };
   replaceSymbolRefs(moduleOp, symbolReplacements.exportRefs);

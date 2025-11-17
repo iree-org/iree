@@ -303,7 +303,7 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSource()); })
       .Case<IREE::TensorExt::DispatchTensorLoadOp>(
           [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
-            return cast<IREE::TensorExt::DispatchTensorType>(
+            return llvm::cast<IREE::TensorExt::DispatchTensorType>(
                        loadOp.getSource().getType())
                        .getAccess() == IREE::TensorExt::TensorAccess::ReadOnly;
           })
@@ -1062,7 +1062,7 @@ FailureOr<int64_t> getSoftwarePipelineDepth(DictionaryAttr config) {
   if (!depth) {
     return failure();
   }
-  return cast<IntegerAttr>(depth).getInt();
+  return llvm::cast<IntegerAttr>(depth).getInt();
 }
 
 FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr config) {
@@ -1073,7 +1073,7 @@ FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr config) {
   if (!stage) {
     return failure();
   }
-  return cast<IntegerAttr>(stage).getInt();
+  return llvm::cast<IntegerAttr>(stage).getInt();
 }
 
 /// Returns a small tiling factor for the given reduction `dimSize`.
@@ -1158,7 +1158,7 @@ static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
 
 Value findOrCreateSubspanBuffer(
     RewriterBase &rewriter, IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-  auto shapedType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
+  auto shapedType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
       subspanOp.getResult().getType());
   assert((shapedType && shapedType.hasRank()) &&
          "expected the result of subspanOp is DispatchTensorType");
@@ -1169,7 +1169,7 @@ Value findOrCreateSubspanBuffer(
     // Using buffer resources on AMDGPU will require buffers to be relocated to
     // offset 0, so any static offset we can compute here might change.
     // Therefore, always use a ? for the offset field unless it's known to be 0.
-    auto tensorType = cast<RankedTensorType>(shapedType.getBoundType());
+    auto tensorType = llvm::cast<RankedTensorType>(shapedType.getBoundType());
     SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
     layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
                                         ShapedType::kDynamic, strides);
@@ -1198,7 +1198,7 @@ Value findOrCreateSubspanBuffer(
       continue;
 
     auto bufferMemrefType =
-        dyn_cast<MemRefType>(bufferSubspanOp.getResult().getType());
+        llvm::dyn_cast<MemRefType>(bufferSubspanOp.getResult().getType());
     if (!bufferMemrefType)
       continue;
 
@@ -1212,7 +1212,7 @@ Value findOrCreateSubspanBuffer(
       continue;
 
     if (useRocdlBuffers && bufferSubspanOp->hasOneUse()) {
-      auto castOp = dyn_cast<amdgpu::FatRawBufferCastOp>(
+      auto castOp = llvm::dyn_cast<amdgpu::FatRawBufferCastOp>(
           *bufferSubspanOp->getUsers().begin());
       if (!castOp)
         continue;
@@ -1395,8 +1395,9 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
 
   LDBG() << "\tReplacing in user by creating new user : " << *user;
   if (auto castOp = dyn_cast<memref::CastOp>(user)) {
-    auto replacementType = cast<MemRefType>(replacement.getType());
-    auto currentResultType = cast<MemRefType>(castOp.getResult().getType());
+    auto replacementType = llvm::cast<MemRefType>(replacement.getType());
+    auto currentResultType =
+        llvm::cast<MemRefType>(castOp.getResult().getType());
     if (replacementType == currentResultType) {
       // Cast is a no op, just return the replacement.
       return SmallVector<Value>{replacement};
@@ -1411,16 +1412,18 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
                               newCastOp->result_end());
   }
   if (auto subviewOp = dyn_cast<memref::SubViewOp>(user)) {
-    auto currResultType = cast<MemRefType>(subviewOp.getResult().getType());
-    auto newSourceType = cast<MemRefType>(replacement.getType());
+    auto currResultType =
+        llvm::cast<MemRefType>(subviewOp.getResult().getType());
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
     SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
     SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
     SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
     MemRefType newResultType =
         (currResultType.getRank() != newSourceType.getRank()
-             ? cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
-                   currResultType.getShape(), newSourceType, offsets, sizes,
-                   strides))
+             ? llvm::cast<MemRefType>(
+                   memref::SubViewOp::inferRankReducedResultType(
+                       currResultType.getShape(), newSourceType, offsets, sizes,
+                       strides))
              : nullptr);
     auto newSubviewOp = memref::SubViewOp::create(
         rewriter, loc, newResultType, replacement, offsets, sizes, strides);
@@ -1429,8 +1432,9 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
     return llvm::to_vector_of<Value>(newSubviewOp->getResults());
   }
   if (auto expandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
-    auto currResultType = cast<MemRefType>(expandOp.getResult().getType());
-    auto newSourceType = cast<MemRefType>(replacement.getType());
+    auto currResultType =
+        llvm::cast<MemRefType>(expandOp.getResult().getType());
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
 
     FailureOr<MemRefType> newResultType =
         memref::ExpandShapeOp::computeExpandedType(
@@ -1447,7 +1451,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
     return llvm::to_vector_of<Value>(newExpandOp->getResults());
   }
   if (auto collapseOp = dyn_cast<memref::CollapseShapeOp>(user)) {
-    auto newSourceType = cast<MemRefType>(replacement.getType());
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
     FailureOr<MemRefType> newResultType =
         memref::CollapseShapeOp::computeCollapsedType(
             newSourceType, collapseOp.getReassociationIndices());
@@ -1718,8 +1722,8 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     unsigned firstOperandDim = operandDimPairs[0].second;
 
     // Trivial case: `dim` size is available in the operand type.
-    int64_t dimSize =
-        cast<ShapedType>(firstOperand.getType()).getShape()[firstOperandDim];
+    int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
+                          .getShape()[firstOperandDim];
     bool dimScalable = false;
     if (ShapedType::isStatic(dimSize)) {
       result.vectorSizes.push_back(dimSize);
@@ -2085,8 +2089,8 @@ bool hasExternalCapture(linalg::GenericOp genericOp) {
 
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes) {
-  auto memrefTypeFrom = dyn_cast<MemRefType>(from.getType());
-  auto memrefTypeTo = dyn_cast<MemRefType>(to.getType());
+  auto memrefTypeFrom = llvm::dyn_cast<MemRefType>(from.getType());
+  auto memrefTypeTo = llvm::dyn_cast<MemRefType>(to.getType());
   if (!memrefTypeFrom || !memrefTypeTo ||
       memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
     mlir::emitError(
@@ -2117,15 +2121,15 @@ SmallVector<OpFoldResult> getCopyTileSizes(OpBuilder &b, memref::CopyOp copy) {
   }
 
   SmallVector<OpFoldResult> tileSizes(rank - 1, b.getIndexAttr(1));
-  int64_t elementBitWidth =
-      cast<MemRefType>(copy.getTarget().getType()).getElementTypeBitWidth();
+  int64_t elementBitWidth = llvm::cast<MemRefType>(copy.getTarget().getType())
+                                .getElementTypeBitWidth();
   tileSizes.push_back(b.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
   return tileSizes;
 }
 
 std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp copyOp) {
   auto type =
-      dyn_cast<MemRefType>(copyOp.getDpsInputOperand(0)->get().getType());
+      llvm::dyn_cast<MemRefType>(copyOp.getDpsInputOperand(0)->get().getType());
   if (!type) {
     return std::nullopt;
   }

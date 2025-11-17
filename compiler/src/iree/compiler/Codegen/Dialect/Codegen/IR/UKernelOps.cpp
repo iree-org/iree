@@ -157,7 +157,7 @@ lowerUKernelGenericToFunctionCall(RewriterBase &rewriter,
   }
   SmallVector<Type> callResultTypes;
   for (auto [idx, resultType] : llvm::enumerate(op->getResultTypes())) {
-    if (isa<ShapedType>(resultType)) {
+    if (llvm::isa<ShapedType>(resultType)) {
       return rewriter.notifyMatchFailure(
           op, "cannot lower a `ShapedType` return value to function call");
     }
@@ -266,14 +266,14 @@ void UKernelGenericOp::getEffects(
   llvm::append_range(readOnlyOperands,
                      llvm::make_pointer_range(getOtherOperandsMutable()));
   for (OpOperand *operand : readOnlyOperands) {
-    if (!isa<MemRefType>(operand->get().getType())) {
+    if (!llvm::isa<MemRefType>(operand->get().getType())) {
       continue;
     }
     effects.emplace_back(MemoryEffects::Read::get(), operand,
                          SideEffects::DefaultResource::get());
   }
   for (OpOperand &operand : getDpsInitsMutable()) {
-    if (!isa<MemRefType>(operand.get().getType())) {
+    if (!llvm::isa<MemRefType>(operand.get().getType())) {
       continue;
     }
     effects.emplace_back(MemoryEffects::Read::get(), &operand,
@@ -310,7 +310,7 @@ struct UKernelOpsBufferizationInterface
     // Replace all `tensor` operands with corresponding `memref` operands.
     for (auto [index, operand] : llvm::enumerate(op->getOperands())) {
       // For `tensor` type operands, replace with `memref` type operand.
-      if (isa<RankedTensorType>(operand.getType())) {
+      if (llvm::isa<RankedTensorType>(operand.getType())) {
         FailureOr<Value> memrefOperand =
             getBuffer(rewriter, operand, options, state);
         if (failed(memrefOperand)) {
@@ -329,7 +329,7 @@ struct UKernelOpsBufferizationInterface
     SmallVector<Value> nonTensorResultValues;
     for (OpResult result : op->getResults()) {
       Type resultType = result.getType();
-      if (isa<RankedTensorType>(resultType))
+      if (llvm::isa<RankedTensorType>(resultType))
         continue;
       nonTensorResultTypes.push_back(resultType);
       nonTensorResultValues.push_back(result);

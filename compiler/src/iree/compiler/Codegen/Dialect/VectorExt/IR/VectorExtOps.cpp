@@ -56,7 +56,7 @@ Speculation::Speculatability TransferGatherOp::getSpeculatability() {
 void TransferGatherOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
-  if (isa<MemRefType>(getBase().getType())) {
+  if (llvm::isa<MemRefType>(getBase().getType())) {
     effects.emplace_back(MemoryEffects::Read::get(), &getBaseMutable(),
                          SideEffects::DefaultResource::get());
   }
@@ -151,13 +151,13 @@ verifyTransferOp(VectorTransferOpInterface op, ShapedType shapedType,
                  VectorType vectorType, VectorType maskType,
                  VectorType inferredMaskType, AffineMap permutationMap,
                  ArrayAttr inBounds) {
-  if (!isa<MemRefType, RankedTensorType>(shapedType))
+  if (!llvm::isa<MemRefType, RankedTensorType>(shapedType))
     return op->emitOpError(
         "requires source to be a memref or ranked tensor type");
 
   Type elementType = shapedType.getElementType();
   DataLayout dataLayout = DataLayout::closest(op);
-  if (auto vectorElementType = dyn_cast<VectorType>(elementType)) {
+  if (auto vectorElementType = llvm::dyn_cast<VectorType>(elementType)) {
     // Memref or tensor has vector element type.
     unsigned sourceVecSize =
         dataLayout.getTypeSizeInBits(vectorElementType.getElementType()) *
@@ -280,7 +280,8 @@ LogicalResult TransferGatherOp::verify() {
                               inferredMaskType, permutationMap, getInBounds())))
     return failure();
 
-  if (auto sourceVectorElementType = dyn_cast<VectorType>(sourceElementType)) {
+  if (auto sourceVectorElementType =
+          llvm::dyn_cast<VectorType>(sourceElementType)) {
     // Source has vector element type.
     // Check that 'sourceVectorElementType' and 'paddingType' types match.
     if (sourceVectorElementType != paddingType)
@@ -385,9 +386,9 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
 
   // The types are arranged as:
   // sourceTy, resultTy
-  auto shapedType = dyn_cast<ShapedType>(types[0]);
-  VectorType vectorType = dyn_cast<VectorType>(types[1]);
-  if (!shapedType || !isa<MemRefType, RankedTensorType>(shapedType))
+  auto shapedType = llvm::dyn_cast<ShapedType>(types[0]);
+  VectorType vectorType = llvm::dyn_cast<VectorType>(types[1]);
+  if (!shapedType || !llvm::isa<MemRefType, RankedTensorType>(shapedType))
     return parser.emitError(typesLoc, "requires memref or ranked tensor type");
   if (!vectorType)
     return parser.emitError(typesLoc, "requires vector type");
@@ -399,7 +400,7 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
     permMap = vector::getTransferMinorIdentityMap(shapedType, vectorType);
     result.attributes.set(permMapAttrName, AffineMapAttr::get(permMap));
   } else {
-    permMap = cast<AffineMapAttr>(permMapAttr).getValue();
+    permMap = llvm::cast<AffineMapAttr>(permMapAttr).getValue();
   }
   auto inBoundsAttrName = TransferGatherOp::getInBoundsAttrName(result.name);
   Attribute inBoundsAttr = result.attributes.get(inBoundsAttrName);
@@ -417,7 +418,7 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
                             result.operands))
     return failure();
   if (hasMask.succeeded()) {
-    if (dyn_cast<VectorType>(shapedType.getElementType()))
+    if (llvm::dyn_cast<VectorType>(shapedType.getElementType()))
       return parser.emitError(
           maskInfo.location, "does not support masks with vector element type");
     if (vectorType.getRank() != permMap.getNumResults()) {
