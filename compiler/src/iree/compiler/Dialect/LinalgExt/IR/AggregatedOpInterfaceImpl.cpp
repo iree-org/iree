@@ -550,7 +550,6 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
 
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
-
   Location loc = getLoc();
   Value query = getQuery();
   Value key = getKey();
@@ -567,10 +566,10 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
-    // Read use_exp2 from decomposition config
     if (auto useExp2Attr = config.getAs<BoolAttr>(getUseExp2AttrStr()))
       useExp2 = useExp2Attr.getValue();
   }
+
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   assert(succeeded(maybeOpInfo) && "Invalid attention indexing maps");
