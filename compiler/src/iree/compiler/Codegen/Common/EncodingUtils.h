@@ -99,12 +99,6 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
     Value packedValue, const MaterializeEncodingTypeConverter &typeConverter);
 
-/// Populates the set of patterns that decompose load/store ops that have
-/// mismatched layout types.
-void populateDecomposeMismatchedLayoutLoadStoreOpsPatterns(
-    RewritePatternSet &patterns,
-    MaterializeEncodingTypeConverter &typeConverter);
-
 /// Populates the set of patterns that lowers operations with encoding types to
 /// operations without encodings.
 void populateMaterializeEncodingPatterns(

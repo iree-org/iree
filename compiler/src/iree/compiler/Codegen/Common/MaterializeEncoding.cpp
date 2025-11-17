@@ -29,7 +29,6 @@
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
 
@@ -67,6 +66,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
                                detail::TestingResolverKind::kNone) {
   MLIRContext *ctx = funcOp.getContext();
   {
+    RewritePatternSet patterns(ctx);
     DictionaryAttr targetConfig =
         targetAttr ? targetAttr.getConfiguration() : nullptr;
     auto getTestTargetResolverOrIdentityResolver =
@@ -131,24 +131,6 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
 
     MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);
     MaterializeEncodingConversionTarget target(*ctx);
-
-    // Decompose mismatched encodings in load/store ops before actual encoding
-    // materialization.
-    // When a load/store op has mismatched source and result encodings that
-    // materialize to different layouts, decompose it into a sequence of
-    // load/store + unset_encoding + set_encoding ops. This phase uses greedy
-    // pattern rewriting to handle these layout transfer cases before the main
-    // dialect conversion. It is needed because no-fallback conversion driver
-    // requires all the immediate ops to be legal, but the patterns can
-    // introduce illegal load/store ops because they still have encodings.
-    {
-      RewritePatternSet patterns(ctx);
-      populateDecomposeMismatchedLayoutLoadStoreOpsPatterns(patterns,
-                                                            typeConverter);
-      walkAndApplyPatterns(funcOp, std::move(patterns));
-    }
-
-    RewritePatternSet patterns(ctx);
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
     // Replace any unrealized conversions to tensor.cast ops if they come from
