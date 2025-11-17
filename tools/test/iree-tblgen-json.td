@@ -95,7 +95,7 @@ def Test_FooOp : Test_Op<"foo", []> {
 // CHECK-NEXT: "dialect": "test"
 // CHECK-NEXT: "cppClassName": "FooOp"
 // CHECK: "metadata": {
-// CHECK: "testFile": "{{.+}}foo_test.mlir"
+// CHECK: "testFile": "{{.+}}/foo_test.mlir"
 // CHECK: "exampleRefs": [
 // CHECK-NEXT: "@basicExample"
 // CHECK: "tags": [
@@ -133,7 +133,7 @@ def Test_CustomType : Test_TypeDef<"Custom"> {
 // CHECK: "category": "Test Types"
 // CHECK: "relatedTypes": [
 // CHECK-NEXT: "test.other"
-// CHECK: "testFile": "{{.+}}custom_type_test.mlir"
+// CHECK: "testFile": "{{.+}}/custom_type_test.mlir"
 // CHECK: "exampleRefs": [
 // CHECK-NEXT: "@typeExample"
 // CHECK: "tags": [
@@ -175,7 +175,7 @@ def Test_CustomAttr : Test_AttrDef<"Custom"> {
 // CHECK: "category": "Test Attributes"
 // CHECK: "relatedAttrs": [
 // CHECK-NEXT: "test.other_attr"
-// CHECK: "testFile": "{{.+}}custom_attr_test.mlir"
+// CHECK: "testFile": "{{.+}}/custom_attr_test.mlir"
 // CHECK: "exampleRefs": [
 // CHECK-NEXT: "@attrExample"
 // CHECK: "tags": [
@@ -215,7 +215,7 @@ def Test_FooInterface : Test_OpInterface<"FooOpInterface"> {
 // CHECK: "category": "Test Interfaces"
 // CHECK: "relatedInterfaces": [
 // CHECK-NEXT: "test.bar_interface"
-// CHECK: "testFile": "{{.+}}interface_test.mlir"
+// CHECK: "testFile": "{{.+}}/interface_test.mlir"
 // CHECK: "exampleRefs": [
 // CHECK-NEXT: "@interfaceExample"
 // CHECK: "tags": [
