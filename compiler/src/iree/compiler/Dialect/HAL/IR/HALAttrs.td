@@ -166,18 +166,6 @@ def HAL_CallingConventionAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_ExecutionModel_Synchronous : I32EnumAttrCase<"Synchronous", 0, "synchronous">;
-def HAL_ExecutionModel_CoarseFences : I32EnumAttrCase<"CoarseFences", 1, "coarse_fences">;
-def HAL_ExecutionModelAttr :
-    I32EnumAttr<
-      "ExecutionModel",
-      "Execution model for function invocation", [
-        HAL_ExecutionModel_Synchronous,
-        HAL_ExecutionModel_CoarseFences,
-      ]>{
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
-
 def HAL_ChannelFlag_None : I64BitEnumAttrCase<"None", 0x0000>;
 def HAL_ChannelFlag_Reserved : I64BitEnumAttrCase<"Reserved", 0x0001>;
 def HAL_ChannelFlagBitfieldAttr :
@@ -401,54 +389,6 @@ def HAL_WriteFlagBitfieldAttr :
       HAL_WriteFlag_None,
       HAL_WriteFlag_Reserved,
     ]>;
-
-//===----------------------------------------------------------------------===//
-// #hal.abi.convention<*>
-//===----------------------------------------------------------------------===//
-
-def HAL_ABIConventionAttr : HAL_AttrDef<"ABIConvention", [
-  Util_CallAnnotationAttrInterface,
-]> {
-  let mnemonic = "abi.convention";
-  let summary = "ABI calling convention for cross-module host functions.";
-  let description = [{
-    Specifies the ABI calling convention and execution model for functions
-    that cross host module boundaries (imports/exports). This determines:
-    * Whether fences are added for async execution (coarse-fences)
-    * How the function participates in timeline scheduling
-    * Marshaling behavior at ABI boundaries
-  }];
-
-  let parameters = (ins
-    AttrParameter<"ExecutionModel", "">:$executionModel
-  );
-
-  let assemblyFormat = "`<` $executionModel `>`";
-
-  let extraClassDeclaration = [{
-    // Ensures call sites are annotated with this attribute so we can control
-    // local optimizations.
-    bool shouldPropagateToCallSite() const { return true; }
-
-    // Returns the execution model of a call-like operation.
-    // Returns `Synchronous` if the attribute is not present.
-    static ExecutionModel lookupExecutionModel(Operation *op) {
-      auto attr = op->getAttrOfType<ABIConventionAttr>("hal.abi.convention");
-      return attr ? attr.getExecutionModel() : ExecutionModel::Synchronous;
-    }
-
-    // Set the ABI convention attribute on an operation.
-    static void setExecutionModel(Operation *op, ExecutionModel model) {
-      op->setAttr("hal.abi.convention", get(op->getContext(), model));
-    }
-  }];
-
-  let builders = [
-    AttrBuilder<(ins), [{
-      return $_get($_ctxt, HAL::ExecutionModel::Synchronous);
-    }]>,
-  ];
-}
 
 //===----------------------------------------------------------------------===//
 // #hal.collective<*>

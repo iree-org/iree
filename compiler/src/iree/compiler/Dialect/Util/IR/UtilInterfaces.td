@@ -1507,32 +1507,6 @@ def Util_SubrangeOperandOpInterface : Util_OpInterface<"SubrangeOperandOpInterfa
 }
 
 //===----------------------------------------------------------------------===//
-// IREE::Util::CallAnnotationAttrInterface
-//===----------------------------------------------------------------------===//
-
-def Util_CallAnnotationAttrInterface : Util_AttrInterface<"CallAnnotationAttrInterface"> {
-  let description = [{
-    Interface for attributes annotating a function or function call that should
-    be propagated from functions to their call sites. This allows for local
-    analysis to vary on the behavior of a callee without needing a non-local
-    symbol lookup.
-  }];
-
-  let methods = [
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns true if this attribute should be propagated to call sites.
-      }],
-      /*retTy=*/"bool",
-      /*methodName=*/"shouldPropagateToCallSite",
-      /*args=*/(ins),
-      /*methodBody=*/[{}],
-      /*defaultImplementation=*/[{ return true; }]
-    >,
-  ];
-}
-
-//===----------------------------------------------------------------------===//
 // IREE::Util::InliningPolicyAttrInterface
 //===----------------------------------------------------------------------===//
 

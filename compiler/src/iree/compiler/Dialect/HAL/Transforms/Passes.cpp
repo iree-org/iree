@@ -316,16 +316,13 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    PipelinePhase compileFrom,
                                    PipelinePhase compileTo) {
   //----------------------------------------------------------------------------
-  // Precondition verification and IR normalization
+  // Precondition verification
   //----------------------------------------------------------------------------
 
   // Verify module initialization order - subsequent passes rely on it being
   // correct (and we maintain it as correct from this point on, so this is our
   // gate).
   passManager.addPass(IREE::Util::createVerifyInitializationOrderPass());
-
-  // Propagate attributes from callees to call sites for local analysis.
-  passManager.addPass(IREE::Util::createAttributeCallGraphPass());
 
   //----------------------------------------------------------------------------
   // Device assignment and interface materialization
