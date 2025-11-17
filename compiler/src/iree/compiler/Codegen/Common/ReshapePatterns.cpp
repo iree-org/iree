@@ -122,7 +122,7 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
                                collapsedStaticShape);
 
     auto tensorAccess =
-        cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType())
+        llvm::cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType())
             .getAccess();
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeOp.getResultType());
@@ -227,7 +227,7 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
     }
 
     auto tensorAccess =
-        cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType())
+        llvm::cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType())
             .getAccess();
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeOp.getResultType());
@@ -317,7 +317,7 @@ struct FoldExpandShapeIntoInterfaceTensorStore
                                collapsedStaticShape);
 
     auto tensorAccess =
-        cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType())
+        llvm::cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType())
             .getAccess();
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeSrc.getType());
@@ -634,7 +634,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
     }
 
     auto subspanType =
-        cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType());
+        llvm::cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType());
     SmallVector<Value> dynamicDims = subspanOp.getDynamicDims();
 
     // Verify the subspan shape against the shape of the slice being inserted.
@@ -933,7 +933,7 @@ struct FoldInnerBitcastIntoInterfaceTensorStore
     }
 
     auto subspanType =
-        cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType());
+        llvm::cast<IREE::TensorExt::DispatchTensorType>(subspanOp.getType());
     auto subspanTensorType = cast<RankedTensorType>(subspanType.getBoundType());
     if (subspanTensorType.getEncoding() ||
         subspanTensorType.getShape().back() !=

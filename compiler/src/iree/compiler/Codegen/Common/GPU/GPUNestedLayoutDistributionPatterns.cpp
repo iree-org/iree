@@ -1137,7 +1137,7 @@ struct DistributeMultiReduction final
 
     auto constOp = arith::ConstantOp::create(rewriter, loc,
                                              rewriter.getZeroAttr(flatVecType));
-    auto res = cast<VectorValue>(constOp.getResult());
+    auto res = llvm::cast<VectorValue>(constOp.getResult());
 
     for (unsigned i = 0; i < numElements; ++i) {
       Value extracted = vector::ExtractOp::create(rewriter, loc, flat, i);

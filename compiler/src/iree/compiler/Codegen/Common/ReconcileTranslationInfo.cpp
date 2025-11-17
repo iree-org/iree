@@ -736,7 +736,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
 
   for (auto exportOp : exportOps) {
     SmallVector<IREE::Codegen::TranslationInfoAttr> translationInfos;
-    auto rootFuncOp = dyn_cast_if_present<FunctionOpInterface>(
+    auto rootFuncOp = llvm::dyn_cast_if_present<FunctionOpInterface>(
         symbolTable.lookup(exportOp.getSymNameAttr()));
     if (!rootFuncOp || rootFuncOp.isExternal()) {
       // Skip external functions.

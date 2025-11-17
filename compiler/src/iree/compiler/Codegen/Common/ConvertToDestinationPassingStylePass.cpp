@@ -79,7 +79,8 @@ static Value getTensorLoadOpForTensorStoreOp(
   // Clone the offset, size and stride values. They will be CSE-ed later.
   SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
   Value tensorLoadOp = IREE::TensorExt::DispatchTensorLoadOp::create(
-      b, storeOp.getLoc(), cast<RankedTensorType>(storeOp.getValue().getType()),
+      b, storeOp.getLoc(),
+      llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
       storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
       clonedVals.sizes, clonedVals.strides);
   return tensorLoadOp;
@@ -271,7 +272,7 @@ convertToDestinationPassingStyle(OpBuilder &b,
   auto walkResult = funcOp.walk<WalkOrder::PreOrder>(
       [&](tensor::EmptyOp emptyOp) -> WalkResult {
         for (auto result : emptyOp->getResults()) {
-          if (!isa<RankedTensorType>(result.getType()))
+          if (!llvm::isa<RankedTensorType>(result.getType()))
             continue;
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);
@@ -515,7 +516,7 @@ struct RemoveCstOutsDependency
         continue;
       if (!attr.isSplat())
         continue;
-      auto type = dyn_cast<RankedTensorType>(attr.getType());
+      auto type = llvm::dyn_cast<RankedTensorType>(attr.getType());
       if (!type)
         continue;
       TypedAttr scalarAttr = attr.getValues<TypedAttr>()[0];
@@ -573,7 +574,8 @@ struct SwitchStoreOfIfResultValue
                                          "store source is not an if statement");
     }
 
-    auto resultNumber = cast<OpResult>(storeOp.getValue()).getResultNumber();
+    auto resultNumber =
+        llvm::cast<OpResult>(storeOp.getValue()).getResultNumber();
     auto moveStoreInsideBody = [&](Block *body) {
       OpBuilder::InsertionGuard guard(rewriter);
       auto yieldOp = cast<scf::YieldOp>(body->getTerminator());

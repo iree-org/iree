@@ -45,7 +45,7 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   MemRefType memrefType;
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  if (auto vectorType = dyn_cast<VectorType>(type)) {
+  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
     memrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType(),
                         MemRefLayoutAttrInterface{}, addressSpaceAttr);
@@ -67,7 +67,7 @@ static bool isUniformLoad(Operation *op) {
   if (!hasGlobalMemoryAddressSpace(loadOp.getMemRefType()))
     return false;
   auto space = loadOp.getMemRefType().getMemorySpace();
-  auto descTypeAttr = dyn_cast_if_present<DescriptorTypeAttr>(space);
+  auto descTypeAttr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
   if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
     return true;
 
@@ -135,7 +135,7 @@ static void moveScalarAndBindingUniformCode(gpu::WarpExecuteOnLane0Op warpOp) {
   // operations from there.
   for (auto &op : body->without_terminator()) {
     bool hasVectorResult = llvm::any_of(op.getResults(), [](Value result) {
-      return isa<VectorType>(result.getType());
+      return llvm::isa<VectorType>(result.getType());
     });
     if ((!hasVectorResult || isUniformLoad(&op)) &&
         canBeHoisted(&op, isDefinedOutsideOfBody)) {
@@ -273,7 +273,7 @@ struct VectorReductionToGPUPass final
                                      *subgroupSize, expandSubgroupReduction);
       };
       auto distributionFn = [](Value val) {
-        auto vecType = dyn_cast<VectorType>(val.getType());
+        auto vecType = llvm::dyn_cast<VectorType>(val.getType());
         if (!vecType)
           return AffineMap::get(val.getContext());
         // Create an identity dim map of rank |vecRank|. This greedily divides

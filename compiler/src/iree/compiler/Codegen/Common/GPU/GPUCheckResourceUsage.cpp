@@ -33,7 +33,8 @@ static int shapedTypeStaticSize(
       continue;
     allocSize *= dimSize;
   }
-  if (auto elementType = dyn_cast<ShapedType>(shapedType.getElementType())) {
+  if (auto elementType =
+          llvm::dyn_cast<ShapedType>(shapedType.getElementType())) {
     allocSize *= shapedTypeStaticSize(allocOp, elementType, getIndexBitwidth);
   } else {
     auto eltTy = shapedType.getElementType();
@@ -63,7 +64,7 @@ static LogicalResult checkGPUAllocationSize(
 
   int cumSize = 0;
   for (auto allocOp : allocOps) {
-    auto allocType = cast<MemRefType>(allocOp.getType());
+    auto allocType = llvm::cast<MemRefType>(allocOp.getType());
     if (!hasSharedMemoryAddressSpace(allocType))
       continue;
 

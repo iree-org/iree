@@ -701,7 +701,7 @@ void populateMaterializeEncodingPatterns(
   MLIRContext *context = patterns.getContext();
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-        auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
             subspanOp.getResult().getType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)
@@ -712,7 +712,7 @@ void populateMaterializeEncodingPatterns(
                       IREE::Encoding::UnsetEncodingOp>();
   target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorStoreOp>(
       [&typeConverter](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
-        auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
             storeOp.getTargetType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)
@@ -721,7 +721,7 @@ void populateMaterializeEncodingPatterns(
       });
   target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorLoadOp>(
       [&typeConverter](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
-        auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
+        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
             loadOp.getSourceType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)

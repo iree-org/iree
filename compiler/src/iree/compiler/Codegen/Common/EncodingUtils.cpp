@@ -78,7 +78,7 @@ MaterializeEncodingTypeConverter::getPackedDimsForDispatchTensor(
     ValueRange dynamicDims) const {
 
   auto boundTensorType =
-      dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+      llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
   if (!boundTensorType) {
     return failure();
   }

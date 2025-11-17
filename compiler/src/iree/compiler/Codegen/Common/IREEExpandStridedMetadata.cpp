@@ -90,7 +90,7 @@ getStridesFromSizes(RewriterBase &rewriter, Location loc,
 static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
     IREE::HAL::InterfaceBindingSubspanOp binding, RewriterBase &rewriter,
     Location loc) {
-  auto memRefType = cast<MemRefType>(binding.getResult().getType());
+  auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
   int rank = memRefType.getRank();
   DescriptorInfo resultDescriptor;
 
@@ -175,7 +175,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     auto binding = getSourceInterfaceBinding(op.getSource());
     if (!binding)
       return failure();
-    auto memRefType = cast<MemRefType>(binding->getResult().getType());
+    auto memRefType = llvm::cast<MemRefType>(binding->getResult().getType());
 
     auto loc = op.getLoc();
     OpBuilder::InsertionGuard g(rewriter);
@@ -246,7 +246,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     }
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() * 2 + 2);
-    auto baseBufferType = cast<MemRefType>(op.getBaseBuffer().getType());
+    auto baseBufferType = llvm::cast<MemRefType>(op.getBaseBuffer().getType());
     if (!op.getBaseBuffer().use_empty()) {
       if (newBufferType == baseBufferType) {
         results.push_back(newBinding);

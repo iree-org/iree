@@ -70,7 +70,7 @@ getDistributeLBAndStep(OpBuilder &b, Location loc, OpFoldResult lb,
 static void changeArithCstToI64Attr(OpBuilder &b,
                                     MutableArrayRef<OpFoldResult> constants) {
   for (OpFoldResult &val : constants) {
-    if (auto dyn_cast = dyn_cast_if_present<Value>(val)) {
+    if (auto dyn_cast = llvm::dyn_cast_if_present<Value>(val)) {
       APInt intVal;
       if (matchPattern(dyn_cast, m_ConstantInt(&intVal))) {
         val = b.getI64IntegerAttr(intVal.getSExtValue());
@@ -256,9 +256,9 @@ static LogicalResult replaceAllStoresWithTiledVersion(
       return rewriter.notifyMatchFailure(
           untiledOp, "failed to rewrite destructive update");
     }
-    if (failed(replaceStoresWithTiledVersion(rewriter, cast<OpResult>(result),
-                                             tiledValues[index], resultOffsets,
-                                             resultSizes, innerLoopBody))) {
+    if (failed(replaceStoresWithTiledVersion(
+            rewriter, llvm::cast<OpResult>(result), tiledValues[index],
+            resultOffsets, resultSizes, innerLoopBody))) {
       return failure();
     }
   }
@@ -525,7 +525,7 @@ tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
       rewriter.setInsertionPoint(sliceOp);
 
       // Generate the tiled implementation of the producer.
-      OpResult untiledValue = cast<OpResult>(sliceOp.getSource());
+      OpResult untiledValue = llvm::cast<OpResult>(sliceOp.getSource());
       FailureOr<TilingResult> swapSliceResult =
           tensor::replaceExtractSliceWithTiledProducer(rewriter, sliceOp,
                                                        untiledValue);

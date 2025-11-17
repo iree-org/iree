@@ -120,7 +120,7 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
                                              int64_t maxVectorSize) {
   int64_t maxFlatVecSize = 1;
   for (OpOperand &operand : linalgOp->getOpOperands()) {
-    auto type = dyn_cast<ShapedType>(operand.get().getType());
+    auto type = llvm::dyn_cast<ShapedType>(operand.get().getType());
     if (!type)
       continue;
     if (!type.hasStaticShape())
