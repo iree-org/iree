@@ -104,13 +104,6 @@ struct AnnotateConstantTransientSizePass
       // Validate function signature.
       auto funcType = sizeQueryFunc.getFunctionType();
 
-      // Must have no arguments.
-      if (funcType.getNumInputs() != 0) {
-        sizeQueryFunc.emitError(
-            "transient size query function must have no arguments");
-        return signalPassFailure();
-      }
-
       // Must have exactly one return value.
       if (funcType.getNumResults() == 0) {
         sizeQueryFunc.emitError(

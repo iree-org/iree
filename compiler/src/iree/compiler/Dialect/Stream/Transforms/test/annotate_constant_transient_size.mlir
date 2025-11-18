@@ -19,7 +19,7 @@ util.func public @constant_size(%arg0: !stream.resource<*>) -> !stream.resource<
   util.return %arg0 : !stream.resource<*>
 }
 
-util.func private @constant_size$transient_size() -> index {
+util.func private @constant_size$transient_size(%arg0: !stream.resource<*>) -> index {
   %c1024 = arith.constant 1024 : index
   util.return %c1024 : index
 }
@@ -38,7 +38,7 @@ util.func public @already_annotated(%arg0: !stream.resource<*>) -> !stream.resou
   util.return %arg0 : !stream.resource<*>
 }
 
-util.func private @already_annotated$transient_size() -> index {
+util.func private @already_annotated$transient_size(%arg0: !stream.resource<*>) -> index {
   %c1024 = arith.constant 1024 : index
   util.return %c1024 : index
 }
@@ -55,7 +55,7 @@ util.func public @non_constant(%arg0: !stream.resource<*>) -> !stream.resource<*
   util.return %arg0 : !stream.resource<*>
 }
 
-util.func private @non_constant$transient_size() -> index {
+util.func private @non_constant$transient_size(%arg0: !stream.resource<*>) -> index {
   %c16 = arith.constant 16 : index
   %c32 = arith.constant 32 : index
   %size = arith.addi %c16, %c32 : index
@@ -82,7 +82,7 @@ util.func public @wrong_type(%arg0: !stream.resource<*>) -> !stream.resource<*>
 }
 
 // expected-error @+1 {{transient size query function must return index type}}
-util.func private @wrong_type$transient_size() -> i64 {
+util.func private @wrong_type$transient_size(%arg0: !stream.resource<*>) -> i64 {
   %c1024 = arith.constant 1024 : i64
   util.return %c1024 : i64
 }
@@ -97,7 +97,7 @@ util.func public @no_return(%arg0: !stream.resource<*>) -> !stream.resource<*>
 }
 
 // expected-error @+1 {{transient size query function must return exactly one value}}
-util.func private @no_return$transient_size() {
+util.func private @no_return$transient_size(%arg0: !stream.resource<*>) {
   util.return
 }
 
@@ -111,22 +111,8 @@ util.func public @multi_value(%arg0: !stream.resource<*>) -> !stream.resource<*>
 }
 
 // expected-warning @+1 {{transient size query with multiple return values not yet supported for constant annotation}}
-util.func private @multi_value$transient_size() -> (index, index) {
+util.func private @multi_value$transient_size(%arg0: !stream.resource<*>) -> (index, index) {
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
   util.return %c128, %c256 : index, index
-}
-
-// -----
-
-// Verifies an error is emitted when the size query function has input arguments.
-
-util.func public @has_args(%arg0: !stream.resource<*>) -> !stream.resource<*>
-    attributes {iree.reflection = {iree.abi.transients.size = @has_args$transient_size}} {
-  util.return %arg0 : !stream.resource<*>
-}
-
-// expected-error @+1 {{transient size query function must have no arguments}}
-util.func private @has_args$transient_size(%arg0: index) -> index {
-  util.return %arg0 : index
 }

@@ -402,7 +402,7 @@ typedef struct iree_status_handle_t* iree_status_t;
 //
 // Example:
 //  IREE_CHECK_OK(some_fn_that_may_fail());
-#define IREE_CHECK_OK(expr)                                                    \
+#define IREE_CHECK_OK(expr, ...)                                               \
   IREE_STATUS_IMPL_CHECK_OK_(IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), \
                              (expr))
 //===----------------------------------------------------------------------===//
