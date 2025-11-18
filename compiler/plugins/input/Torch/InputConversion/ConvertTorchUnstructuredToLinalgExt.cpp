@@ -176,6 +176,11 @@ struct FlexAttentionOpConversion
     : public OpRewritePattern<torch::Torch::AtenFlexAttentionOp> {
   using OpRewritePattern::OpRewritePattern;
 
+  // Attention tensors are 4D: [batch, head, query_seq, key_seq].
+  static constexpr int kAttentionRank = 4;
+  // Modification functions receive 4 index arguments: (b, h, m, n).
+  static constexpr int kNumModificationIndices = 4;
+
   // Makes it convenient to pass around commonly used types.
   struct TypeInfo {
     Type i32Type;
@@ -219,7 +224,7 @@ struct FlexAttentionOpConversion
     ArrayRef<int64_t> valueShape = valueType.getSizes();
 
     // Query shape: [B, H, M, E].
-    if (queryShape.size() != 4) {
+    if (queryShape.size() != kAttentionRank) {
       return rewriter.notifyMatchFailure(op, "expected 4D query tensor");
     }
 
@@ -374,7 +379,7 @@ struct FlexAttentionOpConversion
                            const SmallVector<int64_t> &shape,
                            SmallVector<Value> &dynSizes, Value first,
                            Value second) const {
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < kAttentionRank; ++i) {
       if (shape[i] == torch::Torch::kUnknownSize) {
         Value idx =
             arith::ConstantIndexOp::create(rewriter, loc, std::min(i, 2));
@@ -404,10 +409,10 @@ struct FlexAttentionOpConversion
                                                floatType, maskDynSizes);
     // Create linalg.generic to materialize mask.
     SmallVector<AffineMap> maskMaps;
-    maskMaps.push_back(AffineMap::getMultiDimIdentityMap(4, ctx));
+    maskMaps.push_back(AffineMap::getMultiDimIdentityMap(kAttentionRank, ctx));
 
     SmallVector<utils::IteratorType> iteratorTypes(
-        4, utils::IteratorType::parallel);
+        kAttentionRank, utils::IteratorType::parallel);
 
     Value negInf = arith::ConstantFloatOp::create(
         rewriter, loc, floatType,
@@ -420,7 +425,7 @@ struct FlexAttentionOpConversion
         [&](OpBuilder &b, Location loc, ValueRange args) {
           // Get indices and convert to torch tensors.
           SmallVector<Value> torchIndices;
-          for (unsigned i = 0; i < 4; ++i) {
+          for (unsigned i = 0; i < kNumModificationIndices; ++i) {
             Value idx = linalg::IndexOp::create(b, loc, i);
             Value idxI32 =
                 arith::IndexCastOp::create(b, loc, typeInfo.i32Type, idx);
@@ -465,14 +470,14 @@ struct FlexAttentionOpConversion
     // Add block arguments: score (floatType), b, h, m, n (all index type).
     Type indexType = rewriter.getIndexType();
     block->addArgument(floatType, loc);
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < kNumModificationIndices; ++i) {
       block->addArgument(indexType, loc);
     }
     rewriter.setInsertionPointToStart(block);
 
     Value score = block->getArgument(0);
     SmallVector<Value> indices;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < kNumModificationIndices; ++i) {
       indices.push_back(block->getArgument(i + 1));
     }
     Value modifiedScore = score;
