@@ -522,68 +522,77 @@ static bool hasNestedSharedWrite(Operation *op) {
   return found;
 }
 
-// Inserts synchronization barriers in the pipelined loop.
-// Barriers separate stages: read -> compute (with shared read) -> write.
-static void insertPipelineBarriers(RewriterBase &rewriter,
-                                   scf::ForOp newForOp) {
-  Block *parentBlock = newForOp->getBlock();
-  Location loc = newForOp.getLoc();
+struct SharedBarrierState {
+  bool needBarrierBeforeWrite = false;
+  bool needBarrierBeforeRead = false;
+};
 
-  // Handle prologue barriers: if the prologue writes to shared memory,
-  // we need a barrier before the first write to separate it from any
-  // prior shared memory accesses in the parent block.
-  Block::iterator prologueEnd = newForOp->getIterator();
-  Operation *firstPrologueWrite = nullptr;
-  for (Operation &op : llvm::make_range(parentBlock->begin(), prologueEnd)) {
-    if (hasNestedSharedWrite(&op)) {
-      firstPrologueWrite = &op;
-      break;
-    }
-  }
+// Inserts synchronization barriers before shared memory accesses in the given
+// range using a running `SharedBarrierState`. Conceptually, we track whether
+// the next shared read (or write) must be preceded by a barrier, and only emit
+// one when that flag is set. For example, if the iteration sequence observes a
+// shared read (R) followed by another read, nothing is inserted; the state only
+// toggles `needBarrierBeforeWrite`, so the next shared write (W) will emit a
+// barrier before it. Conversely, seeing a write first toggles
+// `needBarrierBeforeRead`, so the following read receives the barrier. This
+// keeps the minimum number of synchronizations while still enforcing the R↔W
+// ordering required by the pipelined schedule.
+static SharedBarrierState insertBarriersInRange(RewriterBase &rewriter,
+                                                Location loc,
+                                                Block::iterator begin,
+                                                Block::iterator end,
+                                                SharedBarrierState state) {
+  for (auto it = begin; it != end; ++it) {
+    Operation &op = *it;
+    bool hasSharedRead = hasNestedSharedRead(&op);
+    bool hasSharedWrite = hasNestedSharedWrite(&op);
 
-  if (firstPrologueWrite) {
-    LDBG() << "Inserting barrier before first shared write in prologue";
-    rewriter.setInsertionPoint(firstPrologueWrite);
-    gpu::BarrierOp::create(rewriter, loc);
-  }
-
-  // Insert barriers in the kernel loop body
-  bool insertedComputeBarrier = false;
-  bool insertedWriteBarrier = false;
-
-  for (Operation &op :
-       llvm::make_early_inc_range(newForOp.getBody()->without_terminator())) {
-    // Insert barrier before first shared memory read (compute stage)
-    if (!insertedComputeBarrier && hasNestedSharedRead(&op)) {
+    if (hasSharedRead && state.needBarrierBeforeRead) {
       rewriter.setInsertionPoint(&op);
       gpu::BarrierOp::create(rewriter, loc);
-      insertedComputeBarrier = true;
+      state.needBarrierBeforeRead = false;
     }
-    // Insert barriers before first shared memory write (write stage)
-    if (!insertedWriteBarrier && hasNestedSharedWrite(&op)) {
+
+    if (hasSharedWrite && state.needBarrierBeforeWrite) {
       rewriter.setInsertionPoint(&op);
       gpu::BarrierOp::create(rewriter, loc);
       amdgpu::SchedBarrierOp::create(
           rewriter, loc,
           amdgpu::sched_barrier_opt_enumAttr::get(
               rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
-      insertedWriteBarrier = true;
+      state.needBarrierBeforeWrite = false;
     }
+
+    if (hasSharedRead)
+      state.needBarrierBeforeWrite = true;
+    if (hasSharedWrite)
+      state.needBarrierBeforeRead = true;
   }
 
-  // Check if epilogue needs a barrier at the start
-  // (if epilogue reads from shared memory written by the loop)
+  return state;
+}
+
+// Inserts synchronization barriers in the pipelined loop.
+static void insertPipelineBarriers(RewriterBase &rewriter,
+                                   scf::ForOp newForOp) {
+  Block *parentBlock = newForOp->getBlock();
+  Location loc = newForOp.getLoc();
+  SharedBarrierState state;
+
+  // Prologue (operations before the loop).
+  state.needBarrierBeforeWrite = true;
+  state = insertBarriersInRange(rewriter, loc, parentBlock->begin(),
+                                newForOp->getIterator(), state);
+
+  // Loop body (exclude terminator).
+  Block *body = newForOp.getBody();
+  state = insertBarriersInRange(rewriter, loc, body->begin(),
+                                std::prev(body->end()), state);
+
+  // Epilogue (operations after the loop).
   Block::iterator epilogueStart = std::next(newForOp->getIterator());
-  Block::iterator epilogueEnd = parentBlock->end();
-  if (epilogueStart != epilogueEnd) {
-    for (Block::iterator it = epilogueStart; it != epilogueEnd; ++it) {
-      if (hasNestedSharedRead(&*it)) {
-        rewriter.setInsertionPoint(&*epilogueStart);
-        gpu::BarrierOp::create(rewriter, loc);
-        break;
-      }
-    }
-  }
+  insertBarriersInRange(rewriter, loc, epilogueStart, parentBlock->end(),
+                        state);
 }
 
 // Dumps the planned schedule before pipelining for debugging purposes.
