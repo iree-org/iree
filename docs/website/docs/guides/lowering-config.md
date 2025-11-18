@@ -25,8 +25,7 @@ backend and type of computation.
 
 #### Partial Reduction
 
-This configuration is set when an operation contains at least one reduction
-dimension and targets efficient reduction strategies.
+This configuration is designed for memory bound reductions based on the reduction strategy as described in this [document](https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf).
 
 #### Relevant lowering config attributes
 
@@ -36,62 +35,20 @@ dimension and targets efficient reduction strategies.
 - `lane_basis` (thread distribution within a subgroup)
 - `subgroup_basis` (subgroup distribution within a workgroup)
 
----
 
-#### `workgroup` Tile Sizes
+#### Tile Sizes
 
-**Applies to:** Parallel dimensions.
+Tile sizes are expressed as arrays of integers, one per dimension of the iteration space. A zero indicates that the tiling level does not apply to that dimension.
 
-**Definition:** The output tile that each workgroup computes.
+The three relevant tiling levels for this pipeline are: **workgroup**, **thread** and **partial reduction**.
 
-**Format:** Array of integers, one per iteration dimension.
-
-**Semantics:**
-
-* `workgroup[d] > 0`: Each workgroup produces this many elements in dimension
-  `d`.
-
-**Example:**
-
-```mlir
-workgroup = [16, 0]
-
-Dimension 0 (parallel): Each workgroup produces 16 output elements in d0.
-```
-
----
-
-#### `thread` Tile Sizes
-
-**Applies to:** Reduction dimensions.
-
-**Definition:** The number of elements each thread processes per load per
-iteration along reduction dimensions.
-
-**Format:** Array of integers, one per iteration dimension.
-
-**Semantics:**
-
-* `thread[d] = N`: Each thread loads `N` elements per iteration of the reduction
-  loop along `d`.
-
-**Example:**
-
-```mlir
-thread = [0, 8]
-
-Dimension 1 (reduction): Each thread loads 8 elements per loop iteration
-along d1.
-```
-
----
+Workgroup and thread level tiling work as you expect. However, partial reduction tiling is a bit more involved.
 
 #### `partial_reduction` Tile Sizes
 
 **Applies to:** Reduction dimensions.
 
-**Tiling strategy:** We use `PartialReductionOuterReduction` at the partial
-reduction level. This tiles the reduction dimension as `r -> r_outer, r_partial`,
+**Tiling strategy:** The reduction dimension `r` is tiled such that `r -> r_outer, r_partial`,
 where we create a serial loop over `r_outer` with step size equal to
 `r_partial`. Within each iteration, threads maintain `r_partial`
 partial accumulators across the reduction dimension. At the end, partial results
@@ -99,8 +56,6 @@ are merged.
 
 This config specifies the chunk size `S` for `PartialReductionOuterReduction`
 (i.e., `r -> r/S, S`) in the reduction dimension.
-
-**Format:** Array of integers, one per iteration dimension.
 
 **Semantics:**
 
@@ -125,13 +80,16 @@ partial_reduction = [0, 512]
 
 ```text
 Dimension 0: Not a reduction dimension.
-Dimension 1: Process the reduction in chunks of 512 elements.
+Dimension 1: Process the reduction in tiles of 512 elements.
 
 For a reduction of size 16384:
 - Loop iterations: 16384 / 512 = 32.
 - Each iteration: threads within the subgroup process 512 elements along
   dimension 1.
 ```
+
+Tip:
+The total number of elements loaded 
 
 ---
 
