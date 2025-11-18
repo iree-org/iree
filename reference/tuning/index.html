@@ -4960,7 +4960,7 @@ func.func @matmul_reduce_32_1024_2048(%lhs: tensor&lt;32x1024xf16&gt;, %rhs: ten
 the created dispatches.</p>
 <div class="highlight"><pre><span></span><code>// RUN: iree-compile --iree-hal-target-device=hip --iree-hip-target=gfx942 \
             --mlir-print-ir-after=iree-codegen-materialize-user-configs \
-            --iree-hal-dump-executable-files-to=&lt;some directory&gt;
+            --iree-hal-dump-executable-files-to=&lt;some directory&gt; -o /dev/null
 hal.executable public @matmul_reduce_32_1024_2048_dispatch_0 {
   hal.executable.variant public @rocm_hsaco_fb target(&lt;...&gt;) {
     module {
@@ -5045,10 +5045,9 @@ earlier example.</p>
 <div class="highlight"><pre><span></span><code>linalg.matmul {lowering_config = #iree_gpu.lowering_config&lt;{
     mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
     promote_operands = [0, 1],
-    reduction = [0, 0, 128],
-    subgroup_m_count = 1 : i64,
-    subgroup_n_count = 4 : i64,
-    workgroup = [16, 128, 0]}&gt;,
+    reduction = [0, 0, 8],
+    subgroup = [1, 2, 0],
+    workgroup = [32, 64, 0]}&gt;,
     root_op
 } ins(%3, %4 : tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;)
   outs(%6 : tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
@@ -5125,6 +5124,12 @@ that conform to the following format:</p>
   the tuning spec includes a named sequence op with name <code>__kernel_config</code>,
   which must contain exactly one <code>foreach_match</code> op. That <code>foreach_match</code> op
   must have exactly one argument and one result of type any_op.</li>
+<li>IREE provides transform match operations (e.g.,
+  <code>transform.iree.match.contraction</code>, <code>transform.iree.match.convolution</code>,
+  <code>transform.iree.match.attention</code>) that are more robust and user-friendly than
+  the generic <code>transform.iree.match.cast_compatible_dag_from_root</code>, as they are
+  less sensitive to extraneous IR attributes and can automatically extract
+  dimension information.</li>
 </ul>
 <p>The tuning spec above attempts to match <code>linalg.matmul</code> ops that correspond to
 the shape <code>32x1024x2048</code> and <code>f16</code> operand element types and <code>f32</code> result
