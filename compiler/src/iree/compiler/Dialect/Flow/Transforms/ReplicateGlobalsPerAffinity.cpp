@@ -338,10 +338,7 @@ private:
 struct ReplicateGlobalsPerAffinityPass
     : public impl::ReplicateGlobalsPerAffinityPassBase<
           ReplicateGlobalsPerAffinityPass> {
-
-  using impl::ReplicateGlobalsPerAffinityPassBase<
-      ReplicateGlobalsPerAffinityPass>::ReplicateGlobalsPerAffinityPassBase;
-
+  using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
