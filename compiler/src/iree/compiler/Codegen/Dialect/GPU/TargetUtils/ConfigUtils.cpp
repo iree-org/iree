@@ -530,11 +530,11 @@ calculateSubgroupSizesForDMA(IREE::GPU::TargetAttr target,
   if (dmaSizes.empty())
     return nullptr;
 
-  // Get element type bit width
+  // Get element type bit width.
   Type elementType = getElementTypeOrSelf(tensorType);
   unsigned elementBitWidth = elementType.getIntOrFloatBitWidth();
 
-  // Get innermost dimension size
+  // Get innermost dimension size.
   auto shapedType = dyn_cast<ShapedType>(tensorType);
   if (!shapedType || !shapedType.hasRank())
     return nullptr;
@@ -549,32 +549,28 @@ calculateSubgroupSizesForDMA(IREE::GPU::TargetAttr target,
 
   int64_t innermostBits = innermostDim * elementBitWidth;
 
-  // Create a sorted copy of dmaSizes in descending order
+  // Create a sorted copy of dmaSizes in descending order.
   SmallVector<int64_t> sortedDmaSizes(dmaSizes.begin(), dmaSizes.end());
   llvm::sort(sortedDmaSizes, std::greater<int64_t>());
 
-  // Try each DMA size from largest to smallest
+  // Try each DMA size from largest to smallest.
   for (int64_t dmaSize : sortedDmaSizes) {
     int64_t dmaElements = dmaSize / elementBitWidth;
     int64_t requiredSize = targetSubgroupSize * dmaElements;
 
-    // Check if innermost dimension is >= required size
+    // Check if innermost dimension is >= required size.
     if (innermostBits >= requiredSize * elementBitWidth) {
-      // Check if innermost dimension is a multiple of required size
+      // Check if innermost dimension is a multiple of required size.
       if ((innermostBits % (requiredSize * elementBitWidth)) != 0) {
-        // Not a multiple, fail
         return nullptr;
       }
 
-      // Found a valid DMA size
       int64_t innerDim = requiredSize;
       int64_t outerDim = 4;
 
       return builder.getDenseI64ArrayAttr({outerDim, innerDim});
     }
   }
-
-  // No suitable DMA size found
   return nullptr;
 }
 
