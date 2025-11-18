@@ -81,8 +81,7 @@ checkout of IREE.
 Note that, for this option to be effective, you must diverge from typical IREE
 practice and place your build directory under the source directory, using a path
 such as `build/` instead of `../iree-build`. Otherwise, include flags targetting
-the build directory will be written from `/absolute/path/to/iree-build` to
-`../iree-build`, making the hashes of different checkouts not match.
+the build directory will not be rewritten.
 
 ## Ensuring that `ccache` is used and monitoring cache hits
 

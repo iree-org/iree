@@ -332,27 +332,21 @@ endif()
 # builds are most interesting in release modes that have debug info stripped.
 #
 # However, if IREE_USE_RELATIVE_PATHS_IN_FILES is true, map the project root
-# to . and the build directory to its relative path from the source directory.
-# This, in combination with appropriate ccache settings, allows development in
-# multiple worktrees to use the same cached files, at the rost of needing to resolve
-# the directories when debugging outside of the source directory, and requires
-# using an in-tree build/ to ensure distinct path names don't end up in the same
-# path.
+# to the empty string. This, in combination with appropriate ccache settings, allows
+# development in multiple worktrees to use the same cached files, at the cost of
+# needing to resolve the directories when debugging outside of the source directory,
+# and requires using an in-tree build/ to ensure distinct path names don't end up
+# in the same path.
 if(IREE_USE_RELATIVE_PATHS_IN_FILES)
   file(RELATIVE_PATH build_root_rel "${IREE_ROOT_DIR}" "${CMAKE_BINARY_DIR}")
   iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG_OR_GCC
-    "-ffile-prefix-map=${CMAKE_BINARY_DIR}=${build_root_rel}"
-    "-ffile-prefix-map=${IREE_ROOT_DIR}=."
-    "-no-canonical-prefixes" # Ensure relative paths don't get re-absoluted
+    "-ffile-prefix-map=${IREE_ROOT_DIR}/="
   )
 else()
   get_filename_component(_IREE_ROOT_NAME ${IREE_ROOT_DIR} NAME)
   iree_select_compiler_opts(IREE_DEFAULT_COPTS
-    # TODO(benvanik): make this CLANG_OR_GCC once clang-9 is no longer supported.
-    CLANG_GTE_10
-      "-fmacro-prefix-map=${IREE_ROOT_DIR}=${_IREE_ROOT_NAME}"
-    GCC
+    CLANG_OR_GCC
       "-fmacro-prefix-map=${IREE_ROOT_DIR}=${_IREE_ROOT_NAME}"
   )
 endif()
