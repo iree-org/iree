@@ -269,7 +269,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
   // Create the DMA op in the in_parallel region.
   rewriter.setInsertionPointToStart(&inParallelBlock);
-  SmallVector<Value> indicesVec;
+  SmallVector<Value, 1> indicesVec;
   if (indices) {
     indicesVec.push_back(indices);
   }
@@ -280,7 +280,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
                                           indicesVec, sharedOut, laneId);
 
   // Erase the parallel_insert_slice ops and inner operation.
-  for (auto insertOp : toErase) {
+  for (tensor::ParallelInsertSliceOp &insertOp : toErase) {
     rewriter.eraseOp(insertOp);
   }
   rewriter.eraseOp(innerOp);
