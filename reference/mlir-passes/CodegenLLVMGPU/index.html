@@ -3007,6 +3007,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-llvmgpu-prefetch-shared-memory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4949,6 +4964,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-llvmgpu-prefetch-shared-memory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5073,6 +5103,9 @@ supports memory accesses that are specific to GPUs.</p>
 <p><em>Pass pack shared memory allocation in order to reduce memory usage.</em></p>
 <h3 id="-iree-llvmgpu-prefetch-shared-memory"><code>-iree-llvmgpu-prefetch-shared-memory</code><a class="headerlink" href="#-iree-llvmgpu-prefetch-shared-memory" title="Permanent link">link</a></h3>
 <p><em>Rotate scf.for loops to prefetch shared memory with distance 1. This pass is only applicableto ROCDL targets because its effectiveness on non-AMD GPUs lacks testing and evaluation.</em></p>
+<h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-num-stages : Number of pipeline stages (1, 2, or 3+)
+</code></pre></div>
 <h3 id="-iree-llvmgpu-select-lowering-strategy"><code>-iree-llvmgpu-select-lowering-strategy</code><a class="headerlink" href="#-iree-llvmgpu-select-lowering-strategy" title="Permanent link">link</a></h3>
 <p><em>Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant</em></p>
 <h3 id="-iree-llvmgpu-tensorcore-vectorization"><code>-iree-llvmgpu-tensorcore-vectorization</code><a class="headerlink" href="#-iree-llvmgpu-tensorcore-vectorization" title="Permanent link">link</a></h3>
