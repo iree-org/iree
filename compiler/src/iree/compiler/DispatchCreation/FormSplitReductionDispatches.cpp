@@ -27,6 +27,116 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
+/// Pattern to fold extract_slice(broadcast) into the broadcast input when
+/// the extract_slice is rank-reducing and only extracts along the broadcasted
+/// dimensions (with size 1), leaving all non-broadcasted dimensions intact.
+/// This is valid because the broadcast only duplicates data along the
+/// broadcasted dimension, and extracting a single slice from that dimension
+/// gives back the original input.
+///
+/// This fold is critical for correctness in parallel contexts: when the
+/// broadcast's outs operand comes from extracting a slice of a shared_outs
+/// tensor in scf.forall, the broadcast operation writes to that extracted
+/// slice, which aliases back to the shared tensor. Since the extracted slice
+/// spans parallel dimensions (e.g., [4, 1, 1] where dim 0 is the batch
+/// dimension), multiple parallel workgroups would all write to the same
+/// aliased memory location, causing a race condition. By folding to the
+/// broadcast input (which doesn't alias the shared tensor), subsequent passes
+/// can properly tile and distribute the initialization per workgroup, avoiding
+/// the race.
+///
+/// Example:
+///   %broadcast = linalg.broadcast ins(%in : tensor<4x1xf16>)
+///                                 outs(%out : tensor<4x1x1xf16>) dimensions =
+///                                 [2]
+///   %extract = tensor.extract_slice %broadcast[0, 0, 0] [4, 1, 1] [1, 1, 1]
+///              : tensor<4x1x1xf16> to tensor<4x1xf16>
+///   // Extracts all of dims 0,1 (sizes 4,1) and reduces dim 2 (size 1).
+/// ->
+///   %extract is replaced by %in (tensor<4x1xf16>)
+struct FoldExtractSliceOfBroadcast final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
+                                PatternRewriter &rewriter) const override {
+    auto broadcastOp =
+        extractOp.getSource().getDefiningOp<linalg::BroadcastOp>();
+    if (!broadcastOp) {
+      return failure();
+    }
+
+    if (!extractOp.hasUnitStride()) {
+      return failure();
+    }
+
+    auto inputType =
+        dyn_cast<RankedTensorType>(broadcastOp.getInput().getType());
+    auto broadcastOutputType =
+        dyn_cast<RankedTensorType>(broadcastOp.getInit().getType());
+    auto extractResultType =
+        dyn_cast<RankedTensorType>(extractOp.getResult().getType());
+    if (!inputType || !broadcastOutputType || !extractResultType) {
+      return failure();
+    }
+
+    // Extract result type must match broadcast input type.
+    if (inputType != extractResultType) {
+      return failure();
+    }
+
+    // Verify that we're extracting from offset [0, 0, ..., 0] with the same
+    // shape as the input (essentially undoing the broadcast).
+    SmallVector<OpFoldResult> offsets = extractOp.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = extractOp.getMixedSizes();
+    if (llvm::any_of(offsets, [](OpFoldResult offset) {
+          std::optional<int64_t> constOffset = getConstantIntValue(offset);
+          return !constOffset || *constOffset != 0;
+        })) {
+      return failure();
+    }
+
+    // Sizes should match input dimensions (accounting for broadcast dims).
+    ArrayRef<int64_t> broadcastDims = broadcastOp.getDimensions();
+    int64_t broadcastRank = broadcastOutputType.getRank();
+
+    // Verify that for broadcast dimensions, the size is 1.
+    if (llvm::any_of(broadcastDims, [&](int64_t broadcastDim) {
+          std::optional<int64_t> size =
+              getConstantIntValue(sizes[broadcastDim]);
+          return !size || *size != 1;
+        })) {
+      return failure();
+    }
+
+    // Collect the indices of dimensions in the broadcast output that were not
+    // broadcasted (i.e., dimensions that existed in the original input).
+    auto nonBroadcastDims = llvm::to_vector(llvm::make_filter_range(
+        llvm::seq<int64_t>(0, broadcastRank),
+        [&](int64_t i) { return !llvm::is_contained(broadcastDims, i); }));
+
+    // Verify that for non-broadcast dimensions, sizes match input shape.
+    if (llvm::any_of(llvm::enumerate(nonBroadcastDims), [&](auto pair) {
+          auto [idx, inputDim] = pair;
+          std::optional<int64_t> extractSize =
+              getConstantIntValue(sizes[inputDim]);
+          int64_t inputDimSize = inputType.getDimSize(idx);
+          return !extractSize || *extractSize != inputDimSize;
+        })) {
+      return failure();
+    }
+
+    // Only fold if broadcast has a single use to avoid leaving dead broadcast
+    // ops or breaking other uses that expect the broadcast result.
+    if (!broadcastOp->hasOneUse()) {
+      return failure();
+    }
+
+    rewriter.replaceOp(extractOp, broadcastOp.getInput());
+    return success();
+  }
+};
+
 struct FormSplitReductionDispatchesPass final
     : public impl::FormSplitReductionDispatchesPassBase<
           FormSplitReductionDispatchesPass> {
@@ -202,6 +312,7 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
   RewritePatternSet patterns(context);
   linalg::populateSwapExtractSliceWithFillPatterns(patterns);
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+  patterns.add<FoldExtractSliceOfBroadcast>(context);
   GreedyRewriteConfig config;
   config.setMaxIterations(GreedyRewriteConfig::kNoLimit).enableFolding(true);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {

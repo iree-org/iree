@@ -175,3 +175,51 @@ util.func public @fuse_pad_with_conv(%arg0 : tensor<16x225x225x16xbf16>, %arg1 :
 //       CHECK:    tensor.pad
 //       CHECK:    flow.dispatch.region
 //       CHECK:      linalg.generic
+
+// -----
+
+util.func public @split_reduction_arg_compare(%arg0: tensor<4x1x128256xf16>) -> (tensor<4x1xf16>, tensor<4x1xi32>) {
+  %c0_i32 = arith.constant 0 : i32
+  %cst = arith.constant 0xFC00 : f16
+  %0 = tensor.empty() : tensor<4x1xf16>
+  %1 = tensor.empty() : tensor<4x1xi32>
+  %2 = linalg.fill ins(%cst : f16) outs(%0 : tensor<4x1xf16>) -> tensor<4x1xf16>
+  %3 = linalg.fill ins(%c0_i32 : i32) outs(%1 : tensor<4x1xi32>) -> tensor<4x1xi32>
+  %4:2 = iree_linalg_ext.arg_compare {iree_linalg_ext.split_reduction = [1336 : index]} dimension(2) ins(%arg0 : tensor<4x1x128256xf16>) outs(%2, %3 : tensor<4x1xf16>, tensor<4x1xi32>) {
+  ^bb0(%arg1: f16, %arg2: f16):
+    %5 = arith.cmpf ogt, %arg1, %arg2 : f16
+    iree_linalg_ext.yield %5 : i1
+  } -> tensor<4x1xf16>, tensor<4x1xi32>
+  util.return %4#0, %4#1 : tensor<4x1xf16>, tensor<4x1xi32>
+}
+// CHECK-LABEL:  @split_reduction_arg_compare(
+//  CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1x128256xf16>
+//       CHECK:    %[[FILL_F16:.+]] = linalg.fill {{.+}} -> tensor<4x1xf16>
+//       CHECK:    %[[FILL_I32:.+]] = linalg.fill {{.+}} -> tensor<4x1xi32>
+//       CHECK:    %[[EMPTY_F16:.+]] = tensor.empty() : tensor<4x1x96xf16>
+//       CHECK:    %[[EMPTY_I32:.+]] = tensor.empty() : tensor<4x1x96xi32>
+//       CHECK:    %[[DISPATCH:.+]]:2 = flow.dispatch.region -> (tensor<4x1x96xf16>, tensor<4x1x96xi32>) {
+//       CHECK:      %[[FORALL:.+]]:2 = scf.forall (%{{.+}}) = (0) to (128256) step (1336)
+//  CHECK-SAME:          shared_outs(%[[OUT0:.+]] = %[[EMPTY_F16]], %[[OUT1:.+]] = %[[EMPTY_I32]])
+//  CHECK-SAME:          -> (tensor<4x1x96xf16>, tensor<4x1x96xi32>) {
+//       CHECK:        %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[ARG0]]
+//  CHECK-SAME:            [0, 0, %{{.+}}] [4, 1, 1336] [1, 1, 1]
+//  CHECK-SAME:            : tensor<4x1x128256xf16> to tensor<4x1x1336xf16>
+//   CHECK-NOT:        tensor.extract_slice %[[OUT0]]
+//   CHECK-NOT:        linalg.broadcast
+//       CHECK:        %[[ARG_COMPARE:.+]]:2 = iree_linalg_ext.arg_compare
+//  CHECK-SAME:            dimension(2)
+//  CHECK-SAME:            ins(%[[INPUT_SLICE]] : tensor<4x1x1336xf16>)
+//  CHECK-SAME:            outs(%[[FILL_F16]], %[[FILL_I32]] : tensor<4x1xf16>, tensor<4x1xi32>)
+//       CHECK:        scf.forall.in_parallel {
+//       CHECK:          tensor.parallel_insert_slice %[[ARG_COMPARE]]#0 into %[[OUT0]]
+//       CHECK:          tensor.parallel_insert_slice %[[ARG_COMPARE]]#1 into %[[OUT1]]
+//       CHECK:        }
+//       CHECK:      } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
+//       CHECK:      flow.return %[[FORALL]]#0, %[[FORALL]]#1 : tensor<4x1x96xf16>, tensor<4x1x96xi32>
+//       CHECK:    }
+//       CHECK:    %[[REDUCE:.+]]:2 = linalg.reduce
+//  CHECK-SAME:        ins(%[[DISPATCH]]#0, %[[DISPATCH]]#1 :
+//  CHECK-SAME:        outs(%[[FILL_F16]], %[[FILL_I32]] :
+//  CHECK-SAME:        dimensions = [2]
+//       CHECK:    util.return %[[REDUCE]]#0, %[[REDUCE]]#1
