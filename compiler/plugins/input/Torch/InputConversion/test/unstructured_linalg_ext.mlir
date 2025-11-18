@@ -52,6 +52,7 @@ func.func @fft_rfft.with_transpose(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torc
 // CHECK:             return %[[VAR14]] : !torch.vtensor<[3,5,16],complex<f32>>
 
 // -----
+
 func.func @fft_rfft.last(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torch.vtensor<[3,8,9],complex<f32>> {
     %int-1 = torch.constant.int -1
     %none = torch.constant.none
@@ -102,7 +103,8 @@ func.func @fft_rfft.last(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torch.vtensor<
 
 // -----
 
-func.func @main(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>,!torch.vtensor<[4,8,1024],f32>) attributes {torch.assume_strict_symbolic_shapes} {
+// flex_attention with both score_mod and mask_mod.
+func.func @flex_attn_with_scoremod_and_maskmod(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>,!torch.vtensor<[4,8,1024],f32>) attributes {torch.assume_strict_symbolic_shapes} {
   %float1.000000e00 = torch.constant.float 1.000000e+00
   %true = torch.constant.bool true
   // expected-warning @+1 {{FlexAttention: logsumexp output is a dummy (zeros), actual values are not available from AttentionOp}}
@@ -117,8 +119,7 @@ func.func private @sdpa_mask0(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vten
   %0 = torch.aten.ge.Tensor %arg2, %arg3 : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
   return %0 : !torch.vtensor<[],i1>
 }
-
-// CHECK-LABEL: func.func @main(
+// CHECK-LABEL: func.func @flex_attn_with_scoremod_and_maskmod(
 // CHECK-SAME:    %[[ARG0:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG1:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG2:.*]]: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>)
 // CHECK:         %[[LSE_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024xf32>
 // CHECK:         %[[OUT_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
@@ -159,6 +160,154 @@ func.func private @sdpa_mask0(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vten
 // CHECK:           %[[CALL_T:.*]] = torch_c.to_builtin_tensor %[[CALL]] : !torch.vtensor<[],f32> -> tensor<f32>
 // CHECK:           %[[EXTRACT:.*]] = tensor.extract %[[CALL_T]][] : tensor<f32>
 // CHECK:           iree_linalg_ext.yield %[[EXTRACT]] : f32
+// CHECK:         } -> tensor<4x8x1024x64xf32>
+// CHECK:         %[[T_OUT:.*]] = torch_c.from_builtin_tensor %[[ATTN]]
+// CHECK:         %[[T_LSE:.*]] = torch_c.from_builtin_tensor %[[LSE_BUF]]
+// CHECK:         return %[[T_OUT]], %[[T_LSE]]
+
+// -----
+
+// flex_attention with mask_mod only.
+func.func @flex_attn_with_maskmod_only(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>,!torch.vtensor<[4,8,1024],f32>) attributes {torch.assume_strict_symbolic_shapes} {
+  %float1.000000e00 = torch.constant.float 1.000000e+00
+  %true = torch.constant.bool true
+  // expected-warning @+1 {{FlexAttention: logsumexp output is a dummy (zeros), actual values are not available from AttentionOp}}
+  %output, %logsumexp = torch.aten.flex_attention %arg0, %arg1, %arg2, %float1.000000e00, %true {mask_mod_fn = @sdpa_mask0} : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.float, !torch.bool -> !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>
+  return %output, %logsumexp : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>
+}
+func.func private @sdpa_mask0(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>) -> !torch.vtensor<[],i1> {
+  %0 = torch.aten.ge.Tensor %arg2, %arg3 : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
+  return %0 : !torch.vtensor<[],i1>
+}
+// CHECK-LABEL: func.func @flex_attn_with_maskmod_only(
+// CHECK-SAME:    %[[ARG0:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG1:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG2:.*]]: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>)
+// CHECK:         %[[LSE_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024xf32>
+// CHECK:         %[[OUT_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
+// CHECK:         %[[NEG_INF:.*]] = arith.constant 0xFF800000 : f32
+// CHECK:         %[[ZERO:.*]] = arith.constant 0.000000e+00 : f32
+// CHECK:         %[[ONE:.*]] = arith.constant 1.000000e+00 : f32
+// CHECK:         %[[Q:.*]] = torch_c.to_builtin_tensor %[[ARG0]]
+// CHECK:         %[[K:.*]] = torch_c.to_builtin_tensor %[[ARG1]]
+// CHECK:         %[[V:.*]] = torch_c.to_builtin_tensor %[[ARG2]]
+// CHECK:         %[[MASK_BUF:.*]] = tensor.empty() : tensor<4x8x1024x1024xf32>
+// CHECK:         %[[MASK_T:.*]] = linalg.generic
+// CHECK-SAME:      outs(%[[MASK_BUF]] : tensor<4x8x1024x1024xf32>)
+// CHECK:         ^bb0(%{{.*}}: f32):
+// CHECK:           %{{.*}} = func.call @sdpa_mask0
+// CHECK:           %{{.*}} = torch_c.to_builtin_tensor %{{.*}} : !torch.vtensor<[],i1> -> tensor<i1>
+// CHECK:           %{{.*}} = tensor.extract %{{.*}}[] : tensor<i1>
+// CHECK:           %[[SEL:.*]] = arith.select %{{.*}}, %[[ZERO]], %[[NEG_INF]] : f32
+// CHECK:           linalg.yield %[[SEL]] : f32
+// CHECK:         %[[ATTN:.*]] = iree_linalg_ext.attention
+// CHECK-SAME:      ins(%[[Q]], %[[K]], %[[V]], %[[ONE]], %[[MASK_T]]
+// CHECK-SAME:      outs(%[[OUT_BUF]] : tensor<4x8x1024x64xf32>) {
+// CHECK:         ^bb0(%[[SCORE:.*]]: f32, %[[B:.*]]: index, %[[H:.*]]: index, %[[M:.*]]: index, %[[N:.*]]: index):
+// CHECK:           iree_linalg_ext.yield %[[SCORE]] : f32
+// CHECK:         } -> tensor<4x8x1024x64xf32>
+// CHECK:         %[[T_OUT:.*]] = torch_c.from_builtin_tensor %[[ATTN]]
+// CHECK:         %[[T_LSE:.*]] = torch_c.from_builtin_tensor %[[LSE_BUF]]
+// CHECK:         return %[[T_OUT]], %[[T_LSE]]
+
+// -----
+
+// flex_attention with score_mod only.
+func.func @flex_attn_with_scoremod_only(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>,!torch.vtensor<[4,8,1024],f32>) attributes {torch.assume_strict_symbolic_shapes} {
+  %float1.000000e00 = torch.constant.float 1.000000e+00
+  %true = torch.constant.bool true
+  // expected-warning @+1 {{FlexAttention: logsumexp output is a dummy (zeros), actual values are not available from AttentionOp}}
+  %output, %logsumexp = torch.aten.flex_attention %arg0, %arg1, %arg2, %float1.000000e00, %true {score_mod_fn = @sdpa_score0} : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.float, !torch.bool -> !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>
+  return %output, %logsumexp : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>
+}
+func.func private @sdpa_score0(%arg0: !torch.vtensor<[],f32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>, %arg4: !torch.vtensor<[],si32>) -> !torch.vtensor<[],f32> {
+    %0 = torch.aten.tanh %arg0 : !torch.vtensor<[],f32> -> !torch.vtensor<[],f32>
+    return %0 : !torch.vtensor<[],f32>
+}
+// CHECK-LABEL: func.func @flex_attn_with_scoremod_only(
+// CHECK-SAME:    %[[ARG0:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG1:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG2:.*]]: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>)
+// CHECK:         %[[LSE_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024xf32>
+// CHECK:         %[[OUT_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
+// CHECK:         %[[ONE:.*]] = arith.constant 1.000000e+00 : f32
+// CHECK:         %[[Q:.*]] = torch_c.to_builtin_tensor %[[ARG0]]
+// CHECK:         %[[K:.*]] = torch_c.to_builtin_tensor %[[ARG1]]
+// CHECK:         %[[V:.*]] = torch_c.to_builtin_tensor %[[ARG2]]
+// CHECK:         %[[ATTN:.*]] = iree_linalg_ext.attention
+// CHECK-SAME:      ins(%[[Q]], %[[K]], %[[V]], %[[ONE]]
+// CHECK-SAME:      outs(%[[OUT_BUF]] : tensor<4x8x1024x64xf32>) {
+// CHECK:         ^bb0(%[[SCORE:.*]]: f32, %[[B:.*]]: index, %[[H:.*]]: index, %[[M:.*]]: index, %[[N:.*]]: index):
+// CHECK:           %[[SCORE_T:.*]] = tensor.from_elements %[[SCORE]] : tensor<f32>
+// CHECK:           %[[TORCH_SCORE:.*]] = torch_c.from_builtin_tensor %[[SCORE_T]] : tensor<f32> -> !torch.vtensor<[],f32>
+// CHECK:           %[[B_I32:.*]] = arith.index_cast %[[B]] : index to i32
+// CHECK:           %[[B_T:.*]] = tensor.from_elements %[[B_I32]] : tensor<i32>
+// CHECK:           %[[TORCH_B:.*]] = torch_c.from_builtin_tensor %[[B_T]] : tensor<i32> -> !torch.vtensor<[],si32>
+// CHECK:           %[[H_I32:.*]] = arith.index_cast %[[H]] : index to i32
+// CHECK:           %[[H_T:.*]] = tensor.from_elements %[[H_I32]] : tensor<i32>
+// CHECK:           %[[TORCH_H:.*]] = torch_c.from_builtin_tensor %[[H_T]] : tensor<i32> -> !torch.vtensor<[],si32>
+// CHECK:           %[[M_I32:.*]] = arith.index_cast %[[M]] : index to i32
+// CHECK:           %[[M_T:.*]] = tensor.from_elements %[[M_I32]] : tensor<i32>
+// CHECK:           %[[TORCH_M:.*]] = torch_c.from_builtin_tensor %[[M_T]] : tensor<i32> -> !torch.vtensor<[],si32>
+// CHECK:           %[[N_I32:.*]] = arith.index_cast %[[N]] : index to i32
+// CHECK:           %[[N_T:.*]] = tensor.from_elements %[[N_I32]] : tensor<i32>
+// CHECK:           %[[TORCH_N:.*]] = torch_c.from_builtin_tensor %[[N_T]] : tensor<i32> -> !torch.vtensor<[],si32>
+// CHECK:           %[[CALL:.*]] = func.call @sdpa_score0(%[[TORCH_SCORE]], %[[TORCH_B]], %[[TORCH_H]], %[[TORCH_M]], %[[TORCH_N]])
+// CHECK:           %[[CALL_T:.*]] = torch_c.to_builtin_tensor %[[CALL]] : !torch.vtensor<[],f32> -> tensor<f32>
+// CHECK:           %[[EXTRACT:.*]] = tensor.extract %[[CALL_T]][] : tensor<f32>
+// CHECK:           iree_linalg_ext.yield %[[EXTRACT]] : f32
+// CHECK:         } -> tensor<4x8x1024x64xf32>
+// CHECK:         %[[T_OUT:.*]] = torch_c.from_builtin_tensor %[[ATTN]]
+// CHECK:         %[[T_LSE:.*]] = torch_c.from_builtin_tensor %[[LSE_BUF]]
+// CHECK:         return %[[T_OUT]], %[[T_LSE]]
+
+// -----
+
+// flex_attention with neither score_mod nor mask_mod.
+func.func @flex_attn_no_mods(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>,!torch.vtensor<[4,8,1024],f32>) attributes {torch.assume_strict_symbolic_shapes} {
+  %float1.000000e00 = torch.constant.float 1.000000e+00
+  %true = torch.constant.bool true
+  // expected-warning @+1 {{FlexAttention: logsumexp output is a dummy (zeros), actual values are not available from AttentionOp}}
+  %output, %logsumexp = torch.aten.flex_attention %arg0, %arg1, %arg2, %float1.000000e00, %true : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.float, !torch.bool -> !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>
+  return %output, %logsumexp : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>
+}
+// CHECK-LABEL: func.func @flex_attn_no_mods(
+// CHECK-SAME:    %[[ARG0:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG1:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG2:.*]]: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>)
+// CHECK:         %[[LSE_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024xf32>
+// CHECK:         %[[OUT_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
+// CHECK:         %[[ONE:.*]] = arith.constant 1.000000e+00 : f32
+// CHECK:         %[[Q:.*]] = torch_c.to_builtin_tensor %[[ARG0]]
+// CHECK:         %[[K:.*]] = torch_c.to_builtin_tensor %[[ARG1]]
+// CHECK:         %[[V:.*]] = torch_c.to_builtin_tensor %[[ARG2]]
+// CHECK:         %[[ATTN:.*]] = iree_linalg_ext.attention
+// CHECK-SAME:      ins(%[[Q]], %[[K]], %[[V]], %[[ONE]]
+// CHECK-SAME:      outs(%[[OUT_BUF]] : tensor<4x8x1024x64xf32>) {
+// CHECK:         ^bb0(%[[SCORE:.*]]: f32, %[[B:.*]]: index, %[[H:.*]]: index, %[[M:.*]]: index, %[[N:.*]]: index):
+// CHECK:           iree_linalg_ext.yield %[[SCORE]] : f32
+// CHECK:         } -> tensor<4x8x1024x64xf32>
+// CHECK:         %[[T_OUT:.*]] = torch_c.from_builtin_tensor %[[ATTN]]
+// CHECK:         %[[T_LSE:.*]] = torch_c.from_builtin_tensor %[[LSE_BUF]]
+// CHECK:         return %[[T_OUT]], %[[T_LSE]]
+
+// -----
+
+// flex_attention without return_lse.
+// No warning expected. (lse value is garbage.)
+func.func @flex_attn_no_lse(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>,!torch.vtensor<[4,8,1024],f32>) attributes {torch.assume_strict_symbolic_shapes} {
+  %float1.000000e00 = torch.constant.float 1.000000e+00
+  %false = torch.constant.bool false
+  %output, %logsumexp = torch.aten.flex_attention %arg0, %arg1, %arg2, %float1.000000e00, %false : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.float, !torch.bool -> !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>
+  return %output, %logsumexp : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>
+}
+// CHECK-LABEL: func.func @flex_attn_no_lse(
+// CHECK-SAME:    %[[ARG0:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG1:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG2:.*]]: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>)
+// CHECK:         %[[LSE_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024xf32>
+// CHECK:         %[[OUT_BUF:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
+// CHECK:         %[[ONE:.*]] = arith.constant 1.000000e+00 : f32
+// CHECK:         %[[Q:.*]] = torch_c.to_builtin_tensor %[[ARG0]]
+// CHECK:         %[[K:.*]] = torch_c.to_builtin_tensor %[[ARG1]]
+// CHECK:         %[[V:.*]] = torch_c.to_builtin_tensor %[[ARG2]]
+// CHECK:         %[[ATTN:.*]] = iree_linalg_ext.attention
+// CHECK-SAME:      ins(%[[Q]], %[[K]], %[[V]], %[[ONE]]
+// CHECK-SAME:      outs(%[[OUT_BUF]] : tensor<4x8x1024x64xf32>) {
+// CHECK:         ^bb0(%[[SCORE:.*]]: f32, %[[B:.*]]: index, %[[H:.*]]: index, %[[M:.*]]: index, %[[N:.*]]: index):
+// CHECK:           iree_linalg_ext.yield %[[SCORE]] : f32
 // CHECK:         } -> tensor<4x8x1024x64xf32>
 // CHECK:         %[[T_OUT:.*]] = torch_c.from_builtin_tensor %[[ATTN]]
 // CHECK:         %[[T_LSE:.*]] = torch_c.from_builtin_tensor %[[LSE_BUF]]

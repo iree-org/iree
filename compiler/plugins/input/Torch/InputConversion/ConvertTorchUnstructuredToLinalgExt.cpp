@@ -183,7 +183,13 @@ struct FlexAttentionOpConversion
     Value key = op.getKey();
     Value value = op.getValue();
     Value scaleValue = op.getScale();
-    Value returnLseValue = op.getReturnLse();
+
+    bool returnLseValue;
+    if (!matchPattern(op.getReturnLse(),
+                      torch::Torch::m_TorchConstantBool(&returnLseValue))) {
+      return rewriter.notifyMatchFailure(
+          op, "expected return_lse to be a constant bool");
+    }
 
     auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
     auto keyType = cast<torch::Torch::ValueTensorType>(key.getType());
