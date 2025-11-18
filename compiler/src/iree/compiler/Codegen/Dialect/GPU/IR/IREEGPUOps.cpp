@@ -14,6 +14,7 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -227,7 +228,7 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     return emitOpError("source must be memref when init is memref");
   }
 
-  auto indices = getIndices();
+  OperandRange indices = getIndices();
 
   if (indices.size() > initShape.size()) {
     return emitOpError("number of indices (")

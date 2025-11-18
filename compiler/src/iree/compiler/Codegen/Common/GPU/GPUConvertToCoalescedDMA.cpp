@@ -81,12 +81,7 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     return {};
   }
 
-  // Only tile over the innermost dimension.
-  // Return a 1-element array with the subgroup size.
-  // SCF tiling will tile the last (innermost) dimension.
-  SmallVector<OpFoldResult> numThreads;
-  numThreads.push_back(builder.getIndexAttr(*subgroupSize));
-  return numThreads;
+  return {builder.getIndexAttr(*subgroupSize)};
 }
 
 /// Check if the given forall op has warp mapping.
@@ -100,15 +95,13 @@ static bool hasWarpMapping(scf::ForallOp forallOp) {
     return false;
   }
 
-  return llvm::all_of(mapping.value(), [](Attribute attr) {
-    return isa<gpu::GPUWarpMappingAttr>(attr);
-  });
+  return llvm::all_of(mapping.value(), llvm::IsaPred<gpu::GPUWarpMappingAttr>);
 }
 
 template <typename OpTy>
 static scf::ForallOp
 tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
-                  const SmallVector<OpFoldResult> &threadNumThreads) {
+                  ArrayRef<OpFoldResult> threadNumThreads) {
   if (threadNumThreads.empty()) {
     return nullptr;
   }
@@ -163,7 +156,7 @@ tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
 
   // Find the thread-level forall op.
   scf::ForallOp threadForallOp = nullptr;
-  for (auto loop : threadTilingResult->loops) {
+  for (LoopLikeOpInterface loop : threadTilingResult->loops) {
     if (auto fop = dyn_cast<scf::ForallOp>(loop.getOperation())) {
       threadForallOp = fop;
       break;
@@ -206,7 +199,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
   // Collect parallel_insert_slice ops to erase.
   SmallVector<tensor::ParallelInsertSliceOp> toErase;
-  for (auto &op : inParallelBlock) {
+  for (Operation &op : inParallelBlock) {
     if (auto insertOp = dyn_cast<tensor::ParallelInsertSliceOp>(&op)) {
       toErase.push_back(insertOp);
     }
@@ -235,7 +228,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
       // First, read the indices tensor as a vector with the original element
       // type.
-      VectorType vectorTypeOriginal =
+      auto vectorTypeOriginal =
           VectorType::get(indicesType.getShape(), elementType);
 
       SmallVector<Value> readIndices(indicesType.getRank());
@@ -323,7 +316,7 @@ protected:
 
 struct ConvertCopyToCoalescedDMA
     : public ConvertToCoalescedDMABase<linalg::CopyOp> {
-  using ConvertToCoalescedDMABase<linalg::CopyOp>::ConvertToCoalescedDMABase;
+  using ConvertToCoalescedDMABase::ConvertToCoalescedDMABase;
 
 protected:
   SmallVector<OpFoldResult>
@@ -421,21 +414,21 @@ struct ConvertGatherToCoalescedDMA
       } else {
         int64_t batchSize = indicesType.getShape()[0];
         int64_t indexDepth = indicesType.getShape()[1];
-        auto elementType = indicesType.getElementType();
+        Type elementType = indicesType.getElementType();
 
         for (int64_t dim = 0; dim < indexDepth; ++dim) {
-          SmallVector<OpFoldResult> offsets = {rewriter.getIndexAttr(0),
-                                               rewriter.getIndexAttr(dim)};
-          SmallVector<OpFoldResult> sizes = {rewriter.getIndexAttr(batchSize),
-                                             rewriter.getIndexAttr(1)};
-          SmallVector<OpFoldResult> strides = {rewriter.getIndexAttr(1),
-                                               rewriter.getIndexAttr(1)};
+          OpFoldResult offsets[] = {rewriter.getIndexAttr(0),
+                                    rewriter.getIndexAttr(dim)};
+          OpFoldResult sizes[] = {rewriter.getIndexAttr(batchSize),
+                                  rewriter.getIndexAttr(1)};
+          OpFoldResult strides[] = {rewriter.getIndexAttr(1),
+                                    rewriter.getIndexAttr(1)};
 
           Value extractedSlice = tensor::ExtractSliceOp::create(
               rewriter, loc, indices, offsets, sizes, strides);
 
           // Collapse from [N, 1] to [N].
-          SmallVector<ReassociationIndices> reassociation = {{0, 1}};
+          ReassociationIndices reassociation[] = {{0, 1}};
           auto collapsedType = RankedTensorType::get({batchSize}, elementType);
           Value collapsedSlice = tensor::CollapseShapeOp::create(
               rewriter, loc, collapsedType, extractedSlice, reassociation);
@@ -453,12 +446,12 @@ struct ConvertGatherToCoalescedDMA
 
     // Erase parallel_insert_slice ops and gather op.
     SmallVector<tensor::ParallelInsertSliceOp> toErase;
-    for (auto &op : inParallelBlock) {
+    for (Operation &op : inParallelBlock) {
       if (auto insertOp = dyn_cast<tensor::ParallelInsertSliceOp>(&op)) {
         toErase.push_back(insertOp);
       }
     }
-    for (auto insertOp : toErase) {
+    for (tensor::ParallelInsertSliceOp insertOp : toErase) {
       rewriter.eraseOp(insertOp);
     }
     rewriter.eraseOp(tiledGatherOp);
@@ -577,13 +570,13 @@ private:
 
     // Apply subgroup-level tiling to each op.
     IRRewriter rewriter(context);
-    for (auto *op : opsToTile) {
+    for (Operation *op : opsToTile) {
       FailureOr<scf::SCFTilingResult> tilingResult =
           TypeSwitch<Operation *, FailureOr<scf::SCFTilingResult>>(op)
-              .Case<linalg::CopyOp>([&](auto copyOp) {
+              .Case([&](linalg::CopyOp copyOp) {
                 return tileAtSubgroupLevel(rewriter, copyOp);
               })
-              .Case<IREE::LinalgExt::GatherOp>([&](auto gatherOp) {
+              .Case([&](IREE::LinalgExt::GatherOp gatherOp) {
                 return tileAtSubgroupLevel(rewriter, gatherOp);
               })
               .Default([](Operation *) { return failure(); });
