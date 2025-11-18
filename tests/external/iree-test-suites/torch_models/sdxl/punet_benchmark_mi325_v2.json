@@ -34,5 +34,5 @@
     { "value": "100xf32" },
     { "value": "100xf32" }
   ],
-  "golden_time_ms": 43.5
+  "golden_time_ms": 44.28
 }
