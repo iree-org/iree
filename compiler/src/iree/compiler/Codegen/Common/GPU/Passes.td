@@ -84,11 +84,9 @@ def GPUConvertToCoalescedDMAPass :
   let summary = "Convert operations to coalesced DMA operations.";
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-    "::mlir::arith::ArithDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
-    "::mlir::tensor::TensorDialect",
-    "::mlir::vector::VectorDialect"
+    "::mlir::tensor::TensorDialect"
   ];
 }
 
