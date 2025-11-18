@@ -175,6 +175,19 @@ struct FftRfftOpConversion
 struct FlexAttentionOpConversion
     : public OpRewritePattern<torch::Torch::AtenFlexAttentionOp> {
   using OpRewritePattern::OpRewritePattern;
+
+  // Makes it convenient to pass around commonly used types.
+  struct TypeInfo {
+    Type i32Type;
+    Type si32Type;
+    RankedTensorType scalarTensorType;
+    RankedTensorType i32ScalarTensorType;
+    RankedTensorType boolScalarTensorType;
+    torch::Torch::ValueTensorType torchScalarType;
+    torch::Torch::ValueTensorType torchI32ScalarType;
+    torch::Torch::ValueTensorType torchBoolScalarType;
+  } mutable typeInfo;
+
   LogicalResult matchAndRewrite(torch::Torch::AtenFlexAttentionOp op,
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
@@ -183,6 +196,8 @@ struct FlexAttentionOpConversion
     Value key = op.getKey();
     Value value = op.getValue();
     Value scaleValue = op.getScale();
+    auto scoreModSymbol = op.getScoreModFn();
+    auto maskModSymbol = op.getMaskModFn();
 
     bool returnLseValue;
     if (!matchPattern(op.getReturnLse(),
@@ -236,120 +251,29 @@ struct FlexAttentionOpConversion
     Value scale = arith::ConstantOp::create(
         rewriter, loc, floatType, rewriter.getFloatAttr(floatType, scaleVal));
 
-    auto scoreModeSymbol = op.getScoreModFn();
-    auto maskModSymbol = op.getMaskModFn();
-
-    auto toBuiltinTensor = [&](Value torchTensor) -> Value {
-      auto torchType =
-          cast<torch::Torch::ValueTensorType>(torchTensor.getType());
-      return torch::TorchConversion::ToBuiltinTensorOp::create(
-          rewriter, loc, torchType.toBuiltinTensor(), torchTensor);
-    };
-
-    Value builtinQuery = toBuiltinTensor(query);
-    Value builtinKey = toBuiltinTensor(key);
-    Value builtinValue = toBuiltinTensor(value);
+    Value builtinQuery = convertToBuiltinTensor(rewriter, loc, query);
+    Value builtinKey = convertToBuiltinTensor(rewriter, loc, key);
+    Value builtinValue = convertToBuiltinTensor(rewriter, loc, value);
 
     // Declare common types for mask and score modification regions.
-    Type i32Type = rewriter.getI32Type();
-    Type si32Type =
-        IntegerType::get(rewriter.getContext(), 32, IntegerType::Signed);
-    auto scalarTensorType = RankedTensorType::get({}, floatType);
-    auto i32ScalarTensorType = RankedTensorType::get({}, i32Type);
-    auto boolScalarTensorType = RankedTensorType::get({}, rewriter.getI1Type());
-    auto torchScalarType = rewriter.getType<torch::Torch::ValueTensorType>(
-        ArrayRef<int64_t>{}, floatType);
-    auto torchI32ScalarType = rewriter.getType<torch::Torch::ValueTensorType>(
-        ArrayRef<int64_t>{}, si32Type);
-    auto torchBoolScalarType = rewriter.getType<torch::Torch::ValueTensorType>(
-        ArrayRef<int64_t>{}, rewriter.getI1Type());
+    setTypeInfo(rewriter, floatType);
     Value zero = arith::ConstantFloatOp::create(
         rewriter, loc, floatType,
         llvm::APFloat::getZero(floatType.getFloatSemantics()));
     Value mask;
     if (maskModSymbol) {
-      // Create mask tensor [B, H, M, N] with values 0.0 (attend) or -inf
-      // (mask).
-      SmallVector<int64_t> maskShape = {batch, numHeads, seqLenQ, seqLenKV};
-      SmallVector<Value> maskDynSizes;
-
-      // Handling dynamic dimensions
-      for (int i = 0; i < 4; ++i) {
-        if (maskShape[i] == torch::Torch::kUnknownSize) {
-          Value idx =
-              arith::ConstantIndexOp::create(rewriter, loc, std::min(i, 2));
-          Value dim = tensor::DimOp::create(
-              rewriter, loc, i <= 2 ? builtinQuery : builtinKey, idx);
-          maskDynSizes.push_back(dim);
-        }
-      }
-
-      Value maskTensor = tensor::EmptyOp::create(rewriter, loc, maskShape,
-                                                 floatType, maskDynSizes);
-      // Create linalg.generic to materialize mask
-      SmallVector<AffineMap> maskMaps;
-      maskMaps.push_back(AffineMap::getMultiDimIdentityMap(4, ctx));
-
-      SmallVector<utils::IteratorType> iteratorTypes(
-          4, utils::IteratorType::parallel);
-
-      Value negInf = arith::ConstantFloatOp::create(
-          rewriter, loc, floatType,
-          llvm::APFloat::getInf(floatType.getFloatSemantics(),
-                                /*Negative=*/true));
-
-      auto maskGeneric = linalg::GenericOp::create(
-          rewriter, loc, TypeRange{maskTensor.getType()}, ValueRange{},
-          ValueRange{maskTensor}, maskMaps, iteratorTypes,
-          [&](OpBuilder &b, Location loc, ValueRange args) {
-            // Get indices and convert to torch tensors.
-            SmallVector<Value> torchIndices;
-            for (unsigned i = 0; i < 4; ++i) {
-              Value idx = linalg::IndexOp::create(b, loc, i);
-              Value idxI32 = arith::IndexCastOp::create(b, loc, i32Type, idx);
-              Value idxTensor = tensor::FromElementsOp::create(
-                  b, loc, i32ScalarTensorType, ValueRange{idxI32});
-              Value torchIdx =
-                  torch::TorchConversion::FromBuiltinTensorOp::create(
-                      b, loc, torchI32ScalarType, idxTensor);
-              torchIndices.push_back(torchIdx);
-            }
-
-            // Call mask_mod_fn(b, h, q_idx, kv_idx).
-            auto callOp =
-                func::CallOp::create(b, loc, TypeRange{torchBoolScalarType},
-                                     *maskModSymbol, ValueRange(torchIndices));
-            Value torchMaskResult = callOp.getResult(0);
-
-            Value maskResult =
-                torch::TorchConversion::ToBuiltinTensorOp::create(
-                    b, loc, boolScalarTensorType, torchMaskResult);
-
-            Value maskBool =
-                tensor::ExtractOp::create(b, loc, maskResult, ValueRange{});
-
-            // Select: mask ? 0.0 : -inf.
-            Value maskValue =
-                arith::SelectOp::create(b, loc, maskBool, zero, negInf);
-
-            linalg::YieldOp::create(b, loc, maskValue);
-          });
-
-      mask = maskGeneric.getResult(0);
+      FlatSymbolRefAttr maskModRef =
+          FlatSymbolRefAttr::get(ctx, *maskModSymbol);
+      mask = createModifiedMask(rewriter, loc, ctx, maskModRef, batch, numHeads,
+                                seqLenQ, seqLenKV, floatType, builtinQuery,
+                                builtinKey, zero);
     }
 
-    // Create output tensor for attention
+    // Create output tensor for attention.
     SmallVector<Value> outputDynSizes;
     SmallVector<int64_t> outputShape = {batch, numHeads, seqLenQ, valueDim};
-    // Handle dynamic dimensions
-    for (int i = 0; i < 4; ++i) {
-      if (outputShape[i] == torch::Torch::kUnknownSize) {
-        Value idx = arith::ConstantIndexOp::create(rewriter, loc, i);
-        Value dim = tensor::DimOp::create(
-            rewriter, loc, i < 3 ? builtinQuery : builtinValue, idx);
-        outputDynSizes.push_back(dim);
-      }
-    }
+    computeDynamicSizes(rewriter, loc, outputShape, outputDynSizes,
+                        builtinQuery, builtinValue);
 
     // Initialize output tensor with identity value (0.0 for addition).
     Value outputInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
@@ -382,61 +306,8 @@ struct FlexAttentionOpConversion
         builtinValue, scale, outputTensor,
         rewriter.getAffineMapArrayAttr(indexingMaps), mask);
 
-    {
-      OpBuilder::InsertionGuard g(rewriter);
-      Block *block = rewriter.createBlock(&attentionOp.getRegion());
-
-      // Add block arguments: score (floatType), b, h, m, n (all index type).
-      Type indexType = rewriter.getIndexType();
-      block->addArgument(floatType, loc);
-      for (int i = 0; i < 4; ++i) {
-        block->addArgument(indexType, loc);
-      }
-      rewriter.setInsertionPointToStart(block);
-
-      Value score = block->getArgument(0);
-      SmallVector<Value> indices;
-      for (int i = 0; i < 4; ++i) {
-        indices.push_back(block->getArgument(i + 1));
-      }
-      Value modifiedScore = score;
-
-      if (scoreModeSymbol) {
-        // The score_mod_fn takes (score, b, h, m, n) where m=q_idx, n=kv_idx.
-
-        Value scoreTensor = tensor::FromElementsOp::create(
-            rewriter, loc, scalarTensorType, ValueRange{score});
-        Value torchScore = torch::TorchConversion::FromBuiltinTensorOp::create(
-            rewriter, loc, torchScalarType, scoreTensor);
-
-        SmallVector<Value> callArgs;
-        callArgs.push_back(torchScore);
-
-        // Convert index arguments to i32 tensors for torch
-        for (Value idx : indices) {
-          Value idxI32 =
-              arith::IndexCastOp::create(rewriter, loc, i32Type, idx);
-          Value idxTensor = tensor::FromElementsOp::create(
-              rewriter, loc, i32ScalarTensorType, ValueRange{idxI32});
-          Value torchIdx = torch::TorchConversion::FromBuiltinTensorOp::create(
-              rewriter, loc, torchI32ScalarType, idxTensor);
-          callArgs.push_back(torchIdx);
-        }
-
-        auto callOp =
-            func::CallOp::create(rewriter, loc, TypeRange{torchScalarType},
-                                 *scoreModeSymbol, ValueRange(callArgs));
-        Value torchResult = callOp.getResult(0);
-
-        Value resultTensor = torch::TorchConversion::ToBuiltinTensorOp::create(
-            rewriter, loc, scalarTensorType, torchResult);
-
-        modifiedScore = tensor::ExtractOp::create(rewriter, loc, resultTensor,
-                                                  ValueRange{});
-      }
-
-      IREE::LinalgExt::YieldOp::create(rewriter, loc, modifiedScore);
-    }
+    createScoreModificationRegion(rewriter, loc, attentionOp, scoreModSymbol,
+                                  floatType);
 
     rewriter.setInsertionPointAfter(attentionOp);
 
@@ -472,6 +343,174 @@ struct FlexAttentionOpConversion
 
     rewriter.replaceOp(op, {torchOutput, torchLogsumexp});
     return success();
+  }
+
+  Value convertToBuiltinTensor(PatternRewriter &rewriter, Location loc,
+                               Value torchTensor) const {
+    auto torchType = cast<torch::Torch::ValueTensorType>(torchTensor.getType());
+    return torch::TorchConversion::ToBuiltinTensorOp::create(
+        rewriter, loc, torchType.toBuiltinTensor(), torchTensor);
+  }
+
+  void setTypeInfo(PatternRewriter &rewriter, FloatType floatType) const {
+    typeInfo.i32Type = rewriter.getI32Type();
+    typeInfo.si32Type =
+        IntegerType::get(rewriter.getContext(), 32, IntegerType::Signed);
+    typeInfo.scalarTensorType = RankedTensorType::get({}, floatType);
+    typeInfo.i32ScalarTensorType = RankedTensorType::get({}, typeInfo.i32Type);
+    typeInfo.boolScalarTensorType =
+        RankedTensorType::get({}, rewriter.getI1Type());
+    typeInfo.torchScalarType = rewriter.getType<torch::Torch::ValueTensorType>(
+        ArrayRef<int64_t>{}, floatType);
+    typeInfo.torchI32ScalarType =
+        rewriter.getType<torch::Torch::ValueTensorType>(ArrayRef<int64_t>{},
+                                                        typeInfo.si32Type);
+    typeInfo.torchBoolScalarType =
+        rewriter.getType<torch::Torch::ValueTensorType>(ArrayRef<int64_t>{},
+                                                        rewriter.getI1Type());
+  }
+
+  void computeDynamicSizes(PatternRewriter &rewriter, Location loc,
+                           const SmallVector<int64_t> &shape,
+                           SmallVector<Value> &dynSizes, Value first,
+                           Value second) const {
+    for (int i = 0; i < 4; ++i) {
+      if (shape[i] == torch::Torch::kUnknownSize) {
+        Value idx =
+            arith::ConstantIndexOp::create(rewriter, loc, std::min(i, 2));
+        Value dim =
+            tensor::DimOp::create(rewriter, loc, i < 3 ? first : second, idx);
+        dynSizes.push_back(dim);
+      }
+    }
+  }
+
+  // Creates a modified mask tensor.
+  Value createModifiedMask(PatternRewriter &rewriter, Location loc,
+                           MLIRContext *ctx, FlatSymbolRefAttr maskModRef,
+                           int64_t batch, int64_t numHeads, int64_t seqLenQ,
+                           int64_t seqLenKV, FloatType floatType,
+                           Value builtinQuery, Value builtinKey,
+                           Value zero) const {
+    // Create mask tensor [B, H, M, N] with values 0.0 (attend) or -inf
+    // (mask).
+    SmallVector<int64_t> maskShape = {batch, numHeads, seqLenQ, seqLenKV};
+    SmallVector<Value> maskDynSizes;
+
+    computeDynamicSizes(rewriter, loc, maskShape, maskDynSizes, builtinQuery,
+                        builtinKey);
+
+    Value maskTensor = tensor::EmptyOp::create(rewriter, loc, maskShape,
+                                               floatType, maskDynSizes);
+    // Create linalg.generic to materialize mask.
+    SmallVector<AffineMap> maskMaps;
+    maskMaps.push_back(AffineMap::getMultiDimIdentityMap(4, ctx));
+
+    SmallVector<utils::IteratorType> iteratorTypes(
+        4, utils::IteratorType::parallel);
+
+    Value negInf = arith::ConstantFloatOp::create(
+        rewriter, loc, floatType,
+        llvm::APFloat::getInf(floatType.getFloatSemantics(),
+                              /*Negative=*/true));
+
+    auto maskGeneric = linalg::GenericOp::create(
+        rewriter, loc, TypeRange{maskTensor.getType()}, ValueRange{},
+        ValueRange{maskTensor}, maskMaps, iteratorTypes,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          // Get indices and convert to torch tensors.
+          SmallVector<Value> torchIndices;
+          for (unsigned i = 0; i < 4; ++i) {
+            Value idx = linalg::IndexOp::create(b, loc, i);
+            Value idxI32 =
+                arith::IndexCastOp::create(b, loc, typeInfo.i32Type, idx);
+            Value idxTensor = tensor::FromElementsOp::create(
+                b, loc, typeInfo.i32ScalarTensorType, ValueRange{idxI32});
+            Value torchIdx =
+                torch::TorchConversion::FromBuiltinTensorOp::create(
+                    b, loc, typeInfo.torchI32ScalarType, idxTensor);
+            torchIndices.push_back(torchIdx);
+          }
+
+          // Call mask_mod_fn(b, h, q_idx, kv_idx).
+          auto callOp = func::CallOp::create(
+              b, loc, TypeRange{typeInfo.torchBoolScalarType}, maskModRef,
+              ValueRange(torchIndices));
+          Value torchMaskResult = callOp.getResult(0);
+
+          Value maskResult = torch::TorchConversion::ToBuiltinTensorOp::create(
+              b, loc, typeInfo.boolScalarTensorType, torchMaskResult);
+
+          Value maskBool =
+              tensor::ExtractOp::create(b, loc, maskResult, ValueRange{});
+
+          Value maskValue =
+              arith::SelectOp::create(b, loc, maskBool, zero, negInf);
+
+          linalg::YieldOp::create(b, loc, maskValue);
+        });
+
+    return maskGeneric.getResult(0);
+  }
+
+  // Adds a score modification region to the attention op.
+  void
+  createScoreModificationRegion(PatternRewriter &rewriter, Location loc,
+                                IREE::LinalgExt::AttentionOp attentionOp,
+                                std::optional<llvm::StringRef> scoreModSymbol,
+                                FloatType floatType) const {
+    OpBuilder::InsertionGuard g(rewriter);
+    Block *block = rewriter.createBlock(&attentionOp.getRegion());
+
+    // Add block arguments: score (floatType), b, h, m, n (all index type).
+    Type indexType = rewriter.getIndexType();
+    block->addArgument(floatType, loc);
+    for (int i = 0; i < 4; ++i) {
+      block->addArgument(indexType, loc);
+    }
+    rewriter.setInsertionPointToStart(block);
+
+    Value score = block->getArgument(0);
+    SmallVector<Value> indices;
+    for (int i = 0; i < 4; ++i) {
+      indices.push_back(block->getArgument(i + 1));
+    }
+    Value modifiedScore = score;
+
+    if (scoreModSymbol) {
+      // The score_mod_fn takes (score, b, h, m, n) where m=q_idx, n=kv_idx.
+
+      Value scoreTensor = tensor::FromElementsOp::create(
+          rewriter, loc, typeInfo.scalarTensorType, ValueRange{score});
+      Value torchScore = torch::TorchConversion::FromBuiltinTensorOp::create(
+          rewriter, loc, typeInfo.torchScalarType, scoreTensor);
+
+      SmallVector<Value> callArgs;
+      callArgs.push_back(torchScore);
+
+      for (Value idx : indices) {
+        Value idxI32 =
+            arith::IndexCastOp::create(rewriter, loc, typeInfo.i32Type, idx);
+        Value idxTensor = tensor::FromElementsOp::create(
+            rewriter, loc, typeInfo.i32ScalarTensorType, ValueRange{idxI32});
+        Value torchIdx = torch::TorchConversion::FromBuiltinTensorOp::create(
+            rewriter, loc, typeInfo.torchI32ScalarType, idxTensor);
+        callArgs.push_back(torchIdx);
+      }
+
+      auto callOp = func::CallOp::create(
+          rewriter, loc, TypeRange{typeInfo.torchScalarType},
+          scoreModSymbol.value(), ValueRange(callArgs));
+      Value torchResult = callOp.getResult(0);
+
+      Value resultTensor = torch::TorchConversion::ToBuiltinTensorOp::create(
+          rewriter, loc, typeInfo.scalarTensorType, torchResult);
+
+      modifiedScore =
+          tensor::ExtractOp::create(rewriter, loc, resultTensor, ValueRange{});
+    }
+
+    IREE::LinalgExt::YieldOp::create(rewriter, loc, modifiedScore);
   }
 };
 
