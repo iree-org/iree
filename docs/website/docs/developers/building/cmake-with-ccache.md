@@ -74,7 +74,7 @@ Notes:
 If you will build IREE from multiple directories in similar locations, such as if
 you are using git worktries, you should set
 `IREE_USE_RELATIVE_PATHS_IN_FILES=ON`. This, along with `ccache`'s
-`base_dir` option, will caues the compiler to rewrite absolute paths in
+`base_dir` option, will cause the compiler to rewrite absolute paths in
 debug information and macros like `__FILE__` to be relative to the current
 checkout of IREE.
 
