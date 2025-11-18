@@ -119,7 +119,7 @@ the created dispatches.
 ```mlir
 // RUN: iree-compile --iree-hal-target-device=hip --iree-hip-target=gfx942 \
             --mlir-print-ir-after=iree-codegen-materialize-user-configs \
-            --iree-hal-dump-executable-files-to=<some directory>
+            --iree-hal-dump-executable-files-to=<some directory> -o /dev/null
 hal.executable public @matmul_reduce_32_1024_2048_dispatch_0 {
   hal.executable.variant public @rocm_hsaco_fb target(<...>) {
     module {
@@ -214,10 +214,9 @@ earlier example.
 linalg.matmul {lowering_config = #iree_gpu.lowering_config<{
     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     promote_operands = [0, 1],
-    reduction = [0, 0, 128],
-    subgroup_m_count = 1 : i64,
-    subgroup_n_count = 4 : i64,
-    workgroup = [16, 128, 0]}>,
+    reduction = [0, 0, 8],
+    subgroup = [1, 2, 0],
+    workgroup = [32, 64, 0]}>,
     root_op
 } ins(%3, %4 : tensor<32x1024xf16>, tensor<1024x2048xf16>)
   outs(%6 : tensor<32x2048xf32>) -> tensor<32x2048xf32>
@@ -306,6 +305,12 @@ that conform to the following format:
   the tuning spec includes a named sequence op with name `__kernel_config`,
   which must contain exactly one `foreach_match` op. That `foreach_match` op
   must have exactly one argument and one result of type any_op.
+* IREE provides transform match operations (e.g.,
+  `transform.iree.match.contraction`, `transform.iree.match.convolution`,
+  `transform.iree.match.attention`) that are more robust and user-friendly than
+  the generic `transform.iree.match.cast_compatible_dag_from_root`, as they are
+  less sensitive to extraneous IR attributes and can automatically extract
+  dimension information.
 
 The tuning spec above attempts to match `linalg.matmul` ops that correspond to
 the shape `32x1024x2048` and `f16` operand element types and `f32` result
