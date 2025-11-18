@@ -550,7 +550,7 @@ calculateSubgroupSizesForDMA(IREE::GPU::TargetAttr target,
   int64_t innermostBits = innermostDim * elementBitWidth;
 
   // Create a sorted copy of dmaSizes in descending order.
-  SmallVector<int64_t> sortedDmaSizes(dmaSizes.begin(), dmaSizes.end());
+  SmallVector<int64_t> sortedDmaSizes = llvm::to_vector(dmaSizes);
   llvm::sort(sortedDmaSizes, std::greater<int64_t>());
 
   // Try each DMA size from largest to smallest.
