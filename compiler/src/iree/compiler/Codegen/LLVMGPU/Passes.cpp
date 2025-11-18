@@ -464,6 +464,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCSEPass());
   }
 
+  funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
+
   // Step 3. Decompose pack and unpack ops and propagate the resulting reshapes.
   funcPassManager.addPass(createDecomposePackUnPackOpsPass(
       DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/false,
