@@ -213,28 +213,20 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
 
     Location loc = linalgOp.getLoc();
 
-    // Insert compute_barrier.start before creating transpose op to avoid
-    // movements of reshape ops and undesirable fusion.
-    auto barrierStartOp = IREE::TensorExt::ComputeBarrierStartOp::create(
-        rewriter, loc, filterVal);
-
     AffineMap transposedFilterMap = applyPermutationToResults(filterMap, perm);
-    Value transposedFilter =
-        createTransposeOp(rewriter, loc, barrierStartOp.getResult(), perm);
+    Value transposedFilter = createTransposeOp(rewriter, loc, filterVal, perm);
 
-    // Insert compute_barrier.end after the tranpose op and replace its uses.
-    auto barrierEndOp = IREE::TensorExt::ComputeBarrierEndOp::create(
+    // Insert compute_barrier.start to avoid propagation of reshape ops and
+    // undesirable fusion.
+    auto barrierStartOp = IREE::TensorExt::ComputeBarrierStartOp::create(
         rewriter, loc, transposedFilter);
-    transposedFilter.replaceUsesWithIf(
-        barrierEndOp.getResult(),
-        [&](OpOperand &use) { return use.getOwner() == linalgOp; });
 
     SmallVector<utils::IteratorType> iterators =
         linalgOp.getIteratorTypesArray();
 
     auto genericOp = linalg::GenericOp::create(
         rewriter, loc, outputVal.getType(),
-        ValueRange{inputVal, barrierEndOp.getResult()}, outputVal,
+        ValueRange{inputVal, barrierStartOp.getResult()}, outputVal,
         ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
         iterators);
 
@@ -258,6 +250,17 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     rewriter.replaceOp(linalgOp, reorderOp->getResults());
+
+    // Insert compute_barrier.end after the compute op and replace its uses.
+    Value genericVal = genericOp.getResult(0);
+    auto barrierEndOp =
+        IREE::TensorExt::ComputeBarrierEndOp::create(rewriter, loc, genericVal);
+    rewriter.replaceUsesWithIf(genericVal, barrierEndOp.getResult(),
+                               [&](OpOperand &use) {
+                                 return use.getOwner() != genericOp &&
+                                        use.getOwner() != barrierEndOp &&
+                                        !isa<tensor::DimOp>(use.getOwner());
+                               });
     return success();
   }
 };
