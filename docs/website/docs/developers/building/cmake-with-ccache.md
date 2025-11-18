@@ -69,6 +69,21 @@ Notes:
   based on wrapping the compiler in a script that prepends `ccache`. See this
   [article](https://crascit.com/2016/04/09/using-ccache-with-cmake/).
 
+## Using relative paths in your build
+
+If you will build IREE from multiple directories in similar locations, such as if
+you are using git worktries, you should set
+`IREE_USE_RELATIVE_PATHS_IN_FILES=ON`. This, along with `ccache`'s
+`base_dir` option, will caues the compiler to rewrite absolute paths in
+debug information and macros like `__FILE__` to be relative to the current
+checkout of IREE.
+
+Note that, for this option to be effective, you must diverge from typical IREE
+practice and place your build directory under the source directory, using a path
+such as `build/` instead of `../iree-build`. Otherwise, include flags targetting
+the build directory will be written from `/absolute/path/to/iree-build` to
+`../iree-build`, making the hashes of different checkouts not match.
+
 ## Ensuring that `ccache` is used and monitoring cache hits
 
 The `ccache -s` command dumps statistics, including a cache hit count and ratio.
