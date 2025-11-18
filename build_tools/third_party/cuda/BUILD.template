@@ -22,7 +22,7 @@ LIBDEVICE_REL_PATH = "%LIBDEVICE_REL_PATH%"
 
 # This flag will be True if the workspace repository rules detected a usable
 # SDK. config_settings in the project can join over this in order to
-# conditionally enable CUDA features based on pressence of the SDK.
+# conditionally enable CUDA features based on presence of the SDK.
 bool_flag(
     name = "enabled",
     build_setting_default = ENABLED,
