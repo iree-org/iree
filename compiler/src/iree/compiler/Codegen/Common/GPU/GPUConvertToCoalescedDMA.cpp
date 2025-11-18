@@ -20,7 +20,6 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -231,8 +230,9 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
       auto vectorTypeOriginal =
           VectorType::get(indicesType.getShape(), elementType);
 
-      SmallVector<Value> readIndices(indicesType.getRank());
-      for (int64_t i = 0; i < indicesType.getRank(); ++i) {
+      int64_t rank = indicesType.getRank();
+      SmallVector<Value> readIndices(rank);
+      for (int64_t i = 0; i < rank; ++i) {
         readIndices[i] = arith::ConstantIndexOp::create(rewriter, loc, 0);
       }
 
