@@ -1006,14 +1006,14 @@ struct FoldInnerBitcastIntoLoadFromBuffer
     // Step 1: Check for iree_codegen.load_from_buffer.
     auto loadOp = bitcastSrc.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
     if (!loadOp) {
-      return failure();
+      return rewriter.notifyMatchFailure(bitcastOp, "no load_from_buffer");
     }
     Value loadBuffer = loadOp.getBuffer();
 
     // Step 2: Check for amdgpu.fat_raw_buffer_cast.
     auto bufferCastOp = loadBuffer.getDefiningOp<amdgpu::FatRawBufferCastOp>();
     if (!bufferCastOp) {
-      return failure();
+      return rewriter.notifyMatchFailure(bitcastOp, "no fat_raw_buffer_cast");
     }
     Value bufferCastSource = bufferCastOp.getSource();
 
@@ -1021,7 +1021,7 @@ struct FoldInnerBitcastIntoLoadFromBuffer
     auto subspanOp =
         bufferCastSource.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!subspanOp) {
-      return failure();
+      return rewriter.notifyMatchFailure(bitcastOp, "no binding subspan");
     }
 
     // Now we have the full bufferized load chain verified.
@@ -1029,18 +1029,20 @@ struct FoldInnerBitcastIntoLoadFromBuffer
     auto bitcastSrcType = cast<RankedTensorType>(bitcastSrc.getType());
     auto bitcastResType = cast<RankedTensorType>(bitcastOp.getType());
 
-    // Verify that only the inner most dimension is changed by the bitcast by
-    // comparing dynamic and static sizes for equality.
     if (bitcastOp.getSourceDims() != bitcastOp.getResultDims() ||
         bitcastSrcType.getShape().drop_back() !=
             bitcastResType.getShape().drop_back() ||
         ShapedType::isDynamic(bitcastSrcType.getShape().back())) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          bitcastOp,
+          "expected that only the innermost dimension is changed by the "
+          "bitcast op");
     }
 
-    // Fail if the inner most dim doesn't match between subspan and tensor.
     if (subspanType.getShape().back() != bitcastSrcType.getShape().back()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          bitcastOp,
+          "innermost dimension doesn't match between subspan and tensor");
     }
 
     int64_t newInnerSize = bitcastResType.getShape().back();
@@ -1052,14 +1054,14 @@ struct FoldInnerBitcastIntoLoadFromBuffer
     newSubspanShape.back() = newInnerSize;
     // Scale offset and strides by (newInnerSize / oldInnerSize).
     if (auto stridedLayout =
-            dyn_cast_or_null<StridedLayoutAttr>(subspanType.getLayout())) {
+            dyn_cast_if_present<StridedLayoutAttr>(subspanType.getLayout())) {
       int64_t newOffset = stridedLayout.getOffset();
-      if (!ShapedType::isDynamic(newOffset)) {
+      if (ShapedType::isStatic(newOffset)) {
         newOffset = (newOffset * newInnerSize) / oldInnerSize;
       }
       SmallVector<int64_t> newStrides(stridedLayout.getStrides());
       for (size_t i = 0; i + 1 < newStrides.size(); ++i) {
-        if (!ShapedType::isDynamic(newStrides[i])) {
+        if (ShapedType::isStatic(newStrides[i])) {
           newStrides[i] = (newStrides[i] * newInnerSize) / oldInnerSize;
         }
       }
