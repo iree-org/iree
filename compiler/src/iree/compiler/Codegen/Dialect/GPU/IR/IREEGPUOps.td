@@ -365,12 +365,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let extraClassDeclaration = [{
     // Get the rank of the init tensor/memref.
     unsigned getResultRank() {
-      Type type = getInit().getType();
-      if (auto tensorType = ::llvm::dyn_cast<RankedTensorType>(type))
-        return tensorType.getRank();
-      if (auto memrefType = ::llvm::dyn_cast<MemRefType>(type))
-        return memrefType.getRank();
-      llvm_unreachable("expected ranked tensor or memref type");
+      return llvm::cast<ShapedType>(getInit().getType()).getRank();
     }
 
     bool hasTensorSemantics() {

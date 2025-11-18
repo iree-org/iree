@@ -95,12 +95,12 @@ static bool hasWarpMapping(scf::ForallOp forallOp) {
     return false;
   }
 
-  auto mapping = forallOp.getMapping();
+  std::optional<ArrayAttr> mapping = forallOp.getMapping();
   if (!mapping.has_value()) {
     return false;
   }
 
-  return llvm::any_of(mapping.value(), [](Attribute attr) {
+  return llvm::all_of(mapping.value(), [](Attribute attr) {
     return isa<gpu::GPUWarpMappingAttr>(attr);
   });
 }

@@ -30,7 +30,9 @@ def AnyRankedTensorOrVector : RankedTensorOrVectorOf<[AnyType]>;
 
 class RankedTensorOrVectorOrMemRefOf<list<Type> allowedTypes> :
   ShapedContainerType<allowedTypes,
-      Or<[IsVectorOfAnyRankTypePred, IsTensorTypePred, IsMemRefTypePred]>,
+      Or<[IsVectorOfAnyRankTypePred,
+          And<[IsTensorTypePred, HasRankPred]>,
+          And<[IsMemRefTypePred, HasRankPred]>]>,
   "ranked tensor or vector or memref", "::mlir::ShapedType">;
 
 #endif // IREE_CODEGEN_UTILS_COMMONTYPECONSTRAINTS
