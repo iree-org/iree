@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -93,25 +94,27 @@ permuteIndexingMapsToMatchSeedLhs(MLIRContext *context,
       getResultDimsRange(seedLhsIndexingMap.getResults());
   auto lhsResultDimsRange = getResultDimsRange(lhsIndexingMap.getResults());
 
-  // Start with an identity permutations. For now try to only swap dimensions
-  // which is not a general solution.
-  SmallVector<int64_t> interchangeVector =
-      llvm::to_vector(llvm::seq<int64_t>(0, lhsIndexingMap.getNumDims()));
+  SmallVector<int64_t> interchangeVector(lhsIndexingMap.getNumDims(), -1);
+  SmallVector<bool> targetUsed(lhsIndexingMap.getNumDims(), false);
+
   for (auto [seedDimPos, lhsDimPos] :
        llvm::zip_equal(seedLhsResultDimsRange, lhsResultDimsRange)) {
-    if (seedDimPos == lhsDimPos) {
-      continue;
-    }
-    // If the current positions are what we started with, swap the positions.
-    if (interchangeVector[lhsDimPos] == lhsDimPos &&
-        interchangeVector[seedDimPos] == seedDimPos) {
-      std::swap(interchangeVector[lhsDimPos], interchangeVector[seedDimPos]);
-      continue;
-    }
-    // If this was a changed dimension, check that it is consistent.
-    if (interchangeVector[lhsDimPos] != seedDimPos ||
-        interchangeVector[seedDimPos] != lhsDimPos) {
-      return std::nullopt;
+    interchangeVector[lhsDimPos] = seedDimPos;
+    targetUsed[seedDimPos] = true;
+  }
+
+  for (int64_t i = 0; i < static_cast<int64_t>(interchangeVector.size()); ++i) {
+    if (interchangeVector[i] == -1) {
+      int64_t target = targetUsed[i] ? 0 : i;
+      while (target < static_cast<int64_t>(targetUsed.size()) &&
+             targetUsed[target]) {
+        ++target;
+      }
+      if (target >= static_cast<int64_t>(targetUsed.size())) {
+        return std::nullopt;
+      }
+      interchangeVector[i] = target;
+      targetUsed[target] = true;
     }
   }
 
@@ -183,13 +186,19 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
   SmallVector<int64_t> aStaticDims = aLinalgOp.getStaticLoopRanges();
   SmallVector<int64_t> bStaticDims = bLinalgOp.getStaticLoopRanges();
   if (bPermutationVector) {
-    applyPermutationToVector(bStaticDims, bPermutationVector.value());
+    applyPermutationToVector(
+        bStaticDims, invertPermutationVector(bPermutationVector.value()));
   }
+  DenseMap<int64_t, int64_t> aNDimSizeCounts;
   for (auto nDim : aContractionDims->n) {
-    if (aStaticDims[nDim] != bStaticDims[nDim] ||
-        ShapedType::isDynamic(aStaticDims[nDim])) {
-      return false;
-    }
+    aNDimSizeCounts[aStaticDims[nDim]]++;
+  }
+  DenseMap<int64_t, int64_t> bNDimSizeCounts;
+  for (auto nDim : bContactionDims->n) {
+    bNDimSizeCounts[bStaticDims[nDim]]++;
+  }
+  if (aNDimSizeCounts != bNDimSizeCounts) {
+    return false;
   }
 
   // TODO(#20116): hack to prevent codegen failure for small horizontally fused
