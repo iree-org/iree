@@ -476,97 +476,6 @@ struct IREELinalgExtSortTypePropagation
   }
 };
 
-/// Pattern to legalize `linalg.reduce` operations.
-struct ReduceOpTypePropagation final
-    : TypePropagationPattern<linalg::ReduceOp> {
-  using TypePropagationPattern::TypePropagationPattern;
-
-  LogicalResult
-  matchAndRewrite(linalg::ReduceOp reduceOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const final {
-    bool needsConversion = false;
-    for (OpOperand &operand : reduceOp->getOpOperands()) {
-      Type operandType = operand.get().getType();
-      Type legalizedType = this->getTypeConverter()->convertType(operandType);
-      if (!legalizedType) {
-        return reduceOp.emitOpError("failed to get legalized type for operand");
-      }
-      if (operandType != legalizedType) {
-        needsConversion = true;
-        break;
-      }
-    }
-
-    if (!needsConversion) {
-      return rewriter.notifyMatchFailure(
-          reduceOp, "all types already legal within conversion pattern");
-    }
-
-    SmallVector<Type> resultTypes;
-    for (Value init : reduceOp.getInits()) {
-      Type legalizedType =
-          this->getTypeConverter()->convertType(init.getType());
-      if (!legalizedType) {
-        return reduceOp.emitOpError("failed to get legalized type for init");
-      }
-      resultTypes.push_back(legalizedType);
-    }
-
-    auto modifiedOp = cast<linalg::ReduceOp>(mlir::cloneWithoutRegions(
-        rewriter, reduceOp.getOperation(), resultTypes, adaptor.getOperands()));
-
-    rewriter.inlineRegionBefore(reduceOp.getCombiner(),
-                                modifiedOp.getCombiner(),
-                                modifiedOp.getCombiner().begin());
-    Region &modifiedOpRegion = modifiedOp.getCombiner();
-
-    TypeConverter::SignatureConversion signatureConverter(
-        modifiedOpRegion.getNumArguments());
-    for (auto [index, arg] : llvm::enumerate(modifiedOpRegion.getArguments())) {
-      Type argType = arg.getType();
-      std::optional<Type> legalizedArgType =
-          legalizeStorageElementType(argType);
-      if (!legalizedArgType) {
-        return reduceOp.emitOpError("failed to get legalized type for arg ")
-               << index;
-      }
-      signatureConverter.addInputs(index, legalizedArgType.value());
-    }
-    rewriter.applySignatureConversion(&modifiedOpRegion.front(),
-                                      signatureConverter, getTypeConverter());
-
-    OpBuilder::InsertionGuard g(rewriter);
-    Block *entryBlock = &modifiedOpRegion.front();
-    Operation *yieldOp = entryBlock->getTerminator();
-    rewriter.setInsertionPoint(yieldOp);
-
-    SmallVector<Value> convertedYieldValues;
-    bool needsUpdate = false;
-    for (Value yieldValue : yieldOp->getOperands()) {
-      Type yieldType = yieldValue.getType();
-      std::optional<Type> legalizedYieldType =
-          legalizeStorageElementType(yieldType);
-
-      Value valueToYield = yieldValue; // Default to original value.
-      if (legalizedYieldType && legalizedYieldType.value() != yieldType) {
-        valueToYield =
-            convertElementType(rewriter, yieldOp->getLoc(),
-                               legalizedYieldType.value(), yieldValue);
-        needsUpdate = true;
-      }
-      convertedYieldValues.push_back(valueToYield);
-    }
-
-    if (needsUpdate) {
-      rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp,
-                                                   convertedYieldValues);
-    }
-
-    rewriter.replaceOp(reduceOp, modifiedOp->getResults());
-    return success();
-  }
-};
-
 /// Simple rewrite pattern that just forwards the source as the result if the
 /// result type is not legal (but source type is)
 template <typename OpTy>
@@ -713,9 +622,9 @@ struct TypePropagationPass final
         NamedOpTypePropagation<linalg::BatchMatmulOp>,
         NamedOpTypePropagation<linalg::MatmulOp>,
         NamedOpTypePropagation<linalg::MatvecOp>,
-        NamedOpTypePropagation<linalg::DotOp>, ReduceOpTypePropagation,
-        TensorExtractTypePropagation, IREELinalgExtScatterTypePropagation,
-        IREELinalgExtSortTypePropagation>(typeConverter, context);
+        NamedOpTypePropagation<linalg::DotOp>, TensorExtractTypePropagation,
+        IREELinalgExtScatterTypePropagation, IREELinalgExtSortTypePropagation>(
+        typeConverter, context);
 
     ConversionTarget target(*context);
     configureConversionTarget(target, typeConverter);
