@@ -27,19 +27,23 @@ This configuration is designed for memory bound reductions.
 
 #### Relevant lowering config attributes
 
-- `workgroup` tile sizes
-- `thread` tile sizes
-- `partial_reduction` tile sizes
-- `lane_basis` (thread distribution within a subgroup)
-- `subgroup_basis` (subgroup distribution within a workgroup)
+* `workgroup` tile sizes
+* `thread` tile sizes
+* `partial_reduction` tile sizes
+* `lane_basis` (thread distribution within a subgroup)
+* `subgroup_basis` (subgroup distribution within a workgroup)
 
 #### Tile sizes
 
-Tile sizes are expressed as arrays of integers, one per dimension of the iteration space. A zero indicates that the tiling level does not apply to that dimension.
+Tile sizes are expressed as arrays of integers, one per dimension of the
+iteration space. A zero indicates that the tiling level does not apply to that
+dimension.
 
-The three relevant tiling levels for this pipeline are: **workgroup**, **thread** and **partial reduction**.
+The three relevant tiling levels for this pipeline are: **workgroup**,
+**thread** and **partial reduction**.
 
-Workgroup- and thread-level tilings directly describe the tile sizes at their respective levels.
+Workgroup- and thread-level tilings directly describe the tile sizes at their
+respective levels.
 
 **Example:**
 
@@ -49,17 +53,18 @@ workgroup = [16, 0]
 Dimension 0: Each workgroup produces 16 output elements in d0.
 ```
 
-Partial reduction tiling is slightly less straightforward and is described as follows:
+Partial reduction tiling is slightly less straightforward and is described as
+follows:
 
 ##### `partial_reduction` tile sizes
 
 **Applies to:** Reduction dimensions only.
 
-**Tiling strategy:** The reduction dimension `r` is tiled such that `r -> r_outer, r_partial`,
-where we create a serial loop over `r_outer` with step size equal to
-`r_partial`. Within each iteration, threads maintain `r_partial`
-partial accumulators across the reduction dimension. At the end, partial results
-are merged.
+**Tiling strategy:** The reduction dimension `r` is tiled such that
+`r -> r_outer, r_partial`, where we create a serial loop over `r_outer` with
+step size equal to `r_partial`. Within each iteration, threads maintain
+`r_partial` partial accumulators across the reduction dimension. At the end,
+partial results are merged.
 
 **Semantics:**
 
@@ -91,23 +96,28 @@ For a reduction of size 16384:
 ```
 
 > **Tip:**
-> The total number of elements each thread processes per iteration along a reduction dimension `d` is:
+> The total number of elements each thread processes per iteration along a
+> reduction dimension `d` is:
 > **`partial_reduction[d] * thread[d]`**
 
 ---
 
 #### `Basis` attributes
 
-Basis attributes describe how a particular resource is distributed within the iteration space. 
+Basis attributes describe how a particular resource is distributed within the
+iteration space.
 
 There are two basis attributes:
 
-* **Lane basis** — describes how threads within a subgroup are distributed within the specified iteration space
-* **Subgroup basis** — describes how subgroups within a workgroup are distributed within the specified iteration space
+* **Lane basis** — describes how threads within a subgroup are distributed
+  within the specified iteration space
+* **Subgroup basis** — describes how subgroups within a workgroup are
+  distributed within the specified iteration space
 
 **Format:** `[[counts], [mapping]]`
 
-* `counts`: Array of thread counts per basis dimension; i.e, the shape of the conceptual grid of resources onto `mapping`.
+* `counts`: Array of thread counts per basis dimension; i.e, the shape of the
+  conceptual grid of resources onto `mapping`.
 * `mapping`: Permutation array mapping basis coordinates to iteration
   dimensions.
 
@@ -117,7 +127,8 @@ There are two basis attributes:
 Number of threads/subgroups along each basis axis.
 
 **Constraint:**
-The product of all counts equals the subgroup size (for `lane_basis`) or number of subgroups (for `subgroup_basis`).
+The product of all counts equals the subgroup size (for `lane_basis`) or number
+of subgroups (for `subgroup_basis`).
 
 **Example**
 
@@ -218,18 +229,18 @@ row10:  T40  T41  T42  T43  ← Thread 42 at (row = 10, col = 2)
 ...
 ```
 
-**Constraint:**
-
 Subgroups distribute work identically to how lane basis distributes lanes.
-If there is more than one subgroup, results require workgroup-level synchronization.
+If there is more than one subgroup, results require workgroup-level
+synchronization.
 
 ---
 
 ## Summary: Reduction Config Attributes Quick Reference
-| Attribute           | Key Semantic                                                    |
-| ------------------- | --------------------------------------------------------------- |
-| `workgroup`         | Workgroup tile size along each dimension |
-| `thread`            | Thread tile size along each dimension (e.g., load width per thread)        |
-| `partial_reduction` | Tile size of the reduction dimension(s) processed by the workgroup |
-| `lane_basis`     | Distribution of threads within a subgroup onto the iteration space  |
-| `subgroup_basis` | Distribution of subgroups within a workgroup onto the iteration space |
+
+| Attribute           | Key Semantic                                                          |
+| ------------------- | --------------------------------------------------------------------- |
+| `workgroup`         | Workgroup tile size along each dimension                              |
+| `thread`            | Thread tile size along each dimension (e.g., load width per thread)   |
+| `partial_reduction` | Tile size of the reduction dimension(s) processed by the workgroup    |
+| `lane_basis`        | Distribution of threads within a subgroup onto the iteration space    |
+| `subgroup_basis`    | Distribution of subgroups within a workgroup onto the iteration space |
