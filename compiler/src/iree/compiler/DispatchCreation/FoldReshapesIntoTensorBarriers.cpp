@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -44,11 +45,13 @@ struct MoveReshapeAboveBarrierStart : public RewritePattern {
     Value reshapeResult = op->getResult(0);
     auto newBarrier = IREE::TensorExt::ComputeBarrierStartOp::create(
         rewriter, barrierStartOp.getLoc(), reshapeResult);
-    reshapeResult.replaceUsesWithIf(
-        newBarrier.getResult(), [&](OpOperand &use) {
-          return use.getOwner() != newBarrier &&
-                 !isa<tensor::DimOp>(use.getOwner());
-        });
+
+    DominanceInfo domInfo(op);
+    rewriter.replaceUsesWithIf(reshapeResult, newBarrier.getResult(),
+                               [&](OpOperand &use) {
+                                 return domInfo.properlyDominates(
+                                     newBarrier.getOperation(), use.getOwner());
+                               });
     return success();
   }
 };
