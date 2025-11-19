@@ -152,11 +152,6 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //    producer-consumer fusion.
       .addPass(DispatchCreation::createSinkReshapesPass)
       .addPass(IREE::Flow::createCanonicalizePass)
-      .addPass(mlir::createCSEPass)
-
-      // 5. Remove tensor barriers after the preprocessing passes.
-      .addPass(DispatchCreation::createRemoveTensorBarriersPass)
-      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
   if (clEnableFuseHorizontalContractions) {
@@ -313,6 +308,10 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     passManager.addPass(
         IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
   }
+
+  // Remove tensor compute_barriers at the end of dispatch region creation.
+  FunctionLikeNest(passManager)
+      .addPass(DispatchCreation::createRemoveTensorBarriersPass);
 }
 
 // Apply preprocessing and form dispatch regions
