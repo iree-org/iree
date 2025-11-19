@@ -123,13 +123,12 @@ There are two basis attributes:
 
 ##### The `counts` Array
 
-**Definition:**
-Number of threads/subgroups along each basis axis.
+**Definition:** Number of threads/subgroups along each basis axis.
 
-**Constraint:**
-The product of all counts equals the subgroup size (for `lane_basis`) or number
-of subgroups (for `subgroup_basis`).
+**Constraint:** The product of all counts equals the subgroup size
+(for `lane_basis`) or number of subgroups (for `subgroup_basis`).
 
+<!-- markdownlint-disable-next-line MD036 -->
 **Example**
 
 ```mlir
