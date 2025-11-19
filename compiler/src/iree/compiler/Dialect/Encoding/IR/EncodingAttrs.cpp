@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -100,6 +99,36 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
 
 bool PackedStorageAttr::isSerialized() const { return true; }
 
+/// Returns the bit-width of the scalar type. If the type is complex, it
+/// returns the type of individual elements * 2 (1 for real and 1 for
+/// complex).
+static unsigned getTypeBitWidth(Type type) {
+  if (auto complexType = dyn_cast<ComplexType>(type)) {
+    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+  }
+  return type.getIntOrFloatBitWidth();
+}
+
+/// Returns the number of bytes an element of the given type occupies in
+/// memory. This is in the default dense conversion to machine words where
+/// sizes must be powers of two aligned to bytes.
+///
+/// Examples:
+///   getRoundedElementByteWidth(i1) = 1
+///   getRoundedElementByteWidth(i23) = 4
+///   getRoundedElementByteWidth(i32) = 4
+///   getRoundedElementByteWidth(bf16) = 2
+///   getRoundedElementByteWidth(i33) = 8
+///   getRoundedElementByteWidth(complex<f32>) = 8
+static int32_t getRoundedElementByteWidth(Type type) {
+  unsigned bitsUnaligned = getTypeBitWidth(type);
+  assert(bitsUnaligned > 0 && "0-width types unsupported");
+  // Round up to 8-bit aligned bytes.
+  unsigned byteAligned = (bitsUnaligned + 8 - 1) / 8;
+  // Round up to the next power of two (unless already a power of two).
+  return llvm::PowerOf2Ceil(byteAligned);
+}
+
 static Type getExtendedType(Type ty) {
   auto intTy = dyn_cast<IntegerType>(ty);
   if (!intTy) {
@@ -109,7 +138,7 @@ static Type getExtendedType(Type ty) {
   if (bitWidth < 8 || llvm::isPowerOf2_32(bitWidth)) {
     return ty;
   }
-  unsigned alignedBitWidth = IREE::Util::getRoundedElementByteWidth(intTy) * 8;
+  unsigned alignedBitWidth = getRoundedElementByteWidth(intTy) * 8;
   if (alignedBitWidth == bitWidth) {
     return ty;
   }
@@ -123,8 +152,7 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
   Type alignedElementType = getExtendedType(type.getElementType());
-  int64_t staticCount =
-      IREE::Util::getRoundedElementByteWidth(alignedElementType);
+  int64_t staticCount = getRoundedElementByteWidth(alignedElementType);
 
   // Calculate static dimensions if there are any
   for (unsigned i = 0; i < type.getRank(); ++i) {
@@ -142,7 +170,7 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
 
   // For sub-byte element types we need to divide by the number of elements that
   // can be packed into one byte.
-  unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
+  unsigned elementBits = getTypeBitWidth(alignedElementType);
   if (elementBits < 8) {
     if (!llvm::isPowerOf2_32(elementBits)) {
       // Sub-byte types that are not a power of two are currently not supported.
@@ -432,36 +460,6 @@ ParseResult parsePadding(AsmParser &parser, DenseI64ArrayAttr &padding) {
 }
 void printPadding(AsmPrinter &printer, DenseI64ArrayAttr padding) {
   return printDynamicI64IntegerList(printer, padding.asArrayRef());
-}
-
-/// Returns the bit-width of the scalar type. If the type is complex, it
-/// returns the type of individual elements * 2 (1 for real and 1 for
-/// complex).
-static unsigned getTypeBitWidth(Type type) {
-  if (auto complexType = dyn_cast<ComplexType>(type)) {
-    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
-  }
-  return type.getIntOrFloatBitWidth();
-}
-
-/// Returns the number of bytes an element of the given type occupies in
-/// memory. This is in the default dense conversion to machine words where
-/// sizes must be powers of two aligned to bytes.
-///
-/// Examples:
-///   getRoundedElementByteWidth(i1) = 1
-///   getRoundedElementByteWidth(i23) = 4
-///   getRoundedElementByteWidth(i32) = 4
-///   getRoundedElementByteWidth(bf16) = 2
-///   getRoundedElementByteWidth(i33) = 8
-///   getRoundedElementByteWidth(complex<f32>) = 8
-static int32_t getRoundedElementByteWidth(Type type) {
-  unsigned bitsUnaligned = getTypeBitWidth(type);
-  assert(bitsUnaligned > 0 && "0-width types unsupported");
-  // Round up to 8-bit aligned bytes.
-  unsigned byteAligned = (bitsUnaligned + 8 - 1) / 8;
-  // Round up to the next power of two (unless already a power of two).
-  return llvm::PowerOf2Ceil(byteAligned);
 }
 
 PaddingAttr PaddingAttr::get(MLIRContext *ctx, ArrayRef<int64_t> padding) {

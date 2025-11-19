@@ -53,7 +53,6 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorUtils
     iree::compiler::Dialect::TensorExt::IR
-    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 
