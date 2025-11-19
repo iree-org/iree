@@ -250,17 +250,6 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return failure();
 
     rewriter.replaceOp(linalgOp, reorderOp->getResults());
-
-    // Insert compute_barrier.end after the compute op and replace its uses.
-    Value genericVal = genericOp.getResult(0);
-    auto barrierEndOp =
-        IREE::TensorExt::ComputeBarrierEndOp::create(rewriter, loc, genericVal);
-    rewriter.replaceUsesWithIf(genericVal, barrierEndOp.getResult(),
-                               [&](OpOperand &use) {
-                                 return use.getOwner() != genericOp &&
-                                        use.getOwner() != barrierEndOp &&
-                                        !isa<tensor::DimOp>(use.getOwner());
-                               });
     return success();
   }
 };

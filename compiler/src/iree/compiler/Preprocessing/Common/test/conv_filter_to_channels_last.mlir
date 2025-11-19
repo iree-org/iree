@@ -97,7 +97,6 @@ util.func public @conv_2d_nhwc_chwf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
 // CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
 // CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2],
 // CHECK-FHWC-SAME:   ins({{.*}}, %[[START]] : tensor<1x16x16x4xf32>, tensor<16x3x3x4xf32>)
-// CHECK-FHWC:        %[[END:.*]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
 
 // -----
 
@@ -125,7 +124,6 @@ util.func public @conv_2d_nhwgc_gchwf(%arg0: tensor<2x10x10x7x4xf32>, %arg1: ten
 // CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
 // CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2],
 // CHECK-FHWC-SAME:   ins({{.*}}, %[[START]] : tensor<2x10x10x7x4xf32>, tensor<7x16x3x3x4xf32>)
-// CHECK-FHWC:        %[[END:.*]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
 
 // -----
 
