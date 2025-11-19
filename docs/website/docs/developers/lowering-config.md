@@ -23,7 +23,9 @@ backend and type of computation.
 
 ### Reduction
 
-This configuration is designed for memory bound reductions.
+This configuration adopts the broader reduction strategy used in memory-bound
+kernels, drawing inspiration from the high-level approach described in Harris’s
+[Optimizing Parallel Reduction in CUDA](https://developer.download.nvidia.com/assets/cuda/files/reduction.pdf).
 
 #### Relevant lowering config attributes
 
