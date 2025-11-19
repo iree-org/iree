@@ -14,8 +14,7 @@
     "onnx/node/generated/test_einsum_inner_prod",
     "onnx/node/generated/test_group_normalization_epsilon_expanded",
     "onnx/node/generated/test_group_normalization_example_expanded",
-    "onnx/node/generated/test_nonmaxsuppression_two_batches",
-    "onnx/node/generated/test_constantofshape_int_shape_zero"
+    "onnx/node/generated/test_nonmaxsuppression_two_batches"
   ],
   "skip_run_tests": [
     "onnx/node/generated/test_top_k",
