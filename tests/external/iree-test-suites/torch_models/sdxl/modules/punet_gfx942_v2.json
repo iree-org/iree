@@ -5,6 +5,6 @@
         "--iree-hip-target=gfx942",
         "--iree-opt-level=O3",
         "--iree-execution-model=async-external",
-        "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})"
+        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline)"
     ]
 }
