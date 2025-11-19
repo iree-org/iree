@@ -5095,11 +5095,12 @@ in our earlier example.</p>
     transform.yield
   }
   transform.named_sequence @match_matmul_reduce_32_1024_2048_dispatch_0_matmul_32x2048x1024_f16xf16xf32(%arg0: !transform.any_op {transform.readonly}) -&gt; (!transform.any_op, !transform.any_param) {
-    %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
-    ^bb0(%arg1: tensor&lt;32x1024xf16&gt;, %arg2: tensor&lt;1024x2048xf16&gt;, %arg3: tensor&lt;32x2048xf32&gt;):
-      %1 = linalg.matmul ins(%arg1, %arg2 : tensor&lt;32x1024xf16&gt;, tensor&lt;1024x2048xf16&gt;) outs(%arg3 : tensor&lt;32x2048xf32&gt;) -&gt; tensor&lt;32x2048xf32&gt;
-    } : (!transform.any_op) -&gt; (!transform.any_value, !transform.any_value)
-    %0 = transform.param.constant #iree_codegen.compilation_info&lt;lowering_config = #iree_gpu.lowering_config&lt;{mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;, promote_operands = [0, 1], reduction = [0, 0, 128], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64, workgroup = [32, 128, 0]}&gt;, translation_info = &lt;pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options&lt;prefetch_shared_memory = true&gt;, llvm_func_attrs = {&quot;amdgpu-waves-per-eu&quot; = &quot;2&quot;}}&gt;&gt; -&gt; !transform.any_param
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %arg0, lhs_type = f16, rhs_type = f16, output_type = f32, indexing_maps = [affine_map&lt;(d0, d1, d2) -&gt; (d0, d2)&gt;, affine_map&lt;(d0, d1, d2) -&gt; (d2, d1)&gt;, affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;] : !transform.any_op -&gt; !transform.param&lt;i64&gt;
+    transform.iree.match.dims_equal %batch_dims, [] : !transform.param&lt;i64&gt;
+    transform.iree.match.dims_equal %m_dims, [32] : !transform.param&lt;i64&gt;
+    transform.iree.match.dims_equal %n_dims, [2048] : !transform.param&lt;i64&gt;
+    transform.iree.match.dims_equal %k_dims, [1024] : !transform.param&lt;i64&gt;
+    %0 = transform.param.constant #iree_codegen.compilation_info&lt;lowering_config = #iree_gpu.lowering_config&lt;{mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_32x32x8_F16&gt;, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[1, 2, 1], [0, 1, 2]], workgroup = [32, 256, 0]}&gt;, translation_info = &lt;pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options&lt;prefetch_shared_memory = true&gt;, llvm_func_attrs = {&quot;amdgpu-waves-per-eu&quot; = &quot;2&quot;}}&gt;&gt; -&gt; !transform.any_param
     transform.yield %arg0, %0 : !transform.any_op, !transform.any_param
   }
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed}) -&gt; !transform.any_op attributes {iree_codegen.tuning_spec_entrypoint} {
