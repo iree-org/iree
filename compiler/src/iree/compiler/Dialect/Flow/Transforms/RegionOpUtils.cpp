@@ -543,20 +543,14 @@ moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   rewriter.setInsertionPoint(body.getTerminator());
   Operation *clonedTarget = rewriter.clone(*target);
 
-  // Replace any operands returned by the `regionOp` with the results yielded
-  // inside of the `regionOp`.
-  for (OpOperand &operand : clonedTarget->getOpOperands()) {
-    if (operand.get().getDefiningOp() != regionOp) {
-      continue;
-    }
-    auto returnOp =
-        cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
-    auto opResult = cast<OpResult>(operand.get());
-    Value yieldedValue = returnOp->getOperand(opResult.getResultNumber());
-    rewriter.modifyOpInPlace(clonedTarget, [&]() {
-      clonedTarget->setOperand(operand.getOperandNumber(), yieldedValue);
-    });
-  }
+  // Replace all of `clonedTarget` uses of `regionOp` with the values yielded
+  // from inside the region.
+  auto returnOp =
+      cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+  rewriter.replaceOpUsesWithIf(
+      regionOp, returnOp.getOperands(), [&](OpOperand &operand) {
+        return clonedTarget->isAncestor(operand.getOwner());
+      });
 
   // Gather all uses of `target`.
   for (auto [index, result] : llvm::enumerate(target->getResults())) {
