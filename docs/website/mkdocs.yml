@@ -160,7 +160,6 @@ nav:
           - GPU - Metal: "guides/deployment-configurations/gpu-metal.md"
       - "General topics":
           - "guides/parameters.md"
-          - "guides/lowering-config.md"
   - "Reference":
       - "reference/index.md"
       - "General topics":
@@ -263,6 +262,7 @@ nav:
           - "developers/usage-best-practices.md"
           - "developers/update-sdxl-golden-outputs.md"
           - "developers/vulkan-environment-setup.md"
+          - "developers/lowering-config.md"
   - "Community":
       - "community/index.md"
       - "Blog":
