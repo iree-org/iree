@@ -235,6 +235,10 @@ struct DispatchCreationOptions {
   // Enables data tiling in dispatch creation phase.
   bool dataTiling = false;
 
+  // Enables aggressive reshape movement (bubbling expand/collapse shapes
+  // across reduction ops).
+  bool enableAggressiveReshapeMovement = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<DispatchCreationOptions>;
 };

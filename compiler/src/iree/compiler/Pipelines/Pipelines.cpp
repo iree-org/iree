@@ -328,6 +328,8 @@ void buildIREEVMTransformPassPipeline(
     }
     dispatchTransformOptions.enableSplitReduction =
         dispatchCreationOptions.enableSplitReduction;
+    dispatchTransformOptions.enableAggressiveReshapeMovement =
+        dispatchCreationOptions.enableAggressiveReshapeMovement;
     dispatchTransformOptions.constExprMaxSizeIncreaseThreshold =
         pipelineOptions.constExprMaxSizeIncreaseThreshold;
     dispatchTransformOptions.constExprHoisting =
