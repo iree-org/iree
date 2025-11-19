@@ -60,6 +60,10 @@ iree_cc_library(
     "semaphore.h"
     "string_util.c"
     "string_util.h"
+    "topology.c"
+    "topology.h"
+    "topology_builder.c"
+    "topology_builder.h"
   DEPS
     iree::base
     iree::base::internal
@@ -78,6 +82,30 @@ iree_cc_test(
     ::hal
     iree::base
     iree::base::internal::span
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    topology_test
+  SRCS
+    "topology_test.cc"
+  DEPS
+    ::hal
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    topology_builder_test
+  SRCS
+    "topology_builder_test.cc"
+  DEPS
+    ::hal
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )

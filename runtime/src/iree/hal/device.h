@@ -23,6 +23,7 @@
 #include "iree/hal/queue.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
+#include "iree/hal/topology.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -245,6 +246,82 @@ typedef enum iree_hal_wait_mode_e {
   // Waits for one or more semaphores to reach or exceed their specified values.
   IREE_HAL_WAIT_MODE_ANY = 1,
 } iree_hal_wait_mode_t;
+
+// Device capability flags bitfield.
+// These flags describe boolean device features used for topology construction.
+typedef uint64_t iree_hal_device_capability_bits_t;
+enum iree_hal_device_capability_bits_e {
+  IREE_HAL_DEVICE_CAPABILITY_NONE = 0,
+
+  // Native timeline semaphore support (not binary emulation).
+  IREE_HAL_DEVICE_CAPABILITY_TIMELINE_SEMAPHORES = 1ull << 0,
+
+  // Memory model capabilities.
+  IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY = 1ull << 1,
+  IREE_HAL_DEVICE_CAPABILITY_HOST_COHERENT = 1ull << 2,
+  IREE_HAL_DEVICE_CAPABILITY_PEER_COHERENT = 1ull << 3,  // Same-driver.
+
+  // Transfer capabilities.
+  IREE_HAL_DEVICE_CAPABILITY_P2P_COPY = 1ull << 4,
+  IREE_HAL_DEVICE_CAPABILITY_HOST_ZERO_COPY_OK = 1ull << 5,
+
+  // Concurrency and atomics.
+  IREE_HAL_DEVICE_CAPABILITY_CONCURRENT_SAFE = 1ull << 6,
+  IREE_HAL_DEVICE_CAPABILITY_ATOMIC_SCOPE_DEVICE = 1ull << 7,
+  IREE_HAL_DEVICE_CAPABILITY_ATOMIC_SCOPE_SYSTEM = 1ull << 8,
+
+  // Isolation (MIG, SR-IOV, etc.).
+  IREE_HAL_DEVICE_CAPABILITY_ISOLATED = 1ull << 9,
+
+  // Reserved for future use (bits 10-63).
+};
+
+// Device capabilities for topology edge construction.
+// Contains ALL information needed for cross-driver edge computation.
+typedef struct iree_hal_device_capabilities_t {
+  // Capability flags bitfield.
+  iree_hal_device_capability_bits_t flags;
+
+  // External handle types this device supports.
+  iree_hal_topology_handle_type_t semaphore_export_types;
+  iree_hal_topology_handle_type_t semaphore_import_types;
+  iree_hal_topology_handle_type_t buffer_export_types;
+  iree_hal_topology_handle_type_t buffer_import_types;
+
+  // NUMA affinity (for CPU topology integration).
+  uint8_t numa_node;
+  uint8_t reserved[3];  // Padding to 4 bytes.
+
+  // Physical device identification (for detecting same physical GPU).
+  // Vulkan: VkPhysicalDeviceIDProperties.deviceUUID
+  // CUDA: cuDeviceGetUuid()
+  // AMDGPU: HSA_AMD_AGENT_INFO_DRIVER_UID
+  // D3D12: DXGI adapter LUID (expanded to 16 bytes)
+  uint8_t physical_device_uuid[16];
+  bool has_physical_device_uuid;
+
+  // Opaque driver-specific handle (for same-driver refinement).
+  // Used ONLY by same-driver refinement, not by base builder.
+  uintptr_t driver_device_handle;
+
+  // Device group index (for same-driver multi-device groups).
+  uint32_t device_group_index;
+  bool has_device_group;
+} iree_hal_device_capabilities_t;
+
+// Device's cached view of topology for fast compatibility checks.
+// This is populated during device creation from the topology.
+typedef struct iree_hal_device_topology_info_t {
+  iree_hal_topology_edge_t self_edge;  // 8 bytes - own capabilities.
+  uint32_t topology_index;             // 4 bytes - index in topology.
+  iree_hal_topology_device_bitmap_t
+      can_wait_from;  // 4/8 bytes - compatible devices.
+  iree_hal_topology_device_bitmap_t
+      can_signal_to;  // 4/8 bytes - compatible devices.
+  iree_hal_topology_device_bitmap_t
+      can_import_from;  // 4/8 bytes - import capable.
+  iree_hal_topology_device_bitmap_t can_p2p_with;  // 4/8 bytes - P2P capable.
+} iree_hal_device_topology_info_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t
@@ -654,6 +731,28 @@ iree_hal_device_profiling_flush(iree_hal_device_t* device);
 IREE_API_EXPORT iree_status_t
 iree_hal_device_profiling_end(iree_hal_device_t* device);
 
+// Query device capabilities for topology construction.
+// Returns all information needed for cross-driver edge building.
+// If the device doesn't support topology queries, returns OK with zeroed
+// struct.
+IREE_API_EXPORT iree_status_t iree_hal_device_query_capabilities(
+    iree_hal_device_t* device,
+    iree_hal_device_capabilities_t* out_capabilities);
+
+// Get pointer to device's topology info (populated during device creation).
+// Returns NULL if device is not part of a topology.
+// Pointer lifetime matches device lifetime.
+IREE_API_EXPORT const iree_hal_device_topology_info_t*
+iree_hal_device_topology_info(iree_hal_device_t* device);
+
+// Refine topology edge from src_device to dst_device.
+// This is called ONLY for same-driver device pairs during topology
+// construction. If the device doesn't support refinement, returns OK without
+// modification.
+IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
+    iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
+    iree_hal_topology_edge_t* edge);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_device_list_t
 //===----------------------------------------------------------------------===//
@@ -833,6 +932,23 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_device_profiling_options_t* options);
   iree_status_t(IREE_API_PTR* profiling_flush)(iree_hal_device_t* device);
   iree_status_t(IREE_API_PTR* profiling_end)(iree_hal_device_t* device);
+
+  // Query device capabilities for topology construction.
+  // If NULL, returns OK with zeroed capabilities.
+  iree_status_t(IREE_API_PTR* query_capabilities)(
+      iree_hal_device_t* device,
+      iree_hal_device_capabilities_t* out_capabilities);
+
+  // Get pointer to device's topology info.
+  // If NULL, returns NULL.
+  const iree_hal_device_topology_info_t*(IREE_API_PTR* topology_info)(
+      iree_hal_device_t* device);
+
+  // Optional: refine topology edge for same-driver device pairs.
+  // If NULL, no refinement is applied.
+  iree_status_t(IREE_API_PTR* refine_topology_edge)(
+      iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
+      iree_hal_topology_edge_t* edge);
 } iree_hal_device_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 

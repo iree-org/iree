@@ -67,6 +67,10 @@ iree_runtime_cc_library(
         "semaphore.h",
         "string_util.c",
         "string_util.h",
+        "topology.c",
+        "topology.h",
+        "topology_builder.c",
+        "topology_builder.h",
     ],
     hdrs = [
         "api.h",
@@ -87,6 +91,28 @@ iree_runtime_cc_test(
         ":hal",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:span",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "topology_test",
+    srcs = ["topology_test.cc"],
+    deps = [
+        ":hal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "topology_builder_test",
+    srcs = ["topology_builder_test.cc"],
+    deps = [
+        ":hal",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

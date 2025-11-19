@@ -29,5 +29,6 @@
 #include "iree/hal/resource.h"          // IWYU pragma: export
 #include "iree/hal/semaphore.h"         // IWYU pragma: export
 #include "iree/hal/string_util.h"       // IWYU pragma: export
+#include "iree/hal/topology.h"          // IWYU pragma: export
 
 #endif  // IREE_HAL_API_H_
