@@ -34,7 +34,7 @@ typedef uint64_t iree_hal_queue_affinity_t;
 
 // Specifies that any queue may be selected.
 #define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))
-#define IREE_HAL_MAX_QUEUES (sizeof(iree_hal_queue_affinity_t) / 8)
+#define IREE_HAL_MAX_QUEUES (sizeof(iree_hal_queue_affinity_t) * 8)
 
 // Returns true if the |queue_affinity| is empty (none specified).
 #define iree_hal_queue_affinity_is_empty(queue_affinity) ((queue_affinity) == 0)
