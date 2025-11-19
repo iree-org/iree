@@ -48,8 +48,7 @@ static SmallVector<Attribute> getWarpMapping(MLIRContext *ctx, int64_t rank) {
 
 /// Create GPU thread mapping for lane mapping.
 /// Returns a single-element array with gpu.lane_id<0>.
-static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx,
-                                               int64_t numLoops) {
+static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   SmallVector<Attribute> mapping;
   // Since we only tile the innermost dimension, we only have one loop.
   // Map it to gpu.lane_id<0>.
@@ -143,7 +142,7 @@ tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
   threadOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
 
   // Set thread mapping for the single innermost dimension.
-  threadOptions.setMapping(getThreadMapping(rewriter.getContext(), 1));
+  threadOptions.setMapping(getThreadMapping(rewriter.getContext()));
 
   rewriter.setInsertionPoint(op);
   FailureOr<scf::SCFTilingResult> threadTilingResult = scf::tileUsingSCF(
@@ -559,11 +558,15 @@ private:
     SmallVector<Operation *> opsToTile;
 
     // Collect all ops with iree_gpu.use_global_load_dma lowering config.
+    // Skip ops that are already inside a warp-mapped forall.
     funcOp->walk([&](Operation *op) {
       if (isa<linalg::CopyOp, IREE::LinalgExt::GatherOp>(op)) {
         auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
         if (config) {
-          opsToTile.push_back(op);
+          auto parentForall = op->getParentOfType<scf::ForallOp>();
+          if (!hasWarpMapping(parentForall)) {
+            opsToTile.push_back(op);
+          }
         }
       }
     });

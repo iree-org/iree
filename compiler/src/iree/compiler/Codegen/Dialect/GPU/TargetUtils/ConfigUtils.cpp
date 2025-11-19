@@ -516,64 +516,6 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
-/// Calculate subgroup sizes for global load DMA based on GPU target attributes.
-/// Returns nullptr if target info is not available or calculation is not
-/// possible.
-static DenseI64ArrayAttr
-calculateSubgroupSizesForDMA(IREE::GPU::TargetAttr target,
-                             int64_t targetSubgroupSize, Type tensorType,
-                             Builder &builder) {
-  if (!target.getWgp().getDmaSizes())
-    return nullptr;
-
-  ArrayRef<int64_t> dmaSizes = target.getWgp().getDmaSizes().asArrayRef();
-  if (dmaSizes.empty())
-    return nullptr;
-
-  // Get element type bit width.
-  Type elementType = getElementTypeOrSelf(tensorType);
-  unsigned elementBitWidth = elementType.getIntOrFloatBitWidth();
-
-  // Get innermost dimension size.
-  auto shapedType = dyn_cast<ShapedType>(tensorType);
-  if (!shapedType || !shapedType.hasRank())
-    return nullptr;
-
-  ArrayRef<int64_t> shape = shapedType.getShape();
-  if (shape.empty())
-    return nullptr;
-
-  int64_t innermostDim = shape.back();
-  if (ShapedType::isDynamic(innermostDim))
-    return nullptr;
-
-  int64_t innermostBits = innermostDim * elementBitWidth;
-
-  // Create a sorted copy of dmaSizes in descending order.
-  SmallVector<int64_t> sortedDmaSizes = llvm::to_vector(dmaSizes);
-  llvm::sort(sortedDmaSizes, std::greater<int64_t>());
-
-  // Try each DMA size from largest to smallest.
-  for (int64_t dmaSize : sortedDmaSizes) {
-    int64_t dmaElements = dmaSize / elementBitWidth;
-    int64_t requiredSize = targetSubgroupSize * dmaElements;
-
-    // Check if innermost dimension is >= required size.
-    if (innermostBits >= requiredSize * elementBitWidth) {
-      // Check if innermost dimension is a multiple of required size.
-      if ((innermostBits % (requiredSize * elementBitWidth)) != 0) {
-        return nullptr;
-      }
-
-      int64_t innerDim = requiredSize;
-      int64_t outerDim = 4;
-
-      return builder.getDenseI64ArrayAttr({outerDim, innerDim});
-    }
-  }
-  return nullptr;
-}
-
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
