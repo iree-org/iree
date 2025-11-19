@@ -55,6 +55,8 @@ typedef struct iree_hal_streaming_module_registration_t
     iree_hal_streaming_module_registration_t;
 typedef struct iree_hal_streaming_stream_t iree_hal_streaming_stream_t;
 typedef struct iree_hal_streaming_symbol_t iree_hal_streaming_symbol_t;
+typedef struct iree_hal_streaming_async_commit_context_t
+    iree_hal_streaming_async_commit_context_t;
 
 //===----------------------------------------------------------------------===//
 // Symbol tagging
@@ -453,6 +455,8 @@ typedef struct iree_hal_streaming_parameter_copy_op_t {
   uint16_t reserved;
   // Source offset in parameters buffer, in bytes.
   uint16_t src_offset;
+  // Source binding ordinal (for parameter arrays);
+  uint16_t src_ordinal;
   // Destination offset in constants, in bytes.
   uint16_t dst_offset;
 } iree_hal_streaming_parameter_copy_op_t;
@@ -462,6 +466,8 @@ typedef struct iree_hal_streaming_parameter_resolve_op_t {
   uint32_t reserved;
   // Source offset in parameters buffer, in bytes.
   uint16_t src_offset;
+  // Source binding ordinal (for parameter arrays);
+  uint16_t src_ordinal;
   // Destination binding ordinal.
   uint16_t dst_ordinal;
 } iree_hal_streaming_parameter_resolve_op_t;
@@ -664,6 +670,8 @@ typedef enum iree_hal_streaming_dispatch_flag_bits_e {
   IREE_HAL_STREAMING_DISPATCH_FLAG_NONE = 0ull,
   // Cooperative kernel launch.
   IREE_HAL_STREAMING_DISPATCH_FLAG_COOPERATIVE = 1ull << 0,
+  // The parameters are an array of pointers to values.
+  IREE_HAL_STREAMING_DISPATCH_FLAG_ARGS_ARRAY = 1ull << 1,
 } iree_hal_streaming_dispatch_flags_t;
 
 // Dispatch parameters for kernel launches.
@@ -802,6 +810,13 @@ iree_hal_streaming_device_t* iree_hal_streaming_device_entry(
 // Synchronization: none (queries device properties).
 iree_status_t iree_hal_streaming_device_name(
     iree_hal_streaming_device_ordinal_t ordinal, char* name,
+    iree_host_size_t name_size);
+
+iree_status_t iree_hal_streaming_device_get_string_property(
+    iree_hal_streaming_device_ordinal_t ordinal,
+    char* category,
+    char* key,
+    char* name,
     iree_host_size_t name_size);
 
 // Synchronization: none (queries current memory info).
@@ -1082,6 +1097,20 @@ iree_status_t iree_hal_streaming_unpack_parameters(
     const void* parameter_buffer, void* out_constants,
     iree_hal_buffer_ref_list_t* out_bindings);
 
+// Unpacks parameters from an array of pointers (void**) into a constant
+// buffer and binding list. This variant is used when parameters are passed
+// as an array of pointers to argument values rather than a packed buffer.
+// Each element in |parameter_list| is a pointer to the actual parameter value.
+// For bindings (device pointers), the parameter is a pointer to a pointer.
+// Callers must ensure sufficient storage in |out_constants| and |out_bindings|
+// based on the symbol constant size and binding count.
+// Synchronization: none (data packing utility).
+iree_status_t iree_hal_streaming_unpack_parameter_list(
+    iree_hal_streaming_context_t* context,
+    const iree_hal_streaming_parameter_info_t* parameters,
+    void** parameter_list, void* out_constants,
+    iree_hal_buffer_ref_list_t* out_bindings);
+
 // Synchronization: none (enqueues kernel launch, non-blocking).
 iree_status_t iree_hal_streaming_launch_kernel(
     iree_hal_streaming_symbol_t* symbol,
@@ -1306,6 +1335,18 @@ typedef struct iree_hal_streaming_mem_pool_props_t {
   int location_id;
 } iree_hal_streaming_mem_pool_props_t;
 
+// Forward declaration for async allocation tracking.
+typedef struct iree_hal_streaming_async_allocation_t
+    iree_hal_streaming_async_allocation_t;
+
+// Physical memory reuse block (for future optimization).
+typedef struct iree_hal_streaming_physical_memory_block_t {
+  iree_hal_physical_memory_t* physical_memory;
+  iree_device_size_t size;
+  uint64_t available_after_value;
+  struct iree_hal_streaming_physical_memory_block_t* next;
+} iree_hal_streaming_physical_memory_block_t;
+
 // Memory pool structure.
 typedef struct iree_hal_streaming_mem_pool_t {
   iree_atomic_ref_count_t ref_count;
@@ -1336,7 +1377,66 @@ typedef struct iree_hal_streaming_mem_pool_t {
 
   // Host allocator.
   iree_allocator_t host_allocator;
+
+  // NEW: Async allocation tracking.
+  iree_hal_streaming_async_allocation_t* pending_allocations;
+  iree_host_size_t pending_count;
+
+  // NEW: Virtual memory support.
+  bool supports_virtual_memory;
+  iree_device_size_t vm_page_size_min;
+  iree_device_size_t vm_page_size_recommended;
+
+  // NEW: Physical memory reuse (for future optimization).
+  iree_hal_streaming_physical_memory_block_t* free_physical_blocks;
 } iree_hal_streaming_mem_pool_t;
+
+// Async allocation state.
+typedef enum iree_hal_streaming_async_alloc_state_e {
+  IREE_HAL_STREAMING_ASYNC_ALLOC_RESERVED = 0,
+  IREE_HAL_STREAMING_ASYNC_ALLOC_COMMITTED = 1,
+  IREE_HAL_STREAMING_ASYNC_ALLOC_DECOMMITTING = 2,
+} iree_hal_streaming_async_alloc_state_t;
+
+// Tracks a single async allocation's lifecycle.
+struct iree_hal_streaming_async_allocation_t {
+  // Virtual address range (reserved immediately).
+  iree_hal_streaming_deviceptr_t virtual_ptr;
+  iree_device_size_t size;
+
+  // Virtual buffer handle (reserved address space).
+  iree_hal_buffer_t* virtual_buffer;
+
+  // Physical memory (allocated in commit callback).
+  iree_hal_physical_memory_t* physical_memory;
+
+  // State tracking.
+  iree_hal_streaming_async_alloc_state_t state;
+
+  // Lifetime tracking (for future optimization).
+  uint64_t alloc_timeline_value;
+  uint64_t first_use_value;
+  uint64_t last_use_value;
+  uint64_t free_timeline_value;
+
+  // Pool management.
+  iree_hal_streaming_mem_pool_t* pool;
+  struct iree_hal_streaming_async_allocation_t* next;
+
+  iree_allocator_t host_allocator;
+};
+
+// Context passed to host callbacks for commit/decommit operations.
+typedef struct iree_hal_streaming_async_commit_context_t {
+  iree_hal_streaming_context_t* context;
+  iree_hal_streaming_async_allocation_t* allocation;
+  bool is_commit;
+} iree_hal_streaming_async_commit_context_t;
+
+// Host callback: Commit physical memory to virtual range or decommit.
+// This function is called from stream flush to commit physical memory before
+// work submission, and after work completion to decommit.
+void iree_hal_streaming_async_commit_callback(void* user_data);
 
 // Creates a memory pool with the specified properties.
 // Synchronization: none (creates new pool).
@@ -1392,6 +1492,7 @@ iree_status_t iree_hal_streaming_memory_allocate_async(
 // Allocates memory asynchronously from a specific pool.
 // Synchronization: stream (async allocation on stream).
 iree_status_t iree_hal_streaming_memory_allocate_from_pool_async(
+    iree_hal_streaming_context_t* context, 
     iree_hal_streaming_mem_pool_t* pool, iree_device_size_t size,
     iree_hal_streaming_stream_t* stream,
     iree_hal_streaming_deviceptr_t* out_ptr);

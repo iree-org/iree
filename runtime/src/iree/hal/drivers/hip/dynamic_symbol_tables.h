@@ -122,3 +122,23 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipStreamDestroy, hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipStreamSynchronize, hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipStreamWaitEvent, hipStream_t, hipEvent_t,
                                unsigned int)
+
+// Virtual Memory Management (ROCm 6.0+)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemAddressReserve, hipDeviceptr_t *, size_t,
+                               size_t, hipDeviceptr_t, unsigned long long)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemAddressFree, hipDeviceptr_t, size_t)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemCreate, hipMemGenericAllocationHandle_t *,
+                               size_t, const hipMemAllocationProp *,
+                               unsigned long long)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemRelease, hipMemGenericAllocationHandle_t)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemMap, hipDeviceptr_t, size_t, size_t,
+                               hipMemGenericAllocationHandle_t,
+                               unsigned long long)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemUnmap, hipDeviceptr_t, size_t)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemSetAccess, hipDeviceptr_t, size_t,
+                               const hipMemAccessDesc *, size_t)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemGetAccess, unsigned long long *,
+                               const hipMemLocation *, hipDeviceptr_t)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipMemGetAllocationGranularity, size_t *,
+                               const hipMemAllocationProp *,
+                               hipMemAllocationGranularity_flags)

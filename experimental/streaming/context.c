@@ -653,7 +653,8 @@ iree_status_t iree_hal_streaming_context_synchronize(
     iree_hal_streaming_context_t* context) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
-
+  // TODO we should probably be synchronizing any stream
+  // that is not marked as nonblocking.
   // Synchronize default stream.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_streaming_stream_synchronize(context->default_stream));

@@ -21,6 +21,7 @@ set(IREE_ALL_CTS_TESTS
   "queue_host_call"
   "semaphore"
   "semaphore_submission"
+  "virtual_memory"
   PARENT_SCOPE
 )
 
@@ -257,6 +258,19 @@ iree_cc_library(
     semaphore_submission_test_library
   HDRS
     "semaphore_submission_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
+    virtual_memory_test_library
+  HDRS
+    "virtual_memory_test.h"
   DEPS
     ::cts_test_base
     iree::base

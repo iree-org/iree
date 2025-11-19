@@ -4022,8 +4022,15 @@ CUDAAPI CUresult cuMemAllocFromPoolAsync(CUdeviceptr* dptr, size_t bytesize,
     return CUDA_ERROR_INVALID_VALUE;
   }
 
+  iree_hal_streaming_context_t* context = iree_hal_streaming_context_current();
+  if (!context) {
+    IREE_TRACE_ZONE_END(z0);
+    return CUDA_ERROR_NOT_INITIALIZED;
+  }
+
   iree_hal_streaming_deviceptr_t device_ptr = 0;
   iree_status_t status = iree_hal_streaming_memory_allocate_from_pool_async(
+      context,
       (iree_hal_streaming_mem_pool_t*)pool, bytesize,
       (iree_hal_streaming_stream_t*)hStream, &device_ptr);
 

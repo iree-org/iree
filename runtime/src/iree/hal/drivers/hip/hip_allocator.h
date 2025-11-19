@@ -14,6 +14,17 @@
 
 typedef struct iree_hal_hip_device_topology_t iree_hal_hip_device_topology_t;
 
+// Physical memory handle for virtual memory management.
+// Uses HIP's native handle type directly.
+typedef struct iree_hal_hip_physical_memory_t {
+  iree_hal_resource_t resource;
+  const iree_hal_hip_dynamic_symbols_t* symbols;
+  hipMemGenericAllocationHandle_t handle;
+  iree_device_size_t size;
+  hipDevice_t device;
+  iree_allocator_t host_allocator;
+} iree_hal_hip_physical_memory_t;
+
 // Creates a HIP memory allocator.
 // |device| and |stream| will be used for management operations.
 // |pools| provides memory pools that may be shared across multiple allocators

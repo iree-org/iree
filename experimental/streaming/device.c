@@ -86,6 +86,29 @@ iree_status_t iree_hal_streaming_device_name(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_streaming_device_get_string_property(
+    iree_hal_streaming_device_ordinal_t ordinal,
+    char* category,
+    char* key,
+    char* property,
+    iree_host_size_t property_size) {
+  IREE_ASSERT_ARGUMENT(property);
+  IREE_ASSERT_ARGUMENT(key);
+  IREE_ASSERT_ARGUMENT(category);
+  if (property_size == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "property_size must be > 0");
+  }
+
+  iree_hal_streaming_device_t* device = NULL;
+  iree_status_t status = iree_hal_streaming_device_by_ordinal(ordinal, &device);
+  if (!iree_status_is_ok(status)) {
+    return status;
+  }
+  return iree_hal_device_query_string(device->hal_device,
+      iree_make_cstring_view(category), iree_make_cstring_view(key), property_size, property);
+}
+
 iree_hal_streaming_p2p_link_t* iree_hal_streaming_device_lookup_p2p_link(
     iree_hal_streaming_device_ordinal_t src_device,
     iree_hal_streaming_device_ordinal_t dst_device) {
