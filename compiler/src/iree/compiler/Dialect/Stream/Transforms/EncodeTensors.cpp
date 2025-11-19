@@ -47,11 +47,6 @@ namespace {
 static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
                                    ValueRange encodingDims,
                                    PatternRewriter &rewriter) {
-  if (isa_and_nonnull<IREE::Encoding::PackedStorageAttr>(
-          encodingType.getEncoding())) {
-    return success();
-  }
-
   auto serializableEncoding = IREE::Encoding::getSerializableAttr(encodingType);
   if (serializableEncoding && !serializableEncoding.isSerialized()) {
     return rewriter.notifyMatchFailure(op, [=](Diagnostic &d) {
