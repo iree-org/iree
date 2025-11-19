@@ -128,8 +128,7 @@ There are two basis attributes:
 **Constraint:** The product of all counts equals the subgroup size
 (for `lane_basis`) or number of subgroups (for `subgroup_basis`).
 
-<!-- markdownlint-disable-next-line MD036 -->
-**Example**
+**Example:**
 
 ```mlir
 lane_basis = [[16, 4], [1, 0]]
