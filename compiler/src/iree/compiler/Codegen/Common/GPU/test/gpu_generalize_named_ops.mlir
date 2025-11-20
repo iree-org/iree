@@ -145,3 +145,24 @@ func.func @transpose_op(%arg0: tensor<16x32xf16>) -> tensor<32x16xf16> {
 
 // CHECK-LABEL: func.func @transpose_op
 //       CHECK:   linalg.generic
+
+// -----
+
+func.func @reduce_op(%arg0: tensor<32x128xf32>, %arg1: tensor<32xf32>) -> tensor<32xf32> {
+  %reduced = linalg.reduce ins(%arg0 : tensor<32x128xf32>) outs(%arg1 : tensor<32xf32>) dimensions = [1]
+    (%in: f32, %out: f32) {
+      %sum = arith.addf %in, %out : f32
+      linalg.yield %sum : f32
+    }
+  return %reduced : tensor<32xf32>
+}
+
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK:      func.func @reduce_op
+// CHECK:        linalg.generic
+// CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]]]
+// CHECK-SAME:   iterator_types = ["parallel", "reduction"]
+// CHECK:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32)
+// CHECK:          %[[SUM:.+]] = arith.addf %[[IN]], %[[OUT]] : f32
+// CHECK:          linalg.yield %[[SUM]] : f32
