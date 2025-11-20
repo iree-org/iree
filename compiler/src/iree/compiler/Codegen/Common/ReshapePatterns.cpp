@@ -1003,6 +1003,9 @@ struct FoldInnerBitcastIntoLoadFromBuffer
                                 PatternRewriter &rewriter) const override {
     Value bitcastSrc = bitcastOp.getSource();
 
+    // TODO(#22712): This pattern matching is fragile. Simplify this by using
+    // a memref.bitcast or similar operation once available.
+
     // Step 1: Check for iree_codegen.load_from_buffer.
     auto loadOp = bitcastSrc.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
     if (!loadOp) {
