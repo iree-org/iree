@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes))" %s | FileCheck %s --check-prefixes=CHECK,CHECK-DEFAULT
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes{enable-bubble-up-expand-shapes-across-reduction-ops enable-bubble-down-collapse-shapes-across-reduction-ops}))" %s | FileCheck %s --check-prefixes=CHECK,CHECK-AGGRESSIVE
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-bubble-up-expand-shapes{enable-reshape-movement-across-reductions}))" %s | FileCheck %s --check-prefixes=CHECK,CHECK-AGGRESSIVE
 
 util.func public @bubbble_expand_through_extract(%arg0 : tensor<2x4096x5120xf16>) -> (tensor<2x64x64x2560xf16>) {
   %extracted_slice_237 = tensor.extract_slice %arg0[0, 0, 0] [2, 4096, 2560] [1, 1, 1] : tensor<2x4096x5120xf16> to tensor<2x4096x2560xf16>

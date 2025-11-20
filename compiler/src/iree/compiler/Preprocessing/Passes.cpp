@@ -153,7 +153,7 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   passManager.addPass(DispatchCreation::createFusionPreprocessingPass());
   passManager.addPass(mlir::createCSEPass());
   DispatchCreation::BubbleUpExpandShapesPassOptions bubbleOptions;
-  bubbleOptions.enableBubbleUpExpandShapesAcrossReductionOps = true;
+  bubbleOptions.enableReshapeMovementAcrossReductions = true;
   passManager.addPass(
       DispatchCreation::createBubbleUpExpandShapesPass(bubbleOptions));
   passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(

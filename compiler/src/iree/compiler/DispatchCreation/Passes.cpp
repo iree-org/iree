@@ -134,9 +134,7 @@ static void addDispatchRegionCreationPreprocessingPasses(
       .addPass([&]() {
         return DispatchCreation::createBubbleUpExpandShapesPass(
             DispatchCreation::BubbleUpExpandShapesPassOptions{
-                /*enableBubbleUpExpandShapesAcrossReductionOps=*/
-                dispatchOptions.enableAggressiveReshapeMovement,
-                /*enableBubbleDownCollapseShapesAcrossReductionOps=*/
+                /*enableReshapeMovementAcrossReductions=*/
                 dispatchOptions.enableAggressiveReshapeMovement});
       })
       .addPass(IREE::Flow::createCanonicalizePass)

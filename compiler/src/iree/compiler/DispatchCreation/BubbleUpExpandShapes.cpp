@@ -464,7 +464,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           // If producer generic op is elementwise op, bubble up the expand
           // shape past this operation.
           // If bubbling across reduction ops is enabled, allow all generic ops.
-          return (enableBubbleUpExpandShapesAcrossReductionOps ||
+          return (enableReshapeMovementAcrossReductions ||
                   llvm::all_of(producerGenericOp.getIteratorTypesArray(),
                                linalg::isParallelIterator));
         }
@@ -478,7 +478,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           // If bubbling collapse shapes down across reduction ops is enabled,
           // allow collapse shapes to bubble down through reduction ops.
           // TODO: This condition should be removed.
-          return enableBubbleDownCollapseShapesAcrossReductionOps ||
+          return enableReshapeMovementAcrossReductions ||
                  llvm::all_of(consumerGenericOp.getIteratorTypesArray(),
                               linalg::isParallelIterator);
         }
