@@ -521,10 +521,10 @@ tests nightly in
 
 Tests for small scale versions of Large Language Models (LLMs)
 and other Generative AI (GenAI) programs exported using the
-[sharktank package](https://github.com/nod-ai/shark-ai/tree/main/sharktank)
-built as part of the [shark-ai project](https://github.com/nod-ai/shark-ai) are
+[sharktank package](https://github.com/nod-ai/amdshark-ai/tree/main/amdsharktank)
+built as part of the [shark-ai project](https://github.com/nod-ai/amdshark-ai) are
 included at
-[`sharktank_models/`](https://github.com/iree-org/iree-test-suites/tree/main/sharktank_models)
+[`sharktank_models/`](https://github.com/iree-org/iree-test-suites/tree/main/amdsharktank_models)
 in the
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
 repository.
@@ -536,7 +536,7 @@ Types of Sharktank tests:
 * Benchmarks for full models
 
 The quality and benchmark test config files are stored in
-[`tests/external/iree-test-suites/sharktank_models`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/sharktank_models).
+[`tests/external/iree-test-suites/sharktank_models`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/amdsharktank_models).
 
 Detailed steps on how to update the golden output in SDXL may be found [here](../update-sdxl-golden-outputs.md).
 
@@ -544,10 +544,10 @@ Detailed steps on how to update the golden output in SDXL may be found [here](..
 
 ### SHARK-TestSuite
 
-The [nod-ai/SHARK-TestSuite](https://github.com/nod-ai/SHARK-TestSuite)
+The [nod-ai/SHARK-TestSuite](https://github.com/nod-ai/AMDSHARK-TestSuite)
 repository also contains tests using IREE,
 [llvm/torch-mlir](https://github.com/llvm/torch-mlir), and
-[nod-ai/shark-ai](https://github.com/nod-ai/shark-ai).
+[nod-ai/shark-ai](https://github.com/nod-ai/amdshark-ai).
 
 Some test coverage may overlap between SHARK-TestSuite and iree-test-suites,
 though some tests are planned to be migrated into
@@ -556,4 +556,4 @@ they mature and have demonstrated general utility to the upstream developer
 community.
 
 Test reports for nightly runs in SHARK-TestSuite are uploaded to
-[nod-ai/e2eshark-reports](https://github.com/nod-ai/e2eshark-reports).
+[nod-ai/e2eshark-reports](https://github.com/nod-ai/e2eamdshark-reports).

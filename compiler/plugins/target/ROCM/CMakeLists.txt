@@ -83,10 +83,10 @@ iree_cc_library(
 # or we download them from a fixed location and copy them from
 # there. We default to downloading as it is a better use experience
 # by default.
-# See: https://github.com/shark-infra/amdgpu-device-libs
+# See: https://github.com/amdshark-infra/amdgpu-device-libs
 set(_amd_required_libs "ocml.bc" "ockl.bc")
 set(_amd_device_bc_url
-    "https://github.com/shark-infra/amdgpu-device-libs/releases/download/v20231101/amdgpu-device-libs-llvm-6086c272a3a59eb0b6b79dcbe00486bf4461856a.tgz")
+    "https://github.com/amdshark-infra/amdgpu-device-libs/releases/download/v20231101/amdgpu-device-libs-llvm-6086c272a3a59eb0b6b79dcbe00486bf4461856a.tgz")
 set(_amd_device_bc_sha256 "336362416c68fdd8bb80328f65ca7ebaa0c119ea19c95df6df30c832a4df39b9")
 set(_amd_device_bc_stamp "${_amd_device_bc_url} : ${_amd_device_bc_sha256}")
 set(IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH "" CACHE PATH

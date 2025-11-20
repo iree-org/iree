@@ -12,7 +12,7 @@ set -e
 set -o pipefail
 
 PREBUILT_DIR="${HOME}/riscv"
-IREE_ARTIFACT_URL="https://sharkpublic.blob.core.windows.net/sharkpublic/GCP-Migration-Files"
+IREE_ARTIFACT_URL="https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/GCP-Migration-Files"
 
 read -p "Enter the riscv tools root path(press enter to use default path:${PREBUILT_DIR}): " INPUT_PATH
 if [[ "${INPUT_PATH}" ]]; then

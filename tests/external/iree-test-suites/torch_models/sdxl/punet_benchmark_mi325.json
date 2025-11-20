@@ -11,7 +11,7 @@
   "weights" : [
     {
       "type": "url",
-      "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_int8.irpa",
+      "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_int8.irpa",
       "scope": "model"
     }
   ],
@@ -26,27 +26,27 @@
   ],
   "inputs" : [
     {
-      "url" : "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input0.bin",
+      "url" : "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input0.bin",
       "value": "1x4x128x128xf16"
     },
     {
-      "url" : "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input1.bin",
+      "url" : "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input1.bin",
       "value": "1xf16"
     },
     {
-      "url" : "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input2.bin",
+      "url" : "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input2.bin",
       "value": "2x64x2048xf16"
     },
     {
-      "url" : "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input3.bin",
+      "url" : "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input3.bin",
       "value": "2x1280xf16"
     },
     {
-      "url" : "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input4.bin",
+      "url" : "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input4.bin",
       "value": "2x6xf16"
     },
     {
-      "url" : "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input5.bin",
+      "url" : "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree-test-suites/torch-models/sdxl/punet/punet_input5.bin",
       "value": "1xf16"
     }
   ],

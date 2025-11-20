@@ -12,7 +12,7 @@
         {
             "type": "url",
             "scope": "model",
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/llama_8b_fp16/8b_fp16.irpa"
+            "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree-test-suites/torch-models/llama_8b_fp16/8b_fp16.irpa"
         }
     ],
     "run_args": [

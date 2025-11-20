@@ -10,7 +10,7 @@
     "weights": [
       {
         "type": "url",
-        "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
+        "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
         "scope": "model"
       }
     ],
@@ -21,29 +21,29 @@
     ],
     "inputs": [
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.0.bin",
+            "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_input.0.bin",
             "value": "1x64xi64"
         },
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.1.bin",
+            "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_input.1.bin",
             "value": "1x64xi64"
         },
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.2.bin",
+            "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_input.2.bin",
             "value": "1x64xi64"
         },
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.3.bin",
+            "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_input.3.bin",
             "value": "1x64xi64"
         }
     ],
     "expected_outputs": [
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_output.0.bin",
+            "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_output.0.bin",
             "value": "2x64x2048xf16"
         },
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_output.1.bin",
+            "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_output.1.bin",
             "value": "2x1280xf16"
         }
     ]

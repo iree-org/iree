@@ -10,7 +10,7 @@
     "weights": [
         {
             "type": "url",
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
+            "url": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
             "scope": "model"
         }
     ],

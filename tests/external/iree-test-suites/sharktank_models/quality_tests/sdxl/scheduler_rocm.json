@@ -1,5 +1,5 @@
 {
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduler/11-26-2024/model.mlir",
+    "mlir": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduler/11-26-2024/model.mlir",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
         "--iree-opt-const-eval=false",

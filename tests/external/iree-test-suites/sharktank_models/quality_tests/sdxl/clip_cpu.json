@@ -1,35 +1,35 @@
 {
     "inputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.0.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_input.0.bin",
             "value": "1x64xi64"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.1.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_input.1.bin",
             "value": "1x64xi64"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.2.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_input.2.bin",
             "value": "1x64xi64"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_input.3.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_input.3.bin",
             "value": "1x64xi64"
         }
     ],
     "outputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_output.0.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_output.0.bin",
             "value": "2x64x2048xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/inference_output.1.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/inference_output.1.bin",
             "value": "2x1280xf16"
         }
     ],
     "device": "local-task",
-    "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/model.mlir",
+    "real_weights": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
+    "mlir": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-prompt-encoder/model.mlir",
     "compiler_flags": [
         "--iree-hal-local-target-device-backends=llvm-cpu",
         "--iree-hal-target-device=local",

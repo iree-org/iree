@@ -1,5 +1,5 @@
 {
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree_ci/sdxl/punet/punet_int8mm_f16attn.mlir",
+    "mlir": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/iree_ci/sdxl/punet/punet_int8mm_f16attn.mlir",
     "compiler_flags" : [
         "--iree-hal-target-device=hip",
         "--iree-hip-target=gfx942",

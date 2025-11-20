@@ -1,31 +1,31 @@
 {
     "inputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.0.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduled-unet/inference_input.0.bin",
             "value": "1x4x128x128xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.1.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduled-unet/inference_input.1.bin",
             "value": "2x64x2048xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.2.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduled-unet/inference_input.2.bin",
             "value": "2x1280xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_input.3.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduled-unet/inference_input.3.bin",
             "value": "1xf16"
         }
     ],
     "outputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/inference_output.0.bin",
+            "source": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduled-unet/inference_output.0.bin",
             "value": "1x4x128x128xf16"
         }
     ],
-    "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/real_weights.irpa",
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/model.mlir",
-    "pipeline_mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/sdxl_unet_pipeline_bench_f16.mlir",
+    "real_weights": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduled-unet/real_weights.irpa",
+    "mlir": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduled-unet/model.mlir",
+    "pipeline_mlir": "https://amdsharkpublic.blob.core.windows.net/amdsharkpublic/sai/sdxl-scheduled-unet/sdxl_unet_pipeline_bench_f16.mlir",
     "device": "local-task",
     "compiler_flags": [
         "--iree-hal-local-target-device-backends=llvm-cpu",

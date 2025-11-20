@@ -42,7 +42,7 @@ in scope:
 
 * [iree-org/iree](https://github.com/iree-org/iree)
 * [iree-org/iree-turbine](https://github.com/iree-org/iree-turbine)
-* [nod-ai/shark-ai](https://github.com/nod-ai/shark-ai)
+* [nod-ai/shark-ai](https://github.com/nod-ai/amdshark-ai)
 
 !!! info
 
@@ -174,9 +174,9 @@ Stable release history:
 
 | Project | Package | Release status |
 | -- | -- | -- |
-| [nod-ai/shark-ai](https://github.com/nod-ai/shark-ai) | GitHub release (stable) | [![GitHub Release](https://img.shields.io/github/v/release/nod-ai/shark-ai)](https://github.com/nod-ai/shark-ai/releases/latest) |
-| | `shark-ai` | [![PyPI version](https://badge.fury.io/py/shark-ai.svg)](https://pypi.org/project/shark-ai) |
-| | `sharktank` | [![PyPI version](https://badge.fury.io/py/sharktank.svg)](https://pypi.org/project/sharktank) |
+| [nod-ai/shark-ai](https://github.com/nod-ai/amdshark-ai) | GitHub release (stable) | [![GitHub Release](https://img.shields.io/github/v/release/nod-ai/amdshark-ai)](https://github.com/nod-ai/amdshark-ai/releases/latest) |
+| | `shark-ai` | [![PyPI version](https://badge.fury.io/py/amdshark-ai.svg)](https://pypi.org/project/amdshark-ai) |
+| | `sharktank` | [![PyPI version](https://badge.fury.io/py/amdsharktank.svg)](https://pypi.org/project/amdsharktank) |
 | | `shortfin` | [![PyPI version](https://badge.fury.io/py/shortfin.svg)](https://pypi.org/project/shortfin) |
 
 ### Deprecated packages
@@ -187,7 +187,7 @@ Stable release history:
 | | `iree-runtime` | [![PyPI version](https://badge.fury.io/py/iree-runtime.svg)](https://pypi.org/project/iree-runtime) | Renamed to `iree-base-runtime`
 | | `iree-runtime-instrumented` | [![PyPI version](https://badge.fury.io/py/iree-runtime-instrumented.svg)](https://pypi.org/project/iree-runtime-instrumented) | Merged into `iree[-base]-runtime`
 | | `iree-tools-xla` | [![PyPI version](https://badge.fury.io/py/iree-tools-xla.svg)](https://pypi.org/project/iree-tools-xla) | Merged into `iree-tools-tf`
-| [nod-ai/SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine) | `shark-turbine` | [![PyPI version](https://badge.fury.io/py/shark-turbine.svg)](https://pypi.org/project/shark-turbine) | Renamed to `iree-turbine`
+| [nod-ai/SHARK-Turbine](https://github.com/nod-ai/AMDSHARK-Turbine) | `shark-turbine` | [![PyPI version](https://badge.fury.io/py/amdshark-turbine.svg)](https://pypi.org/project/amdshark-turbine) | Renamed to `iree-turbine`
 
 ## :material-hammer-wrench: Release mechanics
 

@@ -9,7 +9,7 @@ icon: octicons/bug-16
 
 Bringing up new models or diagnosing regressions in existing models written
 using one of IREE's supported [ML frameworks](../../guides/ml-frameworks/index.md)
-or downstream projects like [shark-ai](https://github.com/nod-ai/shark-ai) can
+or downstream projects like [shark-ai](https://github.com/nod-ai/amdshark-ai) can
 involve debugging up and down the tech stack. Here are some tips to make that
 process easier.
 
@@ -147,6 +147,6 @@ Some existing test suites can be found at these locations:
 
 * <https://github.com/iree-org/iree/tree/main/tests/e2e>
 * <https://github.com/iree-org/iree-test-suites>
-* <https://github.com/nod-ai/SHARK-TestSuite/tree/main/e2eshark/onnx/operators>
-* <https://github.com/nod-ai/SHARK-TestSuite/tree/main/e2eshark/pytorch/operators>
+* <https://github.com/nod-ai/AMDSHARK-TestSuite/tree/main/e2eamdshark/onnx/operators>
+* <https://github.com/nod-ai/AMDSHARK-TestSuite/tree/main/e2eamdshark/pytorch/operators>
 * <https://github.com/openxla/stablehlo/tree/main/stablehlo/tests/interpret>
