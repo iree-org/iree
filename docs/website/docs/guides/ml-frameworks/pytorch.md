@@ -482,6 +482,6 @@ PyTorch dynamic shapes notebook | [![Open In Colab](https://colab.research.googl
 AOT unit tests | [iree-turbine `tests/aot/`](https://github.com/iree-org/iree-turbine/tree/main/tests/aot)
 
 The sharktank project hosted at
-<https://github.com/nod-ai/shark-ai/tree/main/sharktank> also uses
+<https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktank> also uses
 `iree-turbine` heavily to provide inference-optimized ops, layers, and models
 for popular gen-ai applications.
