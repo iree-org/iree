@@ -476,22 +476,17 @@ private:
     ArrayRef<int64_t> inputShape = inputType.getShape();
     int64_t reductionDim = argCompareOp.getDimension();
     int64_t reductionSize = inputShape[reductionDim];
-
-    if (reductionSize == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(reductionSize)) {
       return std::nullopt;
     }
-
     if (reductionSize < splitReductionTargetSize) {
       return std::nullopt;
     }
-
     int64_t tileSize = findSmallestFactorWithLowerBound(
                            reductionSize, splitReductionTargetSize)
                            .value_or(reductionSize);
-
     LDBG() << "arg_compare split: dim=" << reductionDim
            << " size=" << reductionSize << " tile=" << tileSize;
-
     return SmallVector<int64_t>{tileSize};
   }
 };
