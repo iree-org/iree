@@ -2713,6 +2713,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#haltensortransients-haltensortransientsop" class="md-nav__link">
+    <span class="md-ellipsis">
+      hal.tensor.transients (HAL::TensorTransientsOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2724,7 +2733,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_59" class="md-nav__link">
+  <a href="#attributes_60" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -7737,6 +7746,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#haltensortransients-haltensortransientsop" class="md-nav__link">
+    <span class="md-ellipsis">
+      hal.tensor.transients (HAL::TensorTransientsOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -7748,7 +7766,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_59" class="md-nav__link">
+  <a href="#attributes_60" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -8938,11 +8956,12 @@ input.</p>
 <li><a href="#haltensorbarrier-haltensorbarrierop">hal.tensor.barrier (HAL::TensorBarrierOp)</a></li>
 <li><a href="#haltensorexport-haltensorexportop">hal.tensor.export (HAL::TensorExportOp)</a></li>
 <li><a href="#haltensorimport-haltensorimportop">hal.tensor.import (HAL::TensorImportOp)</a></li>
+<li><a href="#haltensortransients-haltensortransientsop">hal.tensor.transients (HAL::TensorTransientsOp)</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_59">Attributes</a><ul>
+<li><a href="#attributes_60">Attributes</a><ul>
 <li><a href="#abiconventionattr">ABIConventionAttr</a></li>
 <li><a href="#collectiveattr">CollectiveAttr</a></li>
 <li><a href="#descriptortypeattr">DescriptorTypeAttr</a></li>
@@ -13754,7 +13773,85 @@ importer atomically.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_59">Attributes<a class="headerlink" href="#attributes_59" title="Permanent link">link</a></h2>
+<h4 id="haltensortransients-haltensortransientsop"><code>hal.tensor.transients</code> (HAL::TensorTransientsOp)<a class="headerlink" href="#haltensortransients-haltensortransientsop" title="Permanent link">link</a></h4>
+<p><em>Annotates a tensor to use transient storage from a provided buffer.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal.tensor.transients` (`on` `(` $affinity^ `)`)?
+              $source `:` type($source) (`{` $source_dims^ `}`)?
+              `from`
+              $storage `:` type($storage)
+              attr-dict
+</code></pre></div>
+<p>Annotates that any transient memory used in the production of the given
+tensor should be suballocated from the provided storage buffer. This allows
+users to control transient allocations by providing their own storage,
+enabling zero-allocation execution in steady state.</p>
+<p>The storage buffer provided must have sufficient space for all transient
+allocations required to produce the tensor. Unless otherwise overridden the
+compiler will verify that all allocation sizes are computable and generate
+size query functions to allow users to query the required buffer size. If
+size checks are disabled then the user must ensure they pass in a buffer
+with sufficient capacity.</p>
+<p>The storage buffer is assumed to be immediately usable (i.e., any previous
+work using it has completed). Users must ensure proper synchronization if
+reusing storage across multiple operations. Future work may add explicit
+wait semantics to enable pipelining, but for now synchronization is the
+caller's responsibility.</p>
+<p>This operation preserves SSA use-def chains by returning the same tensor
+value it receives. It exists purely for annotation purposes and will be
+lowered away during compilation.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>%result = some.operation(%input) : tensor&lt;?xf32&gt;
+%annotated = hal.tensor.transients %result : tensor&lt;?xf32&gt;{%dim} from %storage : !hal.buffer
+</code></pre></div></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes_59">Attributes:<a class="headerlink" href="#attributes_59" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>affinity</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
+</table>
+
+<h5 id="operands_71">Operands:<a class="headerlink" href="#operands_71" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_dims</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>storage</code></td>
+<td>buffer or buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_55">Results:<a class="headerlink" href="#results_55" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h2 id="attributes_60">Attributes<a class="headerlink" href="#attributes_60" title="Permanent link">link</a></h2>
 <h3 id="abiconventionattr">ABIConventionAttr<a class="headerlink" href="#abiconventionattr" title="Permanent link">link</a></h3>
 <p><em>ABI calling convention for cross-module host functions.</em></p>
 <p>Syntax:</p>

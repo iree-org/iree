@@ -2455,6 +2455,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-annotate-constant-transient-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-annotate-constant-transient-size
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-annotate-dispatch-arguments" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-annotate-dispatch-arguments
@@ -2560,6 +2569,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-emplace-transients" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-emplace-transients
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-encode-device-tensors" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-encode-device-tensors
@@ -2626,6 +2644,15 @@
   <a href="#-iree-stream-materialize-encodings" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-materialize-encodings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-stream-materialize-transient-size-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-materialize-transient-size-queries
     </span>
   </a>
   
@@ -4970,6 +4997,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-annotate-constant-transient-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-annotate-constant-transient-size
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-annotate-dispatch-arguments" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-annotate-dispatch-arguments
@@ -5075,6 +5111,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-emplace-transients" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-emplace-transients
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-encode-device-tensors" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-encode-device-tensors
@@ -5141,6 +5186,15 @@
   <a href="#-iree-stream-materialize-encodings" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-materialize-encodings
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-stream-materialize-transient-size-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-materialize-transient-size-queries
     </span>
   </a>
   
@@ -5337,6 +5391,12 @@
 
 <h3 id="-iree-stream-annotate-affinities"><code>-iree-stream-annotate-affinities</code><a class="headerlink" href="#-iree-stream-annotate-affinities" title="Permanent link">link</a></h3>
 <p><em>Annotates affinities on all ops for debugging.</em></p>
+<h3 id="-iree-stream-annotate-constant-transient-size"><code>-iree-stream-annotate-constant-transient-size</code><a class="headerlink" href="#-iree-stream-annotate-constant-transient-size" title="Permanent link">link</a></h3>
+<p><em>Annotates constant transient sizes in reflection metadata.</em></p>
+<p>Detects when transient size query functions have folded to constant returns
+and adds reflection metadata with the constant size values. At runtime a
+user can query the reflection information and skip calling the size query
+function when sizes are statically known.</p>
 <h3 id="-iree-stream-annotate-dispatch-arguments"><code>-iree-stream-annotate-dispatch-arguments</code><a class="headerlink" href="#-iree-stream-annotate-dispatch-arguments" title="Permanent link">link</a></h3>
 <p><em>Annotates dispatch arguments with potential values derived from dispatch sites.</em></p>
 <p>Uses data flow analysis to identify potential value sets and alignments
@@ -5438,6 +5498,14 @@ intended to run after copy-on-write materialization when such analysis can
 be performed local to the operations. The common case this helps with is
 insertions of produced results into larger resources such as performed by
 tensor concatenation.</p>
+<h3 id="-iree-stream-emplace-transients"><code>-iree-stream-emplace-transients</code><a class="headerlink" href="#-iree-stream-emplace-transients" title="Permanent link">link</a></h3>
+<p><em>Emplaces transient allocations into user-provided storage buffers.</em></p>
+<p>Experimental implementation for validating the transient storage IR design.</p>
+<p>Limitations:
+- Only handles public functions with <code>stream.resource.transients</code> ops
+- Assumes no function calls (single function only)
+- No complex timeline analysis (uses non-overlapping liveness intervals)
+- Only supports a single unique transient storage buffer</p>
 <h3 id="-iree-stream-encode-device-tensors"><code>-iree-stream-encode-device-tensors</code><a class="headerlink" href="#-iree-stream-encode-device-tensors" title="Permanent link">link</a></h3>
 <p><em>Encodes tensors into binary formats based on affinity and target support.</em></p>
 <p>Encodes <code>stream.binding.*</code> ops on tensor-like objects while handling packing
@@ -5523,6 +5591,15 @@ have contained unneeded copies.</p>
 <p><em>Materialize stream.tensor.encode ops to dispatches and executables.</em></p>
 <p>Materializes uniqued executables for <code>stream.tensor.encode</code> ops and replaces
 them with dispatches to those executables.</p>
+<h3 id="-iree-stream-materialize-transient-size-queries"><code>-iree-stream-materialize-transient-size-queries</code><a class="headerlink" href="#-iree-stream-materialize-transient-size-queries" title="Permanent link">link</a></h3>
+<p><em>Generates size query functions for transient storage.</em></p>
+<p>Experimental implementation for generating transient storage size query
+functions.</p>
+<p>For now, handles simple cases where sizes are constant or easily computable
+from function inputs. Later it will handle complex call graphs and dynamic
+size computation with hoisting. Only runs on IR produced by
+<code>EmplaceTransientsPass</code> that adds the <code>stream.experimental.transients</code>
+attribute to <code>stream.resource.pack</code> ops.</p>
 <h3 id="-iree-stream-pack-constants"><code>-iree-stream-pack-constants</code><a class="headerlink" href="#-iree-stream-pack-constants" title="Permanent link">link</a></h3>
 <p><em>Packs and allocates backing storage for fused constant resources.</em></p>
 <p>Packs slices of <code>stream.resource.constants</code> ops and materializes operations

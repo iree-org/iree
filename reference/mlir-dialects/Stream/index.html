@@ -2453,6 +2453,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#streamresourcetransients-streamresourcetransientsop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.resource.transients (Stream::ResourceTransientsOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#streamresourcetry_map-streamresourcetrymapop" class="md-nav__link">
     <span class="md-ellipsis">
       stream.resource.try_map (Stream::ResourceTryMapOp)
@@ -2682,7 +2691,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_65" class="md-nav__link">
+  <a href="#attributes_66" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -6748,6 +6757,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#streamresourcetransients-streamresourcetransientsop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.resource.transients (Stream::ResourceTransientsOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#streamresourcetry_map-streamresourcetrymapop" class="md-nav__link">
     <span class="md-ellipsis">
       stream.resource.try_map (Stream::ResourceTryMapOp)
@@ -6977,7 +6995,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_65" class="md-nav__link">
+  <a href="#attributes_66" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -7546,6 +7564,7 @@ breaking execution correctness.</p>
 <li><a href="#streamresourcesize-streamresourcesizeop">stream.resource.size (Stream::ResourceSizeOp)</a></li>
 <li><a href="#streamresourcestore-streamresourcestoreop">stream.resource.store (Stream::ResourceStoreOp)</a></li>
 <li><a href="#streamresourcesubview-streamresourcesubviewop">stream.resource.subview (Stream::ResourceSubviewOp)</a></li>
+<li><a href="#streamresourcetransients-streamresourcetransientsop">stream.resource.transients (Stream::ResourceTransientsOp)</a></li>
 <li><a href="#streamresourcetry_map-streamresourcetrymapop">stream.resource.try_map (Stream::ResourceTryMapOp)</a></li>
 </ul>
 </li>
@@ -7577,7 +7596,7 @@ breaking execution correctness.</p>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_65">Attributes</a><ul>
+<li><a href="#attributes_66">Attributes</a><ul>
 <li><a href="#collectiveattr">CollectiveAttr</a></li>
 <li><a href="#namedparameterattr">NamedParameterAttr</a></li>
 <li><a href="#partitioningconfigattr">PartitioningConfigAttr</a></li>
@@ -11376,6 +11395,97 @@ introduce a yield point if the staging resource needs to be acquired.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="streamresourcetransients-streamresourcetransientsop"><code>stream.resource.transients</code> (Stream::ResourceTransientsOp)<a class="headerlink" href="#streamresourcetransients-streamresourcetransientsop" title="Permanent link">link</a></h4>
+<p><em>Annotates a resource to use transient storage from provided storage.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `stream.resource.transients` (`on` `(` $affinity^ `)`)?
+              (`await` `(` $await_timepoint^ `)` `=` `` `&gt;` )?
+              $resource `:` type($resource) `` `{` $resource_size `}`
+              `from`
+              $storage `:` type($storage) `` `{` $storage_size `}`
+              `=` `` `&gt;` type($result_timepoint)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Annotates that any transient memory used in the production of the given
+resource should be suballocated from the provided storage. This allows
+users to control transient allocations by providing their own backing
+storage enabling zero-allocation execution in steady state.</p>
+<p>The storage provided must have sufficient space for all transient
+allocations required to produce the resource. Unless otherwise overridden
+the compiler will verify that all allocation sizes are computable and
+generate size query functions to allow users to query the required storage
+size. If size checks are disabled then the user must ensure they pass in
+storage with sufficient capacity.</p>
+<p>This operation preserves SSA use-def chains by returning the same resource
+value it receives. It exists purely for annotation purposes and will be
+lowered away during compilation. The operation is timeline-aware and
+threads timepoints through to enable proper synchronization.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>%result, %result_timepoint = some.operation(%input) : !stream.resource&lt;*&gt;
+%annotated, %annotated_tp = stream.resource.transients
+    await(%result_timepoint) =&gt; %result : !stream.resource&lt;*&gt;{%size}
+    from %storage : !stream.resource&lt;transient&gt;{%storage_size}
+    =&gt; !stream.timepoint
+</code></pre></div></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes_46">Attributes:<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
+</table>
+
+<h5 id="operands_55">Operands:<a class="headerlink" href="#operands_55" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>resource</code></td>
+<td>resource or external resource or transient resource or variable resource or constant resource</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>resource_size</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>storage</code></td>
+<td>any stream-compatible type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>storage_size</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>await_timepoint</code></td>
+<td>A timepoint indicating execution availability.</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_48">Results:<a class="headerlink" href="#results_48" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>resource or external resource or transient resource or variable resource or constant resource</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_timepoint</code></td>
+<td>A timepoint indicating execution availability.</td>
+</tr>
+</tbody>
+</table>
 <h4 id="streamresourcetry_map-streamresourcetrymapop"><code>stream.resource.try_map</code> (Stream::ResourceTryMapOp)<a class="headerlink" href="#streamresourcetry_map-streamresourcetrymapop" title="Permanent link">link</a></h4>
 <p><em>Maps read-only memory into a resource.</em></p>
 <p>Syntax:</p>
@@ -11394,13 +11504,13 @@ and behavior is undefined if the underlying contents change.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_46">Attributes:<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h5>
+<h5 id="attributes_47">Attributes:<a class="headerlink" href="#attributes_47" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_55">Operands:<a class="headerlink" href="#operands_55" title="Permanent link">link</a></h5>
+<h5 id="operands_56">Operands:<a class="headerlink" href="#operands_56" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11423,7 +11533,7 @@ and behavior is undefined if the underlying contents change.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_48">Results:<a class="headerlink" href="#results_48" title="Permanent link">link</a></h5>
+<h5 id="results_49">Results:<a class="headerlink" href="#results_49" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11462,13 +11572,13 @@ timepoint.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_47">Attributes:<a class="headerlink" href="#attributes_47" title="Permanent link">link</a></h5>
+<h5 id="attributes_48">Attributes:<a class="headerlink" href="#attributes_48" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sync</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="operands_56">Operands:<a class="headerlink" href="#operands_56" title="Permanent link">link</a></h5>
+<h5 id="operands_57">Operands:<a class="headerlink" href="#operands_57" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11491,7 +11601,7 @@ timepoint.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_49">Results:<a class="headerlink" href="#results_49" title="Permanent link">link</a></h5>
+<h5 id="results_50">Results:<a class="headerlink" href="#results_50" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11524,13 +11634,13 @@ production timepoint.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_48">Attributes:<a class="headerlink" href="#attributes_48" title="Permanent link">link</a></h5>
+<h5 id="attributes_49">Attributes:<a class="headerlink" href="#attributes_49" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_57">Operands:<a class="headerlink" href="#operands_57" title="Permanent link">link</a></h5>
+<h5 id="operands_58">Operands:<a class="headerlink" href="#operands_58" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11549,7 +11659,7 @@ production timepoint.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_50">Results:<a class="headerlink" href="#results_50" title="Permanent link">link</a></h5>
+<h5 id="results_51">Results:<a class="headerlink" href="#results_51" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11582,13 +11692,13 @@ that is resolved during lowering into the stream dialect. This can be used
 to interoperate between levels of the stack that require specifying stream
 types and those that prior to lowering do not handle them.</p>
 <p>Interfaces: <code>Stream_AffinityOp</code></p>
-<h5 id="attributes_49">Attributes:<a class="headerlink" href="#attributes_49" title="Permanent link">link</a></h5>
+<h5 id="attributes_50">Attributes:<a class="headerlink" href="#attributes_50" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_58">Operands:<a class="headerlink" href="#operands_58" title="Permanent link">link</a></h5>
+<h5 id="operands_59">Operands:<a class="headerlink" href="#operands_59" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11623,13 +11733,13 @@ types and those that prior to lowering do not handle them.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_50">Attributes:<a class="headerlink" href="#attributes_50" title="Permanent link">link</a></h5>
+<h5 id="attributes_51">Attributes:<a class="headerlink" href="#attributes_51" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_59">Operands:<a class="headerlink" href="#operands_59" title="Permanent link">link</a></h5>
+<h5 id="operands_60">Operands:<a class="headerlink" href="#operands_60" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11644,7 +11754,7 @@ types and those that prior to lowering do not handle them.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_51">Results:<a class="headerlink" href="#results_51" title="Permanent link">link</a></h5>
+<h5 id="results_52">Results:<a class="headerlink" href="#results_52" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11672,7 +11782,7 @@ away but can be useful if needing to initialize globals or branch args.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ConstantLike</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="results_52">Results:<a class="headerlink" href="#results_52" title="Permanent link">link</a></h5>
+<h5 id="results_53">Results:<a class="headerlink" href="#results_53" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11703,13 +11813,13 @@ types and those that prior to lowering do not handle them.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_51">Attributes:<a class="headerlink" href="#attributes_51" title="Permanent link">link</a></h5>
+<h5 id="attributes_52">Attributes:<a class="headerlink" href="#attributes_52" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_60">Operands:<a class="headerlink" href="#operands_60" title="Permanent link">link</a></h5>
+<h5 id="operands_61">Operands:<a class="headerlink" href="#operands_61" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11724,7 +11834,7 @@ types and those that prior to lowering do not handle them.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_53">Results:<a class="headerlink" href="#results_53" title="Permanent link">link</a></h5>
+<h5 id="results_54">Results:<a class="headerlink" href="#results_54" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11750,7 +11860,7 @@ been reached.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_61">Operands:<a class="headerlink" href="#operands_61" title="Permanent link">link</a></h5>
+<h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11765,7 +11875,7 @@ been reached.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_54">Results:<a class="headerlink" href="#results_54" title="Permanent link">link</a></h5>
+<h5 id="results_55">Results:<a class="headerlink" href="#results_55" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11800,7 +11910,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_52">Attributes:<a class="headerlink" href="#attributes_52" title="Permanent link">link</a></h5>
+<h5 id="attributes_53">Attributes:<a class="headerlink" href="#attributes_53" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
@@ -11808,7 +11918,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
+<h5 id="operands_63">Operands:<a class="headerlink" href="#operands_63" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11839,7 +11949,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_55">Results:<a class="headerlink" href="#results_55" title="Permanent link">link</a></h5>
+<h5 id="results_56">Results:<a class="headerlink" href="#results_56" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11870,7 +11980,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_53">Attributes:<a class="headerlink" href="#attributes_53" title="Permanent link">link</a></h5>
+<h5 id="attributes_54">Attributes:<a class="headerlink" href="#attributes_54" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>value</code></td><td>::mlir::TypedAttr</td><td>TypedAttr instance</td></tr>
@@ -11878,7 +11988,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_63">Operands:<a class="headerlink" href="#operands_63" title="Permanent link">link</a></h5>
+<h5 id="operands_64">Operands:<a class="headerlink" href="#operands_64" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11893,7 +12003,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_56">Results:<a class="headerlink" href="#results_56" title="Permanent link">link</a></h5>
+<h5 id="results_57">Results:<a class="headerlink" href="#results_57" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11930,7 +12040,7 @@ and results and is able to load/store at will.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_54">Attributes:<a class="headerlink" href="#attributes_54" title="Permanent link">link</a></h5>
+<h5 id="attributes_55">Attributes:<a class="headerlink" href="#attributes_55" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>entry_points</code></td><td>::mlir::ArrayAttr</td><td>symbol ref array attribute</td></tr>
@@ -11940,7 +12050,7 @@ and results and is able to load/store at will.</p>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_64">Operands:<a class="headerlink" href="#operands_64" title="Permanent link">link</a></h5>
+<h5 id="operands_65">Operands:<a class="headerlink" href="#operands_65" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -11975,7 +12085,7 @@ and results and is able to load/store at will.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_57">Results:<a class="headerlink" href="#results_57" title="Permanent link">link</a></h5>
+<h5 id="results_58">Results:<a class="headerlink" href="#results_58" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12008,14 +12118,14 @@ read.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_55">Attributes:<a class="headerlink" href="#attributes_55" title="Permanent link">link</a></h5>
+<h5 id="attributes_56">Attributes:<a class="headerlink" href="#attributes_56" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_65">Operands:<a class="headerlink" href="#operands_65" title="Permanent link">link</a></h5>
+<h5 id="operands_66">Operands:<a class="headerlink" href="#operands_66" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12034,7 +12144,7 @@ read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_58">Results:<a class="headerlink" href="#results_58" title="Permanent link">link</a></h5>
+<h5 id="results_59">Results:<a class="headerlink" href="#results_59" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12070,7 +12180,7 @@ during lowering.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_56">Attributes:<a class="headerlink" href="#attributes_56" title="Permanent link">link</a></h5>
+<h5 id="attributes_57">Attributes:<a class="headerlink" href="#attributes_57" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
@@ -12078,7 +12188,7 @@ during lowering.</p>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_66">Operands:<a class="headerlink" href="#operands_66" title="Permanent link">link</a></h5>
+<h5 id="operands_67">Operands:<a class="headerlink" href="#operands_67" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12109,7 +12219,7 @@ during lowering.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_59">Results:<a class="headerlink" href="#results_59" title="Permanent link">link</a></h5>
+<h5 id="results_60">Results:<a class="headerlink" href="#results_60" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12141,14 +12251,14 @@ resource with the update applied.</p>
 <p>Equivalent to a stream.tensor.splat + stream.tensor.update.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
-<h5 id="attributes_57">Attributes:<a class="headerlink" href="#attributes_57" title="Permanent link">link</a></h5>
+<h5 id="attributes_58">Attributes:<a class="headerlink" href="#attributes_58" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_67">Operands:<a class="headerlink" href="#operands_67" title="Permanent link">link</a></h5>
+<h5 id="operands_68">Operands:<a class="headerlink" href="#operands_68" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12183,7 +12293,7 @@ resource with the update applied.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_60">Results:<a class="headerlink" href="#results_60" title="Permanent link">link</a></h5>
+<h5 id="results_61">Results:<a class="headerlink" href="#results_61" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12213,13 +12323,13 @@ resource with the update applied.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_58">Attributes:<a class="headerlink" href="#attributes_58" title="Permanent link">link</a></h5>
+<h5 id="attributes_59">Attributes:<a class="headerlink" href="#attributes_59" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 </table>
 
-<h5 id="operands_68">Operands:<a class="headerlink" href="#operands_68" title="Permanent link">link</a></h5>
+<h5 id="operands_69">Operands:<a class="headerlink" href="#operands_69" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12246,7 +12356,7 @@ resource with the update applied.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_61">Results:<a class="headerlink" href="#results_61" title="Permanent link">link</a></h5>
+<h5 id="results_62">Results:<a class="headerlink" href="#results_62" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12276,14 +12386,14 @@ assigned.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_59">Attributes:<a class="headerlink" href="#attributes_59" title="Permanent link">link</a></h5>
+<h5 id="attributes_60">Attributes:<a class="headerlink" href="#attributes_60" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_69">Operands:<a class="headerlink" href="#operands_69" title="Permanent link">link</a></h5>
+<h5 id="operands_70">Operands:<a class="headerlink" href="#operands_70" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12298,7 +12408,7 @@ assigned.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_62">Results:<a class="headerlink" href="#results_62" title="Permanent link">link</a></h5>
+<h5 id="results_63">Results:<a class="headerlink" href="#results_63" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12332,7 +12442,7 @@ copy-on-write operation.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_60">Attributes:<a class="headerlink" href="#attributes_60" title="Permanent link">link</a></h5>
+<h5 id="attributes_61">Attributes:<a class="headerlink" href="#attributes_61" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
@@ -12340,7 +12450,7 @@ copy-on-write operation.</p>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_70">Operands:<a class="headerlink" href="#operands_70" title="Permanent link">link</a></h5>
+<h5 id="operands_71">Operands:<a class="headerlink" href="#operands_71" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12379,7 +12489,7 @@ copy-on-write operation.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_63">Results:<a class="headerlink" href="#results_63" title="Permanent link">link</a></h5>
+<h5 id="results_64">Results:<a class="headerlink" href="#results_64" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12410,14 +12520,14 @@ copy-on-write operation.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_61">Attributes:<a class="headerlink" href="#attributes_61" title="Permanent link">link</a></h5>
+<h5 id="attributes_62">Attributes:<a class="headerlink" href="#attributes_62" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_71">Operands:<a class="headerlink" href="#operands_71" title="Permanent link">link</a></h5>
+<h5 id="operands_72">Operands:<a class="headerlink" href="#operands_72" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12440,7 +12550,7 @@ copy-on-write operation.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_64">Results:<a class="headerlink" href="#results_64" title="Permanent link">link</a></h5>
+<h5 id="results_65">Results:<a class="headerlink" href="#results_65" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12471,13 +12581,13 @@ copy-on-write operation.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_62">Attributes:<a class="headerlink" href="#attributes_62" title="Permanent link">link</a></h5>
+<h5 id="attributes_63">Attributes:<a class="headerlink" href="#attributes_63" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 </table>
 
-<h5 id="operands_72">Operands:<a class="headerlink" href="#operands_72" title="Permanent link">link</a></h5>
+<h5 id="operands_73">Operands:<a class="headerlink" href="#operands_73" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12508,7 +12618,7 @@ copy-on-write operation.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_65">Results:<a class="headerlink" href="#results_65" title="Permanent link">link</a></h5>
+<h5 id="results_66">Results:<a class="headerlink" href="#results_66" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12537,14 +12647,14 @@ tensors. The key is arbitrary and can be used for identifying the set of
 values being traced.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ShapeAwareOpInterface</code>, <code>Util_SizeAwareOp</code></p>
-<h5 id="attributes_63">Attributes:<a class="headerlink" href="#attributes_63" title="Permanent link">link</a></h5>
+<h5 id="attributes_64">Attributes:<a class="headerlink" href="#attributes_64" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>resource_encodings</code></td><td>::mlir::ArrayAttr</td><td>type array attribute</td></tr>
 </table>
 
-<h5 id="operands_73">Operands:<a class="headerlink" href="#operands_73" title="Permanent link">link</a></h5>
+<h5 id="operands_74">Operands:<a class="headerlink" href="#operands_74" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12585,7 +12695,7 @@ values being traced.</p>
 is the entire updated target value.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
-<h5 id="attributes_64">Attributes:<a class="headerlink" href="#attributes_64" title="Permanent link">link</a></h5>
+<h5 id="attributes_65">Attributes:<a class="headerlink" href="#attributes_65" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
@@ -12593,7 +12703,7 @@ is the entire updated target value.</p>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
-<h5 id="operands_74">Operands:<a class="headerlink" href="#operands_74" title="Permanent link">link</a></h5>
+<h5 id="operands_75">Operands:<a class="headerlink" href="#operands_75" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12632,7 +12742,7 @@ is the entire updated target value.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_66">Results:<a class="headerlink" href="#results_66" title="Permanent link">link</a></h5>
+<h5 id="results_67">Results:<a class="headerlink" href="#results_67" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -12647,7 +12757,7 @@ is the entire updated target value.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_65">Attributes<a class="headerlink" href="#attributes_65" title="Permanent link">link</a></h2>
+<h2 id="attributes_66">Attributes<a class="headerlink" href="#attributes_66" title="Permanent link">link</a></h2>
 <h3 id="collectiveattr">CollectiveAttr<a class="headerlink" href="#collectiveattr" title="Permanent link">link</a></h3>
 <p><em>Collective operation and specification.</em></p>
 <p>Syntax:</p>
