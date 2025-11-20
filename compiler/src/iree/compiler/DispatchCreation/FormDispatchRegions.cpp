@@ -127,6 +127,19 @@ public:
   FailureOr<AffineMap> getRootParallelLoopToOpMap(Operation *op) const;
 
   bool isFusable(Operation *op) const {
+    // We only handle fusion across operation's operands. Don't fuse if the
+    // operation is using values in the fusion group in it's body.
+    bool hasUseFromAbove = false;
+    mlir::visitUsedValuesDefinedAbove(
+        op->getRegions(), [&](OpOperand *operand) {
+          if (loopMaps.contains(operand->get().getDefiningOp())) {
+            hasUseFromAbove = true;
+          }
+        });
+    if (hasUseFromAbove) {
+      return false;
+    }
+
     FailureOr<AffineMap> maybeMap = getRootParallelLoopToOpMap(op);
     if (failed(maybeMap)) {
       return false;
