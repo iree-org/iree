@@ -59,7 +59,7 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
 // Aligns the element type of a tensor<> to a byte-aligned power of 2 bit width.
 static RankedTensorType alignTensorType(RankedTensorType originalType) {
   Type elementType = originalType.getElementType();
-  Type alignedType = legalizeStorageElementType(elementType);
+  Type alignedType = legalizeStorageElementType(originalType);
   if (alignedType == elementType)
     return originalType;
   return RankedTensorType::get(originalType.getShape(), alignedType,
@@ -656,7 +656,8 @@ struct EncodeHostTensorsPass
 static IREE::TensorExt::DispatchTensorType
 alignDispatchTensorType(IREE::TensorExt::DispatchTensorType originalType) {
   Type elementType = originalType.getBoundElementType();
-  Type alignedType = legalizeStorageElementType(elementType);
+  Type alignedType =
+      legalizeStorageElementType(originalType.asRankedTensorType());
   if (alignedType == elementType)
     return originalType;
   return IREE::TensorExt::DispatchTensorType::get(
