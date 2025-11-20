@@ -218,6 +218,18 @@ use GitHub pull requests (PRs) for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
+* We require review comments to be addressed before merging, even when there is
+  an approval from another reviewer. Unless stated otherwise, we treat request
+  for changes as blocking. Reviewers may indicate that some comments
+  requesting changes are optional (commonly by prefixing them with 'nit' or
+  'optional') -- use your best engineering judgement to decide whether to
+  follow these suggestions or not.
+* If there are new comments requesting changes after a PR was merged, these
+  comments should be addressed as well, either through follow-up discussion
+  or code changes. Small issues may be fixed forward, but reviewers may also
+  ask for your PR to be reverted. This is not a sign that your was faulty -- we
+  prefer to err on the side of caution and reverting allow more time for design
+  discussion.
 * Please keep PRs small (focused on a single issue) to make reviews and later
   culprit-finding easier.
 * You may see trusted core contributors bending this rule for project
