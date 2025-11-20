@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -215,12 +216,17 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     AffineMap transposedFilterMap = applyPermutationToResults(filterMap, perm);
     Value transposedFilter = createTransposeOp(rewriter, loc, filterVal, perm);
 
+    // Insert compute_barrier.start to avoid propagation of reshape ops and
+    // undesirable fusion.
+    auto barrierStartOp = IREE::TensorExt::ComputeBarrierStartOp::create(
+        rewriter, loc, transposedFilter);
+
     SmallVector<utils::IteratorType> iterators =
         linalgOp.getIteratorTypesArray();
 
     auto genericOp = linalg::GenericOp::create(
         rewriter, loc, outputVal.getType(),
-        ValueRange{inputVal, transposedFilter}, outputVal,
+        ValueRange{inputVal, barrierStartOp.getResult()}, outputVal,
         ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
         iterators);
 
