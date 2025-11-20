@@ -233,9 +233,9 @@ information on using pull requests.
 * If there are new comments requesting changes after a PR was merged, these
   comments should be addressed as well, either through follow-up discussion
   or code changes. Small issues may be fixed forward, but reviewers may also
-  ask for your PR to be reverted. This is not a sign that your was faulty -- we
-  prefer to err on the side of caution and reverting allows more time for
-  design discussion.
+  ask for your PR to be reverted. This is not a sign that your PR was faulty
+  -- we prefer to err on the side of caution and reverting allows more time
+  for design discussion.
 
 ### :material-check-all: GitHub Actions workflows
 
