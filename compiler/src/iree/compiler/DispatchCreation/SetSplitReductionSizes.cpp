@@ -481,10 +481,7 @@ private:
       return std::nullopt;
     }
 
-    // This threshold is set heuristically without extensive empirical data.
-    // It may be refined in the future as more practical cases are encountered.
-    const int64_t minSizeToSplit = 1024;
-    if (reductionSize < minSizeToSplit) {
+    if (reductionSize < splitReductionTargetSize) {
       return std::nullopt;
     }
 
