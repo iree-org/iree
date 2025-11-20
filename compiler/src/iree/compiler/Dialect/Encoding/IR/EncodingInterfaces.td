@@ -164,7 +164,7 @@ def IREEEncoding_SerializableAttr :
       /*defaultImplementation=*/[{
         auto attr =
           dyn_cast_if_present<SerializableAttr>($_attr);
-        if (!attr) {
+        if (!attr || !other) {
           return false;
         }
         if (attr.isSerialized() && other.isSerialized()) {
