@@ -10,8 +10,18 @@
   ],
   "skip_compile_tests": [],
   "skip_run_tests": [
-    "generated/test_a_t_b_float16"
+    "generated/ATB/test_float_16/correctness_test"
   ],
   "expected_compile_failures": [],
-  "expected_run_failures": []
+  "expected_run_failures": [],
+  "golden_times_ms": {
+    "SquareGemmBench128x128/test_entry_point": 0.046395,
+    "SquareGemmBench256x256/test_entry_point": 0.051518,
+    "SquareGemmBench512x512/test_entry_point": 0.063608,
+    "SquareGemmBench1024x1024/test_entry_point": 0.08770,
+    "SquareGemmBench2048x2048/test_entry_point": 0.21175,
+    "SquareGemmBench4096x4096/test_entry_point": 1.29708,
+    "SquareGemmBench8192x8192/test_entry_point": 9.52357,
+    "AB/test_float32": 0.06857971185818315
+  }
 }

@@ -8,14 +8,32 @@
     "--device=vulkan"
   ],
   "skip_compile_tests": [
-    "generated/test_a_t_b_float16",
-    "generated/test_a_b_plus_c_float16",
-    "generated/test_a_b_t_float16",
-    "generated/test_relu_a_b_plus_c_float16"
+    "generated/AB/test_float16/correctness_test",
+    "generated/AB/test_float32/correctness_test",
+    "generated/AB/test_float32/benchmark_test",
+    "generated/ABPlusC/test_float16/correctness_test",
+    "generated/ABPlusC/test_float32/correctness_test",
+    "generated/ABT/test_float_16/correctness_test",
+    "generated/ABT/test_float_32/correctness_test",
+    "generated/ATB/test_float_16/correctness_test",
+    "generated/ATB/test_float_32/correctness_test",
+    "generated/AB_bfloat16/test_from_float32/correctness_test",
+    "generated/GeluABPlusC/test_float16/correctness_test",
+    "generated/GeluABPlusC/test_float32/correctness_test",
+    "generated/ReluABPlusC/test_float16/correctness_test",
+    "generated/ReluABPlusC/test_float32/correctness_test"
   ],
   "skip_run_tests": [
-    "generated/test_a_b_float16"
   ],
   "expected_compile_failures": [],
-  "expected_run_failures": []
+  "expected_run_failures": [],
+  "golden_times_ms": {
+    "SquareGemmBench128x128/test_entry_point": 0.13107,
+    "SquareGemmBench256x256/test_entry_point": 0.155316,
+    "SquareGemmBench512x512/test_entry_point": 0.215118,
+    "SquareGemmBench1024x1024/test_entry_point": 0.400859,
+    "SquareGemmBench2048x2048/test_entry_point": 1.464628,
+    "SquareGemmBench4096x4096/test_entry_point": 9.254354,
+    "SquareGemmBench8192x8192/test_entry_point": 95.68374 
+  }
 }

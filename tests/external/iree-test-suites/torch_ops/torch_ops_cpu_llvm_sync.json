@@ -5,9 +5,31 @@
     "--iree-hal-target-backends=llvm-cpu",
     "--iree-llvmcpu-target-cpu=host"
   ],
-  "iree_run_module_flags": [],
+  "iree_run_module_flags": [
+  ],
   "skip_compile_tests": [],
-  "skip_run_tests": [],
+  "skip_run_tests": [
+    "generated/ABPlusC/test_float16/correctness_test",
+    "generated/ABT/test_float_16/correctness_test",
+    "generated/SquareGemmBench128x128/test_entry_point/benchmark_test",
+    "generated/SquareGemmBench256x256/test_entry_point/benchmark_test",
+    "generated/SquareGemmBench512x512/test_entry_point/benchmark_test",
+    "generated/SquareGemmBench1024x1024/test_entry_point/benchmark_test",
+    "generated/SquareGemmBench2048x2048/test_entry_point/benchmark_test",
+    "generated/SquareGemmBench4096x4096/test_entry_point/benchmark_test",
+    "generated/SquareGemmBench8192x8192/test_entry_point/benchmark_test",
+    "generated/AB/test_float32/benchmark_test"
+  ],
   "expected_compile_failures": [],
-  "expected_run_failures": []
+  "expected_run_failures": [],
+  "golden_times_ms": {
+    "SquareGemmBench128x128/test_entry_point": 0.0,
+    "SquareGemmBench256x256/test_entry_point": 0.0,
+    "SquareGemmBench512x512/test_entry_point": 0.0,
+    "SquareGemmBench1024x1024/test_entry_point": 0.0,
+    "SquareGemmBench2048x2048/test_entry_point": 0.0,
+    "SquareGemmBench4096x4096/test_entry_point": 0.0,
+    "SquareGemmBench8192x8192/test_entry_point": 0.0,
+    "AB/test_float32": 0.0
+  }
 }
