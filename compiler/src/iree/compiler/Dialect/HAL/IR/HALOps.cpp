@@ -745,6 +745,33 @@ LogicalResult TensorAliasOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.tensor.transients
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorTransientsOp::verify() {
+  TensorTransientsOp op = *this;
+  auto type = llvm::cast<TensorType>(op.getSource().getType());
+  if (type.getNumDynamicDims() != op.getSourceDims().size()) {
+    return op->emitOpError()
+           << "number of dynamic dims must match the operand type";
+  }
+  return success();
+}
+
+Value TensorTransientsOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+TensorTransientsOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> TensorTransientsOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
+//===----------------------------------------------------------------------===//
 // hal.tensor.barrier
 //===----------------------------------------------------------------------===//
 

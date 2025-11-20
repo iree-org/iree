@@ -160,7 +160,6 @@ using FunctionLikeNest =
 //===----------------------------------------------------------------------===//
 
 static void addCleanupPatterns(OpPassManager &passManager) {
-
   FunctionLikeNest(passManager)
       // Standard MLIR cleanup.
       .addPass(mlir::createCanonicalizerPass)

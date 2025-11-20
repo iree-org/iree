@@ -1691,6 +1691,61 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.resource.transients
+//===----------------------------------------------------------------------===//
+
+bool ResourceTransientsOp::pinsValueAffinity() {
+  return getAffinity().has_value();
+}
+
+Value ResourceTransientsOp::getTiedResult(unsigned resultIndex) {
+  if (resultIndex == 0) {
+    return IREE::Util::TiedOpInterface::findTiedBaseValue(getResource());
+  }
+  return {}; // timepoint result is not tied
+}
+
+::std::optional<unsigned>
+ResourceTransientsOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0) {
+    return {0}; // resource
+  }
+  return std::nullopt; // timepoint result is not tied
+}
+
+SmallVector<int64_t> ResourceTransientsOp::getTiedResultOperandIndices() {
+  return {0, -1}; // resource is tied, timepoint is not
+}
+
+namespace {
+
+struct FoldConsecutiveResourceTransientsOps
+    : public OpRewritePattern<ResourceTransientsOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ResourceTransientsOp op,
+                                PatternRewriter &rewriter) const override {
+    auto resourceOp = op.getResource().getDefiningOp<ResourceTransientsOp>();
+    if (!resourceOp) {
+      return failure();
+    }
+    // Replace the resource and dims with those from the source transients op.
+    // The outer storage wins (most recent specification).
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getResourceMutable().assign(resourceOp.getResource());
+      op.getResourceSizeMutable().assign(resourceOp.getResourceSize());
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void ResourceTransientsOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<FoldConsecutiveResourceTransientsOps>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // stream.file.constant
 //===----------------------------------------------------------------------===//
 

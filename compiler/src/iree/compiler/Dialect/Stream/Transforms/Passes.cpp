@@ -276,6 +276,13 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // lifetime allocations.
   passManager.addPass(IREE::Stream::createScheduleAllocationPass());
 
+  // Tries to emplace transient allocations in user-provided storage, if any.
+  // This will find stream.resource.alloca (and matching dealloca) ops and try
+  // to remove them.
+  passManager.addPass(IREE::Stream::createEmplaceTransientsPass());
+  passManager.addPass(
+      IREE::Stream::createMaterializeTransientSizeQueriesPass());
+
   FunctionLikeNest(passManager)
       // Allocate backing storage for fused constant resources.
       // This expands packed constants into explicit forms with partitioned
@@ -304,6 +311,11 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // TODO(benvanik): run another cleanup after ARC? Today the pass does not
   // generate much garbage and what it does (mostly around timepoints) will be
   // handled during the optimization pipeline below.
+
+  // If there are any external transient memory size query functions that folded
+  // into constants after our layout/propagation/cleanup then tag them now. This
+  // is a no-op if none of the functions exist.
+  passManager.addPass(IREE::Stream::createAnnotateConstantTransientSizePass());
 
   // Everything must now be in explicit stream.cmd.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());

@@ -41,6 +41,7 @@ iree_lit_test_suite(
             "iree-run-module-outputs.mlir",
             "iree-run-module.mlir",
             "iree-tblgen-json.td",
+            "iree-run-module-in-place.mlir",
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "null_values.mlir",

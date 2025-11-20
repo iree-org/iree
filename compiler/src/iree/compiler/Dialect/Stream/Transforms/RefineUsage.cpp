@@ -427,21 +427,53 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
   }
 };
 
+// Update usage of transferred values when they are unknown.
+// AsyncTransferOps with concrete lifetimes are left alone to prevent creating
+// chaining transfers that fight with canonicalization patterns.
+struct ApplyAsyncTransferOp
+    : public UsageRefinementPattern<IREE::Stream::AsyncTransferOp> {
+  using UsageRefinementPattern<
+      IREE::Stream::AsyncTransferOp>::UsageRefinementPattern;
+  LogicalResult matchAndRewrite(IREE::Stream::AsyncTransferOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only refine if the result is unknown.
+    auto resultType =
+        llvm::cast<IREE::Stream::ResourceType>(op.getResult().getType());
+    if (resultType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      return failure();
+    }
+
+    // Get the refined lifetime from usage analysis.
+    auto newUsage = analysis.lookupResourceUsage(op.getResult());
+    auto newLifetime = convertUsageToLifetime(newUsage);
+    auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
+
+    // Directly update the result type without inserting transfers.
+    rewriter.startOpModification(op);
+    op.getResult().setType(newType);
+    rewriter.finalizeOpModification(op);
+
+    return success();
+  }
+};
+
 static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
                                           RewritePatternSet &patterns) {
   // NOTE: only ops that return values or contain regions need to be handled.
   patterns.insert<ApplyInitializerOp, ApplyFuncOp, ApplyScfForOp, ApplyScfIfOp,
-                  ApplyScfWhileOp>(context, analysis);
+                  ApplyScfWhileOp, ApplyAsyncTransferOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::OptimizationBarrierOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
                   ApplyGenericOp<IREE::Util::CallOp>,
                   ApplyGenericOp<mlir::scf::ConditionOp>,
                   ApplyGenericOp<mlir::scf::YieldOp>,
+                  ApplyGenericOp<IREE::Stream::TimepointAwaitOp>,
                   ApplyGenericOp<IREE::Stream::TimepointBarrierOp>>(context,
                                                                     analysis);
   patterns.insert<ApplyStreamableOp<IREE::Stream::ResourceAllocOp>,
                   ApplyStreamableOp<IREE::Stream::ResourceAllocaOp>,
+                  ApplyStreamableOp<IREE::Stream::ResourceTransientsOp>,
                   ApplyStreamableOp<IREE::Stream::TensorImportOp>,
                   ApplyStreamableOp<IREE::Stream::TensorExportOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncAllocaOp>,
@@ -454,7 +486,6 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncCopyOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncCollectiveOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncBarrierOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncTransferOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncLoadOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncStoreOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncDispatchOp>,
@@ -462,7 +493,6 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncExecuteOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncConcurrentOp>,
                   ApplyStreamableOp<IREE::Stream::YieldOp>>(context, analysis);
-  IREE::Stream::AsyncTransferOp::getCanonicalizationPatterns(patterns, context);
 }
 
 //===----------------------------------------------------------------------===//

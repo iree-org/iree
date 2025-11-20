@@ -265,6 +265,82 @@ struct ConvertTensorAliasOp
   }
 };
 
+// %1 = hal.tensor.transients %0 : tensor<4xf32>
+//          from %storage : !hal.buffer (or !hal.buffer_view)
+// ->
+// %buffer = hal.buffer_view.buffer %storage (if buffer_view)
+// %storage_size = hal.buffer.length %buffer
+// %imported = stream.tensor.import %buffer : !hal.buffer -> tensor<?xi8>
+//                 in !stream.resource<transient>{%storage_size}
+// %0a, %t0 = stream.timepoint.barrier %0 : !stream.resource<*>{%size}
+//                                      => !stream.timepoint
+// %1a, %t1 = stream.resource.transients await(%t0) => %0a
+//                                       : !stream.resource<*>{%size}
+//                                       from %imported
+//                                       :
+//                                       !stream.resource<transient>{%storage_size}
+//                                       => !stream.timepoint
+// %1 = stream.timepoint.await %t1 => %1a : !stream.resource<*>{%size}
+struct ConvertTensorTransientsOp
+    : public AffinityOpConversionPattern<IREE::HAL::TensorTransientsOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+  LogicalResult matchAndRewriteOnAffinity(
+      IREE::HAL::TensorTransientsOp op, OneToNOpAdaptor adaptor,
+      IREE::Stream::AffinityAttr executionAffinityAttr,
+      ConversionPatternRewriter &rewriter) const override {
+    auto source =
+        transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
+                               executionAffinityAttr, rewriter);
+
+    // Insert barrier to materialize timepoint from resource.
+    auto timepointType = rewriter.getType<IREE::Stream::TimepointType>();
+    auto barrierOp = IREE::Stream::TimepointBarrierOp::create(
+        rewriter, op.getLoc(), source.resource.getType(), timepointType,
+        source.resource, source.resourceSize, executionAffinityAttr);
+
+    // Get storage (can be hal.buffer or hal.buffer_view) and extract buffer.
+    Value storage = adaptor.getStorage().front();
+    Value halBuffer = storage;
+    if (llvm::isa<IREE::HAL::BufferViewType>(storage.getType())) {
+      // If storage is a buffer_view, extract the underlying buffer.
+      halBuffer = rewriter.createOrFold<IREE::HAL::BufferViewBufferOp>(
+          op.getLoc(), rewriter.getType<IREE::HAL::BufferType>(), storage);
+    }
+
+    // Get buffer length.
+    Value bufferLength = rewriter.createOrFold<IREE::HAL::BufferLengthOp>(
+        op.getLoc(), rewriter.getIndexType(), halBuffer);
+
+    // Import storage as stream.resource<transient>.
+    // We use an arbitrary tensor type for the import - the actual type doesn't
+    // matter as this is just raw storage for transient allocations.
+    auto transientType = rewriter.getType<IREE::Stream::ResourceType>(
+        IREE::Stream::Lifetime::Transient);
+    auto tensorType =
+        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getI8Type());
+    auto importOp = IREE::Stream::TensorImportOp::create(
+        rewriter, op.getLoc(), transientType, halBuffer,
+        TypeAttr::get(tensorType), ValueRange{bufferLength}, bufferLength,
+        /*consume=*/UnitAttr{}, executionAffinityAttr);
+
+    // Convert to stream.resource.transients with imported storage + size.
+    auto transientsOp = IREE::Stream::ResourceTransientsOp::create(
+        rewriter, op.getLoc(), source.resource.getType(), timepointType,
+        barrierOp.getResult(), source.resourceSize, importOp.getResult(),
+        bufferLength, barrierOp.getResultTimepoint(), executionAffinityAttr);
+
+    // Await the result timepoint to resolve to plain resource.
+    auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
+        rewriter, op.getLoc(), {transientsOp.getResult()},
+        {source.resourceSize}, transientsOp.getResultTimepoint());
+    rewriter.replaceOpWithMultiple(op, {{
+                                           awaitOp.getResults().front(),
+                                           source.resourceSize,
+                                       }});
+    return success();
+  }
+};
+
 // %r0b, %r1b = hal.tensor.barrier join(%r0a : tensor<4xf32>,
 //                                      %r1a : tensor<1xi32>) => %fence
 // ->
@@ -329,6 +405,8 @@ void populateHALToStreamConversionPatterns(
                                          affinityAnalysis);
   patterns.insert<ConvertTensorAliasOp>(typeConverter, context,
                                         affinityAnalysis);
+  patterns.insert<ConvertTensorTransientsOp>(typeConverter, context,
+                                             affinityAnalysis);
   patterns.insert<ConvertTensorBarrierOp>(typeConverter, context,
                                           affinityAnalysis);
 }

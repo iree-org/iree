@@ -45,6 +45,33 @@ util.func public @tensorAlias(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: !hal.
 
 // -----
 
+// CHECK-LABEL: @tensorTransientsStatic
+util.func public @tensorTransientsStatic(%arg0: tensor<4xf32>, %arg1: !hal.buffer) -> tensor<4xf32> {
+  // CHECK: hal.tensor.transients %arg0 : tensor<4xf32> from %arg1 : !hal.buffer
+  %0 = hal.tensor.transients %arg0 : tensor<4xf32> from %arg1 : !hal.buffer
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorTransientsDynamic
+util.func public @tensorTransientsDynamic(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: !hal.buffer) -> tensor<?x4xf32> {
+  // CHECK: hal.tensor.transients %arg0 : tensor<?x4xf32>{%arg1} from %arg2 : !hal.buffer
+  %0 = hal.tensor.transients %arg0 : tensor<?x4xf32>{%arg1} from %arg2 : !hal.buffer
+  util.return %0 : tensor<?x4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorTransientsAffinity
+util.func public @tensorTransientsAffinity(%arg0: tensor<4xf32>, %arg1: !hal.buffer) -> tensor<4xf32> attributes {stream.affinity = #hal.device.affinity<@dev>} {
+  // CHECK: hal.tensor.transients on(#hal.device.affinity<@dev>) %arg0 : tensor<4xf32> from %arg1 : !hal.buffer
+  %0 = hal.tensor.transients on(#hal.device.affinity<@dev>) %arg0 : tensor<4xf32> from %arg1 : !hal.buffer
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorBarrier
 util.func public @tensorBarrier(%arg0: tensor<3xf32>, %arg1: tensor<4xf32>, %arg2: !hal.fence) -> (tensor<3xf32>, tensor<4xf32>) {
   // CHECK: :2 = hal.tensor.barrier join(%arg0, %arg1 : tensor<3xf32>, tensor<4xf32>) => %arg2 : !hal.fence

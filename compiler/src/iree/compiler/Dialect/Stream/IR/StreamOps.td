@@ -730,6 +730,82 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
   let hasFolder = 1;
 }
 
+def Stream_ResourceTransientsOp : Stream_PureOp<"resource.transients", [
+  AllTypesMatch<["resource", "result"]>,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "pinsValueAffinity",
+  ]>,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{Annotates a resource to use transient storage from provided storage.}];
+  let description = [{
+    Annotates that any transient memory used in the production of the given
+    resource should be suballocated from the provided storage. This allows
+    users to control transient allocations by providing their own backing
+    storage enabling zero-allocation execution in steady state.
+
+    The storage provided must have sufficient space for all transient
+    allocations required to produce the resource. Unless otherwise overridden
+    the compiler will verify that all allocation sizes are computable and
+    generate size query functions to allow users to query the required storage
+    size. If size checks are disabled then the user must ensure they pass in
+    storage with sufficient capacity.
+
+    This operation preserves SSA use-def chains by returning the same resource
+    value it receives. It exists purely for annotation purposes and will be
+    lowered away during compilation. The operation is timeline-aware and
+    threads timepoints through to enable proper synchronization.
+
+    Example:
+    ```mlir
+    %result, %result_timepoint = some.operation(%input) : !stream.resource<*>
+    %annotated, %annotated_tp = stream.resource.transients
+        await(%result_timepoint) => %result : !stream.resource<*>{%size}
+        from %storage : !stream.resource<transient>{%storage_size}
+        => !stream.timepoint
+    ```
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$resource,
+    Stream_Size:$resource_size,
+    Stream_AnyResource:$storage,
+    Stream_Size:$storage_size,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result,
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>` )?
+    $resource `:` type($resource) `` `{` $resource_size `}`
+    `from`
+    $storage `:` type($storage) `` `{` $storage_size `}`
+    `=` `` `>` type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getResourceSize(); }
+    Value getResultSize(unsigned idx) { return getResourceSize(); }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 } // OpGroupResourceOps
 
 //===----------------------------------------------------------------------===//

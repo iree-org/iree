@@ -316,3 +316,110 @@ util.func private @callerTensorEffects(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: util.return %[[RESULT]]
   util.return %result : tensor<4xf32>
 }
+
+// -----
+
+// Tests that iree.abi.transients attribute wraps results with hal.tensor.transients in coarse-fences mode.
+
+// CHECK-LABEL: util.func public @transients(
+//  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[STORAGE:.+]]: !hal.buffer, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence
+//  CHECK-SAME: ) -> !hal.buffer_view
+//       CHECK:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input0" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[RET_TENSOR:.+]] = util.call @_transients(%[[ARG0_TENSOR]], %[[STORAGE]])
+//       CHECK:   %[[ANNOTATED:.+]] = hal.tensor.transients %[[RET_TENSOR]] : tensor<4xf32> from %[[STORAGE]] : !hal.buffer
+//       CHECK:   %[[READY:.+]] = hal.tensor.barrier join(%[[ANNOTATED]] : tensor<4xf32>) => %[[SIGNAL]] : !hal.fence
+//       CHECK:   %[[RET_VIEW:.+]] = hal.tensor.export %[[READY]] "output0" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[RET_VIEW]] : !hal.buffer_view
+//  CHECK-NEXT: }
+
+// CHECK-LABEL: util.func private @_transients
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<coarse_fences>
+util.func public @transients(%arg0: tensor<4xf32>, %storage: !hal.buffer {iree.abi.transients}) -> tensor<4xf32> {
+  %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// Tests that iree.abi.transients works with dynamic shapes in coarse-fences mode.
+
+// CHECK-LABEL: util.func public @transientsDynamic(
+//  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[STORAGE:.+]]: !hal.buffer, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence
+//  CHECK-SAME: ) -> !hal.buffer_view
+//       CHECK:   %[[ARG0_DIM:.+]] = hal.buffer_view.dim<%[[ARG0]] : !hal.buffer_view>[0]
+//       CHECK:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input0" : !hal.buffer_view -> tensor<?xf32>{%[[ARG0_DIM]]}
+//  CHECK-NEXT:   %[[RET_TENSOR:.+]] = util.call @_transientsDynamic(%[[ARG0_TENSOR]], %[[STORAGE]])
+//       CHECK:   %[[RET_DIM:.+]] = tensor.dim %[[RET_TENSOR]]
+//       CHECK:   %[[ANNOTATED:.+]] = hal.tensor.transients %[[RET_TENSOR]] : tensor<?xf32>{%[[RET_DIM]]} from %[[STORAGE]] : !hal.buffer
+//       CHECK:   %[[READY:.+]] = hal.tensor.barrier join(%[[ANNOTATED]] : tensor<?xf32>) => %[[SIGNAL]] : !hal.fence
+//       CHECK:   %[[RET_VIEW:.+]] = hal.tensor.export %[[READY]] "output0" : tensor<?xf32>{%[[RET_DIM]]} -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[RET_VIEW]] : !hal.buffer_view
+//  CHECK-NEXT: }
+
+// CHECK-LABEL: util.func private @_transientsDynamic
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<coarse_fences>
+util.func public @transientsDynamic(%arg0: tensor<?xf32>, %storage: !hal.buffer {iree.abi.transients}) -> tensor<?xf32> {
+  %0 = arith.addf %arg0, %arg0 : tensor<?xf32>
+  util.return %0 : tensor<?xf32>
+}
+
+// -----
+
+// Tests combining iree.abi.output (hal.tensor.alias) with iree.abi.transients.
+// This is the common flow where users provide both result storage and transient storage.
+
+// CHECK-LABEL: util.func public @outputStorageAndTransients(
+//  CHECK-SAME:   %[[ARG0:[^:]+]]: !hal.buffer_view, %[[ARG1:[^:]+]]: !hal.buffer_view,
+//  CHECK-SAME:   %[[RET0:[^:]+]]: !hal.buffer, %[[RET1:[^:]+]]: !hal.buffer,
+//  CHECK-SAME:   %[[STORAGE:[^:]+]]: !hal.buffer,
+//  CHECK-SAME:   %[[WAIT:[^:]+]]: !hal.fence, %[[SIGNAL:[^:]+]]: !hal.fence
+//  CHECK-SAME: ) -> (!hal.buffer_view, !hal.buffer_view)
+//       CHECK:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input0" : !hal.buffer_view -> tensor<4xf32>
+//       CHECK:   %[[ARG1_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG1]] "input1" : !hal.buffer_view -> tensor<4xf32>
+//       CHECK:   %[[RESULT_TENSORS:.+]]:2 = util.call @_outputStorageAndTransients(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]], %[[RET0]], %[[RET1]], %[[STORAGE]])
+//   CHECK-DAG:   %[[ALIAS0:.+]] = hal.tensor.alias wait(%[[WAIT]]) => %[[RESULT_TENSORS]]#0 : tensor<4xf32> to %[[RET0]] : !hal.buffer
+//   CHECK-DAG:   %[[ALIAS1:.+]] = hal.tensor.alias wait(%[[WAIT]]) => %[[RESULT_TENSORS]]#1 : tensor<4xf32> to %[[RET1]] : !hal.buffer
+//   CHECK-DAG:   %[[TRANS0:.+]] = hal.tensor.transients %[[ALIAS0]] : tensor<4xf32> from %[[STORAGE]] : !hal.buffer
+//   CHECK-DAG:   %[[TRANS1:.+]] = hal.tensor.transients %[[ALIAS1]] : tensor<4xf32> from %[[STORAGE]] : !hal.buffer
+//   CHECK-DAG:   %[[READY:.+]]:2 = hal.tensor.barrier join(%[[TRANS0]], %[[TRANS1]] : tensor<4xf32>, tensor<4xf32>) => %[[SIGNAL]] : !hal.fence
+//   CHECK-DAG:   %[[EXPORT0:.+]] = hal.tensor.export %[[READY]]#0 "output0" : tensor<4xf32> -> !hal.buffer_view
+//   CHECK-DAG:   %[[EXPORT1:.+]] = hal.tensor.export %[[READY]]#1 "output1" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[EXPORT0]], %[[EXPORT1]]
+
+// CHECK-LABEL: util.func private @_outputStorageAndTransients
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<coarse_fences>
+util.func public @outputStorageAndTransients(
+    %arg0: tensor<4xf32>,
+    %arg1: tensor<4xf32>,
+    %ret0: !hal.buffer {iree.abi.output = 0 : index},
+    %ret1: !hal.buffer {iree.abi.output = 1 : index},
+    %storage: !hal.buffer {iree.abi.transients}) -> (tensor<4xf32>, tensor<4xf32>) {
+  %0 = arith.addf %arg0, %arg1 : tensor<4xf32>
+  %1 = arith.addf %0, %arg0 : tensor<4xf32>
+  util.return %0, %1 : tensor<4xf32>, tensor<4xf32>
+}
+
+// -----
+
+// Tests that iree.abi.transients works with multiple tensor results in coarse-fences mode.
+
+// CHECK-LABEL: util.func public @transientsMultipleResults(
+//  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[STORAGE:.+]]: !hal.buffer, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence
+//  CHECK-SAME: ) -> (!hal.buffer_view, !hal.buffer_view)
+//       CHECK:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input0" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[RET_TENSORS:.+]]:2 = util.call @_transientsMultipleResults(%[[ARG0_TENSOR]], %[[STORAGE]])
+//       CHECK:   %[[ANNOTATED0:.+]] = hal.tensor.transients %[[RET_TENSORS]]#0 : tensor<4xf32> from %[[STORAGE]] : !hal.buffer
+//       CHECK:   %[[ANNOTATED1:.+]] = hal.tensor.transients %[[RET_TENSORS]]#1 : tensor<4xf32> from %[[STORAGE]] : !hal.buffer
+//       CHECK:   %[[READY:.+]]:2 = hal.tensor.barrier join(%[[ANNOTATED0]], %[[ANNOTATED1]] : tensor<4xf32>, tensor<4xf32>) => %[[SIGNAL]] : !hal.fence
+//       CHECK:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[READY]]#0 "output0" : tensor<4xf32> -> !hal.buffer_view
+//       CHECK:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[READY]]#1 "output1" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
+//  CHECK-NEXT: }
+
+// CHECK-LABEL: util.func private @_transientsMultipleResults
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<coarse_fences>
+util.func public @transientsMultipleResults(%arg0: tensor<4xf32>, %storage: !hal.buffer {iree.abi.transients}) -> (tensor<4xf32>, tensor<4xf32>) {
+  %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
+  %1 = arith.mulf %arg0, %arg0 : tensor<4xf32>
+  util.return %0, %1 : tensor<4xf32>, tensor<4xf32>
+}

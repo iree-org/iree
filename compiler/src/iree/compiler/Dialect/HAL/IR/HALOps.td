@@ -302,6 +302,73 @@ def HAL_TensorAliasOp : HAL_PureOp<"tensor.alias", [
   let hasVerifier = 1;
 }
 
+def HAL_TensorTransientsOp : HAL_PureOp<"tensor.transients", [
+  AllTypesMatch<["source", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{Annotates a tensor to use transient storage from a provided buffer.}];
+  let description = [{
+    Annotates that any transient memory used in the production of the given
+    tensor should be suballocated from the provided storage buffer. This allows
+    users to control transient allocations by providing their own storage,
+    enabling zero-allocation execution in steady state.
+
+    The storage buffer provided must have sufficient space for all transient
+    allocations required to produce the tensor. Unless otherwise overridden the
+    compiler will verify that all allocation sizes are computable and generate
+    size query functions to allow users to query the required buffer size. If
+    size checks are disabled then the user must ensure they pass in a buffer
+    with sufficient capacity.
+
+    The storage buffer is assumed to be immediately usable (i.e., any previous
+    work using it has completed). Users must ensure proper synchronization if
+    reusing storage across multiple operations. Future work may add explicit
+    wait semantics to enable pipelining, but for now synchronization is the
+    caller's responsibility.
+
+    This operation preserves SSA use-def chains by returning the same tensor
+    value it receives. It exists purely for annotation purposes and will be
+    lowered away during compilation.
+
+    Example:
+    ```mlir
+    %result = some.operation(%input) : tensor<?xf32>
+    %annotated = hal.tensor.transients %result : tensor<?xf32>{%dim} from %storage : !hal.buffer
+    ```
+  }];
+
+  let arguments = (ins
+    AnyTensor:$source,
+    HAL_ShapeDynamicDims:$source_dims,
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$storage,
+    OptionalAttr<AnyAttr>:$affinity
+  );
+  let results = (outs
+    AnyTensor:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `:` type($source) (`{` $source_dims^ `}`)?
+    `from`
+    $storage `:` type($storage)
+    attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getSourceDims(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
+}
+
 def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
   AllTypesMatch<["sources", "results"]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [

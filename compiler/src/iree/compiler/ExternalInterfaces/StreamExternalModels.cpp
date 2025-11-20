@@ -298,6 +298,8 @@ void registerStreamExternalModels(DialectRegistry &registry) {
     HALTensorAffinityAttrExternalModel<IREE::HAL::TensorImportOp>::add(context);
     HALTensorAffinityAttrExternalModel<IREE::HAL::TensorExportOp>::add(context);
     HALTensorAffinityAttrExternalModel<IREE::HAL::TensorAliasOp>::add(context);
+    HALTensorAffinityAttrExternalModel<IREE::HAL::TensorTransientsOp>::add(
+        context);
   });
 
   registry.insert<IREE::Util::UtilDialect>();
