@@ -10,6 +10,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -1047,6 +1048,114 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
 // ExpReductionOp
 //===----------------------------------------------------------------------===//
 
+static LogicalResult captureUsedOperationsAndBlockArguments(
+    linalg::GenericOp linalgOp, SetVector<int64_t> &usedInputs,
+    SetVector<Operation *> &usedOperations, int64_t resultNumber) {
+  BackwardSliceOptions options;
+  options.inclusive = true;
+  options.filter = [&linalgOp](Operation *op) -> bool {
+    return op->getBlock() == linalgOp.getBody();
+  };
+  auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
+  Value result = yieldOp.getOperand(resultNumber);
+
+  if (failed(getBackwardSlice(result, &usedOperations, options))) {
+    return failure();
+  }
+
+  // Get all block arguments used by the operations. If any of the arguments
+  // used is a dpsInit argument other than resultNumber, return failure.
+  for (Operation *op : usedOperations) {
+    for (Value operand : op->getOperands()) {
+      if (auto blockArg = dyn_cast<BlockArgument>(operand)) {
+        if (blockArg.getOwner() != linalgOp.getBlock()) {
+          continue;
+        }
+        int64_t argNumber = blockArg.getArgNumber();
+        if (argNumber >= linalgOp.getNumDpsInputs() &&
+            argNumber - linalgOp.getNumDpsInputs() != resultNumber) {
+          return failure();
+        }
+        if (argNumber < linalgOp.getNumDpsInputs()) {
+          usedInputs.insert(argNumber);
+        }
+      }
+    }
+  }
+
+  return success();
+}
+
+static FailureOr<SmallVector<linalg::GenericOp>>
+decomposeMultipleResults(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
+  if (linalgOp.getNumResults() <= 2) {
+    return failure();
+  }
+
+  SmallVector<linalg::GenericOp> results;
+  // Create num_results linalg.generics, each producing a single result (and
+  // relying on canonicalizations to simplify).
+  for (int64_t resultNumber : llvm::seq<int64_t>(linalgOp.getNumResults())) {
+    rewriter.setInsertionPoint(linalgOp);
+    auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
+    Value result = yieldOp.getOperand(resultNumber);
+    // Get all operations required to produce this result.
+    SetVector<Operation *> usedOperations;
+    SetVector<int64_t> usedInputs;
+    if (failed(captureUsedOperationsAndBlockArguments(
+            linalgOp, usedInputs, usedOperations, resultNumber))) {
+      return failure();
+    }
+    // Create a new linalg.generic operation for this result.
+    SmallVector<Value> inputs = llvm::map_to_vector(usedInputs, [&](int64_t x) {
+      return linalgOp.getDpsInputOperand(x)->get();
+    });
+    SmallVector<Value> inits = {
+        linalgOp.getDpsInitOperand(resultNumber)->get()};
+
+    SmallVector<AffineMap> indexingMaps =
+        llvm::map_to_vector(usedInputs, [&](int64_t x) {
+          return linalgOp.getIndexingMapsArray()[x];
+        });
+    indexingMaps.push_back(linalgOp.getIndexingMapMatchingResult(
+        linalgOp->getOpResult(resultNumber)));
+    llvm::SmallBitVector unusedDims = getUnusedDimsBitVector(indexingMaps);
+    indexingMaps = compressUnusedDims(indexingMaps);
+    SmallVector<utils::IteratorType> iteratorTypes;
+    for (int64_t i : llvm::seq<int64_t>(linalgOp.getNumLoops())) {
+      if (!unusedDims.test(i)) {
+        iteratorTypes.push_back(linalgOp.getIteratorTypesArray()[i]);
+      }
+    }
+    auto newOp = linalg::GenericOp::create(
+        rewriter, linalgOp.getLoc(), TypeRange(inits), inputs, inits,
+        indexingMaps, iteratorTypes,
+        [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
+          Block *oldBody = linalgOp.getBody();
+          usedInputs.insert(resultNumber + linalgOp.getNumDpsInputs());
+          IRMapping regionMapping;
+          for (auto [oldBlockArgNum, newBlockArg] :
+               llvm::zip_equal(usedInputs, blockArgs)) {
+            regionMapping.map(oldBody->getArgument(oldBlockArgNum),
+                              newBlockArg);
+          }
+          for (Operation *usedOperation : usedOperations) {
+            b.clone(*usedOperation, regionMapping);
+          }
+          linalg::YieldOp::create(b, loc, regionMapping.lookup(result));
+        });
+    if (unusedDims.none()) {
+      newOp->setDiscardableAttrs(linalgOp->getDiscardableAttrDictionary());
+    }
+    rewriter.replaceAllUsesWith(linalgOp.getResult(resultNumber),
+                                newOp.getResult(0));
+
+    results.emplace_back(newOp);
+  }
+
+  return results;
+}
+
 FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
   IRRewriter rewriter(b);
@@ -1101,7 +1210,17 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   auto yieldOp =
       cast<IREE::LinalgExt::YieldOp>(expRedGeneric.getBody()->getTerminator());
   rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp, yieldOp.getOperands());
-  return SmallVector<Value>(expRedGeneric->getResults());
+
+  FailureOr<SmallVector<linalg::GenericOp>> decomposedResults =
+      decomposeMultipleResults(expRedGeneric, rewriter);
+  if (failed(decomposedResults)) {
+    return failure();
+  }
+  return llvm::map_to_vector(decomposedResults.value(),
+                             [](linalg::GenericOp op) -> Value {
+                               assert(op->getNumResults() == 1);
+                               return op->getResult(0);
+                             });
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

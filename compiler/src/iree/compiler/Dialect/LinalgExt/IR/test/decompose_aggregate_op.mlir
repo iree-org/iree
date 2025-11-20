@@ -435,7 +435,7 @@ func.func @attention(
   %max_init: tensor<20x4096xf32>,
   %sum_init: tensor<20x4096xf32>,
   %acc_init: tensor<20x4096x64xf32>
-) -> tensor<20x4096x64xf32> 
+) -> (tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>)
   {
   %MAX, %SUM, %PV = iree_linalg_ext.exp_reduction {
     indexing_maps = [
@@ -463,7 +463,7 @@ func.func @attention(
     iree_linalg_ext.yield %m, %nsum, %nacc : f32, f32, f32
   } -> tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
 
-  return %PV : tensor<20x4096x64xf32>
+  return %MAX, %SUM, %PV : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
 }
 // CHECK-LABEL: @attention
 // CHECK-SAME: %[[S:[0-9A-Za-z]*]]: tensor<20x4096x4096xf32>
@@ -489,9 +489,16 @@ func.func @attention(
 // CHECK-SAME: ins(%[[n]]
 // CHECK:   arith.mulf
 // reduction body
-// CHECK: %[[M:.*]]:3 = linalg.generic
-// CHECK-SAME: ins(%[[sub]], %[[V]]
-// CHECK-SAME: outs(
+// CHECK: %[[SUM:.*]] = linalg.generic
+// CHECK-SAME: ins(%[[sub]]
+// CHECK-SAME: outs(%[[max_norm]]
 // CHECK:   arith.addf
+// CHECK: %[[PV:.*]] = linalg.generic
+// CHECK-SAME: ins(%[[sub]], %[[V]]
+// CHECK-SAME: outs(%[[acc_norm]]
 // CHECK:   arith.mulf
 // CHECK:   arith.addf
+// CHECK: return 
+// CHECK-SAME: %[[M]]
+// CHECK-SAME: %[[SUM]]
+// CHECK-SAME: %[[PV]]
