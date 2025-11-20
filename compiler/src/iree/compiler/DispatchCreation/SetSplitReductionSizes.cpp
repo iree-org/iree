@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -107,6 +108,12 @@ struct SetSplitReductionSizesPass final
 
       // --- Case 3: Matmul-like operations ---
       if (auto tileSizes = getMatmulLikeReductionSizes(tilingOp)) {
+        IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
+        return;
+      }
+
+      // --- Case 4: arg_compare operations ---
+      if (auto tileSizes = getArgCompareReductionSizes(tilingOp)) {
         IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
         return;
       }
@@ -454,6 +461,33 @@ private:
     }
 
     return tileSizes;
+  }
+
+  /// Determine split reduction sizes specifically for arg_compare operations.
+  std::optional<SmallVector<int64_t>>
+  getArgCompareReductionSizes(PartialReductionOpInterface op) const {
+    auto argCompareOp =
+        dyn_cast<IREE::LinalgExt::ArgCompareOp>(op.getOperation());
+    if (!argCompareOp) {
+      return std::nullopt;
+    }
+
+    ShapedType inputType = argCompareOp.getInputType();
+    ArrayRef<int64_t> inputShape = inputType.getShape();
+    int64_t reductionDim = argCompareOp.getDimension();
+    int64_t reductionSize = inputShape[reductionDim];
+    if (ShapedType::isDynamic(reductionSize)) {
+      return std::nullopt;
+    }
+    if (reductionSize < splitReductionTargetSize) {
+      return std::nullopt;
+    }
+    int64_t tileSize = findSmallestFactorWithLowerBound(
+                           reductionSize, splitReductionTargetSize)
+                           .value_or(reductionSize);
+    LDBG() << "arg_compare split: dim=" << reductionDim
+           << " size=" << reductionSize << " tile=" << tileSize;
+    return SmallVector<int64_t>{tileSize};
   }
 };
 } // namespace
