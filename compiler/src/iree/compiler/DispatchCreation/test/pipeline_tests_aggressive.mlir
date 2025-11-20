@@ -155,3 +155,30 @@ util.func public @attention_broadcast(
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>]
 //       CHECK:     iree_linalg_ext.attention
 //  CHECK-SAME:       ins({{.*}}, %[[Q]], %[[K]], {{.*}} : tensor<4x8x?x128xf16>, tensor<4x?x8x128xf16>, tensor<4x?x8x128xf16>, f16, tensor<4x8x?x?xf16>)
+
+// -----
+
+util.func public @transpose_barrier_matmul(%arg0: tensor<128x64xf32>, %arg1: tensor<128x64xf32>) -> tensor<128x128xf32> {
+  %c0 = arith.constant 0.0 : f32
+  %empty_transpose = tensor.empty() : tensor<64x128xf32>
+  %transpose = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%arg0 : tensor<128x64xf32>) outs(%empty_transpose : tensor<64x128xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<64x128xf32>
+  %barrier = iree_tensor_ext.compute_barrier.start %transpose : tensor<64x128xf32> -> tensor<64x128xf32>
+  %empty_matmul = tensor.empty() : tensor<128x128xf32>
+  %init = linalg.fill ins(%c0 : f32) outs(%empty_matmul : tensor<128x128xf32>) -> tensor<128x128xf32>
+  %matmul = linalg.matmul ins(%arg1, %barrier : tensor<128x64xf32>, tensor<64x128xf32>) outs(%init : tensor<128x128xf32>) -> tensor<128x128xf32>
+  util.return %matmul : tensor<128x128xf32>
+}
+// CHECK-LABEL: func public @transpose_barrier_matmul
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[TRANSPOSE:.+]] = linalg.generic
+//  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>]
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[TRANSPOSE]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:       ins({{.*}}, {{.*}} : tensor<128x64xf32>, tensor<64x128xf32>)
