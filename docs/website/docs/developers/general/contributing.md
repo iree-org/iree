@@ -218,6 +218,12 @@ use GitHub pull requests (PRs) for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
+* Please keep PRs small (focused on a single issue or feature) to make reviews
+  and later culprit-finding easier.
+    - You may see trusted core contributors bending above rule for project
+      maintenance and major subsystem renovation. If you feel like the rules
+      aren't working for a certain situation, please ask as we bias towards
+      pragmatism for cases that require it.
 * We require review comments to be addressed before merging, even when there is
   an approval from another reviewer. Unless stated otherwise, we treat request
   for changes as blocking. Reviewers may indicate that some comments
@@ -230,12 +236,6 @@ information on using pull requests.
   ask for your PR to be reverted. This is not a sign that your was faulty -- we
   prefer to err on the side of caution and reverting allow more time for design
   discussion.
-* Please keep PRs small (focused on a single issue) to make reviews and later
-  culprit-finding easier.
-* You may see trusted core contributors bending this rule for project
-  maintenance and major subsystem renovation. If you feel like the rules aren't
-  working for a certain situation, please ask as we bias towards pragmatism for
-  cases that require it.
 
 ### :material-check-all: GitHub Actions workflows
 
