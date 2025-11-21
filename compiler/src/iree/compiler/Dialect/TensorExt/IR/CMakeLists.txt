@@ -44,10 +44,13 @@ iree_cc_library(
     ::TensorExtOpInterfacesGen
     ::TensorExtOpsGen
     LLVMSupport
+    MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRIR
     MLIRInferTypeOpInterface
+    MLIRMemRefDialect
     MLIRSCFDialect
     MLIRSupport
     MLIRTensorDialect
