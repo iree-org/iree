@@ -32,8 +32,8 @@ iree_td_library(
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
-        "EncodingUtils.cpp",
         "ConversionUtils.cpp",
+        "EncodingUtils.cpp",
         "EquivalenceUtils.cpp",
         "FlatbufferUtils.cpp",
         "Indexing.cpp",
@@ -47,9 +47,9 @@ iree_compiler_cc_library(
         "TracingUtils.cpp",
     ],
     hdrs = [
-        "EncodingUtils.h",
         "ConversionUtils.h",
         "EmbeddedDataDirectory.h",
+        "EncodingUtils.h",
         "EquivalenceUtils.h",
         "FlatbufferUtils.h",
         "Folding.h",
