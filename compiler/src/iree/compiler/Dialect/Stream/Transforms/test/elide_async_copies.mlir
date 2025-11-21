@@ -292,18 +292,6 @@ util.func private @slice_dispatch_fold(%producer: !stream.resource<*>) -> !strea
 
 util.global private mutable @global_var : !stream.resource<variable>
 
-stream.executable private @dispatch {
-  stream.executable.export public @entry workgroups() -> (index, index, index) {
-    %c1 = arith.constant 1 : index
-    stream.return %c1, %c1, %c1 : index, index, index
-  }
-  builtin.module {
-    func.func @entry() {
-      return
-    }
-  }
-}
-
 // CHECK-LABEL: @cloneToVariable
 util.func public @cloneToVariable() -> !stream.resource<variable> {
   %c4 = arith.constant 4 : index
@@ -375,18 +363,6 @@ util.func public @constantCloneSingleUse(%size: index) -> !stream.resource<const
 }
 
 // -----
-
-stream.executable private @constantDispatch {
-  stream.executable.export public @entry workgroups() -> (index, index, index) {
-    %c1 = arith.constant 1 : index
-    stream.return %c1, %c1, %c1 : index, index, index
-  }
-  builtin.module {
-    func.func @entry() {
-      return
-    }
-  }
-}
 
 // Tests that constant->constant clones with multiple uses are elided.
 // Constants are immutable so aliasing is always safe regardless of use count.

@@ -449,8 +449,9 @@ public:
     // Seed all block arguments throughout the program.
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
-      if (!region)
+      if (!region) {
         continue;
+      }
       for (auto &block : *region) {
         for (auto arg : block.getArguments()) {
           if (isa<IREE::Stream::ResourceType>(arg.getType())) {
@@ -466,14 +467,15 @@ public:
     int seedCount = 0;
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
-      if (!region)
+      if (!region) {
         continue;
+      }
       region->walk([&](Operation *op) {
         for (auto result : op->getResults()) {
           if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
             solver.getOrCreateElementFor<ResourceMutationSemantics>(
                 Position::forValue(result));
-            seedCount++;
+            ++seedCount;
           }
         }
       });
