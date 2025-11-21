@@ -531,7 +531,7 @@ iree_status_t iree_hal_streaming_calculate_optimal_block_size(
                                       : dynamic_shared_mem_size;
 
     // Get max active blocks for this configuration.
-    int active_blocks = 0;
+    uint32_t active_blocks = 0;
     iree_status_t status =
         iree_hal_streaming_calculate_max_active_blocks_per_multiprocessor(
             device, symbol, test_size, dynamic_smem, &active_blocks);

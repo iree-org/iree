@@ -2552,7 +2552,7 @@ CUDAAPI CUresult cuLaunchCooperativeKernel(
   // Calculate maximum blocks for cooperative launch.
   // This will return 0 if the device doesn't support cooperative launch.
   int block_size = blockDimX * blockDimY * blockDimZ;
-  int max_blocks = 0;
+  uint32_t max_blocks = 0;
   iree_status_t status = iree_hal_streaming_calculate_max_cooperative_blocks(
       device, symbol, block_size, sharedMemBytes, &max_blocks);
   if (!iree_status_is_ok(status)) {

@@ -6388,7 +6388,7 @@ HIPAPI hipError_t hipModuleLaunchCooperativeKernel(
   // Calculate maximum blocks for cooperative launch.
   // This will return 0 if the device doesn't support cooperative launch.
   int block_size = blockDimX * blockDimY * blockDimZ;
-  int max_blocks = 0;
+  uint32_t max_blocks = 0;
   HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
       z0,
       iree_hal_streaming_calculate_max_cooperative_blocks(
@@ -6597,7 +6597,7 @@ HIPAPI hipError_t hipModuleOccupancyMaxActiveBlocksPerMultiprocessor(
   }
 
   // Use shared occupancy calculation.
-  int max_blocks = 0;
+  uint32_t max_blocks = 0;
   iree_status_t status =
       iree_hal_streaming_calculate_max_active_blocks_per_multiprocessor(
           device, symbol, blockSize, dynSharedMemPerBlk, &max_blocks);
@@ -6748,12 +6748,17 @@ HIPAPI hipError_t hipModuleOccupancyMaxPotentialBlockSize(
     HIP_RETURN_ERROR(hipErrorInvalidHandle);
   }
 
+  uint32_t block_size = 0;
+  uint32_t min_grid_size = 0;
+
   // Use shared occupancy calculation.
   // HIP doesn't yet have a C API for dynamic shared memory callbacks.
   // Pass NULL for the callback to use fixed dynamic shared memory size.
   iree_status_t status = iree_hal_streaming_calculate_optimal_block_size(
       device, symbol, (uint32_t)dynSharedMemPerBlk, NULL,
-      (uint32_t)blockSizeLimit, blockSize, gridSize);
+      (uint32_t)blockSizeLimit, &block_size, &min_grid_size);
+  *gridSize = min_grid_size;
+  *blockSize = block_size;
 
   hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
