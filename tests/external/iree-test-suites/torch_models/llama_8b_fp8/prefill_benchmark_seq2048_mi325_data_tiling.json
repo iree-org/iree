@@ -5,13 +5,13 @@
         "mi325"
     ],
     "modules": [
-        "llama_8b_fp16/modules/llama_gfx942"
+        "llama_8b_fp8/modules/llama_gfx942_data_tiling"
     ],
     "weights": [
         {
             "type": "random",
             "scope": "model",
-            "module": "llama_8b_fp16/modules/llama_gfx942",
+            "module": "llama_8b_fp8/modules/llama_gfx942_data_tiling",
             "seed": 42
         }
     ],
@@ -33,8 +33,8 @@
         "value": "4x64xi64"
       },
       {
-        "value": "34x2097152xf16"
+        "value": "34x2097152xf8E4M3FNUZ"
       }
     ],
-    "golden_time_ms": 275.55
+    "golden_time_ms": 221.65
 }

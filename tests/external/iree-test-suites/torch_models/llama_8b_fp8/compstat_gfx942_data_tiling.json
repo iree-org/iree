@@ -1,0 +1,10 @@
+{
+  "type": "compstat",
+  "markers": [
+    "hip",
+    "gfx942"
+  ],
+  "module": "llama_8b_fp8/modules/llama_gfx942_data_tiling",
+  "golden_dispatch_count": 1711,
+  "golden_binary_size": 3300000
+}
