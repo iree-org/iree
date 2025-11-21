@@ -2539,6 +2539,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-stream-elide-async-copies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Statistics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5081,6 +5096,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-stream-elide-async-copies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Statistics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5468,6 +5498,11 @@ limited and no retargetability is available when directly providing them.</p>
 program correctness or enabling concurrency, such as clones of the last use
 of a value. This eliminates copies both from input programs and those
 materialized by the <code>iree-stream-materialize-copy-on-write</code> pass.</p>
+<h4 id="statistics">Statistics<a class="headerlink" href="#statistics" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>num-clones-elided : Number of async clone operations elided
+num-slices-elided : Number of async slice operations elided
+num-iterations    : Number of fixed-point iterations required for convergence
+</code></pre></div>
 <h3 id="-iree-stream-elide-async-transfers"><code>-iree-stream-elide-async-transfers</code><a class="headerlink" href="#-iree-stream-elide-async-transfers" title="Permanent link">link</a></h3>
 <p><em>Elides transfer ops when they the topology allows</em></p>
 <p>Elides all transfer ops that are between device links that do not
