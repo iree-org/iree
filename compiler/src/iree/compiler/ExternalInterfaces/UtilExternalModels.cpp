@@ -16,11 +16,13 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
@@ -48,6 +50,229 @@ getDivisibilityOfOperand(Value v,
   }
   return IREE::Util::ConstantIntDivisibility(1, 1);
 }
+
+/// Visits affine expressions and recursively calculates the divisibilities of
+/// each subexpression. The final divisibilities of the expression and its
+/// subexpressions will be stored in the map for which a reference is provided
+/// to the AffineExprDivisibilityFinder (i.e., `divisibilityMap`).
+class AffineExprDivisibilityFinder
+    : public AffineExprVisitor<AffineExprDivisibilityFinder,
+                               IREE::Util::ConstantIntDivisibility> {
+public:
+  using ExprDivisibilityMap =
+      llvm::DenseMap<AffineExpr, IREE::Util::ConstantIntDivisibility>;
+  AffineExprDivisibilityFinder(ExprDivisibilityMap &divisibilityMap)
+      : divisibilityMap(divisibilityMap) {}
+
+  /// Constant expressions are trivial, since they are always static.
+  IREE::Util::ConstantIntDivisibility
+  visitConstantExpr(AffineConstantExpr expr) {
+    uint64_t constValue = std::abs(expr.getValue());
+    return IREE::Util::ConstantIntDivisibility(constValue, constValue);
+  }
+
+  /// Dim expressions cannot be analyzed further, so return the divisibility
+  /// in `divisibilityMap` if it has been populated by the caller, or fallback
+  /// to the minimum divisibility.
+  IREE::Util::ConstantIntDivisibility visitDimExpr(AffineDimExpr expr) {
+    if (divisibilityMap.contains(expr)) {
+      return divisibilityMap[expr];
+    }
+    return IREE::Util::IntegerDivisibility::getMinDivisibility().getValue();
+  }
+
+  /// Symbol expressions cannot be analyzed further, so return the divisibility
+  /// in `divisibilityMap` if it has been populated by the caller, or fallback
+  /// to the minimum divisibility.
+  IREE::Util::ConstantIntDivisibility visitSymbolExpr(AffineSymbolExpr expr) {
+    if (divisibilityMap.contains(expr)) {
+      return divisibilityMap[expr];
+    }
+    return IREE::Util::IntegerDivisibility::getMinDivisibility().getValue();
+  }
+
+  /// The divisibility of an addition is the GCD of its constituents'
+  /// divisibilities. This callback is used for subtraction as well.
+  IREE::Util::ConstantIntDivisibility visitAddExpr(AffineBinaryOpExpr expr) {
+    if (divisibilityMap.contains(expr)) {
+      return divisibilityMap[expr];
+    }
+    IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
+    IREE::Util::ConstantIntDivisibility rhsDiv = visit(expr.getRHS());
+    return lhsDiv.getUnion(rhsDiv);
+  }
+
+  /// The divisibility of a multiplication is the product of its constituents'
+  /// divisibilities.
+  IREE::Util::ConstantIntDivisibility visitMulExpr(AffineBinaryOpExpr expr) {
+    if (divisibilityMap.contains(expr)) {
+      return divisibilityMap[expr];
+    }
+    IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
+    IREE::Util::ConstantIntDivisibility rhsDiv = visit(expr.getRHS());
+    return IREE::Util::ConstantIntDivisibility(lhsDiv.udiv() * rhsDiv.udiv(),
+                                               lhsDiv.sdiv() * rhsDiv.sdiv());
+  }
+
+  IREE::Util::ConstantIntDivisibility
+  visitFloorDivExpr(AffineBinaryOpExpr expr) {
+    return visitDivExpr(expr);
+  }
+
+  IREE::Util::ConstantIntDivisibility
+  visitCeilDivExpr(AffineBinaryOpExpr expr) {
+    return visitDivExpr(expr);
+  }
+
+  /// Mod expressions could be inferred to be zero in some cases, but for now
+  /// just return the minimum divisibility.
+  /// TODO(Max191): Handle evenly divisible cases, and ensure that the zero
+  /// divisibility propagates properly through parent expressions.
+  IREE::Util::ConstantIntDivisibility visitModExpr(AffineBinaryOpExpr expr) {
+    return visitInvalidExpr(expr);
+  }
+
+private:
+  IREE::Util::ConstantIntDivisibility
+  visitInvalidExpr(AffineBinaryOpExpr expr) {
+    return IREE::Util::IntegerDivisibility::getMinDivisibility().getValue();
+  }
+
+  /// Helper shared by ceildiv and floordiv implementations. The divisibility of
+  /// a division is simply the quotient of its constituents' divisibilities as
+  /// long as the division has no remainder. If there is a remainder, then the
+  /// divisibility cannot be easily inferred, so we fallback to the minimum
+  /// divisibility.
+  IREE::Util::ConstantIntDivisibility visitDivExpr(AffineBinaryOpExpr expr) {
+    if (divisibilityMap.contains(expr)) {
+      return divisibilityMap[expr];
+    }
+    IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
+    auto constRhs = dyn_cast<AffineConstantExpr>(expr.getRHS());
+    if (!constRhs) {
+      return IREE::Util::ConstantIntDivisibility(1, 1);
+    }
+    int64_t constValue = constRhs.getValue();
+    uint64_t divUDiv = lhsDiv.udiv() % static_cast<uint64_t>(constValue) == 0
+                           ? lhsDiv.udiv() / static_cast<uint64_t>(constValue)
+                           : 1;
+    uint64_t divSDiv = lhsDiv.sdiv() % std::abs(constValue) == 0
+                           ? lhsDiv.sdiv() / std::abs(constValue)
+                           : 1;
+    return IREE::Util::ConstantIntDivisibility(divUDiv, divSDiv);
+  }
+
+  ExprDivisibilityMap &divisibilityMap;
+};
+
+/// Returns the divisibilities of each AffineMap result based on the
+/// divisibilities of its dims and symbols. The `dimAndSymbolDivisibilities`
+/// should contain the divisibilities of the dims, followed by the
+/// divisibilities of the symbols in ascending order by their positions.
+static SmallVector<IREE::Util::ConstantIntDivisibility> getResultDivisibilities(
+    AffineMap map,
+    ArrayRef<IREE::Util::ConstantIntDivisibility> dimAndSymbolDivisibilities) {
+  // Seed the AffineExprDivisibilityFinder with the dimAndSymbolDivisibilities.
+  llvm::DenseMap<AffineExpr, IREE::Util::ConstantIntDivisibility>
+      exprDivisibilityMap;
+  SmallVector<AffineExpr> inputExprs;
+  inputExprs.append(llvm::map_to_vector(
+      llvm::seq<int64_t>(map.getNumDims()),
+      [&](int64_t dim) { return getAffineDimExpr(dim, map.getContext()); }));
+  inputExprs.append(llvm::map_to_vector(
+      llvm::seq<int64_t>(map.getNumSymbols()),
+      [&](int64_t sym) { return getAffineSymbolExpr(sym, map.getContext()); }));
+  for (auto [expr, divisibility] :
+       llvm::zip_equal(inputExprs, dimAndSymbolDivisibilities)) {
+    exprDivisibilityMap[expr] = divisibility;
+  }
+  AffineExprDivisibilityFinder divisibilityFinder(exprDivisibilityMap);
+
+  // Walk each result expression and compute their divisibilities.
+  SmallVector<IREE::Util::ConstantIntDivisibility> resultDivisibilities;
+  for (AffineExpr resultExpr : map.getResults()) {
+    resultDivisibilities.push_back(divisibilityFinder.visit(resultExpr));
+  }
+  return resultDivisibilities;
+}
+
+struct AffineApplyInferIntDivisibilityOpInterface
+    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          AffineApplyInferIntDivisibilityOpInterface, affine::AffineApplyOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto affineApplyOp = cast<affine::AffineApplyOp>(op);
+    SmallVector<IREE::Util::ConstantIntDivisibility> operandDivisibilities;
+    for (auto [operand, divisibility] :
+         llvm::zip(affineApplyOp.getOperands(), argDivs)) {
+      operandDivisibilities.push_back(
+          getDivisibilityOfOperand(operand, divisibility));
+    }
+
+    SmallVector<IREE::Util::ConstantIntDivisibility> resultDivisibilities =
+        getResultDivisibilities(affineApplyOp.getMap(), operandDivisibilities);
+    for (auto [result, divisibility] :
+         llvm::zip_equal(affineApplyOp->getResults(), resultDivisibilities)) {
+      setResultDivs(result, divisibility);
+    }
+  }
+};
+
+/// Infer the result divisibility of an affine.min or affine.max operation
+/// based on its operand divisibilities. The result divisibility is the GCD
+/// of the divisibilities of each of the affine map results, because the result
+/// of the affine.min/max op could be any of these results.
+template <typename MinOrMaxTy>
+static void inferAffineMinOrMaxResultDivisibility(
+    MinOrMaxTy minOrMaxOp, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+    IREE::Util::SetIntDivisibilityFn setResultDivs) {
+  static_assert(
+      llvm::is_one_of<MinOrMaxTy, affine::AffineMinOp,
+                      affine::AffineMaxOp>::value,
+      "MinOrMaxTy must be affine::AffineMinOp or affine::AffineMaxOp");
+  SmallVector<IREE::Util::ConstantIntDivisibility> operandDivisibilities;
+  for (auto [operand, divisibility] :
+       llvm::zip(minOrMaxOp.getOperands(), argDivs)) {
+    operandDivisibilities.push_back(
+        getDivisibilityOfOperand(operand, divisibility));
+  }
+
+  SmallVector<IREE::Util::ConstantIntDivisibility> resultDivisibilities =
+      getResultDivisibilities(minOrMaxOp.getMap(), operandDivisibilities);
+
+  IREE::Util::ConstantIntDivisibility resultDivisibility =
+      resultDivisibilities.pop_back_val();
+  for (auto divisibility : resultDivisibilities) {
+    resultDivisibility = resultDivisibility.getUnion(divisibility);
+  }
+  setResultDivs(minOrMaxOp.getResult(), resultDivisibility);
+}
+
+struct AffineMinInferIntDivisibilityOpInterface
+    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          AffineMinInferIntDivisibilityOpInterface, affine::AffineMinOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto affineMinOp = cast<affine::AffineMinOp>(op);
+    inferAffineMinOrMaxResultDivisibility(affineMinOp, argDivs, setResultDivs);
+  }
+};
+
+struct AffineMaxInferIntDivisibilityOpInterface
+    : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          AffineMaxInferIntDivisibilityOpInterface, affine::AffineMaxOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto affineMaxOp = cast<affine::AffineMaxOp>(op);
+    inferAffineMinOrMaxResultDivisibility(affineMaxOp, argDivs, setResultDivs);
+  }
+};
 
 struct ArithConstantInferIntDivisibilityOpInterface
     : public IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
@@ -104,8 +329,13 @@ struct ArithDivUIInferIntDivisibilityOpInterface
 
     auto lhsDivisibility = getDivisibilityOfOperand(divOp.getLhs(), argDivs[0]);
 
-    uint64_t divUDiv = lhsDivisibility.udiv() / intVal.getZExtValue();
-    uint64_t divSDiv = lhsDivisibility.sdiv() / std::abs(intVal.getSExtValue());
+    uint64_t divUDiv = lhsDivisibility.udiv() % intVal.getZExtValue() == 0
+                           ? lhsDivisibility.udiv() / intVal.getZExtValue()
+                           : 1;
+    uint64_t divSDiv =
+        lhsDivisibility.sdiv() % std::abs(intVal.getSExtValue()) == 0
+            ? lhsDivisibility.sdiv() / std::abs(intVal.getSExtValue())
+            : 1;
 
     setResultDivs(divOp, IREE::Util::ConstantIntDivisibility(divUDiv, divSDiv));
   }
@@ -906,6 +1136,7 @@ struct SCFIndexSwitchOpMutableRegionBranchOpInterface
 
 void registerUtilExternalModels(DialectRegistry &registry) {
   // Must ensure that any dependent dialects are registered.
+  registry.insert<affine::AffineDialect>();
   registry.insert<arith::ArithDialect>();
   registry.insert<linalg::LinalgDialect>();
   registry.insert<ml_program::MLProgramDialect>();
@@ -931,6 +1162,16 @@ void registerUtilExternalModels(DialectRegistry &registry) {
     arith::DivUIOp::attachInterface<ArithDivUIInferIntDivisibilityOpInterface>(
         *context);
   });
+
+  registry.addExtension(
+      +[](MLIRContext *context, affine::AffineDialect *dialect) {
+        affine::AffineApplyOp::attachInterface<
+            AffineApplyInferIntDivisibilityOpInterface>(*context);
+        affine::AffineMinOp::attachInterface<
+            AffineMinInferIntDivisibilityOpInterface>(*context);
+        affine::AffineMaxOp::attachInterface<
+            AffineMaxInferIntDivisibilityOpInterface>(*context);
+      });
 
   registry.addExtension(
       +[](MLIRContext *context, tensor::TensorDialect *dialect) {
