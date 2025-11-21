@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Utils/AttributeUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -2217,6 +2218,96 @@ GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
   return Base::get(context, b.getBoolAttr(prefetchSharedMemory),
                    b.getBoolAttr(noReduceSharedMemoryBankConflicts),
                    b.getBoolAttr(useIgemmConvolution), strategyAttr);
+}
+
+//===----------------------------------------------------------------------===//
+// DimensionExpansionAttr
+//===----------------------------------------------------------------------===//
+
+void setDimensionExpansion(Operation *op, Attribute config) {
+  op->setAttr(kExpandDimsAttrName, config);
+}
+
+DimensionExpansionAttr
+DimensionExpansionAttr::get(MLIRContext *context,
+                            ArrayRef<ReassociationIndices> reassociations,
+                            ArrayRef<int64_t> outputShape) {
+  Builder b(context);
+  SmallVector<Attribute> reassociationAttrs;
+  for (const auto &indices : reassociations) {
+    SmallVector<Attribute> indexAttrs;
+    for (int64_t idx : indices) {
+      indexAttrs.push_back(b.getI64IntegerAttr(idx));
+    }
+    reassociationAttrs.push_back(b.getArrayAttr(indexAttrs));
+  }
+  ArrayAttr reassociationAttr = b.getArrayAttr(reassociationAttrs);
+  DenseI64ArrayAttr outputShapeAttr = b.getDenseI64ArrayAttr(outputShape);
+  return get(context, reassociationAttr, outputShapeAttr);
+}
+
+LogicalResult
+DimensionExpansionAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                               ArrayAttr reassociations,
+                               DenseI64ArrayAttr outputShape) {
+  if (reassociations.empty()) {
+    return emitError() << "reassociations cannot be empty";
+  }
+  llvm::SmallDenseSet<int64_t> coveredDims;
+  int64_t maxDim = -1;
+  for (auto [origDim, attr] : llvm::enumerate(reassociations)) {
+    auto indexArray = dyn_cast<ArrayAttr>(attr);
+    if (!indexArray) {
+      return emitError() << "reassociation at index " << origDim
+                         << " must be an array";
+    }
+    if (indexArray.empty()) {
+      return emitError() << "reassociation at index " << origDim
+                         << " cannot be empty";
+    }
+    int64_t prevIdx = -1;
+    for (auto [i, idxAttr] : llvm::enumerate(indexArray)) {
+      auto intAttr = dyn_cast<IntegerAttr>(idxAttr);
+      if (!intAttr) {
+        return emitError() << "reassociation index at [" << origDim << "][" << i
+                           << "] must be an integer";
+      }
+      int64_t idx = intAttr.getInt();
+      if (idx < 0) {
+        return emitError() << "reassociation index " << idx << " at ["
+                           << origDim << "][" << i << "] must be non-negative";
+      }
+      if (i > 0 && idx != prevIdx + 1) {
+        return emitError() << "reassociation indices at [" << origDim
+                           << "] must be consecutive, but got " << prevIdx
+                           << " followed by " << idx;
+      }
+      if (coveredDims.contains(idx)) {
+        return emitError() << "output dimension " << idx
+                           << " appears in multiple reassociations";
+      }
+      coveredDims.insert(idx);
+      maxDim = std::max(maxDim, idx);
+      prevIdx = idx;
+    }
+  }
+
+  int64_t expectedOutputRank = maxDim + 1;
+  for (int64_t i = 0; i < expectedOutputRank; ++i) {
+    if (!coveredDims.contains(i)) {
+      return emitError() << "output dimension " << i
+                         << " is not covered by any reassociation";
+    }
+  }
+
+  ArrayRef<int64_t> outputShapeArray = outputShape.asArrayRef();
+  if (outputShapeArray.size() != static_cast<size_t>(expectedOutputRank)) {
+    return emitError() << "output_shape size (" << outputShapeArray.size()
+                       << ") doesn't match number of output dimensions ("
+                       << expectedOutputRank << ")";
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

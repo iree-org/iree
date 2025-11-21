@@ -295,6 +295,17 @@ StringRef getTilingLevelName(GPU::TilingLevel level);
 Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                                 Attribute attr);
 
+
+//===----------------------------------------------------------------------===//
+// Helpers for getting/setting `iree_gpu.dimension_expansion` attribute on root
+//===----------------------------------------------------------------------===//
+
+constexpr StringLiteral kExpandDimsAttrName = "expand_dims";
+template <typename ConfigTy>
+ConfigTy getDimensionExpansion(Operation *op) {
+  return op->getAttrOfType<ConfigTy>(kExpandDimsAttrName);
+}
+void setDimensionExpansion(Operation *op, Attribute config);
 } // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off

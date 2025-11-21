@@ -106,7 +106,7 @@ func.func @matmul_DYN_32_32(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC, %ar
 !TC = tensor<?x4096xf32>
 !DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x4096xf32>>
 func.func @matmul_DYN_4096_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC, %arg4 : index) {
-//      CHECK:         #iree_gpu.lowering_config<{expand_dims = {{\[}}[], [], []], lane_basis =  {{\[}}[1, 1, 64], [0, 1, 2]],
+//      CHECK:         #iree_gpu.lowering_config<{lane_basis =  {{\[}}[1, 1, 64], [0, 1, 2]],
 // CHECK-SAME:         partial_reduction = [0, 0, 4096], subgroup_basis =  {{\[}}[1, 1, 16], [0, 1, 2]], thread = [0, 0, 4], workgroup = [1, 1, 0]}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
   iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [%arg4, 4096], strides = [1, 1] : !TC -> !DTC{%arg4}
@@ -194,7 +194,7 @@ func.func @matmul_4096_4096_DYN(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC)
 !DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32>>
 func.func @matmul_DYN_1_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC, %arg4 : index, %arg5 : index, %arg6 : index) {
 
-  //      CHECK:     {expand_dims = {{\[}}[], [], []], lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+  //      CHECK:     {lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
   // CHECK-SAME:     partial_reduction = [0, 0, 4096], subgroup_basis = {{\[}}[1, 1, 16], [0, 1, 2]],
   // CHECK-SAME:     thread = [0, 0, 4], workgroup = [1, 1, 0]}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC

@@ -13,8 +13,9 @@ func.func @expand_matvec(%a: tensor<4x16384xf16>, %b: tensor<1x16384xf16>) -> te
     iterator_types = ["parallel", "parallel", "reduction"]}
     ins(%a, %b : tensor<4x16384xf16>, tensor<1x16384xf16>)
     outs(%fill : tensor<4x1xf32>)
-    attrs = {lowering_config = #iree_gpu.lowering_config<{
-      expand_dims = [[], [], [1, 8]],
+    attrs = {
+      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
+      lowering_config = #iree_gpu.lowering_config<{
       lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]],
       partial_reduction = [0, 0, 64, 0],
       subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]],
@@ -53,8 +54,9 @@ func.func @expand_dynamic_dim(%a: tensor<4x?xf16>, %b: tensor<1x?xf16>) -> tenso
     iterator_types = ["parallel", "parallel", "reduction"]}
     ins(%a, %b : tensor<4x?xf16>, tensor<1x?xf16>)
     outs(%fill : tensor<4x1xf32>)
-    attrs = {lowering_config = #iree_gpu.lowering_config<{
-      expand_dims = [[], [], [1, 8]],
+    attrs = {
+      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
+      lowering_config = #iree_gpu.lowering_config<{
       lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]],
       partial_reduction = [0, 0, 64, 0],
       subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]],
@@ -86,8 +88,9 @@ func.func @expand_not_divisible(%a: tensor<4x127xf16>, %b: tensor<1x127xf16>) ->
     iterator_types = ["parallel", "parallel", "reduction"]}
     ins(%a, %b : tensor<4x127xf16>, tensor<1x127xf16>)
     outs(%fill : tensor<4x1xf32>)
-    attrs = {lowering_config = #iree_gpu.lowering_config<{
-      expand_dims = [[], [], [1, 8]],
+    attrs = {
+      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
+      lowering_config = #iree_gpu.lowering_config<{
       lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]],
       partial_reduction = [0, 0, 64, 0],
       subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]],

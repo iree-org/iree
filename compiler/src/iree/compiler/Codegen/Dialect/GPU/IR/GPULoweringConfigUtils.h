@@ -31,28 +31,6 @@ struct Basis {
   SmallVector<int64_t> mapping;
 };
 
-// Dimension Expansion consists of a list of expansion factor arrays that
-// specifies how each dimension in the original iteration space should be split.
-// Each dimension can either remain unchanged (empty array) or be expanded into
-// multiple dimensions (non-empty array of factors).
-//
-// For example, given a DimensionExpansion of [[], [], [1, 8]]:
-// - The first dimension remains unchanged (empty array).
-// - The second dimension remains unchanged (empty array).
-// - The third dimension is split into two dimensions with tile sizes 1 and 8.
-//
-// The expansion factors directly specify the tile sizes for the split
-// dimensions. The iteration space of the original dimension is split by the
-// product of the expansion factors. For the above example:
-// - Original d2 is split such that: d2_outer = d2 / 8, d2_inner = 8.
-// - The product (1 * 8 = 8) determines the split factor of the iteration space
-// corresponding to partial_reduction[d2].
-//
-// Currently, Dimension Expansion is only expected to expand dimensions to
-// exactly 2 dimensions.
-using DimensionExpansion = SmallVector<ReassociationIndices>;
-FailureOr<DimensionExpansion>
-getDimensionExpansion(IREE::GPU::LoweringConfigAttr config);
 
 // Helper to retrieve/set distribution basis.
 FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,

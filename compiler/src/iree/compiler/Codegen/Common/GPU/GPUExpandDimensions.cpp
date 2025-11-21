@@ -13,6 +13,8 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
+#include "llvm/Support/DebugLog.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -35,51 +37,45 @@ struct GPUExpandDimensionsPass final
 };
 } // namespace
 
-// Map from tensor dimension index to thread level tile size.
 using DimensionExpansionInfo = llvm::SmallDenseMap<unsigned, int64_t>;
 
 static DimensionExpansionInfo
-getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
-  IREE::GPU::DimensionExpansion expansionFactors =
-      IREE::GPU::getDimensionExpansion(config).value();
-
+getExpansionInfo(IREE::GPU::DimensionExpansionAttr config) {
   DimensionExpansionInfo expansionInfo;
 
-  for (auto [origDimIdx, factors] : llvm::enumerate(expansionFactors)) {
-    if (!factors.empty()) {
-      int64_t expansionFactor = 1;
-      for (int64_t factor : factors) {
-        if (factor > 1) {
-          expansionFactor *= factor;
-        }
-      }
-      if (expansionFactor > 1) {
-        expansionInfo[origDimIdx] = expansionFactor;
-      }
-    }
+  auto reassociationIndices = config.getReassociationIndices();
+  auto outputShape = config.getOutputShape();
+
+  auto computeExpansion = [&](ArrayRef<int64_t> indices) {
+    return llvm::product_of(llvm::make_filter_range(
+        llvm::map_range(indices, [&](int64_t i) { return outputShape[i]; }),
+        [](int64_t size) { return !ShapedType::isDynamic(size); }));
+  };
+
+  for (ReassociationIndices indices : reassociationIndices) {
+    if (indices.size() <= 1)
+      continue;
+
+    expansionInfo[indices.front()] = computeExpansion(indices);
   }
 
-  LLVM_DEBUG(for (auto [dim, factor]
-                  : expansionInfo) {
-    llvm::dbgs() << "Dimension " << dim << " will be expanded by factor "
-                 << factor << "\n";
-  });
+  for (auto [dim, factor] : expansionInfo) {
+    LDBG() << "Dimension " << dim << " will be expanded by factor " << factor;
+  }
 
   return expansionInfo;
 }
 
 static LogicalResult expandIterationSpace(RewriterBase &rewriter,
                                           linalg::LinalgOp op) {
-  auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
-  if (!loweringConfig) {
+  auto dimensionExpansionConfig =
+      IREE::GPU::getDimensionExpansion<IREE::GPU::DimensionExpansionAttr>(op);
+  if (!dimensionExpansionConfig) {
     return success();
   }
 
-  if (failed(IREE::GPU::getDimensionExpansion(loweringConfig))) {
-    return success();
-  }
-
-  DimensionExpansionInfo expansionInfo = getExpansionInfo(loweringConfig);
+  DimensionExpansionInfo expansionInfo =
+      getExpansionInfo(dimensionExpansionConfig);
   if (expansionInfo.empty()) {
     return success();
   }
@@ -110,11 +106,7 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     }
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "Expanding dimensions for op:\n";
-    op->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n";
-  });
+  LDBG() << "Expanding dimensions for op: " << *op;
 
   SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
 
@@ -162,20 +154,22 @@ void GPUExpandDimensionsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
 
-  auto walkResult = operation->walk([&](Operation *op) -> WalkResult {
-    rewriter.setInsertionPoint(op);
-    return expandIterationSpace(rewriter, op);
+  SmallVector<Operation *> worklist;
+  operation->walk([&](Operation *op) {
+    if (IREE::GPU::getDimensionExpansion<IREE::GPU::DimensionExpansionAttr>(
+            op)) {
+      worklist.push_back(op);
+    }
   });
 
-  if (walkResult.wasInterrupted()) {
-    return signalPassFailure();
+  for (Operation *op : worklist) {
+    rewriter.setInsertionPoint(op);
+    if (failed(expandIterationSpace(rewriter, op))) {
+      return signalPassFailure();
+    }
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "After expanding dimensions:\n";
-    operation->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n";
-  });
+  LDBG() << "After expanding dimensions: " << *operation;
 
   ConfigTrackingListener listener;
   GreedyRewriteConfig config;
@@ -196,11 +190,7 @@ void GPUExpandDimensionsPass::runOnOperation() {
     }
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "After reshape propagation:\n";
-    operation->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n";
-  });
+  LDBG() << "After reshape propagation: " << *operation;
 
   {
     RewritePatternSet removeBarrierOpsPatterns(context);
