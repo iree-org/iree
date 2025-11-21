@@ -10,8 +10,10 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -825,8 +827,29 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
   }
 };
 
-/// Folds iree_tensor_ext.bitcast that only change the inner most dimension into
-/// the source hal.interface.binding.subspan
+/// Folds iree_tensor_ext.bitcast that only changes the innermost dimension
+/// into the source hal.interface.binding.subspan.
+///
+/// This pattern matches the following:
+///   %subspan = hal.interface.binding.subspan ... :
+///       !dispatch_tensor<readonly:tensor<MxNx(2K)xf4E2M1FN>>
+///   %tensor = dispatch.tensor.load %subspan :
+///       !dispatch_tensor<readonly:tensor<MxNx(2K)xf4E2M1FN>> ->
+///       tensor<MxNx(2K)xf4E2M1FN>
+///   %bitcast = iree_tensor_ext.bitcast %tensor :
+///       tensor<MxNx(2K)xf4E2M1FN> -> tensor<MxNxKxi8>
+///
+/// And transforms it into:
+///   %subspan = hal.interface.binding.subspan ... :
+///       !dispatch_tensor<readonly:tensor<MxNxKxi8>>
+///   %tensor = dispatch.tensor.load %subspan :
+///       !dispatch_tensor<readonly:tensor<MxNxKxi8>> -> tensor<MxNxKxi8>
+///
+/// This is valid when:
+/// - Only the innermost dimension size and element type change
+/// - The bitcast represents a reinterpretation (e.g., f4E2M1FN -> i8)
+/// - The total byte size of the innermost dimension remains constant
+/// - The tensor has no encoding and the load is a full slice
 struct FoldInnerBitcastIntoInterfaceTensorLoad
     : OpRewritePattern<IREE::TensorExt::BitCastOp> {
   using Base::Base;
@@ -964,6 +987,110 @@ struct FoldInnerBitcastIntoInterfaceTensorStore
         storeOp, TypeRange{}, bitcastSrc, newSubspanOp, storeOp.getTargetDims(),
         storeOp.getOffsets(), storeOp.getSizes(), storeOp.getStrides(),
         storeOp.getStaticOffsets(), newSizes, storeOp.getStaticStrides());
+    return success();
+  }
+};
+
+/// Similar to FoldInnerBitcastIntoInterfaceTensorLoad, but handles the
+/// bufferized load instead:
+///   hal.interface.binding.subspan -> amdgpu.fat_raw_buffer_cast ->
+///   iree_codegen.load_from_buffer -> iree_tensor_ext.bitcast
+struct FoldInnerBitcastIntoLoadFromBuffer
+    : OpRewritePattern<IREE::TensorExt::BitCastOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
+                                PatternRewriter &rewriter) const override {
+    Value bitcastSrc = bitcastOp.getSource();
+
+    // TODO(#22712): This pattern matching is fragile. Simplify this by using
+    // a memref.bitcast or similar operation once available.
+
+    // Step 1: Check for iree_codegen.load_from_buffer.
+    auto loadOp = bitcastSrc.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+    if (!loadOp) {
+      return rewriter.notifyMatchFailure(bitcastOp, "no load_from_buffer");
+    }
+    Value loadBuffer = loadOp.getBuffer();
+
+    // Step 2: Check for amdgpu.fat_raw_buffer_cast.
+    auto bufferCastOp = loadBuffer.getDefiningOp<amdgpu::FatRawBufferCastOp>();
+    if (!bufferCastOp) {
+      return rewriter.notifyMatchFailure(bitcastOp, "no fat_raw_buffer_cast");
+    }
+    Value bufferCastSource = bufferCastOp.getSource();
+
+    // Step 3: Check for hal.interface.binding.subspan.
+    auto subspanOp =
+        bufferCastSource.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!subspanOp) {
+      return rewriter.notifyMatchFailure(bitcastOp, "no binding subspan");
+    }
+
+    // Now we have the full bufferized load chain verified.
+    auto subspanType = cast<MemRefType>(subspanOp.getType());
+    auto bitcastSrcType = cast<RankedTensorType>(bitcastSrc.getType());
+    auto bitcastResType = cast<RankedTensorType>(bitcastOp.getType());
+
+    if (bitcastOp.getSourceDims() != bitcastOp.getResultDims() ||
+        bitcastSrcType.getShape().drop_back() !=
+            bitcastResType.getShape().drop_back() ||
+        ShapedType::isDynamic(bitcastSrcType.getShape().back())) {
+      return rewriter.notifyMatchFailure(
+          bitcastOp,
+          "expected that only the innermost dimension is changed by the "
+          "bitcast op");
+    }
+
+    if (subspanType.getShape().back() != bitcastSrcType.getShape().back()) {
+      return rewriter.notifyMatchFailure(
+          bitcastOp,
+          "innermost dimension doesn't match between subspan and tensor");
+    }
+
+    int64_t newInnerSize = bitcastResType.getShape().back();
+    int64_t oldInnerSize = bitcastSrcType.getShape().back();
+
+    // Adjust the innermost dimension size.
+    MemRefLayoutAttrInterface newSubspanLayout;
+    SmallVector<int64_t> newSubspanShape(subspanType.getShape());
+    newSubspanShape.back() = newInnerSize;
+    // Scale offset and strides by (newInnerSize / oldInnerSize).
+    if (auto stridedLayout =
+            dyn_cast_if_present<StridedLayoutAttr>(subspanType.getLayout())) {
+      int64_t newOffset = stridedLayout.getOffset();
+      if (ShapedType::isStatic(newOffset)) {
+        newOffset = (newOffset * newInnerSize) / oldInnerSize;
+      }
+      SmallVector<int64_t> newStrides(stridedLayout.getStrides());
+      for (size_t i = 0; i + 1 < newStrides.size(); ++i) {
+        if (ShapedType::isStatic(newStrides[i])) {
+          newStrides[i] = (newStrides[i] * newInnerSize) / oldInnerSize;
+        }
+      }
+      newSubspanLayout =
+          StridedLayoutAttr::get(rewriter.getContext(), newOffset, newStrides);
+    }
+    // Use the bitcast's result element type.
+    auto newSubspanType =
+        MemRefType::get(newSubspanShape, bitcastResType.getElementType(),
+                        newSubspanLayout, subspanType.getMemorySpace());
+
+    rewriter.setInsertionPoint(subspanOp);
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+        subspanOp.getBinding(), subspanOp.getByteOffset(),
+        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
+        subspanOp.getDescriptorFlagsAttr());
+
+    rewriter.setInsertionPoint(bufferCastOp);
+    Value newBufferCastOp = amdgpu::FatRawBufferCastOp::create(
+        rewriter, bufferCastOp.getLoc(), newSubspanOp,
+        bufferCastOp.getValidBytes(), bufferCastOp.getCacheSwizzleStride(),
+        bufferCastOp.getBoundsCheck(), bufferCastOp.getResetOffset());
+
+    rewriter.replaceOpWithNewOp<IREE::Codegen::LoadFromBufferOp>(
+        loadOp, bitcastResType, newBufferCastOp);
     return success();
   }
 };
@@ -1178,8 +1305,8 @@ void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
 void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns) {
   patterns.insert<
       FoldCollapseShapeIntoLoadFromBuffer, FoldExpandShapeIntoLoadFromBuffer,
-      FoldCollapseShapeIntoStoreToBuffer, FoldExpandShapeIntoStoreToBuffer>(
-      patterns.getContext());
+      FoldCollapseShapeIntoStoreToBuffer, FoldExpandShapeIntoStoreToBuffer,
+      FoldInnerBitcastIntoLoadFromBuffer>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler
