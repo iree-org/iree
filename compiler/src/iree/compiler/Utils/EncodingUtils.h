@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_UTILS_ATTRIBUTEUTILS_H_
-#define IREE_COMPILER_UTILS_ATTRIBUTEUTILS_H_
+#ifndef IREE_COMPILER_UTILS_ENCODINGUTILS_H_
+#define IREE_COMPILER_UTILS_ENCODINGUTILS_H_
 
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/AsmState.h"
@@ -36,4 +36,4 @@ void printDynamicI64DenseArrayAttr(AsmPrinter &printer, DenseI64ArrayAttr attr);
 
 } // namespace mlir::iree_compiler
 
-#endif // IREE_COMPILER_UTILS_ATTRIBUTEUTILS_H_
+#endif // IREE_COMPILER_UTILS_ENCODINGUTILS_H_

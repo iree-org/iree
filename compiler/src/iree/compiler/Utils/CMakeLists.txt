@@ -14,7 +14,7 @@ iree_cc_library(
   NAME
     Utils
   HDRS
-    "AttributeUtils.h"
+    "EncodingUtils.h"
     "ConversionUtils.h"
     "EmbeddedDataDirectory.h"
     "EquivalenceUtils.h"
@@ -34,7 +34,7 @@ iree_cc_library(
     "ToolUtils.h"
     "TracingUtils.h"
   SRCS
-    "AttributeUtils.cpp"
+    "EncodingUtils.cpp"
     "ConversionUtils.cpp"
     "EquivalenceUtils.cpp"
     "FlatbufferUtils.cpp"
