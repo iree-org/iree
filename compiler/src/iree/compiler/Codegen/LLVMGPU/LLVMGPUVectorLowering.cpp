@@ -359,14 +359,11 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
   }
 
 private:
-  static Value broadcastMissingDims(PatternRewriter &rewriter, Location loc,
-                                      AffineMap operandMap, AffineMap accMap,
-                                      ArrayAttr iteratorTypes,
-                                      unsigned numParallelDims,
-                                      VectorType resultType, Value operand,
-                                      ArrayRef<int64_t> operandShape,
-                                      Type elemType,
-                                      SmallVectorImpl<int64_t> &transpose) {
+  static Value broadcastMissingDims(
+      PatternRewriter &rewriter, Location loc, AffineMap operandMap,
+      AffineMap accMap, ArrayAttr iteratorTypes, unsigned numParallelDims,
+      VectorType resultType, Value operand, ArrayRef<int64_t> operandShape,
+      Type elemType, SmallVectorImpl<int64_t> &transpose) {
     SmallVector<int64_t> reductionDims =
         getReductionIndex(operandMap, iteratorTypes);
 
