@@ -1,3 +1,5 @@
+// RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory{num-stages=3}))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK-3STAGE
+
 // RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory),cse,canonicalize)" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
 // RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory{num-stages=1}))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK-1STAGE
 // RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory{num-stages=3}))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK-3STAGE
@@ -14,11 +16,13 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
   %c1 = arith.constant 1 : index
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
-  // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
-  // CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
+  // CHECK-DAG: %[[SUBVIEW:.*]] = memref.subview %[[SHARED]][0, 0]
+  // CHECK-DAG: %[[CAST:.*]] = memref.cast %[[SUBVIEW]]
+  // CHECK: vector.transfer_write %[[PRO_READ]], %[[SUBVIEW]][%[[C0]]]
+  // CHECK: %[[OUT:.*]]:2 = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]], %[[BUF:.*]] = %[[CAST]])
   // CHECK-1STAGE: scf.for %{{.*}} = %c0 to %c128 step %c1
   // 3-stage prologue: 2 reads
   // CHECK-3STAGE: vector.transfer_read %arg0
@@ -34,18 +38,18 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
     %1 = vector.transfer_read %arg0[%arg1], %cst_0 : memref<128xf32>, vector<1xf32>
     vector.transfer_write %1, %alloc[%c0] {in_bounds = [true]} : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
     // CHECK: gpu.barrier
-    // CHECK: %[[COMPUTE_READ:.*]] = vector.transfer_read %[[SHARED]][%[[C0]]]
+    // CHECK: %[[COMPUTE_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]]]
     %2 = vector.transfer_read %alloc[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
     // CHECK: %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
     %3 = arith.addf %2, %arg2 : vector<1xf32>
     // CHECK: gpu.barrier
     // CHECK: amdgpu.sched_barrier allow = <none>
-    // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
+    // CHECK: vector.transfer_write %[[KER_READ]], %{{.*}}[%[[C0]]]
     // CHECK: scf.yield %[[COMPUTE]]
 
     // 3-stage ordering: compute -> write -> read
     // CHECK-3STAGE: gpu.barrier
-    // CHECK-3STAGE: vector.transfer_read %alloc
+    // CHECK-3STAGE: vector.transfer_read %{{.*}}
     // CHECK-3STAGE: arith.addf
     // CHECK-3STAGE: gpu.barrier
     // CHECK-3STAGE: amdgpu.sched_barrier allow = <none>
@@ -58,16 +62,16 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
   }
   // 2-stage epilogue: 1 iteration
   // CHECK: gpu.barrier
-  // CHECK: %[[EPI_READ:.*]] = vector.transfer_read %[[SHARED]][%[[C0]]]
-  // CHECK: %[[EPI_COMPUTE:.*]] = arith.addf %[[EPI_READ]], %[[OUT]]
+  // CHECK: %[[EPI_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]]]
+  // CHECK: %[[EPI_COMPUTE:.*]] = arith.addf %[[EPI_READ]], %[[OUT]]#0
   // CHECK: vector.transfer_write %[[EPI_COMPUTE]], %[[GLOBAL]][%[[C0]]]
 
   // 3-stage epilogue: 2 iterations
   // CHECK-3STAGE: gpu.barrier
-  // CHECK-3STAGE: vector.transfer_read %alloc
+  // CHECK-3STAGE: vector.transfer_read %{{.*}}
   // CHECK-3STAGE: arith.addf
   // CHECK-3STAGE: vector.transfer_write
-  // CHECK-3STAGE: vector.transfer_read %alloc
+  // CHECK-3STAGE: vector.transfer_read %{{.*}}
   // CHECK-3STAGE: arith.addf
   // CHECK-3STAGE: vector.transfer_write
   vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
@@ -88,18 +92,20 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
   %c1 = arith.constant 1 : index
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
-  // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
-  // CHECK: %[[OUT:.*]]:2 = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]], %[[ARG1:.*]] = %[[CST]])
+  // CHECK-DAG: %[[SUBVIEW:.*]] = memref.subview %[[SHARED]][0, 0]
+  // CHECK-DAG: %[[CAST:.*]] = memref.cast %[[SUBVIEW]]
+  // CHECK: vector.transfer_write %[[PRO_READ]], %[[SUBVIEW]][%[[C0]]]
+  // CHECK: %[[OUT:.*]]:3 = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]], %[[ARG1:.*]] = %[[CST]], %[[BUF:.*]] = %[[CAST]])
   %0:2 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst, %arg3 = %cst) -> (vector<1xf32>, vector<1xf32>) {
     // CHECK-DAG: %[[IVPLUS1:.*]] = arith.addi %[[IV]], %[[C1]]
     // CHECK: %[[KER_READ:.*]] = vector.transfer_read %[[GLOBAL]][%[[IVPLUS1]]]
     %1 = vector.transfer_read %arg0[%arg1], %cst_0 : memref<128xf32>, vector<1xf32>
     vector.transfer_write %1, %alloc[%c0] {in_bounds = [true]} : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
     // CHECK: gpu.barrier
-    // CHECK: %[[COMPUTE_READ:.*]] = vector.transfer_read %[[SHARED]][%[[C0]]]
+    // CHECK: %[[COMPUTE_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]]]
     %2 = vector.transfer_read %alloc[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
     // CHECK: %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
     // CHECK: %[[COMPUTE2:.*]] = arith.addf %[[COMPUTE]], %[[ARG1]]
@@ -107,12 +113,12 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
     %4 = arith.addf %3, %arg3 : vector<1xf32>
     // CHECK: gpu.barrier
     // CHECK: amdgpu.sched_barrier allow = <none>
-    // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
+    // CHECK: vector.transfer_write %[[KER_READ]], %{{.*}}[%[[C0]]]
     // CHECK: scf.yield %[[COMPUTE]], %[[COMPUTE2]]
     scf.yield %3, %4 : vector<1xf32>, vector<1xf32>
   }
   // CHECK: gpu.barrier
-  // CHECK: %[[EPI_READ:.*]] = vector.transfer_read %[[SHARED]][%[[C0]]]
+  // CHECK: %[[EPI_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]]]
   // CHECK: %[[EPI_COMPUTE:.*]] = arith.addf %[[EPI_READ]], %[[OUT]]#0
   // CHECK: %[[EPI_COMPUTE2:.*]] = arith.addf %[[EPI_COMPUTE]], %[[OUT]]#1
   // CHECK: return %[[EPI_COMPUTE]], %[[EPI_COMPUTE2]]
@@ -134,11 +140,13 @@ func.func @prefetch_add_with_if(%arg0: memref<128xf32>) {
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
   %true = arith.constant true
-  // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
-  // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
-  // CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
+  // CHECK-DAG: %[[SUBVIEW:.*]] = memref.subview %[[SHARED]][0, 0]
+  // CHECK-DAG: %[[CAST:.*]] = memref.cast %[[SUBVIEW]]
+  // CHECK: vector.transfer_write %[[PRO_READ]], %[[SUBVIEW]][%[[C0]]]
+  // CHECK: %[[OUT:.*]]:2 = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]], %[[BUF:.*]] = %[[CAST]])
   %0 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst) -> (vector<1xf32>) {
     %dummy = memref.load %arg0[%arg1] : memref<128xf32>
     %5 = arith.cmpf "oeq", %cst_0, %dummy : f32
@@ -157,19 +165,19 @@ func.func @prefetch_add_with_if(%arg0: memref<128xf32>) {
     %1 = vector.transfer_read %arg0[%updated], %cst_0 : memref<128xf32>, vector<1xf32>
     vector.transfer_write %1, %alloc[%c0] {in_bounds = [true]} : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
     // CHECK: gpu.barrier
-    // CHECK: %[[COMPUTE_READ:.*]] = vector.transfer_read %[[SHARED]][%[[C0]]]
+    // CHECK: %[[COMPUTE_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]]]
     %2 = vector.transfer_read %alloc[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
     // CHECK: %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
     %3 = arith.addf %2, %arg2 : vector<1xf32>
     // CHECK: gpu.barrier
     // CHECK: amdgpu.sched_barrier allow = <none>
-    // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
+    // CHECK: vector.transfer_write %[[KER_READ]], %{{.*}}[%[[C0]]]
     // CHECK: scf.yield %[[COMPUTE]]
     scf.yield %3 : vector<1xf32>
   }
   // CHECK: gpu.barrier
-  // CHECK: %[[EPI_READ:.*]] = vector.transfer_read %[[SHARED]][%[[C0]]]
-  // CHECK: %[[EPI_COMPUTE:.*]] = arith.addf %[[EPI_READ]], %[[OUT]]
+  // CHECK: %[[EPI_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]]]
+  // CHECK: %[[EPI_COMPUTE:.*]] = arith.addf %[[EPI_READ]], %[[OUT]]#0
   // CHECK: vector.transfer_write %[[EPI_COMPUTE]], %[[GLOBAL]][%[[C0]]]
   vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
@@ -227,17 +235,17 @@ func.func @prefetch_scf_if(%arg0: memref<128xf32>, %cond : i1) {
 // CHECK-DAG: %[[CST_0:.*]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
 // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
-// CHECK-DAG: %[[WG_ALLOC:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+// CHECK-DAG: %[[WG_ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
 // CHECK-DAG: %[[PRIV_ALLOC:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 
 // CHECK: scf.if %[[COND]] {
 // CHECK:   %[[IF_READ:.*]] = vector.transfer_read %[[GLOBAL]][%[[C0]]]
 // CHECK:   vector.transfer_write %[[IF_READ]], %[[PRIV_ALLOC]][%[[C0]]]
 // CHECK:   %[[PRIV_READ:.*]] = vector.transfer_read %[[PRIV_ALLOC]][%[[C0]]]
-// CHECK:   vector.transfer_write %[[PRIV_READ]], %[[WG_ALLOC]][%[[C0]]]
+// CHECK:   vector.transfer_write %[[PRIV_READ]], %{{.*}}[%[[C0]]]
 // CHECK: }
 
-// CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
+// CHECK: %[[OUT:.*]]:2 = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]], %[[BUF:.*]] = {{.*}}) -> (vector<1xf32>, memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>) {
 // CHECK-DAG:   %[[PRIV_ALLOC2:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 // CHECK-DAG:   %[[IVP1:.*]] = arith.addi %[[IV]], %[[C1]]
 // CHECK:   scf.if %[[COND]] {
@@ -245,19 +253,19 @@ func.func @prefetch_scf_if(%arg0: memref<128xf32>, %cond : i1) {
 // CHECK:     vector.transfer_write %[[KER_READ]], %[[PRIV_ALLOC2]][%[[C0]]]
 // CHECK:   }
 // CHECK:   gpu.barrier
-// CHECK:   %[[COMPUTE_READ:.*]] = vector.transfer_read %[[WG_ALLOC]][%[[C0]]]
+// CHECK:   %[[COMPUTE_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]]]
 // CHECK:   %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
 // CHECK:   gpu.barrier
 // CHECK:   amdgpu.sched_barrier allow = <none>
 // CHECK:   scf.if %[[COND]] {
 // CHECK:     %[[COMPUTE_RELOAD:.*]] = vector.transfer_read %[[PRIV_ALLOC2]][%[[C0]]]
-// CHECK:     vector.transfer_write %[[COMPUTE_RELOAD]], %[[WG_ALLOC]][%[[C0]]]
+// CHECK:     vector.transfer_write %[[COMPUTE_RELOAD]], %{{.*}}[%[[C0]]]
 // CHECK:   }
 // CHECK: scf.yield %[[COMPUTE]]
 
 // CHECK: gpu.barrier
-// CHECK: %[[EPI_READ:.*]] = vector.transfer_read %[[WG_ALLOC]][%[[C0]]]
-// CHECK: %[[EPI_COMPUTE:.*]] = arith.addf %[[EPI_READ]], %[[OUT]]
+// CHECK: %[[EPI_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]]]
+// CHECK: %[[EPI_COMPUTE:.*]] = arith.addf %[[EPI_READ]], %[[OUT]]#0
 // CHECK: vector.transfer_write %[[EPI_COMPUTE]], %[[GLOBAL]][%[[C0]]]
 
 // -----
@@ -343,25 +351,27 @@ func.func @prefetch_scf_if_transientreadwrite(%arg0: memref<128xf32>, %cond : i1
   vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
 }
-// CHECK-DAG: %[[WG_ALLOC:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+// CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[WG_ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
 // CHECK-DAG: %[[PRIV_ALLOC0:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 // CHECK: scf.if
+// CHECK: %[[SUBVIEW:.*]] = memref.subview %[[WG_ALLOC]][0, 0]
 // CHECK: %[[PRIV_ALLOC1:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 // CHECK: scf.if
 // CHECK: %[[INIT:.*]] = vector.transfer_read %[[PRIV_ALLOC1]]
-// CHECK: vector.transfer_write %[[INIT]], %[[WG_ALLOC]]
+// CHECK: vector.transfer_write %[[INIT]], %[[SUBVIEW]][%[[C0]]]
 // CHECK: %[[OUT:.*]] = scf.for
 // CHECK:   %[[PRIV_ALLOC2:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 // CHECK:   scf.if
 // CHECK:   gpu.barrier
-// CHECK:   %[[READ3:.*]] = vector.transfer_read %[[WG_ALLOC]]
+// CHECK:   %[[READ3:.*]] = vector.transfer_read %{{.*}}
 // CHECK:   %[[COMP:.*]] = arith.addf
 // CHECK:   %[[PRIV_ALLOC3:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 // CHECK:   scf.if
 // CHECK:   %[[READ4:.*]] = vector.transfer_read %[[PRIV_ALLOC3]]
 // CHECK:   gpu.barrier
 // CHECK:   amdgpu.sched_barrier allow = <none>
-// CHECK:   vector.transfer_write %[[READ4]], %[[WG_ALLOC]]
+// CHECK:   vector.transfer_write %[[READ4]], %{{.*}}
 // CHECK:   scf.yield %[[COMP]]
 
 // -----
@@ -398,5 +408,29 @@ func.func @prefetch_nested_loop(%arg0: memref<128xf32>) {
     }
     vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   }
+  return
+}
+
+// CHECK-1STAGE-LABEL: @prefetch_double_buffer_test
+// CHECK-1STAGE: %[[ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
+// CHECK-1STAGE: %[[IV:.*]] = affine.apply #map(
+// CHECK-1STAGE: %[[SUBVIEW:.*]] = memref.subview %[[ALLOC]][%[[IV]], 0] [1, 1] [1, 1]
+// CHECK-1STAGE: vector.transfer_write {{.*}}, %[[SUBVIEW]][%c0]
+// CHECK-1STAGE: vector.transfer_read %[[SUBVIEW]][%c0]
+func.func @prefetch_double_buffer_test(%arg0: memref<32xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c32 = arith.constant 32 : index
+  %c1 = arith.constant 1 : index
+  %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %0 = scf.for %arg1 = %c0 to %c32 step %c1 iter_args(%arg2 = %cst) -> (vector<1xf32>) {
+    %1 = vector.transfer_read %arg0[%arg1], %cst_0 : memref<32xf32>, vector<1xf32>
+    vector.transfer_write %1, %alloc[%c0] : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    %2 = vector.transfer_read %alloc[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %3 = arith.addf %2, %arg2 : vector<1xf32>
+    scf.yield %3 : vector<1xf32>
+  }
+  vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<32xf32>
   return
 }

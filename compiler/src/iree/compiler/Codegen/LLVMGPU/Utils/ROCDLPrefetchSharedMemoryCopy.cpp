@@ -16,8 +16,11 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -358,6 +361,33 @@ static void removeBarriers(scf::ForOp forOp) {
   }
 }
 
+// Applies multi-buffering to all shared-memory allocations written by the loop.
+// This enables double buffering without requiring the global multibuffering
+// pass. The rewrite happens up-front so stage classification and pipelining see
+// the post-multibuffer IR.
+static LogicalResult multiBufferSharedAllocations(scf::ForOp forOp,
+                                                  unsigned numBuffers) {
+  SetVector<memref::AllocOp> sharedAllocs;
+
+  forOp->walk([&](vector::TransferWriteOp write) {
+    if (!isSharedMemoryWrite(write))
+      return WalkResult::advance();
+    if (auto alloc = write.getBase().getDefiningOp<memref::AllocOp>())
+      sharedAllocs.insert(alloc);
+    return WalkResult::advance();
+  });
+
+  for (memref::AllocOp alloc : sharedAllocs) {
+    if (failed(memref::multiBuffer(alloc, numBuffers,
+                                   /*skipOverrideAnalysis=*/true))) {
+      alloc.emitError("failed to multi-buffer shared memory for pipelining");
+      return failure();
+    }
+  }
+
+  return success();
+}
+
 // Populates the opToStage map by assigning stages to operations based on
 // stage classification and number of stages.
 static void
@@ -672,7 +702,11 @@ dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp,
                                                unsigned numStages) {
-  // No prefetching needed for single-stage pipelining.
+  if (failed(multiBufferSharedAllocations(forOp, /*numBuffers=*/2))) {
+    return failure();
+  }
+
+  // No pipelining for single-stage mode; multi-buffering is sufficient.
   if (numStages <= 1) {
     return forOp;
   }
