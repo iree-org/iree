@@ -240,6 +240,11 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
+    auto resultVecType = dyn_cast<VectorType>(op.getResultType());
+    if (!resultVecType || resultVecType.isScalable()) {
+      return failure();
+    }
+
     auto maybeAccVecType = dyn_cast<VectorType>(op.getAccType());
     if (maybeAccVecType && maybeAccVecType.isScalable()) {
       return failure();
@@ -285,7 +290,6 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     // Broadcast operands for missing parallel dimensions.
     unsigned numParallelDims = accMap.getNumResults();
-    auto resultVecType = cast<VectorType>(op.getResultType());
 
     SmallVector<int64_t> lhsTranspose, rhsTranspose;
     lhs = broadcastMissingDims(
