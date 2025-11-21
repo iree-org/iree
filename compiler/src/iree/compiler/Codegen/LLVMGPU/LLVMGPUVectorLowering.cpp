@@ -251,7 +251,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
-    Type elemType = accVecType.getElementType();
+    auto elemType = getElementTypeOrSelf(op.getAccType());
 
     Location loc = op.getLoc();
     Value lhs = op.getLhs();
