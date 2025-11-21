@@ -184,6 +184,41 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
   }
 };
 
+// Rewrites vector.contracts into a chain of math.fma ops when possible.
+// Starting from the innermost position of the reduction dimension,
+// the lowering emits a single nested FMA chain as follows:
+// fma(a0 ,b0, fma(a1, b1, fma(a2, b2, fma(a3, b3, acc))))
+// where ai and bi are the elements extracted from lhs and rhs vectors
+// respectively along the reduction dimension.
+//
+// Example:
+// #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// vector.contract
+//{
+//    indexing_maps = [#map, #map, #map1],
+//    iterator_types = ["parallel", "parallel", "reduction"],
+//    kind = #vector.kind<add>
+// }
+// %arg0, %arg1, %cst : vector<2x1x8xf16>, vector<2x1x8xf16> into
+// vector<2x1xf16>
+//
+// ==>
+// <Extract lhs/rhs along reduction dim> then:
+// %34 = math.fma %32, %33, %cst : vector<2xf16>
+// %37 = math.fma %35, %36, %34 : vector<2xf16>
+// %40 = math.fma %38, %39, %37 : vector<2xf16>
+// %43 = math.fma %41, %42, %40 : vector<2xf16>
+// %45 = math.fma %44, %45, %43 : vector<2xf16>
+// %49 = math.fma %47, %48, %46 : vector<2xf16>
+// %52 = math.fma %50, %51, %49 : vector<2xf16>
+// %55 = math.fma %53, %54, %52 : vector<2xf16>
+//
+// Previously, contracts of the same form lowered to elementwise multiplies
+// followed by a vector.reduce. This lowering elides the need to reduce the
+// result of the elementwise operations separately and instead accumulates
+// directly result via FMAs, offering more profitable instruction level
+// scheduling on GPUs.
 struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
   using Base::Base;
 
@@ -246,60 +281,15 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     // Broadcast operands for missing parallel dimensions.
     unsigned numParallelDims = accMap.getNumResults();
-    SmallVector<int64_t> lhsReductionDims =
-        getReductionIndex(lhsMap, op.getIteratorTypes());
-    SmallVector<int64_t> rhsReductionDims =
-        getReductionIndex(rhsMap, op.getIteratorTypes());
+    VectorType resultVecType = cast<VectorType>(op.getResultType());
 
-    unsigned numLhsDimToBroadcast =
-        numParallelDims - (lhsMap.getNumResults() - lhsReductionDims.size());
-    unsigned numRhsDimToBroadcast =
-        numParallelDims - (rhsMap.getNumResults() - rhsReductionDims.size());
-
-    SmallVector<int64_t> lhsBroadcastDims;
-    SmallVector<int64_t> lhsTranspose;
-    SmallVector<int64_t> rhsBroadcastDims;
-    SmallVector<int64_t> rhsTranspose;
-
-    for (int64_t dim : lhsReductionDims) {
-      lhsTranspose.push_back(numLhsDimToBroadcast + dim);
-    }
-    for (int64_t dim : rhsReductionDims) {
-      rhsTranspose.push_back(numRhsDimToBroadcast + dim);
-    }
-
-    for (unsigned i = 0; i < numParallelDims; ++i) {
-      unsigned iterDim = accMap.getDimPosition(i);
-
-      std::optional<unsigned> lhsDim = getDimPosition(lhsMap, iterDim);
-      if (lhsDim) {
-        lhsTranspose.push_back(numLhsDimToBroadcast + *lhsDim);
-      } else {
-        lhsBroadcastDims.push_back(
-            cast<VectorType>(op.getResultType()).getDimSize(i));
-        lhsTranspose.push_back(lhsBroadcastDims.size() - 1);
-      }
-
-      std::optional<unsigned> rhsDim = getDimPosition(rhsMap, iterDim);
-      if (rhsDim) {
-        rhsTranspose.push_back(numRhsDimToBroadcast + *rhsDim);
-      } else {
-        rhsBroadcastDims.push_back(
-            cast<VectorType>(op.getResultType()).getDimSize(i));
-        rhsTranspose.push_back(rhsBroadcastDims.size() - 1);
-      }
-    }
-
-    if (!lhsBroadcastDims.empty()) {
-      llvm::append_range(lhsBroadcastDims, lhsShape);
-      auto expandedType = VectorType::get(lhsBroadcastDims, elemType);
-      lhs = vector::BroadcastOp::create(rewriter, loc, expandedType, lhs);
-    }
-    if (!rhsBroadcastDims.empty()) {
-      llvm::append_range(rhsBroadcastDims, rhsShape);
-      auto expandedType = VectorType::get(rhsBroadcastDims, elemType);
-      rhs = vector::BroadcastOp::create(rewriter, loc, expandedType, rhs);
-    }
+    SmallVector<int64_t> lhsTranspose, rhsTranspose;
+    lhs = broadcastMissingDims(
+        rewriter, loc, lhsMap, accMap, op.getIteratorTypes(), numParallelDims,
+        resultVecType, lhs, lhsShape, elemType, lhsTranspose);
+    rhs = broadcastMissingDims(
+        rewriter, loc, rhsMap, accMap, op.getIteratorTypes(), numParallelDims,
+        resultVecType, rhs, rhsShape, elemType, rhsTranspose);
 
     // Apply transposes to get [reduction..., parallel...] layout.
     lhs = vector::TransposeOp::create(rewriter, loc, lhs, lhsTranspose);
@@ -369,6 +359,48 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
   }
 
 private:
+  static Value broadcastMissingDims(PatternRewriter &rewriter, Location loc,
+                                      AffineMap operandMap, AffineMap accMap,
+                                      ArrayAttr iteratorTypes,
+                                      unsigned numParallelDims,
+                                      VectorType resultType, Value operand,
+                                      ArrayRef<int64_t> operandShape,
+                                      Type elemType,
+                                      SmallVectorImpl<int64_t> &transpose) {
+    SmallVector<int64_t> reductionDims =
+        getReductionIndex(operandMap, iteratorTypes);
+
+    unsigned numDimToBroadcast =
+        numParallelDims - (operandMap.getNumResults() - reductionDims.size());
+
+    SmallVector<int64_t> broadcastDims;
+
+    for (int64_t dim : reductionDims) {
+      transpose.push_back(numDimToBroadcast + dim);
+    }
+
+    for (unsigned i = 0; i < numParallelDims; ++i) {
+      unsigned iterDim = accMap.getDimPosition(i);
+
+      std::optional<unsigned> opDim = getDimPosition(operandMap, iterDim);
+      if (opDim) {
+        transpose.push_back(numDimToBroadcast + *opDim);
+      } else {
+        broadcastDims.push_back(resultType.getDimSize(i));
+        transpose.push_back(broadcastDims.size() - 1);
+      }
+    }
+
+    Value result = operand;
+    if (!broadcastDims.empty()) {
+      llvm::append_range(broadcastDims, operandShape);
+      auto expandedType = VectorType::get(broadcastDims, elemType);
+      result = vector::BroadcastOp::create(rewriter, loc, expandedType, result);
+    }
+
+    return result;
+  }
+
   static std::optional<unsigned> getDimPosition(AffineMap map, unsigned dim) {
     for (unsigned i = 0, e = map.getNumResults(); i < e; i++) {
       if (map.getDimPosition(i) == dim)
