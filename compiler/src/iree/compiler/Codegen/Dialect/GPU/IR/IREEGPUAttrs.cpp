@@ -2237,24 +2237,33 @@ bool DerivedThreadConfigAttr::hasTilingLevel(unsigned level) const {
 SmallVector<int64_t>
 UseGlobalLoadDMAAttr::getStaticTilingLevelSizes(unsigned level,
                                                 Operation *op) const {
-  if (level != llvm::to_underlying(GPU::TilingLevel::Thread)) {
+  if (level == llvm::to_underlying(GPU::TilingLevel::Subgroup)) {
+    // Subgroup tile sizes are derived from translation_info, not stored here.
     return {};
   }
-  return globalLoadDMATileSizes(op);
+  if (level == llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    return globalLoadDMATileSizes(op);
+  }
+  return {};
 }
 
 SmallVector<OpFoldResult>
 UseGlobalLoadDMAAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
                                           Operation *op) const {
-  if (level > llvm::to_underlying(GPU::TilingLevel::Subgroup)) {
+  if (level == llvm::to_underlying(GPU::TilingLevel::Subgroup)) {
+    // Subgroup tile sizes are derived from translation_info, not stored here.
     return {};
   }
-  SmallVector<int64_t> sizes = globalLoadDMATileSizes(op);
-  return getAsIndexOpFoldResult(b.getContext(), sizes);
+  if (level == llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    SmallVector<int64_t> sizes = globalLoadDMATileSizes(op);
+    return getAsIndexOpFoldResult(b.getContext(), sizes);
+  }
+  return {};
 }
 
 bool UseGlobalLoadDMAAttr::hasTilingLevel(unsigned level) const {
-  return level == llvm::to_underlying(GPU::TilingLevel::Subgroup);
+  // Subgroup level is not stored in this attribute anymore.
+  return level == llvm::to_underlying(GPU::TilingLevel::Thread);
 }
 
 //===----------------------------------------------------------------------===//

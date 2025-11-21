@@ -88,8 +88,9 @@ def IREEGPU_UseGlobalLoadDma :
   }];
   let description = [{
     Lowering config for when using global load DMA is needed. This is intended for
-    tagging operations that are known to be able to use global load DMA, which might
-    also have its own cofiguration.
+    tagging operations that are known to be able to use global load DMA.
+
+    Tiling sizes are derived from the translation_info's workgroup_size and subgroup_size.
   }];
   let assemblyFormat = "";
   let parameters = (ins);

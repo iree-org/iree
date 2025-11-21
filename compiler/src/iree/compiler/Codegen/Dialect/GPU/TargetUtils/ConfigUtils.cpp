@@ -792,9 +792,12 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       {"reduction", b.getI64ArrayAttr(reductionTileSizes)},
       {"subgroup", b.getI64ArrayAttr(subgroupTileSizes)},
       {"mma_kind", kind}};
+
+  // Use global load DMA attribute (subgroup sizes will be derived from
+  // translation_info).
   Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-  SmallVector<Attribute, 2> promotionArray = {useGlobalDma, useGlobalDma};
-  SmallVector<int64_t, 4> promotionList = {0, 1};
+  SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
+  SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
     // TODO(#22119): We don't use global load DMA for scaled matmuls, because
     // compilation doesn't support it. Once this is fixed, we should use global
