@@ -20,6 +20,7 @@ package(
 
 LDS_SRCS = [
     "lds_matmul.mlir",
+    "lds_matmul_coalesced_dma.mlir",
 ]
 
 iree_check_single_backend_test_suite(

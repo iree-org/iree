@@ -15,6 +15,7 @@ iree_check_single_backend_test_suite(
     check_global_load_rocm_hip
   SRCS
     "lds_matmul.mlir"
+    "lds_matmul_coalesced_dma.mlir"
   TARGET_BACKEND
     "rocm"
   DRIVER
