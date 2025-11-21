@@ -30,16 +30,6 @@ util.func public @tensorSizeOfUnalignedPackedI4() -> index {
 
 // -----
 
-// CHECK-LABEL: @tensorSizeOfUnalignedPackedI12
-util.func public @tensorSizeOfUnalignedPackedI12() -> index {
-  // CHECK-DAG: %[[C2:.+]] = arith.constant 6 : index
-  %0 = stream.tensor.sizeof tensor<3xi12, #iree_encoding.packed_storage> : index
-  // CHECK: return %[[C2]] : index
-  util.return %0 : index
-}
-
-// -----
-
 #encoding_layout = #iree_cpu.vmvx_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 16], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout]>
 util.func public @sizeof_lhs_encoding_dynamic_using_layouts(%arg0: index, %arg1: index) -> index {

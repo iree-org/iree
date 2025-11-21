@@ -129,32 +129,16 @@ static int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
-static Type getExtendedType(Type ty) {
-  auto intTy = dyn_cast<IntegerType>(ty);
-  if (!intTy) {
-    return ty;
-  }
-  unsigned bitWidth = intTy.getWidth();
-  if (bitWidth < 8 || llvm::isPowerOf2_32(bitWidth)) {
-    return ty;
-  }
-  unsigned alignedBitWidth = getRoundedElementByteWidth(intTy) * 8;
-  if (alignedBitWidth == bitWidth) {
-    return ty;
-  }
-  // For integer types that are bigger then 8 bits and are not byte-aligned, we
-  // need to extend them.
-  return IntegerType::get(ty.getContext(), alignedBitWidth,
-                          intTy.getSignedness());
-}
-
 Value PackedStorageAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
-  Type alignedElementType = getExtendedType(type.getElementType());
-  int64_t staticCount = getRoundedElementByteWidth(alignedElementType);
+  unsigned elementBits = getTypeBitWidth(type.getElementType());
+  assert(elementBits <= 8 && "packed_storage only allowed for sub-byte types");
+  assert(llvm::isPowerOf2_32(elementBits) &&
+         "packed_storage only allowed for power-of-two types");
 
   // Calculate static dimensions if there are any
+  int64_t staticCount = 1;
   for (unsigned i = 0; i < type.getRank(); ++i) {
     if (!type.isDynamicDim(i)) {
       staticCount *= type.getDimSize(i);
@@ -170,18 +154,28 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
 
   // For sub-byte element types we need to divide by the number of elements that
   // can be packed into one byte.
-  unsigned elementBits = getTypeBitWidth(alignedElementType);
-  if (elementBits < 8) {
-    if (!llvm::isPowerOf2_32(elementBits)) {
-      // Sub-byte types that are not a power of two are currently not supported.
-      return nullptr;
-    }
-    unsigned elementsPerByte = 8 / elementBits;
-    auto divisor =
-        arith::ConstantIndexOp::create(builder, loc, elementsPerByte);
-    value = builder.createOrFold<arith::CeilDivUIOp>(loc, value, divisor);
-  }
+  unsigned elementsPerByte = 8 / elementBits;
+  auto divisor = arith::ConstantIndexOp::create(builder, loc, elementsPerByte);
+  value = builder.createOrFold<arith::CeilDivUIOp>(loc, value, divisor);
   return value;
+}
+
+LogicalResult PackedStorageAttr::verifyEncoding(
+    llvm::ArrayRef<int64_t> shape, mlir::Type elementType,
+    llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
+  unsigned elementBitWidth = getTypeBitWidth(elementType);
+  if (elementBitWidth > 7) {
+    return emitError() << "Bit-width of the element type is " << elementBitWidth
+                       << " but packed_storage is currently only supported for "
+                       << "sub-byte types";
+  }
+  if (!llvm::isPowerOf2_32(elementBitWidth)) {
+    return emitError()
+           << "Bit-width of the element type is " << elementBitWidth
+           << " but packed_storage currently only supports types with "
+           << "power-of-two bitwidth.";
+  }
+  return success();
 }
 
 //===---------------------------------------------------------------------===//
