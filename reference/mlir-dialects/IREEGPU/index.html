@@ -2014,13 +2014,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode" class="md-nav__link">
     <span class="md-ellipsis">
-      Example
+      Example of a single subgroup using coalesced_gather_dma in copy mode
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Example">
+    <nav class="md-nav" aria-label="Example of a single subgroup using coalesced_gather_dma in copy mode">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5294,13 +5294,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode" class="md-nav__link">
     <span class="md-ellipsis">
-      Example
+      Example of a single subgroup using coalesced_gather_dma in copy mode
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Example">
+    <nav class="md-nav" aria-label="Example of a single subgroup using coalesced_gather_dma in copy mode">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5890,7 +5890,7 @@ SPIR-V/LLVM are handled separately.</p>
 </li>
 <li><a href="#lowering-paths">Lowering Paths</a></li>
 <li><a href="#operands-and-results">Operands and Results</a></li>
-<li><a href="#example">Example</a><ul>
+<li><a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode">Example of a single subgroup using coalesced_gather_dma in copy mode</a><ul>
 <li><a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop">iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)</a></li>
 <li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
@@ -6120,60 +6120,79 @@ effort and has no verification or failure modes.</p>
 <h3 id="iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop"><code>iree_gpu.coalesced_gather_dma</code> (GPU::CoalescedGatherDMAOp)<a class="headerlink" href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop" title="Permanent link">link</a></h3>
 <p><em>Coalesced gather DMA operation for efficient GPU memory access</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.coalesced_gather_dma` $indices `,` $source `into` $init attr-dict
-              `:` type($indices) `,` type($source) `,` type($init) `-&gt;` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.coalesced_gather_dma` $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
+              attr-dict `:` type(operands) ( `-&gt;` type($result)^ )?
 </code></pre></div>
 <p>Performs a coalesced gather operation.
-This operation can exist in two forms: a tensor-based (value-semantic) form
-and a buffer-based (memref-semantic) form.</p>
-<p>In both forms, it reads elements from a source operand based on indices.
-* When the source is a tensor, the operation produces a new result tensor
-  containing the gathered data.
-* When the source is a memref, the operation writes the gathered data into
-  a destination out memref operand.</p>
-<p>The operation is specifically designed for subgroup-level parallelism, where
-threads within a subgroup cooperatively gather data with coalesced memory
-accesses. It implements ParallelCombiningOpInterface and must live inside an
-op implementing <code>InParallelOpInterface</code>, such as <code>scf.forall.in_parallel</code>.</p>
+This operation can exist in two forms: a tensor-based
+(value-semantic) form and a buffer-based (memref-semantic) form.</p>
+<p>In both forms, it reads elements from a source operand based on the
+optional <code>indices</code> operand and writes the gathered data into the
+destination <code>init</code> operand using destination-passing style.</p>
+<p>The <code>indices</code> operand is optional. The <code>source</code> represents the data
+loaded by this thread, while <code>init</code> is the collective output for all
+threads in the subgroup. Therefore, <code>source</code> and <code>init</code> may have
+different shapes (typically source is smaller, representing one
+thread's portion).</p>
+<p>The operation is specifically designed for subgroup-level
+parallelism, where threads within a subgroup cooperatively gather
+data with coalesced memory accesses. It implements
+ParallelCombiningOpInterface and must live inside an op implementing
+<code>InParallelOpInterface</code>, such as <code>scf.forall.in_parallel</code>.</p>
 <h2 id="lowering-paths">Lowering Paths<a class="headerlink" href="#lowering-paths" title="Permanent link">link</a></h2>
 <p>Two lowering strategies are supported:
-1. Lowers to <code>amdgpu.gather_to_lds</code> operations when lowering requirements
-   are met.
+1. Lowers to <code>amdgpu.gather_to_lds</code> operations when lowering
+   requirements are met.
 2. Default lowering using <code>vector.gather</code> operations.</p>
 <h2 id="operands-and-results">Operands and Results<a class="headerlink" href="#operands-and-results" title="Permanent link">link</a></h2>
 <ul>
-<li><code>$indices</code>: Tensor/memref of index type specifying gather locations in
-  the source tensor</li>
-<li><code>$source</code>: Source tensor/memref containing the data to be gathered</li>
-<li><code>$init</code>: Destination tensor/memref receiving the gathered data
-  (destination-passing style)</li>
-<li><code>$result</code>: Output tensor/memref with gathered data (same type as <code>$init</code>)</li>
+<li><code>$indices</code>: The variadic <code>indices</code> operand is an optional tensor
+  or vector of indices to gather from <code>source</code>. If the indices are
+  present, their shape must be a prefix of the <code>init</code>/<code>result</code> type.
+  Each element of <code>indices</code> must be a 1D tensor or vector whose
+  length matches the length of the corresponding dimension of <code>source</code>.</li>
 </ul>
-<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h2>
-<p>The following example shows how this op is designed to be used in a tiled
-scenario, which sets up lowering path for efficient gathering.</p>
-<ol>
-<li>Outer <code>scf.forall</code> represents workgroup-level parallelism.</li>
-<li>Inner <code>scf.forall</code> represents subgroup-level parallelism.</li>
-<li>Each thread in the subgroup coalesces its memory accesses when
-   gathering data and writes to its lane-offset in the destination tensor.</li>
-</ol>
-<div class="highlight"><pre><span></span><code>%result = scf.forall (%wg_i, %wg_j) in (16, 1) shared_outs(%wg_out = %dest) -&gt; (tensor&lt;128x16xf32&gt;) {
-  %indices_wg_slice = tensor.extract_slice ...
-  %dest_wg_slice = tensor.extract_slice ...
-
-  %inner_result = scf.forall (%sg_i, %sg_j) in (32, 1) shared_outs(%sg_out = %dest_wg_slice) -&gt; (tensor&lt;8x16xf32&gt;) {
-    scf.forall.in_parallel {
-      iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out : ...
-    }
-  } {mapping = [#gpu.thread&lt;linear_dim_1&gt;, #gpu.thread&lt;linear_dim_0&gt;]}
-
-  scf.forall.in_parallel {
-    tensor.parallel_insert_slice %inner_result into %wg_out[...] : ...
-  }
-} {mapping = [#gpu.warp&lt;linear_dim_1&gt;, #gpu.warp&lt;linear_dim_0&gt;]}
+<p>The values in <code>indices</code> form indices into the memref starting at
+  <code>source</code> from which a given thread will gather data, and each
+  tensor/vector component in <code>indices</code> corresponds to one index
+  dimension in <code>source</code>.
+  Any component that is not specified is implicitly assumed to be
+  <code>[0, 1, ..., len - 1]</code> where <code>len</code> is the length of the
+  corresponding dimension of source. That is, gather all the
+  elements along that dimension.</p>
+<p>This operation will gather data into its result as by setting:
+  <div class="highlight"><pre><span></span><code>forall (i0, i1, ... iN) in (dim(source, 0), dim(source, 1), ...
+    dim(source, N)):
+  result[i0, i1, ... iN-1, iN + lane_id * dim(init, N)] =
+      source[indices[0][i0], indices[1][i1], ..., indices[N][iN]]
 </code></pre></div>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>ParallelCombiningOpInterface</code></p>
+  where <code>lane_id</code> is the ID of the thread within its subgroup.</p>
+<p>Note that, in order to enable efficient gathers, the trailing
+  dimension of <code>source</code> must have unspecified indices and the dim's
+  size must be a supported DMA width for your target.</p>
+<p><code>$indices</code> supports both index and i32 element types. The reason
+  is that one lowering path (from linalg_ext.gather) already have
+  indices in i32 type.</p>
+<ul>
+<li><code>$source</code>: Source tensor/memref containing the data to be gathered.</li>
+<li><code>$init</code>: Destination tensor/memref receiving the gathered data
+  (destination-passing style).</li>
+<li><code>lane</code>: The lane that specifies the coalescing store's offset within the
+  workgroup/shared memory.</li>
+</ul>
+<h2 id="example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode">Example of a single subgroup using coalesced_gather_dma in copy mode<a class="headerlink" href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode" title="Permanent link">link</a></h2>
+<p>for transferring tensor&lt;4x128xf32&gt;, with an intended DMA width of 128 bits
+   (4 x f32), with subgroup size 32:
+<div class="highlight"><pre><span></span><code>scf.forall (%arg6) in (32) ... {
+    %2 = %arg6 * 4
+    %thread_slice = ... : tensor&lt;4x128xf32&gt;
+    %dest_slice = ... : tensor&lt;4x128xf32&gt;
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice lane(%arg6) :  ...
+    }
+  } {mapping = [#gpu.lane_id&lt;linear_dim_0&gt;]}
+</code></pre></div></p>
+<p>Interfaces: <code>ParallelCombiningOpInterface</code></p>
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6184,16 +6203,20 @@ scenario, which sets up lowering path for efficient gathering.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>indices</code></td>
-<td>ranked tensor of index values or memref of index values</td>
-</tr>
-<tr>
 <td style="text-align: center;"><code>source</code></td>
 <td>ranked tensor or memref of any type</td>
 </tr>
 <tr>
+<td style="text-align: center;"><code>indices</code></td>
+<td>variadic of ranked tensor or vector or memref of 32-bit signless integer or index values</td>
+</tr>
+<tr>
 <td style="text-align: center;"><code>init</code></td>
 <td>ranked tensor or memref of any type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>lane</code></td>
+<td>index</td>
 </tr>
 </tbody>
 </table>
@@ -7340,8 +7363,8 @@ NVIDIA GPUs.</p>
 <p><em>Drive lowering of an operation by using global load DMA.</em></p>
 <p>Syntax: <code>#iree_gpu.use_global_load_dma</code></p>
 <p>Lowering config for when using global load DMA is needed. This is intended for
-tagging operations that are known to be able to use global load DMA, which might
-also have its own cofiguration.</p>
+tagging operations that are known to be able to use global load DMA.</p>
+<p>Tiling sizes are derived from the translation_info's workgroup_size and subgroup_size.</p>
 <h3 id="virtualmmaattr">VirtualMMAAttr<a class="headerlink" href="#virtualmmaattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_layout&lt;
