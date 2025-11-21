@@ -1298,15 +1298,15 @@ void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
                   FoldExpandShapeIntoInterfaceTensorLoad,
                   FoldExpandShapeIntoInterfaceTensorStore,
                   FoldInnerBitcastIntoInterfaceTensorLoad,
-                  FoldInnerBitcastIntoInterfaceTensorStore,
-                  FoldInnerBitcastIntoLoadFromBuffer>(patterns.getContext());
+                  FoldInnerBitcastIntoInterfaceTensorStore>(
+      patterns.getContext());
 }
 
 void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns) {
   patterns.insert<
       FoldCollapseShapeIntoLoadFromBuffer, FoldExpandShapeIntoLoadFromBuffer,
-      FoldCollapseShapeIntoStoreToBuffer, FoldExpandShapeIntoStoreToBuffer>(
-      patterns.getContext());
+      FoldCollapseShapeIntoStoreToBuffer, FoldExpandShapeIntoStoreToBuffer,
+      FoldInnerBitcastIntoLoadFromBuffer>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler
