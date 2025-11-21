@@ -68,7 +68,6 @@ func.func @general_contract_add_to_chain_fma(
 
 // -----
 
-// Only float-point types should be lowered to fma chains.
 #lhs = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
 #rhs = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
 #res = affine_map<(d0, d1, d2) -> (d0, d1)>
