@@ -293,11 +293,33 @@ getVectorDistributeReductionConfig(
   }
   int subgroup = partialReductionSize / subgroupStride;
   int64_t subgroupBasis = (subgroup == 0) ? 1 : subgroup;
+  SmallVector<Attribute> expandDimFactors = llvm::to_vector(llvm::map_range(
+      llvm::seq<int64_t>(0, op.getNumLoops()), [&](int64_t i) -> Attribute {
+        return b.getI64ArrayAttr({i + (i > lastReductionDim)});
+      }));
 
-  partialReductionTileSizes[lastReductionDim] = partialReductionSize;
-  threadTileSizes[lastReductionDim] = threadLoads;
-  threadCounts[lastReductionDim] = threadBasis;
-  subGroupCounts[lastReductionDim] = subgroupBasis;
+  if (ShapedType::isStaticShape(bounds) && threadLoads > 1) {
+    workgroupTileSizes.push_back(0);
+    partialReductionTileSizes.push_back(0);
+    threadTileSizes.push_back(0);
+    threadCounts.push_back(1);
+    subGroupCounts.push_back(1);
+    mapping.push_back(mapping.size());
+
+    int64_t outer = lastReductionDim;
+    int64_t inner = lastReductionDim + 1;
+
+    expandDimFactors[lastReductionDim] = b.getI64ArrayAttr({outer, inner});
+    partialReductionTileSizes[outer] = partialReductionSize / threadLoads;
+    threadTileSizes[inner] = threadLoads;
+    threadCounts[outer] = threadBasis;
+    subGroupCounts[outer] = subgroupBasis;
+  } else {
+    partialReductionTileSizes[lastReductionDim] = partialReductionSize;
+    threadTileSizes[lastReductionDim] = threadLoads;
+    threadCounts[lastReductionDim] = threadBasis;
+    subGroupCounts[lastReductionDim] = subgroupBasis;
+  }
 
   ArrayAttr subgroupBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
@@ -311,7 +333,8 @@ getVectorDistributeReductionConfig(
                      b.getI64ArrayAttr(partialReductionTileSizes)),
       NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
       NamedAttribute("lane_basis", threadBasisAttr),
-      NamedAttribute("subgroup_basis", subgroupBasisAttr)};
+      NamedAttribute("subgroup_basis", subgroupBasisAttr),
+      NamedAttribute("expand_dims", b.getArrayAttr(expandDimFactors))};
 
   auto configDict = b.getDictionaryAttr(configAttrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);

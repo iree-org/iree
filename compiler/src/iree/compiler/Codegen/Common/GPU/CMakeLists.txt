@@ -66,6 +66,7 @@ iree_cc_library(
     "GPUDistributeScfFor.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUDistributionPatterns.cpp"
+    "GPUExpandDimensions.cpp"
     "GPUFuseAndHoistParallelLoops.cpp"
     "GPUGeneralizeNamedOps.cpp"
     "GPUGreedilyDistributeToThreads.cpp"
