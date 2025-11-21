@@ -185,7 +185,7 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
 };
 
 struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
@@ -210,36 +210,32 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
-    Type accElemType = getElementTypeOrSelf(op.getAccType());
-
-    Location loc = op.getLoc();
-    Value lhs = op.getLhs();
-    Value rhs = op.getRhs();
-
-    if (lhsVecType.getElementType() != accElemType) {
-      Type promotedType = lhsVecType.clone(accElemType);
-      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs);
-      lhsVecType = cast<VectorType>(lhs.getType());
-    }
-
-    if (rhsVecType.getElementType() != accElemType) {
-      Type promotedType = rhsVecType.clone(accElemType);
-      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs);
-      rhsVecType = cast<VectorType>(rhs.getType());
-    }
-
-    Type elemTy = accElemType;
     SmallVector<int64_t> redDims, parDims;
     getReductionAndParallelLoopDims(op.getIteratorTypes(), redDims, parDims);
     if (redDims.empty()) {
       return failure();
     }
 
+    Type elemType = accVecType.getElementType();
+
+    Location loc = op.getLoc();
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    if (lhsVecType.getElementType() != elemType) {
+      Type promotedType = lhsVecType.clone(elemType);
+      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs);
+      lhsVecType = cast<VectorType>(lhs.getType());
+    }
+
+    if (rhsVecType.getElementType() != elemType) {
+      Type promotedType = rhsVecType.clone(elemType);
+      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs);
+      rhsVecType = cast<VectorType>(rhs.getType());
+    }
+
     // New indices: [reduction..., parallel...].
-    SmallVector<int64_t> indices;
-    indices.reserve(redDims.size() + parDims.size());
-    llvm::append_range(indices, redDims);
-    llvm::append_range(indices, parDims);
+    auto indices = llvm::to_vector(llvm::concat<int64_t>(redDims, parDims));
 
     ArrayRef<int64_t> lhsShape = lhsVecType.getShape();
     ArrayRef<int64_t> rhsShape = rhsVecType.getShape();
@@ -272,7 +268,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       rhsTranspose.push_back(numRhsDimToBroadcast + dim);
     }
 
-    for (unsigned i = 0; i < numParallelDims; i++) {
+    for (unsigned i = 0; i < numParallelDims; ++i) {
       unsigned iterDim = accMap.getDimPosition(i);
 
       std::optional<unsigned> lhsDim = getDimPosition(lhsMap, iterDim);
@@ -295,13 +291,13 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     }
 
     if (!lhsBroadcastDims.empty()) {
-      lhsBroadcastDims.append(lhsShape.begin(), lhsShape.end());
-      auto expandedType = VectorType::get(lhsBroadcastDims, elemTy);
+      llvm::append_range(lhsBroadcastDims, lhsShape);
+      auto expandedType = VectorType::get(lhsBroadcastDims, elemType);
       lhs = vector::BroadcastOp::create(rewriter, loc, expandedType, lhs);
     }
     if (!rhsBroadcastDims.empty()) {
-      rhsBroadcastDims.append(rhsShape.begin(), rhsShape.end());
-      auto expandedType = VectorType::get(rhsBroadcastDims, elemTy);
+      llvm::append_range(rhsBroadcastDims, rhsShape);
+      auto expandedType = VectorType::get(rhsBroadcastDims, elemType);
       rhs = vector::BroadcastOp::create(rewriter, loc, expandedType, rhs);
     }
 
@@ -323,14 +319,14 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     // Shape-cast operands to 2D {reduction_size, parallel_size}.
     int64_t redSize = lhsRedSize;
     int64_t parSize = lhsParSize;
-    VectorType flattened2DType = VectorType::get({redSize, parSize}, elemTy);
+    VectorType flattened2DType = VectorType::get({redSize, parSize}, elemType);
     Value lhs2D =
         vector::ShapeCastOp::create(rewriter, loc, flattened2DType, lhs);
     Value rhs2D =
         vector::ShapeCastOp::create(rewriter, loc, flattened2DType, rhs);
 
     Value flattenedAcc;
-    auto flatAccVecType = VectorType::get({parSize}, elemTy);
+    auto flatAccVecType = VectorType::get({parSize}, elemType);
     VectorType preFlattenVecType = accVecType;
 
     if (accVecType) {
