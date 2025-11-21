@@ -192,6 +192,7 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
 // respectively along the reduction dimension.
 //
 // Example:
+// ```mlir
 // #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 // vector.contract
@@ -202,9 +203,11 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
 // }
 // %arg0, %arg1, %cst : vector<2x1x8xf16>, vector<2x1x8xf16> into
 // vector<2x1xf16>
+// ```
 //
 // ==>
 // <Extract lhs/rhs along reduction dim> then:
+// ```mlir
 // %34 = math.fma %32, %33, %cst : vector<2xf16>
 // %37 = math.fma %35, %36, %34 : vector<2xf16>
 // %40 = math.fma %38, %39, %37 : vector<2xf16>
@@ -213,6 +216,7 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
 // %49 = math.fma %47, %48, %46 : vector<2xf16>
 // %52 = math.fma %50, %51, %49 : vector<2xf16>
 // %55 = math.fma %53, %54, %52 : vector<2xf16>
+// ```
 //
 // Previously, contracts of the same form lowered to elementwise multiplies
 // followed by a vector.reduce. This lowering elides the need to reduce the
@@ -236,8 +240,8 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
-    auto accVecType = dyn_cast<VectorType>(op.getAccType());
-    if (accVecType && accVecType.isScalable()) {
+    auto maybeAccVecType = dyn_cast<VectorType>(op.getAccType());
+    if (maybeAccVecType && maybeAccVecType.isScalable()) {
       return failure();
     }
 
@@ -281,7 +285,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     // Broadcast operands for missing parallel dimensions.
     unsigned numParallelDims = accMap.getNumResults();
-    VectorType resultVecType = cast<VectorType>(op.getResultType());
+    auto resultVecType = cast<VectorType>(op.getResultType());
 
     SmallVector<int64_t> lhsTranspose, rhsTranspose;
     lhs = broadcastMissingDims(
@@ -296,7 +300,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     rhs = vector::TransposeOp::create(rewriter, loc, rhs, rhsTranspose);
 
     SmallVector<int64_t> accPerm;
-    if (accVecType) {
+    if (maybeAccVecType) {
       accPerm = getPermutationFromIndexingMap(maps[2], parDims);
     }
 
@@ -309,7 +313,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     // Shape-cast operands to 2D {reduction_size, parallel_size}.
     int64_t redSize = lhsRedSize;
     int64_t parSize = lhsParSize;
-    VectorType flattened2DType = VectorType::get({redSize, parSize}, elemType);
+    auto flattened2DType = VectorType::get({redSize, parSize}, elemType);
     Value lhs2D =
         vector::ShapeCastOp::create(rewriter, loc, flattened2DType, lhs);
     Value rhs2D =
@@ -317,9 +321,9 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     Value flattenedAcc;
     auto flatAccVecType = VectorType::get({parSize}, elemType);
-    VectorType preFlattenVecType = accVecType;
+    VectorType preFlattenVecType = maybeAccVecType;
 
-    if (accVecType) {
+    if (maybeAccVecType) {
       Value acc = op.getAcc();
 
       if (!isIdentityPermutation(accPerm)) {
@@ -339,12 +343,12 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     // Restore result to original form.
     Value result;
-    if (accVecType) {
+    if (maybeAccVecType) {
       Value reshaped = vector::ShapeCastOp::create(
           rewriter, loc, preFlattenVecType, resultFlat);
 
       if (!isIdentityPermutation(accPerm)) {
-        result = vector::TransposeOp::create(rewriter, loc, accVecType,
+        result = vector::TransposeOp::create(rewriter, loc, maybeAccVecType,
                                              reshaped, invert(accPerm));
       } else {
         result = reshaped;
@@ -418,8 +422,8 @@ private:
 
   static SmallVector<int64_t> invert(ArrayRef<int64_t> perm) {
     SmallVector<int64_t> inv(perm.size());
-    for (int64_t i = 0; i < perm.size(); ++i) {
-      inv[perm[i]] = i;
+    for (auto [i, p] : llvm::enumerate(perm)) {
+      inv[p] = i;
     }
     return inv;
   }
