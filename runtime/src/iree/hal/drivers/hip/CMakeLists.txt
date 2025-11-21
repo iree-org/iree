@@ -7,7 +7,12 @@
 iree_add_all_subdirs()
 
 if(NOT DEFINED HIP_API_HEADERS_ROOT)
-  set(HIP_API_HEADERS_ROOT "${IREE_SOURCE_DIR}/third_party/hip-build-deps/include")
+  if(IREE_USE_SYSTEM_DEPS)
+    find_package(HIP CONFIG REQUIRED)
+    set(HIP_API_HEADERS_ROOT "${HIP_INCLUDE_DIRS}")
+  else()
+    set(HIP_API_HEADERS_ROOT "${IREE_SOURCE_DIR}/third_party/hip-build-deps/include")
+  endif()
 endif()
 
 if(NOT EXISTS "${HIP_API_HEADERS_ROOT}/hip/hip_version.h")
