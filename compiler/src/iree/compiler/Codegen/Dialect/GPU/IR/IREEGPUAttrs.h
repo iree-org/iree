@@ -295,7 +295,6 @@ StringRef getTilingLevelName(GPU::TilingLevel level);
 Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                                 Attribute attr);
 
-
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_gpu.dimension_expansion` attribute on root
 //===----------------------------------------------------------------------===//

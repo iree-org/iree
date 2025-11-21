@@ -43,7 +43,8 @@ void printDynamicI64IntegerList(AsmPrinter &printer, ArrayRef<int64_t> vals) {
 
 /// Parse a list of integer values and/or dynamic values ('?') into an ArrayAttr
 ParseResult parseDynamicI64ArrayAttr(AsmParser &parser, ArrayAttr &attr) {
-  FailureOr<SmallVector<int64_t>> integerVals = parseDynamicI64IntegerList(parser);
+  FailureOr<SmallVector<int64_t>> integerVals =
+      parseDynamicI64IntegerList(parser);
   if (failed(integerVals)) {
     return failure();
   }
@@ -62,9 +63,12 @@ void printDynamicI64ArrayAttr(AsmPrinter &printer, ArrayAttr attrs) {
   return printDynamicI64IntegerList(printer, intVals);
 }
 
-/// Parse a list of integer values and/or dynamic values ('?') into a DenseI64ArrayAttr
-ParseResult parseDynamicI64DenseArrayAttr(AsmParser &parser, DenseI64ArrayAttr &attr) {
-  FailureOr<SmallVector<int64_t>> integerVals = parseDynamicI64IntegerList(parser);
+/// Parse a list of integer values and/or dynamic values ('?') into a
+/// DenseI64ArrayAttr
+ParseResult parseDynamicI64DenseArrayAttr(AsmParser &parser,
+                                          DenseI64ArrayAttr &attr) {
+  FailureOr<SmallVector<int64_t>> integerVals =
+      parseDynamicI64IntegerList(parser);
   if (failed(integerVals)) {
     return failure();
   }
@@ -72,8 +76,10 @@ ParseResult parseDynamicI64DenseArrayAttr(AsmParser &parser, DenseI64ArrayAttr &
   return success();
 }
 
-/// Print a DenseI64ArrayAttr as a list of integer values and/or dynamic values ('?')
-void printDynamicI64DenseArrayAttr(AsmPrinter &printer, DenseI64ArrayAttr attr) {
+/// Print a DenseI64ArrayAttr as a list of integer values and/or dynamic values
+/// ('?')
+void printDynamicI64DenseArrayAttr(AsmPrinter &printer,
+                                   DenseI64ArrayAttr attr) {
   printDynamicI64IntegerList(printer, attr.asArrayRef());
 }
 

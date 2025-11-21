@@ -933,13 +933,13 @@ def IREEGPU_DimensionExpansionAttr
     expanded. Each original dimension can either remain
     unchanged or be split into multiple dimensions. The semantics are similar to the familiar
     `tensor.expand_shape` operation.
-                                                                                                                                                                                                    
+
     The reassociations parameter specifies the mapping from original dimensions
     to expanded dimensions. For example, [[0], [1], [2, 3]] means:
     - Original dimension 0 maps to output dimension 0
     - Original dimension 1 maps to output dimension 1
     - Original dimension 2 is split into output dimensions 2 and 3
-                                                                                                                                                                                                    
+
     The output_shape parameter specifies the sizes of the expanded dimensions.
 
     Example: #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>

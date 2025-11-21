@@ -31,7 +31,6 @@ struct Basis {
   SmallVector<int64_t> mapping;
 };
 
-
 // Helper to retrieve/set distribution basis.
 FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
                           IREE::GPU::TilingLevel level);

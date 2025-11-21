@@ -143,7 +143,6 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
              b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
 }
 
-
 LogicalResult
 EncodingAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
                      IntegerAttr operandIndexAttr,
@@ -309,7 +308,8 @@ std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
 
 /// Custom printer/parser methods to handle dynamic shapes.
 ParseResult parsePadding(AsmParser &parser, DenseI64ArrayAttr &padding) {
-  FailureOr<SmallVector<int64_t>> integerVals = parseDynamicI64IntegerList(parser);
+  FailureOr<SmallVector<int64_t>> integerVals =
+      parseDynamicI64IntegerList(parser);
   if (failed(integerVals)) {
     return failure();
   }

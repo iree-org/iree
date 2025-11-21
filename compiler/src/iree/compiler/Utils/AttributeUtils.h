@@ -7,9 +7,9 @@
 #ifndef IREE_COMPILER_UTILS_ATTRIBUTEUTILS_H_
 #define IREE_COMPILER_UTILS_ATTRIBUTEUTILS_H_
 
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace mlir::iree_compiler {
 
@@ -25,10 +25,13 @@ ParseResult parseDynamicI64ArrayAttr(AsmParser &parser, ArrayAttr &attr);
 /// Print an ArrayAttr of integer values and/or dynamic values ('?')
 void printDynamicI64ArrayAttr(AsmPrinter &printer, ArrayAttr attrs);
 
-/// Parse a list of integer values and/or dynamic values ('?') into a DenseI64ArrayAttr
-ParseResult parseDynamicI64DenseArrayAttr(AsmParser &parser, DenseI64ArrayAttr &attr);
+/// Parse a list of integer values and/or dynamic values ('?') into a
+/// DenseI64ArrayAttr
+ParseResult parseDynamicI64DenseArrayAttr(AsmParser &parser,
+                                          DenseI64ArrayAttr &attr);
 
-/// Print a DenseI64ArrayAttr as a list of integer values and/or dynamic values ('?')
+/// Print a DenseI64ArrayAttr as a list of integer values and/or dynamic values
+/// ('?')
 void printDynamicI64DenseArrayAttr(AsmPrinter &printer, DenseI64ArrayAttr attr);
 
 } // namespace mlir::iree_compiler
