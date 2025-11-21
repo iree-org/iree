@@ -2024,20 +2024,41 @@ OpFoldResult AsyncTransferOp::fold(FoldAdaptor operands) {
 
 namespace {
 
-// Elides transfer operations that are a no-op (from/to the same affinity and
-// same resource type).
-struct RedundantTransferElision : public OpRewritePattern<AsyncTransferOp> {
+// Converts same-affinity transfers to clones for clearer semantics.
+// Transfers are meant to represent cross-device or staging operations while
+// clones represent copy-on-write operations on the same device. When a transfer
+// has the same source and target affinity (or both are implicit) it's actually
+// a clone operation that may also change the lifetime.
+struct SameAffinityTransferToClone : public OpRewritePattern<AsyncTransferOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
                                 PatternRewriter &rewriter) const override {
-    if (transferOp.getSourceAffinityAttr() ==
-            transferOp.getResultAffinityAttr() &&
-        transferOp.getSource().getType() == transferOp.getResult().getType()) {
-      // Transfer performs no work, elide.
-      rewriter.replaceOp(transferOp, transferOp.getSource());
-      return success();
+    // Check if source and result affinities are the same.
+    // This includes the case where both are null (implicit same affinity).
+    auto sourceAffinityAttr = transferOp.getSourceAffinityAttr();
+    auto resultAffinityAttr = transferOp.getResultAffinityAttr();
+    if (sourceAffinityAttr != resultAffinityAttr) {
+      return failure();
     }
-    return failure();
+
+    // Don't convert if either source or result is staging.
+    // Clone doesn't support staging resources.
+    auto sourceType =
+        cast<IREE::Stream::ResourceType>(transferOp.getSource().getType());
+    auto resultType =
+        cast<IREE::Stream::ResourceType>(transferOp.getResult().getType());
+    if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging ||
+        resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+      return rewriter.notifyMatchFailure(transferOp, "staging transfer");
+    }
+
+    // Replace with a clone operation using the common affinity.
+    // The clone preserves the lifetime change (e.g., transient -> external).
+    rewriter.replaceOpWithNewOp<AsyncCloneOp>(
+        transferOp, transferOp.getResult().getType(), transferOp.getSource(),
+        transferOp.getSourceSize(), transferOp.getResultSize(),
+        sourceAffinityAttr);
+    return success();
   }
 };
 
@@ -2072,7 +2093,7 @@ struct IntermediateTransferElision : public OpRewritePattern<AsyncTransferOp> {
 void AsyncTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   // TODO(benvanik): staging propagation (fill of staging -> fill on device).
-  results.insert<RedundantTransferElision>(context);
+  results.insert<SameAffinityTransferToClone>(context);
   results.insert<IntermediateTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
 }

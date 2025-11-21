@@ -6,48 +6,49 @@ util.func private @FoldTensorImportOp(%arg0: !stream.resource<external>, %arg1: 
   // CHECK-NOT: stream.tensor.export
   // CHECK: util.return %arg0 : !stream.resource<external>
   %c20 = arith.constant 20 : index
-  %0 = stream.tensor.export %arg0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
-  %1 = stream.tensor.import %0 : !hal.buffer_view -> tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %0 = stream.tensor.export %arg0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !util.buffer
+  %1 = stream.tensor.import %0 : !util.buffer -> tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20}
   util.return %1 : !stream.resource<external>
 }
 
 // -----
 
 // CHECK-LABEL: @FoldTensorExportOp
-util.func private @FoldTensorExportOp(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
+util.func private @FoldTensorExportOp(%arg0: !util.buffer, %arg1: index) -> !util.buffer {
   // CHECK-NOT: stream.tensor.import
   // CHECK-NOT: stream.tensor.export
-  // CHECK: util.return %arg0 : !hal.buffer_view
+  // CHECK: util.return %arg0 : !util.buffer
   %c20 = arith.constant 20 : index
-  %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
-  %1 = stream.tensor.export %0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
-  util.return %1 : !hal.buffer_view
+  %0 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.export %0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !util.buffer
+  util.return %1 : !util.buffer
 }
 
 // -----
 
 // CHECK-LABEL: @NofoldTensorExportOpBufferToView
-util.func private @NofoldTensorExportOpBufferToView(%arg0: !hal.buffer, %arg1: index) -> !hal.buffer_view {
-  // CHECK: %[[IMPORT:.+]] = stream.tensor.import
-  // CHECK: %[[EXPORT:.+]] = stream.tensor.export %[[IMPORT]]
-  // CHECK: util.return %[[EXPORT]] : !hal.buffer_view
+util.func private @NofoldTensorExportOpBufferToView(%arg0: !util.buffer, %arg1: index) -> !util.buffer {
+  // Now that both are !util.buffer with same type, this folds away completely.
+  // CHECK-NOT: stream.tensor.import
+  // CHECK-NOT: stream.tensor.export
+  // CHECK: util.return %arg0 : !util.buffer
   %c20 = arith.constant 20 : index
-  %0 = stream.tensor.import %arg0 : !hal.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
-  %1 = stream.tensor.export %0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
-  util.return %1 : !hal.buffer_view
+  %0 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.export %0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !util.buffer
+  util.return %1 : !util.buffer
 }
 
 // -----
 
 // CHECK-LABEL: @KeepTensorExportOpWithDifferingEncodings
-util.func private @KeepTensorExportOpWithDifferingEncodings(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
-  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
-  // CHECK: %[[EXPORT:.+]] = stream.tensor.export %[[IMPORT]] : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
-  // CHECK: util.return %[[EXPORT]] : !hal.buffer_view
+util.func private @KeepTensorExportOpWithDifferingEncodings(%arg0: !util.buffer, %arg1: index) -> !util.buffer {
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  // CHECK: %[[EXPORT:.+]] = stream.tensor.export %[[IMPORT]] : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !util.buffer
+  // CHECK: util.return %[[EXPORT]] : !util.buffer
   %c20 = arith.constant 20 : index
-  %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
-  %1 = stream.tensor.export %0 : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
-  util.return %1 : !hal.buffer_view
+  %0 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.export %0 : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !util.buffer
+  util.return %1 : !util.buffer
 }
 
 // -----
@@ -79,7 +80,7 @@ util.func private @TensorConstantToEmptyDynamic() -> !stream.resource<constant> 
 util.func private @TensorConstantToSplat() -> !stream.resource<constant> {
   // CHECK-DAG: %[[CST:.+]] = arith.constant 1.000000e+00 : f32
   // CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof tensor<2x2xf32> : index
-  // CHECK: = stream.tensor.splat %[[CST]] : f32 -> tensor<2x2xf32> in !stream.resource<*>{%[[SIZE]]}
+  // CHECK: = stream.tensor.splat %[[CST]] : f32 -> tensor<2x2xf32> in !stream.resource<constant>{%[[SIZE]]}
   %cst = stream.tensor.constant : tensor<2x2xf32> in !stream.resource<constant> = dense<1.000000e+00> : tensor<2x2xf32>
   util.return %cst : !stream.resource<constant>
 }
@@ -90,7 +91,7 @@ util.func private @TensorConstantToSplat() -> !stream.resource<constant> {
 util.func private @TensorComplexConstantToSplat() -> !stream.resource<constant> {
   // CHECK-DAG: %[[CST:.+]] = complex.constant [2.000000e+00 : f32, 3.000000e+00 : f32] : complex<f32>
   // CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof tensor<2x2xcomplex<f32>> : index
-  // CHECK: = stream.tensor.splat %[[CST]] : complex<f32> -> tensor<2x2xcomplex<f32>> in !stream.resource<*>{%[[SIZE]]}
+  // CHECK: = stream.tensor.splat %[[CST]] : complex<f32> -> tensor<2x2xcomplex<f32>> in !stream.resource<constant>{%[[SIZE]]}
   %cst = stream.tensor.constant : tensor<2x2xcomplex<f32>> in !stream.resource<constant> = dense<(2.000000e+00,3.000000e+00)> : tensor<2x2xcomplex<f32>>
   util.return %cst : !stream.resource<constant>
 }

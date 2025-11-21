@@ -38,7 +38,38 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 // Maps a resource usage bitfield to a resource lifetime.
+//
+// The GlobalStorage bit acts as a "storage identity" marker indicating the
+// value is or directly references global storage (not just accessed from it).
+// This enables copy-on-write optimizations by preserving Constant lifetime
+// even when used with External/Staging/Indirect operations.
+//
+// Usage bit semantics:
+// - GlobalRead: Value was loaded from a global (access semantics)
+// - GlobalWrite: Value was stored to a global (access semantics)
+// - GlobalStorage: Value IS/references global storage (identity semantics)
+//
+// Priority order (first match wins):
+// 1. GlobalStorage + Constant -> Constant (preserves constant globals)
+// 2. Indirect | External -> External
+// 3. StagingRead | StagingWrite -> Staging
+// 4. Constant -> Constant
+// 5. GlobalRead | GlobalWrite -> Variable if mutated, else Constant
+// 6. Default -> Transient
+//
+// TODO(benvanik): explode the concept of lifetime so we can just specify these
+// bits directly and avoid needing the mapping - doing this the way we are
+// today is a lossy operation that makes subsequent analysis more difficult.
 static Lifetime convertUsageToLifetime(ResourceUsageBitfield usage) {
+  // Special case: if stored to global and constant, preserve Constant.
+  // This prevents External from overriding the global's type constraint.
+  // This is forward-compatible with the UsageAttr migration where this check
+  // becomes unnecessary (constant|global|external is expressible directly).
+  if (bitEnumContains(usage, ResourceUsageBitfield::GlobalStorage) &&
+      bitEnumContains(usage, ResourceUsageBitfield::Constant)) {
+    return Lifetime::Constant;
+  }
+
   if (bitEnumContains(usage, ResourceUsageBitfield::Indirect) ||
       bitEnumContains(usage, ResourceUsageBitfield::External)) {
     return Lifetime::External;

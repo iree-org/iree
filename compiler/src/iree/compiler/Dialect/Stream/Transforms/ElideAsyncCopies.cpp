@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Element.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
@@ -93,17 +94,6 @@ private:
       }
     }
     indicateOptimisticFixpoint();
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "[elide-copies] initialized value last users for ";
-      value.printAsOperand(llvm::dbgs(), solver.getAsmState());
-      llvm::dbgs() << ": " << getAssumedSet().size() << "\n";
-      for (auto user : getAssumedSet()) {
-        llvm::dbgs() << "  ";
-        user->print(llvm::dbgs(), solver.getAsmState());
-        llvm::dbgs() << "\n";
-      }
-    });
   }
 
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override {
@@ -285,6 +275,151 @@ private:
 };
 const char ArgumentSemantics::ID = 0;
 
+// Tracks whether a resource value is ever mutated anywhere in the program.
+// This performs whole-program transitive use analysis to detect any writes.
+class ResourceMutationSemantics
+    : public DFX::StateWrapper<DFX::BitIntegerState<uint8_t, 1, 0>,
+                               DFX::ValueElement> {
+public:
+  using BaseType =
+      DFX::StateWrapper<DFX::BitIntegerState<uint8_t, 1, 0>, DFX::ValueElement>;
+
+  enum {
+    // Inverted bit so we start optimistic (assume not mutated).
+    NOT_MUTATED = 1u << 0,
+    BEST_STATE = NOT_MUTATED,
+  };
+  static_assert(BEST_STATE == BaseType::getBestState(),
+                "unexpected BEST_STATE value");
+
+  static ResourceMutationSemantics &createForPosition(const Position &pos,
+                                                      DFX::Solver &solver) {
+    return *(new (solver.getAllocator()) ResourceMutationSemantics(pos));
+  }
+
+  const std::string getName() const override {
+    return "ResourceMutationSemantics";
+  }
+  const void *getID() const override { return &ID; }
+  static bool classof(const DFX::AbstractElement *element) {
+    return (element->getID() == &ID);
+  }
+  static const char ID;
+
+  // Returns true if the resource is assumed to never be mutated.
+  bool isAssumedNotMutated() const {
+    return (this->getAssumed() & NOT_MUTATED) == NOT_MUTATED;
+  }
+
+  const std::string getAsStr(AsmState &asmState) const override {
+    return this->isAssumed(NOT_MUTATED) ? "not-mutated" : "mutated";
+  }
+
+private:
+  explicit ResourceMutationSemantics(const Position &pos) : BaseType(pos) {}
+
+  // Analyzes whether a value is mutated by walking all transitive uses.
+  // Checks both TiedOpInterface (for in-place mutations) and
+  // AsyncAccessOpInterface (for explicit write access).
+  void analyzeMutation(Value value, DFX::Solver &solver) {
+    SmallVector<AsyncAccessRange> accessRanges;
+
+    // Walk ALL transitive uses (crosses function boundaries).
+    auto traversalResult = solver.getExplorer().walkTransitiveUses(
+        value, [&](OpOperand &operand) -> WalkResult {
+          // Check if tied (in-place mutation).
+          if (auto tiedOp =
+                  dyn_cast<IREE::Util::TiedOpInterface>(operand.getOwner())) {
+            if (tiedOp.isOperandTied(operand.getOperandNumber())) {
+              LLVM_DEBUG({
+                llvm::dbgs() << "    found tied mutation at op: ";
+                operand.getOwner()->print(llvm::dbgs(), solver.getAsmState());
+                llvm::dbgs() << "\n";
+              });
+              removeAssumedBits(NOT_MUTATED);
+              return WalkResult::interrupt();
+            }
+          }
+
+          // Check AsyncAccessOpInterface for write access.
+          if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(
+                  operand.getOwner())) {
+            accessRanges.clear();
+            accessOp.getAsyncAccessRanges(accessRanges);
+            for (auto &range : accessRanges) {
+              if (range.resource == value && !range.isReadOnly()) {
+                LLVM_DEBUG({
+                  llvm::dbgs() << "    found write access at op: ";
+                  operand.getOwner()->print(llvm::dbgs(), solver.getAsmState());
+                  llvm::dbgs() << "\n";
+                });
+                removeAssumedBits(NOT_MUTATED);
+                return WalkResult::interrupt();
+              }
+            }
+          }
+
+          return WalkResult::advance();
+        });
+
+    if (traversalResult == TraversalResult::INCOMPLETE) {
+      // For constants, even if analysis is incomplete (e.g., returned from
+      // public functions), they maintain immutability guarantees.
+      auto resourceType =
+          llvm::cast<IREE::Stream::ResourceType>(value.getType());
+      if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "    incomplete analysis for constant; assuming immutable\n");
+      } else {
+        // Conservative: assume mutated if analysis fails for non-constants.
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "    incomplete analysis; conservatively assuming mutated\n");
+        removeAssumedBits(NOT_MUTATED);
+      }
+    }
+  }
+
+  void initializeValue(Value value, DFX::Solver &solver) override {
+    // Start optimistic - assume not mutated.
+    intersectAssumedBits(BEST_STATE);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "  analyzing mutations for value: ";
+      value.printAsOperand(llvm::dbgs(), solver.getAsmState());
+      llvm::dbgs() << "\n";
+    });
+
+    analyzeMutation(value, solver);
+
+    LLVM_DEBUG({
+      if ((this->getAssumed() & NOT_MUTATED) == NOT_MUTATED) {
+        llvm::dbgs() << "    result: not mutated\n";
+      } else {
+        llvm::dbgs() << "    result: mutated\n";
+      }
+    });
+
+    // Don't call indicateOptimisticFixpoint() here - let the solver iterate.
+  }
+
+  ChangeStatus updateValue(Value value, DFX::Solver &solver) override {
+    // Perform the same analysis as initialization to allow iterative
+    // refinement. This enables the solver to detect mutations that appear
+    // through control flow joins and tied operation chains.
+    auto assumedBits = getAssumed();
+
+    analyzeMutation(value, solver);
+
+    return assumedBits == getAssumed() ? ChangeStatus::UNCHANGED
+                                       : ChangeStatus::CHANGED;
+  }
+
+  friend class DFX::Solver;
+};
+const char ResourceMutationSemantics::ID = 0;
+
 // TODO(benvanik): change into something we can use for ref counting. We need
 // that to insert stream-ordered deallocs and know when timepoints have been
 // discard as they go out of scope. For now this strictly checks last use.
@@ -314,8 +449,9 @@ public:
     // Seed all block arguments throughout the program.
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
-      if (!region)
+      if (!region) {
         continue;
+      }
       for (auto &block : *region) {
         for (auto arg : block.getArguments()) {
           if (isa<IREE::Stream::ResourceType>(arg.getType())) {
@@ -325,6 +461,27 @@ public:
         }
       }
     }
+
+    // Seed ResourceMutationSemantics for all Stream resource values.
+    // This ensures they participate in the fixed-point iteration.
+    int seedCount = 0;
+    for (auto callableOp : getTopLevelOps()) {
+      auto *region = callableOp.getCallableRegion();
+      if (!region) {
+        continue;
+      }
+      region->walk([&](Operation *op) {
+        for (auto result : op->getResults()) {
+          if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+            solver.getOrCreateElementFor<ResourceMutationSemantics>(
+                Position::forValue(result));
+            ++seedCount;
+          }
+        }
+      });
+    }
+    LLVM_DEBUG(llvm::dbgs() << "seeded " << seedCount
+                            << " ResourceMutationSemantics elements\n");
 
     // Run solver to completion.
     return solver.run();
@@ -351,6 +508,17 @@ public:
     auto lastUsers =
         solver.getOrCreateElementFor<LastUsers>(Position::forValue(operand));
     return lastUsers.isAssumedLastUser(userOp);
+  }
+
+  // Returns true if |value| is never mutated anywhere in the program.
+  // This uses whole-program transitive use analysis.
+  bool isNeverMutated(Value value) {
+    // Get or create the element. It will be initialized with the current
+    // solver state if created after the solver has run.
+    auto &mutationSemantics =
+        solver.getOrCreateElementFor<ResourceMutationSemantics>(
+            Position::forValue(value));
+    return mutationSemantics.isAssumedNotMutated();
   }
 
 private:
@@ -389,28 +557,47 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
     llvm::dbgs() << "\n";
   });
 
-  // If this clone is performing a type change we need to preserve it.
-  //
-  // TODO(benvanik): remove this carveout - could make clone not change type
-  // and transfer be needed instead.
-  //
-  // HACK: the constant check is to support initializers that have lifetime
-  // transfers to constants. This is clearly bad and can lead to additional
-  // weirdness later on in the program, but without it resource usage analysis
-  // will try to treat entire IR trees that result in a constant transfer as if
-  // they are unknown. The real fix is to the analysis by possibly marking
-  // values as "eventually constant" to allow us to promote to constant
-  // lifetime.
+  // If this clone is performing a lifetime conversion we need to preserve it.
+  // Clones can change resource lifetime (e.g., * -> variable, external -> *)
+  // and these conversions are semantically meaningful and must be preserved.
   auto sourceType =
       cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
   auto targetType =
       cast<IREE::Stream::ResourceType>(cloneOp.getResult().getType());
-  if (sourceType != targetType &&
-      sourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
+  if (sourceType.getLifetime() != targetType.getLifetime()) {
     LLVM_DEBUG(llvm::dbgs()
                << "  - clone is a resource lifetime cast (" << sourceType
                << " to " << targetType << "); cannot elide\n");
     return false;
+  }
+
+  // Constant-to-constant clones can be elided only if both source and result
+  // are never mutated anywhere in the program (interprocedural analysis).
+  // Constants are immutable after initialization, but during initialization
+  // they may be mutated.
+  if (sourceType.getLifetime() == IREE::Stream::Lifetime::Constant &&
+      targetType.getLifetime() == IREE::Stream::Lifetime::Constant) {
+
+    // Check if source constant is ever mutated anywhere (whole program).
+    bool sourceSafe = analysis.isNeverMutated(cloneOp.getSource());
+    // Check if clone result is ever mutated anywhere (whole program).
+    bool resultSafe = analysis.isNeverMutated(cloneOp.getResult());
+
+    if (!sourceSafe) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - source constant is mutated somewhere; cannot elide\n");
+      return false;
+    }
+
+    if (!resultSafe) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - clone result is mutated somewhere; cannot elide\n");
+      return false;
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "  + constant->constant clone with no mutations "
+                               "anywhere; can elide\n");
+    return true;
   }
 
   // If the source is a block argument we have to look into the analysis cache
@@ -641,32 +828,39 @@ static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
 // --iree-stream-elide-async-copies
 //===----------------------------------------------------------------------===//
 
+// Results from trying to elide copies in a region.
+struct ElisionResults {
+  unsigned clonesElided = 0;
+  unsigned slicesElided = 0;
+  bool didChange() const { return clonesElided > 0 || slicesElided > 0; }
+};
+
 // Tries to elide copies nested within |region| when safe.
-// Returns true if any ops were elided.
-static bool tryElideAsyncCopiesInRegion(Region &region,
-                                        ElisionAnalysis &analysis) {
-  bool didChange = false;
+// Returns counts of clones and slices elided.
+static ElisionResults tryElideAsyncCopiesInRegion(Region &region,
+                                                  ElisionAnalysis &analysis) {
+  ElisionResults results;
   for (auto &block : region) {
     block.walk([&](Operation *op) {
       return TypeSwitch<Operation *, WalkResult>(op)
           .Case<IREE::Stream::AsyncCloneOp>([&](auto cloneOp) {
             if (isSafeToElideCloneOp(cloneOp, analysis)) {
               elideCloneOp(cloneOp);
-              didChange = true;
+              ++results.clonesElided;
             }
             return WalkResult::advance();
           })
           .Case<IREE::Stream::AsyncSliceOp>([&](auto sliceOp) {
             if (isSafeToElideSliceOp(sliceOp, analysis)) {
               elideSliceOp(sliceOp);
-              didChange = true;
+              ++results.slicesElided;
             }
             return WalkResult::advance();
           })
           .Default([&](auto *op) { return WalkResult::advance(); });
     });
   }
-  return didChange;
+  return results;
 }
 
 // Elides async copies that perform no meaningful work - such as clones of the
@@ -693,6 +887,10 @@ struct ElideAsyncCopiesPass
       return;
     }
 
+    // Track total elisions across all iterations.
+    unsigned totalClonesElided = 0;
+    unsigned totalSlicesElided = 0;
+
     // Try analyzing the program and eliding the unneeded copies until we reach
     // a fixed point (no more copies can be elided).
     unsigned maxIterationCount = 30;
@@ -708,17 +906,29 @@ struct ElideAsyncCopiesPass
 
       // Apply analysis by eliding all copies that are safe to elide.
       // If we can't elide any we'll consider the iteration complete and exit.
-      bool didChange = false;
+      ElisionResults iterationResults;
       for (auto callableOp : analysis.getTopLevelOps()) {
         if (auto *region = callableOp.getCallableRegion()) {
-          didChange =
-              tryElideAsyncCopiesInRegion(*region, analysis) || didChange;
+          ElisionResults regionResults =
+              tryElideAsyncCopiesInRegion(*region, analysis);
+          iterationResults.clonesElided += regionResults.clonesElided;
+          iterationResults.slicesElided += regionResults.slicesElided;
         }
       }
-      if (!didChange) {
+
+      totalClonesElided += iterationResults.clonesElided;
+      totalSlicesElided += iterationResults.slicesElided;
+
+      if (!iterationResults.didChange()) {
         break; // quiesced
       }
     }
+
+    // Update pass statistics.
+    numClonesElided += totalClonesElided;
+    numSlicesElided += totalSlicesElided;
+    numIterations += iterationCount;
+
     if (iterationCount == maxIterationCount) {
       // If you find yourself hitting this we can evaluate increasing the
       // iteration count (if it would eventually converge) or whether we allow
