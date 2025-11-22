@@ -26,7 +26,7 @@ def IREETensorExt_SparseShapeAttrInterface :
 
   let methods = [
     InterfaceMethod<
-      /*description =*/"Return the dimensions that are sparse",
+      /*description =*/"Returns the dimensions that are sparse",
       /*retTy=*/"::llvm::SmallVector<int64_t>",
       /*methodName=*/"getSparseDimensions"
     >

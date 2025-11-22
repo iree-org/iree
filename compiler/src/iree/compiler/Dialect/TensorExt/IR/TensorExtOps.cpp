@@ -419,7 +419,7 @@ LogicalResult ComputeBarrierEndOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult CastToRaggedShapeOp::verify() {
-  // Check that the ragged row dimensions `raggedRowDim` < rank(`result`) - 1
+  // Check that the ragged row dimensions `raggedRowDim` < rank(`result`) - 1.
   int64_t raggedDim = getRaggedDim().getSExtValue();
   ShapedType sourceType = getSourceType();
   if (raggedDim >= sourceType.getRank()) {
@@ -549,7 +549,7 @@ OpFoldResult CastToRaggedShapeOp::getNumRaggedRowsAsOfr() {
   }
   ArrayRef<int64_t> resultShape = getResultType().getShape();
   int64_t raggedDim = getRaggedDimAttr().getInt();
-  assert(!ShapedType::isDynamic(resultShape[raggedDim]) &&
+  assert(ShapedType::isStatic(resultShape[raggedDim]) &&
          "expected number of ragged rows to be static");
   return IntegerAttr::get(IndexType::get(getContext()), resultShape[raggedDim]);
 }

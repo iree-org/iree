@@ -28,7 +28,7 @@ def RaggedShapeAttr :
   let description = [{
     Attribute to encode that a shaped type is ragged shaped.
 
-    if `raggedRow` is `n`, then the dimension `n` and `n+1` of the shaped type are
+    If `raggedRow` is `n`, then the dimension `n` and `n+1` of the shaped type are
     "ragged" dimensions, i.e. the size of the `n+1` dimension of the shaped type
     varies. So a 2D ragged shaped type would have `raggedRow` as `0` where the size
     of dimension 1 is different as shown below.

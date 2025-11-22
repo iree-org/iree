@@ -564,6 +564,21 @@ def IREETensorExt_CastToRaggedShapeOp :
     upper bound for the number of columns (for static upper bounds the shape of the
     dimension in the result shaped type encodes this value)
 
+    For example, if the `n` and `n+1` dimensions of the result represent this ragged structure
+
+    ```
+    OOOO
+    OOOOOO
+    OOO
+    OOOOO
+    ```
+
+    then,
+    - `ragged_dim` is `n`
+    - `num_ragged_rows` is 4
+    - `column_lengths` is [0, 4, 10, 13, 18]
+    - result has an encoding attribute of `#iree_tensor_ext.ragged_shape<n>`.
+
     Contraints are
     1. `ragged_dim` < rank(`source`)
     2. rank(`columnLengths`) == 1.
@@ -602,9 +617,9 @@ def IREETensorExt_CastToRaggedShapeOp :
     }
     RaggedShapeAttr getResultSparseEncoding() {
       if (auto tensorType = dyn_cast<RankedTensorType>(getResultType())) {
-        return dyn_cast_or_null<RaggedShapeAttr>(tensorType.getEncoding());
+        return dyn_cast_if_present<RaggedShapeAttr>(tensorType.getEncoding());
       } else if (auto memrefType = dyn_cast<MemRefType>(getResultType())) {
-        return dyn_cast_or_null<RaggedShapeAttr>(memrefType.getLayout());
+        return dyn_cast_if_present<RaggedShapeAttr>(memrefType.getLayout());
       }
       return RaggedShapeAttr();
     }

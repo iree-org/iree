@@ -78,10 +78,9 @@ LogicalResult
 RaggedShapeAttr::getStridesAndOffset(ArrayRef<int64_t> shape,
                                      SmallVectorImpl<int64_t> &strides,
                                      int64_t &offset) const {
-  // This should only be required on the first "subview" of the
-  // ragged tensor. So we can assume that there are no strides to begin with
-  // and set all strides starting from the least significant sparse dimension
-  // to dynamic.
+  // This should only be required on the first "subview" of the ragged tensor.
+  // So we can assume that there are no strides to begin with and set all
+  // strides starting from the least significant sparse dimension to dynamic.
   strides.clear();
   SmallVector<int64_t> sparseDims = getSparseDimensions();
   std::optional<int64_t> forceDynamicFrom = std::nullopt;
