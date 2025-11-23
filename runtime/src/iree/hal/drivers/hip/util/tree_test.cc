@@ -88,6 +88,12 @@ TEST_F(RedBlackTreeTest, boundary_conditions) {
   EXPECT_EQ(iree_hal_hip_util_tree_node_get_key(
                 iree_hal_hip_util_tree_upper_bound(&tree_, 15)),
             20);
+  EXPECT_EQ(iree_hal_hip_util_tree_node_get_key(
+                iree_hal_hip_util_tree_lower_bound(&tree_, 20)),
+            20);
+  EXPECT_EQ(iree_hal_hip_util_tree_node_get_key(
+                iree_hal_hip_util_tree_upper_bound(&tree_, 20)),
+            30);
 }
 
 TEST_F(RedBlackTreeTest, move_node) {
