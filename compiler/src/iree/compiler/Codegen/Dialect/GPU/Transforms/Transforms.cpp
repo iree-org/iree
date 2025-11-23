@@ -304,27 +304,37 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
     Value gatherResult = newGatherOp.getResult();
 
     // Use a tensor.insert_slice to insert the gather result back into the
-    // shared memory destination at offset 0.
+    // shared memory destination. Extract offsets from the init's extract_slice.
     SmallVector<OpFoldResult> destIndices;
-    auto initType = cast<ShapedType>(coalescedGather.getInit().getType());
-    for (int64_t i = 0; i < initType.getRank(); ++i) {
-      destIndices.push_back(rewriter.getIndexAttr(0));
-    }
-
     SmallVector<OpFoldResult> sizes;
-    for (int64_t dim : initType.getShape()) {
-      sizes.push_back(rewriter.getIndexAttr(dim));
+    SmallVector<OpFoldResult> strides;
+
+    // Get offsets, sizes, and strides from the init's extract_slice op
+    auto extractSlice =
+        coalescedGather.getInit().getDefiningOp<tensor::ExtractSliceOp>();
+    if (extractSlice) {
+      destIndices = extractSlice.getMixedOffsets();
+      sizes = extractSlice.getMixedSizes();
+      strides = extractSlice.getMixedStrides();
+    } else {
+      // Fallback: use offset 0 if init is not from an extract_slice
+      auto initType = cast<ShapedType>(coalescedGather.getInit().getType());
+      for (int64_t i = 0; i < initType.getRank(); ++i) {
+        destIndices.push_back(rewriter.getIndexAttr(0));
+      }
+      for (int64_t dim : initType.getShape()) {
+        sizes.push_back(rewriter.getIndexAttr(dim));
+      }
+      strides.assign(initType.getRank(), rewriter.getIndexAttr(1));
     }
-    SmallVector<OpFoldResult> strides(initType.getRank(),
-                                      rewriter.getIndexAttr(1));
 
     // Get the destination tensor from the loop's iter_args
     Value dest = newProducer.getRegionIterArgs()[0];
-    Value sharedInsert = tensor::InsertSliceOp::create(
+    Value insertedSlice = tensor::InsertSliceOp::create(
         rewriter, loc, gatherResult, dest, destIndices, sizes, strides);
 
     // Yield the result with the inserted slice
-    scf::YieldOp::create(rewriter, loc, sharedInsert);
+    scf::YieldOp::create(rewriter, loc, insertedSlice);
 
     // Erase the old coalesced gather op and the in_parallel terminator
     rewriter.eraseOp(coalescedGather);
