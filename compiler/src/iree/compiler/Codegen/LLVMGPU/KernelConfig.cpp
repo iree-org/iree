@@ -368,12 +368,15 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     reductionTileSizes[ic] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
-  workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  workgroupTileSizes[mDim] = schedule->mSubgroupCounts[0] *
+                             schedule->mTileSizes[0] *
+                             llvm::product_of(schedule->mSizes);
+  workgroupTileSizes[nDim] = schedule->nSubgroupCounts[0] *
+                             schedule->nTileSizes[0] *
+                             llvm::product_of(schedule->nSizes);
 
-  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[kDim] =
+      schedule->kTileSizes[0] * llvm::product_of(schedule->kSizes);
 
   // Tile all filter loop dimensions to 1.
   for (int64_t filterDim : convolutionDims->filterLoop) {
@@ -623,12 +626,15 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
-  workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  workgroupTileSizes[mDim] = schedule->mSubgroupCounts[0] *
+                             schedule->mTileSizes[0] *
+                             llvm::product_of(schedule->mSizes);
+  workgroupTileSizes[nDim] = schedule->nSubgroupCounts[0] *
+                             schedule->nTileSizes[0] *
+                             llvm::product_of(schedule->nSizes);
 
-  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[kDim] =
+      schedule->kTileSizes[0] * llvm::product_of(schedule->kSizes);
 
   LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
                                        *contractionDims, workgroupTileSizes));
@@ -893,7 +899,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
         pvSchedule.mSubgroupCounts[i] * pvSchedule.mTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == mDims.size() - 1) {
-      workgroupTileSizes[mDim] *= pvSchedule.mSize;
+      workgroupTileSizes[mDim] *= llvm::product_of(pvSchedule.mSizes);
     }
     subgroupBasis.counts[mDim] = pvSchedule.mSubgroupCounts[i];
   }
@@ -902,7 +908,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
         pvSchedule.nSubgroupCounts[i] * pvSchedule.nTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == nDims.size() - 1) {
-      workgroupTileSizes[nDim] *= pvSchedule.nSize;
+      workgroupTileSizes[nDim] *= llvm::product_of(pvSchedule.nSizes);
     }
     subgroupBasis.counts[nDim] = pvSchedule.nSubgroupCounts[i];
   }
@@ -910,7 +916,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     reductionTileSizes[k2Dim] = pvSchedule.kTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == k2Dims.size() - 1) {
-      reductionTileSizes[k2Dim] *= pvSchedule.kSize;
+      reductionTileSizes[k2Dim] *= llvm::product_of(pvSchedule.kSizes);
     }
   }
 

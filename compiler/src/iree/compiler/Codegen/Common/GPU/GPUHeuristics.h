@@ -68,12 +68,10 @@ struct GPUMMAHeuristicSeeds {
 struct GPUMMASchedule {
   // The MMA intrinsic kind to use for this schedule.
   IREE::Codegen::InnerTileDescAttrInterface mmaKind;
-  // Native MMA intrinsic size along M dimension for a subgroup.
-  int64_t mSize = 0;
-  // Native MMA intrinsic size along N dimension for a subgroup.
-  int64_t nSize = 0;
-  // Native MMA intrinsic size along K dimension for a subgroup.
-  int64_t kSize = 0;
+  // Native MMA intrinsic sizes along M, N and K dimensions for a subgroup.
+  SmallVector<int64_t> mSizes;
+  SmallVector<int64_t> nSizes;
+  SmallVector<int64_t> kSizes;
 
   // Number of subgroups along each M and N dimension.
   SmallVector<int64_t> mSubgroupCounts;
@@ -89,13 +87,15 @@ struct GPUMMASchedule {
 
   // Constructor for multi M, N, K dim schedules.
   GPUMMASchedule(IREE::Codegen::InnerTileDescAttrInterface kind,
-                 int64_t mIntrinsicSize, int64_t nIntrinsicSize,
-                 int64_t kIntrinsicSize, ArrayRef<int64_t> mSubgroupCounts,
+                 ArrayRef<int64_t> mIntrinsicSizes,
+                 ArrayRef<int64_t> nIntrinsicSizes,
+                 ArrayRef<int64_t> kIntrinsicSizes,
+                 ArrayRef<int64_t> mSubgroupCounts,
                  ArrayRef<int64_t> nSubgroupCounts,
                  ArrayRef<int64_t> mTileSizes, ArrayRef<int64_t> nTileSizes,
                  ArrayRef<int64_t> kTileSizes)
-      : mmaKind(kind), mSize(mIntrinsicSize), nSize(nIntrinsicSize),
-        kSize(kIntrinsicSize), mSubgroupCounts(mSubgroupCounts),
+      : mmaKind(kind), mSizes(mIntrinsicSizes), nSizes(nIntrinsicSizes),
+        kSizes(kIntrinsicSizes), mSubgroupCounts(mSubgroupCounts),
         nSubgroupCounts(nSubgroupCounts), mTileSizes(mTileSizes),
         nTileSizes(nTileSizes), kTileSizes(kTileSizes) {}
 
@@ -104,8 +104,8 @@ struct GPUMMASchedule {
                  int64_t mIntrinsicSize, int64_t nIntrinsicSize,
                  int64_t kIntrinsicSize, int64_t mSubgroup, int64_t nSubgroup,
                  int64_t mTileSize, int64_t nTileSize, int64_t kTileSize)
-      : mmaKind(kind), mSize(mIntrinsicSize), nSize(nIntrinsicSize),
-        kSize(kIntrinsicSize), mSubgroupCounts({mSubgroup}),
+      : mmaKind(kind), mSizes({mIntrinsicSize}), nSizes({nIntrinsicSize}),
+        kSizes({kIntrinsicSize}), mSubgroupCounts({mSubgroup}),
         nSubgroupCounts({nSubgroup}), mTileSizes({mTileSize}),
         nTileSizes({nTileSize}), kTileSizes({kTileSize}) {}
 };

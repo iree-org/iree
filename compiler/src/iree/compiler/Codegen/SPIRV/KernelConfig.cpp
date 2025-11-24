@@ -940,9 +940,9 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
   if (isBM)
     vectorSizes[bIndex] = 1;
-  vectorSizes[mIndex] = schedule->mSize;
-  vectorSizes[nIndex] = schedule->nSize;
-  vectorSizes[kIndex] = schedule->kSize;
+  vectorSizes[mIndex] = llvm::product_of(schedule->mSizes);
+  vectorSizes[nIndex] = llvm::product_of(schedule->nSizes);
+  vectorSizes[kIndex] = llvm::product_of(schedule->kSizes);
 
   SmallVector<int64_t> subgroupTileSizes(lastParallelDim + 1, 0);
   if (isBM)
@@ -963,7 +963,8 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // TODO(#10499): Consolidate tiling configuration across different pipelines.
   SmallVector<int64_t> reductionTileSizes;
   reductionTileSizes.append(kIndex, 0);
-  reductionTileSizes.push_back(schedule->kTileSizes[0] * schedule->kSize);
+  reductionTileSizes.push_back(schedule->kTileSizes[0] *
+                               llvm::product_of(schedule->kSizes));
 
   TileSizesListType tileSizes = {workgroupTileSizes, subgroupTileSizes,
                                  reductionTileSizes, vectorSizes};
