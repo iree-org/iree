@@ -53,7 +53,7 @@ util.func public @barrier_end_static_with_dims(%arg0: tensor<4x8xf32>, %dim0: in
 //===----------------------------------------------------------------------===//
 
 // Check that the sparse dimensions are in-bounds of the rank.
-// expected-error @+1{{sparse dimensions specified are greater than the rank of the tensor}}
+// expected-error @+1{{sparse dimensions specified are greater than the rank of the shaped type}}
 util.func public @test(memref<?xf32, #iree_tensor_ext.ragged_shape<0>>) {
   return
 }

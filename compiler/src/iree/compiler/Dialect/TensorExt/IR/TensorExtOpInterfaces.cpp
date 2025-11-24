@@ -26,7 +26,7 @@ LogicalResult verifySparseCastOpInterface(SparseCastOpInterface sparseOp) {
   SparseShapeAttrInterface sparseAttr;
   if (auto tensorType = dyn_cast<RankedTensorType>(resultType)) {
     sparseAttr =
-        dyn_cast_or_null<SparseShapeAttrInterface>(tensorType.getEncoding());
+        dyn_cast_if_present<SparseShapeAttrInterface>(tensorType.getEncoding());
     if (!sparseAttr) {
       return sparseOp.emitOpError(
           "expected result type to have an encoding attribute that implements "
@@ -34,7 +34,7 @@ LogicalResult verifySparseCastOpInterface(SparseCastOpInterface sparseOp) {
     }
   } else if (auto memrefType = dyn_cast<MemRefType>(resultType)) {
     sparseAttr =
-        dyn_cast_or_null<SparseShapeAttrInterface>(memrefType.getLayout());
+        dyn_cast_if_present<SparseShapeAttrInterface>(memrefType.getLayout());
     if (!sparseAttr) {
       return sparseOp.emitOpError(
           "expected result type to have a layout attribute that implements "

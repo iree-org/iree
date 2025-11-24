@@ -49,7 +49,7 @@ LogicalResult RaggedShapeAttr::verifyLayout(
   if (llvm::any_of(sparseDimensions,
                    [&](int64_t dim) { return dim >= shape.size(); })) {
     return emitError() << "sparse dimensions specified are greater than the "
-                          "rank of the tensor";
+                          "rank of the shaped type";
   }
   return success();
 }

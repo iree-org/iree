@@ -7,8 +7,8 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrs.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
@@ -512,7 +512,7 @@ LogicalResult CastToRaggedShapeOp::verify() {
     int resultIndex = index + foundRaggedDim;
     int64_t resultShape = resultType.getDimSize(resultIndex);
     if (ShapedType::isDynamic(sourceShape)) {
-      if (!ShapedType::isDynamic(resultShape)) {
+      if (ShapedType::isStatic(resultShape)) {
         return emitOpError("expected dimension ")
                << resultIndex
                << " of result to be dynamic since the corresponding dimension "
