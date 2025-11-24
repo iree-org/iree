@@ -12,14 +12,12 @@ func.func @addf_bf16(%arg0 : tensor<128xbf16>) -> tensor<128xbf16> {
 
 // CHECK-LABEL: @addf_bf16
 // CHECK: linalg.generic
-// CHECK-NEXT: ^bb0(%[[IN:.+]]: bf16, %[[OUT:.+]]: bf16):
+// CHECK-NEXT: ^bb0(%[[IN:.+]]: bf16, %{{.+}}: bf16):
 // CHECK: %[[EXT:.+]] = arith.extf %[[IN]] : bf16 to f32
 // CHECK: %[[ADD:.+]] = arith.addf %[[EXT]], %[[EXT]] : f32
-// CHECK: %[[TRUNC:.+]] = arith.truncf %[[ADD]] : f32 to bf16
-
+// CHECK: arith.truncf %[[ADD]] : f32 to bf16
 
 // -----
-
 func.func @addf_bf16(%arg0 : bf16, %arg1 : bf16) -> bf16 {
     %0 = "arith.addf"(%arg0, %arg1) : (bf16, bf16) -> bf16
     return %0 : bf16
@@ -32,9 +30,9 @@ func.func @addf_bf16(%arg0 : bf16, %arg1 : bf16) -> bf16 {
 // CHECK-DAG:  %[[EXT1:.+]] = arith.extf %[[ARG1]] : bf16 to f32
 // CHECK: %[[ADD:.+]] = arith.addf %[[EXT0]], %[[EXT1]] : f32
 // CHECK: %[[TRUNC:.+]] = arith.truncf %[[ADD]] : f32 to bf16
+// CHECK: return %[[TRUNC]] : bf16
 
 // -----
-
 func.func @addf_vector_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> vector<4xbf16> {
     %0 = "arith.addf"(%arg0, %arg1) : (vector<4xbf16>, vector<4xbf16>) -> vector<4xbf16>
     return %0 : vector<4xbf16>
@@ -47,9 +45,9 @@ func.func @addf_vector_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> v
 // CHECK-DAG:  %[[EXT1:.+]] = arith.extf %[[ARG1]] : vector<4xbf16> to vector<4xf32>
 // CHECK: %[[ADD:.+]] = arith.addf %[[EXT0]], %[[EXT1]] : vector<4xf32>
 // CHECK: %[[TRUNC:.+]] = arith.truncf %[[ADD]] : vector<4xf32> to vector<4xbf16>
+// CHECK: return %[[TRUNC]] : vector<4xbf16>
 
 // -----
-
 func.func @bitcast_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> vector<4xbf16> {
     %0 = arith.bitcast %arg0 : vector<4xbf16> to vector<4xi16>
     %1 = arith.bitcast %arg1 : vector<4xbf16> to vector<4xi16>
@@ -58,13 +56,14 @@ func.func @bitcast_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> vecto
     return %3 : vector<4xbf16>
 }
 
-
 // CHECK-LABEL: @bitcast_bf16
-// CHECK-DAG: %[[BITCAST0:.+]] = arith.bitcast %arg0 : vector<4xbf16> to vector<4xi16>
-// CHECK-DAG: %[[BITCAST1:.+]] = arith.bitcast %arg1 : vector<4xbf16> to vector<4xi16>
-// CHECK-DAG: %[[XOR:.+]] = arith.xori %[[BITCAST0]], %[[BITCAST1]]
-// CHECK-DAG: %[[BITCAST2:.+]] = arith.bitcast %[[XOR]]
-// CHECK: return %[[BITCAST2]]
+// CHECK-SAME: %[[ARG0:.+]]: vector<4xbf16>,
+// CHECK-SAME: %[[ARG1:.+]]: vector<4xbf16>
+// CHECK-DAG: %[[BITCAST0:.+]] = arith.bitcast %[[ARG0]] : vector<4xbf16> to vector<4xi16>
+// CHECK-DAG: %[[BITCAST1:.+]] = arith.bitcast %[[ARG1]] : vector<4xbf16> to vector<4xi16>
+// CHECK: %[[XOR:.+]] = arith.xori %[[BITCAST0]], %[[BITCAST1]] : vector<4xi16>
+// CHECK: %[[BITCAST2:.+]] = arith.bitcast %[[XOR]] : vector<4xi16> to vector<4xbf16>
+// CHECK: return %[[BITCAST2]] : vector<4xbf16>
 
 // -----
 
@@ -83,15 +82,14 @@ func.func @truncf_vector(%arg0 : vector<4xbf16>) -> vector<4xbf16> {
 // CHECK: return %[[VAL3]] : vector<4xbf16>
 
 // -----
-
-func.func @extf_scalar_noop(%arg0 : vector<bf16>) -> vector<bf16> {
+func.func @extf_scalar_noop() -> vector<bf16> {
   %0 = arith.constant dense<1.0> : vector<bf16>
   return %0 : vector<bf16>
 }
 
 // CHECK-LABEL: @extf_scalar_noop
 // CHECK: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<bf16>
-// CHECK: return %[[CST]]
+// CHECK: return %[[CST]] : vector<bf16>
 
 // -----
 

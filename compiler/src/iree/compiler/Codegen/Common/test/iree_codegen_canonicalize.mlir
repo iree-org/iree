@@ -10,7 +10,6 @@ func.func @fold_dynamic_trivial_subview(%size: index) -> memref<?xf32, #hal.desc
   return %subview : memref<?xf32, #hal.descriptor_type<storage_buffer>>
 }
 // CHECK-LABEL: @fold_dynamic_trivial_subview
-//  CHECK-SAME:   %[[SIZE:.+]]: index
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan{{.*}} binding(0)
 //       CHECK:   %[[ASSUME_ALIGN:.+]] = memref.assume_alignment %[[SUBSPAN]]
 //   CHECK-NOT:   memref.subview

@@ -251,7 +251,7 @@ func.func @set_pad_encoding_and_store_with_resolved_layout() {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @materialize_pad_encoding_on_partial_dynamic_shape() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -285,17 +285,16 @@ func.func @materialize_pad_encoding_on_partial_dynamic_shape() {
 // -----
 
 #encoding = #iree_encoding.layout<[#iree_encoding.padding<[0, 32]>]>
-#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-#pipeline_layout1 = #hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @materialize_pad_encoding_dynamic_load_store() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i64
   %1 = arith.index_castui %0 : i64 to index
   %2 = util.assume.int %1<umin = 0, umax = 9007199254740991> : index
-  %3 = hal.interface.constant.load layout(#pipeline_layout1) ordinal(0) : i32
+  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
   %4 = arith.index_castui %3 : i32 to index
-  %5 = hal.interface.binding.subspan layout(#pipeline_layout1) binding(0) alignment(64) offset(%4) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>{%2}
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout1) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048xf16, #encoding>>{%2}
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>{%2}
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048xf16, #encoding>>{%2}
   %7 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%2, 2048], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>{%2} -> tensor<?x2048xf16>
   %8 = iree_encoding.set_encoding %7 : tensor<?x2048xf16> -> tensor<?x2048xf16, #iree_encoding.padding<[0, ?]>>
   iree_tensor_ext.dispatch.tensor.store %8, %6, offsets = [0, 0], sizes = [%2, 2048], strides = [1, 1] : tensor<?x2048xf16, #iree_encoding.padding<[0, ?]>> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048xf16, #encoding>>{%2}

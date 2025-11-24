@@ -14,7 +14,8 @@ module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: @main
 //  CHECK-SAME:   (%[[ARG:.+]]: tensor<?xf32>)
-//       CHECK:   %[[DIM:.+]] = tensor.dim %[[ARG]], %c0 : tensor<?xf32>
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[DIM:.+]] = tensor.dim %[[ARG]], %[[C0]] : tensor<?xf32>
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[DIM]]) : tensor<?xf32>
 //       CHECK:   %[[COPY:.+]] = linalg.copy
 //  CHECK-SAME:     ins(%[[ARG]] : tensor<?xf32>)

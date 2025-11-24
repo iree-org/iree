@@ -328,15 +328,13 @@ func.func @vectorize_dynamic_shapes_pack_scalable_vec_and_tile_size(%src: tensor
 #map3 = affine_map<(d0) -> (d0 ceildiv 16)>
 func.func @single_dynamic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
-  %dim = tensor.dim %arg1, %c0 : tensor<?x?xf32>
   %c1 = arith.constant 1 : index
-  %dim_0 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
-  %c0_1 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
-  %0 = scf.for %arg2 = %c0_1 to %dim step %c16 iter_args(%arg3 = %arg1) -> (tensor<?x?xf32>) {
-    %c0_2 = arith.constant 0 : index
-    %c32 = arith.constant 32 : index
-    %1 = scf.for %arg4 = %c0_2 to %dim_0 step %c32 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
+  %c32 = arith.constant 32 : index
+  %dim = tensor.dim %arg1, %c0 : tensor<?x?xf32>
+  %dim_0 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %0 = scf.for %arg2 = %c0 to %dim step %c16 iter_args(%arg3 = %arg1) -> (tensor<?x?xf32>) {
+    %1 = scf.for %arg4 = %c0 to %dim_0 step %c32 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
       %2 = affine.min #map(%arg2)[%dim]
       %3 = affine.min #map1(%arg4)[%dim_0]
       %4 = affine.apply #map2(%arg2)
@@ -444,12 +442,11 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 // CHECK-MASK-LABEL: @val_defined_by_scf_for
 func.func @val_defined_by_scf_for(%arg0: index, %arg1: index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
-  %0 = tensor.empty() : tensor<1x1x16x16xf32>
-  %1 = tensor.empty(%arg0, %arg1) : tensor<?x?xf32>
-  %c0_0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
   %c2 = arith.constant 2 : index
-  %2 = scf.for %arg2 = %c0_0 to %c16 step %c2 iter_args(%arg3 = %0) -> (tensor<1x1x16x16xf32>) {
+  %0 = tensor.empty() : tensor<1x1x16x16xf32>
+  %1 = tensor.empty(%arg0, %arg1) : tensor<?x?xf32>
+  %2 = scf.for %arg2 = %c0 to %c16 step %c2 iter_args(%arg3 = %0) -> (tensor<1x1x16x16xf32>) {
     scf.yield %arg3 : tensor<1x1x16x16xf32>
   }
   %unpack = linalg.unpack %2 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %1 : tensor<1x1x16x16xf32> -> tensor<?x?xf32>

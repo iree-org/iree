@@ -89,9 +89,9 @@ func.func @pad_and_pack(%arg0: tensor<13x15xf32>, %arg1: tensor<2x8x8x2xf32>, %a
 // CHECK-ALL:         %[[EXPAND:.+]] = tensor.expand_shape %[[PAD]] {{\[}}[0, 1], [2, 3]] output_shape [2, 8, 8, 2] : tensor<16x16xf32> into tensor<2x8x8x2xf32>
 // CHECK-ALL:         %[[TRANS:.+]] = linalg.transpose
 // CHECK-ALL-SAME:      ins(%[[EXPAND]] : tensor<2x8x8x2xf32>)
-// CHECK-ALL-SAME:      outs(%[[OUT:.+]] : tensor<2x8x8x2xf32>)
+// CHECK-ALL-SAME:      outs(%[[OUT]] : tensor<2x8x8x2xf32>)
 // CHECK-ALL-SAME:      permutation = [0, 2, 1, 3]
-// CHECK-ALL:         return %[[TRANSP]]
+// CHECK-ALL:         return %[[TRANS]]
 
 // -----
 
@@ -149,7 +149,7 @@ func.func @simple_unpack_and_extract_slice(%input: tensor<1x1x8x2xf32>, %output:
 // CHECK-RESHAPE:     %[[COLLAPSE:.+]] = tensor.collapse_shape
 // CHECK-RESHAPE:     %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSE]]
 // CHECK-RESHAPE:     %[[RES:.+]] = linalg.copy ins(%[[SLICE]] : tensor<5x1xf32>) outs(%[[OUT]] : tensor<5x1xf32>) -> tensor<5x1xf32>
-// CHECK-ALL:         return %[[RES:.+]]
+// CHECK-ALL:         return {{.+}}
 
 // -----
 
@@ -184,7 +184,7 @@ func.func @KCRSsr_to_KCRS(%arg0: tensor<13x12x4x8x8x32xf32>, %arg1: tensor<13x12
 // CHECK-ALL-SAME:      permutation = [0, 1, 2, 5, 3, 4]
 // CHECK-ALL:         %[[COLLAPSE:.+]] = tensor.collapse_shape %[[TRANSP]]
 // CHECK-ALL-SAME:      {{\[}}[0], [1], [2, 3], [4, 5]] : tensor<13x12x4x32x8x8xf32> into tensor<13x12x128x64xf32>
-// CHECK-ALL:         %[[COPY:.]] = linalg.copy ins(%[[COLLAPSE]]
+// CHECK-ALL:         %[[COPY:.+]] = linalg.copy ins(%[[COLLAPSE]]
 // CHECK-ALL-SAME:        outs(%[[OUT]]
 // CHECK-ALL:         return %[[COPY]]
 
@@ -206,7 +206,7 @@ func.func @unpack_and_extract_slice(%arg0: tensor<2x8x8x2xf32>, %arg1: tensor<13
 // CHECK-ALL-SAME:       {{\[}}[0, 1], [2, 3]] : tensor<2x8x8x2xf32> into tensor<16x16xf32>
 // CHECK-ALL:          %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSE]]
 // CHECK-ALL-SAME:       [0, 0] [13, 15] [1, 1] : tensor<16x16xf32> to tensor<13x15xf32>
-// CHECK-ALL:          %[[COPY:.]] = linalg.copy ins(%[[SLICE]]
+// CHECK-ALL:          %[[COPY:.+]] = linalg.copy ins(%[[SLICE]]
 // CHECK-ALL-SAME:         outs(%[[OUT]]
 // CHECK-ALL:          return %[[COPY]]
 // -----
@@ -233,7 +233,7 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK-ALL-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-ALL-SAME:   %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-ALL-DAG:    %[[C0:.+]] = arith.constant 0 : index
-// CHECK-ALL-DAG:    %[[D0:.+]] = tensor.dim %[[IN]], %c0 : tensor<?x?xf32>
+// CHECK-ALL-DAG:    {{.+}} = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
 // CHECK-ALL-DAG:    %[[H0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * 16 - s1)>
 // CHECK-ALL-DAG:    %[[H1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 - s1)>
 // CHECK-ALL:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
@@ -254,7 +254,7 @@ func.func @pack_matmul_DYN_RHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK-ALL:      func.func @pack_matmul_DYN_RHS
 // CHECK-ALL-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-ALL-SAME:   %[[OUT:[A-Za-z0-9]+]]:
-// CHECK-ALL-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-ALL-DAG:    {{.+}} = arith.constant 1 : index
 // CHECK-ALL-DAG:    %[[H0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 - s1)>
 // CHECK-ALL-DAG:    %[[H1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * 16 - s1)>
 // CHECK-ALL:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
@@ -264,6 +264,7 @@ func.func @pack_matmul_DYN_RHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK-ALL-SAME:     ins(%[[EXPANDED]] : tensor<?x1x?x16xf32>)
 // CHECK-ALL-SAME:     outs(%[[OUT]] : tensor<?x?x16x1xf32>)
 // CHECK-ALL-SAME:     permutation = [2, 0, 3, 1]
+// CHECK-ALL:        return %[[TRANSP]]
 
 // -----
 

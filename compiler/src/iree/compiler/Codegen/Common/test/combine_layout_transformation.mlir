@@ -366,7 +366,7 @@ func.func @no_insert_in_non_workgroup_forall(%2 : tensor<32xbf16>, %9 : tensor<1
   return %6 : tensor<32xbf16>
 }
 // WORKGROUP-SCOPE-LABEL: @no_insert_in_non_workgroup_forall
-//   WORKGROUP-SCOPE-NOT:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter
 
 // -----
 

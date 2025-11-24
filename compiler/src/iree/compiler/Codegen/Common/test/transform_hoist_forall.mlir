@@ -49,7 +49,6 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
-#map = affine_map<(d0) -> (d0 * 2)>
 module {
     func.func @hoist_forall_noslice(%arg0: tensor<1x288xf32>) -> tensor<1x1xf32> {
       %0 = tensor.empty() : tensor<1x1xf32>
@@ -85,7 +84,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<1x1xf32>
 //       CHECK:   %[[FORALL:.+]] = scf.forall (%[[ID0:.+]], %[[ID1:.+]]) in (1, 1) shared_outs(%[[OUTS:.+]] = %[[INIT]]) -> (tensor<1x1xf32>)
 //  CHECK-NEXT:     %[[FOR:.+]] = scf.for {{.*}} iter_args(%[[FOR_INIT:.+]] = %[[OUTS]]) -> (tensor<1x1xf32>)
-//  CHECK-NEXT:       %[[SLICE:.+]] = tensor.extract_slice %[[ARG0:.+]][%[[ID0]], %[[FOR_START:.+]]] [1, 1] [1, 1] : tensor<1x288xf32> to tensor<1x1xf32>
+//  CHECK-NEXT:       %[[SLICE:.+]] = tensor.extract_slice {{.+}}[%[[ID0]], {{.+}}] [1, 1] [1, 1] : tensor<1x288xf32> to tensor<1x1xf32>
 //       CHECK:       %[[COPY:.+]] = linalg.copy ins(%[[SLICE]] : tensor<1x1xf32>) outs(%[[FOR_INIT]] : tensor<1x1xf32>)
 //       CHECK:       scf.yield %[[COPY]]
 //       CHECK:     scf.forall.in_parallel

@@ -45,7 +45,7 @@ module attributes { transform.with_named_sequence } {
     // ===========================================================================
     %fusion_group_22_full = transform.merge_handles %fused_2, %original_fill_2
       : !transform.any_op
-    %fusion_root_22_tiled, %block_loop_22 =
+    %_1, %block_loop_22 =
       transform.structured.tile_using_forall %outer_tiled
       tile_sizes [1] ( mapping = [#gpu.thread<z>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -54,7 +54,7 @@ module attributes { transform.with_named_sequence } {
 
     %fusion_group_21 = transform.merge_handles %maybe_leading_2, %more_parallel_fill_2
       : !transform.any_op
-    %fusion_root_21_tiled, %block_loop_21 =
+    %_0, %block_loop_21 =
       transform.structured.tile_using_forall %parallel_reduction_2
       tile_sizes [1, 1] ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)

@@ -91,7 +91,7 @@ func.func @softmax(%7 : tensor<16x32x4096xf32>) -> tensor<16x32x4096xf32> {
 //      CHECK:   %[[MAXF:.+]] = linalg.generic
 // CHECK-SAME:       ["parallel", "parallel", "reduction"]
 // CHECK-SAME:       ins(%[[ARG0]] :
-//      CHECK:   %[[FILL0:.+]] = linalg.fill
+//      CHECK:   linalg.fill
 // CHECK-SAME:       ins(%[[CST0]] :
 //      CHECK:   %[[EXPF:.+]] = linalg.generic
 // CHECK-SAME:       ["parallel", "parallel", "reduction"]
@@ -136,8 +136,11 @@ func.func @no_rematerialize_scalar_ops(%arg0 : tensor<f32>) -> tensor<f32> {
 }
 // CHECK-LABEL: func @no_rematerialize_scalar_ops(
 //       CHECK:   linalg.generic
+//       CHECK:     arith.addf
 //       CHECK:   linalg.generic
+//       CHECK:     arith.mulf
 //       CHECK:   linalg.generic
+//       CHECK:     arith.addf
 
 // -----
 
@@ -145,14 +148,13 @@ func.func @no_rematerialize_scalar_ops(%arg0 : tensor<f32>) -> tensor<f32> {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
-// Do not fuse generic that has external caputure.
-func.func @no_external_capture_fusion(%arg0: tensor<4096x64xi64>, %arg1: tensor<4096x64xf16>, %arg2: tensor<4096x64xf16>, %arg3: f32, %arg4: tensor<4096x4096xf32>) -> tensor<4096x4096xf32> {
-  %empty = tensor.empty() : tensor<4096x64xf16>
+// Do not fuse generic that has external capture.
+func.func @no_external_capture_fusion(%arg0: tensor<4096x64xi64>, %arg1: tensor<4096x64xf16>, %arg2: tensor<4096x64xf16>, %arg3: f32, %arg4: tensor<4096x4096xf32>, %arg5: tensor<4096x64xf16>) -> tensor<4096x4096xf32> {
   %0 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<4096x64xi64>) outs(%arg1 : tensor<4096x64xf16>) {
   ^bb0(%in: i64, %out: f16):
     %3 = linalg.index 0 : index
     %4 = arith.index_cast %in : i64 to index
-    %extracted = tensor.extract %empty[%3, %4] : tensor<4096x64xf16>
+    %extracted = tensor.extract %arg5[%3, %4] : tensor<4096x64xf16>
     linalg.yield %extracted : f16
   } -> tensor<4096x64xf16>
   %1 = linalg.fill ins(%arg3 : f32) outs(%arg4 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
@@ -168,7 +170,9 @@ func.func @no_external_capture_fusion(%arg0: tensor<4096x64xi64>, %arg1: tensor<
 }
 // CHECK-LABEL: func @no_external_capture_fusion(
 //       CHECK:   linalg.generic
+//       CHECK:     tensor.extract
 //       CHECK:   linalg.generic
+//       CHECK:     arith.mulf
 
 // -----
 
@@ -183,7 +187,6 @@ func.func @no_external_capture_fusion(%arg0: tensor<4096x64xi64>, %arg1: tensor<
   ]>
 func.func @producer_has_direct_write(%arg0: tensor<3x4x5xf32>, %arg1: tensor<3x5xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c64) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x5xf32>>

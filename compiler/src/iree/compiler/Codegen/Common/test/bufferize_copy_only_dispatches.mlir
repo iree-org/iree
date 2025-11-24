@@ -120,4 +120,8 @@ func.func @already_bufferized() {
 }
 
 // CHECK-LABEL: func.func @already_bufferized
-//       CHECK: memref.alloc
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<1001xf32>
+//       CHECK:   linalg.fill {{.*}} outs(%[[ALLOC]] : memref<1001xf32>)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[ALLOC]] : memref<1001xf32>)
+//       CHECK:   memref.dealloc %[[ALLOC]]

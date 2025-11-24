@@ -52,14 +52,15 @@ func.func @fold_extract_slice_consumer_into_xfer_write_3(%arg0: vector<1x64x128x
 }
 
 // CHECK-LABEL: func.func @fold_extract_slice_consumer_into_xfer_write_3
-// CHECK-SAME:    %[[VEC2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[VEC:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[SZ1:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[SZ2:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
-// CHECK:         %[[INIT2:.+]] = tensor.empty(%arg1, %arg2) : tensor<1x?x?xf16>
-// CHECK:         %[[WRITE2:.+]] = vector.transfer_write %[[VEC2]], %[[INIT2]]
+// CHECK:         %[[INIT:.+]] = tensor.empty(%[[SZ1]], %[[SZ2]]) : tensor<1x?x?xf16>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[INIT]]
 // CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true, false, false]}
 // CHECK-SAME:      : vector<1x64x128xf16>, tensor<1x?x?xf16>
-// CHECK:         return %[[WRITE2]]
+// CHECK:         return %[[WRITE]]
 
 // -----
 
@@ -71,7 +72,7 @@ func.func @fold_insert_slice_into_transfer_write_static(%v: vector<4x5xf32>, %t1
 }
 // CHECK-LABEL: func.func @fold_insert_slice_into_transfer_write_static
 // CHECK-SAME:    %[[VEC:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[T1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
 // CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
@@ -96,7 +97,7 @@ func.func @fold_insert_slice_into_transfer_write_scalable(%v: vector<4x[4]xf32>,
 }
 // CHECK-LABEL: func.func @fold_insert_slice_into_transfer_write_scalable
 // CHECK-SAME:    %[[VEC:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[T1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
 // CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
@@ -116,10 +117,11 @@ func.func @fold_insert_slice_into_transfer_write_dynamic(%v: vector<4x8xf32>, %t
 }
 // CHECK-LABEL: func.func @fold_insert_slice_into_transfer_write_dynamic
 // CHECK-SAME:    %[[VEC:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[T1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
 // CHECK-SAME:    %[[T2:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
 // CHECK-NEXT:    %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[T2]][%[[A]], %[[B]]] {in_bounds = [true, true]} : vector<4x8xf32>, tensor<?x?xf32>
 // CHECK-NEXT:    return %[[WRITE]]
 
@@ -254,9 +256,12 @@ func.func @_batch_matmul_narrow_n_2_dispatch_4_unpack_i32() attributes {translat
 }
 
 // CHECK-LABEL: func.func @_batch_matmul_narrow_n_2_dispatch_4_unpack_i32
-// CHECK: %[[EMPTY:[a-zA-Z0-9]+]] = tensor.empty() : tensor<3x2xi32>
-// CHECK: %[[TRANS:[a-zA-Z0-9]+]] = vector.transpose %5, [1, 0] : vector<2x8xi32> to vector<8x2xi32>
-// CHECK: vector.transfer_write %[[TRANS]], %[[EMPTY]][%c0, %c0] {in_bounds = [false, true]} : vector<8x2xi32>, tensor<3x2xi32>
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[EMPTY:.+]] = tensor.empty() : tensor<3x2xi32>
+// CHECK:       scf.for
+// CHECK:         %[[READ:.+]] = vector.transfer_read
+// CHECK:         %[[TRANS:.+]] = vector.transpose %[[READ]], [1, 0] : vector<2x8xi32> to vector<8x2xi32>
+// CHECK:         vector.transfer_write %[[TRANS]], %[[EMPTY]][%[[C0]], %[[C0]]] {in_bounds = [false, true]} : vector<8x2xi32>, tensor<3x2xi32>
 
 // -----
 

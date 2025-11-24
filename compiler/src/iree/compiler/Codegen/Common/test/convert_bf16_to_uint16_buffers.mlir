@@ -1,5 +1,4 @@
-// RUN: iree-opt --split-input-file \
-// RUN:   --iree-codegen-convert-bf16-to-uint16-buffers %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-convert-bf16-to-uint16-buffers %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -14,8 +13,8 @@ func.func @bf16_conversion() {
   // CHECK-DAG: %[[BUF0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xi16, #spirv.storage_class<StorageBuffer>>{%c8}
   // CHECK-DAG: %[[BUF1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xi16, #spirv.storage_class<StorageBuffer>>{%c8}
   // CHECK-DAG: %[[BUF2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%c0) : memref<?xi16, #spirv.storage_class<StorageBuffer>>{%c8}
-  // CHECK-DAG: %[[LOAD0:.+]] = memref.load %[[BUF0]][%arg0] : memref<?xi16, #spirv.storage_class<StorageBuffer>>
-  // CHECK-DAG: %[[LOAD1:.+]] = memref.load %[[BUF1]][%arg0] : memref<?xi16, #spirv.storage_class<StorageBuffer>>
+  // CHECK-DAG: memref.load %[[BUF0]][%arg0] : memref<?xi16, #spirv.storage_class<StorageBuffer>>
+  // CHECK-DAG: memref.load %[[BUF1]][%arg0] : memref<?xi16, #spirv.storage_class<StorageBuffer>>
   // CHECK: memref.store %{{.+}}, %[[BUF2]][%arg0] : memref<?xi16, #spirv.storage_class<StorageBuffer>>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xbf16, #spirv.storage_class<StorageBuffer>>{%c8}
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xbf16, #spirv.storage_class<StorageBuffer>>{%c8}
@@ -37,7 +36,7 @@ func.func @bf16_conversion() {
 // -----
 
 // CHECK-LABEL: @bf16_constant
-func.func @bf16_constant(%arg0 : bf16) -> bf16 {
+func.func @bf16_constant() -> bf16 {
   // CHECK: %[[CNST:.+]] = arith.constant 16256 : i16
   %c0 = arith.constant 1.0 : bf16
   // CHECK: return %[[CNST]]
@@ -92,10 +91,9 @@ func.func @mmt4d_bf16xbf16xf32() {
 }
 
 // -----
-
 // CHECK-LABEL: func.func @outerproduct_bf16_preserved
 func.func @outerproduct_bf16_preserved(%arg0 : vector<1xbf16>, %arg1 : vector<1xbf16>, %arg2 : vector<1x1xbf16>) -> vector<1x1xbf16> {
-  // CHECK: vector.outerproduct %[[ARG0:.+]], %[[ARG1:.+]], %[[ARG2:.+]] {kind = #vector.kind<add>} : vector<1xbf16>, vector<1xbf16>
+  // CHECK: vector.outerproduct {{.+}}, {{.+}}, {{.+}} {kind = #vector.kind<add>} : vector<1xbf16>, vector<1xbf16>
   %0 = vector.outerproduct %arg0, %arg1, %arg2 {kind = #vector.kind<add>} : vector<1xbf16>, vector<1xbf16>
   return %0 : vector<1x1xbf16>
 }
@@ -138,9 +136,9 @@ module @extract_strided_metadata {
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%1) flags(ReadOnly) : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>>
     // CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan {{.*}} : memref<1x8x768xi16,
     %base_buffer, %offset, %sizes:3, %strides:3 = iree_codegen.extract_strided_metadata %2 : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>> -> memref<bf16>, index, index, index, index, index, index, index
-    // CHECK: {{.+}} = iree_codegen.extract_strided_metadata %[[SUBSPAN]] : memref<1x8x768xi16,
+    // CHECK: %[[BASE:[^,]+]], %[[OFFSET:[^,]+]], {{.+}} = iree_codegen.extract_strided_metadata %[[SUBSPAN]] : memref<1x8x768xi16,
     call @external_func(%base_buffer, %offset) : (memref<bf16>, index) -> ()
-    // CHECK: call @external_func({{.*}}) : (memref<i16>, index)
+    // CHECK: call @external_func(%[[BASE]], %[[OFFSET]]) : (memref<i16>, index)
     return
   }
 }

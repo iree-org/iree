@@ -2,11 +2,11 @@
 // RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-fission-transfer-ops-in-control-flow))" --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,SINGLE
 
 // CHECK-ALL-LABEL: @fission_global_read_to_private_write
-// CHECK-ALL-SAME: %[[ARG0:.*]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-ALL-SAME: %{{.+}}: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-ALL-SAME: %[[ARG1:.*]]: index
 // CHECK-ALL-SAME: %[[ARG2:.*]]: i1
 // CHECK-ALL-SAME: %[[ARG3:.*]]: vector<1x1x1x8xbf16>
-// CHECK-ALL-SAME: %[[ARG4:.*]]: memref<1x1x1x8xbf16, #gpu.address_space<private>>
+// CHECK-ALL-SAME: %{{.+}}: memref<1x1x1x8xbf16, #gpu.address_space<private>>
 func.func @fission_global_read_to_private_write(%arg0: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg2: i1, %arg3: vector<1x1x1x8xbf16>, %arg4: memref<1x1x1x8xbf16, #gpu.address_space<private>>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -20,13 +20,13 @@ func.func @fission_global_read_to_private_write(%arg0: memref<1x?x?x8xbf16, #amd
 }
 // MULTI: %[[ALLOCA:.*]] = memref.alloca(%[[ARG1]])
 // MULTI: scf.for %[[ITER:.*]] = %c0 to %[[ARG1]] step %c1 {
-// MULTI:   %[[read:.*]] = vector.transfer_read %arg0[%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]}
-// MULTI:   vector.transfer_write %[[read]], %[[ALLOCA]][%[[ITER]], %c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]}
+// MULTI:   %[[READ:.*]] = vector.transfer_read %arg0[%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]}
+// MULTI:   vector.transfer_write %[[READ]], %[[ALLOCA]][%[[ITER]], %c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]}
 // MULTI: }
 // MULTI: scf.for %[[ITER:.*]] = %c0 to %[[ARG1]] step %c1 {
-// MULTI:   %[[read:.*]] = vector.transfer_read %[[ALLOCA]][%[[ITER]], %c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]}
-// MULTI:   %[[select:.*]] = arith.select %[[ARG2]], %[[read]], %[[ARG3]]
-// MULTI:   vector.transfer_write %[[select]], %arg4[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]}
+// MULTI:   %[[READ:.*]] = vector.transfer_read %[[ALLOCA]][%[[ITER]], %c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]}
+// MULTI:   %[[SELECT:.*]] = arith.select %[[ARG2]], %[[READ]], %[[ARG3]]
+// MULTI:   vector.transfer_write %[[SELECT]], %arg4[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]}
 // MULTI: }
 
 // SINGLE: scf.for
@@ -34,6 +34,7 @@ func.func @fission_global_read_to_private_write(%arg0: memref<1x?x?x8xbf16, #amd
 
 // -----
 
+// CHECK-ALL-LABEL: @fission_memref_vector_dim_no_match
 func.func @fission_memref_vector_dim_no_match(%arg0: memref<1x1x1x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg2: memref<1x1x1x8xbf16, #gpu.address_space<private>>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -44,7 +45,7 @@ func.func @fission_memref_vector_dim_no_match(%arg0: memref<1x1x1x8xbf16, #amdgp
   }
   return
 }
-// MULTI-all-count-2: scf.for
+// MULTI-COUNT-2: scf.for
 
 // SINGLE: scf.for
 // SINGLE-NOT: scf.for
@@ -53,16 +54,16 @@ func.func @fission_memref_vector_dim_no_match(%arg0: memref<1x1x1x8xbf16, #amdgp
 
 // CHECK-ALL-LABEL: @fission_global_read_to_workgroup_write
 // CHECK-ALL-SAME: %[[ARG0:.*]]: index
-// CHECK-ALL-SAME: %[[ARG1:.*]]: memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>
-// CHECK-ALL-SAME: %[[ARG2:.*]]: memref<1x4xf32, #gpu.address_space<workgroup>>
+// CHECK-ALL-SAME: %{{.+}}: memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-ALL-SAME: %{{.+}}: memref<1x4xf32, #gpu.address_space<workgroup>>
 func.func @fission_global_read_to_workgroup_write(%arg0: index, %arg1: memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>, %arg2: memref<1x4xf32, #gpu.address_space<workgroup>>) {
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
   %c128 = arith.constant 128 : index
   %cst = arith.constant 0.000000e+00 : f32
   scf.for %arg5 = %arg0 to %c16 step %c128 {
-    %58 = vector.transfer_read %arg1[%c0, %c0], %cst {in_bounds = [true, true]} : memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<1x4xf32>
-    vector.transfer_write %58, %arg2[%c0, %c0] {in_bounds = [true, true]} : vector<1x4xf32>, memref<1x4xf32, #gpu.address_space<workgroup>>
+    %read = vector.transfer_read %arg1[%c0, %c0], %cst {in_bounds = [true, true]} : memref<?x?xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<1x4xf32>
+    vector.transfer_write %read, %arg2[%c0, %c0] {in_bounds = [true, true]} : vector<1x4xf32>, memref<1x4xf32, #gpu.address_space<workgroup>>
   }
   return
 }
@@ -87,8 +88,8 @@ func.func @fission_global_read_to_workgroup_write(%arg0: index, %arg1: memref<?x
 // -----
 
 // CHECK-ALL-LABEL: @no_fission_global_read_to_global_write
-// CHECK-ALL-SAME: %[[ARG0:.*]]: memref<1x?x?xf32, #amdgpu.address_space<fat_raw_buffer>>
-// CHECK-ALL-SAME: %[[ARG1:.*]]: memref<1x?x?xf32, #gpu.address_space<global>>
+// CHECK-ALL-SAME: %{{.+}}: memref<1x?x?xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-ALL-SAME: %{{.+}}: memref<1x?x?xf32, #gpu.address_space<global>>
 // CHECK-ALL-SAME: %[[ARG2:.*]]: index
 func.func @no_fission_global_read_to_global_write(%arg0: memref<1x?x?xf32, #amdgpu.address_space<fat_raw_buffer>>, %arg1: memref<1x?x?xf32, #gpu.address_space<global>>, %arg2: index) {
   %c0 = arith.constant 0 : index
@@ -133,7 +134,6 @@ func.func @fission_unit_trip(%arg0: memref<1x?x?x8xbf16, #amdgpu.address_space<f
 // CHECK-ALL-SAME: %[[ARG1:.*]]: index
 // CHECK-ALL-SAME: %[[ARG2:.*]]: memref<?x1x1x2xbf16, #gpu.address_space<private>>
 func.func @multiple_transfer_pairs(%arg0: memref<?x1x1x2xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg1: index, %arg2: memref<?x1x1x2xbf16, #gpu.address_space<private>>) {
-  // Multiple read/write pairs is currently unsupported.
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant 0.000000e+00 : bf16

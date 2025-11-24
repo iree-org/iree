@@ -32,11 +32,11 @@
 // CHECK:                 %[[VAL_30:.*]] = arith.addf %[[VAL_29]], %[[VAL_14]] : f32
 // CHECK:                 scf.yield %[[VAL_30]] : f32
 // CHECK:               }
-// CHECK:               scf.yield %[[VAL_31:.*]] : f32
+// CHECK:               scf.yield {{.+}} : f32
 // CHECK:             }
-// CHECK:             scf.yield %[[VAL_32:.*]] : f32
+// CHECK:             scf.yield {{.+}} : f32
 // CHECK:           }
-// CHECK:           return %[[VAL_33:.*]] : f32
+// CHECK:           return {{.+}} : f32
 // CHECK:         }
 func.func @decomposeAffine(%arg0: memref<?x?x?xf32, strided<[?, ?, ?], offset: ?>>) -> f32 {
   %cst = arith.constant 0.000000e+00 : f32

@@ -150,11 +150,11 @@ func.func @memref_copy_fully_dynamic(%source: memref<1x4xbf16>, %dest: memref<32
 //       CHECK:     %[[CMP_1:.+]] = arith.cmpi sgt, %[[MIN_1]], %[[C0]] : index
 //       CHECK:     scf.if %[[CMP_1]] {
 //       CHECK:       %[[MIN_2:.+]] = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 8)>(%[[C0]])[%[[MIN_1]]]
-//       CHECK:       %[[SUBIEW_2:.+]] = memref.subview %[[SUBVIEW_0]][0, 0] [1, %[[MIN_2]]] [1, 1]
+//       CHECK:       %[[SUBVIEW_2:.+]] = memref.subview %[[SUBVIEW_0]][0, 0] [1, %[[MIN_2]]] [1, 1]
 //  CHECK-SAME:       memref<?x?xbf16, strided<[4, 1]>> to memref<1x?xbf16, strided<[4, 1]>>
 //       CHECK:       %[[SUBVIEW_3:.+]] = memref.subview %[[SUBVIEW_1]][0, 0] [1, %[[MIN_2]]] [1, 1]
 //  CHECK-SAME:       memref<?x?xbf16, strided<[40, 1], offset: ?>> to memref<1x?xbf16, strided<[40, 1], offset: ?>>
-//       CHECK:       memref.copy %[[SUBIEW_2]], %[[SUBVIEW_3]]
+//       CHECK:       memref.copy %[[SUBVIEW_2]], %[[SUBVIEW_3]]
 
 // -----
 
