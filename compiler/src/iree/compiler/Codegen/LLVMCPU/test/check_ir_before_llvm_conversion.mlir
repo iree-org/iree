@@ -9,8 +9,8 @@ func.func @dynamic_allocas(%arg0: index) {
 // -----
 
 // expected-error @+1 {{exceeded stack allocation limit of 32768 bytes for function. Got 65536 bytes}}
-func.func @static_big_allocas(%arg0: index) {
-  %0 = memref.alloca() : memref<16384xi32>
+func.func @static_big_allocas() {
+  memref.alloca() : memref<16384xi32>
   return
 }
 
@@ -36,11 +36,11 @@ func.func @mix_static_and_dynamic_allocas(%arg0: index) {
 
 // -----
 
-func.func @non_entry_bb_allocas(%arg0: index) {
+func.func @non_entry_bb_allocas() {
   cf.br ^bb1
  ^bb1() :
   // expected-error @+1 {{all stack allocations need to be hoisted to the entry block of the function}}
-  %0 = memref.alloca() : memref<16xi32>
+  memref.alloca() : memref<16xi32>
   return
 }
 
@@ -61,7 +61,7 @@ func.func @nested_op_alloca(%arg0 : index) {
 // -----
 
 func.func @complex_alloca() {
-  %0 = memref.alloca() : memref<128xcomplex<f32>>
+  memref.alloca() : memref<128xcomplex<f32>>
   return
 }
 // CHECK-LABEL: func @complex_alloca(
