@@ -429,8 +429,8 @@ module attributes { transform.with_named_sequence } {
 }
 
 func.func @attention(
-  %s: tensor<20x4096x4096xf32>,
-  %v: tensor<20x4096x64xf32>,
+  %s_in: tensor<20x4096x4096xf32>,
+  %v_in: tensor<20x4096x64xf32>,
   %max_init: tensor<20x4096xf32>,
   %sum_init: tensor<20x4096xf32>,
   %acc_init: tensor<20x4096x64xf32>
@@ -452,7 +452,7 @@ func.func @attention(
     ],
     exp_reduced_operands = [1, 2]
   }
-    ins(%s, %v : tensor<20x4096x4096xf32>, tensor<20x4096x64xf32>)
+    ins(%s_in, %v_in : tensor<20x4096x4096xf32>, tensor<20x4096x64xf32>)
     outs(%max_init, %sum_init, %acc_init : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>)
   {
   ^bb0(%ex : f32, %v : f32, %m : f32, %sum : f32, %acc : f32):
