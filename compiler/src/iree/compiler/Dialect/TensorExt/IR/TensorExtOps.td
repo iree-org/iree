@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECT_TENSOR_EXT_OPS
 #define IREE_DIALECT_TENSOR_EXT_OPS
 
+include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrs.td"
 include "iree/compiler/Dialect/TensorExt/IR/TensorExtBase.td"
 include "iree/compiler/Dialect/TensorExt/IR/TensorExtInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
@@ -448,74 +449,48 @@ def IREETensorExt_DispatchWorkloadOrdinalOp :
 // Barrier Ops
 //===---------------------------------------------------------------------===//
 
-def IREETensorExt_ComputeBarrierStartOp : IREETensorExt_PureOp<"compute_barrier.start", [
+def IREETensorExt_ComputeBarrierOp : IREETensorExt_PureOp<"compute_barrier", [
   Util_ShapeAwareOp,
 ]> {
-  let summary = "Tensor compute barrier start operation";
+  let summary = "Tensor compute barrier operation";
   let description = [{
-    This barrier prevents certain transformations (like reshape propagation)
-    from moving operations down across this boundary.
+    This barrier controls which transformations (like reshape propagation)
+    can move across this boundary and in which direction.
+
+    The direction attribute specifies which way operations can move:
+    - "up": allows operations to move above the barrier
+    - "down": allows operations to move below the barrier
+
+    The flags attribute specifies which types of transformations are allowed:
+    - AllowExpand: allows tensor.expand_shape operations
+    - AllowCollapse: allows tensor.collapse_shape operations
+
     The operand is returned as the result with identical type.
   }];
 
   let arguments = (ins
     AnyRankedTensor:$value,
-    IREETensorExt_ShapeDynamicDims:$value_dims
+    IREETensorExt_ShapeDynamicDims:$value_dims,
+    IREETensorExt_BarrierDirectionAttr:$direction,
+    IREETensorExt_TransformationFlagBitfieldAttr:$flags
   );
   let results = (outs
     AnyRankedTensor:$result
   );
 
   let assemblyFormat = [{
+    `<` $direction `,` $flags `>`
     $value `:` type($value) (`{` $value_dims^ `}`)? `->`
     type($result)
     attr-dict-with-keyword
   }];
 
   let builders = [
-    OpBuilder<(ins "Value":$value), [{
+    OpBuilder<(ins "Value":$value, "IREE::TensorExt::BarrierDirection":$direction, "IREE::TensorExt::TransformationFlagBitfield":$flags), [{
       build($_builder, $_state, value.getType(), value,
-            IREE::Util::buildDynamicDimsForValue($_state.location, value, $_builder));
-    }]>,
-  ];
-
-  let extraClassDeclaration = [{
-    ValueRange getOperandDynamicDims(unsigned idx) { return getValueDims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return getValueDims(); }
-  }];
-
-  let hasFolder = 1;
-  let hasVerifier = 1;
-}
-
-def IREETensorExt_ComputeBarrierEndOp : IREETensorExt_PureOp<"compute_barrier.end", [
-  Util_ShapeAwareOp,
-]> {
-  let summary = "Tensor compute barrier end operation";
-  let description = [{
-    This barrier prevents certain transformations (like reshape propagation)
-    from moving operations up across this boundary.
-    The operand is returned as the result with identical type.
-  }];
-
-  let arguments = (ins
-    AnyRankedTensor:$value,
-    IREETensorExt_ShapeDynamicDims:$value_dims
-  );
-  let results = (outs
-    AnyRankedTensor:$result
-  );
-
-  let assemblyFormat = [{
-    $value `:` type($value) (`{` $value_dims^ `}`)? `->`
-    type($result)
-    attr-dict-with-keyword
-  }];
-
-  let builders = [
-    OpBuilder<(ins "Value":$value), [{
-      build($_builder, $_state, value.getType(), value,
-            IREE::Util::buildDynamicDimsForValue($_state.location, value, $_builder));
+            IREE::Util::buildDynamicDimsForValue($_state.location, value, $_builder),
+            direction,
+            flags);
     }]>,
   ];
 

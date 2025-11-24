@@ -152,6 +152,20 @@ iree_gentbl_cc_library(
         ),
         (
             [
+                "--gen-enum-decls",
+                "--dialect=iree_tensor_ext",
+            ],
+            "TensorExtEnums.h.inc",
+        ),
+        (
+            [
+                "--gen-enum-defs",
+                "--dialect=iree_tensor_ext",
+            ],
+            "TensorExtEnums.cpp.inc",
+        ),
+        (
+            [
                 "--dialect=iree_tensor_ext",
                 "--gen-dialect-decls",
             ],

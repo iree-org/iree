@@ -64,4 +64,4 @@ Operation *IREETensorExtDialect::materializeConstant(OpBuilder &builder,
 
 } // namespace mlir::iree_compiler::IREE::TensorExt
 
-#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.cpp.inc"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.cpp.inc" // IWYU pragma: keep

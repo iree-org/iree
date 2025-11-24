@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXTDIALECT_H_
 #define IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXTDIALECT_H_
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrs.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Support/TypeID.h"

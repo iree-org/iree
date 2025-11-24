@@ -93,7 +93,7 @@ util.func public @conv_2d_nhwc_chwf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
 // CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<16x3x3x4xf32>
 // CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<4x3x3x16xf32>) outs(%[[EMPTY]] : tensor<16x3x3x4xf32>)
 // CHECK-FHWC-SAME:   permutation = [3, 1, 2, 0]
-// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier.start %[[TRANSPOSE]]
+// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[TRANSPOSE]]
 // CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
 // CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2],
 // CHECK-FHWC-SAME:   ins({{.*}}, %[[START]] : tensor<1x16x16x4xf32>, tensor<16x3x3x4xf32>)
@@ -120,7 +120,7 @@ util.func public @conv_2d_nhwgc_gchwf(%arg0: tensor<2x10x10x7x4xf32>, %arg1: ten
 // CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<7x16x3x3x4xf32>
 // CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<7x4x3x3x16xf32>) outs(%[[EMPTY]] : tensor<7x16x3x3x4xf32>)
 // CHECK-FHWC-SAME:   permutation = [0, 4, 2, 3, 1]
-// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier.start %[[TRANSPOSE]]
+// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[TRANSPOSE]]
 // CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
 // CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2],
 // CHECK-FHWC-SAME:   ins({{.*}}, %[[START]] : tensor<2x10x10x7x4xf32>, tensor<7x16x3x3x4xf32>)

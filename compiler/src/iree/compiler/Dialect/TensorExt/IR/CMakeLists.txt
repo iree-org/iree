@@ -94,6 +94,8 @@ iree_tablegen_library(
   OUTS
     --gen-op-decls TensorExtOps.h.inc
     --gen-op-defs TensorExtOps.cpp.inc
+    --gen-enum-decls --dialect=iree_tensor_ext TensorExtEnums.h.inc
+    --gen-enum-defs --dialect=iree_tensor_ext TensorExtEnums.cpp.inc
     --dialect=iree_tensor_ext --gen-dialect-decls TensorExtDialect.h.inc
     --dialect=iree_tensor_ext --gen-dialect-defs TensorExtDialect.cpp.inc
 )
