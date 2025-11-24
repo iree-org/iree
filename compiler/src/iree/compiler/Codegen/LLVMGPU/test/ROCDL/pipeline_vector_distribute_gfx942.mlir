@@ -432,7 +432,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //    CHECK-LABEL: func.func @conv_nhwc
-//          CHECK:   scf.for {{.*}} = %c0 to %c215 step %c1 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x4x1x1x4x1xf32>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c215 step %c1 iter_args({{.*}}) -> (vector<2x4x1x1x4x1xf32>)
 // CHECK-COUNT-16:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //          CHECK:     scf.yield
 // CHECK-COUNT-16:   amdgpu.mfma
@@ -553,10 +553,10 @@ hal.executable public @contract_schedule_considering_read_layout {
 
 // CHECK-LABEL: func.func @contract_schedule_considering_read_layout()
 // CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloc() : memref<128x132xf16, #gpu.address_space<workgroup>>
-// CHECK-DAG:     %[[RHS_SHARED_SUB:.+]] =  memref.subview %[[RHS_SHARED]][0, 0] [128, 128] [1, 1]
+// CHECK-DAG:     memref.subview %[[RHS_SHARED]][0, 0] [128, 128] [1, 1]
 // CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<16x132xf16, #gpu.address_space<workgroup>>
-// CHECK-DAG:     %[[LHS_SHARED_SUB:.+]] =  memref.subview %[[LHS_SHARED]][0, 0] [16, 128] [1, 1]
-// CHECK:   scf.for {{.*}} = %c0 to %c1408 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x2x1x1x4x1xf16>)
+// CHECK-DAG:     memref.subview %[[LHS_SHARED]][0, 0] [16, 128] [1, 1]
+// CHECK:   scf.for {{.*}} = %c0 to %c1408 step %c128 iter_args({{.*}}) -> (vector<1x2x1x1x4x1xf16>)
 // CHECK-COUNT-16:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK:     scf.yield
 // CHECK-COUNT-16:   amdgpu.mfma
@@ -600,7 +600,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 // CHECK-LABEL: func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32
-// CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x1x4x1x4x1xf32>)
+// CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<1x1x4x1x4x1xf32>)
 
 // Validate that VMFMA is decomposed into coalesced read and 2 MFMAs:
 
@@ -613,7 +613,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK:       %[[A_SLICE_1:.+]] = vector.extract_strided_slice %[[A_CAST]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 // CHECK:       %[[B_SLICE_1:.+]] = vector.extract_strided_slice %[[B_CAST]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-// CHECK:       %[[MFMA_1:.+]] = amdgpu.mfma 32x32x8 %[[A_SLICE_1]] * %[[B_SLICE_1]] + %[[MFMA_0]] blgp =  none
+// CHECK:       amdgpu.mfma 32x32x8 %[[A_SLICE_1]] * %[[B_SLICE_1]] + %[[MFMA_0]] blgp =  none
 // CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
 
 // Ensure right number of instructions are being generated.

@@ -61,10 +61,6 @@ func.func @attention_20x1x64x4096x64() {
 func.func @reduction_with_no_consumer() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
-    %cst_0 = arith.constant 4.096000e+04 : f32
-    %cst_1 = arith.constant 9.99999974E-6 : f32
-    %c69524992 = arith.constant 69524992 : index
-    %c74767872 = arith.constant 74767872 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x32x10x4096xf16>>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32xf32>>
     %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 32, 10, 4096], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x32x10x4096xf16>> -> tensor<2x32x10x4096xf16>

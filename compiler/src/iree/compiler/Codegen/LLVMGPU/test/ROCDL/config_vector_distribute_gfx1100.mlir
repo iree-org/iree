@@ -34,5 +34,5 @@ func.func @wmma_matmul_1024x1024x1024() {
 // WMMA: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // WMMA-SAME:                           mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>
 // WMMA-SAME:                           reduction =  [0, 0, 64]
-// WMMA-LITERAL-SAME:                   subgroup_basis = [[2, 2, 1], [0, 1, 2]]
+// WMMA-SAME{LITERAL}:                  subgroup_basis = [[2, 2, 1], [0, 1, 2]]
 // WMMA-SAME:                           workgroup =  [64, 128, 0]

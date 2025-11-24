@@ -105,7 +105,6 @@ builtin.module {
     %0 = memref.alloc() : memref<4x32x16xf32, #gpu.address_space<workgroup>>
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
-    %cst_0 = arith.constant 0.000000e+00 : f32
     // CHECK: %[[CP0:.*]] = nvgpu.device_async_copy {{.*}}, {{.*}}, 4 :
     %1 = vector.load %a[%c0, %c0] : memref<1024x1024xf32>, vector<4xf32>
     vector.store %1, %0[%c0, %c0, %c0] : memref<4x32x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
@@ -138,7 +137,6 @@ builtin.module {
     %alloc_1 = memref.alloc() : memref<4x32x16xf16, #gpu.address_space<workgroup>>
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
-    %cst_0 = arith.constant 0.000000e+00 : f32
 
     // Requires 1-D vector load
     // CHECK-NOT: nvgpu.device_async_copy

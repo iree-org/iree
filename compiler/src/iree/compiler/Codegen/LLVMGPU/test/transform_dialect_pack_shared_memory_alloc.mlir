@@ -14,7 +14,6 @@
 func.func @shared_memory_disjoint() {
   %c0 = arith.constant 0 : index
   %cst_f32 = arith.constant 0.000000e+00 : f32
-  %cst_i8 = arith.constant 0 : i8
   %0 = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
   %1 = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
   %2 = memref.alloc() : memref<32xf32, #gpu.address_space<workgroup>>

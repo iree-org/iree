@@ -150,7 +150,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   }
 }
 
-//          CHECK: func @expanded_matmul_transpose_b
+//    CHECK-LABEL: func @expanded_matmul_transpose_b
 // This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 256 = 1792.
 //          CHECK:   scf.for {{.*}} = %c0 to %c1792 step %c256 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x4x1xf16>)

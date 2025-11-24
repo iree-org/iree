@@ -1,7 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
 
 func.func @winograd_filter_transform(%2: tensor<3x3x64x128xf32>) -> tensor<8x8x64x128xf32> {
-  %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<8x8x64x128xf32>
   %4 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([0, 1]) ins(%2 : tensor<3x3x64x128xf32>) outs(%3 : tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
   return %4 : tensor<8x8x64x128xf32>
@@ -17,7 +16,6 @@ func.func @winograd_filter_transform(%2: tensor<3x3x64x128xf32>) -> tensor<8x8x6
 // -----
 
 func.func @winograd_input_transform(%2: tensor<2x34x34x128xf16>) -> tensor<8x8x2x6x6x128xf16> {
-  %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<8x8x2x6x6x128xf16>
   %4 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2]) ins(%2 : tensor<2x34x34x128xf16>) outs(%3 : tensor<8x8x2x6x6x128xf16>) -> tensor<8x8x2x6x6x128xf16>
   return %4 : tensor<8x8x2x6x6x128xf16>
@@ -33,7 +31,6 @@ func.func @winograd_input_transform(%2: tensor<2x34x34x128xf16>) -> tensor<8x8x2
 // -----
 
 func.func @winograd_output_transform(%2: tensor<8x8x2x6x6x128xf16>) -> tensor<2x36x36x128xf16> {
-  %c0 = arith.constant 0 : index
   %3 = tensor.empty() : tensor<2x36x36x128xf16>
   %4 = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2]) ins(%2 : tensor<8x8x2x6x6x128xf16>) outs(%3 : tensor<2x36x36x128xf16>) -> tensor<2x36x36x128xf16>
   return %4 : tensor<2x36x36x128xf16>
