@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-dispatch-creation-pipeline{aggressive-fusion})" --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-dispatch-creation-pipeline{aggressive-fusion aggressive-reshape-movement})" --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-AGGRESSIVE-RESHAPE
 
 util.func public @truncate_fusion(%arg0: tensor<2x64x64x320xi8>, %arg1: tensor<2x66x66x640xi8>, %arg2: tensor<3x3x640x640xi8>, %arg3: tensor<640xi32>, %arg4: tensor<640xf32>, %arg5: tensor<640x320xi8>, %arg6: tensor<640xi32>, %arg7: tensor<640xf32>) -> tensor<2x640x64x64xf16> {
   %c0_i32 = arith.constant 0 : i32
@@ -182,3 +183,33 @@ util.func public @transpose_barrier_matmul(%arg0: tensor<128x64xf32>, %arg1: ten
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[MATMUL:.+]] = linalg.matmul
 //  CHECK-SAME:       ins({{.*}}, {{.*}} : tensor<128x64xf32>, tensor<64x128xf32>)
+
+// -----
+
+// Test aggressive reshape movement: collapse shape should move through reduction so that the transpose and reduction can be fused.
+util.func public @aggressive_reshape_movement(%arg0: tensor<2x10x20xi64>) -> tensor<10xi64> {
+  %empty_transpose = tensor.empty() : tensor<2x20x10xi64>
+  %transposed = linalg.transpose ins(%arg0 : tensor<2x10x20xi64>) outs(%empty_transpose : tensor<2x20x10xi64>) permutation = [0, 2, 1]
+  %collapsed = tensor.collapse_shape %transposed [[0, 1], [2]] : tensor<2x20x10xi64> into tensor<40x10xi64>
+  %empty_reduction = tensor.empty() : tensor<10xi64>
+  %reduced = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>],
+    iterator_types = ["parallel", "reduction"]
+  } ins(%collapsed : tensor<40x10xi64>) outs(%empty_reduction : tensor<10xi64>) {
+  ^bb0(%in: i64, %out: i64):
+    %x = arith.addi %in, %out : i64
+    linalg.yield %x : i64
+  } -> tensor<10xi64>
+  util.return %reduced : tensor<10xi64>
+}
+// CHECK-LABEL: func public @aggressive_reshape_movement
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]:
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups(%[[ARG0]])
+//       CHECK:   %[[RESHAPED:.+]] = flow.tensor.reshape %[[DISPATCH0]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups(%[[RESHAPED]])
+//       CHECK:   util.return %[[DISPATCH1]]
+
+// CHECK-AGGRESSIVE-RESHAPE-LABEL: util.func public @aggressive_reshape_movement
+// CHECK-AGGRESSIVE-RESHAPE-SAME:    %[[ARG0:[a-zA-Z0-9]+]]:
+// CHECK-AGGRESSIVE-RESHAPE:   %[[DISPATCH:.+]] = flow.dispatch.workgroups(%[[ARG0]])
+// CHECK-AGGRESSIVE-RESHAPE:   util.return %[[DISPATCH]]

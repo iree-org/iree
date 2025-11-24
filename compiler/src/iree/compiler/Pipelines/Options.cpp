@@ -339,6 +339,13 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "Enable split-reduction for certain reduction operations."),
       llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-dispatch-creation-enable-aggressive-reshape-movement",
+      enableAggressiveReshapeMovement,
+      llvm::cl::desc(
+          "Enable aggressive reshape movement (bubbling expand/collapse "
+          "shapes across reduction ops)."),
+      llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler

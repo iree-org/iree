@@ -464,7 +464,7 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           // If producer generic op is elementwise op, bubble up the expand
           // shape past this operation.
           // If bubbling across reduction ops is enabled, allow all generic ops.
-          return (enableBubbleUpExpandShapesAcrossReductionOps ||
+          return (enableReshapeMovementAcrossReductions ||
                   llvm::all_of(producerGenericOp.getIteratorTypesArray(),
                                linalg::isParallelIterator));
         }
@@ -474,13 +474,18 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // Do not push expand shapes down across operations with reduction
-        // iterator types.
-        // TODO: This condition should be removed.
-        if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
-          return isa<linalg::GenericOp>(consumerLinalgOp) &&
-                 llvm::all_of(consumerLinalgOp.getIteratorTypesArray(),
+        if (auto consumerGenericOp = dyn_cast<linalg::GenericOp>(consumer)) {
+          // If bubbling collapse shapes down across reduction ops is enabled,
+          // allow collapse shapes to bubble down through reduction ops.
+          // TODO: This condition should be removed.
+          return enableReshapeMovementAcrossReductions ||
+                 llvm::all_of(consumerGenericOp.getIteratorTypesArray(),
                               linalg::isParallelIterator);
+        }
+
+        // Do not push expand shapes down across named ops for now.
+        if (isa<linalg::LinalgOp>(consumer)) {
+          return false;
         }
         // Fuse in all other cases.
         return true;
