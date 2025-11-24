@@ -12,12 +12,11 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map3 = affine_map<()[s0] -> (16 ceildiv s0)>
 
-// CHECK: func @mmt4d_i8()
+// CHECK-LABEL: func @mmt4d_i8()
 func.func @mmt4d_i8() attributes {hal.executable.target = #executable_target_vmvx_bytecode_fb} {
   %c0 = arith.constant 0 : index
   %c256 = arith.constant 256 : index
   %c512 = arith.constant 512 : index
-  %c16 = arith.constant 16 : index
   %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %1 = affine.apply #map3()[%0#0]
   %2 = affine.apply #map3()[%0#1]

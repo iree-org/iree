@@ -54,7 +54,7 @@ func.func @_matmul_f16_f16_dispatch_0_fill_3456x1024() {
   return
 }
 // CHECK-LABEL: func.func @_matmul_f16_f16_dispatch_0_fill_3456x1024
-// CHECK:  %[[CP_ID:.*]] = nvgpu.device_async_copy %[[GMEMPTR:.*]][%[[IDX:.*]]%[[IDY:.*]]], %[[SMEMPTR:.*]][%[[IDK_S:.*]]%[[IDX_S:.*]]%[[IDY_S:.*]]], 8, %[[PRED:.*]] : memref<3456x2048xf16> to memref<4x32x40xf16, 3>
+// CHECK:         nvgpu.device_async_copy {{.+}}, {{.+}}, 8, {{.+}} : memref<3456x2048xf16> to memref<4x32x40xf16, 3>
 
 // -----
 

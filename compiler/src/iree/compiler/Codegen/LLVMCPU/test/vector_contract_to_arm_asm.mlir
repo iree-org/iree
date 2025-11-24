@@ -28,7 +28,7 @@ func.func @check_in_depth_mmt_8x4x8_i8i8i32 (
 // CHECK-SAME:      %[[LHS:[^:[:space:]]+]]
 // CHECK-SAME:      %[[RHS:[^:[:space:]]+]]
 // CHECK-SAME:      %[[ACC:[^:[:space:]]+]]
-// CHECK-SAME:        -> vector<8x8xi32> attributes {hal.executable.target = #[[TARGET:.+]]} {
+// CHECK-SAME:        -> vector<8x8xi32> attributes {hal.executable.target = #{{.+}}} {
 // CHECK-DAG:     %[[INITRES:.+]] = arith.constant dense<0> : vector<64xi32>
 // CHECK-DAG:     %[[LHS1D:.+]] = vector.shape_cast %[[LHS]] : vector<8x4xi8> to vector<32xi8>
 // CHECK-DAG:     %[[RHS1D:.+]] = vector.shape_cast %[[RHS]] : vector<8x4xi8> to vector<32xi8>
@@ -37,22 +37,22 @@ func.func @check_in_depth_mmt_8x4x8_i8i8i32 (
 // CHECK-DAG:     %[[RHS1D_0:.+]] = vector.extract_strided_slice %[[RHS1D]] {offsets = [0], sizes = [16], strides = [1]} : vector<32xi8> to vector<16xi8>
 // CHECK-DAG:     %[[LHS1D_1:.+]] = vector.extract_strided_slice %[[LHS1D]] {offsets = [16], sizes = [16], strides = [1]} : vector<32xi8> to vector<16xi8>
 // CHECK-DAG:     %[[RHS1D_1:.+]] = vector.extract_strided_slice %[[RHS1D]] {offsets = [16], sizes = [16], strides = [1]} : vector<32xi8> to vector<16xi8>
-// CHECK-DAG:     %[[ACC1D_0:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [0], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_1:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [4], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_2:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [8], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_3:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [12], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_4:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [16], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_5:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [20], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_6:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [24], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_7:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [28], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_8:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [32], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_9:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [36], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_10:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [40], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_11:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [44], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_12:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [48], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_13:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [52], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_14:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [56], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
-// CHECK-DAG:     %[[ACC1D_15:.+]] = vector.extract_strided_slice %[[ACC1D]] {offsets = [60], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [0], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [4], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [8], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [12], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [16], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [20], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [24], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [28], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [32], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [36], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [40], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [44], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [48], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [52], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [56], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
+// CHECK-DAG:     {{.+}} = vector.extract_strided_slice %[[ACC1D]] {offsets = [60], sizes = [4], strides = [1]} : vector<64xi32> to vector<4xi32>
 // CHECK-DAG:     %[[ASM:.+]] = llvm.inline_asm asm_dialect = att
 // CHECK-SAME:      {{((.*sdot){16})}}
 // CHECK-SAME:      "{{(\=w,){16}(w,){4}0,1,.*,15}}"

@@ -20,7 +20,7 @@ func.func @conv_2d_nchw_fchw_trailing_eltwise(%in: !input_tensor_t, %wei: !weigh
     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
                      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
     iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-    ins(%1 : !output_tensor_t) outs(%0 : !output_tensor_t) {
+    ins(%0 : !output_tensor_t) outs(%1 : !output_tensor_t) {
     ^bb0(%arg3: f32, %arg4: f32):
       %3 = math.sqrt %arg3 : f32
       linalg.yield %3 : f32
@@ -58,7 +58,7 @@ func.func @conv_2d_nhwc_hwcf(%in: !input_tensor_t, %wei: !weight_tensor_t) -> !o
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : !output_tensor_t
   // expected-remark @below {{fill}}
-  %1 = linalg.fill ins(%cst : f32) outs(%0 : !output_tensor_t) ->   !output_tensor_t
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : !output_tensor_t) -> !output_tensor_t
 
   // expected-remark @below {{convolution}}
   %2 = linalg.conv_2d_nhwc_hwcf

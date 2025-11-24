@@ -611,7 +611,7 @@ func.func @mfma_64x128x8_read(%mem: memref<128x8xf16>,
   // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM0]], %[[RHSN]]]
   // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM1]], %[[RHSN]]]
   // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM2]], %[[RHSN]]]
-  // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM3]], %[[RHSN]]
+  // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM3]], %[[RHSN]]]
 
   %a = vector.transfer_read %mem[%c0, %c0], %cst
           {in_bounds = [true, true]}
@@ -916,7 +916,6 @@ builtin.module attributes { transform.with_named_sequence } {
 func.func @transpose_3d(%arr: memref<32x32x32xf16>) -> () {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
-  %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
   %root = vector.transfer_read %arr[%c0, %c0, %c0], %cst_0 {
     in_bounds = [true, true, true]
   } : memref<32x32x32xf16>, vector<32x16x16xf16>
@@ -1267,7 +1266,6 @@ func.func @paged_transfer_gather(%indices: vector<16xindex>,
 
   %cst0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
-  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
   [None, %indices: vector<16xindex>, None], %cst0 { indexed_maps = [
@@ -1320,7 +1318,6 @@ func.func @paged_transfer_gather_multi_index(%indices: vector<16xindex>,
 
   %cst0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
-  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
   [None, %indices: vector<16xindex>, %indices2: vector<8x16xindex>], %cst0

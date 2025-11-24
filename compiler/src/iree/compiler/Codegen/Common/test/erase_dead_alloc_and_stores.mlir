@@ -1,5 +1,4 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-erase-dead-alloc-and-stores))" %s | FileCheck %s
-
 module {
   func.func @dead_alloc() {
     %0 = memref.alloc() : memref<8x64xf32, 3>
@@ -14,7 +13,7 @@ module {
 }
 
 // CHECK-LABEL:   func.func @dead_alloc
-//   CHECK-NOT:     alloc
+//   CHECK-NOT:     memref.alloc
 //   CHECK-NOT:     memref.subview
 //   CHECK-NOT:     vector.transfer_write
 //       CHECK:     return

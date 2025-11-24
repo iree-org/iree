@@ -7,7 +7,7 @@ func.func @matmul_1x4x4(%lhs: tensor<1x4xf32>, %rhs: tensor<4x4xf32>, %init: ten
   return %0: tensor<1x4xf32>
 }
 
-// CHECK-LABEL: func.func @matmul_1x4x4
+// CHECK-LABEL: func.func @matmul_1x4x4:
 //  CHECK-SAME: (%[[LHS:.+]]: tensor<1x4xf32>, %[[RHS:.+]]: tensor<4x4xf32>, %[[INIT:.+]]: tensor<1x4xf32>)
 
 //   CHECK-DAG:   %[[PAD:.+]] = ub.poison : f32
@@ -45,7 +45,7 @@ func.func @matmul_8x8x2(%lhs: tensor<8x2xf32>, %rhs: tensor<2x8xf32>, %init: ten
   return %0 : tensor<8x8xf32>
 }
 
-//    CHECK-LABEL: func.func @matmul_8x8x2
+// CHECK-LABEL: func.func @matmul_8x8x2:
 
 //  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x2xf32>, vector<2xf32>
 //  CHECK-COUNT-4: vector.transfer_read {{.*}} : tensor<2x8xf32>, vector<4xf32>
@@ -62,7 +62,7 @@ func.func @matmul_8x8x1(%lhs: tensor<8x1xf32>, %rhs: tensor<1x8xf32>, %init: ten
   return %0 : tensor<8x8xf32>
 }
 
-//    CHECK-LABEL: func.func @matmul_8x8x1
+// CHECK-LABEL: func.func @matmul_8x8x1:
 
 //  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x1xf32>, vector<1xf32>
 //  CHECK-COUNT-2: vector.transfer_read {{.*}} : tensor<1x8xf32>, vector<4xf32>
@@ -79,7 +79,7 @@ func.func @matmul_1x1x6(%lhs: tensor<1x6xf32>, %rhs: tensor<6x1xf32>, %init: ten
   return %0 : tensor<1x1xf32>
 }
 
-//    CHECK-LABEL: func.func @matmul_1x1x6
+// CHECK-LABEL: func.func @matmul_1x1x6:
 
 //  CHECK-COUNT-3: vector.transfer_read {{.*}} : tensor<1x6xf32>, vector<2xf32>
 //  CHECK-COUNT-6: vector.transfer_read {{.*}} : tensor<6x1xf32>, vector<1xf32>
@@ -96,7 +96,7 @@ func.func @matmul_1x3x6(%lhs: tensor<1x6xf32>, %rhs: tensor<6x3xf32>, %init: ten
   return %0 : tensor<1x3xf32>
 }
 
-//     CHECK-LABEL: func.func @matmul_1x3x6
+// CHECK-LABEL: func.func @matmul_1x3x6:
 
 //   CHECK-COUNT-3: vector.transfer_read {{.*}} : tensor<1x6xf32>, vector<2xf32>
 //  CHECK-COUNT-18: vector.transfer_read {{.*}} : tensor<6x3xf32>, vector<1xf32>
@@ -107,12 +107,6 @@ func.func @matmul_1x3x6(%lhs: tensor<1x6xf32>, %rhs: tensor<6x3xf32>, %init: ten
 // -----
 
 func.func @matmul_broadcast_add(%init: tensor<1x8xf32>, %a: tensor<1x8xf32>, %b: tensor<8x8xf32>, %c: tensor<1x8xf32>, %bias: tensor<1xf32>) -> tensor<1x8xf32> {
-  %c16 = arith.constant 16 : index
-  %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.000000e+00 : f32
-  %c8 = arith.constant 8 : index
-  %c1 = arith.constant 1 : index
-
   %matmul = linalg.matmul ins(%a, %b : tensor<1x8xf32>, tensor<8x8xf32>) outs(%c : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bcast_add = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
@@ -125,7 +119,7 @@ func.func @matmul_broadcast_add(%init: tensor<1x8xf32>, %a: tensor<1x8xf32>, %b:
   return %bcast_add: tensor<1x8xf32>
 }
 
-//    CHECK-LABEL: func.func @matmul_broadcast_add
+// CHECK-LABEL: func.func @matmul_broadcast_add:
 //     CHECK-SAME: (%[[INIT:[a-z0-9]+]]: tensor<1x8xf32>
 //     CHECK-SAME:  %[[BIAS:[a-z0-9]+]]: tensor<1xf32>)
 
@@ -151,7 +145,6 @@ func.func @matmul_2x8x128_fp16(%a: tensor<2x128xf16>, %b: tensor<128x8xf16>, %x:
   %c8 = arith.constant 8 : index
   %c128 = arith.constant 128 : index
   %f0 = arith.constant 0.0 : f16
-
   %init = tensor.empty() : tensor<2x8xf16>
   %fill = linalg.fill ins(%f0 : f16) outs(%init : tensor<2x8xf16>) -> tensor<2x8xf16>
   %matmul = scf.for %iv = %c0 to %c128 step %c8 iter_args(%arg = %fill) -> (tensor<2x8xf16>) {
@@ -172,7 +165,7 @@ func.func @matmul_2x8x128_fp16(%a: tensor<2x128xf16>, %b: tensor<128x8xf16>, %x:
   return %0: tensor<2x8xf16>
 }
 
-//    CHECK-LABEL: func.func @matmul_2x8x128_fp16
+// CHECK-LABEL: func.func @matmul_2x8x128_fp16:
 //     CHECK-SAME: (%[[LHS:.+]]: tensor<2x128xf16>, %[[RHS:.+]]: tensor<128x8xf16>, %[[X:.+]]: tensor<2x8xf16>, %[[Y:.+]]: tensor<2x8xf16>)
 //          CHECK:   %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<8xf16>
 //          CHECK:   %[[FOR:.+]]:2 = scf.for %arg4 = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%arg5 = %[[ZERO]], %arg6 = %[[ZERO]])
@@ -215,7 +208,6 @@ func.func @matmul_2x8x128_fp16(%a: tensor<2x128xf16>, %b: tensor<128x8xf16>, %x:
 
 func.func @matmul_4x4x4_i8_to_i32(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -> tensor<4x4xi32> {
   %c0 = arith.constant 0 : i32
-  %i0 = arith.constant 0 : index
   %init = tensor.empty() : tensor<4x4xi32>
   %CC = linalg.fill ins(%c0 : i32) outs(%init : tensor<4x4xi32>) -> tensor<4x4xi32>
   %D = linalg.matmul ins(%lhs, %rhs: tensor<4x4xi8>, tensor<4x4xi8>)
@@ -223,7 +215,7 @@ func.func @matmul_4x4x4_i8_to_i32(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -
   return %D : tensor<4x4xi32>
 }
 
-// CHECK-LABEL: func.func @matmul_4x4x4_i8_to_i32
+// CHECK-LABEL: func.func @matmul_4x4x4_i8_to_i32:
 // CHECK-SAME:    (%[[LHS:.+]]: tensor<4x4xi8>, %[[RHS:.+]]: tensor<4x4xi8>)
 // CHECK-DAG:     %[[PV:.+]]   = ub.poison : i8
 // CHECK-DAG:     %[[IDX0:.+]]   = arith.constant 0 : index
@@ -273,7 +265,6 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>} {
   %c0 = arith.constant 0 : i32
-  %i0 = arith.constant 0 : index
   %init = tensor.empty() : tensor<4x4xi32>
   %CC = linalg.fill ins(%c0 : i32) outs(%init : tensor<4x4xi32>) -> tensor<4x4xi32>
   %D = linalg.matmul ins(%lhs, %rhs: tensor<4x4xi8>, tensor<4x4xi8>)
@@ -281,7 +272,7 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
   return %D : tensor<4x4xi32>
 }
 
-// CHECK-LABEL: func.func @matmul_4x4x4_i8_to_i32
+// CHECK-LABEL: func.func @matmul_4x4x4_i8_to_i32_dot_prod:
 // CHECK-SAME:    (%[[LHS:.+]]: tensor<4x4xi8>, %[[RHS:.+]]: tensor<4x4xi8>)
 // CHECK-DAG:     %[[PV:.+]]   = ub.poison : i8
 // CHECK-DAG:     %[[C0I32:.+]]  = arith.constant 0 : i32
@@ -327,7 +318,6 @@ func.func @matmul_4x16x4_i8_to_i32_dot_prod(%lhs: tensor<4x16xi8>, %rhs : tensor
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>} {
   %c0 = arith.constant 0 : i32
-  %i0 = arith.constant 0 : index
   %init = tensor.empty() : tensor<4x4xi32>
   %CC = linalg.fill ins(%c0 : i32) outs(%init : tensor<4x4xi32>) -> tensor<4x4xi32>
   %D = linalg.matmul ins(%lhs, %rhs: tensor<4x16xi8>, tensor<16x4xi8>)
@@ -335,5 +325,5 @@ func.func @matmul_4x16x4_i8_to_i32_dot_prod(%lhs: tensor<4x16xi8>, %rhs : tensor
   return %D : tensor<4x4xi32>
 }
 
-// CHECK-LABEL: func.func @matmul_4x16x4_i8_to_i32
+// CHECK-LABEL: func.func @matmul_4x16x4_i8_to_i32_dot_prod:
 // CHECK-COUNT-64:          spirv.SDotAccSat

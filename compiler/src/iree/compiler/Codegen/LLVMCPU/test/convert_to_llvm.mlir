@@ -8,9 +8,9 @@ builtin.module {
 }
 //      CHECK: llvm.func @extern_public()
 //      CHECK: llvm.func @entry_point(
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias, llvm.nonnull, llvm.noundef},
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias, llvm.nonnull, llvm.noundef},
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias, llvm.nonnull, llvm.noundef}) -> i32
+// CHECK-SAME:     {{.+}}: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias, llvm.nonnull, llvm.noundef},
+// CHECK-SAME:     {{.+}}: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias, llvm.nonnull, llvm.noundef},
+// CHECK-SAME:     {{.+}}: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias, llvm.nonnull, llvm.noundef}) -> i32
 //      CHECK:     llvm.return %{{.+}} : i32
 
 // -----
@@ -51,9 +51,6 @@ func.func @interleave_and_bitcast_lowering() {
   %cst = arith.constant dense<4> : vector<4x2xi8>
   %cst_0 = arith.constant dense<0> : vector<4x4xi4>
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
-  %c3 = arith.constant 3 : index
   %c4096 = arith.constant 4096 : index
   %c8192 = arith.constant 8192 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c4096) flags(ReadOnly) : memref<128xi8, strided<[1], offset: ?>>

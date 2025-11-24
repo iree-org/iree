@@ -1,7 +1,7 @@
 // RUN: iree-opt --verify-diagnostics --split-input-file %s
 
 module @foo_module attributes { transform.with_named_sequence } {
-  func.func @baz(%arg0: i32) -> () {
+  func.func @baz() -> () {
     return
   }
   transform.named_sequence @bar(%arg0: !transform.any_op {transform.readonly}) -> !transform.any_op
@@ -182,7 +182,7 @@ module @iree_default_tuning_spec attributes { transform.with_named_sequence, ire
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed})
     -> (!transform.any_op) attributes { iree_codegen.tuning_spec_entrypoint } {
     // expected-error @+1 {{'ForeachMatchOp' must return exactly one 'any_op' result (required by 'iree_codegen.tuning_spec_with_default_entrypoint')}}
-    %res1, %res2 = transform.foreach_match in %arg0
+    %res1, %_unused = transform.foreach_match in %arg0
       @match -> @apply_op_config
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 

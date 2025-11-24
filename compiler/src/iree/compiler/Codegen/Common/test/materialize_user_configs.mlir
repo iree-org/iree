@@ -23,28 +23,11 @@ module {
     iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x512xf32>>
     return
   }
-  func.func @preset_config_1() attributes {hal.executable.target = #executable_target_system_elf_x86_64_} {
-    %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x256xf32>>
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x512xf32>>
-    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x512xf32>>
-    %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x256xf32>> -> tensor<128x256xf32>
-    %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 512], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x512xf32>> -> tensor<256x512xf32>
-    %5 = tensor.empty() : tensor<128x512xf32>
-    %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<128x512xf32>) -> tensor<128x512xf32>
-    %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<128x256xf32>, tensor<256x512xf32>) outs(%6 : tensor<128x512xf32>) -> tensor<128x512xf32>
-    iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x512xf32>>
-    return
-  }
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 //      CHECK: func.func @preset_config_0()
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.matmul
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
-//      CHECK: func.func @preset_config_1()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
@@ -102,7 +85,7 @@ func.func @custom_op_compilation_info(%arg0 : tensor<384x512xf32>, %arg1 : tenso
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[24, 32]]>
 //  CHECK-DAG: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = CPUDefault>
 //      CHECK: func @custom_op_compilation_info(
-// CHECK-SAME:     translation_info = #translation
+// CHECK-SAME:     translation_info = #[[TRANSLATION_INFO]]
 //      CHECK:   iree_linalg_ext.custom_op
 // CHECK-SAME:       attributes {lowering_config = #[[CONFIG]]}
 //  CHECK-NOT:   compilation_info

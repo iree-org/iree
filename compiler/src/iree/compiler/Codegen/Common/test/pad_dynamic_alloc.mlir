@@ -37,7 +37,8 @@ func.func @dynamic_bound_alloc(%id : index) {
   return
 }
 // CHECK-LABEL: func @dynamic_bound_alloc(
-//       CHECK:   memref.alloc() : memref<4088xf32, 3>
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<4088xf32, 3>
+//       CHECK:   memref.subview %[[ALLOC]][0] [%{{.+}}] [1] : memref<4088xf32, 3> to memref<?xf32, strided<[1]>, 3>
 
 // -----
 
@@ -47,7 +48,8 @@ func.func @dynamic_bound_alloca(%id : index) {
   return
 }
 // CHECK-LABEL: func @dynamic_bound_alloca(
-//       CHECK:   memref.alloca() : memref<4088xf32, 3>
+//       CHECK:   %[[ALLOCA:.+]] = memref.alloca() : memref<4088xf32, 3>
+//       CHECK:   memref.subview %[[ALLOCA]][0] [%{{.+}}] [1] : memref<4088xf32, 3> to memref<?xf32, strided<[1]>, 3>
 
 // -----
 

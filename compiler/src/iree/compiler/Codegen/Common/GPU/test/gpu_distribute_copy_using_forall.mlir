@@ -26,7 +26,7 @@ func.func @unaligned_copy(%src : memref<56x31xf32>, %target : memref<56x31xf32>)
 //  CHECK-SAME: (%[[SRC:.+]]: memref<56x31xf32>, %[[TARGET:.+]]: memref<56x31xf32>)
 
 //       CHECK:   scf.forall (%[[IV0:[A-Za-z0-9]+]], %[[IV1:[A-Za-z0-9]+]]) = (0, 0) to (56, 31) step (1, 4) {
-//       CHECK:       %[[MIN:.+]] = affine.min #[[$MAP]](%c4, %c31, %[[IV1]])
+//       CHECK:       %[[MIN:.+]] = affine.min #[[$MAP]]({{.+}}, {{.+}}, %[[IV1]])
 //   CHECK-DAG:       %[[SRC_SUBVIEW:.+]] = memref.subview %[[SRC]][%[[IV0]], %[[IV1]]] [1, %[[MIN]]]
 //   CHECK-DAG:       %[[TARGET_SUBVIEW:.+]] = memref.subview %[[TARGET]][%[[IV0]], %[[IV1]]] [1, %[[MIN]]]
 //       CHECK:       memref.copy %[[SRC_SUBVIEW]], %[[TARGET_SUBVIEW]]
@@ -43,10 +43,10 @@ func.func @dynamic_copy(%src : memref<?x?xf32>, %target : memref<?x?xf32>) {
 // CHECK-LABEL: func.func @dynamic_copy
 //  CHECK-SAME: (%[[SRC:.+]]: memref<?x?xf32>, %[[TARGET:.+]]: memref<?x?xf32>)
 
-//   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[SRC]], %c0 : memref<?x?xf32>
-//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[SRC]], %c1 : memref<?x?xf32>
+//   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[SRC]], %{{.+}} : memref<?x?xf32>
+//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[SRC]], %{{.+}} : memref<?x?xf32>
 //       CHECK:   scf.forall (%[[IV0:[A-Za-z0-9]+]], %[[IV1:[A-Za-z0-9]+]]) = (0, 0) to (%[[D0]], %[[D1]]) step (1, 4) {
-//       CHECK:       %[[MIN:.+]] = affine.min #[[$MAP]](%c4, %[[D1]], %[[IV1]])
+//       CHECK:       %[[MIN:.+]] = affine.min #[[$MAP]]({{.+}}, %[[D1]], %[[IV1]])
 //   CHECK-DAG:       %[[SRC_SUBVIEW:.+]] = memref.subview %[[SRC]][%[[IV0]], %[[IV1]]] [1, %[[MIN]]]
 //   CHECK-DAG:       %[[TARGET_SUBVIEW:.+]] = memref.subview %[[TARGET]][%[[IV0]], %[[IV1]]] [1, %[[MIN]]]
 //       CHECK:       memref.copy %[[SRC_SUBVIEW]], %[[TARGET_SUBVIEW]]

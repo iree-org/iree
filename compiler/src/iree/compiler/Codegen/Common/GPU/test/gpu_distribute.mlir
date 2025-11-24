@@ -11,7 +11,6 @@
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 func.func @add_tensor() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
-  %c64 = arith.constant 64 : index
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<233x1024xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<233x1024xf32>
@@ -22,7 +21,7 @@ func.func @add_tensor() attributes {translation_info = #translation} {
   %subview = memref.subview %2[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, #map1>
   %subview_0 = memref.subview %0[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, #map1>
   %subview_1 = memref.subview %1[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, #map1>
-  scf.forall (%arg0) in (%c64) {
+  scf.forall (%arg0) in (64) {
     %4 = affine.apply #map2(%arg0)
     %subview_2 = memref.subview %subview[0, %4] [1, 4] [1, 1] : memref<1x256xf32, #map1> to memref<1x4xf32, #map1>
     %5 = vector.transfer_read %subview_0[%c0, %4], %cst {in_bounds = [true]} : memref<1x256xf32, #map1>, vector<4xf32>
@@ -57,7 +56,6 @@ func.func @add_tensor() attributes {translation_info = #translation} {
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1]>
 func.func @add_tensor_lane_id() attributes {translation_info = #translation} {
   %cst = arith.constant 0.000000e+00 : f32
-  %c64 = arith.constant 64 : index
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<233x1024xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<233x1024xf32>
@@ -68,7 +66,7 @@ func.func @add_tensor_lane_id() attributes {translation_info = #translation} {
   %subview = memref.subview %2[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, #map1>
   %subview_0 = memref.subview %0[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, #map1>
   %subview_1 = memref.subview %1[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, #map1>
-  scf.forall (%arg0) in (%c64) {
+  scf.forall (%arg0) in (64) {
     %4 = affine.apply #map2(%arg0)
     %subview_2 = memref.subview %subview[0, %4] [1, 4] [1, 1] : memref<1x256xf32, #map1> to memref<1x4xf32, #map1>
     %5 = vector.transfer_read %subview_0[%c0, %4], %cst {in_bounds = [true]} : memref<1x256xf32, #map1>, vector<4xf32>

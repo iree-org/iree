@@ -947,16 +947,10 @@ func.func @do_not_crash_on_non_ranked_tensor_type() {
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d3, d4, d0, d2)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @do_not_crash_on_non_encoded_tensors(%offset0: index, %offset1: index, %size: index) attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple = "x86_64-xyz-xyz"}>
 } {
-  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
-  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
-  %3 = arith.index_castui %0 : i32 to index
-  %4 = arith.index_castui %1 : i32 to index
-  %5 = arith.index_castui %2 : i32 to index
   %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%offset0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x32x4x32xf16>>{%size}
   %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%offset1) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x2x32x?x32xf16>>{%size}
   %10 = tensor.empty(%size) : tensor<4x2x32x?x32xf16>

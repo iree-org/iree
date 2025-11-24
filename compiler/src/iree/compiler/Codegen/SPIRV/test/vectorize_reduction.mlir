@@ -15,7 +15,7 @@ func.func @reduce_outmost_dim(%input: tensor<4x1x4xf32>, %init: tensor<1x4xf32>)
   return %0 : tensor<1x4xf32>
 }
 
-// CHECK-LABEL: func @reduce_outmost_dim
+// CHECK-LABEL: func @reduce_outmost_dim:
 //  CHECK-SAME: (%[[INPUT:.+]]: tensor<4x1x4xf32>, %[[INIT:.+]]: tensor<1x4xf32>)
 
 //   CHECK-DAG:   %[[PV:.+]] = ub.poison : f32
@@ -40,7 +40,6 @@ func.func @reduce_outmost_dim(%input: tensor<4x1x4xf32>, %init: tensor<1x4xf32>)
 // -----
 
 func.func @reduce_two_dims(%input: tensor<2x3x4xf32>, %init: tensor<4xf32>) -> tensor<4xf32> {
-  %f0 = arith.constant 0.0 : f32
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>],
     iterator_types = ["parallel", "reduction", "reduction"]
@@ -52,7 +51,7 @@ func.func @reduce_two_dims(%input: tensor<2x3x4xf32>, %init: tensor<4xf32>) -> t
   return %0 : tensor<4xf32>
 }
 
-//   CHECK-LABEL: func @reduce_two_dims
+// CHECK-LABEL: func @reduce_two_dims:
 //    CHECK-SAME: (%[[INPUT:.+]]: tensor<2x3x4xf32>, %[[INIT:.+]]: tensor<4xf32>)
 
 // CHECK-COUNT-6:   vector.transfer_read %[[INPUT]]{{.+}} : tensor<2x3x4xf32>, vector<4xf32>
@@ -82,7 +81,7 @@ func.func @reduce_multi_inputs_no_contraction(%a: tensor<2x3x4xf32>, %b: tensor<
   return %0: tensor<4xf32>
 }
 
-//   CHECK-LABEL: func @reduce_multi_inputs_no_contraction
+// CHECK-LABEL: func @reduce_multi_inputs_no_contraction:
 //    CHECK-SAME: (%[[A:.+]]: tensor<2x3x4xf32>, %[[B:.+]]: tensor<2x3x4xf32>, %[[INIT:.+]]: tensor<4xf32>)
 
 // CHECK-COUNT-6:   vector.transfer_read %[[A]]{{.+}} : tensor<2x3x4xf32>, vector<4xf32>
@@ -119,7 +118,7 @@ func.func @reduce_multi_inputs_contraction(%a: tensor<2x3x4xf32>, %b: tensor<2x3
   return %0: tensor<4xf32>
 }
 
-//   CHECK-LABEL: func @reduce_multi_inputs_contraction
+// CHECK-LABEL: func @reduce_multi_inputs_contraction:
 //    CHECK-SAME: (%[[A:.+]]: tensor<2x3x4xf32>, %[[B:.+]]: tensor<2x3x4xf32>, %[[INIT:.+]]: tensor<4xf32>)
 
 // CHECK-COUNT-6:   vector.transfer_read %[[A]]{{.+}} : tensor<2x3x4xf32>, vector<4xf32>
@@ -153,7 +152,7 @@ func.func @reduce_innermost_dim_contraction(%a: tensor<4x12xf32>, %b: tensor<4xf
 }
 
 
-//    CHECK-LABEL: func @reduce_innermost_dim_contraction
+// CHECK-LABEL: func @reduce_innermost_dim_contraction:
 //     CHECK-SAME: (%[[A:.+]]: tensor<4x12xf32>, %[[B:.+]]: tensor<4xf32>, %[[INIT:.+]]: tensor<4xf32>)
 
 // CHECK-COUNT-12: vector.transfer_read %[[A]]{{.+}} : tensor<4x12xf32>, vector<4xf32>
@@ -166,7 +165,6 @@ func.func @reduce_innermost_dim_contraction(%a: tensor<4x12xf32>, %b: tensor<4xf
 // -----
 
 func.func @reduce_vector3(%input: tensor<4x3xf32>, %init: tensor<3xf32>) -> tensor<3xf32> {
-  %f0 = arith.constant 0.0 : f32
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]
@@ -178,5 +176,5 @@ func.func @reduce_vector3(%input: tensor<4x3xf32>, %init: tensor<3xf32>) -> tens
   return %0 : tensor<3xf32>
 }
 
-// CHECK-LABEL: func @reduce_vector3
+// CHECK-LABEL: func @reduce_vector3:
 // CHECK-COUNT-4: arith.addf {{.+}} : vector<3xf32>

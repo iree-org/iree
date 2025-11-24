@@ -30,7 +30,7 @@ func.func @generic_op_illegal_operand() {
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi8>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi8>)
-//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, %[[ARG1:[a-zA-Z0-9]+]]: i8)
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, {{.+}}: i8)
 //   CHECK-DAG:       %[[TRUNC:.+]] = arith.trunci %[[ARG0]] : i8 to i1
 //   CHECK-DAG:       %[[EXTUI:.+]] = arith.extui %[[TRUNC]] : i1 to i8
 //       CHECK:       linalg.yield %[[EXTUI]]
@@ -68,7 +68,7 @@ func.func @generic_op_illegal_operand_i7() {
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi8>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi8>)
-//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, %[[ARG1:[a-zA-Z0-9]+]]: i8)
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, {{.+}}: i8)
 //   CHECK-DAG:       %[[TRUNC:.+]] = arith.trunci %[[ARG0]] : i8 to i7
 //   CHECK-DAG:       %[[EXTUI:.+]] = arith.extui %[[TRUNC]] : i7 to i8
 //       CHECK:       linalg.yield %[[EXTUI]]
@@ -106,7 +106,7 @@ func.func @generic_op_illegal_operand_i33() {
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi64>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi64>)
-//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i64, %[[ARG1:[a-zA-Z0-9]+]]: i64)
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i64, {{.+}}: i64)
 //   CHECK-DAG:       %[[TRUNC:.+]] = arith.trunci %[[ARG0]] : i64 to i33
 //   CHECK-DAG:       %[[EXTUI:.+]] = arith.extui %[[TRUNC]] : i33 to i64
 //       CHECK:       linalg.yield %[[EXTUI]]
@@ -144,7 +144,7 @@ func.func @generic_op_illegal_result() {
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi8>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi8>)
-//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, %[[ARG1:[a-zA-Z0-9]+]]: i8)
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, {{.+}}: i8)
 //   CHECK-DAG:       %[[TRUNC:.+]] = arith.trunci %[[ARG0]] : i8 to i1
 //   CHECK-DAG:       %[[EXTUI:.+]] = arith.extui %[[TRUNC]] : i1 to i8
 //       CHECK:       linalg.yield %[[EXTUI]]
@@ -469,7 +469,6 @@ func.func @sort() {
 }
 
 // CHECK-LABEL: func.func @sort()
-//   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //   CHECK-DAG:   %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //   CHECK-DAG:   %[[A_TENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[A]]
@@ -507,7 +506,6 @@ func.func @sort_secondary() {
 }
 
 // CHECK-LABEL: func.func @sort_secondary()
-//   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //   CHECK-DAG:   %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //   CHECK-DAG:   %[[A_TENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[A]]

@@ -23,9 +23,10 @@ func.func @matmul_lowering_MFMA_i32_16x16x16_i8(
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK:     func.func @matmul_lowering_MFMA_i32_16x16x16_i8
+// CHECK-LABEL: func.func @matmul_lowering_MFMA_i32_16x16x16_i8(
 // CHECK-SAME:   %[[LHS:.+]]: tensor<?x?x4x4x16x4x4xi8>, %[[RHS:.+]]: tensor<?x?x4x2x4x16x4x4xi8>
 // CHECK-SAME:   %[[ACC:.+]]: tensor<?x?x4x4x2x4x16x4xi32>
+// CHECK-SAME: ) -> tensor<?x?x4x4x2x4x16x4xi32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]

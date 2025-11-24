@@ -5,7 +5,7 @@
 #pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_2D_dynamic_tile_size {
-  hal.executable.variant public @scf_forall_2D_dynamic_tile_size target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @scf_forall_2D_dynamic_tile_size target(#hal.executable.target<"", "">) {
     hal.executable.export public @scf_forall_2D_dynamic_tile_size layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
       hal.return %x, %y, %z : index, index, index
@@ -34,7 +34,7 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
   }
 }
 //         CHECK-ALL:   hal.executable.export
-//    CHECK-ALL-SAME:       %[[ARG0:[a-zA-Z0-9]+]]: !hal.device
+//    CHECK-ALL-SAME:       {{.+}}: !hal.device
 //    CHECK-ALL-SAME:       %[[ARG1:[a-zA-Z0-9]+]]: index
 //    CHECK-ALL-SAME:       %[[ARG2:[a-zA-Z0-9]+]]: index
 //    CHECK-ALL-SAME:       %[[ARG3:[a-zA-Z0-9]+]]: index
@@ -93,12 +93,12 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
 //   DISTRIBUTEZ-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%[[IDX]], %[[ARG5]], %[[ARG1]]]
 //       DISTRIBUTEZ:     "use"(%[[IV0]], %[[IV1]])
 
-// // -----
+// -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_3D_tile_size {
-  hal.executable.variant public @scf_forall_3D_tile_size target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @scf_forall_3D_tile_size target(#hal.executable.target<"", "">) {
     hal.executable.export public @scf_forall_3D_tile_size layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
@@ -171,7 +171,7 @@ hal.executable private @scf_forall_3D_tile_size {
     #hal.pipeline.binding<storage_buffer, "ReadOnly">,
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @split_reduction_executable {
-  hal.executable.variant public @split_reduction_variant target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @split_reduction_variant target(#hal.executable.target<"", "">) {
     hal.executable.export public @split_reduction layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)

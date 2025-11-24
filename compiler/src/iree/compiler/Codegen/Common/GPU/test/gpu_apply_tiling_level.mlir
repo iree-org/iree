@@ -113,7 +113,6 @@ func.func @matmul_transpose_b(%5: tensor<64x64xf32>, %6: tensor<64x1280xf16>, %7
 // -----
 
 #config = #iree_gpu.lowering_config<{reduction = [0, 8]}>
-#map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #map2 = affine_map<(d0, d1) -> (d0)>
 func.func @reduction(%3: tensor<128x384xf32>) -> tensor<128xf32> {
@@ -163,7 +162,7 @@ func.func @matmul_fuse(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tensor<
 // CHECK-LABEL: func.func @matmul_fuse
 //       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c8
 //       CHECK:     %[[ELEMWISE:.+]] = linalg.generic {{.*}} ins(%{{.*}} : tensor<64x8xf32>)
-//       CHECK:     %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[ELEMWISE]], {{.*}} : tensor<64x8xf32>, tensor<8x64xf32>)
+//       CHECK:     linalg.matmul {{.*}} ins(%[[ELEMWISE]], {{.*}} : tensor<64x8xf32>, tensor<8x64xf32>)
 
 // -----
 
@@ -179,13 +178,13 @@ func.func @matmul_fuse_destination(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>)
 
 // Verify that destinations are not fused for reduction tiling.
 // CHECK-LABEL: func.func @matmul_fuse_destination
-//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%{{.*}} : tensor<64x64xf32>)
-//       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c8 iter_args(%[[ITER:.+]] = %[[FILL]]
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%{{.*}} : f32)
+//       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c8 iter_args({{.+}} = %[[FILL]]
 //       CHECK:     linalg.matmul
 
 // THREAD-LABEL: func.func @matmul_fuse_destination
 //       THREAD:   %[[EMPTY:.+]] = tensor.empty() : tensor<64x64xf32>
-//       THREAD:   scf.forall {{.*}} shared_outs(%[[INIT:.+]] = %[[EMPTY]]
+//       THREAD:   scf.forall {{.*}} shared_outs({{.+}} = %[[EMPTY]]
 //       THREAD:     linalg.fill
 //       THREAD:     linalg.matmul
 
@@ -212,7 +211,7 @@ func.func @matmul_cleanup(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tens
 //       THREAD:     scf.forall
 //   THREAD-DAG:       %[[LHS:.+]] = tensor.extract_slice %[[A]]
 //   THREAD-DAG:       %[[RHS:.+]] = tensor.extract_slice %[[B]]
-//       THREAD:       %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[LHS]], %[[RHS]] : tensor<8x8xf32>, tensor<8x8xf32>)
+//       THREAD:       linalg.matmul {{.*}} ins(%[[LHS]], %[[RHS]] : tensor<8x8xf32>, tensor<8x8xf32>)
 
 // -----
 
@@ -535,8 +534,7 @@ func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
 // check if the tiling implementation itself is correct (it should be tested
 // in the partial tiling unit tests).
 // PARTRED-LABEL: func.func @partial_reduction
-//   PARTRED-DAG:  %[[DIM0:.+]]  = tensor.dim %{{.*}}, %c0
-//   PARTRED-DAG:  %[[DIM1:.+]]  = tensor.dim %{{.*}}, %c1
+//   PARTRED-DAG:   %[[DIM1:.+]]  = tensor.dim %{{.*}}, %c1
 //   PARTRED-DAG:   %[[FULL:.+]] = linalg.fill {{.*}} tensor<?xf32>
 //   PARTRED-DAG:   %[[PART:.+]] = linalg.fill {{.*}} tensor<?x8xf32>
 //       PARTRED:   %[[OUT:.+]] = scf.for %{{.*}} = %c0 to %[[DIM1]] step %c8 iter_args(%{{.*}} = %[[PART]])
@@ -641,7 +639,7 @@ func.func @no_swap_collapse_shape_with_extract_slice_2(%arg0: tensor<32x2x2x16xf
 // -----
 
 #config = #iree_gpu.lowering_config<{reduction = [0, 30]}>
-func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf32>) -> tensor<2592x32xf32> {
+func.func @no_swap_collapse_shape_with_extract_slice_3(%arg0: tensor<288x3x3x32xf32>) -> tensor<2592x32xf32> {
   %collapsed = tensor.collapse_shape %arg0 [[0, 1, 2], [3]] : tensor<288x3x3x32xf32> into tensor<2592x32xf32>
   %empty = tensor.empty() : tensor<2592x32xf32>
   %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<2592x32xf32>) outs(%empty : tensor<2592x32xf32>) -> tensor<2592x32xf32>
@@ -649,7 +647,7 @@ func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf3
 }
 
 // No swap would happen when both the collapsed size and offset are dynamic after tiling.
-// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice_3
 //       NORM-REDUCTION:   tensor.collapse_shape
 //       NORM-REDUCTION:   scf.for
 //       NORM-REDUCTION:     tensor.extract_slice {{.*}} tensor<2592x32xf32> to tensor<2592x?xf32>
@@ -706,7 +704,7 @@ module {
   }
 }
 
-// SERIAL-LABEL: func.func @serial_tiling
+// SERIAL-LABEL: func.func @serial_tiling_consumer_fusion
 // SERIAL: scf.forall ({{.*}}) = (0) to (256) step (16)
 // SERIAL: linalg.generic
 // SERIAL: linalg.generic

@@ -55,7 +55,7 @@ func.func @fuse_destination(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>) -> ten
 }
 
 // CHECK-LABEL: func.func @fuse_destination
-//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<64x64xf32>
+//       CHECK:   tensor.empty() : tensor<64x64xf32>
 //       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c1
 //       CHECK:     linalg.fill {{.*}} -> tensor<1x64xf32>
 
@@ -174,7 +174,7 @@ func.func @dynamic_reduction_dim(%arg0: tensor<?x?xf32>, %arg1: tensor<1x?xf32>,
 // CHECK-LABEL: func.func @dynamic_reduction_dim
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<?x?xf32>
 //       CHECK:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %c0 : tensor<?x?xf32>
-//       CHECK:   scf.for %[[I:.+]] = %c0 to %[[DIM]] step %c1
+//       CHECK:   scf.for {{.+}} = %c0 to %[[DIM]] step %c1
 //       CHECK:     linalg.generic
 //  CHECK-SAME:       ins(%{{.*}}: tensor<1x?xf32>, tensor<1x?xf32>)
 //  CHECK-SAME:       outs(%{{.*}}: tensor<1x1xf32>)

@@ -26,14 +26,14 @@
 // INTEGRATION-LABEL: func.func @test(
 // INTEGRATION-SAME: %[[BASE:.*]]: memref<2x16x16xf32>,
 // INTEGRATION-SAME: %[[OFF:.*]]: index) -> f32 {
-// INTEGRATION:   %[[VAL_2:.*]] = arith.constant 0 : index
-// INTEGRATION:   %[[MEMREF_BASE:.*]], %[[VAL_6:.*]], %[[VAL_5:.*]]:3, %[[VAL_6:.*]]:3 = memref.extract_strided_metadata %[[BASE]] : memref<2x16x16xf32> -> memref<f32>, index, index, index, index, index, index, index
-// INTEGRATION:   %[[VAL_7:.*]] = affine.apply #[[$C8_MAP]]()
-// INTEGRATION:   %[[VAL_8:.*]] = affine.apply #[[$x256_MAP]](){{\[}}%[[OFF]]]
-// INTEGRATION:   %[[VAL_9:.*]] = affine.apply #[[$ADD_MAP]](){{\[}}%[[VAL_7]], %[[VAL_8]]]
-// INTEGRATION:   %[[VAL_10:.*]] = memref.reinterpret_cast %[[MEMREF_BASE]] to offset: {{\[}}%[[VAL_9]]], sizes: [1, 1, 1], strides: [256, 16, 1] : memref<f32> to memref<1x1x1xf32, strided<[256, 16, 1], offset: ?>>
-// INTEGRATION:   %[[VAL_11:.*]] = memref.load %[[VAL_10]]{{\[}}%[[VAL_2]], %[[VAL_2]], %[[VAL_2]]] : memref<1x1x1xf32, strided<[256, 16, 1], offset: ?>>
-// INTEGRATION:   return %[[VAL_11]] : f32
+// INTEGRATION:   %[[C0:.*]] = arith.constant 0 : index
+// INTEGRATION:   %[[MEMREF_BASE:[^,]+]], {{.+}} = memref.extract_strided_metadata %[[BASE]] : memref<2x16x16xf32> -> memref<f32>, index, index, index, index, index, index, index
+// INTEGRATION:   %[[CONST8:.*]] = affine.apply #[[$C8_MAP]]()
+// INTEGRATION:   %[[SCALED_OFF:.*]] = affine.apply #[[$x256_MAP]](){{\[}}%[[OFF]]]
+// INTEGRATION:   %[[FINAL_OFF:.*]] = affine.apply #[[$ADD_MAP]](){{\[}}%[[CONST8]], %[[SCALED_OFF]]]
+// INTEGRATION:   %[[REINTERPRET:.*]] = memref.reinterpret_cast %[[MEMREF_BASE]] to offset: {{\[}}%[[FINAL_OFF]]], sizes: [1, 1, 1], strides: [256, 16, 1] : memref<f32> to memref<1x1x1xf32, strided<[256, 16, 1], offset: ?>>
+// INTEGRATION:   %[[LOADED_VAL:.*]] = memref.load %[[REINTERPRET]]{{\[}}%[[C0]], %[[C0]], %[[C0]]] : memref<1x1x1xf32, strided<[256, 16, 1], offset: ?>>
+// INTEGRATION:   return %[[LOADED_VAL]] : f32
 // INTEGRATION: }
 func.func @test(%base : memref<2x16x16xf32>, %offset : index) -> f32 {
   %c0 = arith.constant 0 : index
@@ -69,13 +69,13 @@ func.func @test(%base : memref<2x16x16xf32>, %offset : index) -> f32 {
 // INTEGRATION-SAME: %[[BASE:.*]]: memref<2x16x16xf32>,
 // INTEGRATION-SAME: %[[OFF:.*]]: index) {
 // INTEGRATION-DAG:   %[[CF0:.*]] = arith.constant 0.0{{0*e\+00}} : f32
-// INTEGRATION-DAG:   %[[VAL_2:.*]] = arith.constant 0 : index
-// INTEGRATION:   %[[MEMREF_BASE:.*]], %[[VAL_6:.*]], %[[VAL_5:.*]]:3, %[[VAL_6:.*]]:3 = memref.extract_strided_metadata %[[BASE]] : memref<2x16x16xf32> -> memref<f32>, index, index, index, index, index, index, index
-// INTEGRATION:   %[[VAL_7:.*]] = affine.apply #[[$C8_MAP]]()
-// INTEGRATION:   %[[VAL_8:.*]] = affine.apply #[[$x256_MAP]](){{\[}}%[[OFF]]]
-// INTEGRATION:   %[[VAL_9:.*]] = affine.apply #[[$ADD_MAP]](){{\[}}%[[VAL_7]], %[[VAL_8]]]
-// INTEGRATION:   %[[VAL_10:.*]] = memref.reinterpret_cast %[[MEMREF_BASE]] to offset: {{\[}}%[[VAL_9]]], sizes: [1, 1, 1], strides: [256, 16, 1] : memref<f32> to memref<1x1x1xf32, strided<[256, 16, 1], offset: ?>>
-// INTEGRATION:   memref.store %[[CF0]], %[[VAL_10]]{{\[}}%[[VAL_2]], %[[VAL_2]], %[[VAL_2]]] : memref<1x1x1xf32, strided<[256, 16, 1], offset: ?>>
+// INTEGRATION-DAG:   %[[C0:.*]] = arith.constant 0 : index
+// INTEGRATION:   %[[MEMREF_BASE:[^,]+]], {{.+}} = memref.extract_strided_metadata %[[BASE]] : memref<2x16x16xf32> -> memref<f32>, index, index, index, index, index, index, index
+// INTEGRATION:   %[[CONST8:.*]] = affine.apply #[[$C8_MAP]]()
+// INTEGRATION:   %[[SCALED_OFF:.*]] = affine.apply #[[$x256_MAP]](){{\[}}%[[OFF]]]
+// INTEGRATION:   %[[FINAL_OFF:.*]] = affine.apply #[[$ADD_MAP]](){{\[}}%[[CONST8]], %[[SCALED_OFF]]]
+// INTEGRATION:   %[[REINTERPRET:.*]] = memref.reinterpret_cast %[[MEMREF_BASE]] to offset: {{\[}}%[[FINAL_OFF]]], sizes: [1, 1, 1], strides: [256, 16, 1] : memref<f32> to memref<1x1x1xf32, strided<[256, 16, 1], offset: ?>>
+// INTEGRATION:   memref.store %[[CF0]], %[[REINTERPRET]]{{\[}}%[[C0]], %[[C0]], %[[C0]]] : memref<1x1x1xf32, strided<[256, 16, 1], offset: ?>>
 // INTEGRATION:   return
 // INTEGRATION: }
 func.func @test_store(%base : memref<2x16x16xf32>, %offset : index) -> () {

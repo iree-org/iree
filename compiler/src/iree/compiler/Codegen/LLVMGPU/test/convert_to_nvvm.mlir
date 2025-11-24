@@ -11,7 +11,6 @@ hal.executable @abs_ex_dispatch_0 {
     hal.executable.export public @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
-        %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: ?>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
@@ -38,6 +37,7 @@ hal.executable @abs_ex_dispatch_0 {
 //  CHECK: %[[FADD:.+]] = llvm.fadd %{{.*}}, %{{.*}}  : f32
 //  CHECK: %[[ADDR:.+]] = llvm.getelementptr inbounds|nuw %[[ARG2]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //  CHECK: llvm.store %[[FADD]], %[[ADDR]] : f32, !llvm.ptr
+
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
@@ -134,8 +134,6 @@ hal.executable @dead_symbol {
     hal.executable.export public @dead_symbol layout(#pipeline_layout)
     builtin.module {
       func.func @dead_symbol() {
-        %c0 = arith.constant 0 : index
-        %c128 = arith.constant 128 : index
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
         %3 = gpu.block_id x

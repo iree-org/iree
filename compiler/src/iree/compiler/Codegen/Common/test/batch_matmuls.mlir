@@ -6,7 +6,7 @@
 !rhs = tensor<128x32x320xf32>
 !res = tensor<128x80x320xf32>
 
-func.func @batch_matmul(%arg0: !lhs, %arg1: !rhs, %arg2: !res) -> !res {
+func.func @batch_matmul_generic(%arg0: !lhs, %arg1: !rhs) -> !res {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : !res
   // expected-remark @below {{fill}}
@@ -34,7 +34,7 @@ func.func @batch_matmul(%arg0: !lhs, %arg1: !rhs, %arg2: !res) -> !res {
 !rhs = tensor<128x32x320xf32>
 !res = tensor<128x80x320xf32>
 
-func.func @batch_matmul(%arg0: !lhs, %arg1: !rhs, %arg2: !res) -> !res {
+func.func @batch_matmul_named(%arg0: !lhs, %arg1: !rhs) -> !res {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : !res
   // expected-remark @below {{fill}}
@@ -50,7 +50,7 @@ func.func @batch_matmul(%arg0: !lhs, %arg1: !rhs, %arg2: !res) -> !res {
 !rhs = tensor<128x32x320xf32>
 !res = tensor<80x320x128xf32>
 
-func.func @batch_matmul(%arg0: !lhs, %arg1: !rhs, %arg2: !res) -> !res {
+func.func @batch_matmul_generic_transposed(%arg0: !lhs, %arg1: !rhs) -> !res {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : !res
   // expected-remark @below {{fill}}

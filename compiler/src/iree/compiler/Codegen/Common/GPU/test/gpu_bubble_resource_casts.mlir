@@ -3,7 +3,6 @@
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
 func.func @simple_cast() -> (tensor<2xf32>, tensor<2xf32>) {
   %c0 = arith.constant 0 : index
-  %c2 = arith.constant 2 : index
   %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
     : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2xf32>>
   %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0], sizes=[2], strides=[1]

@@ -14,22 +14,21 @@
 // The current implementation (see applyPaddingLevel) uses option 2, because
 // it is a more general purpose solution.
 
-//  CHECK: #[[MAP:.+]]     = affine_map<()[s0, s1] -> (-s1 + (s0 ceildiv 4096) * 4096)>
-//  CHECK:                   sum_exp_sub_reduction
-//  CHECK: %[[ZEROF32:.+]] = arith.constant 0.000000e+00 : f32
-//  CHECK: %[[ONE:.+]]     = arith.constant 1 : index
-//  CHECK: %[[DIMARG0:.+]] = tensor.dim %arg0, %[[ONE]] : tensor<1x?xf32>
-//  CHECK: %[[CEIL:.+]]    = affine.apply #[[MAP]]()[%[[DIMARG0]], %[[DIMARG0]]]
-//  CHECK:                   tensor.pad %arg0 low[0, 0] high[0, %[[CEIL]]
-//  CHECK:                   linalg.generic
-//  CHECK:                   ^bb0(
-//  CHECK:  %[[INDEX1:.+]] = linalg.index 1 : index
-//  CHECK:  %[[CMP:.+]]    = arith.cmpi ult, %[[INDEX1]], %[[DIMARG0]] : index
-//  CHECK:                   arith.subf
-//  CHECK:  %[[EXP:.+]]    = math.exp
-//  CHECK:  %[[SELECT:.+]] = arith.select %[[CMP]], %[[EXP:.+]], %[[ZEROF32]] : f32
-//  CHECK:  %[[ADD:.+]]   = arith.addf %[[SELECT]], %out : f32
-//  CHECK:  linalg.yield %[[ADD]] : f32
+// CHECK-LABEL: func.func @sum_exp_sub_reduction
+//   CHECK-DAG: %[[ZEROF32:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[ONE:.+]]     = arith.constant 1 : index
+//       CHECK: %[[DIMARG0:.+]] = tensor.dim %arg0, %[[ONE]] : tensor<1x?xf32>
+//       CHECK: {{.+}} = affine.apply {{.+}}()[%[[DIMARG0]], %[[DIMARG0]]]
+//       CHECK: tensor.pad %arg0 low[0, 0] high[0, %{{.+}}]
+//       CHECK: linalg.generic
+//       CHECK: ^bb0(
+//       CHECK:  %[[INDEX1:.+]] = linalg.index 1 : index
+//       CHECK:  %[[CMP:.+]]    = arith.cmpi ult, %[[INDEX1]], %[[DIMARG0]] : index
+//       CHECK:  {{.+}} = arith.subf
+//       CHECK:  %[[EXP:.+]]    = math.exp
+//       CHECK:  %[[SELECT:.+]] = arith.select %[[CMP]], %[[EXP]], %[[ZEROF32]] : f32
+//       CHECK:  %[[ADD:.+]]    = arith.addf %[[SELECT]], %out : f32
+//       CHECK:  linalg.yield %[[ADD]] : f32
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
@@ -58,7 +57,7 @@ func.func @sum_exp_sub_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>, %
 // So we check that the selected value in the padded region is one of the
 // NaN values.
 
-// CHECK-LABEL: max_reduction
+// CHECK-LABEL: func.func @max_reduction
 //   CHECK-DAG: %[[NANVAL:.+]]  = arith.constant 0xFFC00000 : f32
 //   CHECK-DAG: %[[C1:.+]]      = arith.constant 1 : index
 //   CHECK-DAG: %[[DIMARG0:.+]] = tensor.dim %arg0, %[[C1]] : tensor<1x?xf32>
@@ -86,7 +85,7 @@ func.func @max_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>) -> tensor
 
 // -----
 
-// CHECK-LABEL: min_reduction
+// CHECK-LABEL: func.func @min_reduction
 //   CHECK-DAG: %[[NANVAL:.+]]  = arith.constant 0x7FC00000 : f32
 //   CHECK-DAG: %[[C1:.+]]      = arith.constant 1 : index
 //   CHECK-DAG: %[[DIMARG0:.+]] = tensor.dim %arg0, %[[C1]] : tensor<1x?xf32>
@@ -117,7 +116,7 @@ func.func @min_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>) -> tensor
 
 // This reduction corresponds to a standard inner product.
 
-// CHECK-LABEL: standard_inner_product
+// CHECK-LABEL: func.func @standard_inner_product
 //   CHECK-DAG: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f16
 //   CHECK-DAG: %[[C1:.+]]      = arith.constant 1 : index
 //   CHECK-DAG: %[[DIMARG0:.+]] = tensor.dim %arg0, %[[C1]] : tensor<1x?xf16>
@@ -150,7 +149,7 @@ func.func @standard_inner_product(%arg0 : tensor<1x?xf16>, %arg1 : tensor<1x?xf1
 // Inner product where the accumulation (add) is in f16 but the multiplication is in f32
 // Check for an f16 zero as the reduction identity.
 
-// CHECK-LABEL: standard_inner_product_with_trunc
+// CHECK-LABEL: func.func @standard_inner_product_with_trunc
 //   CHECK-DAG: %[[ZERO:.+]]    = arith.constant 0.000000e+00 : f16
 //   CHECK-DAG: %[[C1:.+]]      = arith.constant 1 : index
 //   CHECK-DAG: %[[DIMARG0:.+]] = tensor.dim %arg0, %[[C1]] : tensor<1x?xf32>
@@ -189,7 +188,7 @@ func.func @standard_inner_product_with_trunc(%arg0 : tensor<1x?xf32>, %arg1 : te
 // In this example, the reduction type is multiplicative, so we check that
 // the value selected in the padded part of the iteration space is 1, the multiplicative identity.
 
-// CHECK-LABEL: product_of_sum_reduction
+// CHECK-LABEL: func.func @product_of_sum_reduction
 //       CHECK: %[[ONE:.+]] = arith.constant 1.000000e+00 : f16
 //       CHECK: %[[CMP:.+]] = arith.cmpi
 //       CHECK: %[[ADD:.+]] = arith.addf
@@ -215,7 +214,7 @@ func.func @product_of_sum_reduction(%arg0 : tensor<1x?xf16>, %arg1 : tensor<1x?x
 // Reductions in multiple dimensions have a 2-D region to check for padding.
 // Check for 2 compare ops, and an 'and' to combine them
 
-// CHECK-LABEL: multi_dim_reduction
+// CHECK-LABEL: func.func @multi_dim_reduction
 //  CHECK-SAME: (%[[ARG0:[0-9a-zA-Z]+]]: tensor<?x?xf16>, %
 //   CHECK-DAG: %[[ZEROF16:.+]] = arith.constant 0.000000e+00 : f16
 //   CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
@@ -253,11 +252,11 @@ func.func @multi_dim_reduction(%arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>,
 
 // Multiple reductions in parallel in a linalg.generic op.
 
-// CHECK-LABEL: minmax_reduction
+// CHECK-LABEL: func.func @minmax_reduction
 //   CHECK-DAG: %[[NAN0:.+]] = arith.constant 0xFFC00000 : f32
 //   CHECK-DAG: %[[NAN1:.+]] = arith.constant 0x7FC00000 : f32
-//   CHECK-DAG: %[[SELECT0:.+]] = arith.select {{.*}} %[[NAN0]] : f32
-//   CHECK-DAG: %[[SELECT0:.+]] = arith.select {{.*}} %[[NAN1]] : f32
+//   CHECK-DAG: {{.+}} = arith.select {{.+}}, {{.+}}, %[[NAN0]] : f32
+//   CHECK-DAG: {{.+}} = arith.select {{.+}}, {{.+}}, %[[NAN1]] : f32
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 func.func @minmax_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>, %arg2 : tensor<1xf32>) -> (tensor<1xf32>, tensor<1xf32>) {
@@ -280,7 +279,7 @@ func.func @minmax_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>, %arg2 
 // The reduction dimension is perfectly tiled by the partial reduction (1024 % 128 == 0).
 // We confirm that we directly optimize this case, where the arith.select condition is always true.
 
-// CHECK-LABEL: reduction_static_complete_tile
+// CHECK-LABEL: func.func @reduction_static_complete_tile
 //   CHECK-NOT: arith.select
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
@@ -301,7 +300,7 @@ func.func @reduction_static_complete_tile(%arg0: tensor<1x1024xf32>, %arg1: tens
 
 // The reduction dimension is not perfectly tiled by the partial reduction (1024 % 100 != 0).
 
-// CHECK-LABEL: reduction_static_incomplete_tile
+// CHECK-LABEL: func.func @reduction_static_incomplete_tile
 //       CHECK: arith.select
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>

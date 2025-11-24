@@ -13,9 +13,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
     }
     builtin.module {
       func.func @fuse_and_vectorize_fill_matmul() {
-        %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %c4096 = arith.constant 4096 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x4096xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x4096xf32>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096x4096xf32>>
@@ -55,10 +53,7 @@ hal.executable private @fuse_and_vectorize_matmul_add {
     }
     builtin.module {
       func.func @fuse_and_vectorize_matmul_add() {
-        %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %c1024 = arith.constant 1024 : index
-        %c256 = arith.constant 256 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x256xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512xf32>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x256xf32>>

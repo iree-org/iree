@@ -123,10 +123,8 @@ func.func @nested_op_scalable_alloca_linalg_use(%arg0 : index) {
 func.func @nested_op_alloca_subview_use(%arg0 : index, %o0 : index, %o1 : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c42 = arith.constant 42 : i32
   scf.for %iv = %c0 to %arg0 step %c1 {
     %0 = affine.min #map(%iv)
-    // expected-error @+1 {{all stack allocations need to be hoisted to the entry block of the function}}
     %1 = memref.alloca(%0, %0) : memref<?x?xi32>
     %2 = memref.subview %1[%o0, %o1][%c1, %0][1, 1] : memref<?x?xi32> to memref<?x?xi32, strided<[?, 1], offset: ?>>
     scf.yield

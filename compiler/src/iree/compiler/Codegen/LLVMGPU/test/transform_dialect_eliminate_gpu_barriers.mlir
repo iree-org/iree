@@ -80,7 +80,7 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
-// CHECK-LABEL @read_read_write_loop
+// CHECK-LABEL: @read_read_write_loop
 func.func @read_read_write_loop(%arg0: memref<?xf32>, %arg1: f32) attributes {__parallel_region_boundary_for_test} {
   %c0 = arith.constant 0 : index
   %c42 = arith.constant 42 : index

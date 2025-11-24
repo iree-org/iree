@@ -12,7 +12,7 @@ func.func @alloc_transfer_read_write_vector4_vector8(%arg0: memref<4096x4096xf32
   return
 }
 
-// BASE-LABEL: func @alloc_transfer_read_write_vector4_vector8
+// BASE-LABEL: func @alloc_transfer_read_write_vector4_vector8:
 //  BASE-SAME: (%[[ARG:.+]]: memref<4096x1024xvector<4xf32>>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index)
 
 //   BASE-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -40,7 +40,7 @@ func.func @alloc_transfer_read_write_vector4_vector8(%arg0: memref<4096x4096xf32
 
 // Test that the memref is not vectorized if used by scalar load or store.
 
-// CHECK-LABEL: func.func @dont_vectorize_scalar_load
+// CHECK-LABEL: func.func @dont_vectorize_scalar_load:
 //  CHECK-SAME: %[[ARG0:.+]]: memref<4096x4096xf32>
 func.func @dont_vectorize_scalar_load(%arg0: memref<4096x4096xf32>, %x: index, %y: index) -> f32 {
   %s = memref.load %arg0[%x, %y] : memref<4096x4096xf32>
@@ -54,7 +54,7 @@ func.func @dont_vectorize_scalar_load(%arg0: memref<4096x4096xf32>, %x: index, %
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @resource_copy()
+// CHECK-LABEL: func.func @resource_copy():
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
@@ -76,7 +76,7 @@ func.func @resource_copy() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @resource_copy_with_assume_alignment()
+// CHECK-LABEL: func.func @resource_copy_with_assume_alignment():
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[ASUMMED_A:.+]] = memref.assume_alignment %[[A]], 32
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<4096x1024xvector<4xf32>>
@@ -102,7 +102,7 @@ func.func @resource_copy_with_assume_alignment() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @resource_copy_with_offset()
+// CHECK-LABEL: func.func @resource_copy_with_offset():
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) offset(%{{.*}}) : memref<2048x4096x1024xvector<4xf32>, strided<[4194304, 1024, 1], offset: ?>>
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}, %{{.*}}] : memref<2048x4096x1024xvector<4xf32>, strided<[4194304, 1024, 1], offset: ?>>
@@ -125,7 +125,7 @@ func.func @resource_copy_with_offset() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @resource_copy_f16
+// CHECK-LABEL: func.func @resource_copy_f16:
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<4096x1024xvector<4xf16>>
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<4096x1024xvector<4xf16>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf16>>
@@ -147,7 +147,7 @@ func.func @resource_copy_f16() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @resource_copy_8xf16
+// CHECK-LABEL: func.func @resource_copy_8xf16:
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<4096x512xvector<4xf32>>
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<4096x512xvector<4xf32>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x512xvector<4xf32>>
@@ -169,7 +169,7 @@ func.func @resource_copy_8xf16() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @resource_copy_dynamic_shape()
+// CHECK-LABEL: func.func @resource_copy_dynamic_shape():
 func.func @resource_copy_dynamic_shape() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -198,7 +198,7 @@ func.func @resource_copy_dynamic_shape() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @resource_copy_dynamic_last_dim()
+// CHECK-LABEL: func.func @resource_copy_dynamic_last_dim():
 func.func @resource_copy_dynamic_last_dim() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -219,7 +219,7 @@ func.func @resource_copy_dynamic_last_dim() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @dont_vectorize_odd_vector_size
+// CHECK-LABEL: func.func @dont_vectorize_odd_vector_size:
 func.func @dont_vectorize_odd_vector_size() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -241,7 +241,7 @@ func.func @dont_vectorize_odd_vector_size() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @scalarize_vector_transfer_op
+// CHECK-LABEL: func.func @scalarize_vector_transfer_op:
 func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) {
   %c0 = arith.constant 0: index
   %c3 = arith.constant 3: index
@@ -270,7 +270,7 @@ func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) 
 
 // -----
 
-// CHECK-LABEL: func.func @scalarize_non_minor_identity_transfer_read
+// CHECK-LABEL: func.func @scalarize_non_minor_identity_transfer_read:
 //  CHECK-SAME: (%[[MEM:.+]]: memref<4x2x4xi32>, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 func.func @scalarize_non_minor_identity_transfer_read(%memory: memref<4x2x4xi32>, %i1: index, %i2: index, %i3: index) -> vector<4xi32> {
   %c0 = arith.constant 0 : i32
@@ -296,7 +296,7 @@ func.func @scalarize_non_minor_identity_transfer_read(%memory: memref<4x2x4xi32>
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @scalarize_non_minor_identity_transfer_write
+// CHECK-LABEL: func.func @scalarize_non_minor_identity_transfer_write:
 //  CHECK-SAME: (%[[VALUE:.+]]: vector<4xf32>, %[[I1:.+]]: index, %[[I2:.+]]: index)
 func.func @scalarize_non_minor_identity_transfer_write(%value: vector<4xf32>, %i1: index, %i2: index) {
   %c0 = arith.constant 0: index
@@ -321,7 +321,7 @@ func.func @scalarize_non_minor_identity_transfer_write(%value: vector<4xf32>, %i
 
 // -----
 
-// CHECK-LABEL: func.func @scalarize_0d_transfer_read
+// CHECK-LABEL: func.func @scalarize_0d_transfer_read:
 //  CHECK-SAME: (%[[MEM:.+]]: memref<4xf32>, %[[I:.+]]: index)
 func.func @scalarize_0d_transfer_read(%memory: memref<4xf32>, %i: index) -> vector<f32> {
   %f0 = arith.constant 0.0 : f32
@@ -335,7 +335,7 @@ func.func @scalarize_0d_transfer_read(%memory: memref<4xf32>, %i: index) -> vect
 
 // -----
 
-// CHECK-LABEL: func.func @scalarize_0d_transfer_write
+// CHECK-LABEL: func.func @scalarize_0d_transfer_write:
 //  CHECK-SAME: (%[[V:.+]]: vector<f32>, %[[MEM:.+]]: memref<4xf32>, %[[I:.+]]: index)
 func.func @scalarize_0d_transfer_write(%val: vector<f32>, %memory: memref<4xf32>, %i: index) {
   vector.transfer_write %val, %memory[%i] : vector<f32>, memref<4xf32>
@@ -351,7 +351,7 @@ func.func @scalarize_0d_transfer_write(%val: vector<f32>, %memory: memref<4xf32>
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @scalarize_indivisible_vector_transfer_read_op
+// CHECK-LABEL: func.func @scalarize_indivisible_vector_transfer_read_op:
 func.func @scalarize_indivisible_vector_transfer_read_op(%i: index) -> vector<4xf32> {
   %f0 = arith.constant 0.0 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<10xf32>
@@ -369,7 +369,7 @@ func.func @scalarize_indivisible_vector_transfer_read_op(%i: index) -> vector<4x
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @scalarize_indivisible_vector_transfer_write_op
+// CHECK-LABEL: func.func @scalarize_indivisible_vector_transfer_write_op:
 func.func @scalarize_indivisible_vector_transfer_write_op(%value: vector<4xf32>, %i: index) {
   %f0 = arith.constant 0.0 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<10xf32>
@@ -382,7 +382,7 @@ func.func @scalarize_indivisible_vector_transfer_write_op(%value: vector<4xf32>,
 
 // -----
 
-// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store:
 //  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
 func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
   %alloc = memref.alloc() : memref<32x32xf16, 3>
@@ -398,9 +398,9 @@ func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
 
 // -----
 
-// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store_ld16:
 //  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
-func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
+func.func @vectorize_alloc_with_mma_load_store_ld16(%i0: index, %i1: index) {
   %alloc = memref.alloc() : memref<32x32xf16, 3>
   %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 16 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
   gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 16 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
@@ -415,7 +415,7 @@ func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
 
 // -----
 
-// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store_unaligned_case
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store_unaligned_case:
 func.func @vectorize_alloc_with_mma_load_store_unaligned_case(%i0: index, %i1: index) {
   %alloc = memref.alloc() : memref<32x32xf16, 3>
   %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 18 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
@@ -435,7 +435,7 @@ func.func @vectorize_alloc_with_mma_load_store_unaligned_case(%i0: index, %i1: i
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @scalarize_vector_load_op
+// CHECK-LABEL: func.func @scalarize_vector_load_op:
 //  CHECK-SAME: (%[[ARG0:.+]]: index)
 func.func @scalarize_vector_load_op(%i: index) -> vector<4xi32> {
   %c0 = arith.constant 0 : index
@@ -464,7 +464,7 @@ func.func @scalarize_vector_load_op(%i: index) -> vector<4xi32> {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @complex_memref
+// CHECK-LABEL: func.func @complex_memref:
 func.func @complex_memref(%x: index, %y: index) -> complex<f32> {
   // CHECK: hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<8x32xcomplex<f32>>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<8x32xcomplex<f32>>
@@ -479,7 +479,7 @@ func.func @complex_memref(%x: index, %y: index) -> complex<f32> {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: func.func @vectorize_mma_load_store_non_identity_memref
+// CHECK-LABEL: func.func @vectorize_mma_load_store_non_identity_memref:
 //  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
 func.func @vectorize_mma_load_store_non_identity_memref(%i0: index, %i1: index) {
   %c0 = arith.constant 0 : index
@@ -510,7 +510,7 @@ func.func @transfer_read_i4_memref_vector8(%x: index) -> vector<8xi4> {
   return %1: vector<8xi4>
 }
 
-// CHECK-LABEL: func.func @transfer_read_i4_memref_vector8
+// CHECK-LABEL: func.func @transfer_read_i4_memref_vector8:
 //  CHECK-SAME: (%[[ARG:.+]]: index)
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<256xvector<1xi32>>
 //       CHECK:   %[[INDEX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[ARG]]]
@@ -569,7 +569,7 @@ func.func @transfer_read_i3_memref_vector8(%x: index) -> vector<8xi3> {
   return %1: vector<8xi3>
 }
 
-//   CHECK-LABEL: func.func @transfer_read_i3_memref_vector8
+// CHECK-LABEL: func.func @transfer_read_i3_memref_vector8:
 //         CHECK:   hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<2048xi3>
 // CHECK-COUNT-8:   memref.load {{.+}} : memref<2048xi3>
 
@@ -587,7 +587,7 @@ func.func @transfer_read_vector2_vector8(%x: index) -> (vector<2xi32>, vector<8x
   return %1, %2: vector<2xi32>, vector<8xi32>
 }
 
-// CHECK-LABEL: func @transfer_read_vector2_vector8
+// CHECK-LABEL: func @transfer_read_vector2_vector8:
 //  CHECK-SAME: (%[[INDEX:.+]]: index) -> (vector<2xi32>, vector<8xi32>)
 //       CHECK:   %[[INIT:.+]] = arith.constant dense<0> : vector<8xi32>
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan {{.+}} : memref<1024xvector<2xi32>>
@@ -619,7 +619,7 @@ func.func @transfer_write_vector2_vector8(%x: index, %val0: vector<2xi32>, %val1
   return
 }
 
-// CHECK-LABEL: func @transfer_write_vector2_vector8
+// CHECK-LABEL: func @transfer_write_vector2_vector8:
 //  CHECK-SAME: (%[[INDEX:.+]]: index, %[[VAL0:.+]]: vector<2xi32>, %[[VAL1:.+]]: vector<8xi32>)
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<1024xvector<2xi32>>
 
@@ -656,7 +656,7 @@ func.func @scalarize_masked_vector_transfer_op(%arg: vector<3xf32>, %mask: vecto
   return %3: vector<3xf32>
 }
 
-// CHECK-LABEL: func.func @scalarize_masked_vector_transfer_op
+// CHECK-LABEL: func.func @scalarize_masked_vector_transfer_op:
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG: %[[C5:.+]] = arith.constant 5 : index
 // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
@@ -708,7 +708,7 @@ func.func @extract_vector_transfer_read_mask_bits(%arg: vector<3xf32>, %index: i
   return %1: vector<3xf32>
 }
 
-// CHECK-LABEL: func.func @extract_vector_transfer_read_mask_bits
+// CHECK-LABEL: func.func @extract_vector_transfer_read_mask_bits:
 // CHECK-SAME:    %{{.*}}: vector<3xf32>, %[[MASK_SIZE:.+]]: index
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index

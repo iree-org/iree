@@ -24,14 +24,13 @@ func.func @fold_load_from_bitcast_dynamic() -> tensor<?x32xf4E2M1FN> {
 //       CHECK:   return %[[LOAD]]
 
 // -----
-
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @fold_store_of_bitcast_dynamic(%arg0 : tensor<?x32xf4E2M1FN>) {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
-      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x16xi8>>{%0}
+      flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x16xi8>>{%0}
   %2 = iree_tensor_ext.bitcast %arg0 : tensor<?x32xf4E2M1FN>{%0} -> tensor<?x16xi8>{%0}
   iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0, 0], sizes = [%0, 16], strides = [1, 1]
       : tensor<?x16xi8> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x16xi8>>{%0}

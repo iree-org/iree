@@ -148,8 +148,8 @@ func.func @simple_mul(%0: memref<4xf32>, %1: memref<4xf32>, %2: memref<4xf32>) {
   return
 }
 // CHECK-LABEL: func.func @simple_mul
-// CHECK:         scf.for
-// CHECK:         scf.for
+// CHECK:         scf.for %{{.+}} to %{{.+}} step %{{.+}} {
+// CHECK:         scf.for %{{.+}} to %{{.+}} step %{{.+}} {
 
 // -----
 
@@ -174,7 +174,7 @@ func.func @delinearize_linearize() {
     }
   }
   // The loop doesn't always execute once so it needs an scf.if
-  //     CHECK: %[[COND:.+]] = arith.cmpi slt, %[[IDS:.+]]#0, %[[C3]] : index
+  //     CHECK: %[[COND:.+]] = arith.cmpi slt, %[[IDS]]#0, %[[C3]] : index
   //     CHECK: scf.if %[[COND]] {
   //     CHECK:   gpu.barrier
   scf.for %arg3 = %ids#0 to %c3 step %c4 {
@@ -252,7 +252,6 @@ func.func @dynamic_ub_unittrip(%arg_index : index, %arg_value : memref<8xf16>) {
 // -----
 
 func.func @dynamic_lb_unittrip(%arg_index : index, %arg_value : memref<8xf16>) {
-  %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
   %0 = util.assume.int %arg_index<umin = 0, umax = 50> : index
   scf.for %arg1 = %0 to %c3 step %c3 {

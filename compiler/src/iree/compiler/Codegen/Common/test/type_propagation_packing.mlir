@@ -30,7 +30,7 @@ func.func @generic_op_i4() {
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi4>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi4>)
-//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i4, %[[ARG1:[a-zA-Z0-9]+]]: i4)
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i4, {{.+}}: i4)
 //   CHECK-DAG:       %[[ADD:.+]] = arith.addi %[[ARG0]], %[[ARG0]] : i4
 //       CHECK:       linalg.yield %[[ADD]]
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[OUT]]

@@ -123,11 +123,11 @@ hal.executable private @multiple_specialization_executable {
 // CHECK-LABEL: hal.executable private @multiple_specialization_executable
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0)
-//  CHECK-SAME:     condition(%{{.*}}: !hal.device, %[[W:.+]]: index) -> i1
+//  CHECK-SAME:     condition({{.*}}: !hal.device, {{.+}}: index) -> i1
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0)
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0 ordinal(1)
-//  CHECK-SAME:     condition(%{{.*}}: !hal.device, %[[W:.+]]: index) -> i1
+//  CHECK-SAME:     condition({{.*}}: !hal.device, {{.+}}: index) -> i1
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1)
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1 ordinal(2)
@@ -299,7 +299,7 @@ hal.executable private @unrelated_int_assume {
 // CHECK-LABEL: hal.executable private @unrelated_int_assume
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0)
-//  CHECK-SAME:     condition(%{{.*}}: !hal.device, %[[W:.+]]: index) -> i1
+//  CHECK-SAME:     condition({{.*}}: !hal.device, {{.+}}: index) -> i1
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0)
 //  CHECK-SAME:     count(%{{[A-Za-z0-9]*}}: !hal.device
 //  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()

@@ -62,9 +62,9 @@ func.func @matmul_64x16xi8(%3: tensor<64x32xi8>, %4: tensor<32x16xi8>) -> tensor
     max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @matmul_64x16xi64(%3: tensor<64x32xi64>, %4: tensor<32x16xi64>) -> tensor<64x16xi64> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0_i32 = arith.constant 0 : i32
+  %c0_i64 = arith.constant 0 : i64
   %5 = tensor.empty() : tensor<64x16xi64>
-  %6 = linalg.fill ins(%c0_i32 : i32) outs(%5 : tensor<64x16xi64>) -> tensor<64x16xi64>
+  %6 = linalg.fill ins(%c0_i64 : i64) outs(%5 : tensor<64x16xi64>) -> tensor<64x16xi64>
   %7 = linalg.matmul ins(%3, %4 : tensor<64x32xi64>, tensor<32x16xi64>) outs(%6 : tensor<64x16xi64>) -> tensor<64x16xi64>
   return %7 : tensor<64x16xi64>
 }

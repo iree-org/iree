@@ -261,7 +261,7 @@ func.func @fold_collapse_into_stores_slice_1d(%arg0 : tensor<3x?x16xf32>, %arg1:
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @fold_collapse_into_stores_slice_3d(%arg0 : tensor<4x8x4x128xf32>) {
   %c0 = arith.constant 0 : index
@@ -323,7 +323,7 @@ func.func @unsupported_multiple_dynamic_dims_in_group(%arg0 : tensor<?x?x32xf32>
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @unsupported_dynamic_store_into_static_subspan(%arg0 : tensor<2x?x32xf32>) {
   %c0 = arith.constant 0 : index
@@ -357,7 +357,7 @@ func.func @unsupported_offset_in_dynamic_dim(%arg0 : tensor<2x?x32xf32>) {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @unsupported_offset_in_static_dims(%arg0 : tensor<4x8x4x128xf32>) {
   %c0 = arith.constant 0 : index

@@ -6,7 +6,7 @@
 //   CHECK-DAG: %[[ARG0SV:.*]] = memref.subview %arg0
 //   CHECK-DAG: %[[ARG1SV:.*]] = memref.subview %arg1
 //   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %[[ARG0SV]]
-//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %[[ARG1SV]]
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], {{.+}}, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %[[ARG1SV]]
 //       CHECK: vmvx.copy in(%[[BB1]] offset %[[OFFSET1]] strides[%[[STRIDES1]]#0, %[[STRIDES1]]#1] : !util.buffer)
 //  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] strides[%[[STRIDES0]]#0, %[[STRIDES0]]#1] : !util.buffer)
 //  CHECK-SAME:   sizes(%[[SIZES0]]#0, %[[SIZES0]]#1)
@@ -28,10 +28,10 @@ func.func @subview_indexing_2d(%arg0 : memref<384x128xf32>, %arg1 : memref<128x3
 // CHECK-LABEL: @generic_2d_transposed_to_copy
 //   CHECK-DAG: %[[ARG0SV:.*]] = memref.subview %arg0
 //   CHECK-DAG: %[[ARG1SV:.*]] = memref.subview %arg1
-//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %[[ARG0SV]]
-//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %[[ARG1SV]]
-//       CHECK: vmvx.copy in({{.*}} offset {{.*}} strides[%[[STRIDES1]]#1, %[[STRIDES1]]#0] : !util.buffer)
-//  CHECK-SAME:   out({{.*}} offset {{.*}} strides[%[[STRIDES0]]#0, %[[STRIDES0]]#1] : !util.buffer) sizes({{.*}})
+//   CHECK-DAG: %[[BB0:.*]], {{.+}}, {{.+}}, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %[[ARG0SV]]
+//   CHECK-DAG: %[[BB1:.*]], {{.+}}, {{.+}}, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %[[ARG1SV]]
+//       CHECK: vmvx.copy in(%[[BB1]] offset {{.*}} strides[%[[STRIDES1]]#1, %[[STRIDES1]]#0] : !util.buffer)
+//  CHECK-SAME:   out(%[[BB0]] offset {{.*}} strides[%[[STRIDES0]]#0, %[[STRIDES0]]#1] : !util.buffer) sizes({{.*}})
 func.func @generic_2d_transposed_to_copy(%arg0 : memref<384x128xf32>, %arg1 : memref<128x384xf32>, %arg2 : index, %arg3 : index) {
   %6 = memref.subview %arg0[%arg2, %arg3] [64, 64] [1, 1] : memref<384x128xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
   %7 = memref.subview %arg1[%arg3, %arg2] [64, 64] [1, 1] : memref<128x384xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 384 + s0 + d1)>>
@@ -56,7 +56,7 @@ func.func @fill2d(%arg0 : memref<384x128xf32>, %arg1 : f32) {
 // CHECK-LABEL: @addf2d_rank_broadcast
 //   CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
-//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZE1:.*]], %[[STRIDE1:.*]] = vmvx.get_buffer_descriptor %arg1
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], {{.+}}, %[[STRIDE1:.*]] = vmvx.get_buffer_descriptor %arg1
 //       CHECK: vmvx.binary op("add" : f32) lhs(%[[BB1]] offset %[[OFFSET1]] strides[%[[C0]], %[[STRIDE1]]] : !util.buffer)
 //  CHECK-SAME:   rhs(%[[BB0]] offset %[[OFFSET0]] strides[%[[STRIDES0]]#0, %[[STRIDES0]]#1] : !util.buffer)
 //  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] strides[%[[STRIDES0]]#0, %[[STRIDES0]]#1] : !util.buffer)

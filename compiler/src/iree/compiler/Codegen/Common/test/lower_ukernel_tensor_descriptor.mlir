@@ -1,6 +1,5 @@
 // RUN: iree-opt --iree-codegen-lower-tensor-ukernels --split-input-file --verify-diagnostics %s | FileCheck %s
 
-// CHECK-LABEL: @ukernel_impl
 // CHECK-LABEL: @replace_generic_with_ukernel_impl
 // CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>
 // CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>
@@ -34,7 +33,6 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 
 // -----
 
-// CHECK-LABEL: @ukernel_impl_dynamic
 // CHECK-LABEL: @replace_generic_with_ukernel_impl_and_cast
 // CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>
 // CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>

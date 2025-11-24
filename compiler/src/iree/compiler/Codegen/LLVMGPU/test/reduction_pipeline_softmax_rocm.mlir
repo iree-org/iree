@@ -7,9 +7,6 @@
 ]>
 func.func @softmax() {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant -3.40282347E+38 : f32
-  %cst_0 = arith.constant 0.000000e+00 : f32
-  %cst_1 = arith.constant 1.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
@@ -43,9 +40,6 @@ func.func @softmax() {
 ]>
 func.func @softmax_singlesubgroup() {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant -3.40282347E+38 : f32
-  %cst_0 = arith.constant 0.000000e+00 : f32
-  %cst_1 = arith.constant 1.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12x256x40960xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<12x256x40960xf32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 256, 40960], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12x256x40960xf32>> -> tensor<12x256x40960xf32>

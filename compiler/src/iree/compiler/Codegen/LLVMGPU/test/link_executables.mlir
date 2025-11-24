@@ -157,11 +157,11 @@ hal.executable private @external_executable {
   }
 }
 
-// CHECK-LABEL: hal.executable private
-//       CHECK:   hal.executable.export public @export1
-//   CHECK-NOT:   hal.executable.export public @export0
-//       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @external_executable
+// CHECK-TARGET-LABEL: hal.executable private @link_executables_linked
+//       CHECK-TARGET:   hal.executable.export public @export1
+//   CHECK-TARGET-NOT:   hal.executable.export public @export0
+//       CHECK-TARGET:   builtin.module
+// CHECK-TARGET-LABEL: hal.executable private @external_executable
 
 // -----
 
@@ -186,11 +186,11 @@ hal.executable private @external_executable {
     }
   }
 }
-// CHECK-LABEL: hal.executable private
-//       CHECK:   hal.executable.export public @export0
-//   CHECK-NOT:   hal.executable.export public @export1
-//       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @external_executable
+// CHECK-TARGET-LABEL: hal.executable private @link_executables_linked
+//       CHECK-TARGET:   hal.executable.export public @export0
+//   CHECK-TARGET-NOT:   hal.executable.export public @export1
+//       CHECK-TARGET:   builtin.module
+// CHECK-TARGET-LABEL: hal.executable private @external_executable
 
 // -----
 
@@ -222,11 +222,11 @@ hal.executable private @external_executable {
   }
 }
 
-// CHECK-LABEL: hal.executable private
-//       CHECK:   hal.executable.export public @export0
-//   CHECK-NOT:   hal.executable.export public @export1
-//       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @external_executable
+// CHECK-TARGET-LABEL: hal.executable private @link_executables_linked
+//       CHECK-TARGET:   hal.executable.export public @export0
+//   CHECK-TARGET-NOT:   hal.executable.export public @export1
+//       CHECK-TARGET:   builtin.module
+// CHECK-TARGET-LABEL: hal.executable private @external_executable
 
 // -----
 
@@ -264,10 +264,9 @@ hal.executable private @internal_executable1 {
   }
 }
 
-// CHECK-LABEL: hal.executable private
-//       CHECK:   hal.executable.export public @export0
-//   CHECK-NOT:   hal.executable.export public @export1
-//       CHECK:   hal.executable.export public @export2
-//       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @external_executable
-//       CHECK:   hal.executable.export public @export1
+// CHECK-TARGET-LABEL: hal.executable private @link_executables_linked
+//       CHECK-TARGET:   hal.executable.export public @export1
+//       CHECK-TARGET:   hal.executable.export public @export2
+//       CHECK-TARGET:   builtin.module
+// CHECK-TARGET-LABEL: hal.executable private @external_executable
+//       CHECK-TARGET:   hal.executable.export public @export0

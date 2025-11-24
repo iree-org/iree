@@ -1,6 +1,6 @@
 // RUN: iree-opt -iree-transform-dialect-interpreter %s | FileCheck %s
 
-// CHECK-LABEL: @matmul
+// CHECK-LABEL: func.func @matmul
 func.func @matmul(%lhs: tensor<128x128xf32>, %rhs: tensor<128x128xf32>) -> tensor<128x128xf32> {
   %c0 = arith.constant 0.0 : f32
   %init = tensor.empty() : tensor<128x128xf32>

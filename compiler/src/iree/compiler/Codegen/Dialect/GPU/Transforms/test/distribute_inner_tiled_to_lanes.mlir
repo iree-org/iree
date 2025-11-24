@@ -1185,9 +1185,9 @@ func.func @fuse_producer_slice(%arg1 : tensor<4x2x16x16xbf16>, %arg2 : tensor<1x
 }
 
 // CHECK-LABEL: func @fuse_producer_slice
-// CHECK      :   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<4x1x16x16xf32>)
-// CHECK      :     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]]
-// CHECK      :     %[[FILL:.+]] = linalg.fill ins(%cst : f32) outs(%[[ACC_SLICE]] : tensor<4x1x4x1xf32>) -> tensor<4x1x4x1xf32>
-// CHECK      :     iree_codegen.inner_tiled
-// CHECK-SAME :     outs(%[[FILL]])
-// CHECK      :     mapping = [#iree_gpu.lane_id<0>]
+//       CHECK:   scf.forall ({{.+}}) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<4x1x16x16xf32>)
+//       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]]
+//       CHECK:     %[[FILL:.+]] = linalg.fill ins(%cst : f32) outs(%[[ACC_SLICE]] : tensor<4x1x4x1xf32>) -> tensor<4x1x4x1xf32>
+//       CHECK:     iree_codegen.inner_tiled
+//  CHECK-SAME:     outs(%[[FILL]])
+//       CHECK:     mapping = [#iree_gpu.lane_id<0>]

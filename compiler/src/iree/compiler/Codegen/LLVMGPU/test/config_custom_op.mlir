@@ -34,7 +34,7 @@ func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
 }
 //      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 128, 0]]>
 //      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64,
-//      CHECK: func @custom_op
+// CHECK-LABEL: func @custom_op
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   iree_linalg_ext.custom_op
 // CHECK-SAME:       lowering_config = #[[CONFIG]]

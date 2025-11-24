@@ -207,7 +207,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK-LABEL: subgroup_reduction_masked_tail_thread
+// CHECK-LABEL: func @subgroup_reduction_masked_tail_thread
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: vector.transfer_write
 // CHECK: gpu.barrier
@@ -244,7 +244,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK-LABEL: subgroup_reduction_serial_tail
+// CHECK-LABEL: func @subgroup_reduction_serial_tail
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: vector.transfer_write
 // CHECK: gpu.barrier

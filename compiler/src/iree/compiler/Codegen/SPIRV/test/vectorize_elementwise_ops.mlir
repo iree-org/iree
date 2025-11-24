@@ -20,7 +20,7 @@ func.func @add(%lhs: tensor<2x8xf32>, %rhs: tensor<2x8xf32>) -> tensor<2x8xf32> 
   return %0 : tensor<2x8xf32>
 }
 
-//   CHECK-LABEL: func.func @add
+// CHECK-LABEL: func.func @add
 // CHECK-COUNT-8:   vector.transfer_read %{{.+}} : tensor<2x8xf32>, vector<4xf32>
 // CHECK-COUNT-4:   arith.addf %{{.*}}, %{{.*}} : vector<4xf32>
 // CHECK-COUNT-4:   arith.mulf %{{.*}}, %{{.*}} : vector<4xf32>
@@ -41,7 +41,7 @@ func.func @transpose_leading_one_dim(%input: tensor<4x1x1xf32>) -> tensor<1x1x4x
   return %0: tensor<1x1x4xf32>
 }
 
-// CHECK-LABEL: func @transpose_leading_one_dim
+// CHECK-LABEL: func @transpose_leading_one_dim:
 //  CHECK-SAME: (%[[INPUT:.+]]: tensor<4x1x1xf32>)
 
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -81,7 +81,7 @@ func.func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2
   return %0 : tensor<2x4xf32>
 }
 
-// CHECK-LABEL: func.func @transpose_add
+// CHECK-LABEL: func.func @transpose_add:
 //  CHECK-SAME: (%[[LHS:.+]]: tensor<4x2xf32>, %[[RHS:.+]]: tensor<2xf32>)
 
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -131,7 +131,7 @@ func.func @transpose_nd(%input: tensor<2x4x2x1x1xf32>) -> tensor<2x2x1x1x4xf32> 
   return %0: tensor<2x2x1x1x4xf32>
 }
 
-//    CHECK-LABEL: func @transpose_nd
+// CHECK-LABEL: func @transpose_nd:
 //     CHECK-SAME: (%[[INPUT:.+]]: tensor<2x4x2x1x1xf32>)
 // CHECK-COUNT-16:   vector.transfer_read %[[INPUT]]{{.+}} : tensor<2x4x2x1x1xf32>, vector<1xf32>
 //  CHECK-COUNT-4:   vector.from_elements {{.+}} : vector<4xf32>

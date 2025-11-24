@@ -258,10 +258,10 @@ hal.executable private @interface_wg_id {
 //       CHECK:   spirv.func
 //       CHECK:     %[[ADDR1:.+]] = spirv.mlir.addressof @[[WGID]]
 //       CHECK:     %[[VAL1:.+]] = spirv.Load "Input" %[[ADDR1]]
-//       CHECK:     %[[WGIDX:.+]] = spirv.CompositeExtract %[[VAL1]][0 : i32]
+//       CHECK:     {{.+}} = spirv.CompositeExtract %[[VAL1]][0 : i32]
 //       CHECK:     %[[ADDR2:.+]] = spirv.mlir.addressof @[[WGID]]
 //       CHECK:     %[[VAL2:.+]] = spirv.Load "Input" %[[ADDR2]]
-//       CHECK:     %[[WGIDY:.+]] = spirv.CompositeExtract %[[VAL2]][1 : i32]
+//       CHECK:     {{.+}} = spirv.CompositeExtract %[[VAL2]][1 : i32]
 
 // -----
 
@@ -326,17 +326,17 @@ hal.executable private @interface_wg_count {
 //       CHECK:   spirv.func
 //       CHECK:     %[[ADDR1:.+]] = spirv.mlir.addressof @[[WGCOUNT]]
 //       CHECK:     %[[VAL1:.+]] = spirv.Load "Input" %[[ADDR1]]
-//       CHECK:     %[[WGIDX:.+]] = spirv.CompositeExtract %[[VAL1]][0 : i32]
+//       CHECK:     {{.+}} = spirv.CompositeExtract %[[VAL1]][0 : i32]
 //       CHECK:     %[[ADDR2:.+]] = spirv.mlir.addressof @[[WGCOUNT]]
 //       CHECK:     %[[VAL2:.+]] = spirv.Load "Input" %[[ADDR2]]
-//       CHECK:     %[[WGIDY:.+]] = spirv.CompositeExtract %[[VAL2]][1 : i32]
+//       CHECK:     {{.+}} = spirv.CompositeExtract %[[VAL2]][1 : i32]
 //   INDEX64-DAG:   spirv.GlobalVariable @[[WGCOUNT:.+]] built_in("NumWorkgroups")
 //       INDEX64:   spirv.func
 //       INDEX64:     %[[ADDR1:.+]] = spirv.mlir.addressof @[[WGCOUNT]]
 //       INDEX64:     %[[VAL1:.+]] = spirv.Load "Input" %[[ADDR1]]
 //       INDEX64:     %[[WGIDX:.+]] = spirv.CompositeExtract %[[VAL1]][0 : i32]
-//       INDEX64:     %[[WGXEXT:.+]] = spirv.UConvert %[[WGIDX]] : i32 to i64
+//       INDEX64:     {{.+}} = spirv.UConvert %[[WGIDX]] : i32 to i64
 //       INDEX64:     %[[ADDR2:.+]] = spirv.mlir.addressof @[[WGCOUNT]]
 //       INDEX64:     %[[VAL2:.+]] = spirv.Load "Input" %[[ADDR2]]
 //       INDEX64:     %[[WGIDY:.+]] = spirv.CompositeExtract %[[VAL2]][1 : i32]
-//       INDEX64:     %[[WGYEXT:.+]] = spirv.UConvert %[[WGIDY]] : i32 to i64
+//       INDEX64:     {{.+}} = spirv.UConvert %[[WGIDY]] : i32 to i64

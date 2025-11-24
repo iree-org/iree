@@ -10,7 +10,6 @@
 ]>
 builtin.module {
   func.func @abs_ex_dispatch_0() {
-    %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) flags(ReadOnly) : memref<16xf32>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<16xf32>

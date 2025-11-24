@@ -193,7 +193,7 @@ func.func @split_reduction_innermost_dynamic_reduction_unsupported() attributes 
 }
 
 // CHECK-LABEL:  func.func @split_reduction_innermost_dynamic_reduction_unsupported()
-//     CHECK-4:    vector.mask %{{.*}} { vector.reduction <add>
+// CHECK-COUNT-4:    vector.mask %{{.*}} { vector.reduction <add>
 
 // -----
 
@@ -220,7 +220,7 @@ func.func @split_reduction_innermost_imperfect_reduction_unsupported() attribute
 }
 
 // CHECK-LABEL:  func.func @split_reduction_innermost_imperfect_reduction_unsupported()
-//     CHECK-4:    vector.mask %{{.*}} { vector.reduction <add>
+// CHECK-COUNT-4:    vector.mask %{{.*}} { vector.reduction <add>
 
 // -----
 

@@ -22,7 +22,7 @@ func.func @tensor_extract(%arg0: tensor<6x4xf32>, %arg1: tensor<6xi32>, %data: t
   return %generic : tensor<6x4xf32>
 }
 
-//    CHECK-LABEL: func.func @tensor_extract
+// CHECK-LABEL: func.func @tensor_extract
 //      CHECK-NOT: linalg.generic
 // CHECK-COUNT-24: tensor.extract {{.+}} : tensor<1x2x512xf32>
 
@@ -36,7 +36,7 @@ func.func @vector_gather(%arg0: memref<16x1082x1922xi8>, %index_vec: vector<16xi
   return %0 : vector<16xi8>
 }
 
-// CHECK-LABEL: func.func @vector_gather
+// CHECK-LABEL: func.func @vector_gather:
 // CHECK-SAME:  %[[ARG0:.+]]: memref<16x1082x1922xi8>
 // CHECK-SAME:  %[[INDEX_VEC:.+]]: vector<16xindex>
 // CHECK-DAG:   %[[INIT:.+]] = arith.constant dense<0> : vector<16xi8>
@@ -57,4 +57,4 @@ func.func @vector_gather(%arg0: memref<16x1082x1922xi8>, %index_vec: vector<16xi
 // CHECK:       %[[VEC:.+]] = vector.from_elements %[[EXTRACT0]], %[[EXTRACT1]], %[[EXTRACT2]], %[[EXTRACT3]] : vector<4xi8>
 
 // CHECK:       vector.insert_strided_slice %[[VEC]], %[[INIT]] {offsets = [0], strides = [1]} : vector<4xi8> into vector<16xi8>
-// CHECK-12:    vector.load %[[ARG0]][%[[C0]], %[[C0]], %{{.*}}] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK-COUNT-12: vector.load %[[ARG0]][%[[C0]], %[[C0]], %{{.*}}] : memref<16x1082x1922xi8>, vector<1xi8>

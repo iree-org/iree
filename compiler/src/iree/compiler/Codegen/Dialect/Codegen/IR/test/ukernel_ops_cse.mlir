@@ -37,15 +37,9 @@ func.func @unused_ukernel_generic(
       (%b0, %b1 : f32, i64) -> tensor<?xf32>, tensor<?x?xf32>
   return %out0, %out1 : tensor<?xf32>, tensor<?x?xf32>
 }
-// CHECK-LABEL: func.func @unused_ukernel_generic
-// CHECK-SAME:     %[[IN0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-// CHECK-SAME:     %[[IN1:[a-zA-Z0-9]+]]: tensor<?xf32>
-// CHECK-SAME:     %[[OUT0:[a-zA-Z0-9]+]]: tensor<?xf32>
-// CHECK-SAME:     %[[OUT1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-// CHECK-SAME:     %[[B0:[a-zA-Z0-9]+]]: f32
-// CHECK-SAME:     %[[B1:[a-zA-Z0-9]+]]: i64
+//      CHECK: func.func @unused_ukernel_generic(
 // CHECK-NOT:      iree_codegen.ukernel.generic
-// CHECK:          return %[[OUT0]], %[[OUT1]]
+//      CHECK:     return %{{.+}}, %{{.+}} :
 
 // -----
 

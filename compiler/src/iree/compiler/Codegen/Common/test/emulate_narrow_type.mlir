@@ -1,5 +1,4 @@
 // RUN: iree-opt --split-input-file --iree-codegen-emulate-narrow-type %s | FileCheck %s
-
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
@@ -10,7 +9,11 @@ func.func @memref_i4_to_i8() -> i4 {
   return %1 : i4
 }
 // CHECK-LABEL: func.func @memref_i4_to_i8
-//       CHECK:    hal.interface.binding.subspan {{.+}} memref<23xi8>
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan {{.+}} : memref<23xi8>
+//       CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[C0]]] : memref<23xi8>
+//       CHECK:   %[[TRUNC:.+]] = arith.trunci %[[LOAD]] : i8 to i4
+//       CHECK:   return %[[TRUNC]] : i4
 
 // -----
 
@@ -34,10 +37,12 @@ func.func @memref_i4_to_i8_dynamic(%arg0 : index, %arg1 : index, %arg2 : index) 
 // CHECK-SAME:       memref<?xi8, strided<[1], offset: ?>>{%[[SIZE]]}
 
 // -----
-
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
 func.func @broadcast_extui() -> vector<1x1x64xi32> {
   %c0 = arith.constant 0 : index
-  %0 = memref.alloc() : memref<64xi4>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<64xi4>
   %1 = vector.load %0[%c0] : memref<64xi4>, vector<64xi4>
   %2 = vector.broadcast %1 : vector<64xi4> to vector<1x1x64xi4>
   %3 = arith.extui %2 : vector<1x1x64xi4> to vector<1x1x64xi32>
@@ -48,7 +53,6 @@ func.func @broadcast_extui() -> vector<1x1x64xi32> {
 //       CHECK:   vector.interleave
 
 // -----
-
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
@@ -61,9 +65,9 @@ func.func @memref_load_2d_i4() -> i4 {
 }
 
 // CHECK-LABEL:   func.func @memref_load_2d_i4()
-//       CHECK:     %[[C16:.*]] = arith.constant 16 : index
-//       CHECK:     %[[C0:.*]] = arith.constant 0 : index
-//       CHECK:     %[[SUBSPAN:.*]] = hal.interface.binding.subspan {{.*}} : memref<256xi8>
-//       CHECK:     %[[LOAD:.*]] = memref.load %[[SUBSPAN]][%[[C16]]] : memref<256xi8>
-//       CHECK:     %[[TRUNC:.*]] = arith.trunci %[[LOAD]] : i8 to i4
+//       CHECK:     %[[C16:.+]] = arith.constant 16 : index
+//       CHECK:     arith.constant 0 : index
+//       CHECK:     %[[SUBSPAN:.+]] = hal.interface.binding.subspan {{.*}} : memref<256xi8>
+//       CHECK:     %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[C16]]] : memref<256xi8>
+//       CHECK:     %[[TRUNC:.+]] = arith.trunci %[[LOAD]] : i8 to i4
 //       CHECK:     return %[[TRUNC]] : i4

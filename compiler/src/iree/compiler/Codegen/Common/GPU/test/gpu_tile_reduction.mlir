@@ -16,7 +16,7 @@ func.func @warp_reduction_dispatch() {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%3 : tensor<1x10240xf32>) outs(%4 : tensor<1xf32>)
-    attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} {
+    attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} {
   ^bb0(%in: f32, %out: f32):
     %6 = arith.addf %in, %out : f32
     linalg.yield %6 : f32
@@ -26,7 +26,7 @@ func.func @warp_reduction_dispatch() {
 }
 
 //   CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: warp_reduction_dispatch()
+// CHECK-LABEL: func.func @warp_reduction_dispatch()
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C2048:.+]] = arith.constant 2048 : index
 //   CHECK-DAG:   %[[C10240:.+]] = arith.constant 10240 : index
@@ -70,7 +70,7 @@ func.func @warp_reduction_batch_matmul() {
   return
 }
 
-// CHECK-LABEL: warp_reduction_batch_matmul()
+// CHECK-LABEL: func.func @warp_reduction_batch_matmul()
 //   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 //   CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -108,7 +108,7 @@ func.func @warp_reduction_broadcast_dispatch() {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%3 : tensor<1x10240xf32>) outs(%4 : tensor<1xf32>)
-    attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} {
+    attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} {
   ^bb0(%in: f32, %out: f32):
     %6 = arith.addf %in, %out : f32
     linalg.yield %6 : f32
@@ -128,7 +128,7 @@ func.func @warp_reduction_broadcast_dispatch() {
 
 //   CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
-// CHECK-LABEL: warp_reduction_broadcast_dispatch()
+// CHECK-LABEL: func.func @warp_reduction_broadcast_dispatch()
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C2048:.+]] = arith.constant 2048 : index
 //   CHECK-DAG:   %[[C10240:.+]] = arith.constant 10240 : index
@@ -187,7 +187,7 @@ func.func @warp_reduction_multi_reduction() {
     iterator_types = ["parallel", "reduction", "reduction"]
   }
   ins(%16, %17, %18, %19 : tensor<86x128xf32>, tensor<1x86x128xi4>, tensor<1x86xf32>, tensor<1x86xf32>)
-  outs(%20 : tensor<1xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2, 64]]>} {
+  outs(%20 : tensor<1xf32>) attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2, 64]]>} {
   ^bb0(%in: f32, %in_0: i4, %in_1: f32, %in_2: f32, %out: f32):
     %22 = arith.extui %in_0 : i4 to i32
     %23 = arith.uitofp %22 : i32 to f32
@@ -202,17 +202,24 @@ func.func @warp_reduction_multi_reduction() {
 }
 
 // CHECK-LABEL: func.func @warp_reduction_multi_reduction()
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
+//   CHECK-DAG:   %[[C86:.+]] = arith.constant 86 : index
+//   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
+//       CHECK:   %[[F0:.+]] = linalg.fill {{.+}} -> tensor<1xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill {{.+}} -> tensor<1x2x64xf32>
 
-//       CHECK:  %[[FILL:.+]] = linalg.fill {{.+}} -> tensor<1x2x64xf32>
-
-//       CHECK:  %[[LN:.+]] = scf.for %arg0 = %c0 to %c86 step %c2 iter_args(%[[ARG0:.+]] = %[[FILL]]) -> (tensor<1x2x64xf32>)
-//       CHECK:    scf.for %arg2 = %c0 to %c128 step %c64 iter_args(%{{.+}} = %[[ARG0]]) -> (tensor<1x2x64xf32>)
+//       CHECK:   %[[LN:.+]] = scf.for %arg0 = %[[C0]] to %[[C86]] step %[[C2]] iter_args(%[[ARG0:.+]] = %[[FILL]]) -> (tensor<1x2x64xf32>)
+//       CHECK:     scf.for %arg2 = %[[C0]] to %[[C128]] step %[[C64]] iter_args(%{{.+}} = %[[ARG0]]) -> (tensor<1x2x64xf32>)
 //       CHECK:      linalg.generic
 //  CHECK-SAME:        iterator_types = ["parallel", "parallel", "parallel"]
 //       CHECK:      scf.yield %{{.+}} : tensor<1x2x64xf32>
 //       CHECK:    scf.yield %{{.+}} : tensor<1x2x64xf32>
 
-//       CHECK:  linalg.reduce
-//  CHECK-SAME:    ins(%[[LN]] : tensor<1x2x64xf32>)
-//  CHECK-SAME:    outs(%{{.+}} : tensor<1xf32>)
-//  CHECK-SAME:    dimensions = [1, 2]
+//       CHECK:   %[[RED:.+]] = linalg.reduce
+//  CHECK-SAME:      ins(%[[LN]] : tensor<1x2x64xf32>)
+//  CHECK-SAME:      outs(%[[F0]] : tensor<1xf32>)
+//  CHECK-SAME:      dimensions = [1, 2]
+//       CHECK:     arith.addf
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[RED]]

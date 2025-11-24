@@ -55,7 +55,6 @@ func.func @pad_only_dispatch() attributes {hal.executable.target = #executable_t
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3)>
 func.func @pad_with_producer_dispatch() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant 1.001000e-05 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x56x56x256xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1x256x128xf32>>

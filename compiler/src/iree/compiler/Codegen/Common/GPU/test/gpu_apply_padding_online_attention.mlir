@@ -69,8 +69,8 @@ func.func @online_attention_tile_then_pad(%query: tensor<192x1024x64xf32>, %key:
 
   //         CHECK: arith.constant 0xFF800000 : f32
   // CHECK-COUNT-3: tensor.pad
-  //         CHECK: iree_linalg_ext.online_attention {{.*}} ins(%{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}
-  //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, f32, tensor<192x1024x32xf32>
+  //         CHECK: iree_linalg_ext.online_attention {{.*}} ins(%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}
+  //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, f32, tensor<192x1024x32xf32>)
   %out:3 = iree_linalg_ext.online_attention
         {
           indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
@@ -101,7 +101,7 @@ func.func @online_attention_tile_then_pad(%query: tensor<192x1024x64xf32>, %key:
 #lowering_config = #iree_gpu.lowering_config<{reduction = [   4, 8,  0, 32]}>
 
 // CHECK-LABEL: func.func @online_attention_tile_then_pad_7
-func.func @online_attention_tile_then_pad_7(%n_batches: index, %query: tensor<?x1021x64xf32>, %key: tensor<192x?x64xf32>, %value: tensor<192x?x64xf32>, %mask: tensor<?x1021xf32>) -> tensor<?x1021x64xf32> {
+func.func @online_attention_tile_then_pad_7(%n_batches: index, %query: tensor<?x1021x64xf32>, %key: tensor<?x?x64xf32>, %value: tensor<?x?x64xf32>, %mask: tensor<?x1021xf32>) -> tensor<?x1021x64xf32> {
   %scale = arith.constant 1.0 : f32
 
   %output_empty = tensor.empty(%n_batches) : tensor<?x1021x64xf32>
@@ -115,16 +115,16 @@ func.func @online_attention_tile_then_pad_7(%n_batches: index, %query: tensor<?x
   %sum_fill = linalg.fill ins(%sum_ident : f32) outs(%row_red_empty : tensor<?x1021xf32>) -> tensor<?x1021xf32>
 
   // CHECK-COUNT-7: tensor.pad
-  //         CHECK: iree_linalg_ext.online_attention {{.*}} ins(%{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}
+  //         CHECK: iree_linalg_ext.online_attention {{.*}} ins(%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}
   //    CHECK-SAME:   : tensor<4x8x64xf32>, tensor<4x32x64xf32>, tensor<4x32x64xf32>, f32, tensor<4x8xf32>)
-  //    CHECK-SAME:     outs(%{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}
+  //    CHECK-SAME:     outs(%{{.+}}, %{{.+}}, %{{.+}}
   //    CHECK-SAME:   : tensor<4x8x64xf32>, tensor<4x8xf32>, tensor<4x8xf32>)
   %out:3 = iree_linalg_ext.online_attention
         {
           indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
           lowering_config = #lowering_config
         }
-        ins(%query, %key, %value, %scale, %mask : tensor<?x1021x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32, tensor<?x1021xf32>)
+        ins(%query, %key, %value, %scale, %mask : tensor<?x1021x64xf32>, tensor<?x?x64xf32>, tensor<?x?x64xf32>, f32, tensor<?x1021xf32>)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<?x1021x64xf32>, tensor<?x1021xf32>, tensor<?x1021xf32>)
         {
           ^bb0(%score: f32):

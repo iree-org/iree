@@ -282,7 +282,6 @@ func.func @cannot_prove_cst_bound() -> index {
 func.func @can_prove_symbolic_bound() -> index {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
-  %c9 = arith.constant 9 : index
   %c112 = arith.constant 112 : index
 
   %workgroup_id_x = hal.interface.workgroup.id[0] : index

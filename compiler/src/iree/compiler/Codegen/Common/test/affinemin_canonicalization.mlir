@@ -1,13 +1,14 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-affinemin-scf-canonicalization),canonicalize)" %s | FileCheck %s
-
-// CHECK-LABEL: scf_for_distributed
-func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
+// CHECK-LABEL: canonicalize_affinemin_in_nested_scf_loops
+func.func @canonicalize_affinemin_in_nested_scf_loops(%A : memref<i64>, %id1 : index, %count1 : index,
                       %id2 : index, %count2 : index) {
   %c1020 = arith.constant 1020 : index
   %c1024 = arith.constant 1024 : index
   %0 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%id1]
   %1 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%count1]
 
+  // Test 1: Both affine.min operations can be removed when bounds are divisible.
+  // 1024 is divisible by 32, and 32 is divisible by 4.
   //  CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
   //  CHECK-DAG:   %[[C4:.*]] = arith.constant 4 : i64
   //      CHECK: scf.for
@@ -24,9 +25,10 @@ func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
     }
   }
 
-  // In this case the first affine.min cannot be removed as the 1020 is not
-  // divisible by 32 but we can still remove the second level of affine.min
-  // since we know that %2 is always divisible by 4.
+  // Test 2: Only the inner affine.min can be removed.
+  // 1020 is not divisible by 32, so the outer affine.min remains.
+  // However, the inner affine.min can still be removed since %2 is always
+  // divisible by 4 (either 32 or 1020 mod 32 = 12, but the tiling ensures 4).
   //      CHECK: scf.for
   //      CHECK:   %[[MIN:.*]] = affine.min
   //      CHECK:   scf.for %{{.*}} = %{{.*}} to %[[MIN]]
@@ -42,10 +44,10 @@ func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
     }
   }
 
-  // Same case but using scf.parallel.
+  // Test 3: Same as Test 2 but using scf.parallel for the inner loop.
   //      CHECK: scf.for
-  //      CHECK:   %[[MIN:.*]] = affine.min
-  //      CHECK:   scf.parallel {{.*}} to (%[[MIN]])
+  //      CHECK:   %[[MIN2:.*]] = affine.min
+  //      CHECK:   scf.parallel {{.*}} to (%[[MIN2]])
   // CHECK-NEXT:     memref.store %[[C4]], %{{.*}}[] : memref<i64>
   scf.for %arg0 = %0 to %c1020 step %1 {
     %2 = affine.min affine_map<(d0) -> (32, -d0 + 1020)>(%arg0)

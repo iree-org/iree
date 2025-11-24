@@ -1,11 +1,9 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-cleanup-buffer-alloc-view))" %s | FileCheck %s
-
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @fold_reshape_load() {
-  %cst = arith.constant 0.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<3x3x96xf32, #hal.descriptor_type<storage_buffer>>
   %2 = iree_codegen.load_from_buffer %0 : memref<3x3x1x96xf32, #hal.descriptor_type<storage_buffer>> -> tensor<3x3x1x96xf32>
@@ -106,13 +104,11 @@ func.func @fold_reshape_with_slice_store() {
 //       CHECK:   iree_codegen.store_to_buffer {{.*}}, %[[EXPAND]]
 
 // -----
-
 #pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @fold_dynamic_reshape_load() {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
@@ -139,13 +135,11 @@ func.func @fold_dynamic_reshape_load() {
 //       CHECK:   iree_codegen.store_to_buffer %[[BARRIER]], %[[DEST_SUBSPAN]]
 
 // -----
-
 #pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @fold_dynamic_reshape_store() {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index

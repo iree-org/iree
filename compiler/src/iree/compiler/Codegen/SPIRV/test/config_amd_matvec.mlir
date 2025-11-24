@@ -217,7 +217,7 @@ func.func @i4_dequant_matvec(%23: index, %26: tensor<11008x32x128xi4>, %27: tens
 
 // -----
 
-func.func @dynamic_batch_matvec(%11: index, %12: index, %15: tensor<32x1x?xf16>, %16: tensor<32x?x128xf16>) -> tensor<32x1x128xf16> {
+func.func @dynamic_batch_matvec(%15: tensor<32x1x?xf16>, %16: tensor<32x?x128xf16>) -> tensor<32x1x128xf16> {
   %cst = arith.constant 0.000000e+00 : f16
   %17 = tensor.empty() : tensor<32x1x128xf16>
   %18 = linalg.fill ins(%cst : f16) outs(%17 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>

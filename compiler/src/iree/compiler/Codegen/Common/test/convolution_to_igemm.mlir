@@ -1,5 +1,4 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-convolution-to-igemm),canonicalize,cse)" %s | FileCheck %s
-
 #map = affine_map<(d0, d1, d2, d3)->(d0, d1, d2, d3)>
 func.func public @conv_with_consumer(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3x4x16xf32>) -> tensor<1x14x14x16xf16> {
   %cst = arith.constant 0.0 : f32
@@ -18,22 +17,22 @@ func.func public @conv_with_consumer(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor
   return %2 : tensor<1x14x14x16xf16>
 }
 // CHECK:      func.func public @conv_with_consumer
-// CHECK-DAG:    %[[IM2COL:.+]] = iree_linalg_ext.im2col {{.*}} : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
+// CHECK-DAG:    {{.+}} = iree_linalg_ext.im2col {{.*}} : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
 // CHECK-DAG:    %[[FILL:.+]] = linalg.fill {{.*}} -> tensor<1x14x14x16xf32>
 // CHECK:        %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:     outs(%[[FILL]] : tensor<1x14x14x16xf32>)
 // CHECK:        %[[TRUNCF:.+]] = linalg.generic
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:     ins(%[[MATMUL]] : tensor<1x14x14x16xf32>)
 // CHECK:        return %[[TRUNCF]] : tensor<1x14x14x16xf16>
 
 // -----
-
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @fold_with_interface_tensor() {
@@ -68,7 +67,6 @@ module {
 // CHECK:      iree_tensor_ext.dispatch.tensor.store %[[MATMUL]]
 
 // -----
-
 func.func @conv_with_lowering_config() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -85,12 +83,12 @@ func.func @conv_with_lowering_config() attributes {translation_info = #iree_code
 }
 
 // CHECK:      func.func @conv_with_lowering_config
-// CHECK:        iree_linalg_ext.im2col
-// CHECK:        linalg.generic
-// CHECK-SAME:     lowering_config = {{.*}}
+// CHECK:        %[[FILL:.+]] = linalg.fill
+// CHECK:        %[[IM2COL:.+]] = iree_linalg_ext.im2col
+// CHECK:        %[[MATMUL:.+]] = linalg.generic {{.*}} ins(%[[IM2COL]], {{.*}}) outs(%[[FILL]] : {{.*}}) {{.*}}lowering_config = {{.*}}
+// CHECK:        iree_tensor_ext.dispatch.tensor.store %[[MATMUL]]
 
 // -----
-
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -106,5 +104,7 @@ func.func public @no_conv_contraction(%arg0: tensor<128x128xf32>, %arg1: tensor<
   } -> tensor<128x128xf32>
   return %matmul : tensor<128x128xf32>
 }
-// CHECK: func.func public @no_conv_contraction
-// CHECK:   linalg.generic
+// CHECK:       func.func public @no_conv_contraction
+// CHECK-NOT:     iree_linalg_ext.im2col
+// CHECK:         linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "reduction"]
