@@ -16,8 +16,6 @@
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
-  %c10240 = arith.constant 10240 : index
   %cst = arith.constant 1.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x10240xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<512xf32>>
@@ -90,8 +88,8 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
+  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x9216x9216xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 9216, 9216], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x9216x9216xf16>> -> tensor<10x9216x9216xf16>
@@ -172,9 +170,6 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 }>
 func.func @softmax() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant -3.40282347E+38 : f32
-  %cst_0 = arith.constant 0.000000e+00 : f32
-  %cst_1 = arith.constant 1.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>

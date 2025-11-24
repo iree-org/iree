@@ -33,7 +33,6 @@ func.func @nwc_conv_1d_dot_prod(%input: tensor<1x7x3xi8>, %filter: tensor<1x3x4x
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>}>} {
   %c0 = arith.constant 0 : i32
-  %i0 = arith.constant 0 : index
   %init = tensor.empty() : tensor<1x4x4xi32>
   %fill = linalg.fill ins(%c0 : i32) outs(%init : tensor<1x4x4xi32>) -> tensor<1x4x4xi32>
   %conv = linalg.conv_1d_nwc_wcf {

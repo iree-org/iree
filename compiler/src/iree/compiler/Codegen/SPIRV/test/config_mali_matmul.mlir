@@ -96,7 +96,7 @@ func.func @matmul_49x160x576(%3: tensor<49x576xf32>, %4: tensor<576x160xf32>) ->
 
 // Small matmul M to "shift" parallelism to N.
 
-func.func @matmul_2x1024x576(%4: tensor<2x576xf32>, %5: tensor<576x1024xf32>, %6: tensor<2x1024xf32>) -> tensor<2x1024xf32> {
+func.func @matmul_2x1024x576(%4: tensor<2x576xf32>, %5: tensor<576x1024xf32>) -> tensor<2x1024xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %7 = tensor.empty() : tensor<2x1024xf32>
   %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<2x1024xf32>) -> tensor<2x1024xf32>

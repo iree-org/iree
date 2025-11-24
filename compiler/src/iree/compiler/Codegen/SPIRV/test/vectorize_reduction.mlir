@@ -40,7 +40,6 @@ func.func @reduce_outmost_dim(%input: tensor<4x1x4xf32>, %init: tensor<1x4xf32>)
 // -----
 
 func.func @reduce_two_dims(%input: tensor<2x3x4xf32>, %init: tensor<4xf32>) -> tensor<4xf32> {
-  %f0 = arith.constant 0.0 : f32
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>],
     iterator_types = ["parallel", "reduction", "reduction"]
@@ -166,7 +165,6 @@ func.func @reduce_innermost_dim_contraction(%a: tensor<4x12xf32>, %b: tensor<4xf
 // -----
 
 func.func @reduce_vector3(%input: tensor<4x3xf32>, %init: tensor<3xf32>) -> tensor<3xf32> {
-  %f0 = arith.constant 0.0 : f32
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]

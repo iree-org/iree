@@ -176,7 +176,6 @@ func.func @dwconv_elementwise(%3: tensor<1x21x20x1xf32>) -> tensor<1x19x18x1x4xf
   %cst = arith.constant dense_resource<__elided__> : tensor<3x3x1x4xf32>
   %cst_0 = arith.constant 1.001000e+00 : f32
   %cst_1 = arith.constant 0.000000e+00 : f32
-  %c4 = arith.constant 4 : index
   %2 = tensor.empty() : tensor<1x19x18x1x4xf32>
   %4 = tensor.empty() : tensor<1x19x18x1x4xf32>
   %5 = linalg.fill ins(%cst_1 : f32) outs(%4 : tensor<1x19x18x1x4xf32>) -> tensor<1x19x18x1x4xf32>
@@ -238,11 +237,8 @@ func.func @outermost_reduction(%2: tensor<4x2048x512xf32>) -> tensor<2048x512xf3
 }>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
-func.func @innermost_reduction(%0: i32, %1: i32, %2: i32, %9: tensor<128x384xf32>, %10: tensor<128xf32>) -> tensor<128xf32> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+func.func @innermost_reduction(%9: tensor<128x384xf32>, %10: tensor<128xf32>) -> tensor<128xf32> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %cst = arith.constant -0.000000e+00 : f32
-  %3 = arith.index_cast %0 {stream.alignment = 512 : index, stream.values = [0 : index, 394752 : index, 984064 : index]} : i32 to index
-  %4 = arith.index_cast %1 {stream.alignment = 512 : index, stream.values = [0 : index, 196608 : index, 197120 : index]} : i32 to index
-  %5 = arith.index_cast %2 {stream.alignment = 512 : index, stream.values = [512 : index, 197120 : index, 197632 : index]} : i32 to index
   %11 = tensor.empty() : tensor<128xf32>
   %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<128xf32>) -> tensor<128xf32>
   %13 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "reduction"]} ins(%9, %10 : tensor<128x384xf32>, tensor<128xf32>) outs(%12 : tensor<128xf32>) {
