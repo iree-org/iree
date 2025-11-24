@@ -66,7 +66,7 @@ module {
     return
   }
 }
-// CHECK: #iree_codegen.export_config<workgroup_size = [4, 1]
+// CHECK: #iree_codegen.export_config<workgroup_size = [4, 1]>
 
 // -----
 

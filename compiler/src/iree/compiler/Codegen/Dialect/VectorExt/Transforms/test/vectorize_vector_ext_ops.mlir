@@ -65,15 +65,17 @@ func.func @vectorize_matmul_dyn_parallel(%A: tensor<?x64xf32>,
 
 // CHECK-LABEL: func.func @vectorize_matmul_dyn_parallel
 // CHECK-SAME: %[[AT:.+]]: tensor<?x64xf32>, %[[BT:.+]]: tensor<64x?xf32>, %[[CT:.+]]: tensor<?x?xf32>
+// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG: %[[PAD:.+]] = ub.poison : f32
-// CHECK-DAG: %[[ADIM:.+]] = tensor.dim %arg0, %c0 : tensor<?x64xf32>
-// CHECK-DAG: %[[BDIM:.+]] = tensor.dim %arg1, %c1 : tensor<64x?xf32>
-// CHECK-DAG: %[[AMASK:.+]] = vector.create_mask %[[ADIM]], %c64 : vector<64x64xi1>
-// CHECK-DAG: %[[AV:.+]] = vector.transfer_read %arg0[%c0, %c0], %[[PAD]], %[[AMASK]]
-// CHECK-DAG: %[[A:.+]]  = iree_vector_ext.to_layout %[[AV]] to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [1, 1], outer_tile = [1, 1], thread_tile = [1, 1], element_tile = [64, 64], subgroup_strides = [0, 0], thread_strides = [0, 0]>) : vector<64x64xf32>
-
-// CHECK-DAG: %[[OPMASK:.+]]  = vector.create_mask %[[ADIM]], %[[BDIM]], %c64 : vector<64x64x64xi1>
-// CHECK-DAG: vector.mask %[[OPMASK]] { vector.contract {{.*}} %[[A]]
+// CHECK-DAG: %[[ADIM:.+]] = tensor.dim %[[AT]], %{{.+}} : tensor<?x64xf32>
+// CHECK-DAG: %[[BDIM:.+]] = tensor.dim %[[BT]], %{{.+}} : tensor<64x?xf32>
+// CHECK-DAG: %[[AMASK:.+]] = vector.create_mask %[[ADIM]], %[[C64]] : vector<64x64xi1>
+// CHECK-DAG: %[[AV:.+]] = vector.transfer_read %[[AT]][%{{.+}}, %{{.+}}], %[[PAD]], %[[AMASK]]
+// CHECK-DAG: %[[A:.+]] = iree_vector_ext.to_layout %[[AV]] to layout({{.+}}) : vector<64x64xf32>
+// CHECK-DAG: %[[BV:.+]] = vector.transfer_read %[[BT]][%{{.+}}, %{{.+}}], %[[PAD]], %{{.+}}
+// CHECK-DAG: %[[B:.+]] = iree_vector_ext.to_layout %[[BV]] to layout({{.+}}) : vector<64x64xf32>
+// CHECK-DAG: %[[OPMASK:.+]] = vector.create_mask %[[ADIM]], %[[BDIM]], %[[C64]] : vector<64x64x64xi1>
+// CHECK: vector.mask %[[OPMASK]] { vector.contract {{.*}} %[[A]], %[[B]], %{{.+}}
 
 // -----
 
