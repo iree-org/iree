@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/Encoding/IR/EncodingBase.td"
 include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/IR/TensorEncoding.td"
 
 //===---------------------------------------------------------------------===//
 // Data layout encoding attributes
@@ -41,7 +42,7 @@ def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.packed_storage
+// iree_encoding.layout
 //===---------------------------------------------------------------------===//
 
 def LayoutAttr :
@@ -82,12 +83,21 @@ def LayoutAttr :
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
 
-def PackedStorageAttr : IREEEncoding_AttrDef<"PackedStorage"> {
+def PackedStorageAttr :
+    IREEEncoding_AttrDef<"PackedStorage", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+          "isSerialized",
+          "calculateStorageSizeInBytes",
+      ]>,
+      DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
+    ]> {
   let mnemonic = "packed_storage";
   let summary = [{Indicates packed storage data type.}];
   let description = [{
     This attribute indicates this is a back-to-back packed storage in memory.
     This attribute takes no arguments.
+    The element type of the encoded tensors must be sub-byte (i.e., <8 bits)
+    types with power-of-two bitwidth.
   }];
   let genVerifyDecl = 0;
 }

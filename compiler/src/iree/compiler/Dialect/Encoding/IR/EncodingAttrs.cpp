@@ -94,6 +94,92 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
 }
 
 //===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
+
+bool PackedStorageAttr::isSerialized() const { return true; }
+
+/// Returns the bit-width of the scalar type. If the type is complex, it
+/// returns the type of individual elements * 2 (1 for real and 1 for
+/// complex).
+static unsigned getTypeBitWidth(Type type) {
+  if (auto complexType = dyn_cast<ComplexType>(type)) {
+    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+  }
+  return type.getIntOrFloatBitWidth();
+}
+
+/// Returns the number of bytes an element of the given type occupies in
+/// memory. This is in the default dense conversion to machine words where
+/// sizes must be powers of two aligned to bytes.
+///
+/// Examples:
+///   getRoundedElementByteWidth(i1) = 1
+///   getRoundedElementByteWidth(i23) = 4
+///   getRoundedElementByteWidth(i32) = 4
+///   getRoundedElementByteWidth(bf16) = 2
+///   getRoundedElementByteWidth(i33) = 8
+///   getRoundedElementByteWidth(complex<f32>) = 8
+static int32_t getRoundedElementByteWidth(Type type) {
+  unsigned bitsUnaligned = getTypeBitWidth(type);
+  assert(bitsUnaligned > 0 && "0-width types unsupported");
+  // Round up to 8-bit aligned bytes.
+  unsigned byteAligned = (bitsUnaligned + 8 - 1) / 8;
+  // Round up to the next power of two (unless already a power of two).
+  return llvm::PowerOf2Ceil(byteAligned);
+}
+
+Value PackedStorageAttr::calculateStorageSizeInBytes(
+    Location loc, OpBuilder &builder, RankedTensorType type,
+    ValueRange dynamicDims) const {
+  unsigned elementBits = getTypeBitWidth(type.getElementType());
+  assert(elementBits <= 8 && "packed_storage only allowed for sub-byte types");
+  assert(llvm::isPowerOf2_32(elementBits) &&
+         "packed_storage only allowed for power-of-two types");
+
+  // Calculate static dimensions if there are any.
+  int64_t staticCount = 1;
+  for (unsigned i = 0; i < type.getRank(); ++i) {
+    if (!type.isDynamicDim(i)) {
+      staticCount *= type.getDimSize(i);
+    }
+  }
+
+  // Emit computation of dynamic dimensions.
+  auto value =
+      arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
+  for (Value dim : dynamicDims) {
+    value = builder.createOrFold<arith::MulIOp>(
+        loc, value, dim, arith::IntegerOverflowFlags::nsw);
+  }
+
+  // For sub-byte element types we need to divide by the number of elements that
+  // can be packed into one byte.
+  unsigned elementsPerByte = 8 / elementBits;
+  auto divisor = arith::ConstantIndexOp::create(builder, loc, elementsPerByte);
+  value = builder.createOrFold<arith::CeilDivUIOp>(loc, value, divisor);
+  return value;
+}
+
+LogicalResult PackedStorageAttr::verifyEncoding(
+    llvm::ArrayRef<int64_t> shape, mlir::Type elementType,
+    llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
+  unsigned elementBitWidth = getTypeBitWidth(elementType);
+  if (elementBitWidth > 7) {
+    return emitError() << "bit-width of the element type is " << elementBitWidth
+                       << " but packed_storage is currently only supported for "
+                       << "sub-byte types";
+  }
+  if (!llvm::isPowerOf2_32(elementBitWidth)) {
+    return emitError()
+           << "bit-width of the element type is " << elementBitWidth
+           << " but packed_storage currently only supports types with "
+           << "power-of-two bitwidth";
+  }
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
 // iree_encoding.encoding
 //===---------------------------------------------------------------------===//
 
@@ -369,36 +455,6 @@ ParseResult parsePadding(AsmParser &parser, DenseI64ArrayAttr &padding) {
 }
 void printPadding(AsmPrinter &printer, DenseI64ArrayAttr padding) {
   return printDynamicI64IntegerList(printer, padding.asArrayRef());
-}
-
-/// Returns the bit-width of the scalar type. If the type is complex, it
-/// returns the type of individual elements * 2 (1 for real and 1 for
-/// complex).
-static unsigned getTypeBitWidth(Type type) {
-  if (auto complexType = dyn_cast<ComplexType>(type)) {
-    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
-  }
-  return type.getIntOrFloatBitWidth();
-}
-
-/// Returns the number of bytes an element of the given type occupies in
-/// memory. This is in the default dense conversion to machine words where
-/// sizes must be powers of two aligned to bytes.
-///
-/// Examples:
-///   getRoundedElementByteWidth(i1) = 1
-///   getRoundedElementByteWidth(i23) = 4
-///   getRoundedElementByteWidth(i32) = 4
-///   getRoundedElementByteWidth(bf16) = 2
-///   getRoundedElementByteWidth(i33) = 8
-///   getRoundedElementByteWidth(complex<f32>) = 8
-static int32_t getRoundedElementByteWidth(Type type) {
-  unsigned bitsUnaligned = getTypeBitWidth(type);
-  assert(bitsUnaligned > 0 && "0-width types unsupported");
-  // Round up to 8-bit aligned bytes.
-  unsigned byteAligned = (bitsUnaligned + 8 - 1) / 8;
-  // Round up to the next power of two (unless already a power of two).
-  return llvm::PowerOf2Ceil(byteAligned);
 }
 
 PaddingAttr PaddingAttr::get(MLIRContext *ctx, ArrayRef<int64_t> padding) {
