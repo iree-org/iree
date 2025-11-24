@@ -5,8 +5,9 @@
 //
 // This rotates waits through stores and into loads.
 
-// CHECK: util.global private mutable @constantGlobal__timepoint = #stream.timepoint<immediate>
-// CHECK-NEXT: util.global private mutable @constantGlobal : !stream.resource<constant>
+// CHECK-LABEL: util.global private mutable @constantGlobal__timepoint
+// CHECK-SAME: = #stream.timepoint<immediate>
+// CHECK: util.global private mutable @constantGlobal : !stream.resource<constant>
 util.global private mutable @constantGlobal : !stream.resource<constant>
 
 // CHECK-LABEL: @globalLoad
@@ -14,7 +15,8 @@ util.func private @globalLoad() {
   // CHECK-NEXT: %[[TIMEPOINT:.+]] = util.global.load @constantGlobal__timepoint : !stream.timepoint
   // CHECK-NEXT: %[[UNREADY:.+]] = util.global.load @constantGlobal : !stream.resource<constant>
   // CHECK-NEXT: %[[SIZE:.+]] = stream.resource.size %[[UNREADY]]
-  // CHECK-NEXT: %[[VALUE:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[UNREADY]] : !stream.resource<constant>{%[[SIZE]]}
+  // CHECK-NEXT: %[[VALUE:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[UNREADY]] :
+  // CHECK-SAME: !stream.resource<constant>{%[[SIZE]]}
   %0 = util.global.load @constantGlobal : !stream.resource<constant>
   // CHECK-NEXT: util.optimization_barrier %[[VALUE]]
   util.optimization_barrier %0 : !stream.resource<constant>
@@ -29,8 +31,9 @@ util.func private @globalLoad() {
 //
 // This rotates waits through stores and into loads.
 
-// CHECK: util.global private mutable @mutableGlobal__timepoint = #stream.timepoint<immediate>
-// CHECK-NEXT: util.global private mutable @mutableGlobal : !stream.resource<variable>
+// CHECK-LABEL: util.global private mutable @mutableGlobal__timepoint
+// CHECK-SAME: = #stream.timepoint<immediate>
+// CHECK: util.global private mutable @mutableGlobal : !stream.resource<variable>
 util.global private mutable @mutableGlobal : !stream.resource<variable>
 
 // CHECK-LABEL: @globalStore
@@ -102,8 +105,10 @@ util.func private @caller(%arg0: !stream.resource<external>, %arg1: !stream.reso
   // consumes the unready resources and we expect the args to be passed
   // directly.
 
-  // CHECK: %[[RET:.+]]:4 = util.call @callee(%[[UNREADY0]], %[[TIMEPOINT0]], %[[UNREADY1]], %[[TIMEPOINT1]])
-  // CHECK-SAME: : (!stream.resource<external>, !stream.timepoint, !stream.resource<transient>, !stream.timepoint) -> (!stream.resource<external>, !stream.timepoint, !stream.resource<transient>, !stream.timepoint)
+  // CHECK: %[[RET:.+]]:4 = util.call @callee(%[[UNREADY0]], %[[TIMEPOINT0]],
+  // CHECK-SAME: %[[UNREADY1]], %[[TIMEPOINT1]]) :
+  // CHECK-SAME: (!stream.resource<external>, !stream.timepoint, !stream.resource<transient>, !stream.timepoint)
+  // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint, !stream.resource<transient>, !stream.timepoint)
   %0:2 = util.call @callee(%arg0, %arg1) : (!stream.resource<external>, !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>)
   // CHECK-NEXT: %[[RET_SIZE0:.+]] = stream.resource.size %[[RET]]#0 : !stream.resource<external>
   // CHECK-NEXT: %[[RET_READY0:.+]] = stream.timepoint.await %[[RET]]#1 => %[[RET]]#0 : !stream.resource<external>{%[[RET_SIZE0]]}
