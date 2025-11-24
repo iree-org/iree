@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
-#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlowFramework.h"
 
@@ -38,8 +37,10 @@ public:
     });
 
     DataFlowSolver solver;
+    // DeadCodeAnalysis is the base analysis that allows the solver to traverse
+    // control flow. We include it to make the divisibility analysis more
+    // powerful.
     solver.load<dataflow::DeadCodeAnalysis>();
-    solver.load<dataflow::SparseConstantPropagation>();
     solver.load<IntegerDivisibilityAnalysis>();
     if (failed(solver.initializeAndRun(rootOp))) {
       return signalPassFailure();
