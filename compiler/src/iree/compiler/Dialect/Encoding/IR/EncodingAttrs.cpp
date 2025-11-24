@@ -137,7 +137,7 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
   assert(llvm::isPowerOf2_32(elementBits) &&
          "packed_storage only allowed for power-of-two types");
 
-  // Calculate static dimensions if there are any
+  // Calculate static dimensions if there are any.
   int64_t staticCount = 1;
   for (unsigned i = 0; i < type.getRank(); ++i) {
     if (!type.isDynamicDim(i)) {
@@ -148,7 +148,7 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
   // Emit computation of dynamic dimensions.
   auto value =
       arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
-  for (auto dim : dynamicDims) {
+  for (Value dim : dynamicDims) {
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
 
@@ -165,15 +165,15 @@ LogicalResult PackedStorageAttr::verifyEncoding(
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
   unsigned elementBitWidth = getTypeBitWidth(elementType);
   if (elementBitWidth > 7) {
-    return emitError() << "Bit-width of the element type is " << elementBitWidth
+    return emitError() << "bit-width of the element type is " << elementBitWidth
                        << " but packed_storage is currently only supported for "
                        << "sub-byte types";
   }
   if (!llvm::isPowerOf2_32(elementBitWidth)) {
     return emitError()
-           << "Bit-width of the element type is " << elementBitWidth
+           << "bit-width of the element type is " << elementBitWidth
            << " but packed_storage currently only supports types with "
-           << "power-of-two bitwidth.";
+           << "power-of-two bitwidth";
   }
   return success();
 }
