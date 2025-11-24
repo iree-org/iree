@@ -205,22 +205,12 @@ def ElideAsyncCopiesPass :
   let statistics = [
     Statistic<"numClonesElided", "num-clones-elided",
               "Number of async clone operations elided">,
+    Statistic<"numTransfersElided", "num-transfers-elided",
+              "Number of async transfer operations elided">,
     Statistic<"numSlicesElided", "num-slices-elided",
               "Number of async slice operations elided">,
     Statistic<"numIterations", "num-iterations",
               "Number of fixed-point iterations required for convergence">
-  ];
-}
-
-def ElideAsyncTransfersPass :
-    Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
-  let summary = "Elides transfer ops when they the topology allows";
-  let description = [{
-    Elides all transfer ops that are between device links that do not
-    require tansfers and do not change the lifetime of the resource.
-  }];
-  let dependentDialects = [
-    "IREE::Stream::StreamDialect",
   ];
 }
 
