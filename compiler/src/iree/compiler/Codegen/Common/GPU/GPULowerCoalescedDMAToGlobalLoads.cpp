@@ -119,25 +119,31 @@ struct LowerCoalescedGatherDMAPattern
 
   LogicalResult matchAndRewrite(IREE::GPU::CoalescedGatherDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override {
-    LDBG() << "Processing CoalescedGatherDMAOp: " << dmaOp;
+    LLVM_DEBUG(LDBG() << "Processing CoalescedGatherDMAOp: " << dmaOp << "\n");
 
     // Verify the DMA op is inside a scf.forall
     auto forallOp = dmaOp->getParentOfType<scf::ForallOp>();
     if (!forallOp) {
+      LLVM_DEBUG(LDBG() << "FAILED - not inside scf.forall\n");
       return rewriter.notifyMatchFailure(
           dmaOp, "coalesced_gather_dma not inside scf.forall");
     }
+    LLVM_DEBUG(LDBG() << "Found parent forall\n");
 
     // Verify thread mapping
     if (failed(verifyThreadMapping(forallOp))) {
+      LLVM_DEBUG(LDBG() << "FAILED - thread mapping verification failed\n");
       return rewriter.notifyMatchFailure(
           dmaOp, "forall does not have proper thread mapping");
     }
+    LLVM_DEBUG(LDBG() << "Thread mapping verified\n");
 
     // Verify memory layout
     if (failed(verifyMemoryLayout(dmaOp, rewriter))) {
+      LLVM_DEBUG(LDBG() << "FAILED - memory layout verification failed\n");
       return failure();
     }
+    LLVM_DEBUG(LDBG() << "Memory layout verified\n");
 
     [[maybe_unused]] Location loc = dmaOp.getLoc();
     Value source = dmaOp.getSource();
@@ -198,27 +204,44 @@ struct LowerCoalescedGatherDMAPattern
     std::optional<int64_t> subgroupSize =
         getSubgroupSize(dmaOp->getParentOfType<FunctionOpInterface>());
     if (!subgroupSize.has_value()) {
+      LLVM_DEBUG(LDBG() << "FAILED - unable to determine subgroup size\n");
       return rewriter.notifyMatchFailure(
           dmaOp, "unable to determine subgroup size from forall");
     }
+    LLVM_DEBUG(LDBG() << "Subgroup size: " << *subgroupSize << "\n");
 
     // Check that transfer size matches one of the target DMA sizes (if
     // specified) Note: dma_sizes are in bits
+    int64_t transferSizePerLane = transferSizeBits / *subgroupSize;
+    LLVM_DEBUG({
+      LDBG() << "Transfer size per lane: " << transferSizePerLane << " bits\n";
+      LDBG() << "Target DMA sizes: [";
+      for (int64_t dmaSize : targetDmaSizes) {
+        llvm::dbgs() << dmaSize << " ";
+      }
+      llvm::dbgs() << "]\n";
+    });
+
     if (!targetDmaSizes.empty() &&
-        !matchesTargetDmaSize(transferSizeBits / *subgroupSize,
-                              targetDmaSizes)) {
+        !matchesTargetDmaSize(transferSizePerLane, targetDmaSizes)) {
+      LLVM_DEBUG(LDBG() << "FAILED - transfer size " << transferSizePerLane
+                        << " does not match any target DMA size\n");
       return rewriter.notifyMatchFailure(
           dmaOp, "transfer size does not match any target DMA size");
     }
+    LLVM_DEBUG(LDBG() << "Transfer size matches target DMA sizes\n");
 
     // TODO: Handle indices properly - for now we skip the explicit indices
     // check The lane parameter is always present but we handle it differently
 
     ArrayRef<int64_t> sourceShape = sourceType.getShape();
+    LLVM_DEBUG(LDBG() << "Source rank: " << sourceShape.size() << "\n");
     if (sourceShape.size() < 2) {
+      LLVM_DEBUG(LDBG() << "FAILED - source rank < 2\n");
       return rewriter.notifyMatchFailure(
           dmaOp, "source must have at least 2 dimensions");
     }
+    LLVM_DEBUG(LDBG() << "Source shape check passed\n");
 
     int64_t secondInnermostDimSize = sourceShape[sourceShape.size() - 2];
     LDBG() << "  Source second innermost dimension size: "
