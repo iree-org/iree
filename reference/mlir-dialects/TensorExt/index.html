@@ -1871,6 +1871,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_tensor_extcast_to_ragged_shape-tensorextcasttoraggedshapeop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.cast_to_ragged_shape (TensorExt::CastToRaggedShapeOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_tensor_ext.compute_barrier.end (TensorExt::ComputeBarrierEndOp)
@@ -4776,6 +4785,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_tensor_extcast_to_ragged_shape-tensorextcasttoraggedshapeop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_tensor_ext.cast_to_ragged_shape (TensorExt::CastToRaggedShapeOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_tensor_ext.compute_barrier.end (TensorExt::ComputeBarrierEndOp)
@@ -4928,6 +4946,7 @@ beyond what is currently available in the Tensor Dialect.</p>
 <li><a href="#iree_tensor_ext-dialect">'iree_tensor_ext' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_tensor_extbitcast-tensorextbitcastop">iree_tensor_ext.bitcast (TensorExt::BitCastOp)</a></li>
+<li><a href="#iree_tensor_extcast_to_ragged_shape-tensorextcasttoraggedshapeop">iree_tensor_ext.cast_to_ragged_shape (TensorExt::CastToRaggedShapeOp)</a></li>
 <li><a href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop">iree_tensor_ext.compute_barrier.end (TensorExt::ComputeBarrierEndOp)</a></li>
 <li><a href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop">iree_tensor_ext.compute_barrier.start (TensorExt::ComputeBarrierStartOp)</a></li>
 <li><a href="#iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop">iree_tensor_ext.dispatch.tensor.load (TensorExt::DispatchTensorLoadOp)</a></li>
@@ -5009,19 +5028,62 @@ translation such as bufferization.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop"><code>iree_tensor_ext.compute_barrier.end</code> (TensorExt::ComputeBarrierEndOp)<a class="headerlink" href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop" title="Permanent link">link</a></h3>
-<p><em>Tensor compute barrier end operation</em></p>
+<h3 id="iree_tensor_extcast_to_ragged_shape-tensorextcasttoraggedshapeop"><code>iree_tensor_ext.cast_to_ragged_shape</code> (TensorExt::CastToRaggedShapeOp)<a class="headerlink" href="#iree_tensor_extcast_to_ragged_shape-tensorextcasttoraggedshapeop" title="Permanent link">link</a></h3>
+<p><em>Create a shaped type with ragged rows.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.compute_barrier.end` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
-              type($result)
-              attr-dict-with-keyword
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.cast_to_ragged_shape` $source `ragged_dim` `(` $raggedDim `)`
+              `column_lengths` `(` $columnLengths `)`
+              (`num_ragged_rows` `(` $numRaggedRows^ `)`)?
+              (`avg_ragged_column_length` `(` $avgRaggedColumnLength^ `)`)?
+              attr-dict `:`
+              `(` type($source) (`{` $sourceDynamicDims^ `}`)? `,` type($columnLengths) `)`
+              `-&gt;` type($result)
 </code></pre></div>
-<p>This barrier prevents certain transformations (like reshape propagation)
-from moving operations up across this boundary.
-The operand is returned as the result with identical type.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>The op takes a shaped type and reinterprets its contents as a ragged shaped type. The
+dimensions specified by <code>ragged_dim</code> in the source is interpreted as two
+dimensions at <code>ragged_dim</code> and <code>ragged_dim + 1</code> in the result shaped type. The
+result shaped type has a rank of one more than that of the <code>source</code>. The result
+type also has the encoding set to an attribute of type <code>RaggedShapeAttr</code>
+with the specified <code>ragged_dim</code> used to specify the <code>raggedRow</code> in the
+encoding attribute. (See description of <code>RaggedShapeAttr</code>). The number of
+ragged rows is specified using <code>num_ragged_rows</code> argument. The size of each
+row is specified using <code>column_lengths</code> argument, which is a single rank
+shaped type of size <code>num_rows + 1</code> and where size of the <code>i</code>-th row of the result
+is computed using</p>
+<div class="highlight"><pre><span></span><code>column_lengths[i+1] - column_lengths[i]
+</code></pre></div>
+<p>In other words, <code>column_lengths</code> is same as the <code>ROW_INDEX</code> in CSR
+representation (<a href="https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format">https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format</a>)).
+An optional argument <code>max_ragged_column_length</code> allows specifying the dynamic
+upper bound for the number of columns (for static upper bounds the shape of the
+dimension in the result shaped type encodes this value)</p>
+<p>For example, if the <code>n</code> and <code>n+1</code> dimensions of the result represent this ragged structure</p>
+<div class="highlight"><pre><span></span><code>OOOO
+OOOOOO
+OOO
+OOOOO
+</code></pre></div>
+<p>then,
+- <code>ragged_dim</code> is <code>n</code>
+- <code>num_ragged_rows</code> is 4
+- <code>column_lengths</code> is [0, 4, 10, 13, 18]
+- result has an encoding attribute of <code>#iree_tensor_ext.ragged_shape&lt;n&gt;</code>.</p>
+<p>Contraints are
+1. <code>ragged_dim</code> &lt; rank(<code>source</code>)
+2. rank(<code>columnLengths</code>) == 1.
+3. dim(<code>columnLengths</code>, 0) == <code>num_rows</code> + 1.
+4. dim(<code>result</code>, <code>raggedRowDim</code> + 1) &gt;=
+    (<code>columnLengths</code>[k+1] - <code>columnLengths</code>[k])
+    for all 0 &lt;= k &lt; dim(<code>result</code>, <code>raggedRowDim</code>)</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>SparseCastOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>raggedDim</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
+</table>
+
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5032,11 +5094,23 @@ The operand is returned as the result with identical type.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>value</code></td>
-<td>ranked tensor of any type values</td>
+<td style="text-align: center;"><code>source</code></td>
+<td>ranked tensor of any type values or memref of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>value_dims</code></td>
+<td style="text-align: center;"><code>columnLengths</code></td>
+<td>ranked tensor of any type values or memref of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>numRaggedRows</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>avgRaggedColumnLength</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>sourceDynamicDims</code></td>
 <td>variadic of index</td>
 </tr>
 </tbody>
@@ -5052,19 +5126,19 @@ The operand is returned as the result with identical type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor of any type values</td>
+<td>ranked tensor of any type values or memref of any type values</td>
 </tr>
 </tbody>
 </table>
-<h3 id="iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop"><code>iree_tensor_ext.compute_barrier.start</code> (TensorExt::ComputeBarrierStartOp)<a class="headerlink" href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop" title="Permanent link">link</a></h3>
-<p><em>Tensor compute barrier start operation</em></p>
+<h3 id="iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop"><code>iree_tensor_ext.compute_barrier.end</code> (TensorExt::ComputeBarrierEndOp)<a class="headerlink" href="#iree_tensor_extcompute_barrierend-tensorextcomputebarrierendop" title="Permanent link">link</a></h3>
+<p><em>Tensor compute barrier end operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.compute_barrier.start` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.compute_barrier.end` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
               type($result)
               attr-dict-with-keyword
 </code></pre></div>
 <p>This barrier prevents certain transformations (like reshape propagation)
-from moving operations down across this boundary.
+from moving operations up across this boundary.
 The operand is returned as the result with identical type.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
@@ -5103,6 +5177,53 @@ The operand is returned as the result with identical type.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop"><code>iree_tensor_ext.compute_barrier.start</code> (TensorExt::ComputeBarrierStartOp)<a class="headerlink" href="#iree_tensor_extcompute_barrierstart-tensorextcomputebarrierstartop" title="Permanent link">link</a></h3>
+<p><em>Tensor compute barrier start operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.compute_barrier.start` $value `:` type($value) (`{` $value_dims^ `}`)? `-&gt;`
+              type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>This barrier prevents certain transformations (like reshape propagation)
+from moving operations down across this boundary.
+The operand is returned as the result with identical type.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>value</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>value_dims</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop"><code>iree_tensor_ext.dispatch.tensor.load</code> (TensorExt::DispatchTensorLoadOp)<a class="headerlink" href="#iree_tensor_extdispatchtensorload-tensorextdispatchtensorloadop" title="Permanent link">link</a></h3>
 <p><em>Loads a tensor from a dispatch input placeholder.</em></p>
 <p>Syntax:</p>
@@ -5121,7 +5242,7 @@ results of regions that may overlap.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OffsetSizeAndStrideOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>static_offsets</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
@@ -5129,7 +5250,7 @@ results of regions that may overlap.</p>
 <tr><td><code>static_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5160,7 +5281,7 @@ results of regions that may overlap.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5192,7 +5313,7 @@ workgroup executes concurrently behavior is undefined if more than one
 workgroup stores into overlapping regions of the full output tensor.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>OffsetSizeAndStrideOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>static_offsets</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
@@ -5200,7 +5321,7 @@ workgroup stores into overlapping regions of the full output tensor.</p>
 <tr><td><code>static_strides</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5251,7 +5372,7 @@ and distribute the root of the DAG).</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5266,7 +5387,7 @@ and distribute the root of the DAG).</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5310,7 +5431,7 @@ workload could be more than just values of index types.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
+<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5325,7 +5446,7 @@ workload could be more than just values of index types.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
+<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5363,7 +5484,7 @@ workgroups required to run the computation after accounting for the
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
+<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5390,7 +5511,7 @@ workgroups required to run the computation after accounting for the
 </tr>
 </tbody>
 </table>
-<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
+<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5432,13 +5553,13 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntDivisibilityOpInterface</code>, <code>InferIntRangeInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
-<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
+<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5453,7 +5574,7 @@ list/attribute that can be plumbed through without using explicit ops.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
+<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
