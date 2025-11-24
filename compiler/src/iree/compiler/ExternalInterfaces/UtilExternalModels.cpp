@@ -64,50 +64,54 @@ public:
   AffineExprDivisibilityFinder(ExprDivisibilityMap &divisibilityMap)
       : divisibilityMap(divisibilityMap) {}
 
-  /// Constant expressions are trivial, since they are always static.
   IREE::Util::ConstantIntDivisibility
   visitConstantExpr(AffineConstantExpr expr) {
+    // Constant expressions are trivial, since they are always static.
     uint64_t constValue = std::abs(expr.getValue());
     return IREE::Util::ConstantIntDivisibility(constValue, constValue);
   }
 
-  /// Dim expressions cannot be analyzed further, so return the divisibility
-  /// in `divisibilityMap` if it has been populated by the caller, or fallback
-  /// to the minimum divisibility.
   IREE::Util::ConstantIntDivisibility visitDimExpr(AffineDimExpr expr) {
+    // Dim expressions cannot be analyzed further, so return the divisibility
+    // in `divisibilityMap` if it has been populated by the caller, or fallback
+    // to the minimum divisibility.
     if (divisibilityMap.contains(expr)) {
       return divisibilityMap[expr];
     }
     return IREE::Util::IntegerDivisibility::getMinDivisibility().getValue();
   }
 
-  /// Symbol expressions cannot be analyzed further, so return the divisibility
-  /// in `divisibilityMap` if it has been populated by the caller, or fallback
-  /// to the minimum divisibility.
   IREE::Util::ConstantIntDivisibility visitSymbolExpr(AffineSymbolExpr expr) {
+    // Symbol expressions cannot be analyzed further, so return the divisibility
+    // in `divisibilityMap` if it has been populated by the caller, or fallback
+    // to the minimum divisibility.
     if (divisibilityMap.contains(expr)) {
       return divisibilityMap[expr];
     }
     return IREE::Util::IntegerDivisibility::getMinDivisibility().getValue();
   }
 
-  /// The divisibility of an addition is the GCD of its constituents'
-  /// divisibilities. This callback is used for subtraction as well.
+  /// Infer the divisibility of an addition or subtraction expression by
+  /// recursively visiting the LHS and RHS, and then unioning the results.
   IREE::Util::ConstantIntDivisibility visitAddExpr(AffineBinaryOpExpr expr) {
     if (divisibilityMap.contains(expr)) {
       return divisibilityMap[expr];
     }
+    // The divisibility of an addition is the GCD of its constituents'
+    // divisibilities.
     IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
     IREE::Util::ConstantIntDivisibility rhsDiv = visit(expr.getRHS());
     return lhsDiv.getUnion(rhsDiv);
   }
 
-  /// The divisibility of a multiplication is the product of its constituents'
-  /// divisibilities.
+  /// Infer the divisibility of a multiplication expression by recursively
+  /// visiting the LHS and RHS, and then multiplying the results.
   IREE::Util::ConstantIntDivisibility visitMulExpr(AffineBinaryOpExpr expr) {
     if (divisibilityMap.contains(expr)) {
       return divisibilityMap[expr];
     }
+    // The divisibility of a multiplication is the product of its constituents'
+    // divisibilities.
     IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
     IREE::Util::ConstantIntDivisibility rhsDiv = visit(expr.getRHS());
     return IREE::Util::ConstantIntDivisibility(lhsDiv.udiv() * rhsDiv.udiv(),
@@ -138,27 +142,27 @@ private:
     return IREE::Util::IntegerDivisibility::getMinDivisibility().getValue();
   }
 
-  /// Helper shared by ceildiv and floordiv implementations. The divisibility of
-  /// a division is simply the quotient of its constituents' divisibilities as
-  /// long as the division has no remainder. If there is a remainder, then the
-  /// divisibility cannot be easily inferred, so we fallback to the minimum
-  /// divisibility.
+  /// Helper shared by ceildiv and floordiv implementations. Returns the minimum
+  /// divisibility as a fallback if the divisor is not a constant, because the
+  /// divisibility cannot be inferred in this case. If the divisor is a
+  /// constant, then this function recursively visits the dividend, and returns
+  /// the quotient of the dividend's divisibility with the divisor.
   IREE::Util::ConstantIntDivisibility visitDivExpr(AffineBinaryOpExpr expr) {
     if (divisibilityMap.contains(expr)) {
       return divisibilityMap[expr];
     }
-    IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
     auto constRhs = dyn_cast<AffineConstantExpr>(expr.getRHS());
-    if (!constRhs) {
+    // Division by zero is undefined, so return the minimum divisibility.
+    if (!constRhs || constRhs.getValue() == 0) {
       return IREE::Util::ConstantIntDivisibility(1, 1);
     }
-    int64_t constValue = constRhs.getValue();
+    int64_t constValue = std::abs(constRhs.getValue());
+    IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
     uint64_t divUDiv = lhsDiv.udiv() % static_cast<uint64_t>(constValue) == 0
                            ? lhsDiv.udiv() / static_cast<uint64_t>(constValue)
                            : 1;
-    uint64_t divSDiv = lhsDiv.sdiv() % std::abs(constValue) == 0
-                           ? lhsDiv.sdiv() / std::abs(constValue)
-                           : 1;
+    uint64_t divSDiv =
+        lhsDiv.sdiv() % constValue == 0 ? lhsDiv.sdiv() / constValue : 1;
     return IREE::Util::ConstantIntDivisibility(divUDiv, divSDiv);
   }
 
