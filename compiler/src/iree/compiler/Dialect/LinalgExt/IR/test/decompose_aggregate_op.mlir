@@ -417,7 +417,6 @@ func.func @online_attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
 
-
 // -----
 
 // Spec to decompose exp reduction op.

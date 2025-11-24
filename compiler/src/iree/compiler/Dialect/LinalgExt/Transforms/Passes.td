@@ -83,11 +83,6 @@ def DecomposeWinogradTransformPass :
       "Decomposes winograd transform ops into linalg ops";
 }
 
-def DecomposeExpReductionPass :
-    InterfacePass<"iree-linalg-ext-decompose-exp-reduction", "mlir::FunctionOpInterface"> {
-  let summary = "Decomposes exponential reduction op into a sequence of linalg ops";
-}
-
 def ConvertConvToIm2ColOpPass :
     InterfacePass<"iree-linalg-ext-convert-conv-to-im2col-op", "mlir::FunctionOpInterface"> {
   let summary = "Convert linalg convolution ops to im2col gemm based implementation.";

@@ -1048,6 +1048,10 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
 // ExpReductionOp
 //===----------------------------------------------------------------------===//
 
+/// For a given resultNumber in a linalg::GenericOp, this op scans the
+/// GenericOp's body for:
+/// 1. The index of the inputs used by the result
+/// 2. The operations used by the result
 static LogicalResult captureUsedOperationsAndBlockArguments(
     linalg::GenericOp linalgOp, SetVector<int64_t> &usedInputs,
     SetVector<Operation *> &usedOperations, int64_t resultNumber) {
@@ -1086,6 +1090,9 @@ static LogicalResult captureUsedOperationsAndBlockArguments(
   return success();
 }
 
+/// this function decomposes a linalg::GenericOp with multiple results into
+/// multiple ops with a single result
+/// if the linalgOp only has one result, return failure
 static FailureOr<SmallVector<linalg::GenericOp>>
 decomposeMultipleResults(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
   if (linalgOp.getNumResults() <= 2) {
@@ -1176,7 +1183,7 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   AffineMap normValMap = getMatchingIndexingMap(sValue);
   AffineMap prevMaxMap = getMatchingIndexingMap(prevMax);
 
-  // curr_max =  max(sValue, prev_max)
+  // curr_max = max(sValue, prev_max)
   Value currMax = reduce<arith::MaximumFOp>(
       rewriter, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
   // ex = e^{sValue - curr_max}
