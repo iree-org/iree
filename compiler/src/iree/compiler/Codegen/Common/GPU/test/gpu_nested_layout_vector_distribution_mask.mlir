@@ -381,7 +381,6 @@ func.func @paged_transfer_gather_mask(%indices: vector<16xindex>,
   %cst0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
   %c7 = arith.constant 7 : index
-  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
   %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
@@ -405,15 +404,11 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: @paged_transfer_gather_mask
-// CHECK: %[[MASK0:.+]] = vector.create_mask %{{.*}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read
-// CHECK-SAME: %[[MASK0]]
-// CHECK: %[[MASK1:.+]] = vector.create_mask %{{.*}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read
-// CHECK-SAME: %[[MASK1]]
-// CHECK: %[[MASK2:.+]] = vector.create_mask %{{.*}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read
-// CHECK-SAME: %[[MASK2]]
-// CHECK: %[[MASK3:.+]] = vector.create_mask %{{.*}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read
-// CHECK-SAME: %[[MASK3]]
+// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[MASK]]
+// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[MASK]]
+// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[MASK]]
+// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[MASK]]

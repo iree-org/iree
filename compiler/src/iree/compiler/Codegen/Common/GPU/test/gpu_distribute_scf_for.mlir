@@ -4,16 +4,10 @@
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 func.func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memref<?xf32>)
   attributes {translation_info = #translation} {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
   %zero = arith.constant 0.0 : f32
-
-  %init = tensor.empty() : tensor<2x128xf32>
   scf.for %iv = %lb to %ub step %step {
     memref.store %zero, %output[%iv] : memref<?xf32>
   } {iree.gpu.distribute_dim = 0 : index}
-
   return
 }
 
@@ -40,16 +34,10 @@ func.func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memr
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [1, 64, 1]>
 func.func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memref<?xf32>)
   attributes {translation_info = #translation} {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
   %zero = arith.constant 0.0 : f32
-
-  %init = tensor.empty() : tensor<2x128xf32>
   scf.for %iv = %lb to %ub step %step {
     memref.store %zero, %output[%iv] : memref<?xf32>
   } {iree.gpu.distribute_dim = 1 : index}
-
   return
 }
 
@@ -67,16 +55,10 @@ func.func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memr
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorize workgroup_size = [1, 1, 64]>
 func.func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memref<?xf32>)
   attributes {translation_info = #translation} {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
   %zero = arith.constant 0.0 : f32
-
-  %init = tensor.empty() : tensor<2x128xf32>
   scf.for %iv = %lb to %ub step %step {
     memref.store %zero, %output[%iv] : memref<?xf32>
   } {iree.gpu.distribute_dim = 2 : index}
-
   return
 }
 
@@ -92,16 +74,10 @@ func.func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memr
 // -----
 
 func.func @no_distribute_without_attr(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
   %zero = arith.constant 0.0 : f32
-
-  %init = tensor.empty() : tensor<2x128xf32>
   scf.for %iv = %lb to %ub step %step {
     memref.store %zero, %output[%iv] : memref<?xf32>
   }
-
   return
 }
 

@@ -24,7 +24,7 @@ module {
 //       CHECK:  scf.for %{{.*}} = %c0 to %c3 step %c1
 //       CHECK:    scf.for %{{.*}} = %c0 to %c3 step %c1
 //       CHECK:      linalg.generic
-//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)
+//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
 
 // -----
 
@@ -42,4 +42,4 @@ module {
 //       CHECK:  scf.for %{{.*}} = %c0 to %c3 step %c1
 //       CHECK:    scf.for %{{.*}} = %c0 to %c3 step %c1
 //       CHECK:      linalg.generic
-//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)
+//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
