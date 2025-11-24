@@ -1050,8 +1050,8 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
 
 /// For a given resultNumber in a linalg::GenericOp, this op scans the
 /// GenericOp's body for:
-/// 1. The index of the inputs used by the result
-/// 2. The operations used by the result
+/// 1. The index of the inputs used to compute the result
+/// 2. The operations used to compute the result
 static LogicalResult captureUsedOperationsAndBlockArguments(
     linalg::GenericOp linalgOp, SetVector<int64_t> &usedInputs,
     SetVector<Operation *> &usedOperations, int64_t resultNumber) {

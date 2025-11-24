@@ -429,14 +429,14 @@ module attributes { transform.with_named_sequence } {
 }
 
 func.func @attention(
-  %S: tensor<20x4096x4096xf32>,
-  %V: tensor<20x4096x64xf32>,
+  %s: tensor<20x4096x4096xf32>,
+  %v: tensor<20x4096x64xf32>,
   %max_init: tensor<20x4096xf32>,
   %sum_init: tensor<20x4096xf32>,
   %acc_init: tensor<20x4096x64xf32>
 ) -> (tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>)
   {
-  %MAX, %SUM, %PV = iree_linalg_ext.exp_reduction {
+  %max, %sumt, %pv = iree_linalg_ext.exp_reduction {
     indexing_maps = [
       affine_map<(B, M, N, K2) -> (B, M, K2)>,
       affine_map<(B, M, N, K2) -> (B, K2, N)>,
@@ -452,7 +452,7 @@ func.func @attention(
     ],
     exp_reduced_operands = [1, 2]
   }
-    ins(%S, %V : tensor<20x4096x4096xf32>, tensor<20x4096x64xf32>)
+    ins(%s, %v : tensor<20x4096x4096xf32>, tensor<20x4096x64xf32>)
     outs(%max_init, %sum_init, %acc_init : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>)
   {
   ^bb0(%ex : f32, %v : f32, %m : f32, %sum : f32, %acc : f32):
@@ -462,7 +462,7 @@ func.func @attention(
     iree_linalg_ext.yield %m, %nsum, %nacc : f32, f32, f32
   } -> tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
 
-  return %MAX, %SUM, %PV : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
+  return %max, %sumt, %pv : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
 }
 // CHECK-LABEL: @attention
 // CHECK-SAME: %[[S:[0-9A-Za-z]*]]: tensor<20x4096x4096xf32>
