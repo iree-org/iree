@@ -149,7 +149,8 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
   auto value =
       arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
   for (Value dim : dynamicDims) {
-    value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
+    value = builder.createOrFold<arith::MulIOp>(
+        loc, value, dim, arith::IntegerOverflowFlags::nsw);
   }
 
   // For sub-byte element types we need to divide by the number of elements that
