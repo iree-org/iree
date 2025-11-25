@@ -18,6 +18,7 @@ func.func @addf_bf16(%arg0 : tensor<128xbf16>) -> tensor<128xbf16> {
 // CHECK: arith.truncf %[[ADD]] : f32 to bf16
 
 // -----
+
 func.func @addf_bf16(%arg0 : bf16, %arg1 : bf16) -> bf16 {
     %0 = "arith.addf"(%arg0, %arg1) : (bf16, bf16) -> bf16
     return %0 : bf16
@@ -33,6 +34,7 @@ func.func @addf_bf16(%arg0 : bf16, %arg1 : bf16) -> bf16 {
 // CHECK: return %[[TRUNC]] : bf16
 
 // -----
+
 func.func @addf_vector_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> vector<4xbf16> {
     %0 = "arith.addf"(%arg0, %arg1) : (vector<4xbf16>, vector<4xbf16>) -> vector<4xbf16>
     return %0 : vector<4xbf16>
@@ -48,6 +50,7 @@ func.func @addf_vector_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> v
 // CHECK: return %[[TRUNC]] : vector<4xbf16>
 
 // -----
+
 func.func @bitcast_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> vector<4xbf16> {
     %0 = arith.bitcast %arg0 : vector<4xbf16> to vector<4xi16>
     %1 = arith.bitcast %arg1 : vector<4xbf16> to vector<4xi16>
@@ -82,6 +85,7 @@ func.func @truncf_vector(%arg0 : vector<4xbf16>) -> vector<4xbf16> {
 // CHECK: return %[[VAL3]] : vector<4xbf16>
 
 // -----
+
 func.func @extf_scalar_noop() -> vector<bf16> {
   %0 = arith.constant dense<1.0> : vector<bf16>
   return %0 : vector<bf16>

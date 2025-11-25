@@ -67,6 +67,7 @@ func.func @dont_fold_reshape_with_not_full_load() {
 }
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -99,6 +100,7 @@ func.func @fold_dynamic_reshape() {
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[IN]], %[[OUT_BINDING]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>

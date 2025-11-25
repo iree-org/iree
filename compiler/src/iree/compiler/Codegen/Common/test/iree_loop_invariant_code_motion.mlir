@@ -13,9 +13,11 @@ func.func @nested_loops_code_invariant_to_both() {
 }
 
 // CHECK-LABEL: @nested_loops_code_invariant_to_both
-//       CHECK:   arith.constant 7
-//  CHECK-NEXT:   arith.constant 8
-//  CHECK-NEXT:   arith.addf
+//   CHECK-DAG:   arith.constant 7
+//   CHECK-DAG:   arith.constant 8
+//       CHECK:   arith.addf
+//       CHECK:   affine.for
+//       CHECK:     affine.for
 
 // -----
 

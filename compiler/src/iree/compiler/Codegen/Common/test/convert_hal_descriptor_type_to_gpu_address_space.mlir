@@ -1,4 +1,5 @@
 // RUN: iree-opt -iree-codegen-convert-hal-descriptor-type-to-gpu-address-space -split-input-file %s | FileCheck %s
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>

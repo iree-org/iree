@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-convolution-to-lower-dim-ops))" --split-input-file %s | FileCheck %s
+
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 0, 0], [1, 1, 1, 4, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
 module {
   func.func @restrict_num_workgroups(%input: tensor<1x1x4x4xf32>, %filter: tensor<1x4x4xf32>) -> tensor<1x1x1x4xf32> {

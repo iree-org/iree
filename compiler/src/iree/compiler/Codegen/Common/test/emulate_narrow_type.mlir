@@ -38,6 +38,7 @@ func.func @memref_i4_to_i8_dynamic(%arg0 : index, %arg1 : index, %arg2 : index) 
 // CHECK-SAME:       memref<?xi8, strided<[1], offset: ?>>{%[[SIZE]]}
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>

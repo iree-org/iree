@@ -14,6 +14,7 @@ func.func @load_scalar_from_memref(%input: memref<4x8xf32, strided<[8, 1], offse
 // CHECK: memref.load %[[REINT]][%[[C10]]] : memref<32xf32, strided<[1], offset: 100>>
 
 // -----
+
 func.func @load_scalar_from_memref_static_dim_2(%input: memref<4x8xf32, strided<[8, 12], offset: 100>>, %row: index, %col: index) -> f32 {
   %value = memref.load %input[%col, %row] : memref<4x8xf32, strided<[8, 12], offset: 100>>
   return %value : f32
@@ -44,6 +45,7 @@ func.func @load_scalar_from_memref_dynamic_dim(%input: memref<?x?xf32, strided<[
 // CHECK: memref.load %[[REINT]][%[[IDX]]]
 
 // -----
+
 func.func @load_scalar_from_memref_subview(%input: memref<4x8xf32>, %row: index, %col: index) -> memref<1x1xf32, strided<[8, 1], offset: ?>> {
   %subview = memref.subview %input[%col, %row] [1, 1] [1, 1] : memref<4x8xf32> to memref<1x1xf32, strided<[8, 1], offset: ?>>
   return %subview : memref<1x1xf32, strided<[8, 1], offset: ?>>
@@ -100,6 +102,7 @@ func.func @load_vector_from_memref(%input: memref<4x8xf32>) -> vector<8xf32> {
 // CHECK-NEXT: vector.load %[[REINT]][%[[C30]]] : memref<32xf32, strided<[1]>>, vector<8xf32>
 
 // -----
+
 func.func @load_vector_from_memref_odd(%input: memref<3x7xi2>) -> vector<3xi2> {
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -113,6 +116,7 @@ func.func @load_vector_from_memref_odd(%input: memref<3x7xi2>) -> vector<3xi2> {
 // CHECK-NEXT: vector.load %[[REINT]][%[[C10]]] : memref<21xi2, strided<[1]>>, vector<3xi2>
 
 // -----
+
 func.func @load_vector_from_memref_dynamic(%input: memref<3x7xi2>, %row: index, %col: index) -> vector<3xi2> {
   %value = vector.load %input[%col, %row] : memref<3x7xi2>, vector<3xi2>
   return %value : vector<3xi2>
@@ -125,6 +129,7 @@ func.func @load_vector_from_memref_dynamic(%input: memref<3x7xi2>, %row: index, 
 // CHECK: vector.load %[[REINT]][%[[IDX]]] : memref<21xi2, strided<[1]>>, vector<3xi2>
 
 // -----
+
 func.func @store_vector_to_memref_odd(%input: memref<3x7xi2>, %value: vector<3xi2>) {
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -165,6 +170,7 @@ func.func @mask_store_vector_to_memref_odd(%input: memref<3x7xi2>, %value: vecto
 // CHECK: vector.maskedstore %[[REINT]][%[[C10]]], %[[ARG2]], %[[ARG1]] : memref<21xi2, strided<[1]>>, vector<3xi1>, vector<3xi2>
 
 // -----
+
 func.func @mask_store_vector_to_memref_dynamic(%input: memref<3x7xi2>, %value: vector<3xi2>, %row: index, %col: index, %mask: vector<3xi1>) {
   vector.maskedstore %input[%col, %row], %mask, %value : memref<3x7xi2>, vector<3xi1>, vector<3xi2>
   return
@@ -177,6 +183,7 @@ func.func @mask_store_vector_to_memref_dynamic(%input: memref<3x7xi2>, %value: v
 // CHECK: vector.maskedstore %[[REINT]][%[[IDX]]], %[[ARG4]], %[[ARG1]]
 
 // -----
+
 func.func @mask_load_vector_from_memref_odd(%input: memref<3x7xi2>, %mask: vector<3xi1>, %passthru: vector<3xi2>) -> vector<3xi2> {
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -203,6 +210,7 @@ func.func @mask_load_vector_from_memref_dynamic(%input: memref<3x7xi2>, %row: in
 // CHECK: vector.maskedload %[[REINT]][%[[IDX]]], %[[ARG3]], %[[ARG4]] : memref<21xi2, strided<[1]>>, vector<3xi1>, vector<3xi2>
 
 // -----
+
 func.func @transfer_read_memref(%input: memref<4x8xi2>, %row: index, %col: index) -> vector<8xi2> {
    %c0 = arith.constant 0 : i2
    %0 = vector.transfer_read %input[%col, %row], %c0 : memref<4x8xi2>, vector<8xi2>
@@ -217,6 +225,7 @@ func.func @transfer_read_memref(%input: memref<4x8xi2>, %row: index, %col: index
 // CHECK-NEXT: vector.transfer_read %[[REINT]][%[[IDX]]], %[[C0]]
 
 // -----
+
 func.func @transfer_write_memref(%input: memref<4x8xi2>, %value: vector<8xi2>, %row: index, %col: index) {
    vector.transfer_write %value, %input[%col, %row] : vector<8xi2>, memref<4x8xi2>
    return

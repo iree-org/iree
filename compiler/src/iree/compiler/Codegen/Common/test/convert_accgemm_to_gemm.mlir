@@ -71,6 +71,7 @@ func.func @accumulate_scaled_gemm(
 //       CHECK: iree_codegen.store_to_buffer %[[ADD]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
@@ -123,6 +124,7 @@ func.func @acc_conv_nchw(%1 : tensor<1x64x58x58xf32>, %2 : tensor<64x64x3x3xf32>
 //       CHECK: iree_tensor_ext.dispatch.tensor.store %[[ADD]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>

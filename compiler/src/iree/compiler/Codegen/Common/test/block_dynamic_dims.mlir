@@ -184,6 +184,7 @@ func.func @contract_op_interface_op(%rhs : tensor<2048x4096xf16>, %m : index, %l
 //       CHECK:   return %[[COLLAPSED]]
 
 // -----
+
 func.func @reshape_propagation_test(%rhs : tensor<2048x4096xf16>, %m : index, %lhs : tensor<?x4096xf16>)
     -> tensor<?x2048xf16> {
   %cst = arith.constant 0.0 : f32

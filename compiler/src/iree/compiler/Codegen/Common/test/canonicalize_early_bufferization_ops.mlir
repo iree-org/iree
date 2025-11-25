@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-cleanup-buffer-alloc-view))" %s | FileCheck %s
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -104,6 +105,7 @@ func.func @fold_reshape_with_slice_store() {
 //       CHECK:   iree_codegen.store_to_buffer {{.*}}, %[[EXPAND]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -135,6 +137,7 @@ func.func @fold_dynamic_reshape_load() {
 //       CHECK:   iree_codegen.store_to_buffer %[[BARRIER]], %[[DEST_SUBSPAN]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>

@@ -30,6 +30,7 @@ func.func public @conv_with_consumer(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor
 // CHECK:        return %[[TRUNCF]] : tensor<1x14x14x16xf16>
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -92,6 +93,7 @@ func.func @conv_with_lowering_config() attributes {translation_info = #iree_code
 // CHECK:        iree_tensor_ext.dispatch.tensor.store %[[MATMUL]]
 
 // -----
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

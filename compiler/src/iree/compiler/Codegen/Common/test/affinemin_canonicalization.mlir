@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-affinemin-scf-canonicalization),canonicalize)" %s | FileCheck %s
+
 // CHECK-LABEL: canonicalize_affinemin_in_nested_scf_loops
 func.func @canonicalize_affinemin_in_nested_scf_loops(%A : memref<i64>, %id1 : index, %count1 : index,
                       %id2 : index, %count2 : index) {

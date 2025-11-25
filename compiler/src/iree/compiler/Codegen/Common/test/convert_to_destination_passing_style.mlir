@@ -202,6 +202,7 @@ module {
 //      CHECK:   iree_tensor_ext.dispatch.tensor.store %[[FORALL]], %[[OUT_SUBSPAN]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -222,6 +223,7 @@ func.func @reshape_simple() {
 //      CHECK:   iree_tensor_ext.dispatch.tensor.store %[[RESHAPE]], %[[RET0]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -255,6 +257,7 @@ func.func @reshape_fused_source() {
 //      CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[RET0]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -293,6 +296,7 @@ func.func @reshape_fused_source_and_copyout() {
 //      CHECK:   iree_tensor_ext.dispatch.tensor.store %[[RESHAPE]], %[[RET1]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -327,6 +331,7 @@ func.func @reshape_fused_target() {
 //      CHECK:   iree_tensor_ext.dispatch.tensor.store %[[RESHAPE_COLLAPSE]], %[[RET0]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -709,6 +714,7 @@ func.func @gemm_gather() {
 //  CHECK-SAME:       outs(%[[GEMM]] :
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,

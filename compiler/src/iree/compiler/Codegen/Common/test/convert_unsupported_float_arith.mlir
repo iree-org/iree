@@ -65,6 +65,7 @@ func.func @expand_f8_ocp(%x: f8E5M2) -> f8E5M2 attributes
 }
 
 // -----
+
 // CHECK-LABEL: func.func @dont_expand_cpu_target
 // CHECK: {{.+}} = arith.negf {{.*}} : f8E4M3FNUZ
 func.func @dont_expand_cpu_target(%arg0 : f8E4M3FNUZ) -> f8E4M3FNUZ attributes

@@ -24,6 +24,7 @@ func.func @pack_at_source() {
 //   CHECK-NOT:   linalg.pack
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -47,6 +48,7 @@ func.func @unpack_at_source() {
 //       CHECK:   util.optimization_barrier %[[UNPACK]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -70,6 +72,7 @@ func.func @pack_at_dest() {
 //       CHECK:   linalg.pack %[[BARRIER]] {{.+}} into %[[DEST]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -98,6 +101,7 @@ func.func @unpack_at_dest() {
 //   CHECK-NOT:   linalg.unpack
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -120,6 +124,7 @@ func.func @padded_pack() {
 //       CHECK:   linalg.pack %[[SRC]] padding_value({{.+}}) {{.+}} into %[[DEST]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -141,6 +146,7 @@ func.func @padded_unpack() {
 //       CHECK:   linalg.unpack %[[SRC]] {{.+}} into %[[DEST]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -167,6 +173,7 @@ func.func @dynamic_pack() {
 //       CHECK:   linalg.pack %[[SRC]] padding_value({{.+}}) {{.+}} into %[[DEST]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -192,6 +199,7 @@ func.func @dynamic_unpack() {
 //       CHECK:   linalg.unpack %[[SRC]] {{.+}} into %[[DEST]]
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -216,6 +224,7 @@ func.func @load_non_full_slice() {
 //   CHECK-NOT:   linalg.pack
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
@@ -242,6 +251,7 @@ func.func @store_non_full_slice() {
 //   CHECK-NOT:   linalg.unpack
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -272,6 +282,7 @@ func.func @multi_use_unpack_fold() {
 //   CHECK-NOT:   linalg.unpack
 
 // -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
