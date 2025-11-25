@@ -4664,4 +4664,66 @@ def Stream_YieldOp : Stream_Op<"yield", [
 
 } // OpGroupMiscellaneousOps
 
+//===----------------------------------------------------------------------===//
+// Test ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupTestOps : OpDocGroup {
+  let summary = "Test-only ops for Stream dialect testing";
+  let description = "Ops used only in unit tests.";
+}
+
+let opDocGroup = OpGroupTestOps in {
+
+def Stream_TestTimelineAwareOp : Stream_PureOp<"test.timeline_aware", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Stream_TimelineAwareOp, [
+    "buildAwaitTimepoints",
+    "buildResultTimepoint",
+  ]>,
+]> {
+  let summary = [{Test op implementing TimelineAwareOpInterface.}];
+  let description = [{
+    Test-only operation that implements TimelineAwareOpInterface directly,
+    allowing Stream dialect tests to verify timeline-aware behavior without
+    requiring HAL/etc dialect dependencies.
+
+    Mimics util.call with the HAL coarse-fences model:
+    - Takes wait fences that must complete before execution.
+    - Takes a signal fence to signal when complete.
+    - Returns an arbitrary result.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$args,
+    Variadic<Stream_TestFence>:$wait_fence_likes,
+    Stream_TestFence:$signal_fence_like
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    `(` $args `)` `waits` `(` $wait_fence_likes `)` `signals` `(` $signal_fence_like `)`
+    attr-dict `:` functional-type($args, $results)
+  }];
+
+  let extraClassDeclaration = [{
+    bool participatesInTimeline() { return true; }
+
+    SmallVector<Value> getAwaitFences() {
+      // Return all wait fences (excluding signal fence).
+      SmallVector<Value> fences;
+      for (auto fence : getWaitFenceLikes()) {
+        fences.push_back(fence);
+      }
+      return fences;
+    }
+
+    Value getSignalFence() { return getSignalFenceLike(); }
+  }];
+}
+
+}  // OpGroupTestOps
+
 #endif  // IREE_DIALECT_STREAM_OPS
