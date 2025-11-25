@@ -26,8 +26,7 @@ static bool areAllRankReducedLeadingDim(tensor::ExtractSliceOp extractOp,
     return true;
 
   RankedTensorType inferredType = extractOp.inferResultType(
-      extractOp.getSourceType(), extractOp.getMixedOffsets(),
-      extractOp.getMixedSizes(), extractOp.getMixedStrides());
+      extractOp.getSourceType(), extractOp.getMixedSizes());
   return extractOp.getType().getShape().take_back(trailingRank) ==
          inferredType.getShape().take_back(trailingRank);
 }
@@ -237,9 +236,8 @@ public:
         insertOp.getType().getRank() - insertOp.getSourceType().getRank();
     int64_t vectorRank = xferOp.getVectorType().getRank();
     RankedTensorType inferredSourceTensorType =
-        tensor::ExtractSliceOp::inferResultType(
-            insertOp.getType(), insertOp.getMixedOffsets(),
-            insertOp.getMixedSizes(), insertOp.getMixedStrides());
+        tensor::ExtractSliceOp::inferResultType(insertOp.getType(),
+                                                insertOp.getMixedSizes());
     auto actualSourceTensorShape = insertOp.getSourceType().getShape();
     if (rankReduced > 0 &&
         actualSourceTensorShape.take_back(vectorRank) !=
