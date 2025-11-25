@@ -32,7 +32,7 @@ func.func @matmul_f16_64x640x320(%3: tensor<64x320xf16>, %4: tensor<320x640xf16>
 
 // -----
 
-func.func @batch_matmul_f32_16x4096x40x4096(%3: tensor<16x4096x4096xf32>, %4: tensor<16x4096x48xf32>) -> tensor<16x4096x48xf32> {
+func.func @batch_matmul_f32_16x4096x48x4096(%3: tensor<16x4096x4096xf32>, %4: tensor<16x4096x48xf32>) -> tensor<16x4096x48xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<16x4096x48xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<16x4096x48xf32>) -> tensor<16x4096x48xf32>
@@ -42,7 +42,7 @@ func.func @batch_matmul_f32_16x4096x40x4096(%3: tensor<16x4096x4096xf32>, %4: te
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128, 16, 32]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [4, 16, 1], {pipeline_depth = 2 : i64, store_stage = 0 : i64}>
-//      CHECK: func.func @batch_matmul_f32_16x4096x40x4096(
+//      CHECK: func.func @batch_matmul_f32_16x4096x48x4096(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

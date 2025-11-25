@@ -6,8 +6,7 @@
 func.func @matmul_256x1024x128_div_add(%5: tensor<256x1024xf16>, %6: tensor<256x1024xf16>, %8: tensor<256x128xf16>, %9: tensor<128x1024xf16>) -> tensor<256x1024xf16> {
   %cst = arith.constant 0.000000e+00 : f16
   %7 = tensor.empty() : tensor<256x1024xf16>
-  %10 = tensor.empty() : tensor<256x1024xf16>
-  %11 = linalg.fill ins(%cst : f16) outs(%10 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
+  %11 = linalg.fill ins(%cst : f16) outs(%7 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
   %12 = linalg.matmul ins(%8, %9 : tensor<256x128xf16>, tensor<128x1024xf16>) outs(%11 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
   %13 = linalg.generic {indexing_maps = [#map, #map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%12, %5, %6 : tensor<256x1024xf16>, tensor<256x1024xf16>, tensor<256x1024xf16>) outs(%7 : tensor<256x1024xf16>) {
   ^bb0(%in: f16, %in_0: f16, %in_1: f16, %out: f16):

@@ -18,7 +18,6 @@
 #translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x8xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<8x16xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<4x16xf32>
@@ -46,7 +45,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 // expected-error @+1 {{expected workgroup size to have three dimensions for SPIR-V pipelines}}
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x16xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x128xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<64x128xf32>
@@ -72,7 +70,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 128], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x16xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x128xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<64x128xf32>
@@ -99,7 +96,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x16xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x128xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<64x128xf32>
@@ -126,7 +122,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [8, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x16xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x128xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<64x128xf32>
@@ -153,7 +148,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [15, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x16xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x128xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<64x128xf32>
@@ -180,7 +174,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<48x16xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x128xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<48x128xf32>
@@ -207,7 +200,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<64x16xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16x80xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<64x80xf32>
@@ -235,7 +227,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
@@ -269,7 +260,6 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [128, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
@@ -303,7 +293,6 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [256, 4, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
@@ -337,7 +326,6 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [64, 2, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
@@ -371,7 +359,6 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 #translation = #iree_codegen.translation_info<pipeline = SPIRVCooperativeMatrixVectorize workgroup_size = [128, 4, 1] subgroup_size = 64, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
@@ -578,7 +565,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1x11x11x576xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<5x5x576xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<1x7x7x576xf32>
@@ -605,7 +591,6 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 #translation = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 1, 1]>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @illegal() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1x11x11x576xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<5x5x576xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<1x7x7x576xf32>

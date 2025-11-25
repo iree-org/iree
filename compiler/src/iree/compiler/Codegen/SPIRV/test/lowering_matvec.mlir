@@ -43,7 +43,7 @@ func.func @i4_dequant_matvec_f32() {
   return
 }
 
-//   CHECK-LABEL: func.func @i4_dequant_matvec_f32()
+//   CHECK-LABEL:  func.func @i4_dequant_matvec_f32()
 
 //         CHECK:   %[[FOR:.+]] = scf.for %arg0 = %c0 to %c86 step %c2 iter_args({{.+}}) -> (vector<1x4xf32>)
 //         CHECK:     %[[READ0:.+]] = vector.transfer_read {{.+}} : memref<4096x86x128xi4, #hal.descriptor_type<storage_buffer>>, vector<4xi4>

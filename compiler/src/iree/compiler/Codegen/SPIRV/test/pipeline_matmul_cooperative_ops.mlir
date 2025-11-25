@@ -26,9 +26,6 @@ hal.executable public @matmul_256x1024x128_div_exp {
     }
     builtin.module  {
       func.func @matmul_256x1024x128_div_exp() {
-        %c0 = arith.constant 0 : index
-        %c1024 = arith.constant 1024 : index
-        %c256 = arith.constant 256 : index
         %cst = arith.constant 0.000000e+00 : f16
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x1024xf16>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x1024xf16>>

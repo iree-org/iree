@@ -24,7 +24,7 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
 // CHECK-SAME: spirv.target_env = #spirv.target_env<#spirv.vce<v1.6,
 // CHECK-SAME:   [Shader, Float64, Float16, Int64, Int16, Int8,
 // CHECK-SAME:    StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16,
-// CHECK-SMAE:    StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8,
+// CHECK-SAME:    StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8,
 // CHECK-SAME:    GroupNonUniformShuffle, GroupNonUniformShuffleRelative, GroupNonUniformArithmetic,
 // CHECK-SAME:    DotProduct, DotProductInput4x8BitPacked, DotProductInputAll, DotProductInput4x8Bit,
 // CHECK-SAME:    CooperativeMatrixKHR],
