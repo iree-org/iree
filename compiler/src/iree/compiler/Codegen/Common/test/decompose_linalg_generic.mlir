@@ -1,7 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-linalg-generic))" %s | FileCheck %s
 
-
-// -----
 // CHECK-LABEL: @parallel_with_broadcast_dynamic
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<64xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x64xf32>

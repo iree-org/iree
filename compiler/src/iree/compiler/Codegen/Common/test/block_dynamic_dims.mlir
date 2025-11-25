@@ -102,6 +102,7 @@ func.func @block_attention_dims() {
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
 
 // -----
+
 func.func @basic_blocking_test(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : tensor<2048x4096xf32>) -> tensor<?x4096xf32> {
   %0 = util.assume.int %arg0<umin = 0, umax = 1024, udiv = 16> : index
   %init = tensor.empty(%0) : tensor<?x4096xf32>
@@ -119,6 +120,7 @@ func.func @basic_blocking_test(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : 
 //       CHECK:   return %[[COLLAPSE]]
 
 // -----
+
 func.func @no_blocking(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : tensor<2048x4096xf32>) -> tensor<?x4096xf32> {
   %init = tensor.empty(%arg0) : tensor<?x4096xf32>
   %matmul = linalg.matmul ins(%lhs, %rhs : tensor<?x2048xf32>, tensor<2048x4096xf32>)
@@ -133,6 +135,7 @@ func.func @no_blocking(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : tensor<2
 //       CHECK:   return %[[MATMUL]]
 
 // -----
+
 func.func @no_unit_blocking(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : tensor<2048x4096xf32>) -> tensor<?x4096xf32> {
   %0 = util.assume.int %arg0<umin = 0, umax = 1024, udiv = 1> : index
   %init = tensor.empty(%0) : tensor<?x4096xf32>
@@ -141,13 +144,16 @@ func.func @no_unit_blocking(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : ten
   return %matmul : tensor<?x4096xf32>
 }
 // CHECK-LABEL: func @no_unit_blocking(
+//  CHECK-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x2048xf32>
+//  CHECK-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<2048x4096xf32>
 //   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?x4096xf32>
 //       CHECK:   %[[MATMUL:.+]] = linalg.matmul
-//  CHECK-SAME:       ins(%{{.+}},
+//  CHECK-SAME:       ins(%[[LHS]], %[[RHS]]
 //  CHECK-SAME:       outs(%[[INIT]] :
 //       CHECK:   return %[[MATMUL]]
 
 // -----
+
 func.func @contract_op_interface_op(%rhs : tensor<2048x4096xf16>, %m : index, %lhs : tensor<?x4096xf16>)
     -> tensor<?x2048xf32> {
   %0 = util.assume.int %m<udiv = 16> : index

@@ -1,4 +1,5 @@
 // RUN: iree-opt -iree-codegen-add-fast-math-flags --split-input-file %s | FileCheck %s
+
 // CHECK-LABEL: llvm.func @add_fastmath_flags
 llvm.func @add_fastmath_flags() -> f32 {
   %c3 = llvm.mlir.constant(3.000000e+00 : f32) : f32

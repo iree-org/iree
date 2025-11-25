@@ -149,7 +149,7 @@ func.func @simple_unpack_and_extract_slice(%input: tensor<1x1x8x2xf32>, %output:
 // CHECK-RESHAPE:     %[[COLLAPSE:.+]] = tensor.collapse_shape
 // CHECK-RESHAPE:     %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSE]]
 // CHECK-RESHAPE:     %[[RES:.+]] = linalg.copy ins(%[[SLICE]] : tensor<5x1xf32>) outs(%[[OUT]] : tensor<5x1xf32>) -> tensor<5x1xf32>
-// CHECK-ALL:         return {{.+}}
+// CHECK-ALL:         return %[[RES]]
 
 // -----
 
@@ -233,7 +233,7 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK-ALL-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-ALL-SAME:   %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-ALL-DAG:    %[[C0:.+]] = arith.constant 0 : index
-// CHECK-ALL-DAG:    {{.+}} = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
+// CHECK-ALL-DAG:    %{{.+}} = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
 // CHECK-ALL-DAG:    %[[H0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * 16 - s1)>
 // CHECK-ALL-DAG:    %[[H1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 - s1)>
 // CHECK-ALL:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
