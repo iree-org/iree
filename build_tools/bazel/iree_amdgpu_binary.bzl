@@ -37,7 +37,8 @@ def iree_amdgpu_binary(
     link_tool = "@llvm-project//llvm:llvm-link"
     lld_tool = "@llvm-project//lld:lld"
     builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
-    builtin_headers_path = "external/llvm-project/clang/staging/include/"
+    # Note: With bzlmod, the path includes the extension name prefix.
+    builtin_headers_path = "external/_main~iree_extension~llvm-project/clang/staging/include/"
 
     base_copts = [
         # C configuration.

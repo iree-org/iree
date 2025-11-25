@@ -8,6 +8,10 @@
 # Common flags that apply to all configurations.
 # Use sparingly for things common to all compilers and platforms.
 ###############################################################################
+
+# Enable bzlmod (required for LLVM integration as of Nov 2025)
+common --enable_bzlmod
+
 # Prevent invalid caching if input files are modified during a build.
 build --experimental_guard_against_concurrent_changes
 # Default to optimized builds
