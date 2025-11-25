@@ -18,10 +18,11 @@ func.func public @conv_with_consumer(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor
   return %2 : tensor<1x14x14x16xf16>
 }
 // CHECK:      func.func public @conv_with_consumer
-// CHECK-DAG:    {{.+}} = iree_linalg_ext.im2col {{.*}} : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
+// CHECK-DAG:    %[[IM2COL:.+]] = iree_linalg_ext.im2col {{.*}} : tensor<1x14x14x36xf32>) -> tensor<1x14x14x36xf32>
 // CHECK-DAG:    %[[FILL:.+]] = linalg.fill {{.*}} -> tensor<1x14x14x16xf32>
 // CHECK:        %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:     ins(%[[IM2COL]], %{{.*}} : tensor<1x14x14x36xf32>
 // CHECK-SAME:     outs(%[[FILL]] : tensor<1x14x14x16xf32>)
 // CHECK:        %[[TRUNCF:.+]] = linalg.generic
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel"]
