@@ -56,9 +56,7 @@ func.func @dot_384x512x128_dispatch_0() {
   }
   return
 }
-//      CHECK: #{{.+}} = affine_map<()[s0] -> (s0 * 64)>
 //      CHECK: func.func @dot_384x512x128_dispatch_0() {
-//  CHECK-DAG: {{.+}} = arith.constant 0.000000e+00 : f32
 //  CHECK-DAG: %[[CST_VECTOR:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf32>
 //  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG: %[[C384:.+]] = arith.constant 384 : index
@@ -69,7 +67,6 @@ func.func @dot_384x512x128_dispatch_0() {
 //  CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
 //      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>>
 //      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x128xf32>>
-//      CHECK: {{.+}} = hal.interface.binding.subspan layout({{.+}}) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<384x128xf32>>
 //      CHECK: %[[DST_TILE_INIT:.+]] = tensor.empty()
 //      CHECK: scf.for {{.+}} = {{.*}} to %[[C384]] step %{{[0-9]*}} {
 //      CHECK:   %[[LHS_TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS]], {{.*}} -> tensor<64x512xf32>

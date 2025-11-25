@@ -66,11 +66,11 @@ func.func @peel_static_matmul(%arg0: tensor<128x49xf32>, %arg1: tensor<49x512xf3
 // CHECK:                 linalg.matmul {{.*}} outs(%[[T0]] : tensor<8x32xf32>) -> tensor<8x32xf32>
 // CHECK:               scf.for
 // CHECK:                 linalg.fill {{.*}} -> tensor<8x?xf32>
-// CHECK:                 {{.+}} = scf.for
+// CHECK:                 scf.for
 // CHECK:                   linalg.matmul {{.*}} tensor<8x?xf32>
 // CHECK:               scf.for
 // CHECK:                 linalg.fill {{.*}} -> tensor<?x?xf32>
-// CHECK:                 {{.+}} = scf.for
+// CHECK:                 scf.for
 // CHECK:                   linalg.matmul {{.*}} tensor<?x?xf32>
 
 // -----

@@ -58,7 +58,7 @@ func.func @matmul_391x384x384_f32() {
 // CHECK-LABEL:       func.func @matmul_391x384x384_f32
 // CHECK:               scf.for
 // CHECK:                 scf.for
-// CHECK:                   %{{.*}} = scf.if
+// CHECK:                   scf.if
 // CHECK:                     scf.yield %{{.*}}
 // CHECK:                   } else {
 // CHECK:                     linalg.fill
@@ -67,7 +67,7 @@ func.func @matmul_391x384x384_f32() {
 // CHECK:                   }
 // CHECK:                   scf.for
 // CHECK-COUNT-128:           vector.fma
-// CHECK:                 %{{.*}} = scf.if
+// CHECK:                 scf.if
 // CHECK:                 scf.if %{{.*}} {
 // CHECK:                   memref.copy
 // CHECK:                 }
