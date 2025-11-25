@@ -94,6 +94,22 @@ util.func public @propagate_through_rank_reduced_extract_slice(%arg0 : tensor<1x
 
 // -----
 
+util.func public @propagate_through_rank_reduced_extract_slice_2(%arg0: tensor<80x80x1x1x1203xf16>) -> tensor<1203x5x80xf16> {
+  %empty = tensor.empty() : tensor<1x1203x80x80x1xf16>
+  %transposed = linalg.transpose ins(%arg0 : tensor<80x80x1x1x1203xf16>) outs(%empty : tensor<1x1203x80x80x1xf16>) permutation = [3, 4, 0, 1, 2]
+  %extracted_slice = tensor.extract_slice %transposed[0, 0, 0, 0, 0] [1, 1203, 5, 80, 1] [1, 1, 1, 1, 1] : tensor<1x1203x80x80x1xf16> to tensor<1203x5x80xf16>
+  util.return %extracted_slice : tensor<1203x5x80xf16>
+}
+// CHECK-LABEL:   util.func public @propagate_through_rank_reduced_extract_slice_2(
+//  CHECK-SAME:     %[[ARG0:.*]]: tensor<80x80x1x1x1203xf16>) -> tensor<1203x5x80xf16> {
+//       CHECK:     %[[EXTRACT_SLICE_0:.*]] = tensor.extract_slice %[[ARG0]][0, 0, 0, 0, 0] [5, 80, 1, 1, 1203] [1, 1, 1, 1, 1] : tensor<80x80x1x1x1203xf16> to tensor<5x80x1203xf16>
+//       CHECK:     %[[EMPTY_0:.*]] = tensor.empty() : tensor<1203x5x80xf16>
+//       CHECK:     %[[TRANSPOSE_0:.*]] = linalg.transpose ins(%[[EXTRACT_SLICE_0]] : tensor<5x80x1203xf16>) outs(%[[EMPTY_0]] : tensor<1203x5x80xf16>) permutation = [2, 0, 1]
+//       CHECK:     util.return %[[TRANSPOSE_0]] : tensor<1203x5x80xf16>
+//       CHECK:   }
+
+// -----
+
 util.func public @rank_reduced_extract_transposed_unit_dim(%arg0: tensor<256x1x32x128xf32>, %arg1: tensor<1x32x256x128xf32>) -> tensor<32x64x128xf32> {
   %transposed = linalg.transpose ins(%arg0 : tensor<256x1x32x128xf32>) outs(%arg1 : tensor<1x32x256x128xf32>) permutation = [1, 2, 0, 3]
   %extracted_slice = tensor.extract_slice %transposed[0, 0, 0, 0] [1, 32, 64, 128] [1, 1, 1, 1] : tensor<1x32x256x128xf32> to tensor<32x64x128xf32>
