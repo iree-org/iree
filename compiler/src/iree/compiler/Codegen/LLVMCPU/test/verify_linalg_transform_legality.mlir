@@ -2,7 +2,6 @@
 
 func.func @generic_with_marker(%arg0: tensor<123x4x114xf32>, %arg1: tensor<4x114x789xf32>) -> tensor<4x123x789xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
   %0 = tensor.empty() : tensor<4x123x789xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x123x789xf32>) -> tensor<4x123x789xf32>
   // expected-error @+1 {{expected no Linalg transform markers}}

@@ -56,9 +56,7 @@ func.func @dot_384x512x128_dispatch_0() {
   }
   return
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //      CHECK: func.func @dot_384x512x128_dispatch_0() {
-//  CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 //  CHECK-DAG: %[[CST_VECTOR:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf32>
 //  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG: %[[C384:.+]] = arith.constant 384 : index
@@ -69,25 +67,24 @@ func.func @dot_384x512x128_dispatch_0() {
 //  CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
 //      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384x512xf32>>
 //      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x128xf32>>
-//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<384x128xf32>>
 //      CHECK: %[[DST_TILE_INIT:.+]] = tensor.empty()
-//      CHECK: scf.for %[[I_IDX:.+]] = {{.*}} to %[[C384]] step %{{[0-9]*}} {
+//      CHECK: scf.for {{.+}} = {{.*}} to %[[C384]] step %{{[0-9]*}} {
 //      CHECK:   %[[LHS_TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS]], {{.*}} -> tensor<64x512xf32>
-//      CHECK:   scf.for %[[J_IDX:.+]] = {{.*}} to %[[C128]] step %{{[0-9]*}} {
+//      CHECK:   scf.for {{.+}} = {{.*}} to %[[C128]] step %{{[0-9]*}} {
 //      CHECK:     %[[RHS_TILE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS]], {{.*}} -> tensor<512x64xf32>
 //      CHECK:     {{.*}} = scf.for %[[L1_I:.+]] = %[[C0]] to %[[C64]] step %[[C16]]
 // CHECK-SAME:       iter_args(%[[ITER0:.+]] = %[[DST_TILE_INIT]]) -> (tensor<64x64xf32>)
 //      CHECK:       {{.*}} = scf.for %[[L1_J:.+]] = %[[C0]] to %[[C64]] step %[[C16]]
 // CHECK-SAME:         iter_args(%[[ITER1:.+]] = %[[ITER0]]) -> (tensor<64x64xf32>)
-//      CHECK:         %[[MATMUL_RES:.+]] = scf.for %[[L1_K:.+]] = %[[C0]] to %[[C512]] step %[[C32]]
-// CHECK-SAME:           iter_args(%[[ITER2:.+]] = %[[CST_VECTOR]]) -> (vector<16x16xf32>)
+//      CHECK:         %[[MATMUL_RES:.+]] = scf.for {{.+}} = %[[C0]] to %[[C512]] step %[[C32]]
+// CHECK-SAME:           iter_args({{.+}} = %[[CST_VECTOR]]) -> (vector<16x16xf32>)
 //  CHECK-DAG:           {{.*}} = tensor.extract %[[LHS_TILE]]
-//  CHECK-DAD:           {{.*}} = vector.transfer_read %[[RHS_TILE]]
+//  CHECK-DAG:           {{.*}} = vector.transfer_read %[[RHS_TILE]]
 // CHECK-COUNT-32:       vector.fma
 //      CHECK:           scf.yield %{{.*}} : vector<16x16xf32>
 //      CHECK:         %[[EXP:.+]] = math.exp %[[MATMUL_RES]] : vector<16x16xf32>
-//      CHECK:         %[[RES:.+]] = vector.transfer_write %[[EXP]], %[[ITER1]][%[[L1_I]], %[[L1_J]]] {{.*}} : vector<16x16xf32>, tensor<64x64xf32>
-//      CHECK:         scf.yield %[[RES]]
+//      CHECK:         {{.+}} = vector.transfer_write %[[EXP]], %[[ITER1]][%[[L1_I]], %[[L1_J]]] {{.*}} : vector<16x16xf32>, tensor<64x64xf32>
+//      CHECK:         scf.yield {{.+}}
 
 // -----
 

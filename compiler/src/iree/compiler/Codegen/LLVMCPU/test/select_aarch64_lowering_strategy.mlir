@@ -114,7 +114,6 @@ func.func @matmul_aarch_i8_i8_i32_static(%3: tensor<128x384xi8>, %4: tensor<384x
 
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}>
 func.func @matmul_aarch_i8_i8_i32_dynamic(%6: tensor<?x?xi8>, %7: tensor<?x?xi8>, %8: tensor<?x?xi32>) -> tensor<?x?xi32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
-  %c0 = arith.constant 0 : index
   %9 = linalg.matmul ins(%6, %7 : tensor<?x?xi8>, tensor<?x?xi8>) outs(%8 : tensor<?x?xi32>) -> tensor<?x?xi32>
   return %9 : tensor<?x?xi32>
 }

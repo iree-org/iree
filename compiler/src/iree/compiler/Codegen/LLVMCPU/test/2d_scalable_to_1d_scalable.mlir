@@ -91,12 +91,12 @@ func.func @scalable_2d_matmul_and_generic(%arg0: tensor<32400x32xf32>, %arg1: te
 
 #lowering_config_parallel_only =  #iree_cpu.lowering_config<distribution = [0, 0], vector_common_parallel =  [[4], [4]]>
 
-// CHECK: #[[GENERIC_CONFIG:.*]] = #iree_cpu.lowering_config<distribution = [0, 0], vector_common_parallel = [4, [4]]>
-///
-//      CHECK: func.func @should_not_crash
+// CHECK: #[[$GENERIC_CONFIG:.*]] = #iree_cpu.lowering_config<distribution = [0, 0], vector_common_parallel = [4, [4]]>
+//
+// CHECK-LABEL: func.func @should_not_crash
 //      CHECK:   scf.for
 //      CHECK:         linalg.generic
-// CHECK-SAME:           lowering_config = #[[GENERIC_CONFIG]]
+// CHECK-SAME:           lowering_config = #[[$GENERIC_CONFIG]]
 func.func @should_not_crash(%a: tensor<?x?xf32>, %b: tensor<?xf32>, %c: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>],
