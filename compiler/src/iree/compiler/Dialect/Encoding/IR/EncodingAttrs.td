@@ -88,6 +88,8 @@ def PackedStorageAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
           "isSerialized",
           "calculateStorageSizeInBytes",
+          "isCompatibleWith",
+          "dropWithoutMaterialization",
       ]>,
       DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
     ]> {
