@@ -48,7 +48,8 @@ static iree_status_t query_transient_size(
       main_function, IREE_SV("iree.abi.transients.size.constant"));
   if (!iree_string_view_is_empty(size_constant_attr)) {
     // Constant size is specified - parse it directly.
-    if (!iree_string_view_atoi_uint64(size_constant_attr, out_size)) {
+    if (!iree_string_view_atoi_uint64(size_constant_attr,
+                                      (uint64_t*)(out_size))) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "failed to parse integer attribute");
     }
