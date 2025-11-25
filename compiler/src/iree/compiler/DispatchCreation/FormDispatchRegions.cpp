@@ -50,9 +50,6 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 
-// Maximum number of operands allowed for a dispatch region.
-constexpr int kIreeMaxOperandCount = 16;
-
 #define GEN_PASS_DEF_FORMDISPATCHREGIONSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
