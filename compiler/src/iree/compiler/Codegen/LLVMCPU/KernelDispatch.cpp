@@ -1528,54 +1528,54 @@ static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
   return inputAndOutputElementTypes[0];
 }
 
-/// Compute or adjust existing vector sizes using a generic heuristic that will
-/// aim to fill at least one full vector register for all the element types of
-/// the matmul. For now, the current heuristics only look at the N dimension but
-/// we would introduce logic to also consider unrolling trade-offs between the
-/// M, N and K.
-///
-/// Example: for an (i32 <- i8, i8) matmul and a 128-bit vector register, vector
-/// size N would be at least 128/8=16.
-///
-/// NOTE: This function should not contain target-specific conditional code.
-/// TODO: Currently it's only use on Aarch64. We should generalize it to other
-/// targets.
-static void getMatmulVectorSizesUsingFullVectorHeuristics(
+/// Compute vector tile sizes using a heuristic that aims to keep the entire
+/// ACC/OUT tile in registers, leave a few registers for LHS/RHS columns
+/// or rows, and all that while not exceeding the number of available registers.
+/// The rationale is that a matrix multiplication typically lowers to a loop
+/// nest in which the ACC/OUT tile remains live across all iterations of the
+/// innermost loop, whereas the LHS and RHS operands live for a single iteration
+/// and do not require the entire tiles to be simultaneously resident in
+/// registers.
+/// The base element type used is the element type of the output
+/// vector under the assumption the operand types with smaller bitwidths
+/// will be promoted to the output type and thus require more registers for the
+/// same number of elements.
+/// TODO: It might be worth extending the heuristic to consider target
+/// architecture features and operand types as well, e.g. for AArch64 FEAT_I8MM
+/// we might want to consider tile sizes that are multiples of 2x8.
+static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
     mlir::FunctionOpInterface entryPointFn, linalg::LinalgOp op,
     int64_t vectorSize, SmallVectorImpl<int64_t> &sizes,
     SmallVectorImpl<bool> &scalableSizeFlags) {
-  if (sizes.empty()) {
-    getDefaultMatmulVectorSizes(op, vectorSize, sizes, scalableSizeFlags);
+  assert(sizes.empty() && "Pre-condition enforced by caller");
+
+  // Find the output element type of the matmul.
+  assert(op->getResultTypes().size() == 1 &&
+         "Expected single output type for matmul op");
+  Type outputEltType = getElementTypeOrSelf(op->getResultTypes()[0]);
+  if (!outputEltType.isSignlessIntOrFloat()) {
+    return;
   }
 
-  // Find the smallest type size in the matmul.
-  SmallVector<Type> matmulTypes;
-  auto operandTypes = op->getOperandTypes();
-  matmulTypes.append(operandTypes.begin(), operandTypes.end());
-  auto resultTypes = op->getResultTypes();
-  matmulTypes.append(resultTypes.begin(), resultTypes.end());
-
-  int64_t minSize = std::numeric_limits<int64_t>::max();
-  for (Type mmType : matmulTypes) {
-    if (auto shType = dyn_cast<ShapedType>(mmType)) {
-      mmType = shType.getElementType();
-    }
-
-    if (mmType.isSignlessIntOrFloat()) {
-      minSize = std::min(minSize, int64_t{mmType.getIntOrFloatBitWidth()});
-    }
-  }
-
-  LDBG() << "Smallest type found: " << minSize << " bits";
-  assert(minSize > 0 && minSize < std::numeric_limits<int64_t>::max() &&
-         "Min size couldn't be computed");
-
-  // Make sure that the smallest type can at least fill a full vector register
-  // given the tile size of the main vector dimension (N).
   constexpr int64_t byteSizeInBits = 8;
-  int64_t minNumElements =
-      (getNativeVectorSizeInBytes(entryPointFn) * byteSizeInBits) / minSize;
-  sizes[1] = std::max(sizes[1], minNumElements);
+  int64_t outBitWidth = outputEltType.getIntOrFloatBitWidth();
+  int64_t outNumElements =
+      (getNativeVectorSizeInBytes(entryPointFn) * byteSizeInBits) / outBitWidth;
+
+  // Numbers picked experimentally for a range of element types.
+  constexpr int64_t m = 8, n = 2, k = 1;
+
+  // Multiply "horizontal" extents by the number of elements that fit in a vector
+  // register.
+  sizes.append({m, n * outNumElements, k * outNumElements});
+
+  // Mark N dimension as scalable, if doing scalable vectorization.
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  scalableSizeFlags.resize(3, false);
+  if (isScalableVectorizationEnabled() &&
+      hasAnySVEFeature(targetAttr.getConfiguration())) {
+    scalableSizeFlags[1] = true;
+  }
 }
 
 /// Utility to compute the tile sizes for RISC-V Vector.
@@ -1701,7 +1701,7 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
     // Try to maximize the vector register utilization for all the matmul
     // element types.
     if (matmulTileSizes.empty()) {
-      getMatmulVectorSizesUsingFullVectorHeuristics(
+      getMatmulVectorSizesUsingFillRegisterFileHeuristic(
           entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
     }
   }
