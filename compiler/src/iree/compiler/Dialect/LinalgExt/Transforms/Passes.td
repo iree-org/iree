@@ -83,16 +83,6 @@ def DecomposeWinogradTransformPass :
       "Decomposes winograd transform ops into linalg ops";
 }
 
-def DecomposeAggregatedOpPass :
-    InterfacePass<"iree-linalg-ext-decompose-aggregated-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Decomposes ops that implement the AggregatedOpImpl interface";
-  let options = [
-    Option<"filterOps", "filter-ops", "std::string", /*default=*/"",
-           "If specified, filters such that only ops in the comma-delimited string are decomposed."
-           "If string is empty, filters all ops by default.">
-  ];
-}
-
 def ConvertConvToIm2ColOpPass :
     InterfacePass<"iree-linalg-ext-convert-conv-to-im2col-op", "mlir::FunctionOpInterface"> {
   let summary = "Convert linalg convolution ops to im2col gemm based implementation.";
