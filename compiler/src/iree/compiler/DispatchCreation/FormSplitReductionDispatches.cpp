@@ -27,23 +27,28 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
-/// Pattern to fold extract_slice(broadcast) into the broadcast input when
-/// the extract_slice is rank-reducing and only extracts along the broadcasted
-/// dimensions (with size 1), leaving all non-broadcasted dimensions intact.
-/// This is valid because the broadcast only duplicates data along the
-/// broadcasted dimension, and extracting a single slice from that dimension
-/// gives back the original input.
+/// WAR (Workaround): Pattern to fold extract_slice(broadcast) into the
+/// broadcast input when the extract_slice is rank-reducing and only extracts
+/// along the broadcasted dimensions (with size 1), leaving all non-broadcasted
+/// dimensions intact. This is valid because the broadcast only duplicates data
+/// along the broadcasted dimension, and extracting a single slice from that
+/// dimension gives back the original input.
 ///
-/// This fold is critical for correctness in parallel contexts: when the
-/// broadcast's outs operand comes from extracting a slice of a shared_outs
-/// tensor in scf.forall, the broadcast operation writes to that extracted
-/// slice, which aliases back to the shared tensor. Since the extracted slice
-/// spans parallel dimensions (e.g., [4, 1, 1] where dim 0 is the batch
-/// dimension), multiple parallel workgroups would all write to the same
-/// aliased memory location, causing a race condition. By folding to the
-/// broadcast input (which doesn't alias the shared tensor), subsequent passes
-/// can properly tile and distribute the initialization per workgroup, avoiding
-/// the race.
+/// TODO(Bangtian): Investigate and fix the root cause of the race condition in
+/// the lower levels of the stack to eliminate the need for this fold pattern
+/// workaround.
+///
+/// This fold masks an underlying race condition in the lower levels of the
+/// stack. When the broadcast's outs operand comes from extracting
+/// a slice of a shared_outs tensor in scf.forall, the broadcast operation
+/// writes to that extracted slice, which aliases back to the shared tensor.
+/// Since the extracted slice spans parallel dimensions (e.g., [4, 1, 1] where
+/// dim 0 is the batch dimension), multiple parallel workgroups would all write
+/// to the same aliased memory location, creating a race condition. By folding
+/// to the broadcast input (which doesn't alias the shared tensor), this pattern
+/// works around the race, allowing subsequent passes to properly tile and
+/// distribute the initialization per workgroup. However, the root cause of the
+/// race condition exists deeper in the stack and is not addressed by this fold.
 ///
 /// Example:
 ///   %broadcast = linalg.broadcast ins(%in : tensor<4x1xf16>)
@@ -63,11 +68,13 @@ struct FoldExtractSliceOfBroadcast final
     auto broadcastOp =
         extractOp.getSource().getDefiningOp<linalg::BroadcastOp>();
     if (!broadcastOp) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "source is not a linalg.broadcast operation");
     }
 
     if (!extractOp.hasUnitStride()) {
-      return failure();
+      return rewriter.notifyMatchFailure(extractOp,
+                                         "extract_slice has non-unit stride");
     }
 
     auto inputType =
@@ -77,12 +84,14 @@ struct FoldExtractSliceOfBroadcast final
     auto extractResultType =
         dyn_cast<RankedTensorType>(extractOp.getResult().getType());
     if (!inputType || !broadcastOutputType || !extractResultType) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "operand or result types are not RankedTensorType");
     }
 
     // Extract result type must match broadcast input type.
     if (inputType != extractResultType) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "extract result type does not match broadcast input type");
     }
 
     // Verify that we're extracting from offset [0, 0, ..., 0] with the same
@@ -90,10 +99,10 @@ struct FoldExtractSliceOfBroadcast final
     SmallVector<OpFoldResult> offsets = extractOp.getMixedOffsets();
     SmallVector<OpFoldResult> sizes = extractOp.getMixedSizes();
     if (llvm::any_of(offsets, [](OpFoldResult offset) {
-          std::optional<int64_t> constOffset = getConstantIntValue(offset);
-          return !constOffset || *constOffset != 0;
+          return !isConstantIntValue(offset, 0);
         })) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "extract_slice offsets are not all zeros");
     }
 
     // Sizes should match input dimensions (accounting for broadcast dims).
@@ -102,11 +111,10 @@ struct FoldExtractSliceOfBroadcast final
 
     // Verify that for broadcast dimensions, the size is 1.
     if (llvm::any_of(broadcastDims, [&](int64_t broadcastDim) {
-          std::optional<int64_t> size =
-              getConstantIntValue(sizes[broadcastDim]);
-          return !size || *size != 1;
+          return !isOneInteger(sizes[broadcastDim]);
         })) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "broadcast dimensions do not all have size 1");
     }
 
     // Collect the indices of dimensions in the broadcast output that were not
@@ -118,18 +126,18 @@ struct FoldExtractSliceOfBroadcast final
     // Verify that for non-broadcast dimensions, sizes match input shape.
     if (llvm::any_of(llvm::enumerate(nonBroadcastDims), [&](auto pair) {
           auto [idx, inputDim] = pair;
-          std::optional<int64_t> extractSize =
-              getConstantIntValue(sizes[inputDim]);
           int64_t inputDimSize = inputType.getDimSize(idx);
-          return !extractSize || *extractSize != inputDimSize;
+          return !isConstantIntValue(sizes[inputDim], inputDimSize);
         })) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "non-broadcast dimension sizes do not match input shape");
     }
 
     // Only fold if broadcast has a single use to avoid leaving dead broadcast
     // ops or breaking other uses that expect the broadcast result.
     if (!broadcastOp->hasOneUse()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "broadcast operation has multiple uses");
     }
 
     rewriter.replaceOp(extractOp, broadcastOp.getInput());
