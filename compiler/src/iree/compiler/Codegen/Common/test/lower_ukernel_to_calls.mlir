@@ -62,7 +62,6 @@ func.func @ukernel_generic_memref_3D_strided_outer_dims_2(%arg0 : memref<?x?x?xf
 //      CHECK:   %[[BASE:.+]], %[[OFFSET:.+]], %[[SIZE:.+]]:3, %[[STRIDES:.+]]:3 = memref.extract_strided_metadata %[[ARG0]]
 //      CHECK:   call @test3d(%[[BASE]], %[[OFFSET]], %[[STRIDES]]#0, %[[STRIDES]]#1)
 
-
 // -----
 
 func.func @ukernel_generic_memref_strided_non_outer_dims(%arg0 : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>) {
@@ -74,7 +73,6 @@ func.func @ukernel_generic_memref_strided_non_outer_dims(%arg0 : memref<?x?x?xf3
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>
 //      CHECK:   %[[BASE:.+]], %[[OFFSET:.+]], %[[SIZE:.+]]:3, %[[STRIDES:.+]]:3 = memref.extract_strided_metadata %[[ARG0]]
 //      CHECK:   call @test3d(%[[BASE]], %[[OFFSET]], %[[STRIDES]]#0, %[[STRIDES]]#2)
-
 
 // -----
 

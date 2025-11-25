@@ -55,8 +55,6 @@ func.func @fold_reshape_store() {
 func.func @dont_fold_reshape_with_not_full_load() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c3 = arith.constant 3 : index
-  %c96 = arith.constant 96 : index
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<6x3x1x96xf32>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x3x96xf32>>
   %3 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [3, 0, 0, 0], sizes = [3, 3, 1, 96], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<6x3x1x96xf32>> -> tensor<3x3x1x96xf32>
@@ -75,8 +73,6 @@ func.func @dont_fold_reshape_with_not_full_load() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @fold_dynamic_reshape() {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
   %dim0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %dim1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %dim2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
@@ -84,6 +80,7 @@ func.func @fold_dynamic_reshape() {
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x12x8xf32>>{%dim2}
   %3 = iree_tensor_ext.dispatch.tensor.load %1, offsets=[0, 0, 0], sizes =[%dim0, %dim1, 96], strides=[1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x96xf32>>{%dim0, %dim1} -> tensor<?x?x96xf32>
   %4 = tensor.collapse_shape %3 [[0, 1], [2]] : tensor<?x?x96xf32> into tensor<?x96xf32>
+  %c0 = arith.constant 0 : index
   %dyn = tensor.dim %4, %c0 : tensor<?x96xf32>
   %5 = tensor.expand_shape %4 [[0], [1, 2]] output_shape [%dyn, 12, 8] : tensor<?x96xf32> into tensor<?x12x8xf32>
   iree_tensor_ext.dispatch.tensor.store %5, %2, offsets = [0, 0, 0], sizes = [%dim2, 12, 8], strides = [1, 1, 1] : tensor<?x12x8xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x12x8xf32>>{%dim2}
@@ -109,8 +106,6 @@ func.func @fold_dynamic_reshape() {
 ]>
 // CHECK-LABEL: func.func @fold_reshape_slice_store
 func.func @fold_reshape_slice_store() {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
   %cst = arith.constant 0.0 : f32
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x1x96xf32>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1728xf32>>

@@ -275,7 +275,6 @@ func.func @matmul_fusion_test(%arg0 : tensor<?x?xf16>,
     %arg1 : tensor<?x?xf16>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
   %cst0 = arith.constant 0.0 : f32
   %M = tensor.dim %arg0, %c0 : tensor<?x?xf16>
   %N = tensor.dim %arg1, %c1 : tensor<?x?xf16>
@@ -382,7 +381,6 @@ func.func @matmul_consumer_fusion_test(%arg0 : tensor<?x?xf16>,
     %arg1 : tensor<?x?xf16>, %arg2: tensor<?xf16>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
   %cst0 = arith.constant 0.0 : f32
   %M = tensor.dim %arg0, %c0 : tensor<?x?xf16>
   %N = tensor.dim %arg1, %c1 : tensor<?x?xf16>
@@ -458,7 +456,6 @@ func.func @matmul_consumer_fusion_test(%arg0 : tensor<?x?xf16>,
 // -----
 
 func.func @multi_result(%arg0: tensor<64x128xf32>, %arg1: tensor<128x256xf32>, %arg2: tensor<256xf32>) -> (tensor<64x256xf32>, tensor<64x256xf32>) {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<64x256xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64x256xf32>) -> tensor<64x256xf32>
@@ -481,7 +478,7 @@ func.func @multi_result(%arg0: tensor<64x128xf32>, %arg1: tensor<128x256xf32>, %
 
 // CHECK-LABEL: func @multi_result(
 //       CHECK:   %[[RESULT:.+]]:2 = scf.forall (%[[IV0:[a-zA-Z0-9]+]], %[[IV1:[a-zA-Z0-9]+]])
-//  CHECK-SAME:       shared_outs(%[[OUTS:.+]] = {{.*}}, %[[OUTS:.+]] = {{.*}})
+//  CHECK-SAME:       shared_outs({{.+}} = {{.*}}, {{.+}} = {{.*}})
 //       CHECK:      linalg.matmul
 //       CHECK:      linalg.generic
 //       CHECK:     scf.forall.in_parallel
@@ -560,7 +557,6 @@ func.func @multi_use_producer_no_yield_replacement(%7: tensor<12x197x197xf32>) -
 //   D
 #map = affine_map<(d0) -> (d0)>
 func.func @diamond_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf32> {
-  %cst = arith.constant 0.000000e+00 : f32
   %2 = tensor.empty() : tensor<12xf32>
   %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
   } ins(%0, %1 : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
@@ -593,7 +589,7 @@ func.func @diamond_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf3
 // CHECK-LABEL: func @diamond_graph(
 //       CHECK:   %[[RESULT:.+]] = scf.forall
 //       CHECK:     %[[TOP:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[IN0_SLICE:.+]], %[[IN1_SLICE:.+]]
+//  CHECK-SAME:       ins(%[[IN0_SLICE:[a-zA-Z0-9_]+]], %[[IN1_SLICE:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:     %[[LEFT:.+]] = linalg.generic {{.*}} ins(%[[TOP]], %[[IN0_SLICE]]
 //   CHECK-DAG:     %[[RIGHT:.+]] = linalg.generic {{.*}} ins(%[[TOP]], %[[IN1_SLICE]]
 //       CHECK:     linalg.generic {{.*}} ins(%[[LEFT]], %[[RIGHT]]
@@ -607,7 +603,6 @@ func.func @diamond_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf3
 //   C
 #map = affine_map<(d0) -> (d0)>
 func.func @v_shaped_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf32> {
-  %cst = arith.constant 0.000000e+00 : f32
   %2 = tensor.empty() : tensor<12xf32>
   %A = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
   } ins(%0 : tensor<12xf32>) outs(%2 : tensor<12xf32>) attrs =  {
@@ -866,7 +861,6 @@ func.func @horizontal_fusion_consumer_fusion1(%arg0 : tensor<2x4096x640xf16>,
 func.func @horizontal_fusion_consumer_fusion2(%arg0 : tensor<2x4096x640xi8>,
     %arg1 : tensor<2x640x640xi8>, %arg2 : tensor<2x640x640xi8>) -> tensor<2x4096x640xf16> {
   %c0_i32 = arith.constant 0 : i32
-  %c0 = arith.constant 0 : index
   %7 = tensor.empty() : tensor<2x4096x640xf16>
   %8 = tensor.empty() : tensor<2x4096x640xi32>
   %9 = linalg.fill ins(%c0_i32 : i32) outs(%8 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
@@ -1144,7 +1138,6 @@ func.func @multi_result_consumer_fusion(
 ) {
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant 2.048000e+03 : f32
-  %c0 = arith.constant 0 : index
   %9 = tensor.empty() : tensor<16x256x2048xf32>
   %11 = tensor.empty() : tensor<16x256xf32>
   %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%13 : tensor<16x256xf32>) outs(%11 : tensor<16x256xf32>) {
@@ -1253,7 +1246,6 @@ func.func @matmul_transposed_reordering_static_on(%arg0 : tensor<8192x4096xf16>,
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
 {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
   %5 = tensor.empty() : tensor<8192x128256xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<8192x128256xf32>) -> tensor<8192x128256xf32>
   %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
@@ -1283,7 +1275,6 @@ func.func @matmul_transposed_reordering_static_no_reordering(%arg0 : tensor<8192
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
 {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
   %5 = tensor.empty() : tensor<8192x128256xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<8192x128256xf32>) -> tensor<8192x128256xf32>
   %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
@@ -1312,7 +1303,6 @@ func.func @matmul_transposed_reordering_static_off(%arg0 : tensor<128256x4096xf1
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
 {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
   %7 = tensor.empty() : tensor<128256x8192xf32>
   %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128256x8192xf32>) -> tensor<128256x8192xf32>
   %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]}
@@ -1341,7 +1331,6 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 func.func @matmul_transposed_reordering_dynamic(%arg0 : tensor<?x256x4096xf16>,%arg1 : tensor<8192x4096xf16>) -> tensor<?x256x8192xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
 {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
-  %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %dim0 = tensor.dim %arg0, %c0 : tensor<?x256x4096xf16>

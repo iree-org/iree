@@ -151,7 +151,7 @@ func.func @loop_pack_v1x8i4(%arg0: vector<1x8xi4>, %arg1: vector<1x8xf16>)
 //  CHECK:      vector.bitcast {{.*}} : vector<8xi4> to vector<1xi32>
 //  CHECK:      vector.shape_cast %[[ARG1]] : vector<1x8xf16> to vector<8xf16>
 //  CHECK:      vector.bitcast {{.*}} : vector<8xf16> to vector<4xi32>
-//  CHECK:      %[[FOR:.+]]:2 = scf.for {{.*}} iter_args(%[[ARG3:.+]] = {{.*}}, %[[ARG4:.+]] = {{.*}}) -> (vector<1xi32>, vector<4xi32>) {
+//  CHECK:      {{.+}}:2 = scf.for {{.*}} iter_args(%[[ARG3:.+]] = {{.*}}, %[[ARG4:.+]] = {{.*}}) -> (vector<1xi32>, vector<4xi32>) {
 //  CHECK:        vector.bitcast %[[ARG3]] : vector<1xi32> to vector<8xi4>
 //  CHECK:        vector.shape_cast {{.*}} : vector<8xi4> to vector<1x8xi4>
 //  CHECK:        vector.bitcast %[[ARG4]] : vector<4xi32> to vector<8xf16>
@@ -264,7 +264,6 @@ func.func @subset_of_indvars_updated() -> (vector<4xf32>, vector<4xf32>) {
 //       CHECK:       scf.yield %[[ADD]], %[[MUL]] : vector<4xf32>, vector<4xf32>
 //       CHECK:     }
 //       CHECK:   return %[[FOR]]#0, %[[FOR]]#1 : vector<4xf32>, vector<4xf32>
-
 
 // -----
 

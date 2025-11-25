@@ -188,22 +188,20 @@ hal.executable private @llvm_func_attrs {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_2D {
   hal.executable.variant public @scf_forall_2D target(#hal.executable.target<"", "", {}>) {
-    hal.executable.export public @scf_forall_2D layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3)
+    hal.executable.export public @scf_forall_2D layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       func.func @scf_forall_2D() {
         %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
         %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
-        %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
         %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
         %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
-        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
         scf.forall (%arg0, %arg1) = (0, 0) to (%0, %1) step(64, 32) {
           "use"(%arg0, %arg1) : (index, index) -> ()
           scf.forall.in_parallel {}
@@ -219,7 +217,6 @@ hal.executable private @scf_forall_2D {
 //      CHECK: hal.executable.export public @scf_forall_2D layout
 // CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
-// CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
 //  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]], %[[ARG1]]]
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   hal.return %[[WG_X]], %[[C1]], %[[C1]]
@@ -470,26 +467,24 @@ hal.executable private @no_loop_default_workgroup_count {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @multi_export_scf_forall {
   hal.executable.variant public @multi_export_scf_forall target(#hal.executable.target<"", "", {}>) {
-    hal.executable.export public @entry_point0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3)
+    hal.executable.export public @entry_point0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
-    hal.executable.export public @entry_point1 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3)
+    hal.executable.export public @entry_point1 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       func.func @entry_point0() {
         %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
         %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
-        %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
         %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
         %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
-        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
         scf.forall (%arg0, %arg1) = (0, 0) to (%0, %1) step(64, 32) {
           "use0"(%arg0, %arg1) : (index, index) -> ()
           scf.forall.in_parallel {}
@@ -499,10 +494,8 @@ hal.executable private @multi_export_scf_forall {
       func.func @entry_point1() {
         %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
         %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
-        %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
         %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
         %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
-        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
         scf.forall (%arg0, %arg1) = (0, 0) to (%0, %1) step(64, 32) {
           "use1"(%arg0, %arg1) : (index, index) -> ()
           scf.forall.in_parallel {}
@@ -516,14 +509,12 @@ hal.executable private @multi_export_scf_forall {
 //      CHECK: hal.executable.export public @entry_point0 layout
 // CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
-// CHECK-SAME:     %[[ARG3:[a-zA-z0-9]+]]: index
 //  CHECK-DAG:   %[[WG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]], %[[ARG1]]]
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //      CHECK:   hal.return %[[WG_X]], %[[C1]], %[[C1]]
 //      CHECK: hal.executable.export public @entry_point1 layout
 // CHECK-SAME:     %[[ARG1_1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2_1:[a-zA-z0-9]+]]: index
-// CHECK-SAME:     %[[ARG3_1:[a-zA-z0-9]+]]: index
 //  CHECK-DAG:   %[[WG_X_1:.+]] = affine.apply #[[MAP0]]()[%[[ARG2_1]], %[[ARG1_1]]]
 //  CHECK-DAG:   %[[C1_1:.+]] = arith.constant 1
 //      CHECK:   hal.return %[[WG_X_1]], %[[C1_1]], %[[C1_1]]

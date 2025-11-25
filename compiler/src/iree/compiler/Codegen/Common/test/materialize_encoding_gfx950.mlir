@@ -8,7 +8,6 @@
 // 1. MFMA_I32_16x16x64_I8
 //-----------------------------------------------------------------------------
 
-// XXX I don't think these test names are correct but I don't understand what "unroll" has to do with anything XXX
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
@@ -26,7 +25,7 @@ func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x64_I8(
 // CHECK-SAME:      inner_tiles = [16, 64]
 // CHECK-SAME:      : tensor<255x513xi8> -> tensor<16x9x16x64xi8>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<16x9x16x64xi8> into tensor<16x9x16x4x16xi8>
+// CHECK-SAME:      : tensor<16x9x16x64xi8> into tensor<16x9x16x4x16xi8>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
 // CHECK-SAME:       ins(%[[EXPAND]] : tensor<16x9x16x4x16xi8>)
 // CHECK-SAME:       outs({{.*}} : tensor<16x9x4x16x16xi8>)

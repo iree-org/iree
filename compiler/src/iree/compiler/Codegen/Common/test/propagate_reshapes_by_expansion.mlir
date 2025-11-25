@@ -21,13 +21,11 @@ func.func @reshape_and_lowering_config(%src: tensor<3x4xf16>, %dest: tensor<12xf
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall() {
-  %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %index = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
       flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
   %1 = tensor.empty(%index) : tensor<?x64x32xf32>
-  %extra = tensor.empty() : tensor<32x32xf32>
   %2 = scf.forall (%arg0, %arg1) = (0, 0) to (64, 32) step (16, 16)
     shared_outs(%arg2 = %1) -> (tensor<?x64x32xf32>) {
     %extracted_slice = tensor.extract_slice %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
@@ -68,7 +66,6 @@ func.func @expand_dest_forall() {
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall_multiresult() {
-  %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
       flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
@@ -124,8 +121,6 @@ func.func @expand_dest_forall_multiresult() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
-    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall_store_to_buffer(%0: memref<?x64x32xf32>, %index: index) {
   %c0 = arith.constant 0 : index
   %1 = tensor.empty(%index) : tensor<?x64x32xf32>
@@ -173,7 +168,6 @@ func.func @noexpand_dest_forall_dynamicpacked() {
   %index1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %index2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %index3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
-  %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
       flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
@@ -205,7 +199,7 @@ func.func @noexpand_dest_forall_dynamicpacked() {
 //  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32xf32>>
 
 // -----
-#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+#pipeline_layout = #hal.pipeline.layout<bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall_unsupporteduse() {
   %c0 = arith.constant 0 : index
@@ -241,7 +235,7 @@ func.func @expand_dest_forall_unsupporteduse() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+#pipeline_layout = #hal.pipeline.layout<bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @noexpand_dest_forall_nomapping() {
   %c0 = arith.constant 0 : index
@@ -276,7 +270,7 @@ func.func @noexpand_dest_forall_nomapping() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+#pipeline_layout = #hal.pipeline.layout<bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @noexpand_dest_forall_notfullslicestore() {
   %c0 = arith.constant 0 : index
@@ -312,13 +306,11 @@ func.func @noexpand_dest_forall_notfullslicestore() {
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @expand_dest_forall_chained() {
-  %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %index = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
       flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x64x32xf32>>{%index}
   %1 = tensor.empty(%index) : tensor<?x64x32xf32>
-  %extra = tensor.empty() : tensor<32x32xf32>
   %2 = scf.forall (%arg0, %arg1) = (0, 0) to (64, 32) step (16, 16)
     shared_outs(%arg2 = %1) -> (tensor<?x64x32xf32>) {
     %extracted_slice = tensor.extract_slice %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
@@ -361,11 +353,11 @@ func.func @expand_dest_forall_chained() {
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-func.func @expand_dest_forall_no_crash_issue_20736(%arg0: tensor<16x8x48x32x3x96xbf16>, %arg1: tensor<3x96x1x3x3x96xbf16>) {
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @expand_dest_forall_no_crash_issue_20736() {
   // IR that previously crashed during pattern application.
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x8x48x32x3x96xbf16>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x8x48x32x3x96xbf16>>
   %1 = tensor.empty() : tensor<16x8x48x32x3x96xbf16>
   %2 = scf.forall (%arg2, %arg3, %arg4, %arg5, %arg6) = (0, 0, 0, 0, 0) to (16, 8, 48, 3, 96) step (1, 1, 16, 1, 32) shared_outs(%arg7 = %1) -> (tensor<16x8x48x32x3x96xbf16>) {
     %extracted_slice = tensor.extract_slice %arg7[%arg2, %arg3, %arg4, 0, %arg5, %arg6] [1, 1, 16, 32, 1, 32] [1, 1, 1, 1, 1, 1] : tensor<16x8x48x32x3x96xbf16> to tensor<1x1x16x32x1x32xbf16>
@@ -379,7 +371,7 @@ func.func @expand_dest_forall_no_crash_issue_20736(%arg0: tensor<16x8x48x32x3x96
   iree_tensor_ext.dispatch.tensor.store %2, %0, offsets = [0, 0, 0, 0, 0, 0], sizes = [16, 8, 48, 32, 3, 96], strides = [1, 1, 1, 1, 1, 1] : tensor<16x8x48x32x3x96xbf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x8x48x32x3x96xbf16>>
   return
 }
-// CHECK-LABEL: func @expand_dest_forall_no_crash_issue_20736(
+// CHECK-LABEL: func @expand_dest_forall_no_crash_issue_20736()
 //       CHECK:   scf.forall
 //   CHECK-NOT:     tensor.collapse_shape
 //       CHECK:     tensor.parallel_insert_slice

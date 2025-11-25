@@ -27,7 +27,7 @@ func.func @multiple_dim_distribute(%s0 : index, %s1 : index, %s2 : index, %s3 : 
 //  CHECK-SAME:     %[[S0:[a-zA-Z0-9]+]]: index,
 //  CHECK-SAME:     %[[S1:[a-zA-Z0-9]+]]: index,
 //  CHECK-SAME:     %[[S2:[a-zA-Z0-9]+]]: index,
-//  CHECK-SAME:     %[[S3:[a-zA-Z0-9]+]]: index,
+//  CHECK-SAME:     %{{[a-zA-Z0-9]+}}: index,
 //  CHECK-SAME:     %[[INPUT:.+]]: tensor<2x3x4x5xf32>)
 //   CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //   CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]

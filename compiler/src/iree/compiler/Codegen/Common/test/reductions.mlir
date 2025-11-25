@@ -30,13 +30,15 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 }
 
 // CHECK-LABEL: @reduce
-// CHECK: scf.forall
-// CHECK:   scf.forall
+// CHECK: scf.forall {{.*}} {
+// CHECK:   scf.forall {{.*}} {
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
-// CHECK:   scf.forall
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:   } {mapping = [#gpu.thread<z>, #gpu.thread<y>]}
+// CHECK:   scf.forall {{.*}} {
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:   } {mapping = [#gpu.thread<z>]}
 
 // -----
 
@@ -77,14 +79,16 @@ func.func @eltwise_reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 }
 
 // CHECK-LABEL: @eltwise_reduce
-// CHECK: scf.forall
-// CHECK:   scf.forall
-// CHECK:     linalg.generic
+// CHECK: scf.forall {{.*}} {
+// CHECK:   scf.forall {{.*}} {
+// CHECK:     linalg.generic {{.*}} iterator_types = ["parallel"]
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
-// CHECK:   scf.forall
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:   } {mapping = [#gpu.thread<z>, #gpu.thread<y>]}
+// CHECK:   scf.forall {{.*}} {
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:   } {mapping = [#gpu.thread<z>]}
 
 // -----
 
@@ -124,14 +128,18 @@ func.func @reduce_eltwise(%arg : !in_tensor_t) -> (!out_tensor_t) {
 
 
 // CHECK-LABEL: @reduce_eltwise
-// CHECK: scf.forall
-// CHECK:   scf.forall
+// CHECK: scf.forall {{.*}} {
+// CHECK:   scf.forall {{.*}} {
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
-// CHECK:   scf.forall
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:   } {mapping = [#gpu.thread<z>, #gpu.thread<y>]}
+// CHECK:   scf.forall {{.*}} {
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
-// CHECK:     linalg.generic
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:       arith.addf
+// CHECK:     linalg.generic {{.*}} iterator_types = []
+// CHECK:       math.sqrt
+// CHECK:   } {mapping = [#gpu.thread<z>]}
 
 // -----
 
@@ -185,15 +193,19 @@ func.func @eltwise_reduce_eltwise(%arg : !in_tensor_t) -> (!out_tensor_t) {
 }
 
 // CHECK-LABEL: @eltwise_reduce_eltwise
-// CHECK: scf.forall
-// CHECK:   scf.forall
-// CHECK:     linalg.generic
+// CHECK: scf.forall {{.*}} {
+// CHECK:   scf.forall {{.*}} {
+// CHECK:     linalg.generic {{.*}} iterator_types = ["parallel"]
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
-// CHECK:   scf.forall
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:   } {mapping = [#gpu.thread<z>, #gpu.thread<y>]}
+// CHECK:   scf.forall {{.*}} {
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
-// CHECK:     linalg.generic
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:       arith.addf
+// CHECK:     linalg.generic {{.*}} iterator_types = []
+// CHECK:       math.sqrt
+// CHECK:   } {mapping = [#gpu.thread<z>]}
 
 // -----
 
@@ -247,12 +259,16 @@ func.func @eltwise_reduce_eltwise_swapped(%arg : !in_tensor_t) -> (!out_tensor_t
 }
 
 // CHECK-LABEL: @eltwise_reduce_eltwise_swapped
-// CHECK: scf.forall
-// CHECK:   scf.forall
-// CHECK:     linalg.generic
+// CHECK: scf.forall {{.*}} {
+// CHECK:   scf.forall {{.*}} {
+// CHECK:     linalg.generic {{.*}} iterator_types = ["parallel"]
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
-// CHECK:   scf.forall
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:   } {mapping = [#gpu.thread<z>, #gpu.thread<y>]}
+// CHECK:   scf.forall {{.*}} {
 // CHECK:     linalg.fill
-// CHECK:     linalg.generic
-// CHECK:     linalg.generic
+// CHECK:     linalg.generic {{.*}} iterator_types = ["reduction"]
+// CHECK:       arith.addf
+// CHECK:     linalg.generic {{.*}} iterator_types = []
+// CHECK:       math.sqrt
+// CHECK:   } {mapping = [#gpu.thread<z>]}

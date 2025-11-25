@@ -183,7 +183,7 @@ func.func @batch_matmul_fill_dynamic(%arg0 : tensor<?x?x?xf32>, %arg1 : tensor<?
 //      CHECK:   %[[FILL:.+]] = linalg.fill
 // CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x?x?xf32>)
 //      CHECK:   %[[RES:.+]] = linalg.batch_matmul
-// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[FILL]] :
 //      CHECK:   return %[[RES]]
 

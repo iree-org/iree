@@ -1,13 +1,15 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-affinemin-scf-canonicalization),canonicalize)" %s | FileCheck %s
 
-// CHECK-LABEL: scf_for_distributed
-func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
+// CHECK-LABEL: canonicalize_affinemin_in_nested_scf_loops
+func.func @canonicalize_affinemin_in_nested_scf_loops(%A : memref<i64>, %id1 : index, %count1 : index,
                       %id2 : index, %count2 : index) {
   %c1020 = arith.constant 1020 : index
   %c1024 = arith.constant 1024 : index
   %0 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%id1]
   %1 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%count1]
 
+  // Test 1: Both affine.min operations can be removed when bounds are divisible.
+  // 1024 is divisible by 32, and 32 is divisible by 4.
   //  CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
   //  CHECK-DAG:   %[[C4:.*]] = arith.constant 4 : i64
   //      CHECK: scf.for
