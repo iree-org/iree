@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -294,10 +295,50 @@ getVectorDistributeReductionConfig(
   int subgroup = partialReductionSize / subgroupStride;
   int64_t subgroupBasis = (subgroup == 0) ? 1 : subgroup;
 
-  partialReductionTileSizes[lastReductionDim] = partialReductionSize;
-  threadTileSizes[lastReductionDim] = threadLoads;
-  threadCounts[lastReductionDim] = threadBasis;
-  subGroupCounts[lastReductionDim] = subgroupBasis;
+  SmallVector<ReassociationIndices> reassociations;
+  SmallVector<int64_t> outputShape;
+
+  // We require the reduction dimension to be evenly divisible by threadLoads
+  // because the current expansion strategy doesn't support padding.
+  if (ShapedType::isStaticShape(bounds) && threadLoads > 1 &&
+      bounds[lastReductionDim] % threadLoads == 0) {
+    workgroupTileSizes.push_back(0);
+    partialReductionTileSizes.push_back(0);
+    threadTileSizes.push_back(0);
+    threadCounts.push_back(1);
+    subGroupCounts.push_back(1);
+    mapping.push_back(mapping.size());
+
+    int64_t outer = lastReductionDim;
+    int64_t inner = lastReductionDim + 1;
+
+    for (int64_t i = 0; i < op.getNumLoops(); ++i) {
+      if (i == lastReductionDim) {
+        int64_t idx = outputShape.size();
+        reassociations.push_back({idx, idx + 1});
+        outputShape.append({ShapedType::kDynamic, threadLoads});
+      } else {
+        reassociations.push_back({static_cast<int64_t>(outputShape.size())});
+        outputShape.push_back(ShapedType::kDynamic);
+      }
+    }
+
+    partialReductionTileSizes[outer] = partialReductionSize / threadLoads;
+    threadTileSizes[inner] = threadLoads;
+    threadCounts[outer] = threadBasis;
+    subGroupCounts[outer] = subgroupBasis;
+  } else {
+    partialReductionTileSizes[lastReductionDim] = partialReductionSize;
+    threadTileSizes[lastReductionDim] = threadLoads;
+    threadCounts[lastReductionDim] = threadBasis;
+    subGroupCounts[lastReductionDim] = subgroupBasis;
+  }
+
+  if (!reassociations.empty()) {
+    auto dimExpandAttr =
+        DimensionExpansionAttr::get(context, reassociations, outputShape);
+    setDimensionExpansion(op, dimExpandAttr);
+  }
 
   ArrayAttr subgroupBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
@@ -311,7 +352,8 @@ getVectorDistributeReductionConfig(
                      b.getI64ArrayAttr(partialReductionTileSizes)),
       NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
       NamedAttribute("lane_basis", threadBasisAttr),
-      NamedAttribute("subgroup_basis", subgroupBasisAttr)};
+      NamedAttribute("subgroup_basis", subgroupBasisAttr),
+  };
 
   auto configDict = b.getDictionaryAttr(configAttrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
