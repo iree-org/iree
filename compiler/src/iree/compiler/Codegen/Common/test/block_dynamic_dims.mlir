@@ -111,7 +111,7 @@ func.func @basic_blocking_test(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : 
   return %matmul : tensor<?x4096xf32>
 }
 // CHECK-LABEL: func @basic_blocking_test(
-//   CHECK-DAG:   %[[LHS:.+]] = tensor.expand_shape %{{.+}} {{\[}}[0, 1], [2]{{\]}}
+//   CHECK-DAG:   %[[LHS:.+]] = tensor.expand_shape %{{.+}} {{\[}}[0, 1], [2]]
 //   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?x16x4096xf32>
 //       CHECK:   %[[MATMUL:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[LHS]],
