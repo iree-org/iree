@@ -96,9 +96,6 @@ static std::optional<Type> dropEncodingWithoutMaterialization(Type t) {
     if (IREE::Encoding::SerializableAttr encoding =
             dyn_cast_if_present<IREE::Encoding::SerializableAttr>(
                 shapedType.getEncoding())) {
-      if (!encoding.isSerialized()) {
-        return std::nullopt;
-      }
       RankedTensorType newTy = encoding.dropWithoutMaterialization(shapedType);
       // As we have already propagated bitwidths to all tensors in the first
       // phase, we don't allow a change in element type/bitwidth in the second
@@ -522,6 +519,7 @@ struct LegalizeResultElementType : public ConversionPattern {
     SmallVector<Type> resultTypes;
     for (Type resultType : op->getResultTypes()) {
       Type legalizedType = this->typeConverter->convertType(resultType);
+      assert(legalizedType && "Failed to drop encoding from type");
       resultTypes.push_back(legalizedType);
     }
     OperationState state(loc, op->getName(), convertedOperands, resultTypes,
@@ -580,7 +578,7 @@ struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
 };
 
 static void configureConversionTarget(ConversionTarget &target,
-                                      TypeConverter typeConverter) {
+                                      TypeConverter &typeConverter) {
   target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
     Region &body = funcOp.getBody();
     for (Block &block : body) {
