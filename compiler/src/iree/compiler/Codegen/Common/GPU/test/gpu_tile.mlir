@@ -54,8 +54,8 @@ func.func @innermost_reduction() {
 //      CHECK:     linalg.fill
 //      CHECK:     scf.for %{{.+}} = %[[C0]] to %[[C384]] step %[[C4]]
 //      CHECK:       linalg.generic
-// CHECK-SAME:         ins(%{{[^,]+}}, %{{[^:]+}} : tensor<4x4xf32>, tensor<4xf32>)
-// CHECK-SAME:         outs(%{{[^:]+}} : tensor<4xf32>)
+// CHECK-SAME:         ins(%{{[A-Za-z0-9_]+}}, %{{[A-Za-z0-9_]+}} : tensor<4x4xf32>, tensor<4xf32>)
+// CHECK-SAME:         outs(%{{[A-Za-z0-9_]+}} : tensor<4xf32>)
 
 // -----
 
@@ -110,8 +110,8 @@ func.func @has_scf_if() {
 //      CHECK: scf.for
 //      CHECK:     scf.for %{{.+}} = %[[C0]] to %[[C256]] step %[[C4]]
 //      CHECK:       linalg.generic
-// CHECK-SAME:         ins(%{{[^:]+}} : tensor<4xi32>)
-// CHECK-SAME:         outs(%{{[^:]+}} : tensor<4xi32>)
+// CHECK-SAME:         ins(%{{[A-Za-z0-9_]+}} : tensor<4xi32>)
+// CHECK-SAME:         outs(%{{[A-Za-z0-9_]+}} : tensor<4xi32>)
 //      CHECK: scf.if
 //      CHECK: scf.if
-//      CHECK: linalg.yield %{{.*}} : i32
+//      CHECK: linalg.yield %{{.+}} : i32
