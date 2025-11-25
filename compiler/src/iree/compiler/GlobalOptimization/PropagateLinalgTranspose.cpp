@@ -494,10 +494,10 @@ public:
     llvm::SmallDenseMap<int64_t, int64_t> rankReducedMap;
     // Since `dim` is in the pre-transposed domain, and is incrementing each
     // iteration, `idx` must also be in the pre-transposed domain.
-    for (int64_t idx = 0, e = perm.size(); idx < e; ++idx) {
+    for (int64_t idx = 0, e = invPerm.size(); idx < e; ++idx) {
       // Get index in the transposed domain, since `rankReducingMask` is in
       // the transposed domain.
-      if (!rankReducingMask.contains(perm[idx])) {
+      if (!rankReducingMask.contains(invPerm[idx])) {
         // Domain of `rankReducedMap` is in pre-transposed domain.
         rankReducedMap[idx] = dim++;
       }
@@ -506,7 +506,7 @@ public:
     // Compute the new permutation by dropping all rank-reduced dimensions.
     SmallVector<int64_t> rankReducedPerm;
     for (int64_t i : perm) {
-      if (!rankReducingMask.contains(i)) {
+      if (rankReducedMap.contains(i)) {
         rankReducedPerm.push_back(rankReducedMap[i]);
       }
     }
