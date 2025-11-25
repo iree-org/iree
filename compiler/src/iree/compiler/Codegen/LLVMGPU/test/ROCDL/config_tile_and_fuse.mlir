@@ -11,7 +11,6 @@
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor<10x64x2048xf16>) -> tensor<2x10x64x64xf32> {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<2x10x64x64xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x10x64x64xf32>) -> tensor<2x10x64x64xf32>
@@ -49,7 +48,6 @@ func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d3, d4, d5)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4x32x128x16xf16>) -> tensor<10x4x32x32xf32> {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<10x4x32x32xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<10x4x32x32xf32>) -> tensor<10x4x32x32xf32>
@@ -119,7 +117,6 @@ func.func @dynamic_multi_dim_mma_schedule(%lhs: tensor<?x6x16x?x16xf16>, %rhs: t
 
 func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<1024x1024xf16>) -> tensor<1024x1024xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
   %5 = tensor.empty() : tensor<1024x1024xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
   %7 = linalg.matmul ins(%lhs, %rhs : tensor<1024x1024xf16>, tensor<1024x1024xf16>) outs(%6 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
@@ -212,7 +209,6 @@ func.func @mfma_matmul_m_aligned_intrinsic(%lhs: tensor<176x1024xi8>, %rhs: tens
 
 module {
   func.func @conv_nhwc(%3: tensor<2x258x514x768xf16>, %4: tensor<3x3x768x256xf16>) -> tensor<2x256x512x256xf32> {
-    %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %5 = tensor.empty() : tensor<2x256x512x256xf32>
     %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x256x512x256xf32>) -> tensor<2x256x512x256xf32>
@@ -249,7 +245,6 @@ func.func @matmul_dynamic_M(%arg0: tensor<?x256xf32>, %arg1: tensor<256x256xf32>
 module {
   func.func @elementwise_dynamic_dim(%11: tensor<?x256xf16>, %12: tensor<?x256xf16>) -> tensor<?x256xf16> {
     %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f32
     %8 = tensor.dim %11, %c0 : tensor<?x256xf16>
     %13 = tensor.empty(%8) : tensor<?x256xf16>
     %15 = linalg.add ins(%11, %12 : tensor<?x256xf16>, tensor<?x256xf16>) outs(%13 : tensor<?x256xf16>) -> tensor<?x256xf16>
@@ -266,7 +261,6 @@ module {
 // -----
 
 func.func @elementwise_unaligned(%11: tensor<180x180xf16>, %12: tensor<180x180xf16>) -> tensor<180x180xf16> {
-  %cst = arith.constant 0.000000e+00 : f32
   %13 = tensor.empty() : tensor<180x180xf16>
   %15 = linalg.add ins(%11, %12 : tensor<180x180xf16>, tensor<180x180xf16>) outs(%13 : tensor<180x180xf16>) -> tensor<180x180xf16>
   return %15 : tensor<180x180xf16>
@@ -278,7 +272,6 @@ func.func @elementwise_unaligned(%11: tensor<180x180xf16>, %12: tensor<180x180xf
 // -----
 
 func.func @elementwise_large_rank(%11: tensor<3x5x7x11x13x17x19x23xf16>, %12: tensor<3x5x7x11x13x17x19x23xf16>) -> tensor<3x5x7x11x13x17x19x23xf16> {
-  %cst = arith.constant 0.000000e+00 : f32
   %13 = tensor.empty() : tensor<3x5x7x11x13x17x19x23xf16>
   %15 = linalg.add ins(%11, %12 : tensor<3x5x7x11x13x17x19x23xf16>, tensor<3x5x7x11x13x17x19x23xf16>) outs(%13 : tensor<3x5x7x11x13x17x19x23xf16>) -> tensor<3x5x7x11x13x17x19x23xf16>
   return %15 : tensor<3x5x7x11x13x17x19x23xf16>
@@ -293,9 +286,6 @@ func.func @elementwise_large_rank(%11: tensor<3x5x7x11x13x17x19x23xf16>, %12: te
 
 func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32(
       %3: tensor<1x8x8x4x16x4xf32>, %4: tensor<1x8x4x2x4x16x4xf32>, %5: tensor<1x1x4x8x2x4x16x4xf32>) -> tensor<1x1x4x8x2x4x16x4xf32> {
-  %c0 = arith.constant 0 : index
-  %c65536 = arith.constant 65536 : index
-  %c131072 = arith.constant 131072 : index
   %6 = iree_codegen.inner_tiled ins(%3, %4) outs(%5) {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                        affine_map<(d0, d1, d2) -> (d1, d2)>,
@@ -323,9 +313,9 @@ func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32(
 // -----
 
 func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x8x577xf32>, %rhs : tensor<12x577x577xf32>) -> tensor<12x8x577xf32> {
-    %c0 = arith.constant 0.0 : f32
+    %cst = arith.constant 0.0 : f32
     %empty = tensor.empty() : tensor<12x8x577xf32>
-    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<12x8x577xf32>) -> tensor<12x8x577xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<12x8x577xf32>) -> tensor<12x8x577xf32>
     %mm = linalg.batch_matmul ins(%lhs, %rhs : tensor<12x8x577xf32>, tensor<12x577x577xf32>) outs(%fill : tensor<12x8x577xf32>) -> tensor<12x8x577xf32>
     return %mm :  tensor<12x8x577xf32>
 }
@@ -413,9 +403,9 @@ func.func @unaligned_dynamic_matmul_with_two_reduce_dim(%arg0: tensor<196x?x4xf3
 // -----
 
 func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x577x577xf32>, %rhs : tensor<12x577x1024xf32>) -> tensor<12x577x1024xf32> {
-    %c0 = arith.constant 0.0 : f32
+    %cst = arith.constant 0.0 : f32
     %empty = tensor.empty() : tensor<12x577x1024xf32>
-    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<12x577x1024xf32>) -> tensor<12x577x1024xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<12x577x1024xf32>) -> tensor<12x577x1024xf32>
     %mm = linalg.batch_matmul ins(%lhs, %rhs : tensor<12x577x577xf32>, tensor<12x577x1024xf32>) outs(%fill : tensor<12x577x1024xf32>) -> tensor<12x577x1024xf32>
     return %mm :  tensor<12x577x1024xf32>
 }

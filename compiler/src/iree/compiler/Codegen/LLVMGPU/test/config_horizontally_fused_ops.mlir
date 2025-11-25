@@ -72,7 +72,7 @@ func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
 //  CHECK-SAME:         pipeline = LLVMGPUVectorDistribute
 //  CHECK-SAME:         workgroup_size = [256, 1, 1]
 //  CHECK-SAME:         subgroup_size = 64
-//       CHECK:   %[[GENERIC:.+]]:3 = linalg.generic
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
 // GFX942-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16
 // GFX950-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16
@@ -123,7 +123,7 @@ func.func @fused_contraction_2(%arg0: tensor<4096x640xf32>,
 //  CHECK-SAME:         pipeline = LLVMGPUVectorDistribute
 //  CHECK-SAME:         workgroup_size = [256, 1, 1]
 //  CHECK-SAME:         subgroup_size = 64
-//       CHECK:   %[[GENERIC:.+]]:3 = linalg.generic
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
 // GFX942-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32
 // GFX950-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32
@@ -188,7 +188,7 @@ func.func @fused_contraction_3(%arg0 : tensor<2x4096x640xi8>,
 //  CHECK-SAME:         pipeline = LLVMGPUVectorDistribute
 //  CHECK-SAME:         workgroup_size = [256, 1, 1]
 //  CHECK-SAME:         subgroup_size = 64
-//       CHECK:   %[[GENERIC:.+]]:2 = linalg.generic
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
 // GFX942-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8
 // GFX950-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x64_I8
@@ -274,7 +274,7 @@ func.func @fused_contraction_4(%arg0: tensor<2x4096x640xf16>,
 //  CHECK-SAME:         pipeline = LLVMGPUVectorDistribute
 //  CHECK-SAME:         workgroup_size = [256, 1, 1]
 //  CHECK-SAME:         subgroup_size = 64
-//       CHECK:   %[[GENERIC:.+]]:3 = linalg.generic
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
 // GFX942-SAME:       mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16
 // GFX950-SAME:       mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16

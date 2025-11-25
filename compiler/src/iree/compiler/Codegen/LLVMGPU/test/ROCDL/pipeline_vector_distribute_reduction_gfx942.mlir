@@ -484,8 +484,8 @@ hal.executable private @matvec_fp16_unaligned {
 
 // Test that we don't emit spurious roundtrips to (shared) memory to perform masked reads for unaligned cases.
 //
-//   MEMORY-LABEL: func.func @matvec_fp16
-//    CHECK-LABEL: func.func @matvec_fp16
+//   MEMORY-LABEL: func.func @matvec_fp16_unaligned
+//    CHECK-LABEL: func.func @matvec_fp16_unaligned
 //      CHECK-NOT:   vector.transfer_write
 //          CHECK:   gpu.subgroup_reduce
 //          CHECK:   vector.transfer_write

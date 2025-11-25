@@ -3,8 +3,11 @@
 
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 
+// CHECK-TARGET-LABEL: module @link_two_executables
+builtin.module @link_two_executables {
+
 // Expect a single executable with both exports and correct ordinals.
-// CHECK-TARGET: hal.executable private @link_executables_linked
+// CHECK-TARGET: hal.executable private @link_two_executables_linked
 // CHECK-TARGET:   hal.executable.variant public @rocm_hsaco_fb
 // CHECK-TARGET:     hal.executable.export public @export0 ordinal(0)
 // CHECK-TARGET:     hal.executable.export public @export1 ordinal(1)
@@ -57,13 +60,19 @@ hal.executable private @executable1 {
   }
 }
 
+}
+
 // -----
 
 #executable_target_cuda = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #executable_target_rocm = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 
+// CHECK-TARGET-LABEL: module @link_with_multiple_targets
+// CHECK-MULTI-LABEL: module @link_with_multiple_targets
+builtin.module @link_with_multiple_targets {
+
 // Expect only one target be linked when specified.
-// CHECK-TARGET: hal.executable private @link_executables_linked
+// CHECK-TARGET: hal.executable private @link_with_multiple_targets_linked
 // CHECK-TARGET:   hal.executable.variant public @rocm_hsaco_fb_1
 // CHECK-TARGET:     hal.executable.export public @export0 ordinal(0)
 // CHECK-TARGET:     hal.executable.export public @export1 ordinal(1)
@@ -75,11 +84,11 @@ hal.executable private @executable1 {
 // CHECK-TARGET:     hal.executable.export public @export1 ordinal(0)
 
 // Multiple applications of the pass per target should not conflict.
-// CHECK-MULTI: hal.executable private @link_executables_linked_0
+// CHECK-MULTI: hal.executable private @link_with_multiple_targets_linked_0
 // CHECK-MULTI:   hal.executable.variant public @rocm_hsaco_fb
 // CHECK-MULTI:     hal.executable.export public @export0 ordinal(0)
 // CHECK-MULTI:     hal.executable.export public @export1 ordinal(1)
-// CHECK-MULTI: hal.executable private @link_executables_linked
+// CHECK-MULTI: hal.executable private @link_with_multiple_targets_linked
 // CHECK-MULTI:   hal.executable.variant public @cuda_nvptx_fb_0
 // CHECK-MULTI:     hal.executable.export public @export0 ordinal(0)
 // CHECK-MULTI:     hal.executable.export public @export1 ordinal(1)
@@ -133,7 +142,12 @@ hal.executable private @executable1 {
   }
 }
 
+}
+
 // -----
+
+// CHECK-TARGET-LABEL: module @external_no_link_to_internal
+builtin.module @external_no_link_to_internal {
 
 // Tests that externally defined executables (no inner module) don't get linked
 // into internal ones (inner module).
@@ -157,13 +171,18 @@ hal.executable private @external_executable {
   }
 }
 
-// CHECK-LABEL: hal.executable private
-//       CHECK:   hal.executable.export public @export1
-//   CHECK-NOT:   hal.executable.export public @export0
-//       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @external_executable
+// CHECK-TARGET: hal.executable private @external_no_link_to_internal_linked
+// CHECK-TARGET:   hal.executable.export public @export1
+// CHECK-TARGET-NOT:   hal.executable.export public @export0
+// CHECK-TARGET:   builtin.module
+// CHECK-TARGET: hal.executable private @internal_executable
+
+}
 
 // -----
+
+// CHECK-TARGET-LABEL: module @external_no_link_to_internal_2
+builtin.module @external_no_link_to_internal_2 {
 
 // Tests that externally defined executables (no inner module) don't get linked
 // into internal ones (inner module).
@@ -186,13 +205,18 @@ hal.executable private @external_executable {
     }
   }
 }
-// CHECK-LABEL: hal.executable private
-//       CHECK:   hal.executable.export public @export0
-//   CHECK-NOT:   hal.executable.export public @export1
-//       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @external_executable
+// CHECK-TARGET: hal.executable private @external_no_link_to_internal_2_linked
+// CHECK-TARGET:   hal.executable.export public @export0
+// CHECK-TARGET-NOT:   hal.executable.export public @export1
+// CHECK-TARGET:   builtin.module
+// CHECK-TARGET: hal.executable private @external_executable
+
+}
 
 // -----
+
+// CHECK-TARGET-LABEL: module @external_variant_disables_linking
+builtin.module @external_variant_disables_linking {
 
 // Tests that any variant being externally defined disables linking.
 hal.executable private @internal_executable {
@@ -222,13 +246,18 @@ hal.executable private @external_executable {
   }
 }
 
-// CHECK-LABEL: hal.executable private
-//       CHECK:   hal.executable.export public @export0
-//   CHECK-NOT:   hal.executable.export public @export1
-//       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @external_executable
+// CHECK-TARGET: hal.executable private @external_variant_disables_linking_linked
+// CHECK-TARGET:   hal.executable.export public @export0
+// CHECK-TARGET-NOT:   hal.executable.export public @export1
+// CHECK-TARGET:   builtin.module
+// CHECK-TARGET: hal.executable private @external_executable
+
+}
 
 // -----
+
+// CHECK-TARGET-LABEL: module @link_with_different_target_attrs
+builtin.module @link_with_different_target_attrs {
 
 // Tests that linking handles external executables with different target attrs.
 // Here the external executable includes a different config even though it's
@@ -264,10 +293,11 @@ hal.executable private @internal_executable1 {
   }
 }
 
-// CHECK-LABEL: hal.executable private
-//       CHECK:   hal.executable.export public @export0
-//   CHECK-NOT:   hal.executable.export public @export1
-//       CHECK:   hal.executable.export public @export2
-//       CHECK:   builtin.module
-// CHECK-LABEL: hal.executable private @external_executable
-//       CHECK:   hal.executable.export public @export1
+// CHECK-TARGET: hal.executable private @link_with_different_target_attrs_linked
+// CHECK-TARGET:   hal.executable.export public @export1
+// CHECK-TARGET:   hal.executable.export public @export2
+// CHECK-TARGET:   builtin.module
+// CHECK-TARGET: hal.executable private @external_executable
+// CHECK-TARGET:   hal.executable.export public @export0
+
+}

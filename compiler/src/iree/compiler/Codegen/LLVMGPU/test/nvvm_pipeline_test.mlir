@@ -17,7 +17,6 @@ hal.executable @simpleMath_ex_dispatch_0 {
     }
   builtin.module {
     func.func @add_dispatch_0() {
-      %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
@@ -42,9 +41,6 @@ hal.executable @simpleMath_ex_dispatch_0 {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -59,9 +55,6 @@ hal.executable @dot_dispatch_0 {
     builtin.module {
       func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
-        %c0 = arith.constant 0 : index
-        %c1024 = arith.constant 1024 : index
-        %c1 = arith.constant 1 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
@@ -94,9 +87,6 @@ hal.executable @dot_dispatch_0 {
 
 // Check that a generic op representing a matmul is getting the same
 // configuration as the matmul op.
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #matmul_trait = {
   args_in = 2,
   args_out = 1,
@@ -121,9 +111,6 @@ hal.executable @dot_dispatch_0 {
     builtin.module {
       func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
-        %c0 = arith.constant 0 : index
-        %c1024 = arith.constant 1024 : index
-        %c1 = arith.constant 1 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
@@ -169,11 +156,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     }
   builtin.module {
     func.func @conv2d_dispatch_0() {
-      %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
-      %c2 = arith.constant 2 : index
-      %c3 = arith.constant 3 : index
-      %c1 = arith.constant 1 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x4x4x2xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x2x2x1xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x2x3x1xf32>>
@@ -214,7 +197,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     }
   builtin.module {
     func.func @add_dispatch_0() {
-      %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
       %3 = tensor.empty() : tensor<16xf32>
@@ -251,9 +233,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     }
   builtin.module {
     func.func @reduction() {
-      %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
-      %c96 = arith.constant 96 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<14x14x96xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<96xf32>>
       %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [14, 14, 96], strides = [1, 1, 1]
@@ -295,8 +275,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     }
   builtin.module {
     func.func @vector_add_dispatch() {
-      %c0 = arith.constant 0 : index
-      %c16384 = arith.constant 16384 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16384xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16384xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16384xf32>>
@@ -328,9 +306,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 16384)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 16384, s0)>
 #map3 = affine_map<(d0, d1) -> (d1, d0)>
 #map4 = affine_map<(d0, d1) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -345,8 +320,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     }
   builtin.module {
     func.func @vector_reduction_dispatch() {
-      %c0 = arith.constant 0 : index
-      %c16384 = arith.constant 16384 : index
       %cst = arith.constant 1.000000e+00 : f32
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x16384xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16384xf32>>
@@ -389,8 +362,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
       }
       builtin.module {
         func.func @pooling_dynamic() {
-          %c1_i64 = arith.constant 1 : i64
-          %c2_i64 = arith.constant 2 : i64
           %cst = arith.constant 0.000000e+00 : f32
           %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
           %s = arith.index_cast %0 : i32 to index
@@ -414,9 +385,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 16384)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 16384, s0)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map4 = affine_map<(d0, d1) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -431,8 +399,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     }
   builtin.module {
     func.func @vector_distribute_dispatch() {
-      %c0 = arith.constant 0 : index
-      %c1024 = arith.constant 1024 : index
       %cst = arith.constant 1.000000e+00 : f32
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x1024xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<512xf32>>
@@ -466,7 +432,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map4 = affine_map<(d0, d1) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -481,8 +446,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     }
   builtin.module {
     func.func @vector_distribution_broadcast_dispatch() {
-      %c0 = arith.constant 0 : index
-      %c1024 = arith.constant 1024 : index
       %cst_0 = arith.constant 3.840000e+02 : f32
       %cst = arith.constant 1.000000e+00 : f32
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x1024xf32>>
@@ -567,8 +530,6 @@ hal.executable private @generalized_pool {
 
 // -----
 
-
-#config = #iree_codegen.lowering_config<tile_sizes = [[32,32]]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
