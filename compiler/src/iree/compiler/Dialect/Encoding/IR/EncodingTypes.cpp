@@ -23,11 +23,9 @@ bool SerializableAttr::areCompatible(Attribute lhs, Attribute rhs) {
   }
   auto lhsEncoding = dyn_cast_if_present<SerializableAttr>(lhs);
   auto rhsEncoding = dyn_cast_if_present<SerializableAttr>(rhs);
-  if (!lhsEncoding || !rhsEncoding) {
-    return false;
-  }
-  return lhsEncoding.isCompatibleWith(rhsEncoding) &&
-         rhsEncoding.isCompatibleWith(lhsEncoding);
+
+  return (!lhsEncoding || lhsEncoding.isCompatibleWith(rhsEncoding)) &&
+         (!rhsEncoding || rhsEncoding.isCompatibleWith(lhsEncoding));
 }
 
 std::string stringifyOperandIndex(IntegerAttr valueAttr) {
