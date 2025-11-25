@@ -279,8 +279,43 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 // the inputs.
 bool hasFusedLeadingOp(linalg::LinalgOp rootOp);
 
+/// Retrieves the DenormalFpMathAttr for F32 values from the given target
+/// configuration. This attribute specifies how denormal floating-point values
+/// are handled in F32 operations.
+IREE::Codegen::DenormalFpMathAttr
+getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
+std::optional<IREE::Codegen::DenormalFpMath>
+getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
+
+/// Adds a denormal floating-point math configuration for F32 values to the
+/// configuration list. This configures how denormal floating-point values are
+/// handled in F32 operations.
+void addConfigDenormalFpMathF32(MLIRContext *context,
+                                IREE::Codegen::DenormalFpMath mode,
+                                SmallVectorImpl<NamedAttribute> &config);
+
+// Utility to make sure we are storing the full incoming subspan. Otherwise we
+// cannot simply adjust the subspan's resultant type later.
+bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
+                 IREE::TensorExt::DispatchTensorType tensorType,
+                 ValueRange dynamicDims);
+
+//===---------------------------------------------------------------------===//
+// Scalable size utility functions
+//===---------------------------------------------------------------------===//
+
 std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+using SizesAndScalableFlags =
+    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
+
+// This function takes a vector of mixed sizes and returns the static tile sizes
+// and scalable tile flags. For scalable inner tiles, it returns the static
+// counterpart and the corresponding flag. E.g. for [8, [8]] it returns [8, 8]
+// and [false, true].
+std::optional<SizesAndScalableFlags>
+getScalableTileSizesAndFlags(ArrayRef<OpFoldResult> mixedSizes);
 
 using DimBound = vector::ConstantOrScalableBound;
 using DimBoundSize = DimBound::BoundSize;
@@ -297,33 +332,9 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
                      std::optional<vector::VscaleRange> vscaleRange,
                      RoundUpVscaleMultiple = RoundUpVscaleMultiple::No);
 
-// Utility to make sure we are storing the full incoming subspan. Otherwise we
-// cannot simply adjust the subspan's resultant type later.
-bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                 IREE::TensorExt::DispatchTensorType tensorType,
-                 ValueRange dynamicDims);
-
-/// Retrieves the DenormalFpMathAttr for F32 values from the given target
-/// configuration. This attribute specifies how denormal floating-point values
-/// are handled in F32 operations.
-IREE::Codegen::DenormalFpMathAttr
-getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
-std::optional<IREE::Codegen::DenormalFpMath>
-getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
-
-/// Adds a denormal floating-point math configuration for F32 values to the
-/// configuration list. This configures how denormal floating-point values are
-/// handled in F32 operations.
-void addConfigDenormalFpMathF32(MLIRContext *context,
-                                IREE::Codegen::DenormalFpMath mode,
-                                SmallVectorImpl<NamedAttribute> &config);
-
 //===----------------------------------------------------------------------===//
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
-
-using SizesAndScalableFlags =
-    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
 
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
