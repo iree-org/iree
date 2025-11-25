@@ -1177,7 +1177,7 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   //     norm_outs = outs * norm
   // linalg.generic ins(ex, ...) outs(norm_outs)
 
-  const int reducingOpIndex = 0;
+  const int reducingOpIndex = getReducingOpIndex();
   OpOperand *sValue = getDpsInputOperand(reducingOpIndex);
   OpOperand *prevMax = getDpsInitOperand(reducingOpIndex);
   AffineMap normValMap = getMatchingIndexingMap(sValue);

@@ -1163,6 +1163,10 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     MutableOperandRange getDpsInitsMutable() {
       return getOutputsMutable();
     }
+
+    int64_t getReducingOpIndex() {
+      return 0;
+    }
   }];
 }
 
