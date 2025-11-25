@@ -9,22 +9,15 @@
 func.func @padded_conv() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %c32 = arith.constant 32 : index
-  %c112 = arith.constant 112 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x224x224x3xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x3x32xf32>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x112x112x32xf32>>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x32xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
-  %workgroup_count_y = hal.interface.workgroup.count[1] : index
   %workgroup_id_z = hal.interface.workgroup.id[2] : index
-  %workgroup_count_z = hal.interface.workgroup.count[2] : index
   %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_id_y]
-  %5 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_count_y]
   %6 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
-  %7 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
   %8 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, %workgroup_id_z, %4, %6], sizes = [1, 1, 4, 32], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x112x112x32xf32>> -> tensor<1x1x4x32xf32>
   %9 = tensor.empty() : tensor<1x1x4x32xf32>
   %10 = affine.apply affine_map<(d0) -> (d0 * 2)>(%workgroup_id_z)
@@ -66,10 +59,10 @@ func.func @padded_conv() {
 
 //       CHECK:      scf.if %[[COND]] {
 
-//       CHECK:        iree_tensor_ext.dispatch.tensor.load
-//       CHECK:        %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load
-//       CHECK:        %[[FILTER:.+]] = iree_tensor_ext.dispatch.tensor.load
-//       CHECK:        %[[FILL:.+]] = linalg.fill
+//       CHECK:        iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<1x1x4x32xf32>
+//       CHECK:        %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<1x?x?x3xf32>
+//       CHECK:        %[[FILTER:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<3x3x3x32xf32>
+//       CHECK:        linalg.fill
 //       CHECK:        %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:          ins(%[[INPUT]], %[[FILTER]]
 //       CHECK:        %[[GENERIC:.+]] = linalg.generic
@@ -78,11 +71,11 @@ func.func @padded_conv() {
 
 //       CHECK:      } else {
 
-//       CHECK:        iree_tensor_ext.dispatch.tensor.load
-//       CHECK:        %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load
+//       CHECK:        iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<1x1x4x32xf32>
+//       CHECK:        %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<1x?x?x3xf32>
 //       CHECK:        %[[PAD:.+]] = tensor.pad %[[INPUT]]
-//       CHECK:        %[[FILTER:.+]] = iree_tensor_ext.dispatch.tensor.load
-//       CHECK:        %[[FILL:.+]] = linalg.fill
+//       CHECK:        %[[FILTER:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<3x3x3x32xf32>
+//       CHECK:        linalg.fill
 //       CHECK:        %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:          ins(%[[PAD]], %[[FILTER]]
 //       CHECK:        %[[GENERIC:.+]] = linalg.generic

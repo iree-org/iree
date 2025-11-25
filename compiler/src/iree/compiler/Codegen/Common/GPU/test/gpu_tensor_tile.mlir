@@ -108,7 +108,7 @@ module {
 //         CHECK:       tensor.parallel_insert_slice %[[R]] into %[[O]][%[[ARG]]] [1] [1] : tensor<1xf32> into tensor<64xf32>
 //         CHECK:     }
 //         CHECK:   } {mapping = [#gpu.thread<x>]}
-//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[T]], %{{.}}, offsets = [%{{.*}}], sizes = [64], strides = [1] : tensor<64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128xf32>>
+//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[T]], %{{.*}}, offsets = [%{{.*}}], sizes = [64], strides = [1] : tensor<64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128xf32>>
 
 // -----
 

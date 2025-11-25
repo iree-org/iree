@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-codegen-gpu-combine-value-barriers %s --split-input-file | FileCheck %s
 
-// Since the pass only rearanges the order of instructions, we only check the
+// Since the pass only rearranges the order of instructions, we only check the
 // number of value_barriers.
 
 func.func @tensor_barrier(%write: vector<8xf16>, %input: tensor<8xf16>, %input2 : tensor<16xf16>) -> (vector<8xf16>, vector<8xf16>) {
@@ -57,8 +57,8 @@ func.func @tensor_and_vector_barrier(%write: vector<8xf16>, %input: tensor<8xf16
 // tensor and vector barriers cannot be combined, so both should remain
 
 // CHECK-LABEL: func.func @tensor_and_vector_barrier
-// CHECK: value_barrier
-// CHECK: value_barrier
+// CHECK-COUNT-2: value_barrier
+// CHECK-NOT: value_barrier
 
 // -----
 
@@ -123,7 +123,5 @@ func.func @barrier_diamond_chain(%write: vector<8xf16>, %input: tensor<8xf16>) -
 // only combine the middle barriers.
 
 // CHECK-LABEL: func.func @barrier_diamond_chain
-// CHECK: value_barrier
-// CHECK: value_barrier
-// CHECK: value_barrier
+// CHECK-COUNT-3: value_barrier
 // CHECK-NOT: value_barrier

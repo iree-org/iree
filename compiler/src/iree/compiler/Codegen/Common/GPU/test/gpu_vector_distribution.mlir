@@ -12,8 +12,6 @@
 
 // CHECK-LABEL: @distribute_elementwise_nested_layout_f16
 func.func @distribute_elementwise_nested_layout_f16(%a: vector<128x128x128xf16>, %b: vector<128x128x128xf16>) -> vector<128x128x128xf16> {
-  %c0 = arith.constant 0 : index
-  %cst_0 = arith.constant 0.0 : f16
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<8x2x4x1x4x4x1x8x2xf16>
   %root = arith.constant dense<0.0> : vector<128x128x128xf16>
   %rootl = iree_vector_ext.to_layout %root to layout(#nested) : vector<128x128x128xf16>
@@ -50,7 +48,6 @@ func.func @distribute_scf_for(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> v
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
-  %cst_0 = arith.constant 0 : i32
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<1x1x1x1x16x16xi32>
   %root = arith.constant dense<0> : vector<16x16xi32>
   %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xi32>
@@ -83,7 +80,6 @@ func.func @distribute_scf_for_0d(%a: vector<i32>, %b: vector<i32>) -> vector<i32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
-  %cst_0 = arith.constant 0 : i32
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<i32>
   %root = arith.constant dense<0> : vector<i32>
   %rootl = iree_vector_ext.to_layout %root to layout(#layout_0d) : vector<i32>
@@ -103,8 +99,6 @@ func.func @distribute_scf_for_0d(%a: vector<i32>, %b: vector<i32>) -> vector<i32
 
 // CHECK-LABEL: @distribute_scalar_extract
 func.func @distribute_scalar_extract(%a: f16, %b: vector<f16>) -> f16 {
-  %c0 = arith.constant 0 : index
-  %cst_0 = arith.constant 0.0 : f16
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<f16>
   %root = arith.constant dense<0.0> : vector<f16>
   %rootl = iree_vector_ext.to_layout %root to layout(#layout_0d) : vector<f16>

@@ -173,7 +173,7 @@ func.func @matmul_global_load_dma(%a: tensor<32x1024xf32>, %b: tensor<1024x128xf
   return %mm : tensor<32x128xf32>
 }
 
-// CHECK-LABEL: func.func @matmul
+// CHECK-LABEL: func.func @matmul_global_load_dma
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<32x1024xf32>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<1024x128xf32>
 //       CHECK:   %[[PA:.+]] = linalg.copy

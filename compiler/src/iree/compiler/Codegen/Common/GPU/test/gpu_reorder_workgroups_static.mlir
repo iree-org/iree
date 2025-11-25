@@ -1,23 +1,21 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=transpose})))))" \
 // RUN:   %s | FileCheck --check-prefix=TRANSPOSE %s
 
-// Make sure we use static workgroup counts instead of introducting
+// Make sure we use static workgroup counts instead of introducing
 // `hal.interface.workgroup.count` ops. These are currently not supported on ROCm.
 
-// TRANSPOSE-LABEL: hal.executable private @main_dispatch_0 {
 // TRANSPOSE-LABEL: func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16
-// TRANSPOSE-DAG:               %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
-// TRANSPOSE-DAG:               %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
-// TRANSPOSE-NOT:               hal.interface.workgroup.count
-// TRANSPOSE-DAG:               %[[C250:.+]] = arith.constant 250 : index
-// TRANSPOSE-DAG:               %[[C500:.+]] = arith.constant 500 : index
-// TRANSPOSE:                   %[[MUL:.+]] = arith.muli %[[WG_Y]], %[[C250]] : index
-// TRANSPOSE:                   %[[ADD:.+]] = arith.addi %[[MUL]], %[[WG_X]] : index
-// TRANSPOSE:                   %[[DIV:.+]] = arith.divui %[[ADD]], %[[C500]] : index
-// TRANSPOSE:                   %[[REM:.+]] = arith.remui %[[ADD]], %[[C500]] : index
-// TRANSPOSE-DAG:               affine.apply #{{.+}}()[%[[DIV]]]
-// TRANSPOSE-DAG:               affine.apply #{{.+}}()[%[[REM]]]
-// TRANSPOSE:                   return
+// TRANSPOSE-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
+// TRANSPOSE-DAG:     %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
+// TRANSPOSE-DAG:     %[[C250:.+]] = arith.constant 250 : index
+// TRANSPOSE-DAG:     %[[C500:.+]] = arith.constant 500 : index
+// TRANSPOSE-NOT:     hal.interface.workgroup.count
+// TRANSPOSE:         %[[MUL:.+]] = arith.muli %[[WG_Y]], %[[C250]] : index
+// TRANSPOSE:         %[[ADD:.+]] = arith.addi %[[MUL]], %[[WG_X]] : index
+// TRANSPOSE:         %[[DIV:.+]] = arith.divui %[[ADD]], %[[C500]] : index
+// TRANSPOSE:         %[[REM:.+]] = arith.remui %[[ADD]], %[[C500]] : index
+// TRANSPOSE-DAG:     affine.apply{{.*}}[%[[REM]]]
+// TRANSPOSE-DAG:     affine.apply{{.*}}[%[[DIV]]]
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

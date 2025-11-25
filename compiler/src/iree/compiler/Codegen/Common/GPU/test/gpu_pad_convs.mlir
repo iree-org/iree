@@ -3,7 +3,7 @@
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-#lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, padding_conv = [1, 8, 32, 32, 0, 0, 32]}>
+#lowering_config = #iree_gpu.lowering_config<{padding_conv = [1, 8, 32, 32, 0, 0, 32]}>
 func.func @conv_2d_nhwc_fhwc(%arg0: tensor<16x26x19x287xf16>, %arg1: tensor<287x3x3x287xf16>) -> tensor<16x24x17x287xbf16> {
    %cst = arith.constant 0.000000e+00 : f32
   %empty = tensor.empty() : tensor<16x24x17x287xf32>
@@ -45,7 +45,7 @@ func.func @conv_2d_nhwc_fhwc(%arg0: tensor<16x26x19x287xf16>, %arg1: tensor<287x
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5 * 2, d2 + d6 * 2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-#lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>, padding_conv = [16, 1, 1, 16, 0, 0, 0]}>
+#lowering_config = #iree_gpu.lowering_config<{padding_conv = [16, 1, 1, 16, 0, 0, 0]}>
 func.func @conv_2d_chwn_chwf(%arg0: tensor<16x193x129x40xbf16>, %arg1: tensor<16x96x64x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x193x129x40xbf16>, tensor<16x96x64x40xbf16>) outs(%arg2 : tensor<40x3x3x40xf32>) attrs =  {lowering_config = #lowering_config} {
   ^bb0(%in: bf16, %in_0: bf16, %out: f32):

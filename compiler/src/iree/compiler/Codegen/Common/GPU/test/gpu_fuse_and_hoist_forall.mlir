@@ -78,7 +78,6 @@ func.func @forall_fuse_then_hoist_mixed_mappings(%3: tensor<128x128xf16>, %5: te
   %c0 = arith.constant 0 : index
   %cst = arith.constant dense<0.0> : tensor<4x128xf16>
   %6 = tensor.empty() : tensor<128x4xf16>
-  %7 = tensor.empty() : tensor<4x128xf16>
   %8 = scf.for %arg0 = %c0 to %c128 step %c4 iter_args(%arg1 = %5) -> (tensor<128x128xf32>) {
     %9 = scf.forall (%arg2, %arg3, %arg4) in (1, 64, 1) shared_outs(%arg5 = %6) -> (tensor<128x4xf16>) {
       %12 = affine.apply #map(%arg3)
@@ -272,7 +271,7 @@ func.func @multi_hoist_and_fuse_trailing_with_producer_fusion(%2: tensor<128x128
 
 // -----
 
-func.func @multi_hoist_with_other_ops_in_loop(%2: tensor<128x128xf16>, %3: tensor<128x128xf16>) -> tensor<128x128xf16> {
+func.func @multi_hoist_with_other_ops_in_loop(%2: tensor<128x128xf16>) -> tensor<128x128xf16> {
   %c4 = arith.constant 4 : index
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
@@ -301,8 +300,7 @@ func.func @multi_hoist_with_other_ops_in_loop(%2: tensor<128x128xf16>, %3: tenso
 }
 
 // CHECK-LABEL: func @multi_hoist_with_other_ops_in_loop
-//  CHECK-SAME:   %[[I0:[A-Za-z0-9]+]]: tensor<128x128xf16>
-//  CHECK-SAME:   %[[I1:[A-Za-z0-9]+]]: tensor<128x128xf16>
+//  CHECK-SAME:   %{{.+}}: tensor<128x128xf16>
 //       CHECK:   scf.forall
 //       CHECK:     scf.forall
 //       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} -> (tensor<2x4xf16>)
@@ -316,7 +314,7 @@ func.func @multi_hoist_with_other_ops_in_loop(%2: tensor<128x128xf16>, %3: tenso
 
 // -----
 
-func.func @hoist_with_single_trip_loops(%2: tensor<128x128xf16>, %3: tensor<128x128xf16>) -> tensor<128x128xf16> {
+func.func @hoist_with_single_trip_loops(%2: tensor<128x128xf16>) -> tensor<128x128xf16> {
   %c4 = arith.constant 4 : index
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
@@ -340,8 +338,7 @@ func.func @hoist_with_single_trip_loops(%2: tensor<128x128xf16>, %3: tensor<128x
 }
 
 // CHECK-LABEL: func @hoist_with_single_trip_loops
-//  CHECK-SAME:   %[[I0:[A-Za-z0-9]+]]: tensor<128x128xf16>
-//  CHECK-SAME:   %[[I1:[A-Za-z0-9]+]]: tensor<128x128xf16>
+//  CHECK-SAME:   %{{.+}}: tensor<128x128xf16>
 //       CHECK:   scf.forall
 //       CHECK:     scf.forall
 //       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} -> (tensor<128x128xf16>)
@@ -663,9 +660,6 @@ func.func @fuse_collapse_shape(%arg0: tensor<?x?x8xf32>, %arg1 : index, %arg2 : 
 // -----
 
 func.func @fuse_warp_and_lane_foralls(%2: tensor<2x2x64xf32>) -> tensor<2x2x64xf32> {
-  %c4 = arith.constant 4 : index
-  %c128 = arith.constant 128 : index
-  %c0 = arith.constant 0 : index
   %empty = tensor.empty() : tensor<2x2x64xf32>
   %9 = scf.forall (%arg2, %arg3) in (2, 2) shared_outs(%arg4 = %empty) -> (tensor<2x2x64xf32>) {
     %extracted_slice = tensor.extract_slice %arg4[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
@@ -701,9 +695,6 @@ func.func @fuse_warp_and_lane_foralls(%2: tensor<2x2x64xf32>) -> tensor<2x2x64xf
 // -----
 
 func.func @warp_and_lane_foralls_with_fusions(%2: tensor<2x2x64xf32>) -> tensor<2x2x64xf32> {
-  %c4 = arith.constant 4 : index
-  %c128 = arith.constant 128 : index
-  %c0 = arith.constant 0 : index
   %empty = tensor.empty() : tensor<2x2x64xf32>
   %producer = linalg.copy ins(%2 : tensor<2x2x64xf32>) outs(%empty : tensor<2x2x64xf32>) -> tensor<2x2x64xf32>
   %9 = scf.forall (%arg2, %arg3) in (2, 2) shared_outs(%arg4 = %empty) -> (tensor<2x2x64xf32>) {
@@ -743,9 +734,6 @@ func.func @warp_and_lane_foralls_with_fusions(%2: tensor<2x2x64xf32>) -> tensor<
 // -----
 
 func.func @fuse_warp_and_lane_foralls_multi_result(%2: tensor<2x2x64xf32>) -> (tensor<2x2x64xf32>, tensor<2x2x64xf32>) {
-  %c4 = arith.constant 4 : index
-  %c128 = arith.constant 128 : index
-  %c0 = arith.constant 0 : index
   %empty = tensor.empty() : tensor<2x2x64xf32>
   %9:2 = scf.forall (%arg2, %arg3) in (2, 2) shared_outs(%arg4 = %empty, %arg5 = %empty) -> (tensor<2x2x64xf32>, tensor<2x2x64xf32>) {
     %extracted_slice = tensor.extract_slice %arg4[%arg2, %arg3, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
@@ -812,8 +800,8 @@ func.func @fusion_through_non_dominating_loop_user(%arg0: tensor<1xf32>, %arg1: 
 }
 
 // CHECK-LABEL: func @fusion_through_non_dominating_loop_user
-//  CHECK-SAME:   %[[ARG0:.[a-zA-Z0-9]]]
-//  CHECK-SAME:   %[[ARG1:.[a-zA-Z0-9]]]
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<64xf32>
 //       CHECK:   %[[FORALL:.+]]:2 = scf.forall (%[[TID:.+]]) in (64)
 //  CHECK-SAME:       shared_outs(%[[OUT0:.+]] = %[[EMPTY]], %[[OUT1:.+]] = %[[EMPTY]])
