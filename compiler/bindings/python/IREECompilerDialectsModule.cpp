@@ -774,16 +774,17 @@ NB_MODULE(_ireeCompilerDialects, m) {
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetScaledContractionDetails
   //===-------------------------------------------------------------------===//
-  iree_codegen_module.def(
-      "isa_scaled_contraction_op", &ireeCodegenMlirOperationIsAScaledContractionOp,
-      "Checks if the given operation is an IREE LinalgExt scaled contraction op.",
-      py::arg("op"));
+  iree_codegen_module.def("isa_scaled_contraction_op",
+                          &ireeCodegenMlirOperationIsAScaledContractionOp,
+                          "Checks if the given operation is an IREE LinalgExt "
+                          "scaled contraction op.",
+                          py::arg("op"));
 
   //===-------------------------------------------------------------------===//
   // Binding to struct ireeCodegenScaledContractionDimensions
   //===-------------------------------------------------------------------===//
-  py::class_<ireeCodegenScaledContractionDimensions>(iree_codegen_module,
-                                                     "ScaledContractionDimensions")
+  py::class_<ireeCodegenScaledContractionDimensions>(
+      iree_codegen_module, "ScaledContractionDimensions")
       .def_prop_ro("batch",
                    [](const ireeCodegenScaledContractionDimensions &self) {
                      return getIntArrayAttrValues(self.batch);
@@ -806,16 +807,19 @@ NB_MODULE(_ireeCompilerDialects, m) {
                    });
 
   iree_codegen_module.def(
-      "infer_scaled_contraction_dimensions", &ireeCodegenInferScaledContractionDimensions,
+      "infer_scaled_contraction_dimensions",
+      &ireeCodegenInferScaledContractionDimensions,
       "Infers the scaled contraction dimensions for a given operation.",
       py::arg("op"));
 
   iree_codegen_module.def(
       "infer_scaled_contraction_dimensions_from_maps",
-      [](const std::vector<MlirAffineMap> &indexingMaps) -> ireeCodegenScaledContractionDimensions {
+      [](const std::vector<MlirAffineMap> &indexingMaps)
+          -> ireeCodegenScaledContractionDimensions {
         return ireeCodegenInferScaledContractionDimensionsFromMaps(
             indexingMaps.data(), indexingMaps.size());
       },
-      "Infers the scaled contraction dimensions for a given operation from indexing maps.",
+      "Infers the scaled contraction dimensions for a given operation from "
+      "indexing maps.",
       py::arg("indexing_maps"));
 }

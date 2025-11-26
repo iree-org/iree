@@ -127,14 +127,15 @@ typedef struct ireeCodegenScaledContractionDimensions {
   MlirAttribute kB;
 } ireeCodegenScaledContractionDimensions;
 
-MLIR_CAPI_EXPORTED bool ireeCodegenMlirOperationIsAScaledContractionOp(MlirOperation op);
+MLIR_CAPI_EXPORTED bool
+ireeCodegenMlirOperationIsAScaledContractionOp(MlirOperation op);
 
 MLIR_CAPI_EXPORTED ireeCodegenScaledContractionDimensions
 ireeCodegenInferScaledContractionDimensions(MlirOperation op);
 
 MLIR_CAPI_EXPORTED ireeCodegenScaledContractionDimensions
-ireeCodegenInferScaledContractionDimensionsFromMaps(const MlirAffineMap *indexingMaps,
-                                             size_t numMaps);
+ireeCodegenInferScaledContractionDimensionsFromMaps(
+    const MlirAffineMap *indexingMaps, size_t numMaps);
 
 #ifdef __cplusplus
 }
