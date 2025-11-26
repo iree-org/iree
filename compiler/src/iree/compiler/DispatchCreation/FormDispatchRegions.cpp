@@ -606,7 +606,9 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
 
   // If consumer is a dequant operation, dont fuse it. These get cloned
   // into their consumers.
-  if (IREE::LinalgExt::isBitExtendOp(consumer)) {
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
+  if (IREE::Flow::isClonableIntoDispatchOp(consumer, clonableOptions)) {
     return false;
   }
 
