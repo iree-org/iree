@@ -20,7 +20,6 @@ package(
 
 BITCODE_SRCS = glob([
     "*.c",
-    "support/*.c",
 ])
 
 BITCODE_HDRS = glob([
