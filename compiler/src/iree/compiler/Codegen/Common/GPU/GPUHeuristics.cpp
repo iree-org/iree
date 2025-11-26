@@ -52,14 +52,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
     const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth,
     int64_t numRhs = 1) {
-  int64_t tileM = llvm::product_of(schedule.mSizes) *
-                  llvm::product_of(schedule.mTileSizes) *
-                  llvm::product_of(schedule.mSubgroupCounts);
-  int64_t tileN = llvm::product_of(schedule.nSizes) *
-                  llvm::product_of(schedule.nTileSizes) *
-                  llvm::product_of(schedule.nSubgroupCounts);
-  int64_t tileK =
-      llvm::product_of(schedule.kSizes) * llvm::product_of(schedule.kTileSizes);
+  int64_t tileM = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
+                  schedule.getTotalMSubgroupCount();
+  int64_t tileN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
+                  schedule.getTotalNSubgroupCount();
+  int64_t tileK = schedule.getTotalKSize() * schedule.getTotalKTileSize();
   return (tileM * tileK * lhsBitwidth + numRhs * tileN * tileK * rhsBitwidth) /
          8;
 }
@@ -68,12 +65,10 @@ static int64_t
 calculateResultSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
                                        int64_t resultBitwidth,
                                        int64_t numRes = 1) {
-  int64_t tileM = llvm::product_of(schedule.mSizes) *
-                  llvm::product_of(schedule.mTileSizes) *
-                  llvm::product_of(schedule.mSubgroupCounts);
-  int64_t tileN = llvm::product_of(schedule.nSizes) *
-                  llvm::product_of(schedule.nTileSizes) *
-                  llvm::product_of(schedule.nSubgroupCounts);
+  int64_t tileM = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
+                  schedule.getTotalMSubgroupCount();
+  int64_t tileN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
+                  schedule.getTotalNSubgroupCount();
   return (numRes * tileM * tileN * resultBitwidth) / 8;
 }
 
@@ -89,26 +84,26 @@ static bool isScheduleAligned(const GPUMatmulShapeType &problem,
     return true;
   }
   // Returns the number of elements in the schedule for each dimension.
-  auto getScheduleSizes =
-      [&](ArrayRef<int64_t> intrinsicSizes, ArrayRef<int64_t> tileCount,
-          std::optional<SmallVector<int64_t>> subgroupCount) {
-        SmallVector<int64_t> sizes = llvm::map_to_vector(
-            llvm::seq<int64_t>(tileCount.size()), [&](int64_t i) {
-              return subgroupCount ? tileCount[i] * subgroupCount.value()[i]
-                                   : tileCount[i];
-            });
-        // Multiply by intrinsic sizes, applying to the inner dimensions, as
-        // the outer dimensions are unrolling factors. For example, if tileCount
-        // = [a, b, c, d] and intrinsicSizes = [x, y], the result is [a, b, c*x,
-        // d*y].
-        assert(intrinsicSizes.size() <= sizes.size() &&
-               "intrinsic sizes should not exceed tile count sizes");
-        for (auto &&[intrinsicSize, size] :
-             llvm::zip(llvm::reverse(intrinsicSizes), llvm::reverse(sizes))) {
-          size *= intrinsicSize;
-        }
-        return sizes;
-      };
+  auto getScheduleSizes = [&](ArrayRef<int64_t> intrinsicSizes,
+                              ArrayRef<int64_t> tileCount,
+                              std::optional<ArrayRef<int64_t>> subgroupCount) {
+    SmallVector<int64_t> sizes = llvm::map_to_vector(
+        llvm::seq<int64_t>(tileCount.size()), [&](int64_t i) {
+          return subgroupCount ? tileCount[i] * subgroupCount.value()[i]
+                               : tileCount[i];
+        });
+    // Multiply by intrinsic sizes, applying to the inner dimensions, as
+    // the outer dimensions are unrolling factors. For example, if tileCount
+    // = [a, b, c, d] and intrinsicSizes = [x, y], the result is [a, b, c*x,
+    // d*y].
+    assert(intrinsicSizes.size() <= sizes.size() &&
+           "intrinsic sizes should not exceed tile count sizes");
+    for (auto &&[intrinsicSize, size] :
+         llvm::zip(llvm::reverse(intrinsicSizes), llvm::reverse(sizes))) {
+      size *= intrinsicSize;
+    }
+    return sizes;
+  };
   // Checks whether the elements of `a` are evenly divisible by the
   // corresponding elements of `b`.
   auto areAligned = [](ArrayRef<int64_t> a, ArrayRef<int64_t> b) {
@@ -147,17 +142,13 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
   const int64_t kMaxVectorLoadBitWidth = 128;
   int64_t elemsPerThread =
       kMaxVectorLoadBitWidth / problem.bType.getIntOrFloatBitWidth();
-  int64_t wgThreads = subgroupSize *
-                      llvm::product_of(schedule.mSubgroupCounts) *
-                      llvm::product_of(schedule.nSubgroupCounts);
-  int64_t mWgSize = llvm::product_of(schedule.mSizes) *
-                    llvm::product_of(schedule.mTileSizes) *
-                    llvm::product_of(schedule.mSubgroupCounts);
-  int64_t nWgSize = llvm::product_of(schedule.nSizes) *
-                    llvm::product_of(schedule.nTileSizes) *
-                    llvm::product_of(schedule.nSubgroupCounts);
-  int64_t kWgSize =
-      llvm::product_of(schedule.kSizes) * llvm::product_of(schedule.kTileSizes);
+  int64_t wgThreads = subgroupSize * schedule.getTotalMSubgroupCount() *
+                      schedule.getTotalNSubgroupCount();
+  int64_t mWgSize = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
+                    schedule.getTotalMSubgroupCount();
+  int64_t nWgSize = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
+                    schedule.getTotalNSubgroupCount();
+  int64_t kWgSize = schedule.getTotalKSize() * schedule.getTotalKTileSize();
   int64_t innerLhsDimSize = transposedLhs ? mWgSize : kWgSize;
   int64_t innerRhsDimSize = transposedRhs ? kWgSize : nWgSize;
 
@@ -184,7 +175,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
            << schedule << "\nShrinking schedule...";
 
     auto decrementIfPossible =
-        [](SmallVector<int64_t> &sizes) -> LogicalResult {
+        [](SmallVector<int64_t, 2> &sizes) -> LogicalResult {
       for (int64_t &size : sizes) {
         if (size <= 1)
           continue;

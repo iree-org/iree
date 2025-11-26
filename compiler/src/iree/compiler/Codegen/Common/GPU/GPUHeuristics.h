@@ -68,22 +68,23 @@ struct GPUMMAHeuristicSeeds {
 struct GPUMMASchedule {
   // The MMA intrinsic kind to use for this schedule.
   IREE::Codegen::InnerTileDescAttrInterface mmaKind;
+
   // Native MMA intrinsic sizes along M, N and K dimensions for a subgroup.
-  SmallVector<int64_t> mSizes;
-  SmallVector<int64_t> nSizes;
-  SmallVector<int64_t> kSizes;
+  SmallVector<int64_t, 2> mSizes;
+  SmallVector<int64_t, 2> nSizes;
+  SmallVector<int64_t, 2> kSizes;
 
   // Number of subgroups along each M and N dimension.
-  SmallVector<int64_t> mSubgroupCounts;
-  SmallVector<int64_t> nSubgroupCounts;
+  SmallVector<int64_t, 2> mSubgroupCounts;
+  SmallVector<int64_t, 2> nSubgroupCounts;
 
   // Tile sizes for each M, N, and K dimension. When there are multiple M, N,
   // or K dimensions, the intrinsic sizes are targeted to the innermost
   // dimension, and the outer dimensions can be thought of as unrolling factors
   // along M, N, or K.
-  SmallVector<int64_t> mTileSizes; // M tile sizes per subgroup.
-  SmallVector<int64_t> nTileSizes; // N tile sizes per subgroup.
-  SmallVector<int64_t> kTileSizes; // K tile sizes.
+  SmallVector<int64_t, 2> mTileSizes; // M tile sizes per subgroup.
+  SmallVector<int64_t, 2> nTileSizes; // N tile sizes per subgroup.
+  SmallVector<int64_t, 2> kTileSizes; // K tile sizes.
 
   // Constructor for multi M, N, K dim schedules.
   GPUMMASchedule(IREE::Codegen::InnerTileDescAttrInterface kind,
@@ -108,6 +109,32 @@ struct GPUMMASchedule {
         kSizes({kIntrinsicSize}), mSubgroupCounts({mSubgroup}),
         nSubgroupCounts({nSubgroup}), mTileSizes({mTileSize}),
         nTileSizes({nTileSize}), kTileSizes({kTileSize}) {}
+
+  // Helper methods to get the total product of intrinsic sizes.
+  int64_t getTotalMSize() const { return llvm::product_of(mSizes); }
+  int64_t getTotalNSize() const { return llvm::product_of(nSizes); }
+  int64_t getTotalKSize() const { return llvm::product_of(kSizes); }
+
+  // Helper methods to get the total product of tile sizes.
+  int64_t getTotalMTileSize() const { return llvm::product_of(mTileSizes); }
+  int64_t getTotalNTileSize() const { return llvm::product_of(nTileSizes); }
+  int64_t getTotalKTileSize() const { return llvm::product_of(kTileSizes); }
+
+  // Helper methods to get the total product of subgroup counts.
+  int64_t getTotalMSubgroupCount() const {
+    return llvm::product_of(mSubgroupCounts);
+  }
+  int64_t getTotalNSubgroupCount() const {
+    return llvm::product_of(nSubgroupCounts);
+  }
+
+  // Check if all schedule dimensions are single-element.
+  bool hasSingleDimensions() const {
+    return mSubgroupCounts.size() == 1 && nSubgroupCounts.size() == 1 &&
+           mTileSizes.size() == 1 && nTileSizes.size() == 1 &&
+           kTileSizes.size() == 1 && mSizes.size() == 1 && nSizes.size() == 1 &&
+           kSizes.size() == 1;
+  }
 };
 
 /// Returns a schedule for using one of the given MMA |intrinsics| to target the

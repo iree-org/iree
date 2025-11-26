@@ -895,9 +895,9 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   Type initElem = getElementType(init);
   // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
   // once the pipeline is able to support it. After adding multiple dimensions,
-  // all instances of schedule->m/nSubgroupCounts[0] and
-  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
-  // just the first element.
+  // all instances of schedule->m/nSubgroupCounts[0],
+  // schedule->m/n/kTileSizes[0] and schedule->m/n/kSizes[0] need to use the
+  // full list of sizes instead of just the first element.
   GPUMatmulShapeType problem(dimM, dimN, dimK, lhsElem, rhsElem, initElem);
 
   SmallVector<GPUIntrinsicType> intrinsics;
@@ -930,6 +930,7 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
                         subgroupSize, transposedLhs, transposedRhs);
   if (failed(schedule))
     return failure();
+  assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
 
   auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
 
@@ -940,9 +941,9 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
   if (isBM)
     vectorSizes[bIndex] = 1;
-  vectorSizes[mIndex] = llvm::product_of(schedule->mSizes);
-  vectorSizes[nIndex] = llvm::product_of(schedule->nSizes);
-  vectorSizes[kIndex] = llvm::product_of(schedule->kSizes);
+  vectorSizes[mIndex] = schedule->mSizes[0];
+  vectorSizes[nIndex] = schedule->nSizes[0];
+  vectorSizes[kIndex] = schedule->kSizes[0];
 
   SmallVector<int64_t> subgroupTileSizes(lastParallelDim + 1, 0);
   if (isBM)
@@ -963,8 +964,7 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // TODO(#10499): Consolidate tiling configuration across different pipelines.
   SmallVector<int64_t> reductionTileSizes;
   reductionTileSizes.append(kIndex, 0);
-  reductionTileSizes.push_back(schedule->kTileSizes[0] *
-                               llvm::product_of(schedule->kSizes));
+  reductionTileSizes.push_back(schedule->kTileSizes[0] * schedule->kSizes[0]);
 
   TileSizesListType tileSizes = {workgroupTileSizes, subgroupTileSizes,
                                  reductionTileSizes, vectorSizes};

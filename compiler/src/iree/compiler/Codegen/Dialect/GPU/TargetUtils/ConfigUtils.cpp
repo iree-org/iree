@@ -761,7 +761,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // Multiply by the intrinsic shape for the inner most dim as we distribute
     // to workgroups before packing to intrinsic.
     if (i == mDims.size() - 1) {
-      workgroupTileSizes[mDim] *= llvm::product_of(schedule->mSizes);
+      workgroupTileSizes[mDim] *= schedule->getTotalMSize();
     }
     subgroupTileSizes[mDim] = schedule->mTileSizes[i];
   }
@@ -771,7 +771,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // Multiply by the intrinsic shape for the inner most dim as we distribute
     // to workgroups before packing to intrinsic.
     if (i == nDims.size() - 1) {
-      workgroupTileSizes[nDim] *= llvm::product_of(schedule->nSizes);
+      workgroupTileSizes[nDim] *= schedule->getTotalNSize();
     }
     subgroupTileSizes[nDim] = schedule->nTileSizes[i];
   }
@@ -1737,13 +1737,12 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
+  assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
   workgroupTileSizes[mDim] = schedule->mSubgroupCounts[0] *
-                             schedule->mTileSizes[0] *
-                             llvm::product_of(schedule->mSizes);
+                             schedule->mTileSizes[0] * schedule->mSizes[0];
   subgroupTileSizes[mDim] = schedule->mTileSizes[0];
   workgroupTileSizes[nDim] = schedule->nSubgroupCounts[0] *
-                             schedule->nTileSizes[0] *
-                             llvm::product_of(schedule->nSizes);
+                             schedule->nTileSizes[0] * schedule->nSizes[0];
   subgroupTileSizes[nDim] = schedule->nTileSizes[0];
 
   // The reduction tile size is just the post-packing tile count.
@@ -1760,8 +1759,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   if (!mustBeAligned) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
-    paddingTileSizes[kDim] =
-        reductionTileSizes[kDim] * llvm::product_of(schedule->kSizes);
+    paddingTileSizes[kDim] = reductionTileSizes[kDim] * schedule->kSizes[0];
     attrs.emplace_back("padding_conv", b.getI64ArrayAttr(paddingTileSizes));
   }
 
