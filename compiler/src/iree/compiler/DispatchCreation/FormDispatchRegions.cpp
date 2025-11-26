@@ -1083,7 +1083,8 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       auto newRegionOp = IREE::Flow::moveFollowingOpIntoDispatchRegion(
           rewriter, consumer, regionOp);
       if (failed(newRegionOp)) {
-        return consumer->emitOpError("failed to move consumer into region");
+        consumer->emitWarning("failed to move consumer into region");
+        continue;
       }
       regionOp = *newRegionOp;
     }
