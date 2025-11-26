@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
@@ -66,6 +67,7 @@ struct TorchSession
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<IREE::HAL::HALDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
+    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }
 
