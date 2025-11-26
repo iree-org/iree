@@ -458,3 +458,98 @@ util.func @fold_unit_dims_from_extract_all_unit(%arg0: tensor<1x1x1xf32>, %idx0:
 //       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]]
 //  CHECK-SAME:     tensor<f32>
 //       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+// Test folding unit dims from tensor.extract_slice - basic case
+util.func @fold_unit_dims_from_extract_slice_basic(%arg0: tensor<10x1x20x1x30xf32>, %idx0: index, %idx1: index, %idx2: index, %sz0: index, %sz1: index, %sz2: index) -> tensor<?x1x?x1x?xf32> {
+  %slice = tensor.extract_slice %arg0[%idx0, 0, %idx1, 0, %idx2][%sz0, 1, %sz1, 1, %sz2][1, 1, 1, 1, 1]
+    : tensor<10x1x20x1x30xf32> to tensor<?x1x?x1x?xf32>
+  util.return %slice : tensor<?x1x?x1x?xf32>
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_slice_basic
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<10x1x20x1x30xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[SZ0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[SZ1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[SZ2:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2], [3, 4]{{\]}}
+//  CHECK-SAME:     tensor<10x1x20x1x30xf32> into tensor<10x20x30xf32>
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSED]][%[[IDX0]], %[[IDX1]], %[[IDX2]]]
+//  CHECK-SAME:     [%[[SZ0]], %[[SZ1]], %[[SZ2]]] [1, 1, 1]
+//  CHECK-SAME:     tensor<10x20x30xf32> to tensor<?x?x?xf32>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SLICE]] {{\[}}[0], [1, 2], [3, 4]{{\]}}
+//       CHECK:   util.return %[[EXPANDED]]
+
+// -----
+
+// Test folding unit dims from tensor.extract_slice - rank reducing case
+util.func @fold_unit_dims_from_extract_slice_rank_reducing(%arg0: tensor<10x1x20x1x30xf32>) -> tensor<5x10xf32> {
+  %slice = tensor.extract_slice %arg0[0, 0, 5, 0, 10][5, 1, 1, 1, 10][1, 1, 1, 1, 1]
+    : tensor<10x1x20x1x30xf32> to tensor<5x10xf32>
+  util.return %slice : tensor<5x10xf32>
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_slice_rank_reducing
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<10x1x20x1x30xf32>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2], [3, 4]{{\]}}
+//  CHECK-SAME:     tensor<10x1x20x1x30xf32> into tensor<10x20x30xf32>
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSED]][0, 5, 10] [5, 1, 10] [1, 1, 1]
+//  CHECK-SAME:     tensor<10x20x30xf32> to tensor<5x10xf32>
+//       CHECK:   util.return %[[SLICE]]
+
+// -----
+
+// Test folding unit dims from tensor.extract_slice - leading unit dims
+util.func @fold_unit_dims_from_extract_slice_leading(%arg0: tensor<1x1x20x30xf32>, %idx: index, %sz: index) -> tensor<1x1x?x30xf32> {
+  %slice = tensor.extract_slice %arg0[0, 0, %idx, 0][1, 1, %sz, 30][1, 1, 1, 1]
+    : tensor<1x1x20x30xf32> to tensor<1x1x?x30xf32>
+  util.return %slice : tensor<1x1x?x30xf32>
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_slice_leading
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x1x20x30xf32>
+//  CHECK-SAME:   %[[IDX:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[SZ:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1, 2], [3]{{\]}}
+//  CHECK-SAME:     tensor<1x1x20x30xf32> into tensor<20x30xf32>
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSED]][%[[IDX]], 0] [%[[SZ]], 30] [1, 1]
+//  CHECK-SAME:     tensor<20x30xf32> to tensor<?x30xf32>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SLICE]] {{\[}}[0, 1, 2], [3]{{\]}}
+//       CHECK:   util.return %[[EXPANDED]]
+
+// -----
+
+// Test folding unit dims from tensor.extract_slice - trailing unit dims
+util.func @fold_unit_dims_from_extract_slice_trailing(%arg0: tensor<20x30x1x1xf32>, %idx: index, %sz: index) -> tensor<?x30x1x1xf32> {
+  %slice = tensor.extract_slice %arg0[%idx, 0, 0, 0][%sz, 30, 1, 1][1, 1, 1, 1]
+    : tensor<20x30x1x1xf32> to tensor<?x30x1x1xf32>
+  util.return %slice : tensor<?x30x1x1xf32>
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_slice_trailing
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<20x30x1x1xf32>
+//  CHECK-SAME:   %[[IDX:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[SZ:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2, 3]{{\]}}
+//  CHECK-SAME:     tensor<20x30x1x1xf32> into tensor<20x30xf32>
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSED]][%[[IDX]], 0] [%[[SZ]], 30] [1, 1]
+//  CHECK-SAME:     tensor<20x30xf32> to tensor<?x30xf32>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SLICE]] {{\[}}[0], [1, 2, 3]{{\]}}
+//       CHECK:   util.return %[[EXPANDED]]
+
+// -----
+
+// Test folding unit dims from tensor.extract_slice - static offsets and sizes
+util.func @fold_unit_dims_from_extract_slice_static(%arg0: tensor<4x1x32x1x64xf32>) -> tensor<4x1x16x1x64xf32> {
+  %slice = tensor.extract_slice %arg0[0, 0, 8, 0, 0][4, 1, 16, 1, 64][1, 1, 1, 1, 1]
+    : tensor<4x1x32x1x64xf32> to tensor<4x1x16x1x64xf32>
+  util.return %slice : tensor<4x1x16x1x64xf32>
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_slice_static
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1x32x1x64xf32>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2], [3, 4]{{\]}}
+//  CHECK-SAME:     tensor<4x1x32x1x64xf32> into tensor<4x32x64xf32>
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSED]][0, 8, 0] [4, 16, 64] [1, 1, 1]
+//  CHECK-SAME:     tensor<4x32x64xf32> to tensor<4x16x64xf32>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SLICE]] {{\[}}[0], [1, 2], [3, 4]{{\]}}
+//       CHECK:   util.return %[[EXPANDED]]

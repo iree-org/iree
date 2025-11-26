@@ -75,6 +75,10 @@ static bool shouldSinkExpandShapeOp(tensor::ExpandShapeOp expandOp,
   if (!IREE::Flow::isNonNullAndOutsideDispatch({expandOp, consumer})) {
     return false;
   }
+  if (Operation *producer = expandOp.getSrc().getDefiningOp();
+      producer && (!producer->hasOneUse() || !expandOp->hasOneUse())) {
+    return false;
+  }
   auto consumerGenericOp = dyn_cast<linalg::GenericOp>(consumer);
   if (!consumerGenericOp) {
     return false;
