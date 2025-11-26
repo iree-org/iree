@@ -348,9 +348,8 @@ ireeCodegenInferScaledContractionDimensions(MlirOperation op) {
   const mlir::iree_compiler::IREE::LinalgExt::ScaledContractionDimensions
       &scaledContractionDims = *maybeDims;
   mlir::MLIRContext *ctx = linalgOp.getContext();
-
-  auto toAttr = [&ctx](llvm::ArrayRef<unsigned> vals) -> MlirAttribute {
-    mlir::Builder b(ctx);
+  mlir::Builder b(ctx);
+  auto toAttr = [&b](llvm::ArrayRef<unsigned> vals) -> MlirAttribute {
     llvm::SmallVector<mlir::Attribute, 2> attrs =
         llvm::map_to_vector(vals, [&b](unsigned val) -> mlir::Attribute {
           return b.getI32IntegerAttr(val);

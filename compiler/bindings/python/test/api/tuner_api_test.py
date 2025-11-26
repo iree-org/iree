@@ -426,12 +426,11 @@ def test_isa_scaled_contraction_op():
     dims = iree_codegen.infer_scaled_contraction_dimensions(scaled_generic_op)
     assert dims is not None, "Should be able to infer dimensions for scaled contraction"
 
-    # Expected: m=[0], n=[1], k=[2], kB=[3] for the given indexing maps.
-    assert list(dims.m) == [0], f"Expected m=[0], got {list(dims.m)}"
-    assert list(dims.n) == [1], f"Expected n=[1], got {list(dims.n)}"
-    assert list(dims.k) == [2], f"Expected k=[2], got {list(dims.k)}"
-    assert list(dims.kB) == [3], f"Expected kB=[3], got {list(dims.kB)}"
-    assert list(dims.batch) == [], f"Expected no batch dims, got {list(dims.batch)}"
+    assert dims.m == [0], f"Got {dims.m}"
+    assert dims.n == [1], f"Got {dims.n}"
+    assert dims.k == [2], f"Got {dims.k}"
+    assert dims.kB == [3], f"Got {dims.kB}"
+    assert dims.batch == [], f"Got {dims.batch}"
 
 
 @run
@@ -485,11 +484,11 @@ def test_infer_scaled_contraction_dimensions():
     # d1 = N (parallel) -> n,
     # d2 = Ko (reduction) -> k,
     # d3 = Kb (reduction, block dim) -> kB.
-    assert list(dims.m) == [0], f"Expected m=[0], got {list(dims.m)}"
-    assert list(dims.n) == [1], f"Expected n=[1], got {list(dims.n)}"
-    assert list(dims.k) == [2], f"Expected k=[2], got {list(dims.k)}"
-    assert list(dims.kB) == [3], f"Expected kB=[3], got {list(dims.kB)}"
-    assert list(dims.batch) == [], f"Expected no batch dims, got {list(dims.batch)}"
+    assert dims.m == [0], f"Got {dims.m}"
+    assert dims.n == [1], f"Got {dims.n}"
+    assert dims.k == [2], f"Got {dims.k}"
+    assert dims.kB == [3], f"Got {dims.kB}"
+    assert dims.batch == [], f"Got {dims.batch}"
 
     # Test 2: Non-scaled contraction should return None.
     module_str_regular = """
@@ -510,11 +509,11 @@ def test_infer_scaled_contraction_dimensions():
     # Check if all dimensions are empty (indicating it's not a scaled contraction).
     if dims_regular is not None:
         all_empty = (
-            len(list(dims_regular.m)) == 0
-            and len(list(dims_regular.n)) == 0
-            and len(list(dims_regular.k)) == 0
-            and len(list(dims_regular.kB)) == 0
-            and len(list(dims_regular.batch)) == 0
+            len(dims_regular.m) == 0
+            and len(dims_regular.n) == 0
+            and len(dims_regular.k) == 0
+            and len(dims_regular.kB) == 0
+            and len(dims_regular.batch) == 0
         )
         assert (
             all_empty or dims_regular is None
@@ -559,19 +558,8 @@ def test_infer_scaled_contraction_dimensions():
 
         dims_batched = iree_codegen.infer_scaled_contraction_dimensions(batched_op)
         if dims_batched is not None:
-            # Expected: batch=[0], m=[1], n=[2], k=[3], kB=[4].
-            assert list(dims_batched.batch) == [
-                0
-            ], f"Expected batch=[0], got {list(dims_batched.batch)}"
-            assert list(dims_batched.m) == [
-                1
-            ], f"Expected m=[1], got {list(dims_batched.m)}"
-            assert list(dims_batched.n) == [
-                2
-            ], f"Expected n=[2], got {list(dims_batched.n)}"
-            assert list(dims_batched.k) == [
-                3
-            ], f"Expected k=[3], got {list(dims_batched.k)}"
-            assert list(dims_batched.kB) == [
-                4
-            ], f"Expected kB=[4], got {list(dims_batched.kB)}"
+            assert dims_batched.batch == [0], f"Got {dims_batched.batch}"
+            assert dims_batched.m == [1], f"Got {dims_batched.m}"
+            assert dims_batched.n == [2], f"Got {dims_batched.n}"
+            assert dims_batched.k == [3], f"Got {dims_batched.k}"
+            assert dims_batched.kB == [4], f"Got {dims_batched.kB}"
