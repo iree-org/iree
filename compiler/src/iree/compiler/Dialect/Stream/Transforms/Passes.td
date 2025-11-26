@@ -562,6 +562,42 @@ def SpecializeDispatchesPass :
   ];
 }
 
+def UnifyEncodingForGlobalsPass :
+    Pass<"iree-stream-unify-encoding-for-globals", "mlir::ModuleOp"> {
+  let summary = "Unifies multiple encodings of the same immutable global to reduce memory.";
+  let description = [{
+    When a single source global (e.g., a model weight) is encoded multiple
+    times with different encodings for different uses, this pass selects a
+    unified encoding and updates all references to reduce memory footprint.
+
+    The pass analyzes initializers to identify:
+    1. Source globals (e.g., stream.tensor.constant with parameters)
+    2. Encoded globals derived from the same source
+    3. Dispatch sites using these encoded globals
+
+    When multiple encoded globals share the same source, the pass queries
+    layout resolvers to determine a unified encoding. If a common encoding
+    is found, the pass updates:
+    1. The encoding operations in initializers
+    2. The corresponding stream.tensor.sizeof operations
+    3. The dispatch operand encodings
+    4. The executable binding types
+
+    Constraints:
+    - Only handles immutable globals with !stream.resource<constant> type
+    - Bails out if an encoded global can have multiple sources due to CFG
+    - Requires exactly one AffinityAnalysisDialectInterface implementation
+    - Skips hand-authored executables to avoid incorrect modifications
+
+    This pass should run after CombineInitializersPass and before
+    SpecializeEncodingsPass in the Stream pipeline.
+  }];
+  let dependentDialects = [
+    "IREE::Encoding::IREEEncodingDialect",
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def SpecializeEncodingsPass :
     Pass<"iree-stream-specialize-encodings", "mlir::ModuleOp"> {
   let summary = "Specializes serializable encodings based on layout analysis.";
