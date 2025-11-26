@@ -77,18 +77,10 @@ def root_op():
 def attention_op_detail():
     dim_exprs = [affine.AffineDimExpr.get(i) for i in range(5)]
 
-    q_map = affine.AffineMap.get(
-        5, 0, [dim_exprs[0], dim_exprs[1], dim_exprs[2]]
-    )  # (d0, d1, d2).
-    k_map = affine.AffineMap.get(
-        5, 0, [dim_exprs[0], dim_exprs[3], dim_exprs[2]]
-    )  # (d0, d3, d2).
-    v_map = affine.AffineMap.get(
-        5, 0, [dim_exprs[0], dim_exprs[3], dim_exprs[4]]
-    )  # (d0, d3, d4).
-    o_map = affine.AffineMap.get(
-        5, 0, [dim_exprs[0], dim_exprs[1], dim_exprs[4]]
-    )  # (d0, d1, d4).
+    q_map = affine.AffineMap.get(5, 0, [dim_exprs[0], dim_exprs[1], dim_exprs[2]])
+    k_map = affine.AffineMap.get(5, 0, [dim_exprs[0], dim_exprs[3], dim_exprs[2]])
+    v_map = affine.AffineMap.get(5, 0, [dim_exprs[0], dim_exprs[3], dim_exprs[4]])
+    o_map = affine.AffineMap.get(5, 0, [dim_exprs[0], dim_exprs[1], dim_exprs[4]])
 
     result = iree_codegen.get_attention_op_detail(q_map, k_map, v_map, o_map)
 
@@ -102,10 +94,10 @@ def attention_op_detail():
     dim_exprs = [affine.AffineDimExpr.get(i) for i in range(4)]
 
     # Input affine maps that do not follow the expected pattern for an attention operation.
-    q_map = affine.AffineMap.get(4, 0, [dim_exprs[0], dim_exprs[1]])  # (d0, d1).
-    k_map = affine.AffineMap.get(4, 0, [dim_exprs[0], dim_exprs[2]])  # (d0, d2).
-    v_map = affine.AffineMap.get(4, 0, [dim_exprs[0], dim_exprs[3]])  # (d0, d3).
-    o_map = affine.AffineMap.get(4, 0, [dim_exprs[0], dim_exprs[1]])  # (d0, d1).
+    q_map = affine.AffineMap.get(4, 0, [dim_exprs[0], dim_exprs[1]])
+    k_map = affine.AffineMap.get(4, 0, [dim_exprs[0], dim_exprs[2]])
+    v_map = affine.AffineMap.get(4, 0, [dim_exprs[0], dim_exprs[3]])
+    o_map = affine.AffineMap.get(4, 0, [dim_exprs[0], dim_exprs[1]])
 
     result = iree_codegen.get_attention_op_detail(q_map, k_map, v_map, o_map)
     assert result.domain_rank == 4
@@ -355,7 +347,6 @@ def test_isa_scaled_contraction_op():
     assert len(root_op_list) == 1
     matmul_op = root_op_list[0]
 
-    # Regular matmul should not be a scaled contraction.
     assert not iree_codegen.isa_scaled_contraction_op(
         matmul_op
     ), "Regular matmul should not be a scaled contraction"
@@ -414,15 +405,13 @@ def test_isa_scaled_contraction_op():
     input_module = ir.Module.parse(module_str)
     root_op_list = iree_codegen.get_tuner_root_ops(input_module)
     assert len(root_op_list) == 1, "Should have one root op"
-    scaled_generic_op = root_op_list[0]
 
-    # Check if it's recognized as a scaled contraction.
+    scaled_generic_op = root_op_list[0]
     is_scaled = iree_codegen.isa_scaled_contraction_op(scaled_generic_op)
     assert (
         is_scaled
     ), "linalg.generic with scaled matmul pattern should be detected as scaled contraction"
 
-    # Try to infer dimensions.
     dims = iree_codegen.infer_scaled_contraction_dimensions(scaled_generic_op)
     assert dims is not None, "Should be able to infer dimensions for scaled contraction"
 
@@ -474,7 +463,6 @@ def test_infer_scaled_contraction_dimensions():
         scaled_op
     ), "Operation should be recognized as scaled contraction"
 
-    # Test dimension inference.
     dims = iree_codegen.infer_scaled_contraction_dimensions(scaled_op)
     assert dims is not None, "Should successfully infer dimensions"
 
@@ -505,8 +493,8 @@ def test_infer_scaled_contraction_dimensions():
     regular_matmul = regular_ops[0]
 
     # Regular matmul should not have scaled contraction dimensions.
-    dims_regular = iree_codegen.infer_scaled_contraction_dimensions(regular_matmul)
     # Check if all dimensions are empty (indicating it's not a scaled contraction).
+    dims_regular = iree_codegen.infer_scaled_contraction_dimensions(regular_matmul)
     if dims_regular is not None:
         all_empty = (
             len(dims_regular.m) == 0

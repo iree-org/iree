@@ -120,15 +120,15 @@ MLIR_CAPI_EXPORTED ireeCodegenIGEMMGenericConvDetails
 ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op);
 
 struct ireeCodegenScaledContractionDimensions {
-  // Batch dimension for scaled contraction (ArrayAttr)
+  // Batch dimension for scaled contraction (ArrayAttr).
   MlirAttribute batch;
-  // M dimension for scaled contraction (ArrayAttr)
+  // M dimension for scaled contraction (ArrayAttr).
   MlirAttribute m;
-  // N dimension for scaled contraction (ArrayAttr)
+  // N dimension for scaled contraction (ArrayAttr).
   MlirAttribute n;
-  // K outer reduction dimension for scaled contraction (ArrayAttr)
+  // K outer reduction dimension for scaled contraction (ArrayAttr).
   MlirAttribute k;
-  // K blocking dimension for scaled contraction (ArrayAttr)
+  // K blocking dimension for scaled contraction (ArrayAttr).
   MlirAttribute kB;
 };
 
