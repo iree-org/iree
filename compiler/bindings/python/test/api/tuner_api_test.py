@@ -85,7 +85,7 @@ def attention_op_detail():
     )  # (d0, d3, d2).
     v_map = affine.AffineMap.get(
         5, 0, [dim_exprs[0], dim_exprs[3], dim_exprs[4]]
-    )  # (d0, d3, d4).                                      # ()
+    )  # (d0, d3, d4).
     o_map = affine.AffineMap.get(
         5, 0, [dim_exprs[0], dim_exprs[1], dim_exprs[4]]
     )  # (d0, d1, d4).
@@ -340,7 +340,7 @@ def test_igemm_conv_details():
 
 @run
 def test_isa_scaled_contraction_op():
-    # Test 1: Regular matmul is not a scaled contraction
+    # Test 1: Regular matmul is not a scaled contraction.
     module_str = """
         module {
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>, %arg2: tensor<4x4xf32>) -> tensor<4x4xf32> {
@@ -355,12 +355,12 @@ def test_isa_scaled_contraction_op():
     assert len(root_op_list) == 1
     matmul_op = root_op_list[0]
 
-    # Regular matmul should not be a scaled contraction
+    # Regular matmul should not be a scaled contraction.
     assert not iree_codegen.isa_scaled_contraction_op(
         matmul_op
     ), "Regular matmul should not be a scaled contraction"
 
-    # Test 2: Fill op is not a scaled contraction
+    # Test 2: Fill op is not a scaled contraction.
     module_str = """
         module {
             func.func @fill(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
@@ -379,10 +379,10 @@ def test_isa_scaled_contraction_op():
         fill_op
     ), "Fill op should not be a scaled contraction"
 
-    # Test 3: Scaled matmul as linalg.generic should be detected
-    # Pattern: linalg.generic with 5 indexing maps (lhs, rhs, lhs_scale, rhs_scale, output)
-    # and 4 iterator types (2 parallel for M,N; 2 reduction for Ko,Kb)
-    # Uses f4E2M1FN for operands and f8E8M0FNU for scales (matching real scaled matmul pattern)
+    # Test 3: Scaled matmul as linalg.generic should be detected.
+    # Pattern: linalg.generic with 5 indexing maps (lhs, rhs, lhs_scale, rhs_scale, output),
+    # and 4 iterator types (2 parallel for M,N; 2 reduction for Ko,Kb).
+    # Uses f4E2M1FN for operands and f8E8M0FNU for scales (matching real scaled matmul pattern).
     module_str = """
         module {
             func.func @scaled_matmul(%lhs: tensor<16x4x32xf4E2M1FN>, %rhs: tensor<16x4x32xf4E2M1FN>,
@@ -416,17 +416,17 @@ def test_isa_scaled_contraction_op():
     assert len(root_op_list) == 1, "Should have one root op"
     scaled_generic_op = root_op_list[0]
 
-    # Check if it's recognized as a scaled contraction
+    # Check if it's recognized as a scaled contraction.
     is_scaled = iree_codegen.isa_scaled_contraction_op(scaled_generic_op)
     assert (
         is_scaled
     ), "linalg.generic with scaled matmul pattern should be detected as scaled contraction"
 
-    # Try to infer dimensions
+    # Try to infer dimensions.
     dims = iree_codegen.infer_scaled_contraction_dimensions(scaled_generic_op)
     assert dims is not None, "Should be able to infer dimensions for scaled contraction"
 
-    # Expected: m=[0], n=[1], k=[2], kB=[3] for the given indexing maps
+    # Expected: m=[0], n=[1], k=[2], kB=[3] for the given indexing maps.
     assert list(dims.m) == [0], f"Expected m=[0], got {list(dims.m)}"
     assert list(dims.n) == [1], f"Expected n=[1], got {list(dims.n)}"
     assert list(dims.k) == [2], f"Expected k=[2], got {list(dims.k)}"
@@ -436,7 +436,7 @@ def test_isa_scaled_contraction_op():
 
 @run
 def test_infer_scaled_contraction_dimensions():
-    # Test 1: Verify dimension inference on a scaled matmul operation
+    # Test 1: Verify dimension inference on a scaled matmul operation.
     module_str = """
         module {
             func.func @scaled_matmul(%lhs: tensor<16x4x32xf4E2M1FN>, %rhs: tensor<16x4x32xf4E2M1FN>,
@@ -470,28 +470,28 @@ def test_infer_scaled_contraction_dimensions():
     assert len(root_op_list) == 1, "Should have exactly one root op"
     scaled_op = root_op_list[0]
 
-    # Verify it's a scaled contraction first
+    # Verify it's a scaled contraction first.
     assert iree_codegen.isa_scaled_contraction_op(
         scaled_op
     ), "Operation should be recognized as scaled contraction"
 
-    # Test dimension inference
+    # Test dimension inference.
     dims = iree_codegen.infer_scaled_contraction_dimensions(scaled_op)
     assert dims is not None, "Should successfully infer dimensions"
 
-    # Verify the inferred dimensions match expected values
+    # Verify the inferred dimensions match expected values.
     # For the given indexing maps:
-    # d0 = M (parallel) -> m
-    # d1 = N (parallel) -> n
-    # d2 = Ko (reduction) -> k
-    # d3 = Kb (reduction, block dim) -> kB
+    # d0 = M (parallel) -> m,
+    # d1 = N (parallel) -> n,
+    # d2 = Ko (reduction) -> k,
+    # d3 = Kb (reduction, block dim) -> kB.
     assert list(dims.m) == [0], f"Expected m=[0], got {list(dims.m)}"
     assert list(dims.n) == [1], f"Expected n=[1], got {list(dims.n)}"
     assert list(dims.k) == [2], f"Expected k=[2], got {list(dims.k)}"
     assert list(dims.kB) == [3], f"Expected kB=[3], got {list(dims.kB)}"
     assert list(dims.batch) == [], f"Expected no batch dims, got {list(dims.batch)}"
 
-    # Test 2: Non-scaled contraction should return None
+    # Test 2: Non-scaled contraction should return None.
     module_str_regular = """
         module {
             func.func @regular_matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>, %arg2: tensor<4x4xf32>) -> tensor<4x4xf32> {
@@ -505,9 +505,9 @@ def test_infer_scaled_contraction_dimensions():
     assert len(regular_ops) == 1
     regular_matmul = regular_ops[0]
 
-    # Regular matmul should not have scaled contraction dimensions
+    # Regular matmul should not have scaled contraction dimensions.
     dims_regular = iree_codegen.infer_scaled_contraction_dimensions(regular_matmul)
-    # Check if all dimensions are empty (indicating it's not a scaled contraction)
+    # Check if all dimensions are empty (indicating it's not a scaled contraction).
     if dims_regular is not None:
         all_empty = (
             len(list(dims_regular.m)) == 0
@@ -520,7 +520,7 @@ def test_infer_scaled_contraction_dimensions():
             all_empty or dims_regular is None
         ), "Regular matmul should not have valid scaled contraction dimensions"
 
-    # Test 3: Batched scaled matmul
+    # Test 3: Batched scaled matmul.
     module_str_batched = """
         module {
             func.func @batched_scaled_matmul(%lhs: tensor<8x16x4x32xf4E2M1FN>, %rhs: tensor<8x16x4x32xf4E2M1FN>,
@@ -559,7 +559,7 @@ def test_infer_scaled_contraction_dimensions():
 
         dims_batched = iree_codegen.infer_scaled_contraction_dimensions(batched_op)
         if dims_batched is not None:
-            # Expected: batch=[0], m=[1], n=[2], k=[3], kB=[4]
+            # Expected: batch=[0], m=[1], n=[2], k=[3], kB=[4].
             assert list(dims_batched.batch) == [
                 0
             ], f"Expected batch=[0], got {list(dims_batched.batch)}"
@@ -575,40 +575,3 @@ def test_infer_scaled_contraction_dimensions():
             assert list(dims_batched.kB) == [
                 4
             ], f"Expected kB=[4], got {list(dims_batched.kB)}"
-
-
-@run
-def test_infer_scaled_contraction_dimensions_from_maps():
-    # Test inferring scaled contraction dimensions from affine maps
-    # This follows the pattern of a scaled matmul with block scaling
-    # Pattern: (M, N, Ko, Kb) where Ko is the outer reduction and Kb is the block dimension
-    d0, d1, d2, d3 = [AffineDimExpr.get(i) for i in range(4)]
-
-    # Maps for scaled contraction matching the example:
-    # lhs_map: (M, Ko, Kb) - left operand with outer and block reduction dims
-    # rhs_map: (N, Ko, Kb) - right operand with outer and block reduction dims
-    # lhs_scale_map: (M, Ko) - left scale factors indexed by M and Ko
-    # rhs_scale_map: (N, Ko) - right scale factors indexed by N and Ko
-    # out_map: (M, N) - output indexed by parallel dims only
-
-    lhs_map = AffineMap.get(4, 0, [d0, d2, d3])  # (M, Ko, Kb)
-    rhs_map = AffineMap.get(4, 0, [d1, d2, d3])  # (N, Ko, Kb)
-    lhs_scale_map = AffineMap.get(4, 0, [d0, d2])  # (M, Ko)
-    rhs_scale_map = AffineMap.get(4, 0, [d1, d2])  # (N, Ko)
-    out_map = AffineMap.get(4, 0, [d0, d1])  # (M, N)
-
-    # Call the inference function
-    dims = iree_codegen.infer_scaled_contraction_dimensions_from_maps(
-        [lhs_map, rhs_map, lhs_scale_map, rhs_scale_map, out_map]
-    )
-
-    assert (
-        dims is not None
-    ), "Should be able to infer scaled contraction dimensions from maps"
-    # Verify the inferred dimensions
-    # Expected: m=[0] (d0), n=[1] (d1), k=[2] (d2/Ko), kB=[3] (d3/Kb)
-    assert list(dims.m) == [0], f"Expected m=[0], got {list(dims.m)}"
-    assert list(dims.n) == [1], f"Expected n=[1], got {list(dims.n)}"
-    assert list(dims.k) == [2], f"Expected k=[2], got {list(dims.k)}"
-    assert list(dims.kB) == [3], f"Expected kB=[3], got {list(dims.kB)}"
-    assert list(dims.batch) == [], f"Expected no batch dims, got {list(dims.batch)}"

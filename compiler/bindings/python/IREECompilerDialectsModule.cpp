@@ -811,15 +811,4 @@ NB_MODULE(_ireeCompilerDialects, m) {
       &ireeCodegenInferScaledContractionDimensions,
       "Infers the scaled contraction dimensions for a given operation.",
       py::arg("op"));
-
-  iree_codegen_module.def(
-      "infer_scaled_contraction_dimensions_from_maps",
-      [](const std::vector<MlirAffineMap> &indexingMaps)
-          -> ireeCodegenScaledContractionDimensions {
-        return ireeCodegenInferScaledContractionDimensionsFromMaps(
-            indexingMaps.data(), indexingMaps.size());
-      },
-      "Infers the scaled contraction dimensions for a given operation from "
-      "indexing maps.",
-      py::arg("indexing_maps"));
 }

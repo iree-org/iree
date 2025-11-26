@@ -349,12 +349,12 @@ ireeCodegenInferScaledContractionDimensions(MlirOperation op) {
       &scaledContractionDims = *maybeDims;
   mlir::MLIRContext *ctx = linalgOp.getContext();
 
-  auto toAttr = [ctx](llvm::ArrayRef<unsigned> vals) -> MlirAttribute {
+  auto toAttr = [&ctx](llvm::ArrayRef<unsigned> vals) -> MlirAttribute {
     mlir::Builder b(ctx);
-    llvm::SmallVector<mlir::Attribute, 2> attrs;
-    for (unsigned val : vals) {
-      attrs.push_back(b.getI32IntegerAttr(val));
-    }
+    llvm::SmallVector<mlir::Attribute, 2> attrs =
+        llvm::map_to_vector(vals, [&b](unsigned val) -> mlir::Attribute {
+          return b.getI32IntegerAttr(val);
+        });
     return wrap(b.getArrayAttr(attrs));
   };
 
@@ -363,45 +363,5 @@ ireeCodegenInferScaledContractionDimensions(MlirOperation op) {
   result.n = toAttr(scaledContractionDims.n);
   result.k = toAttr(scaledContractionDims.k);
   result.kB = toAttr(scaledContractionDims.kB);
-  return result;
-}
-
-ireeCodegenScaledContractionDimensions
-ireeCodegenInferScaledContractionDimensionsFromMaps(
-    const MlirAffineMap *indexingMaps, size_t numMaps) {
-  ireeCodegenScaledContractionDimensions result{};
-  if (!indexingMaps || numMaps == 0) {
-    return result;
-  }
-
-  llvm::SmallVector<mlir::AffineMap, 3> maps;
-  for (size_t i = 0; i < numMaps; ++i) {
-    maps.push_back(unwrap(indexingMaps[i]));
-  }
-
-  llvm::FailureOr<
-      mlir::iree_compiler::IREE::LinalgExt::ScaledContractionDimensions>
-      maybeDims =
-          mlir::iree_compiler::IREE::LinalgExt::inferScaledContractionDims(
-              maps);
-  if (failed(maybeDims)) {
-    return result;
-  }
-
-  mlir::MLIRContext *ctx = maps[0].getContext();
-  auto toAttr = [ctx](llvm::ArrayRef<unsigned> vals) -> MlirAttribute {
-    mlir::Builder b(ctx);
-    llvm::SmallVector<mlir::Attribute, 2> attrs;
-    for (unsigned val : vals) {
-      attrs.push_back(b.getI32IntegerAttr(val));
-    }
-    return wrap(b.getArrayAttr(attrs));
-  };
-
-  result.batch = toAttr(maybeDims->batch);
-  result.m = toAttr(maybeDims->m);
-  result.n = toAttr(maybeDims->n);
-  result.k = toAttr(maybeDims->k);
-  result.kB = toAttr(maybeDims->kB);
   return result;
 }
