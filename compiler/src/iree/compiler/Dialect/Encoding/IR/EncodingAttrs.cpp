@@ -99,6 +99,17 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
 
 bool PackedStorageAttr::isSerialized() const { return true; }
 
+bool PackedStorageAttr::isCompatibleWith(
+    IREE::Encoding::SerializableAttr other) const {
+  // The packed_storage encodings is compatible with empty encodings, because it
+  // doesn't impact tensor shape.
+  if (!other) {
+    return true;
+  }
+  // Otherwise, packed_storage is only compatible with itself.
+  return isa<IREE::Encoding::PackedStorageAttr>(other);
+}
+
 /// Returns the bit-width of the scalar type. If the type is complex, it
 /// returns the type of individual elements * 2 (1 for real and 1 for
 /// complex).
