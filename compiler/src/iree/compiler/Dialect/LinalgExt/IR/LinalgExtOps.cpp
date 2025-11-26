@@ -2816,11 +2816,12 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
         "expected parent op to be one of `iree_linalg_ext.custom_op`, "
         "`iree_linalg_ext.attention`");
   }
-  int64_t numLoops = customOp ? customOp.getNumLoops() : attentionOp.getNumLoops();
+  int64_t numLoops =
+      customOp ? customOp.getNumLoops() : attentionOp.getNumLoops();
   if (numLoops <= getDim()) {
     return emitOpError("expected dim (")
-           << getDim() << ") to be lower than the number of loops ("
-           << numLoops << ") of the enclosing CustomOp/AttentionOp";
+           << getDim() << ") to be lower than the number of loops (" << numLoops
+           << ") of the enclosing CustomOp/AttentionOp";
   }
   return success();
 }
