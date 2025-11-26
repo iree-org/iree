@@ -119,6 +119,23 @@ MLIR_CAPI_EXPORTED bool ireeCodegenHasIGEMMGenericConvDetails(MlirOperation op);
 MLIR_CAPI_EXPORTED ireeCodegenIGEMMGenericConvDetails
 ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op);
 
+typedef struct ireeCodegenScaledContractionDimensions {
+  MlirAttribute batch;
+  MlirAttribute m;
+  MlirAttribute n;
+  MlirAttribute k;
+  MlirAttribute kB;
+} ireeCodegenScaledContractionDimensions;
+
+MLIR_CAPI_EXPORTED bool ireeCodegenMlirOperationIsAScaledContractionOp(MlirOperation op);
+
+MLIR_CAPI_EXPORTED ireeCodegenScaledContractionDimensions
+ireeCodegenInferScaledContractionDimensions(MlirOperation op);
+
+MLIR_CAPI_EXPORTED ireeCodegenScaledContractionDimensions
+ireeCodegenInferScaledContractionDimensionsFromMaps(const MlirAffineMap *indexingMaps,
+                                             size_t numMaps);
+
 #ifdef __cplusplus
 }
 #endif
