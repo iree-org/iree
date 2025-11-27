@@ -519,7 +519,7 @@ iree_status_t iree_hal_hip_device_create(
     if (iree_status_is_ok(status)) {
       status = IREE_HIP_CALL_TO_STATUS(
           symbols,
-          hipStreamCreateWithFlags(&device->devices[i].hip_async_memory_stream,
+          hipStreamCreateWithFlags(&device->devices[i].hip_dispatch_stream,
                                    hipStreamNonBlocking));
     }
 
@@ -616,9 +616,6 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
       IREE_HIP_IGNORE_ERROR(
           symbols, hipStreamDestroy(device->devices[i].hip_dispatch_stream));
     }
-
-    IREE_HIP_IGNORE_ERROR(
-        symbols, hipStreamDestroy(device->devices[i].hip_async_memory_stream));
 
     // NOTE: This function return hipSuccess though doesn't release the
     // primaryCtx by design on HIP/HCC path.
@@ -1496,9 +1493,7 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
   // the alloc) is waiting on was signaled on the dispatch stream, and was the
   // last thing signaled, we could keep it on the dispatch stream.
   hipStream_t stream =
-      data->type == IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_ALLOC
-          ? device->devices[device_ordinal].hip_async_memory_stream
-          : device->devices[device_ordinal].hip_dispatch_stream;
+      device->devices[device_ordinal].hip_dispatch_stream;
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_device_stream_wait_for_semaphores(
