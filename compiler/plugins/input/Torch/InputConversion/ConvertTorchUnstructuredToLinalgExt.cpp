@@ -381,6 +381,11 @@ struct FlexAttentionOpConversion
     int64_t seqLenKV = keyType.getSizes()[2];
     int64_t valueDim = valueShape[3];
 
+    // Dynamic head dim is not supported.
+    if (headDim == kUnknownSize) {
+      return emitError() << "NYI: dynamic head dimension";
+    }
+
     auto floatType = dyn_cast<FloatType>(queryType.getOptionalDtype());
     // Default scale: 1.0 / sqrt(head_dim).
     double scaleVal;
