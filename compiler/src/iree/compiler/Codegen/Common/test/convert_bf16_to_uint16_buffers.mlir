@@ -35,6 +35,28 @@ func.func @bf16_conversion() {
 
 // -----
 
+// CHECK-LABEL: @load_bf16_with_alignment
+func.func @load_bf16_with_alignment(%arg0 : memref<?xbf16>, %arg1 : index) -> bf16 {
+  // CHECK: memref.load
+  // CHECK-SAME: {alignment = 8 : i64}
+  // CHECK-SAME: memref<?xi16>
+  %0 = memref.load %arg0[%arg1] {alignment = 8} : memref<?xbf16>
+  return %0 : bf16
+}
+
+// -----
+
+// CHECK-LABEL: @store_bf16_with_alignment
+func.func @store_bf16_with_alignment(%arg0 : memref<?xbf16>, %arg1 : index, %arg2 : bf16) {
+  // CHECK: memref.store
+  // CHECK-SAME: {alignment = 8 : i64}
+  // CHECK-SAME: memref<?xi16>
+  memref.store %arg2, %arg0[%arg1] {alignment = 8} : memref<?xbf16>
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @bf16_constant
 func.func @bf16_constant() -> bf16 {
   // CHECK: %[[CNST:.+]] = arith.constant 16256 : i16
