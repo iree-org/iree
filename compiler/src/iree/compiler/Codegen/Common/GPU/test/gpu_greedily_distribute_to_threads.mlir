@@ -158,3 +158,60 @@ func.func @multiple_use_tilable_op(%3: tensor<64x256xf32>, %4: tensor<64x256xf32
 //       CHECK:       tensor.parallel_insert_slice %[[T]]
 //       CHECK:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 //       CHECK:   return %[[ADD_DIST]], %[[T_DIST]]
+
+// -----
+
+#map = affine_map<() -> ()>
+func.func @scalar_op(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<f32>) -> tensor<f32>
+    attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+    } {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map, #map],
+    iterator_types = []
+    } ins(%arg0, %arg1 : tensor<f32>, tensor<f32>) outs(%arg2 : tensor<f32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %7 = arith.addf %in, %in_0 : f32
+    linalg.yield %7 : f32
+  } -> tensor<f32>
+  return %0 : tensor<f32>
+}
+
+// CHECK-LABEL: func.func @scalar_op
+//  CHECK-SAME:   %{{[A-Za-z0-9]+}}: tensor<f32>
+//  CHECK-SAME:   %{{[A-Za-z0-9]+}}: tensor<f32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<f32>
+//       CHECK:   scf.forall (%{{.*}}) in (1) shared_outs(%[[ITER:.+]] = %[[DEST]])
+//       CHECK:     %[[SCALAR:.+]] = linalg.generic {{.*}} outs({{.*}}: tensor<f32>)
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       tensor.parallel_insert_slice %[[SCALAR]] into %[[ITER]][] [] []
+//       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
+
+// -----
+
+#map = affine_map<() -> ()>
+func.func @multi_result_scalar_op(%arg0: tensor<f32>, %arg1: tensor<f32>) -> (tensor<f32>, tensor<f32>)
+    attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {}>
+    } {
+  %0:2 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = []
+    } outs(%arg0, %arg1 : tensor<f32>, tensor<f32>) {
+  ^bb0(%out_0: f32, %out_1: f32):
+    %add = arith.addf %out_0, %out_1 : f32
+    %diff = arith.subf %out_0, %out_1 : f32
+    linalg.yield %add, %diff : f32, f32
+  } -> (tensor<f32>, tensor<f32>)
+  return %0#0, %0#1 : tensor<f32>, tensor<f32>
+}
+
+// CHECK-LABEL: func.func @multi_result_scalar_op
+//  CHECK-SAME:   %[[DEST0:[A-Za-z0-9]+]]: tensor<f32>
+//  CHECK-SAME:   %[[DEST1:[A-Za-z0-9]+]]: tensor<f32>
+//       CHECK:   scf.forall (%{{.*}}) in (1) shared_outs(%[[ITER0:.+]] = %[[DEST0]], %[[ITER1:.+]] = %[[DEST1]])
+//       CHECK:     %[[SCALAR:.+]]:2 = linalg.generic {{.*}} outs({{.*}}: tensor<f32>, tensor<f32>)
+//       CHECK:     scf.forall.in_parallel
+//   CHECK-DAG:       tensor.parallel_insert_slice %[[SCALAR]]#0 into %[[ITER0]][] [] []
+//   CHECK-DAG:       tensor.parallel_insert_slice %[[SCALAR]]#1 into %[[ITER1]][] [] []
+//       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
