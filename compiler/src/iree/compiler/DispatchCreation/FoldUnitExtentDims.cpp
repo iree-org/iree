@@ -274,6 +274,55 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
     return defaultFn(op);
   };
 
+  options.computeOperandShapeAndMapFn =
+      [](const linalg::ControlDropUnitDims &control, MLIRContext *context,
+         IndexingMapOpInterface op, OpOperand *opOperand,
+         linalg::ControlDropUnitDims::DimensionMapping &oldDimsToNewDimsMap,
+         ArrayRef<AffineExpr> dimReplacements)
+      -> linalg::ControlDropUnitDims::UnitExtentReplacementInfo {
+    auto isCollapsible = [](Type ty) {
+      if (auto tensorTy = dyn_cast<RankedTensorType>(ty)) {
+        Attribute encoding = tensorTy.getEncoding();
+        if (!encoding) {
+          return true;
+        }
+        if (auto collapsibleEncoding = llvm::dyn_cast<
+                IREE::Encoding::CollapsibleEncodingAttrInterface>(encoding)) {
+          return collapsibleEncoding.canCollapse();
+        }
+      }
+      return false;
+    };
+    auto indexingMap = op.getMatchingIndexingMap(opOperand);
+    SmallVector<int64_t> shape = op.getStaticOperandShape(opOperand);
+    if (!isCollapsible(opOperand->get().getType())) {
+      AffineMap newIndexingMap = indexingMap.replaceDimsAndSymbols(
+          dimReplacements, ArrayRef<AffineExpr>{}, oldDimsToNewDimsMap.size(),
+          0);
+      linalg::ControlDropUnitDims::UnitExtentReplacementInfo info;
+      info.indexMap = newIndexingMap;
+      info.targetShape = llvm::to_vector(shape);
+      return info;
+    }
+    return control.dropUnitExtentFromOperandMetadata(
+        context, op, opOperand, oldDimsToNewDimsMap, dimReplacements);
+  };
+
+  options.collapseValueFn =
+      [](const linalg::ControlDropUnitDims &control, RewriterBase &rewriter,
+         Location loc, Value operand, ArrayRef<int64_t> targetShape,
+         ArrayRef<ReassociationIndices> reassociation) -> Value {
+    auto tensorType = cast<RankedTensorType>(operand.getType());
+    assert(control.rankReductionStrategy ==
+               linalg::ControlDropUnitDims::RankReductionStrategy::
+                   ReassociativeReshape &&
+           "unexpected rank reduction strategy");
+    auto targetType = RankedTensorType::get(
+        targetShape, tensorType.getElementType(), tensorType.getEncoding());
+    return tensor::CollapseShapeOp::create(rewriter, loc, targetType, operand,
+                                           reassociation);
+  };
+
   linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
   IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
                                                       options);
