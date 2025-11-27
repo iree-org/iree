@@ -444,6 +444,7 @@ static void initializeLLVMTargets() {
 #define LLVM_INITIALIZE_TARGET_SystemZ()
 #define LLVM_INITIALIZE_TARGET_VE()
 #define LLVM_INITIALIZE_TARGET_XCore()
+#define LLVM_INITIALIZE_TARGET_SPIRV()
 
 #define LLVM_TARGET(TargetName) LLVM_INITIALIZE_TARGET_##TargetName()
 #include "llvm/Config/Targets.def"

@@ -6,12 +6,19 @@
 
 # Smoke tests for the execution of tool binaries.
 
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+py_binary(
+    name = "python_with_numpy",
+    srcs = ["python_with_numpy.py"],
+    deps = ["@pip//numpy"],
 )
 
 iree_lit_test_suite(
@@ -81,11 +88,15 @@ iree_lit_test_suite(
         "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
+    env = {
+        "PYTHON": "python_with_numpy",
+    },
     tags = [
         "driver=local-task",
         "hostonly",
     ],
     tools = [
+        ":python_with_numpy",
         "//tools:iree-benchmark-executable",
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",
