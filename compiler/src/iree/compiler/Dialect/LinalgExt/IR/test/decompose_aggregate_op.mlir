@@ -419,6 +419,98 @@ func.func @online_attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 
 // -----
 
+// Spec to decompose online attention op.
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.online_attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
+    transform.yield
+  }
+}
+
+#mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
+#mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
+#mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
+#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
+#mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
+#mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
+
+func.func @online_attention_f16_noexp2(%query: tensor<192x1024x64xf16>,
+                         %key: tensor<192x1024x64xf16>,
+                         %value: tensor<192x1024x64xf16>,
+                         %output: tensor<192x1024x64xf32>,
+                         %max: tensor<192x1024xf32>,
+                         %sum: tensor<192x1024xf32>)
+                         -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
+  %scale = arith.constant 1.0 : f16
+
+  %out:3 = iree_linalg_ext.online_attention
+        {decomposition_config = {use_exp2=false}, indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR] }
+        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
+        outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     }
+        -> tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
+
+  return %out#0, %out#2 : tensor<192x1024x64xf32>, tensor<192x1024xf32>
+}
+
+// We want to check that we're correctly using exp
+// when specified so from the decomposition_config.
+// CHECK-LABEL: @online_attention_f16_noexp2
+// Q = Q * scale
+// CHECK: linalg.generic
+// CHECK:   arith.mulf
+// S = Q @ K
+// CHECK: linalg.generic
+// CHECK:   arith.extf
+// CHECK:   arith.extf
+// CHECK:   arith.mulf
+// CHECK:   arith.addf
+// CHECK:   linalg.yield
+// newMax = max(oldMax, rowMax(S))
+// CHECK: linalg.generic
+// CHECK-NOT: arith.extf
+// CHECK:   arith.maximumf
+// CHECK:   linalg.yield
+// norm = exp (oldMax - newMax)
+// CHECK: linalg.generic
+// CHECK-NOT: arith.extf
+// CHECK:   arith.subf
+// CHECK-NOT:   math.exp2
+// CHECK:   linalg.yield
+// normSum = norm * oldSum
+// CHECK: linalg.generic
+// CHECK-NOT: arith.extf
+// CHECK:   arith.mulf
+// CHECK:   linalg.yield
+// P = exp(S - newMax)
+// CHECK: linalg.generic
+// CHECK-NOT: arith.extf
+// CHECK:   arith.subf
+// CHECK-NOT:   math.exp2
+// CHECK:   linalg.yield
+// newSum = normSum + rowSum(P)
+// CHECK: linalg.generic
+// CHECK-NOT: arith.extf
+// CHECK:   arith.addf
+// CHECK:   linalg.yield
+// newAcc = norm * oldAcc
+// CHECK: linalg.generic
+// CHECK-NOT: arith.extf
+// CHECK:   arith.mulf
+// CHECK:   linalg.yield
+// newAcc = P @ V + newAcc
+// CHECK: linalg.generic
+// CHECK:   arith.extf
+// CHECK:   arith.extf
+// CHECK:   arith.mulf
+// CHECK:   arith.addf
+// CHECK:   linalg.yield
+
+// -----
+
 // Spec to decompose exp reduction op.
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
