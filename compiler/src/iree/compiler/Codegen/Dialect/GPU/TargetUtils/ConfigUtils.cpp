@@ -290,16 +290,20 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   // We need to clean it up and make it adjusting to different targets.
   // See https://github.com/iree-org/iree/issues/16341 for details.
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+  llvm::errs() << "mSize: " << mSize << "\n";
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+  llvm::errs() << "nSize: " << nSize << "\n";
   int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+  llvm::errs() << "kSize: " << kSize << "\n";
   int64_t computeIntensity = (2 * mSize * nSize * kSize) /
                              (mSize * nSize + nSize * kSize + mSize * kSize);
-
+  llvm::errs() << "computeIntensity: " << computeIntensity << "\n";
   if (computeIntensity <= gemmCutoffs.smallGemmCutoff) {
     // For matmuls with small arithmetic intensity, use small
     // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
     problem.gemmSize = GemmSize::SmallGemm;
     LDBG() << "This config is SmallGemm";
+    llvm::errs() << "This config is SmallGemm\n";
     if (isGemm) {
       seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
                /*bestMNTileCountPerSubgroup=*/2,
@@ -319,12 +323,19 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     // amortize launch/memory costs and maximize throughput.
     problem.gemmSize = GemmSize::LargeGemm;
     LDBG() << "This config is LargeGemm";
+    llvm::errs() << "This config is LargeGemm\n";
+    llvm::errs() << "isGemm: " << isGemm << "\n";
     if (isGemm) {
       seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
                /*bestMNTileCountPerSubgroup=*/16,
                /*bestKTileCountPerSubgroup=*/2,
                /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
                    inBitWidth};
+      if (scaled) {
+        seeds.bestMNTileCountPerSubgroup = 64;
+        seeds.bestKElementCountPerSubgroup = 256;
+      }
+      llvm::errs() << "seeds gemm: " << seeds.bestSubgroupCountPerWorkgroup << ", " << seeds.bestMNTileCountPerSubgroup << ", " << seeds.bestKTileCountPerSubgroup << ", " << seeds.bestKElementCountPerSubgroup << "\n";
     } else {
       // Favor more subgroups for convolution to help latency hiding from global
       // loads.
@@ -333,6 +344,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
                /*bestKTileCountPerSubgroup=*/2,
                /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
                    inBitWidth};
+      llvm::errs() << "seeds non gemm: " << seeds.bestSubgroupCountPerWorkgroup << ", " << seeds.bestMNTileCountPerSubgroup << ", " << seeds.bestKTileCountPerSubgroup << ", " << seeds.bestKElementCountPerSubgroup << "\n";
     }
   } else {
     // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
@@ -356,6 +368,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     }
   }
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+  llvm::errs() << "maxSharedMemoryBytes: " << maxSharedMemoryBytes << "\n";
 
   std::optional<int64_t> wgpCount = std::nullopt;
   if (TargetChipAttr chip = target.getChip()) {
@@ -367,6 +380,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       wgpCount, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
       /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt);
+  llvm::errs() << "schedule: " << schedule << "\n";
   return schedule;
 }
 

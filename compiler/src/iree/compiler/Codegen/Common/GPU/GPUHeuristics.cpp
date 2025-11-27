@@ -650,12 +650,14 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     // more than once in a row, and we want to keep the original seeds intact
     // for the next call.
     GPUMMAHeuristicSeeds localSeeds = seeds;
+    llvm::errs() << "before adjustSeedsForWgpCount: local seeds: " << localSeeds.bestSubgroupCountPerWorkgroup << ", " << localSeeds.bestMNTileCountPerSubgroup << ", " << localSeeds.bestKTileCountPerSubgroup << ", " << localSeeds.bestKElementCountPerSubgroup << "\n";
     localSeeds.bestMNTileCountPerSubgroup = adjustSeedsForWgpCount(
         problem, intrinsic, wgpCount, seeds.bestSubgroupCountPerWorkgroup,
         seeds.bestMNTileCountPerSubgroup, splitReductionTripCnt);
+    llvm::errs() << "after adjustSeedsForWgpCount: local seeds: " << localSeeds.bestSubgroupCountPerWorkgroup << ", " << localSeeds.bestMNTileCountPerSubgroup << ", " << localSeeds.bestKTileCountPerSubgroup << ", " << localSeeds.bestKElementCountPerSubgroup << "\n";
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
-
+    llvm::errs() << "schedule: " << schedule << "\n";
     LDBG() << "Chosen MMA schedule:\n" << schedule;
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
