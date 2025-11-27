@@ -285,9 +285,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
   // once the pipeline is able to support it. After adding multiple dimensions,
-  // all instances of schedule->m/nSubgroupCounts[0] and
-  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
-  // just the first element.
+  // all instances of schedule->m/nSubgroupCounts[0],
+  // schedule->m/n/kTileSizes[0] and schedule->m/n/kSizes[0] need to use the
+  // full list of sizes instead of just the first element.
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
@@ -345,6 +345,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   LDBG() << "Schedule: " << schedule;
 
+  assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
+
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
       ShapedType::getNumElements(schedule->nSubgroupCounts) *
@@ -368,12 +370,12 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     reductionTileSizes[ic] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
-  workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  workgroupTileSizes[mDim] = schedule->mSubgroupCounts[0] *
+                             schedule->mTileSizes[0] * schedule->mSizes[0];
+  workgroupTileSizes[nDim] = schedule->nSubgroupCounts[0] *
+                             schedule->nTileSizes[0] * schedule->nSizes[0];
 
-  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSizes[0];
 
   // Tile all filter loop dimensions to 1.
   for (int64_t filterDim : convolutionDims->filterLoop) {
@@ -510,9 +512,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
   // once the pipeline is able to support it. After adding multiple dimensions,
-  // all instances of schedule->m/nSubgroupCounts[0] and
-  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
-  // just the first element.
+  // all instances of schedule->m/nSubgroupCounts[0],
+  // schedule->m/n/kTileSizes[0] and schedule->m/n/kSizes[0] need to use the
+  // full list of sizes instead of just the first element.
   GPUMatmulShapeType problem{
       {bounds[mDim]}, {bounds[nDim]}, {bounds[kDim]}, getDimBounds(batchDims),
       lhsElemType,    rhsElemType,    initElemType,   numHorizontallyFusedOps};
@@ -597,6 +599,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "Schedule: " << schedule;
 
+  assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
+
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
       ShapedType::getNumElements(schedule->nSubgroupCounts) *
@@ -623,12 +627,12 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
-  workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  workgroupTileSizes[mDim] = schedule->mSubgroupCounts[0] *
+                             schedule->mTileSizes[0] * schedule->mSizes[0];
+  workgroupTileSizes[nDim] = schedule->nSubgroupCounts[0] *
+                             schedule->nTileSizes[0] * schedule->nSizes[0];
 
-  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSizes[0];
 
   LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
                                        *contractionDims, workgroupTileSizes));
@@ -893,7 +897,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
         pvSchedule.mSubgroupCounts[i] * pvSchedule.mTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == mDims.size() - 1) {
-      workgroupTileSizes[mDim] *= pvSchedule.mSize;
+      workgroupTileSizes[mDim] *= llvm::product_of(pvSchedule.mSizes);
     }
     subgroupBasis.counts[mDim] = pvSchedule.mSubgroupCounts[i];
   }
@@ -902,7 +906,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
         pvSchedule.nSubgroupCounts[i] * pvSchedule.nTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == nDims.size() - 1) {
-      workgroupTileSizes[nDim] *= pvSchedule.nSize;
+      workgroupTileSizes[nDim] *= llvm::product_of(pvSchedule.nSizes);
     }
     subgroupBasis.counts[nDim] = pvSchedule.nSubgroupCounts[i];
   }
@@ -910,7 +914,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     reductionTileSizes[k2Dim] = pvSchedule.kTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == k2Dims.size() - 1) {
-      reductionTileSizes[k2Dim] *= pvSchedule.kSize;
+      reductionTileSizes[k2Dim] *= llvm::product_of(pvSchedule.kSizes);
     }
   }
 
