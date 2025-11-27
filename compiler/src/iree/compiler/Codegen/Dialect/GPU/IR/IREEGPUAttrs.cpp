@@ -1359,11 +1359,11 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
               /*tstrides=*/{16, 1, 1},
               /*element=*/{1, 32, 1}};
     case kScaledMMAOperandLhsScale:
-      return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
-              /*element=*/{1, 1}};
+      return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*tstrides=*/{1, 16},
+              /*element=*/{1, 4}};
     case kScaledMMAOperandRhsScale:
-      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
-              /*element=*/{1, 1}};
+      return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{4, 1}};
     case kScaledMMAOperandAcc:
       return mfmaAcc16x16;
     }
