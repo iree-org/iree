@@ -382,8 +382,8 @@ struct FlexAttentionOpConversion
     int64_t valueDim = valueShape[3];
 
     // Dynamic head dim is not supported.
-    if (headDim == kUnknownSize) {
-      return emitError() << "NYI: dynamic head dimension";
+    if (headDim == torch::Torch::kUnknownSize) {
+      return rewriter.notifyMatchFailure(op, "NYI: dynamic head dimension");
     }
 
     auto floatType = dyn_cast<FloatType>(queryType.getOptionalDtype());
