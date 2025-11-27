@@ -12,6 +12,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -26,51 +27,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 using IREE::LinalgExt::MapScatterOp;
-
-//===----------------------------------------------------------------------===//
-// Preprocessing Utilities
-//===----------------------------------------------------------------------===//
-
-/// Convert complex ops into simpler ops by decomposing or raising to a named
-/// op.
-///  - `PackOp`s and `UnPackOp`s are decomposed.
-///  - Transpose `linalg::GenericOp`s are raised to `linalg::TransposeOp`s.
-static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
-                                       FunctionOpInterface funcOp) {
-  OpBuilder::InsertionGuard g(rewriter);
-  SmallVector<linalg::PackOp> packOps(
-      funcOp.getFunctionBody().getOps<linalg::PackOp>());
-  for (auto packOp : packOps) {
-    rewriter.setInsertionPoint(packOp);
-    FailureOr<linalg::LowerPackResult> result = linalg::lowerPack(
-        rewriter, packOp, /*lowerPadLikeWithInsertSlice=*/false);
-    // For aligned pack ops, the pad will be a no-op, and can be folded away.
-    // Fold it here so it does not complicate the index transformation folding
-    // later on.
-    if (failed(result) || !result->padOp) {
-      continue;
-    }
-    if (areAllConstantIntValue(result->padOp.getMixedLowPad(), 0) &&
-        areAllConstantIntValue(result->padOp.getMixedHighPad(), 0)) {
-      rewriter.replaceOp(result->padOp, result->padOp.getSource());
-    }
-  }
-  SmallVector<linalg::UnPackOp> unPackOps(
-      funcOp.getFunctionBody().getOps<linalg::UnPackOp>());
-  for (auto unPackOp : unPackOps) {
-    rewriter.setInsertionPoint(unPackOp);
-    (void)linalg::lowerUnPack(rewriter, unPackOp,
-                              /*lowerUnpadLikeWithExtractSlice=*/false);
-  }
-  SmallVector<linalg::GenericOp> genericOps(
-      funcOp.getFunctionBody().getOps<linalg::GenericOp>());
-  for (auto genericOp : genericOps) {
-    if (linalg::isaTransposeOpInterface(genericOp)) {
-      rewriter.setInsertionPoint(genericOp);
-      (void)linalg::specializeGenericOp(rewriter, genericOp);
-    }
-  }
-}
 
 //===----------------------------------------------------------------------===//
 // Combining Layout Transformation Ops
@@ -89,15 +45,28 @@ foldIdentityLikeOpIntoMapScatter(RewriterBase &rewriter, Operation *op,
   return mapScatterOp;
 }
 
-/// Fold a `transposeOp` into a consumer `mapScatterOp`, by transposing the
-/// uses of the `mapScatterOp`s transformation_region block arguments.
-static MapScatterOp foldTransposeIntoMapScatter(RewriterBase &rewriter,
-                                                linalg::TransposeOp transposeOp,
-                                                MapScatterOp mapScatterOp) {
-  assert(mapScatterOp.getInput() == transposeOp->getResult(0) &&
+/// Fold a transpose op into a consumer `mapScatterOp`, by transposing the
+/// uses of the `mapScatterOp`s transformation_region block arguments. If
+/// the `linalgOp` is not a transpose, then return failure.
+static FailureOr<MapScatterOp>
+foldTransposeIntoMapScatter(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                            MapScatterOp mapScatterOp) {
+  ArrayRef<int64_t> perm;
+  if (auto transposeOp =
+          dyn_cast<linalg::TransposeOp>(linalgOp.getOperation())) {
+    perm = transposeOp.getPermutation();
+  } else if (auto genericOp =
+                 dyn_cast<linalg::GenericOp>(linalgOp.getOperation())) {
+    std::optional<SmallVector<int64_t>> maybePerm =
+        linalg::isaTransposeOpInterface(genericOp);
+    if (!maybePerm.has_value()) {
+      return rewriter.notifyMatchFailure(linalgOp, "not a transpose op");
+    }
+    perm = maybePerm.value();
+  }
+  assert(mapScatterOp.getInput() == linalgOp->getResult(0) &&
          "expected transposeOp to be the producer of mapScatterOp");
 
-  ArrayRef<int64_t> perm = transposeOp.getPermutation();
   auto indexTransformBuilder =
       [&](ArrayRef<BlockArgument> srcIndices) -> SmallVector<Value> {
     SmallVector<Value> indexValues(srcIndices);
@@ -106,7 +75,8 @@ static MapScatterOp foldTransposeIntoMapScatter(RewriterBase &rewriter,
   rewriter.modifyOpInPlace(mapScatterOp, [&]() {
     mapScatterOp.insertTransformationAtStart(rewriter, indexTransformBuilder,
                                              perm.size());
-    mapScatterOp.getInputMutable().assign(transposeOp.getInput());
+    mapScatterOp.getInputMutable().assign(
+        linalgOp.getDpsInputOperand(0)->get());
   });
   return mapScatterOp;
 }
@@ -232,6 +202,122 @@ foldExtractSliceIntoMapScatter(RewriterBase &rewriter,
   return mapScatterOp;
 }
 
+///
+static std::optional<OpOperand *>
+getMapScatterOutputBuffer(MapScatterOp mapScatterOp) {
+  // Find the output buffer that the mapScatterOp is stored into.
+  if (!mapScatterOp->hasOneUse()) {
+    return std::nullopt;
+  }
+  auto storeOp = dyn_cast<IREE::Codegen::StoreToBufferOp>(
+      *mapScatterOp->getUsers().begin());
+  if (!storeOp) {
+    return std::nullopt;
+  }
+  return &storeOp.getBufferMutable();
+}
+
+FailureOr<MapScatterOp>
+foldPackIntoMapScatter(RewriterBase &rewriter, linalg::PackOp packOp,
+                       MapScatterOp mapScatterOp,
+                       PadDistributionConfigFn padDistributionConfigFn) {
+  assert(mapScatterOp.getInput() == packOp->getResult(0) &&
+         "expected packOp to be the producer of mapScatterOp");
+  // If the pack has padding semantics, then we need to be able to
+  // distribute the pad.
+  if (packOp.getPaddingValue() && !padDistributionConfigFn) {
+    return rewriter.notifyMatchFailure(
+        packOp, "packOp has padding semantics, but pad folding is not allowed");
+  }
+  if (packOp.getPaddingValue() && !getMapScatterOutputBuffer(mapScatterOp)) {
+    return rewriter.notifyMatchFailure(
+        mapScatterOp, "packOp has padding semantics, and map_scatter user "
+                      "is not an iree_codegen.store_to_buffer op");
+  }
+
+  // Decompose the pack op, and fold each decomposed op one by one.
+  rewriter.setInsertionPoint(packOp);
+  FailureOr<linalg::LowerPackResult> result = linalg::lowerPack(
+      rewriter, packOp, /*lowerPadLikeWithInsertSlice=*/false);
+  if (failed(result)) {
+    return rewriter.notifyMatchFailure(packOp,
+                                       "could not decompose linalg.pack");
+  }
+
+  // Fold TransposeOp.
+  if (linalg::TransposeOp transposeOp = result->transposeOp) {
+    mapScatterOp =
+        foldTransposeIntoMapScatter(rewriter, transposeOp, mapScatterOp)
+            .value();
+  }
+  // Fold ExpandShapeOp.
+  if (tensor::ExpandShapeOp expandShapeOp = result->expandShapeOp) {
+    mapScatterOp =
+        foldExpandShapeIntoMapScatter(rewriter, expandShapeOp, mapScatterOp);
+  }
+  // Fold PadOp.
+  if (tensor::PadOp padOp = result->padOp) {
+    // For aligned pack ops, the pad will be a no-op, and can be folded away.
+    // Fold it here so it does not complicate the index transformation.
+    if (areAllConstantIntValue(padOp.getMixedLowPad(), 0) &&
+        areAllConstantIntValue(padOp.getMixedHighPad(), 0)) {
+      rewriter.replaceOp(padOp, padOp.getSource());
+    } else {
+      // `foldPadIntoMapScatter` is guaranteed to succeed because we checked
+      // for the outputBuffer above.
+      mapScatterOp = foldPadIntoMapScatter(rewriter, padOp, mapScatterOp,
+                                           padDistributionConfigFn)
+                         .value();
+    }
+  }
+  return mapScatterOp;
+}
+
+/// Fold a `unpackOp` into a consumer `mapScatterOp`.
+static FailureOr<MapScatterOp>
+foldUnpackIntoMapScatter(RewriterBase &rewriter, linalg::UnPackOp unpackOp,
+                         MapScatterOp mapScatterOp) {
+  assert(mapScatterOp.getInput() == unpackOp->getResult(0) &&
+         "expected unpackOp to be the producer of mapScatterOp");
+
+  // Decompose the unpack op, and fold each decomposed op one by one.
+  rewriter.setInsertionPoint(unpackOp);
+  FailureOr<linalg::LowerUnPackOpResult> result = linalg::lowerUnPack(
+      rewriter, unpackOp, /*lowerUnpadLikeWithExtractSlice=*/false);
+  if (failed(result)) {
+    return rewriter.notifyMatchFailure(unpackOp,
+                                       "could not decompose linalg.unpack");
+  }
+
+  // The unpack decomposition will generate a linalg.copy, but it is
+  // not included in the `LowerUnPackOpResult`.
+  if (auto copyOp = mapScatterOp.getInput().getDefiningOp<linalg::CopyOp>()) {
+    mapScatterOp =
+        foldIdentityLikeOpIntoMapScatter(rewriter, copyOp, mapScatterOp);
+  }
+  // Fold ExtractSliceOp.
+  if (tensor::ExtractSliceOp extractSliceOp = result->extractSliceOp) {
+    // `foldExtractSliceIntoMapScatter` is guaranteed to succeed because the
+    // unpack decomposition creates a non-strided, zero offset slice with no
+    // rank reduction.
+    mapScatterOp =
+        foldExtractSliceIntoMapScatter(rewriter, extractSliceOp, mapScatterOp)
+            .value();
+  }
+  // Fold CollapseShapeOp.
+  if (tensor::CollapseShapeOp collapseShapeOp = result->collapseShapeOp) {
+    mapScatterOp = foldCollapseShapeIntoMapScatter(rewriter, collapseShapeOp,
+                                                   mapScatterOp);
+  }
+  // Fold TransposeOp.
+  if (linalg::TransposeOp transposeOp = result->transposeOp) {
+    mapScatterOp =
+        foldTransposeIntoMapScatter(rewriter, transposeOp, mapScatterOp)
+            .value();
+  }
+  return mapScatterOp;
+}
+
 static void buildNestedDistributionLoops(
     RewriterBase &rewriter, Location loc, int64_t distributionLevel,
     SmallVector<OpFoldResult> lbs, SmallVector<OpFoldResult> ubs,
@@ -280,20 +366,15 @@ FailureOr<MapScatterOp>
 foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                       MapScatterOp mapScatterOp,
                       PadDistributionConfigFn padDistributionConfigFn) {
-  // Find the output buffer that the mapScatterOp is stored into.
-  if (!mapScatterOp->hasOneUse()) {
-    return rewriter.notifyMatchFailure(
-        mapScatterOp, "map_scatter does not have a single user");
-  }
-  auto storeOp = dyn_cast<IREE::Codegen::StoreToBufferOp>(
-      *mapScatterOp->getUsers().begin());
-  if (!storeOp) {
+  std::optional<OpOperand *> maybeOutputBuffer =
+      getMapScatterOutputBuffer(mapScatterOp);
+  if (!maybeOutputBuffer.has_value()) {
     return rewriter.notifyMatchFailure(
         mapScatterOp,
         "map_scatter user is not an iree_codegen.store_to_buffer op");
   }
 
-  rewriter.setInsertionPointAfter(storeOp);
+  rewriter.setInsertionPointAfter(maybeOutputBuffer.value()->getOwner());
   Location loc = padOp->getLoc();
   SmallVector<OpFoldResult> padSrcSizes =
       tensor::getMixedSizes(rewriter, loc, padOp.getSource());
@@ -301,7 +382,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
       tensor::getMixedSizes(rewriter, loc, padOp.getResult());
 
   // Write the padding values directly into the outputBuffer.
-  Value outputBuffer = storeOp.getBuffer();
+  Value outputBuffer = maybeOutputBuffer.value()->get();
   auto innerLoopBuilder = [&](OpBuilder &b, Location loopLoc, ValueRange ivs) {
     // We need to scatter the padding values according to the existing
     // mapScatterOp transformation, so clone the transformation into the
@@ -413,6 +494,9 @@ FailureOr<MapScatterOp> foldIntoMapScatter(RewriterBase &rewriter,
       .Case<linalg::TransposeOp>([&](linalg::TransposeOp transposeOp) {
         return foldTransposeIntoMapScatter(rewriter, transposeOp, mapScatterOp);
       })
+      .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
+        return foldTransposeIntoMapScatter(rewriter, genericOp, mapScatterOp);
+      })
       .Case<tensor::ExpandShapeOp>([&](tensor::ExpandShapeOp expandOp) {
         return foldExpandShapeIntoMapScatter(rewriter, expandOp, mapScatterOp);
       })
@@ -423,6 +507,12 @@ FailureOr<MapScatterOp> foldIntoMapScatter(RewriterBase &rewriter,
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp extractSliceOp) {
         return foldExtractSliceIntoMapScatter(rewriter, extractSliceOp,
                                               mapScatterOp);
+      })
+      .Case<linalg::PackOp>([&](linalg::PackOp packOp) {
+        return foldPackIntoMapScatter(rewriter, packOp, mapScatterOp);
+      })
+      .Case<linalg::UnPackOp>([&](linalg::UnPackOp unpackOp) {
+        return foldUnpackIntoMapScatter(rewriter, unpackOp, mapScatterOp);
       })
       .Default([](Operation *) { return failure(); });
 }
@@ -451,9 +541,12 @@ static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
 }
 
 bool isSupportedRelayoutOp(Operation *op) {
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+    return linalg::isaTransposeOpInterface(genericOp).has_value();
+  }
   return isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
              tensor::ExtractSliceOp, tensor::PadOp, linalg::CopyOp,
-             linalg::TransposeOp>(op);
+             linalg::TransposeOp, linalg::UnPackOp, linalg::PackOp>(op);
 }
 
 // This is only desirable in the dispatch scope but not in the workgroup scope.
@@ -564,12 +657,8 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
     return failure();
   }
 
-  // Apply some preprocessing to convert complex layout transformation
-  // ops like pack and unpack into simpler supported ops.
-  IRRewriter rewriter(ctx);
-  simplifyComplexRelayoutOps(rewriter, funcOp);
-
   // Combine relayout operations into new the map_scatter ops.
+  IRRewriter rewriter(ctx);
   RewritePatternSet relayoutCombinationPatterns(ctx);
   relayoutCombinationPatterns.add<InsertMapScatterOpPattern>(ctx, controlFn);
   populateCombineRelayoutOpPatterns(relayoutCombinationPatterns,
