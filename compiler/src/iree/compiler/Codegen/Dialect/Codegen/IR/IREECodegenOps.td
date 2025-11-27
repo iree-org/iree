@@ -112,6 +112,22 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
 }
 
 //===----------------------------------------------------------------------===//
+// FusionBarrierOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_FusionBarrierOp :
+    Op<IREECodegen_Dialect, "fusion_barrier", [
+      SameOperandsAndResultType, Pure]> {
+  let summary = [{Prevents fusion through a tensor value}];
+
+  let arguments = (ins AnyRankedTensor:$source);
+  let results = (outs AnyRankedTensor:$result);
+  let assemblyFormat = [{
+    attr-dict $source `:` type($result)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // SwizzleHintOp
 //===----------------------------------------------------------------------===//
 
