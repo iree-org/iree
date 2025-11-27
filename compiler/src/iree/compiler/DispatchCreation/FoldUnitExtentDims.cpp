@@ -278,6 +278,58 @@ static linalg::ControlDropUnitDims getControlDropUnitDimsOptions() {
     }
     return defaultFn(op);
   };
+
+  options.collapseFn =
+      [](RewriterBase &rewriter, Location loc, Value operand,
+         ArrayRef<int64_t> targetShape,
+         ArrayRef<ReassociationIndices> reassociation,
+         const linalg::ControlDropUnitDims &control) -> FailureOr<Value> {
+    auto tensorType = cast<RankedTensorType>(operand.getType());
+    assert(control.rankReductionStrategy ==
+               linalg::ControlDropUnitDims::RankReductionStrategy::
+                   ReassociativeReshape &&
+           "unexpected rank reduction strategy");
+    auto encoding = tensorType.getEncoding();
+    if (encoding &&
+        (!isa_and_present<IREE::Encoding::CollapsibleEncodingAttrInterface>(
+             encoding) ||
+         !cast<IREE::Encoding::CollapsibleEncodingAttrInterface>(encoding)
+              .canCollapse())) {
+      // If the tensor has an encoding and that encoding does not implement the
+      // interface or cannot be collapsed, return failure to abort the
+      // transformation.
+      return failure();
+    }
+    auto targetType = RankedTensorType::get(
+        targetShape, tensorType.getElementType(), encoding);
+    return tensor::CollapseShapeOp::create(rewriter, loc, targetType, operand,
+                                           reassociation)
+        .getResult();
+  };
+
+  options.expandFn =
+      [=](RewriterBase &rewriter, Location loc, Value result, Value origDest,
+          ArrayRef<ReassociationIndices> reassociation,
+          const linalg::ControlDropUnitDims &control) -> FailureOr<Value> {
+    auto origResultType = cast<RankedTensorType>(origDest.getType());
+    auto origEncoding = origResultType.getEncoding();
+    if (origEncoding &&
+        (!isa_and_present<IREE::Encoding::CollapsibleEncodingAttrInterface>(
+             origEncoding) ||
+         !cast<IREE::Encoding::CollapsibleEncodingAttrInterface>(origEncoding)
+              .canCollapse())) {
+      // If the tensor has an encoding that does not implement the interface or
+      // cannot be collapsed, return failure to abort the transformation.
+      return failure();
+    }
+    assert(control.rankReductionStrategy ==
+               linalg::ControlDropUnitDims::RankReductionStrategy::
+                   ReassociativeReshape &&
+           "unknown rank reduction strategy");
+    return tensor::ExpandShapeOp::create(rewriter, loc, origResultType, result,
+                                         reassociation)
+        .getResult();
+  };
   return options;
 }
 

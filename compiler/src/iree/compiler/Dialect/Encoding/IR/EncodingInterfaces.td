@@ -342,6 +342,32 @@ def IREEEncoding_ContractionEncodingAttrInterface :
   ];
 }
 
+def IREEEncoding_CollapsibleEncodingAttrInterface :
+  AttrInterface<"CollapsibleEncodingAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
+  let description = [{
+    Interface used to query whether a tensor with the encoding
+    can be collapsed, e.g., to fold away unit extent dimensions.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if a tensor type with this encoding can be
+        collapsed.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"canCollapse",
+      /*args=*/(ins
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Type Interfaces
 //===----------------------------------------------------------------------===//
