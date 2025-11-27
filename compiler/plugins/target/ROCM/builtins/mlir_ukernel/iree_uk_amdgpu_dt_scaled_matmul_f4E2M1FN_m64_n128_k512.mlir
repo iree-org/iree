@@ -66,9 +66,8 @@
 !res_ty = tensor<4x16x8x16xf32>
 !return_ty = tensor<1x1x4x4x2x4x16x4xf32>
 
-!acc_ty = vector<4x2x4x4x1xf32>
+!acc_ty = vector<4x2x4x1xf32>
 
-!reduce_ty = vector<4x2x4x1xf32>
 !store_ty = vector<1x1x1x4x2x1x1x4xf32>
 !tensor_store_ty = tensor<1x1x1x4x2x1x1x4xf32>
 
@@ -77,14 +76,14 @@
   affine_map<(i, j, k, d) -> (j, d, k)>,
   affine_map<(i, j, k, d) -> (i, d, k)>,
   affine_map<(i, j, k, d) -> (j, d, k)>,
-  affine_map<(i, j, k, d) -> (i, j, k)>
+  affine_map<(i, j, k, d) -> (i, j)>
 ]
 
 #iterator_types = [
   #linalg.iterator_type<parallel>,
   #linalg.iterator_type<parallel>,
   #linalg.iterator_type<parallel>,
-  #linalg.iterator_type<parallel>
+  #linalg.iterator_type<reduction>
 ]
 
 #mfma_type = #iree_gpu.scaled_mma_layout<
@@ -105,7 +104,7 @@ util.func @dt_scaled_matmul_f4f4f32_m64_n128_k512(
     match = {
       types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]
     },
-    benefit = 1,
+    benefit = 2,
     mma = #iree_gpu.data_tiled_scaled_mma_layout<
       intrinsic = MFMA_SCALE_F32_16x16x128_B32,
       lhs_elem_type = f4E2M1FN,
@@ -254,11 +253,7 @@ util.func @dt_scaled_matmul_f4f4f32_m64_n128_k512(
       scf.yield %dot : !acc_ty
     }
 
-    %reduce_init = arith.constant dense<0.0> : !reduce_ty
-    %reduce = vector.multi_reduction <add>, %loop, %reduce_init [2] :
-      !acc_ty to !reduce_ty
-
-    %t = vector.shape_cast %reduce : !reduce_ty to !store_ty
+    %t = vector.shape_cast %loop : !acc_ty to !store_ty
 
     %empty = tensor.empty() : !tensor_store_ty
     %to_tensor = vector.transfer_write %t, %empty[%c0, %c0, %c0, %c0, %c0, %c0, %c0, %c0]
