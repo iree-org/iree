@@ -112,9 +112,8 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
       // Remove if it is added there.
       // https://github.com/llvm/llvm-project/issues/78458
       .addPass(affine::createAffineExpandIndexOpsPass)
-      .addPass(mlir::createLowerAffinePass);
-
-  passManager.addPass(mlir::arith::createArithUnsignedWhenEquivalentPass());
+      .addPass(mlir::createLowerAffinePass)
+      .addPass(mlir::arith::createArithUnsignedWhenEquivalentPass);
 
   // Propagate buffer subranges throughout the program - this should remove any
   // remaining subspans and give us a smaller surface area during conversion.
