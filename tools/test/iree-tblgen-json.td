@@ -7,7 +7,7 @@
 // RUN: iree-tblgen --gen-dialect-json %s \
 // RUN:   -I %S/../../compiler/src \
 // RUN:   -I %S/../../third_party/llvm-project/mlir/include \
-// RUN:   -I %S/../../external/llvm-project/mlir/include \
+// RUN:   -I %S/../../external/_main~_repo_rules~llvm-project/mlir/include \
 // RUN:   | FileCheck %s
 
 include "mlir/IR/OpBase.td"
