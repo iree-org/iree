@@ -171,6 +171,7 @@ function(iree_cc_test)
         ${_NAME_PATH}
       COMMAND
        "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv_test.sh"
+        -L "${RISCV_TOOLCHAIN_ROOT}/sysroot"
         "$<TARGET_FILE:${_NAME}>"
         ${_RULE_ARGS}
     )
