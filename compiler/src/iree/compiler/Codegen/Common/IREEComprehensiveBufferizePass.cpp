@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -238,6 +239,14 @@ runIREEOneShotBufferize(Operation *op,
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
+
+  // First drop all fusion barriers. Fusion is done at this point and these can
+  // be safely removed.
+  IRRewriter rewriter(funcOp.getContext());
+  funcOp.walk([&](IREE::Codegen::FusionBarrierOp barrier) {
+    rewriter.replaceOp(barrier, barrier.getSource());
+  });
+
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
