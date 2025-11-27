@@ -329,9 +329,6 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
         b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
     scale = arith::MulFOp::create(b, loc, scale, log2e);
   }
-  Value log2e = arith::ConstantOp::create(
-      b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  scale = arith::MulFOp::create(b, loc, scale, log2e);
 
   auto qETy = getElementTypeOrSelf(query.getType());
 
