@@ -458,20 +458,12 @@ def test_infer_scaled_contraction_dimensions():
     assert len(root_op_list) == 1, "Should have exactly one root op"
     scaled_op = root_op_list[0]
 
-    # Verify it's a scaled contraction first.
     assert iree_codegen.isa_scaled_contraction_op(
         scaled_op
     ), "Operation should be recognized as scaled contraction"
 
     dims = iree_codegen.infer_scaled_contraction_dimensions(scaled_op)
     assert dims is not None, "Should successfully infer dimensions"
-
-    # Verify the inferred dimensions match expected values.
-    # For the given indexing maps:
-    # d0 = M (parallel) -> m,
-    # d1 = N (parallel) -> n,
-    # d2 = Ko (reduction) -> k,
-    # d3 = Kb (reduction, block dim) -> kB.
     assert dims.m == [0], f"Got {dims.m}"
     assert dims.n == [1], f"Got {dims.n}"
     assert dims.k == [2], f"Got {dims.k}"
@@ -538,16 +530,18 @@ def test_infer_scaled_contraction_dimensions():
     """
     input_module_batched = ir.Module.parse(module_str_batched)
     batched_ops = iree_codegen.get_tuner_root_ops(input_module_batched)
-    if len(batched_ops) == 1:
-        batched_op = batched_ops[0]
-        assert iree_codegen.isa_scaled_contraction_op(
-            batched_op
-        ), "Batched scaled matmul should be recognized"
+    assert len(batched_ops) == 1, "Batched op should be found"
+    batched_op = batched_ops[0]
+    assert iree_codegen.isa_scaled_contraction_op(
+        batched_op
+    ), "Batched scaled matmul should be recognized"
 
-        dims_batched = iree_codegen.infer_scaled_contraction_dimensions(batched_op)
-        if dims_batched is not None:
-            assert dims_batched.batch == [0], f"Got {dims_batched.batch}"
-            assert dims_batched.m == [1], f"Got {dims_batched.m}"
-            assert dims_batched.n == [2], f"Got {dims_batched.n}"
-            assert dims_batched.k == [3], f"Got {dims_batched.k}"
-            assert dims_batched.kB == [4], f"Got {dims_batched.kB}"
+    dims_batched = iree_codegen.infer_scaled_contraction_dimensions(batched_op)
+    assert (
+        dims_batched is not None
+    ), "Batch dimension must be present in batched scaled matmul"
+    assert dims_batched.batch == [0], f"Got {dims_batched.batch}"
+    assert dims_batched.m == [1], f"Got {dims_batched.m}"
+    assert dims_batched.n == [2], f"Got {dims_batched.n}"
+    assert dims_batched.k == [3], f"Got {dims_batched.k}"
+    assert dims_batched.kB == [4], f"Got {dims_batched.kB}"
