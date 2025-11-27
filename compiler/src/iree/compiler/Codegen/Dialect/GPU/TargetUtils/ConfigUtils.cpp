@@ -333,7 +333,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
                    inBitWidth};
       if (scaled) {
         // seeds.bestMNTileCountPerSubgroup = 64;
-        // seeds.bestKElementCountPerSubgroup = 256;
+        seeds.bestKElementCountPerSubgroup = 256;
       }
       llvm::errs() << "seeds gemm: " << seeds.bestSubgroupCountPerWorkgroup << ", " << seeds.bestMNTileCountPerSubgroup << ", " << seeds.bestKTileCountPerSubgroup << ", " << seeds.bestKElementCountPerSubgroup << "\n";
     } else {
