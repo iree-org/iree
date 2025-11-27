@@ -21,7 +21,9 @@ VER_0 {
     ireeGPUGetSingleSubgroupLayout;
     ireeCodegenGetTunerRootOps;
     ireeCodegenGetAttentionOpDetail;
+    ireeCodegenInferScaledContractionDimensions;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
+    ireeCodegenMlirOperationIsAScaledContractionOp;
     ireeCodegenHasIGEMMGenericConvDetails;
     ireeCodegenGetIGEMMGenericConvDetails;
     ireeCodegenTranslationInfoAttrGet;
