@@ -58,12 +58,12 @@ use_repo(
 iree_ext = use_extension("//build_tools/bazel:extensions.bzl", "iree_extension")
 use_repo(
     iree_ext,
-    "llvm-raw",
     "com_github_dvidelabs_flatcc",
     "com_google_benchmark",
     "com_google_googletest",
     "hsa_runtime_headers",
     "iree_cuda",
+    "llvm-raw",
     "nccl",
     "spirv_cross",
     "stablehlo",
@@ -74,4 +74,5 @@ use_repo(
 
 # Configure LLVM using the llvm-raw repo (creates llvm-project)
 llvm_configure = use_repo_rule("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure")
+
 llvm_configure(name = "llvm-project")

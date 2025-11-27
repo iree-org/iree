@@ -37,8 +37,7 @@ def iree_amdgpu_binary(
     link_tool = "@llvm-project//llvm:llvm-link"
     lld_tool = "@llvm-project//lld:lld"
     builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
-    # Note: With bzlmod, repo rules create repos with +_repo_rules+ prefix.
-    builtin_headers_path = "external/+_repo_rules+llvm-project/clang/staging/include/"
+    builtin_headers_path = "external/_main~_repo_rules~llvm-project/clang/staging/include/"
 
     base_copts = [
         # C configuration.

@@ -9,7 +9,6 @@
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", "new_local_repository")
 load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
 
-
 def _iree_extension_impl(module_ctx):
     """Implementation of the IREE module extension."""
 
