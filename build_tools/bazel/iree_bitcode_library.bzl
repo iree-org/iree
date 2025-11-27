@@ -67,7 +67,7 @@ def iree_bitcode_library(
     clang_tool = "@llvm-project//clang:clang"
     link_tool = "@llvm-project//llvm:llvm-link"
     builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
-    builtin_headers_path = "external/llvm-project/clang/staging/include/"
+    builtin_headers_path = "external/_main~_repo_rules~llvm-project/clang/staging/include/"
 
     base_copts = [
         # Target architecture
@@ -189,7 +189,7 @@ def iree_cuda_bitcode_library(
     clang_tool = "@llvm-project//clang:clang"
     link_tool = "@llvm-project//llvm:llvm-link"
     builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
-    builtin_headers_path = "external/llvm-project/clang/staging/include/"
+    builtin_headers_path = "external/_main~_repo_rules~llvm-project/clang/staging/include/"
 
     base_copts = [
         "-x",
