@@ -47,6 +47,13 @@ def IREEGPU_LoweringConfigAttr :
     AttrParameter<"DictionaryAttr",
         "The configured fields, including tiling levels">:$attributes
   );
+  
+  let extraClassDeclaration = [{
+    // Padding level methods
+    SmallVector<int64_t> getInitialPaddingSizes() const;
+    SmallVector<int64_t> getStaticPaddingLevelSizes(unsigned level) const;
+    bool hasPaddingLevel(GPU::PaddingLevel level) const;
+  }];
 }
 
 def IREEGPU_DerivedThreadConfig :

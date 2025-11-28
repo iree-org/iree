@@ -519,10 +519,11 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
-/// sizes and the workgroup size. The optional argument `padConvDims` is used to
-/// determine the convolution dimensions for padding when creating
-/// `padding_conv` config. `padding_conv` attribute is only used when padding
-/// convolutions before converting them to IGEMM.
+/// sizes and the workgroup size. The optional argument `convToIgemmInfo` is 
+/// used to determine the convolution dimensions for padding when creating the
+/// `padding_initial` level config. The `padding_initial` level is used when 
+/// padding convolutions before converting them to IGEMM (i.e., padding happens
+/// in the convolution space before transformation to GEMM space).
 static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
@@ -827,14 +828,18 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       kPackFactor = std::get<2>(mmaKind.getMNKShape());
     }
     paddingTileSizes[innerKDim] *= kPackFactor;
-    attrs.emplace_back("padding", b.getI64ArrayAttr(paddingTileSizes));
+    attrs.emplace_back(
+      StringAttr::get(context, 
+        getPaddingLevelName(GPU::PaddingLevel::PartialReduction)),
+      b.getI64ArrayAttr(paddingTileSizes));
 
-    // Create `padding_conv` attribute when padding convolutions before IGEMM
-    // is possible.
+    // Create padding attribute at Initial level when padding convolutions
+    // before IGEMM is possible (before IGEMM transformation).
     if (auto attr =
             getPaddingConvSizes(b, bounds, paddingTileSizes, workgroupTileSizes,
                                 reductionTileSizes, convToIgemmInfo)) {
-      attrs.emplace_back("padding_conv", *attr);
+      attrs.emplace_back(StringAttr::get(context, 
+          getPaddingLevelName(GPU::PaddingLevel::Initial)), *attr);
     }
   }
   auto configDict = DictionaryAttr::get(context, attrs);
@@ -1759,7 +1764,10 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   if (!mustBeAligned) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
     paddingTileSizes[kDim] = reductionTileSizes[kDim] * schedule->kSize;
-    attrs.emplace_back("padding_conv", b.getI64ArrayAttr(paddingTileSizes));
+    // Padding at Initial level for convolution (before transformation)
+    attrs.emplace_back(
+      StringAttr::get(context, getPaddingLevelName(GPU::PaddingLevel::Initial)),
+      b.getI64ArrayAttr(paddingTileSizes));
   }
 
   auto configDict = DictionaryAttr::get(context, attrs);

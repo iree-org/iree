@@ -409,6 +409,7 @@ def IREEGPU_ScaledMMAIntrinsic : IREEGPU_I32Enum<"ScaledMMAIntrinsic",
 
 //===----------------------------------------------------------------------===//
 // Tiling levels
+//===----------------------------------------------------------------------===//
 
 def Workgroup : I32EnumAttrCase<"Workgroup", 0>;
 def Reduction : I32EnumAttrCase<"Reduction", 1>;
@@ -431,6 +432,24 @@ def IREEGPU_TilingLevel : IREEGPU_I32EnumAttr<"TilingLevel",
       Thread,
       Subgroup,
       Lane
+    ]>;
+
+//===----------------------------------------------------------------------===//
+// Padding levels
+//===----------------------------------------------------------------------===//
+
+// Padding at the start of the pipeline, before transformations like IGEMM
+def PaddingInitial : I32EnumAttrCase<"Initial", 0>;
+// Padding at partial reduction level
+def PaddingPartialReduction : I32EnumAttrCase<"PartialReduction", 1>;
+
+/// Enum descriptor for the set of padding levels for GPU pass pipelines.
+/// The `Initial` level is used for operations like convolution that need
+/// padding before transformation (e.g., before IGEMM conversion).
+def IREEGPU_PaddingLevel : IREEGPU_I32EnumAttr<"PaddingLevel",
+    "Descriptor for padding levels for GPU lowering configs", [
+      PaddingInitial,
+      PaddingPartialReduction
     ]>;
 
 //===----------------------------------------------------------------------===//

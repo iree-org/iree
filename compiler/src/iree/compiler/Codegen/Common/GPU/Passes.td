@@ -202,26 +202,6 @@ def GPUPackToIntrinsicsPass :
   ];
 }
 
-def GPUPadConvsPass :
-    InterfacePass<"iree-codegen-gpu-pad-convs",
-                  "mlir::FunctionOpInterface"> {
-  let summary = "Pass to pad operands of a convolution with padding configuration provided.";
-  let dependentDialects = [
-    "::mlir::linalg::LinalgDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
-  ];
-}
-
-def GPUPadOperandsPass :
-    InterfacePass<"iree-codegen-gpu-pad-operands",
-                  "mlir::FunctionOpInterface"> {
-  let summary = "Pass to pad operands of ops with padding configuration provided. ";
-  let dependentDialects = [
-    "::mlir::linalg::LinalgDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
-  ];
-}
-
 def GPUPipeliningPass :
     InterfacePass<"iree-codegen-gpu-pipelining", "mlir::FunctionOpInterface"> {
   let summary = "Pass to do software pipelining.";
@@ -366,17 +346,17 @@ def GPUApplyTilingLevelPass :
 
 def GPUApplyPaddingLevelPass :
     InterfacePass<"iree-codegen-gpu-apply-padding-level", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to pad based on tiling configs";
+  let summary = "Pass to pad based on padding level configs";
   let dependentDialects = ["::mlir::tensor::TensorDialect"];
   let options = [
-    Option<"tilingLevel", "tiling-level", "IREE::GPU::TilingLevel",
-           /*default=*/"IREE::GPU::TilingLevel::Reduction",
-           "Tiling level to tile. Supported levels are 'reduction' and 'thread'",
+    Option<"paddingLevel", "padding-level", "IREE::GPU::PaddingLevel",
+           /*default=*/"IREE::GPU::PaddingLevel::PartialReduction",
+           "Padding level to apply. Supported levels are 'initial' and 'partial_reduction'",
            [{llvm::cl::values(
-              clEnumValN(IREE::GPU::TilingLevel::Reduction, "reduction",
-                         "Tile and fuse all annotated ops to serial loops"),
-              clEnumValN(IREE::GPU::TilingLevel::PartialReduction, "partial_reduction",
-                         "Tile and fuse all annotated ops to partial reduuction loops")
+              clEnumValN(IREE::GPU::PaddingLevel::Initial, "initial",
+                         "Apply padding at initial level (before transformations like IGEMM)"),
+              clEnumValN(IREE::GPU::PaddingLevel::PartialReduction, "partial_reduction",
+                         "Apply padding at partial reduction level")
            )}]>
   ];
 }
