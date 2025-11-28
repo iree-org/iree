@@ -98,7 +98,7 @@ util.func @dt_scaled_matmul_f4f4f32_m128_n256_k256(
     match = {
       types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]
     },
-    benefit = 2,
+    benefit = 1,
     mma = #iree_gpu.data_tiled_scaled_mma_layout<
       intrinsic = MFMA_SCALE_F32_16x16x128_B32,
       lhs_elem_type = f4E2M1FN,

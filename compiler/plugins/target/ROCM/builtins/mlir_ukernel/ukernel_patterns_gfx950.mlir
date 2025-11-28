@@ -1170,7 +1170,7 @@ pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m32_n64_k2048 : benefit(1) 
   }
 }
 
-pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m64_n128_k512 : benefit(1) {
+pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m64_n128_k512 : benefit(2) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %lhs_scale_type = pdl.type
@@ -1292,7 +1292,7 @@ pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m128_n128_k256 : benefit(1)
   }
 }
 
-pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m128_n256_k256 : benefit(2) {
+pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m128_n256_k256 : benefit(1) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %lhs_scale_type = pdl.type
