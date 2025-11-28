@@ -149,10 +149,8 @@ void ElementwiseOpFusionPass::runOnOperation() {
           return false;
         }
 
-        // Limit the number of operands. We have hard limit (32) of bindings
-        // passing down to HAL. Set the number to be as same as the limit --
-        // IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT.
-        constexpr int64_t kIreeMaxOperandCount = 32;
+        // Limit the number of operands to avoid exceeding backend binding
+        // limits.
         DenseSet<Value> operands;
         operands.insert(producer->operand_begin(), producer->operand_end());
         operands.insert(consumer->operand_begin(),
