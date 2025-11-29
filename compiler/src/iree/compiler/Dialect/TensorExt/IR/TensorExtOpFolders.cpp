@@ -452,27 +452,18 @@ void DispatchWorkloadOrdinalOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_tensor_ext.compute_barrier.start
+// iree_tensor_ext.compute_barrier
 //===----------------------------------------------------------------------===//
 
-OpFoldResult ComputeBarrierStartOp::fold(FoldAdaptor adaptor) {
-  // Fold duplicate barriers in a chain:
-  // compute_barrier.start(compute_barrier.start(x)) -> compute_barrier.start(x)
-  if (auto producer = getValue().getDefiningOp<ComputeBarrierStartOp>()) {
-    return producer.getResult();
-  }
-  return {};
-}
-
-//===----------------------------------------------------------------------===//
-// iree_tensor_ext.compute_barrier.end
-//===----------------------------------------------------------------------===//
-
-OpFoldResult ComputeBarrierEndOp::fold(FoldAdaptor adaptor) {
-  // Fold duplicate barriers in a chain:
-  // compute_barrier.end(compute_barrier.end(x)) -> compute_barrier.end(x)
-  if (auto producer = getValue().getDefiningOp<ComputeBarrierEndOp>()) {
-    return producer.getResult();
+OpFoldResult ComputeBarrierOp::fold(FoldAdaptor adaptor) {
+  // Fold duplicate barriers in a chain with matching direction and flags:
+  // compute_barrier<dir, flags>(compute_barrier<dir, flags>(x)) ->
+  // compute_barrier<dir, flags>(x)
+  if (auto producer = getValue().getDefiningOp<ComputeBarrierOp>()) {
+    if (producer.getDirection() == getDirection() &&
+        producer.getFlags() == getFlags()) {
+      return producer.getResult();
+    }
   }
   return {};
 }

@@ -216,17 +216,19 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     AffineMap transposedFilterMap = applyPermutationToResults(filterMap, perm);
     Value transposedFilter = createTransposeOp(rewriter, loc, filterVal, perm);
 
-    // Insert compute_barrier.start to avoid propagation of reshape ops and
-    // undesirable fusion.
-    auto barrierStartOp = IREE::TensorExt::ComputeBarrierStartOp::create(
-        rewriter, loc, transposedFilter);
+    // Insert compute_barrier with "up" direction to avoid propagation of
+    // reshape ops and undesirable fusion.
+    auto barrierOp = IREE::TensorExt::ComputeBarrierOp::create(
+        rewriter, loc, transposedFilter, IREE::TensorExt::BarrierDirection::Up,
+        IREE::TensorExt::TransformationFlagBitfield::AllowExpand |
+            IREE::TensorExt::TransformationFlagBitfield::AllowCollapse);
 
     SmallVector<utils::IteratorType> iterators =
         linalgOp.getIteratorTypesArray();
 
     auto genericOp = linalg::GenericOp::create(
         rewriter, loc, outputVal.getType(),
-        ValueRange{inputVal, barrierStartOp.getResult()}, outputVal,
+        ValueRange{inputVal, barrierOp.getResult()}, outputVal,
         ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
         iterators);
 

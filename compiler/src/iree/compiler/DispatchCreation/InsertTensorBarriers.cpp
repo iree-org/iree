@@ -36,7 +36,7 @@ static bool isComputeOp(Operation *op) {
 
 // Traverse forward along use-def chains starting from `val` to identify values
 // that flow into compute operations. These values are candidates for inserting
-// compute_barrier.start operations.
+// compute_barrier operations with "up" direction.
 static void collectInputsToComputeRegion(Value val,
                                          llvm::SetVector<Value> &inputValues,
                                          llvm::DenseSet<Value> &visited) {
@@ -61,7 +61,7 @@ static void collectInputsToComputeRegion(Value val,
 
 // Traverse backward along use-def chains starting from `val` to identify values
 // produced by compute operations. These values are candidates for inserting
-// compute_barrier.end operations.
+// compute_barrier operations with "down" direction.
 static void
 collectOutputsFromComputeRegion(Value val, llvm::SetVector<Value> &outputValues,
                                 llvm::DenseSet<Value> &visited) {
@@ -87,8 +87,8 @@ struct InsertTensorBarriersPass final
     FunctionOpInterface funcOp = getOperation();
     OpBuilder builder(funcOp.getContext());
 
-    // Insert compute_barrier.start operations for values that flow into compute
-    // ops.
+    // Insert compute_barrier operations with "up" direction for values that
+    // flow into compute ops.
     llvm::SetVector<Value> needsStartBarrier;
     llvm::DenseSet<Value> visited;
     llvm::for_each(funcOp.getArguments(), [&](BlockArgument arg) {
@@ -101,16 +101,20 @@ struct InsertTensorBarriersPass final
       }
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointAfterValue(val);
-      auto startOp = IREE::TensorExt::ComputeBarrierStartOp::create(
-          builder, val.getLoc(), val);
-      val.replaceUsesWithIf(startOp.getResult(), [&](OpOperand &use) {
+      auto barrierOp = builder.create<IREE::TensorExt::ComputeBarrierOp>(
+          val.getLoc(), val.getType(), val,
+          IREE::Util::buildDynamicDimsForValue(val.getLoc(), val, builder),
+          IREE::TensorExt::BarrierDirection::Up,
+          IREE::TensorExt::TransformationFlagBitfield::AllowExpand |
+              IREE::TensorExt::TransformationFlagBitfield::AllowCollapse);
+      val.replaceUsesWithIf(barrierOp.getResult(), [&](OpOperand &use) {
         return isComputeOp(use.getOwner()) &&
                !isa<tensor::DimOp>(use.getOwner());
       });
     }
 
-    // Insert compute_barrier.end operations for values that flow out of compute
-    // ops.
+    // Insert compute_barrier operations with "down" direction for values that
+    // flow out of compute ops.
     llvm::SetVector<Value> needsEndBarrier;
     visited.clear();
     funcOp.walk([&](Operation *op) {
@@ -132,10 +136,14 @@ struct InsertTensorBarriersPass final
       }
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointAfter(definingOp);
-      auto endOp = IREE::TensorExt::ComputeBarrierEndOp::create(
-          builder, val.getLoc(), val);
-      val.replaceUsesWithIf(endOp.getResult(), [&](OpOperand &use) {
-        return !isComputeOp(use.getOwner()) && use.getOwner() != endOp &&
+      auto barrierOp = builder.create<IREE::TensorExt::ComputeBarrierOp>(
+          val.getLoc(), val.getType(), val,
+          IREE::Util::buildDynamicDimsForValue(val.getLoc(), val, builder),
+          IREE::TensorExt::BarrierDirection::Down,
+          IREE::TensorExt::TransformationFlagBitfield::AllowExpand |
+              IREE::TensorExt::TransformationFlagBitfield::AllowCollapse);
+      val.replaceUsesWithIf(barrierOp.getResult(), [&](OpOperand &use) {
+        return !isComputeOp(use.getOwner()) && use.getOwner() != barrierOp &&
                !isa<tensor::DimOp>(use.getOwner());
       });
     }

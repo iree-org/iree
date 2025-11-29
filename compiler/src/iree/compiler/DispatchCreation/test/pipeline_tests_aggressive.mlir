@@ -169,7 +169,7 @@ util.func public @transpose_barrier_matmul(%arg0: tensor<128x64xf32>, %arg1: ten
   ^bb0(%in: f32, %out: f32):
     linalg.yield %in : f32
   } -> tensor<64x128xf32>
-  %barrier = iree_tensor_ext.compute_barrier.start %transpose : tensor<64x128xf32> -> tensor<64x128xf32>
+  %barrier = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %transpose : tensor<64x128xf32> -> tensor<64x128xf32>
   %empty_matmul = tensor.empty() : tensor<128x128xf32>
   %init = linalg.fill ins(%c0 : f32) outs(%empty_matmul : tensor<128x128xf32>) -> tensor<128x128xf32>
   %matmul = linalg.matmul ins(%arg1, %barrier : tensor<128x64xf32>, tensor<64x128xf32>) outs(%init : tensor<128x128xf32>) -> tensor<128x128xf32>
