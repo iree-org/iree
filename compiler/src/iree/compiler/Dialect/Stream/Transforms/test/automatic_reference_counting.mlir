@@ -31,9 +31,9 @@ util.func private @insertDeallocaWithAffinity(%input_timepoint: !stream.timepoin
 util.func private @insertDeallocaOneUserOneUse(%input_timepoint: !stream.timepoint, %size: index) -> !stream.timepoint {
   // CHECK: %[[RESOURCE:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca
   %resource, %alloca_timepoint = stream.resource.alloca uninitialized await(%input_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK: %[[EXECUTE_TIMEPOINT:.+]] = stream.cmd.execute
-  %execute_timepoint = stream.cmd.execute await(%alloca_timepoint) => with(%resource as %capture : !stream.resource<transient>{%size}) {
-  } => !stream.timepoint
+  // CHECK: %[[EXECUTE_TIMEPOINT:.+]] = stream.test.timeline_op
+  %execute_timepoint = stream.test.timeline_op await(%alloca_timepoint) =>
+    with(%resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
   // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[EXECUTE_TIMEPOINT]]) => %[[RESOURCE]]
   // CHECK: util.return %[[DEALLOCA_TIMEPOINT]]
   util.return %execute_timepoint : !stream.timepoint
@@ -49,9 +49,9 @@ util.func private @insertDeallocaOneUserOneUse(%input_timepoint: !stream.timepoi
 util.func private @insertDeallocaOneUserMultiUse(%input_timepoint: !stream.timepoint, %size: index) -> !stream.timepoint {
   // CHECK: %[[RESOURCE:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca
   %resource, %alloca_timepoint = stream.resource.alloca uninitialized await(%input_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK: %[[EXECUTE_TIMEPOINT:.+]] = stream.cmd.execute
-  %execute_timepoint = stream.cmd.execute await(%alloca_timepoint) => with(%resource as %capture0 : !stream.resource<transient>{%size}, %resource as %capture1 : !stream.resource<transient>{%size}) {
-  } => !stream.timepoint
+  // CHECK: %[[EXECUTE_TIMEPOINT:.+]] = stream.test.timeline_op
+  %execute_timepoint = stream.test.timeline_op await(%alloca_timepoint) =>
+    with(%resource, %resource) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
   // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[EXECUTE_TIMEPOINT]]) => %[[RESOURCE]]
   // CHECK-NOT: stream.resource.dealloca
   // CHECK: util.return %[[DEALLOCA_TIMEPOINT]]
@@ -67,12 +67,12 @@ util.func private @insertDeallocaOneUserMultiUse(%input_timepoint: !stream.timep
 util.func private @insertDeallocaMultiUserSequence(%input_timepoint: !stream.timepoint, %size: index) -> !stream.timepoint {
   // CHECK: %[[RESOURCE:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca
   %resource, %alloca_timepoint = stream.resource.alloca uninitialized await(%input_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK: %[[EXECUTE0_TIMEPOINT:.+]] = stream.cmd.execute
-  %execute0_timepoint = stream.cmd.execute await(%alloca_timepoint) => with(%resource as %capture : !stream.resource<transient>{%size}) {
-  } => !stream.timepoint
-  // CHECK: %[[EXECUTE1_TIMEPOINT:.+]] = stream.cmd.execute
-  %execute1_timepoint = stream.cmd.execute await(%execute0_timepoint) => with(%resource as %capture : !stream.resource<transient>{%size}) {
-  } => !stream.timepoint
+  // CHECK: %[[EXECUTE0_TIMEPOINT:.+]] = stream.test.timeline_op
+  %execute0_timepoint = stream.test.timeline_op await(%alloca_timepoint) =>
+    with(%resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: %[[EXECUTE1_TIMEPOINT:.+]] = stream.test.timeline_op
+  %execute1_timepoint = stream.test.timeline_op await(%execute0_timepoint) =>
+    with(%resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
   // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[EXECUTE1_TIMEPOINT]]) => %[[RESOURCE]]
   // Note: needs cleanup in ElideTimepointsPass.
   // CHECK: %[[EXECUTE_JOIN_TIMEPOINT:.+]] = stream.timepoint.join max(%[[EXECUTE0_TIMEPOINT]], %[[DEALLOCA_TIMEPOINT]])
@@ -90,17 +90,17 @@ util.func private @insertDeallocaMultiUserSequence(%input_timepoint: !stream.tim
 util.func private @insertDeallocaMultiUserFork(%input_timepoint: !stream.timepoint, %size: index) -> (!stream.timepoint, !stream.timepoint) {
   // CHECK: %[[RESOURCE:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca
   %resource, %alloca_timepoint = stream.resource.alloca uninitialized await(%input_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK: %[[EXECUTE0_TIMEPOINT:.+]] = stream.cmd.execute await(%[[ALLOCA_TIMEPOINT]])
-  %execute0_timepoint = stream.cmd.execute await(%alloca_timepoint) => with(%resource as %capture : !stream.resource<transient>{%size}) {
-  } => !stream.timepoint
+  // CHECK: %[[EXECUTE0_TIMEPOINT:.+]] = stream.test.timeline_op await(%[[ALLOCA_TIMEPOINT]])
+  %execute0_timepoint = stream.test.timeline_op await(%alloca_timepoint) =>
+    with(%resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
   // Note: this is here to force another timepoint user earlier than the last
   // deallocation; this exposes potential SSA ordering issues.
-  // CHECK: %[[OTHER_TIMEPOINT:.+]] = stream.cmd.execute await(%[[EXECUTE0_TIMEPOINT]])
-  %other_timepoint = stream.cmd.execute await(%execute0_timepoint) => with() {
-  } => !stream.timepoint
-  // CHECK: %[[EXECUTE1_TIMEPOINT:.+]] = stream.cmd.execute await(%[[ALLOCA_TIMEPOINT]])
-  %execute1_timepoint = stream.cmd.execute await(%alloca_timepoint) => with(%resource as %capture : !stream.resource<transient>{%size}) {
-  } => !stream.timepoint
+  // CHECK: %[[OTHER_TIMEPOINT:.+]] = stream.test.timeline_op await(%[[EXECUTE0_TIMEPOINT]])
+  %other_timepoint = stream.test.timeline_op await(%execute0_timepoint) =>
+    with() : () -> () => !stream.timepoint
+  // CHECK: %[[EXECUTE1_TIMEPOINT:.+]] = stream.test.timeline_op await(%[[ALLOCA_TIMEPOINT]])
+  %execute1_timepoint = stream.test.timeline_op await(%alloca_timepoint) =>
+    with(%resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
   // CHECK: %[[DEALLOCA_JOIN_TIMEPOINT:.+]] = stream.timepoint.join max(%[[EXECUTE0_TIMEPOINT]], %[[EXECUTE1_TIMEPOINT]])
   // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[DEALLOCA_JOIN_TIMEPOINT]]) => %[[RESOURCE]]
   // Note: the dealloca adds an additional synchronization point.
@@ -117,9 +117,9 @@ util.func private @insertDeallocaMultiUserFork(%input_timepoint: !stream.timepoi
 util.func private @ignoreHandledResources(%input_timepoint: !stream.timepoint, %size: index) -> !stream.timepoint {
   // CHECK: stream.resource.alloca
   %resource, %alloca_timepoint = stream.resource.alloca uninitialized await(%input_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK: stream.cmd.execute
-  %execute_timepoint = stream.cmd.execute await(%alloca_timepoint) => with(%resource as %capture : !stream.resource<transient>{%size}) {
-  } => !stream.timepoint
+  // CHECK: stream.test.timeline_op
+  %execute_timepoint = stream.test.timeline_op await(%alloca_timepoint) =>
+    with(%resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
   // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca
   // CHECK-NOT: stream.resource.dealloca
   %dealloca_timepoint = stream.resource.dealloca await(%execute_timepoint) => %resource : !stream.resource<transient>{%size} => !stream.timepoint
@@ -133,8 +133,8 @@ util.func private @ignoreHandledResources(%input_timepoint: !stream.timepoint, %
 
 // CHECK-LABEL: @ignoreLiveIn
 util.func private @ignoreLiveIn(%input_timepoint: !stream.timepoint, %resource: !stream.resource<transient>, %size: index) -> !stream.timepoint {
-  %execute_timepoint = stream.cmd.execute await(%input_timepoint) => with(%resource as %capture : !stream.resource<transient>{%size}) {
-  } => !stream.timepoint
+  %execute_timepoint = stream.test.timeline_op await(%input_timepoint) =>
+    with(%resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
   // CHECK-NOT: stream.resource.dealloca
   util.return %execute_timepoint : !stream.timepoint
 }
@@ -238,23 +238,6 @@ util.func private @some_func() -> () {
 
 // -----
 
-// TODO(benvanik): scf is something we should support even in this local pass
-// in constrained scenarios (only for resources not used in regions, etc).
-// For now using SCF will cause the entire parent block to be skipped.
-
-// CHECK-LABEL: @ignoreSCF
-util.func private @ignoreSCF(%input_timepoint: !stream.timepoint, %size: index) -> !stream.timepoint {
-  %resource, %alloca_timepoint = stream.resource.alloca uninitialized on(#hal.device.promise<@device>) await(%input_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK-NOT: stream.resource.dealloca
-  %cond = arith.constant 1 : i1
-  scf.if %cond {
-    scf.yield
-  }
-  util.return %alloca_timepoint : !stream.timepoint
-}
-
-// -----
-
 // Tests that resources loaded from globals are treated as indeterminate.
 
 util.global private @resource : !stream.resource<variable>
@@ -264,9 +247,9 @@ util.global private @timepoint : !stream.timepoint
 util.func private @ignoreGlobalLoad(%size: index) -> !stream.timepoint {
   %resource = util.global.load @resource : !stream.resource<variable>
   %load_timepoint = util.global.load @timepoint : !stream.timepoint
-  // CHECK: stream.cmd.execute
-  %execute_timepoint = stream.cmd.execute await(%load_timepoint) => with(%resource as %capture : !stream.resource<variable>{%size}) {
-  } => !stream.timepoint
+  // CHECK: stream.test.timeline_op
+  %execute_timepoint = stream.test.timeline_op await(%load_timepoint) =>
+    with(%resource) : (!stream.resource<variable>{%size}) -> () => !stream.timepoint
   // CHECK-NOT: stream.resource.dealloca
   util.return %execute_timepoint : !stream.timepoint
 }
