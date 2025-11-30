@@ -49,9 +49,9 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Minimum size of constants to export as parameters."),
       llvm::cl::init(0),
   };
-  Option<std::string> parameterSplatExportFile{
+  Option<std::string> parameterSplatPath{
       *this,
-      "parameter-splat-export-file",
+      "parameter-splat-path",
       llvm::cl::desc("File path to create a splat parameter archive out of all "
                      "parameters in the module."),
       llvm::cl::init(""),

@@ -271,10 +271,10 @@ void buildGlobalOptimizationPassPipeline(
         exportParametersOptions));
   }
 
-  if (!transformOptions.parameterSplatExportFile.empty()) {
+  if (!transformOptions.parameterSplatPath.empty()) {
     IREE::IO::Parameters::GenerateSplatParameterArchivePassOptions
         generateSplatOptions;
-    generateSplatOptions.filePath = transformOptions.parameterSplatExportFile;
+    generateSplatOptions.filePath = transformOptions.parameterSplatPath;
     mainPassManager.addPass(
         IREE::IO::Parameters::createGenerateSplatParameterArchivePass(
             generateSplatOptions));

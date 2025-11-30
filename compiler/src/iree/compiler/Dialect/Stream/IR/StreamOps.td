@@ -577,6 +577,14 @@ def Stream_ResourcePackOp : Stream_PureOp<"resource.pack", [
     attr-dict-with-keyword
   }];
 
+  let builders = [
+    OpBuilder<(ins
+      "Value":$offset,
+      "ValueRange":$valueSizes,
+      CArg<"AffinityAttr", "{}">:$affinityAttr
+    )>,
+  ];
+
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
@@ -1844,6 +1852,7 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,
+  Util_HoistableOpInterface,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
@@ -1906,6 +1915,7 @@ def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
     "getAsyncAccessRanges",
   ]>,
   Util_SizeAwareOp,
+  Util_HoistableOpInterface,
 ]> {
   let summary = [{Splats a value into a resource.}];
   let description = [{
@@ -1972,6 +1982,7 @@ def Stream_AsyncCloneOp : Stream_Op<"async.clone", [
     "getAsyncAccessRanges",
   ]>,
   Util_SizeAwareOp,
+  Util_HoistableOpInterface,
 ]> {
   let summary = [{Clones the contents of a value.}];
   let description = [{
@@ -2016,6 +2027,7 @@ def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,
+  Util_HoistableOpInterface,
   Util_SizeAwareOp,
 ]> {
   let summary = [{Slices out a cloned subview of a value.}];
@@ -2069,6 +2081,7 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
     "getTiedResultOperandIndex",
     "getTiedResultOperandIndices",
   ]>,
+  Util_HoistableOpInterface,
 ]> {
   let summary = [{Fills a subview of a stream resource with a value.}];
   let description = [{
@@ -2124,6 +2137,7 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
     "getTiedResultOperandIndex",
     "getTiedResultOperandIndices",
   ]>,
+  Util_HoistableOpInterface,
 ]> {
   let summary = [{Updates a slice of a subview of a resource in-place.}];
   let description = [{
@@ -2181,6 +2195,7 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
     "getTiedResultOperandIndex",
     "getTiedResultOperandIndices",
   ]>,
+  Util_HoistableOpInterface,
 ]> {
   let summary = [{Copies a subview of a stream resource to another.}];
   let description = [{
@@ -2244,6 +2259,7 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
     "getTiedResultOperandIndex",
     "getTiedResultOperandIndices",
   ]>,
+  Util_HoistableOpInterface,
 ]> {
   let summary = [{Performs a collective operation.}];
   let description = [{
@@ -2358,12 +2374,14 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
     "getAffinityAttr",
     "setAffinityAttr",
     "getResultAffinityAttr",
+    "removeAffinityAttrs",
   ]>,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,
+  Util_HoistableOpInterface,
   Util_SizeAwareOp,
 ]> {
   let summary = [{Transfers a resource from one location/state to another.}];
@@ -2504,6 +2522,7 @@ def Stream_AsyncDispatchOp : Stream_PureOp<"async.dispatch", [
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
     "getAsyncAccessRanges",
   ]>,
+  Util_HoistableOpInterface,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",

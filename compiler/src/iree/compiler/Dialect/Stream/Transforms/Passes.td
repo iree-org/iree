@@ -44,6 +44,56 @@ def ConvertToStreamPass :
   ];
 }
 
+def SplitParameterEncoderPass :
+    Pass<"iree-stream-split-parameter-encoder", "mlir::ModuleOp"> {
+  let summary = "Splits out a parameter encoder module for compatible hoisted expressions.";
+  let description = [{
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::HAL::HALDialect",
+    "IREE::Stream::StreamDialect",
+    "IREE::Util::UtilDialect",
+  ];
+  let options = [
+    Option<
+      "mode", "mode",
+      "IREE::Stream::ParameterEncoderMode",
+      /*default=*/"IREE::Stream::ParameterEncoderMode::Consolidate",
+      "Controls how the encoder manages parameters.",
+      [{::llvm::cl::values(
+        clEnumValN(IREE::Stream::ParameterEncoderMode::Consolidate, "consolidate", "Merge all encoded parameters and original parameters into a single consolidated scope."),
+        clEnumValN(IREE::Stream::ParameterEncoderMode::Overlay, "overlay", "Only produce encoded parameters and leave original parameters untouched.")
+      )}]
+    >,
+    Option<
+      "outputScope", "output-scope",
+      "std::string", /*default=*/"\"encoded\"",
+      "Parameter scope for the output parameters. Omit for global."
+    >,
+    Option<
+      "outputFile", "output-file",
+      "std::string", /*default=*/"std::string()",
+      ".mlir/.mlirbc file path to write the split parameter encoder module to."
+    >,
+    Option<
+      "hoistParameterExpressions", "hoist-parameter-expressions",
+      "bool", /*default=*/"true",
+      "Enable hoisting parameter transformation expressions."
+    >,
+    Option<
+      "hoistConstantExpressions", "hoist-constant-expressions",
+      "bool", /*default=*/"true",
+      "Enable hoisting pure constant expressions with transformations."
+    >,
+    Option<
+      "maxEncodingGrowthFactor", "max-encoding-growth-factor",
+      "float", /*default=*/"1.2f",
+      "Maximum ratio of output size to input parameter size."
+    >,
+  ];
+}
+
 def EncodeHostTensorsPass :
     Pass<"iree-stream-encode-host-tensors", ""> {
   let summary = "Encodes tensors into storage formats based on affinity and target support.";
@@ -707,7 +757,7 @@ def DumpStatisticsPass :
     Option<
       "outputFormat", "output-format",
       "IREE::Stream::DumpOutputFormat",
-      "IREE::Stream::DumpOutputFormat::Pretty",
+      /*default=*/"IREE::Stream::DumpOutputFormat::Pretty",
       "Specifies the output format to produce.",
       [{::llvm::cl::values(
         clEnumValN(IREE::Stream::DumpOutputFormat::Pretty, "pretty", "Human-readable pretty printed output."),
@@ -717,8 +767,7 @@ def DumpStatisticsPass :
     >,
     Option<
       "outputFile", "output-file",
-      "std::string",
-      /*default=*/"std::string()",
+      "std::string", /*default=*/"std::string()",
       "File path to write to; or `` for stderr or `-` for stdout."
     >,
   ];

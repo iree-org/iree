@@ -246,6 +246,7 @@ struct GlobalInit {
   InputDialectOptions *clInputOptions = nullptr;
   PreprocessingOptions *clPreprocessingOptions = nullptr;
   GlobalOptimizationOptions *clGlobalOptimizationOptions = nullptr;
+  ParameterOptions *clParameterOptions = nullptr;
   DispatchCreationOptions *clDispatchCreationOptions = nullptr;
   SchedulingOptions *clSchedulingOptions = nullptr;
   IREE::HAL::TargetOptions *clHalTargetOptions = nullptr;
@@ -292,6 +293,7 @@ void GlobalInit::registerCommandLineOptions() {
   clInputOptions = &InputDialectOptions::FromFlags::get();
   clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
   clGlobalOptimizationOptions = &GlobalOptimizationOptions::FromFlags::get();
+  clParameterOptions = &ParameterOptions::FromFlags::get();
   clDispatchCreationOptions = &DispatchCreationOptions::FromFlags::get();
   clSchedulingOptions = &SchedulingOptions::FromFlags::get();
   clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
@@ -402,6 +404,7 @@ struct Session {
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
+  ParameterOptions parameterOptions;
   GlobalOptimizationOptions highLevelOptimizationOptions;
   DispatchCreationOptions dispatchCreationOptions;
   SchedulingOptions schedulingOptions;
@@ -431,6 +434,7 @@ Session::Session(GlobalInit &globalInit)
     inputOptions = *globalInit.clInputOptions;
     preprocessingOptions = *globalInit.clPreprocessingOptions;
     highLevelOptimizationOptions = *globalInit.clGlobalOptimizationOptions;
+    parameterOptions = *globalInit.clParameterOptions;
     dispatchCreationOptions = *globalInit.clDispatchCreationOptions;
     schedulingOptions = *globalInit.clSchedulingOptions;
     halTargetOptions = *globalInit.clHalTargetOptions;
@@ -452,6 +456,7 @@ Session::Session(GlobalInit &globalInit)
   preprocessingOptions.bindOptions(binder);
   inputOptions.bindOptions(binder);
   highLevelOptimizationOptions.bindOptions(binder);
+  parameterOptions.bindOptions(binder);
   dispatchCreationOptions.bindOptions(binder);
   schedulingOptions.bindOptions(binder);
   halTargetOptions.bindOptions(binder);
@@ -1014,10 +1019,10 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     buildIREEVMTransformPassPipeline(
         session.targetRegistry, session.pipelineOptions, session.bindingOptions,
         session.inputOptions, session.preprocessingOptions,
-        session.highLevelOptimizationOptions, session.dispatchCreationOptions,
-        session.schedulingOptions, session.halTargetOptions,
-        session.vmTargetOptions, pipelineHooks, *passManager, compileFrom,
-        compileTo);
+        session.parameterOptions, session.highLevelOptimizationOptions,
+        session.dispatchCreationOptions, session.schedulingOptions,
+        session.halTargetOptions, session.vmTargetOptions, pipelineHooks,
+        *passManager, compileFrom, compileTo);
     break;
   }
   case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
@@ -1048,9 +1053,10 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     buildIREEPrecompileTransformPassPipeline(
         session.targetRegistry, session.pipelineOptions, session.bindingOptions,
         session.inputOptions, session.preprocessingOptions,
-        session.highLevelOptimizationOptions, session.dispatchCreationOptions,
-        session.schedulingOptions, session.halTargetOptions, pipelineHooks,
-        *passManager, compileFrom, compileTo);
+        session.parameterOptions, session.highLevelOptimizationOptions,
+        session.dispatchCreationOptions, session.schedulingOptions,
+        session.halTargetOptions, pipelineHooks, *passManager, compileFrom,
+        compileTo);
     break;
   }
   default:

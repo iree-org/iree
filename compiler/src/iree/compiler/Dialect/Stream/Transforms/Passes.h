@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -55,6 +56,21 @@ enum class DumpOutputFormat {
   JSON = 4,
 };
 
+// Controls how the encoder manages parameters.
+enum class ParameterEncoderMode {
+  // Merge all encoded parameters and original parameters into a single
+  // consolidated scope.
+  Consolidate = 0,
+  // Only produce encoded parameters and leave original parameters untouched.
+  Overlay = 1,
+};
+
+// Options for the Stream transformation pipeline.
+//
+// These options are typically populated from top-level compiler options
+// (ParameterOptions in Pipelines/Options.h) when building the full compiler
+// pipeline. When constructing individual passes, relevant options are mapped
+// to pass-specific option structs (e.g., SplitParameterEncoderPassOptions).
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   Option<InitializationMode> initializationMode{
       *this,
@@ -70,6 +86,34 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
                      "Asynchronously initialize all parameters and globals and "
                      "return immediately from the module initializer without "
                      "waiting for them to complete.")),
+  };
+
+  Option<ParameterEncoderMode> parameterEncoderMode{
+      *this,
+      "parameter-encoder-mode",
+      llvm::cl::desc("Controls how the encoder manages parameters."),
+      llvm::cl::init(ParameterEncoderMode::Consolidate),
+      llvm::cl::values(
+          clEnumValN(ParameterEncoderMode::Consolidate, "consolidate",
+                     "Merge all encoded parameters and original parameters "
+                     "into a single consolidated scope."),
+          clEnumValN(ParameterEncoderMode::Overlay, "overlay",
+                     "Only produce encoded parameters and leave original "
+                     "parameters untouched.")),
+  };
+  Option<std::string> parameterEncoderOutputScope{
+      *this,
+      "parameter-encoder-output-scope",
+      llvm::cl::desc(
+          "Parameter scope for the output parameters. Omit for global."),
+      llvm::cl::init("encoded"),
+  };
+  Option<std::string> parameterEncoderOutputFile{
+      *this,
+      "parameter-encoder-output-file",
+      llvm::cl::desc(".mlir/.mlirbc file path to write the split parameter "
+                     "encoder module to."),
+      llvm::cl::init(""),
   };
 
   Option<bool> optimizeBindings{

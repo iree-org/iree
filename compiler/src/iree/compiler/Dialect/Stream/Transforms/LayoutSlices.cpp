@@ -53,7 +53,7 @@ using Slice = IREE::Stream::ResourcePackOp::Slice;
 // |baseOffset|. Returns |baseOffset| + the total size of the allocation
 // aligned to the requirements of |resourceConfig|.
 static Value
-packStaticSlicesGreedily(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
+packStaticSlicesGreedily(Location loc, Value baseOffset,
                          MutableArrayRef<Slice> slices,
                          IREE::Stream::ResourceConfigAttr resourceConfig,
                          IndexSet &indexSet, OpBuilder &builder) {
@@ -114,7 +114,7 @@ packStaticSlicesGreedily(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
     }
     reservations.insert(insertionIt, reservation);
     slice.packedOffset.replaceAllUsesWith(builder.createOrFold<arith::AddIOp>(
-        packOp.getLoc(), baseOffset, indexSet.get(bestOffset)));
+        loc, baseOffset, indexSet.get(bestOffset)));
 
     // Update highwater mark indicating how much memory needs to be allocated
     // for the entire slab.
@@ -122,7 +122,7 @@ packStaticSlicesGreedily(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
   }
 
   highwaterMark = IREE::Util::align(highwaterMark, rangeAlignment);
-  return builder.createOrFold<arith::AddIOp>(packOp.getLoc(), baseOffset,
+  return builder.createOrFold<arith::AddIOp>(loc, baseOffset,
                                              indexSet.get(highwaterMark));
 }
 
@@ -145,11 +145,10 @@ packStaticSlicesGreedily(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
 // |baseOffset|. Returns |baseOffset| + the total size of the allocation
 // aligned to the requirements of |resourceConfig|.
 static Value
-packDynamicSlicesConservatively(IREE::Stream::ResourcePackOp packOp,
-                                Value baseOffset, MutableArrayRef<Slice> slices,
+packDynamicSlicesConservatively(Location loc, Value baseOffset,
+                                MutableArrayRef<Slice> slices,
                                 IREE::Stream::ResourceConfigAttr resourceConfig,
                                 IndexSet &indexSet, OpBuilder &builder) {
-  auto loc = packOp.getLoc();
   int64_t offsetAlignment = resourceConfig.getMinBufferOffsetAlignment();
   int64_t rangeAlignment = resourceConfig.getMinBufferRangeAlignment();
 
@@ -255,9 +254,9 @@ struct LayoutSlicesPass
 
       // First pack all static slices as these are entirely knowable here at
       // compile time.
-      auto offset = packOp.getOffset() ? packOp.getOffset() : indexSet.get(0);
+      Value offset = packOp.getOffset() ? packOp.getOffset() : indexSet.get(0);
       if (!staticSlices.empty()) {
-        offset = packStaticSlicesGreedily(packOp, offset, staticSlices,
+        offset = packStaticSlicesGreedily(packOp.getLoc(), offset, staticSlices,
                                           resourceConfig, indexSet, builder);
 
         // TODO(benvanik): make this an option; it can be useful for debugging
@@ -270,8 +269,9 @@ struct LayoutSlicesPass
       // available we could reuse static slices with non-overlapping lifetimes
       // in some cases.
       if (!dynamicSlices.empty()) {
-        offset = packDynamicSlicesConservatively(
-            packOp, offset, dynamicSlices, resourceConfig, indexSet, builder);
+        offset = packDynamicSlicesConservatively(packOp.getLoc(), offset,
+                                                 dynamicSlices, resourceConfig,
+                                                 indexSet, builder);
       }
 
       // Total packed length is the current offset after all slices are
