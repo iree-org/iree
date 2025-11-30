@@ -2685,6 +2685,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#test-only-ops-for-stream-dialect-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Test-only ops for Stream dialect testing
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test-only ops for Stream dialect testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamtesttimeline_aware-streamtesttimelineawareop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.test.timeline_aware (Stream::TestTimelineAwareOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2860,6 +2884,15 @@
   <a href="#resourcetype" class="md-nav__link">
     <span class="md-ellipsis">
       ResourceType
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testfencetype" class="md-nav__link">
+    <span class="md-ellipsis">
+      TestFenceType
     </span>
   </a>
   
@@ -6989,6 +7022,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#test-only-ops-for-stream-dialect-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Test-only ops for Stream dialect testing
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test-only ops for Stream dialect testing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamtesttimeline_aware-streamtesttimelineawareop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.test.timeline_aware (Stream::TestTimelineAwareOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -7164,6 +7221,15 @@
   <a href="#resourcetype" class="md-nav__link">
     <span class="md-ellipsis">
       ResourceType
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testfencetype" class="md-nav__link">
+    <span class="md-ellipsis">
+      TestFenceType
     </span>
   </a>
   
@@ -7594,6 +7660,10 @@ breaking execution correctness.</p>
 <li><a href="#streamtensorupdate-streamtensorupdateop">stream.tensor.update (Stream::TensorUpdateOp)</a></li>
 </ul>
 </li>
+<li><a href="#test-only-ops-for-stream-dialect-testing">Test-only ops for Stream dialect testing</a><ul>
+<li><a href="#streamtesttimeline_aware-streamtesttimelineawareop">stream.test.timeline_aware (Stream::TestTimelineAwareOp)</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#attributes_66">Attributes</a><ul>
@@ -7618,6 +7688,7 @@ breaking execution correctness.</p>
 <li><a href="#channeltype">ChannelType</a></li>
 <li><a href="#filetype">FileType</a></li>
 <li><a href="#resourcetype">ResourceType</a></li>
+<li><a href="#testfencetype">TestFenceType</a></li>
 <li><a href="#timepointtype">TimepointType</a></li>
 </ul>
 </li>
@@ -12757,6 +12828,62 @@ is the entire updated target value.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="test-only-ops-for-stream-dialect-testing">Test-only ops for Stream dialect testing<a class="headerlink" href="#test-only-ops-for-stream-dialect-testing" title="Permanent link">link</a></h3>
+<p>Ops used only in unit tests.</p>
+<h4 id="streamtesttimeline_aware-streamtesttimelineawareop"><code>stream.test.timeline_aware</code> (Stream::TestTimelineAwareOp)<a class="headerlink" href="#streamtesttimeline_aware-streamtesttimelineawareop" title="Permanent link">link</a></h4>
+<p><em>Test op implementing TimelineAwareOpInterface.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `stream.test.timeline_aware` `(` $args `)` `waits` `(` $wait_fence_likes `)` `signals` `(` $signal_fence_like `)`
+              attr-dict `:` functional-type($args, $results)
+</code></pre></div>
+<p>Test-only operation that implements TimelineAwareOpInterface directly,
+allowing Stream dialect tests to verify timeline-aware behavior without
+requiring HAL/etc dialect dependencies.</p>
+<p>Mimics util.call with the HAL coarse-fences model:
+- Takes wait fences that must complete before execution.
+- Takes a signal fence to signal when complete.
+- Returns an arbitrary result.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TimelineAwareOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_76">Operands:<a class="headerlink" href="#operands_76" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>args</code></td>
+<td>variadic of any type</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>wait_fence_likes</code></td>
+<td>variadic of Test-only fence type for timeline-aware op testing.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>signal_fence_like</code></td>
+<td>Test-only fence type for timeline-aware op testing.</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_68">Results:<a class="headerlink" href="#results_68" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>results</code></td>
+<td>variadic of any type</td>
+</tr>
+</tbody>
+</table>
 <h2 id="attributes_66">Attributes<a class="headerlink" href="#attributes_66" title="Permanent link">link</a></h2>
 <h3 id="collectiveattr">CollectiveAttr<a class="headerlink" href="#collectiveattr" title="Permanent link">link</a></h3>
 <p><em>Collective operation and specification.</em></p>
@@ -13020,6 +13147,11 @@ be transferred via a transfer operation (e.g. <code>stream.async.transfer</code>
 </tr>
 </tbody>
 </table>
+<h3 id="testfencetype">TestFenceType<a class="headerlink" href="#testfencetype" title="Permanent link">link</a></h3>
+<p><em>Test-only fence type for timeline-aware op testing.</em></p>
+<p>Syntax: <code>!stream.test.fence</code></p>
+<p>A test-only type that behaves like hal.fence for testing TimelineAwareOpInterface
+without introducing HAL dependencies in Stream unit tests.</p>
 <h3 id="timepointtype">TimepointType<a class="headerlink" href="#timepointtype" title="Permanent link">link</a></h3>
 <p><em>A timepoint indicating execution availability.</em></p>
 <p>Syntax: <code>!stream.timepoint</code></p>
