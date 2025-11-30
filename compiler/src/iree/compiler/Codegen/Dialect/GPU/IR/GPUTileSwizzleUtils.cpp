@@ -262,6 +262,14 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
     expandIfNonUnit(swizzle, N, subgroupsN);
     expandIfNonUnit(swizzle, M, subgroupsM);
   }
+
+  size_t size = swizzle.permutation.size();
+  if (isLhsScale && interleaveM && interleaveK) {
+    std::swap(swizzle.permutation[size - 2], swizzle.permutation[size - 3]);
+  }
+  if (isRhsScale && interleaveN && interleaveK) {
+    std::swap(swizzle.permutation[size - 2], swizzle.permutation[size - 3]);
+  }
   return swizzle;
 }
 

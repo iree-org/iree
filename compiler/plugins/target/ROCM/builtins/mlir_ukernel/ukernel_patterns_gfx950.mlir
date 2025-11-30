@@ -1315,9 +1315,9 @@ pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m128_n256_k256 : benefit(2)
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
   %rhs_cast_type = pdl.type : tensor<?x?x1x2x8x2x4x16x32xf4E2M1FN>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
-      %lhs_scale_cast_type = pdl.type : tensor<?x?x2x4x4x16x2xf8E8M0FNU>
+      %lhs_scale_cast_type = pdl.type : tensor<?x?x2x4x16x4x2xf8E8M0FNU>
       pdl.apply_native_constraint "matchCastCompatibleType"(%lhs_scale, %lhs_scale_cast_type : !pdl.value, !pdl.type)
-      %rhs_scale_cast_type = pdl.type : tensor<?x?x2x8x4x16x2xf8E8M0FNU>
+      %rhs_scale_cast_type = pdl.type : tensor<?x?x2x4x16x8x2xf8E8M0FNU>
       pdl.apply_native_constraint "matchCastCompatibleType"(%rhs_scale, %rhs_scale_cast_type : !pdl.value, !pdl.type)
 
   pdl.rewrite {
