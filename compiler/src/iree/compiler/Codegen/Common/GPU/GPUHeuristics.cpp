@@ -175,7 +175,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
            << schedule << "\nShrinking schedule...";
 
     auto decrementIfPossible =
-        [](SmallVectorImpl<int64_t> &sizes) -> LogicalResult {
+        [](MutableArrayRef<int64_t> sizes) -> LogicalResult {
       for (int64_t &size : sizes) {
         if (size <= 1)
           continue;
