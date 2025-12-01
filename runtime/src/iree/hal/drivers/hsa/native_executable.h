@@ -44,6 +44,14 @@ typedef struct iree_hal_hsa_kernel_params_t {
   IREE_TRACE(iree_hal_hsa_kernel_debug_info_t debug_info;)
 } iree_hal_hsa_kernel_params_t;
 
+// Infers the format of the executable and calculates its total size.
+// If executable_data.data_length is 0 attempts to infer size from the data.
+// Returns the canonical format string and total size of the executable data.
+iree_status_t iree_hal_hsa_native_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size);
+
 // Creates an IREE executable from an HSACO (HSA Code Object).
 iree_status_t iree_hal_hsa_native_executable_create(
     const iree_hal_hsa_dynamic_symbols_t* symbols,

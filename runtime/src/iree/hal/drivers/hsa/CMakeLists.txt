@@ -40,6 +40,7 @@ iree_cc_library(
     "hsa_semaphore.h"
     "native_executable.c"
     "native_executable.h"
+    "native_executable_hsaf.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
     "per_device_information.h"
@@ -71,6 +72,7 @@ iree_cc_library(
     iree::hal::utils::semaphore_base
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::hip_executable_def_c_fbs
+    iree::hal::drivers::hip::hip
   PUBLIC
 )
 

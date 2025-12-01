@@ -11,6 +11,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/hal/drivers/hsa/dynamic_symbols.h"
+#include "iree/hal/drivers/hsa/native_executable_hsaf.h"
 #include "iree/hal/drivers/hsa/status_util.h"
 #include "iree/hal/utils/executable_debug_info.h"
 #include "iree/hal/utils/executable_header.h"
@@ -50,6 +51,52 @@ static iree_hal_hsa_native_executable_t* iree_hal_hsa_native_executable_cast(
     iree_hal_executable_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_hsa_native_executable_vtable);
   return (iree_hal_hsa_native_executable_t*)base_value;
+}
+
+iree_status_t iree_hal_hsa_native_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Read the size prefix (with unsafe inference if size is unknown).
+  const bool unsafe_infer_size = (executable_data.data_length == 0);
+  iree_const_byte_span_t contained_data = iree_const_byte_span_empty();
+
+  iree_status_t native_hsa = iree_hal_hsa_read_native_header(
+      executable_data, unsafe_infer_size, &contained_data);
+  if (iree_status_is_ok(native_hsa)) {
+    // Successfully read as native HSA executable (fat binary format).
+    iree_string_view_t format = IREE_SV("FPIH");  // Use same format as HIP
+    if (format.size >= executable_format_capacity) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "executable format buffer too small");
+    }
+    memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
+    *out_inferred_size = contained_data.data_length;
+    return iree_ok_status();
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_read_executable_flatbuffer_header(
+      executable_data, unsafe_infer_size,
+      iree_hal_hip_ExecutableDef_file_identifier, &contained_data));
+
+  // Verify the flatbuffer structure.
+  if (!iree_hal_hip_ExecutableDef_verify_as_root(contained_data.data,
+                                                 contained_data.data_length)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to verify executable flatbuffer structure");
+  }
+
+  // Write the format string.
+  iree_string_view_t format = IREE_SV("HSACO");
+  if (format.size >= executable_format_capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable format buffer too small");
+  }
+  memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
+
+  // Return the total size (header + flatbuffer).
+  *out_inferred_size =
+      sizeof(iree_flatbuffer_file_header_t) + contained_data.data_length;
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_hsa_native_executable_create(
