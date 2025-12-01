@@ -340,6 +340,17 @@ static iree_status_t iree_hal_hip_decompress_ccob(
                             "unknown CCOB compression method %u", method);
   }
 
+#ifndef IREE_HAL_HIP_ENABLE_ZSTD
+  // ZSTD support not compiled in
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "CCOB decompression with zstd is not available. "
+      "The bundle contains zstd-compressed data (%" PRIu32
+      " bytes uncompressed). "
+      "Please rebuild with IREE_HAL_DRIVER_ENABLE_ZSTD=ON or use an "
+      "uncompressed bundle.",
+      uncompressed_size);
+#else
   // Allocate buffer for decompressed data
   uint8_t* decompressed_data = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
@@ -372,6 +383,7 @@ static iree_status_t iree_hal_hip_decompress_ccob(
   *out_decompressed_data = decompressed_data;
   *out_decompressed_size = (iree_host_size_t)decompressed_size;
   return iree_ok_status();
+#endif  // IREE_HAL_HIP_ENABLE_ZSTD
 }
 
 // Forward declaration
