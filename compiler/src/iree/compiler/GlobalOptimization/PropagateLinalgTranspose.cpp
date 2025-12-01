@@ -1125,7 +1125,6 @@ static void populateNamedOpSinkingPatterns(MLIRContext *context,
   sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
                                            /*inputIdx=*/0>>(
       context, SmallVector<int64_t>{0, 2, 1});
-  // Also handle generic ops that are effectively matmul contractions.
   sinkingPatterns.insert<FuseTransposeThroughGenericContraction>(context);
 }
 
@@ -1230,7 +1229,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
           // Only propagate if the immediate consumer of the reshape is a
           // transpose.
           return consumer->hasOneUse() &&
-                 llvm::isa<linalg::TransposeOp>(*(consumer->user_begin()));
+                 isa<linalg::TransposeOp>(*(consumer->user_begin()));
         };
     RewritePatternSet bubblingPatterns(context);
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubblingPatterns,
