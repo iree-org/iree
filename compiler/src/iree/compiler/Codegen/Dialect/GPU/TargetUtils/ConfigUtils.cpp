@@ -235,6 +235,73 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   return {smallGemmCutoff, largeGemmCutoff};
 }
 
+static std::optional<GPUMMAHeuristicSeeds> getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
+  switch (gemmSize) {
+    case GemmSize::SmallGemm:
+      return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/2,
+        /*bestMNTileCountPerSubgroup=*/2,
+        /*bestKTileCountPerSubgroup=*/4,
+        /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits /
+            inBitWidth});
+    case GemmSize::MediumGemm:
+      return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/4,
+        /*bestMNTileCountPerSubgroup=*/8,
+        /*bestKTileCountPerSubgroup=*/4,
+        /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits /
+            inBitWidth});
+    case GemmSize::LargeGemm:
+      if (scaled) {
+        return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/64,
+          /*bestMNTileCountPerSubgroup=*/16,
+          /*bestKTileCountPerSubgroup=*/2,
+          /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits /
+              inBitWidth});
+      }
+      return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/4,
+        /*bestMNTileCountPerSubgroup=*/16,
+        /*bestKTileCountPerSubgroup=*/2,
+        /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
+            inBitWidth});
+    default:
+      return std::nullopt;
+    }
+}
+
+static std::optional<GPUMMAHeuristicSeeds> getConvolutionHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth) {
+  switch (gemmSize) {
+    case GemmSize::SmallGemm:
+      return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/2,
+        /*bestMNTileCountPerSubgroup=*/2,
+        /*bestKTileCountPerSubgroup=*/4,
+        /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits /
+            inBitWidth});
+    case GemmSize::MediumGemm:
+      return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/8,
+        /*bestMNTileCountPerSubgroup=*/8,
+        /*bestKTileCountPerSubgroup=*/2,
+        /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
+            inBitWidth});
+    case GemmSize::LargeGemm:
+      return GPUMMAHeuristicSeeds({/*bestSubgroupCountPerWorkgroup=*/8,
+        /*bestMNTileCountPerSubgroup=*/4,
+        /*bestKTileCountPerSubgroup=*/4,
+        /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits /
+            inBitWidth});
+    default:
+      return std::nullopt;
+    }
+}
+
+static std::optional<GPUMMAHeuristicSeeds> getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm, bool scaled) {
+  GemmSize gemmSize = problem.gemmSize;
+  int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
+  if (isGemm) {
+    return getGemmHeuristicSeeds(gemmSize, inBitWidth, scaled);
+  }
+  return getConvolutionHeuristicSeeds(gemmSize, inBitWidth);
+}
+  
+
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
@@ -279,10 +346,10 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     return std::nullopt;
   }
 
-  GPUMMAHeuristicSeeds seeds;
   assert(problem.aType == problem.bType &&
          "expected the same aType and bType.");
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
+  int64_t outBitWidth = problem.cType.getIntOrFloatBitWidth();
 
   GemmCutoff gemmCutoffs = computeGemmCutoffsForAI(target, problem.aType);
 
@@ -292,69 +359,42 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
   int64_t kSize = ShapedType::getNumElements(problem.kSizes);
-  int64_t computeIntensity = (2 * mSize * nSize * kSize) /
-                             (mSize * nSize + nSize * kSize + mSize * kSize);
+
+  int64_t flops = (2 * mSize * nSize * kSize);
+  llvm::errs() << "mSize: " << mSize << ", nSize: " << nSize << ", kSize: " << kSize << "\n";
+  llvm::errs() << "inBitWidth: " << inBitWidth << "\n";
+  int64_t bytes =
+      (mSize * nSize * outBitWidth + nSize * kSize * inBitWidth + mSize * kSize * inBitWidth) / 8;
+
+  // Only support blocking along the last dimension for now.
+  int64_t outerK = (kSize / problem.kSizes.back());
+  // Assume scaling exponents are a type of bitwidth 8.
+  int64_t scalesBytes = mSize * outerK + nSize * outerK;
+  if (scaled) {
+    bytes += scalesBytes;
+  }
+  llvm::errs() << "flops: " << flops << ", bytes: " << bytes << "\n";
+  int64_t computeIntensity = flops / bytes;    
 
   if (computeIntensity <= gemmCutoffs.smallGemmCutoff) {
     // For matmuls with small arithmetic intensity, use small
     // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
     problem.gemmSize = GemmSize::SmallGemm;
-    LDBG() << "This config is SmallGemm";
-    if (isGemm) {
-      seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
-               /*bestMNTileCountPerSubgroup=*/2,
-               /*bestKTileCountPerSubgroup=*/4,
-               /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits /
-                   inBitWidth};
-    } else {
-      seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
-               /*bestMNTileCountPerSubgroup=*/2,
-               /*bestKTileCountPerSubgroup=*/4,
-               /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits /
-                   inBitWidth};
-    }
   } else if (computeIntensity >= gemmCutoffs.largeGemmCutoff) {
     // For matmuls with large arithmetic intensity, use large
     // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
     // amortize launch/memory costs and maximize throughput.
     problem.gemmSize = GemmSize::LargeGemm;
-    LDBG() << "This config is LargeGemm";
-    if (isGemm) {
-      seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-               /*bestMNTileCountPerSubgroup=*/16,
-               /*bestKTileCountPerSubgroup=*/2,
-               /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-                   inBitWidth};
-    } else {
-      // Favor more subgroups for convolution to help latency hiding from global
-      // loads.
-      seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
-               /*bestMNTileCountPerSubgroup=*/8,
-               /*bestKTileCountPerSubgroup=*/2,
-               /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-                   inBitWidth};
-    }
   } else {
     // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
     // either small or large tiles depending on kernel details.
     problem.gemmSize = GemmSize::MediumGemm;
-    LDBG() << "This config is MediumGemm";
-    if (isGemm) {
-      seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-               /*bestMNTileCountPerSubgroup=*/8,
-               /*bestKTileCountPerSubgroup=*/4,
-               /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits /
-                   inBitWidth};
-    } else {
-      // Favor more subgroups for convolution to help latency hiding from global
-      // loads.
-      seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
-               /*bestMNTileCountPerSubgroup=*/4,
-               /*bestKTileCountPerSubgroup=*/4,
-               /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits /
-                   inBitWidth};
-    }
   }
+  LDBG() << "This config is " << problem.gemmSize;
+  std::optional<GPUMMAHeuristicSeeds> maybeSeeds = getContractionHeuristicSeeds(problem, isGemm, scaled);
+  assert(maybeSeeds.has_value() && "expected seeds to be found");
+  GPUMMAHeuristicSeeds seeds = maybeSeeds.value();
+
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   std::optional<int64_t> wgpCount = std::nullopt;
