@@ -193,6 +193,24 @@ def IREEEncoding_SerializableAttr :
         assert(false && "unimplemented interface method");
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the storage size (in bytes) for the tensor types with an
+        optional encoding. Returns Value() if the size is unknown, i.e., it can
+        not be inferred with existing information.
+        Returns nullptr on failure.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"convertForBitcast",
+      /*args=*/(ins
+        "::mlir::Type":$type
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return {};
+      }]
     >
   ];
 

@@ -431,6 +431,19 @@ Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
+Attribute EncodingAttr::convertForBitcast(Type type) const {
+  auto encoding = dyn_cast_or_null<EncodingAttr>(type.getEncoding());
+  if (!encoding) {
+    return {};
+  }
+  if (encoding.getUnderlyingType()) {
+    return {};
+  }
+  return EncodingAttr::get(type.getContext(), encoding.getOperandIndex(), 
+    encoding.getOpType(), encoding.getElementTypes(), encoding.getUserIndexingMaps(),
+    encoding.getIterationSizes(), type.getElementType());
+}
+
 std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
   if (!getUserIndexingMaps()) {
     return std::nullopt;

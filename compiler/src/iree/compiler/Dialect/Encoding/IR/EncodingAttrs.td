@@ -112,6 +112,7 @@ def EncodingAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
+        "convertForBitcast",
       ]>,
       DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
         "getReductionDims",
@@ -148,7 +149,8 @@ def EncodingAttr :
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
     OptionalParameter<"ArrayAttr", "The original operation's iteration sizes. "
-    "This is useful for handling skinny dimension sizes">:$iteration_sizes
+    "This is useful for handling skinny dimension sizes">:$iteration_sizes,
+    OptionalParameter<"Type", "The underlying data type">:$underlying_type
   );
 
   let builders = [
