@@ -74,7 +74,7 @@ jobs:
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 17a391dc3882f136e567bf2687806ef6af46ad64
+          ref: 9bb9c9aedf7f4722a6560f7132d7ff6183a421ed
           path: iree-test-suites
       - name: Install Torch ops test suite requirements
         run: |
