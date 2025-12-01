@@ -1007,7 +1007,7 @@ private:
   SmallVector<int64_t> permutation;
 };
 
-// Sink transpose through linalg.generic that look like matmul
+// Fuse transpose through linalg.generic that look like matmul
 class FuseTransposeThroughGenericContraction
     : public OpRewritePattern<linalg::GenericOp> {
 public:
