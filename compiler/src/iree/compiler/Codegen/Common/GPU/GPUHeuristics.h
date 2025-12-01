@@ -12,6 +12,8 @@ namespace mlir::iree_compiler {
 
 enum class GemmSize { NotSet, SmallGemm, MediumGemm, LargeGemm };
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize);
+
 /// Struct containing information about a matmul's shape and type.
 struct GPUMatmulShapeType {
   SmallVector<int64_t, 2> mSizes;

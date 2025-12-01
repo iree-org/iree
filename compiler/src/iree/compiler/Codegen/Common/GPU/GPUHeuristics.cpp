@@ -49,6 +49,19 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
+  switch (gemmSize) {
+  case GemmSize::SmallGemm:
+    return os << "SmallGemm";
+  case GemmSize::MediumGemm:
+    return os << "MediumGemm";
+  case GemmSize::LargeGemm:
+    return os << "LargeGemm";
+  default:
+    return os << "NotSet";
+  }
+}
+
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
     const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth,
     int64_t numRhs = 1) {
