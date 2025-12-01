@@ -280,7 +280,7 @@ public:
       for (int i = 0, e = transposedMap.getNumDims(); i < e; ++i) {
         if (transposedMap.isFunctionOfDim(i)) {
           interchange.push_back(
-              llvm::cast<AffineDimExpr>(transposedMap.getResult(permIdx))
+              cast<AffineDimExpr>(transposedMap.getResult(permIdx))
                   .getPosition());
           permIdx++;
           continue;
