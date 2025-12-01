@@ -1952,6 +1952,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_codegenfusion_barrier-codegenfusionbarrierop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_codegeninner_tiled-codegeninnertiledop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_codegen.inner_tiled (Codegen::InnerTiledOp)
@@ -5223,6 +5232,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_codegenfusion_barrier-codegenfusionbarrierop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_codegeninner_tiled-codegeninnertiledop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_codegen.inner_tiled (Codegen::InnerTiledOp)
@@ -5831,6 +5849,7 @@ within a backend.</p>
 <li><a href="#iree_codegen-dialect">'iree_codegen' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop">iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)</a></li>
+<li><a href="#iree_codegenfusion_barrier-codegenfusionbarrierop">iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)</a></li>
 <li><a href="#iree_codegeninner_tiled-codegeninnertiledop">iree_codegen.inner_tiled (Codegen::InnerTiledOp)</a><ul>
 <li><a href="#motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls</a></li>
 </ul>
@@ -6009,6 +6028,44 @@ This makes lowering more progressive and brings the following benefits:
 </tr>
 </tbody>
 </table>
+<h3 id="iree_codegenfusion_barrier-codegenfusionbarrierop"><code>iree_codegen.fusion_barrier</code> (Codegen::FusionBarrierOp)<a class="headerlink" href="#iree_codegenfusion_barrier-codegenfusionbarrierop" title="Permanent link">link</a></h3>
+<p><em>Prevents fusion through a tensor value</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.fusion_barrier` attr-dict $source `:` type($result)
+</code></pre></div>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_codegeninner_tiled-codegeninnertiledop"><code>iree_codegen.inner_tiled</code> (Codegen::InnerTiledOp)<a class="headerlink" href="#iree_codegeninner_tiled-codegeninnertiledop" title="Permanent link">link</a></h3>
 <p><em>Models an inner-tiled operation that may perform contractions.</em></p>
 <p>Syntax:</p>
@@ -6158,7 +6215,7 @@ without needing to essentially clone this op.</p>
 <tr><td><code>permutations</code></td><td>::mlir::ArrayAttr</td><td>permutations</td></tr>
 </table>
 
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6177,7 +6234,7 @@ without needing to essentially clone this op.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6200,7 +6257,7 @@ without needing to essentially clone this op.</p>
 <p>Loads a tensor from a memref with a compatible shape and the same element
 type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code></p>
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6215,7 +6272,7 @@ type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6239,7 +6296,7 @@ type.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6271,7 +6328,7 @@ to VMVX.</p>
 <tr><td><code>tensor_type</code></td><td>::mlir::TypeAttr</td><td>Tensor type attribute</td></tr>
 </table>
 
-<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6295,7 +6352,7 @@ to VMVX.</p>
 <p>Stores a tensor into a memref with a compatible shape and the same element
 type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6358,7 +6415,7 @@ is otherwise perfectly legal.</p>
 <tr><td><code>swizzle</code></td><td>IREE::Codegen::SwizzleAttrInterface</td><td>swizzling descriptor attributes</td></tr>
 </table>
 
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6373,7 +6430,7 @@ is otherwise perfectly legal.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
+<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
