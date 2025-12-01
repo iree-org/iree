@@ -335,9 +335,8 @@ static linalg::ControlDropUnitDims getControlDropUnitDimsOptions() {
 
 /// Populate patterns for the core unit-extent dim folding transformations.
 /// These patterns are applied with a walk-based driver.
-static void populateFoldUnitDimsPatterns(
-    RewritePatternSet &patterns,
-    linalg::ControlDropUnitDims &options) {
+static void populateFoldUnitDimsPatterns(RewritePatternSet &patterns,
+                                         linalg::ControlDropUnitDims &options) {
   linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
   IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(patterns, options);
   patterns.insert<DropUnitDimsFromCollapseOfExpand, FoldUnitDimsFromExtractOp>(
@@ -347,8 +346,7 @@ static void populateFoldUnitDimsPatterns(
 /// Populate canonicalization patterns that clean up after unit-extent dim
 /// folding. These patterns are applied with a greedy driver.
 static void populateFoldUnitDimsCanonicalizationPatterns(
-    RewritePatternSet &patterns,
-    linalg::ControlDropUnitDims &options) {
+    RewritePatternSet &patterns, linalg::ControlDropUnitDims &options) {
   linalg::populateMoveInitOperandsToInputPattern(patterns);
   linalg::populateFoldUnitExtentDimsCanonicalizationPatterns(patterns, options);
 }
