@@ -513,3 +513,40 @@ util.func @fold_unit_dims_with_encoding(%arg0: tensor<1x1x4x8xi1, #iree_encoding
 // CHECK:           %[[EXPAND_SHAPE_0:.*]] = tensor.expand_shape %[[GENERIC_0]] {{\[\[}}0, 1, 2], [3]] output_shape [1, 1, 4, 8] : tensor<4x8xi1, #iree_encoding.packed_storage>
 // CHECK-SAME:        into tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
 // CHECK:           util.return %[[EXPAND_SHAPE_0]] : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+
+// -----
+
+util.func public @no_fold_attention_with_non_collapsible_encoding(%arg0 : tensor<1x32x128xf16>, %arg1 : tensor<32x?x128xf16>, %arg2 : tensor<32x128x?xf16>, %arg3 : f16, %arg4 : tensor<1x32x?xf16, #iree_encoding.testing<>>) -> tensor<1x32x128xf16> {
+  %0 = tensor.empty() : tensor<1x32x128xf16>
+  %1 = iree_linalg_ext.attention {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d1, d4, d3)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+    ins(%arg0, %arg1, %arg2, %arg3, %arg4 : tensor<1x32x128xf16>, tensor<32x?x128xf16>, tensor<32x128x?xf16>, f16, tensor<1x32x?xf16, #iree_encoding.testing<>>)
+    outs(%0 : tensor<1x32x128xf16>) {
+  ^bb0(%arg7: f32):
+    iree_linalg_ext.yield %arg7 : f32
+  } -> tensor<1x32x128xf16>
+  util.return %1 : tensor<1x32x128xf16>
+}
+// CHECK-LABEL: func public @no_fold_attention_with_non_collapsible_encoding
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x32x128xf16>
+//  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<32x?x128xf16>
+//  CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<32x128x?xf16>
+//  CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]: f16
+//  CHECK-SAME:    %[[ARG4:[a-zA-Z0-9]+]]: tensor<1x32x?xf16, #iree_encoding.testing<>>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x32x128xf16>
+//       CHECK:   %[[ATTN:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d1, d4, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> ()>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG4]]
+//  CHECK-SAME:     outs(%[[EMPTY]]
+//       CHECK:   util.return %[[ATTN]]
