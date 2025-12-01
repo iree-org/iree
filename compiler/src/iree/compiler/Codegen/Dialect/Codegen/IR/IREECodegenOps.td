@@ -505,33 +505,48 @@ def IREECodegen_WorkgroupCountHintOp :
 
   let description = [{
     Captures a set of values to use as the workgroup count. The backward slice
-    starting from this op's operands are cloned into the workgroup count region
+    starting from this op's operands is cloned into the workgroup count region
     of all transitive callers.
 
-    If `maxDim` is specified, the outer most sizes are linearized down to the
-    `maxDim`th count. `maxDim` is zero-indexed. If multiple hints inform the
-    same entry point, the maximum per dim is used as the count along that dim.
-    For example,
+    The sizes are specified in logical order (innermost to outermost), matching
+    the workgroup count region's (x, y, z) convention. If fewer than 3 sizes
+    are provided, the remaining dimensions default to 1.
 
-    ```
+    If multiple hints inform the same entry point, the **elementwise maximum**
+    across all hints is used as the count along each dimension. For example:
+
+    ```mlir
     hal.executable.export @entry_point
     module {
-      func @entry_point() {
-        iree_codegen.workgroup_count_hint sizes(%a, %b) maxDim(0)
-        iree_codegen.workgroup_count_hint sizes(%c, %d, %e) maxDim(1)
+      func.func @entry_point() {
+        iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+        iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
       }
     }
     ```
 
-    resolves to
+    resolves to:
 
-    ```
+    ```mlir
     hal.executable.export @entry_point {
-      return max(%a * %b, %c), %d, %e
+      %wx = arith.maxsi %a, %x
+      %wy = arith.maxsi %b, %y
+      %wz = arith.maxsi %c, %z
+      hal.return %wx, %wy, %wz
     }
     ```
 
-    `maxDim` must be ∈ {0, 1, 2} = {x, y, z}.
+    #### Common Usage: Linearized Workgroup Counts
+
+    The most common use case for this operation involves computing a linearized
+    (1-D) workgroup count and specifying it as a single size.
+
+    ```mlir
+    %num_workgroups = arith.ceildivui %total_iterations, %tile_size : index
+    iree_codegen.workgroup_count_hint sizes(%num_workgroups)
+    ```
+
+    This results in `(%num_workgroups, 1, 1)` as the final workgroup count.
   }];
 
   let arguments = (ins
