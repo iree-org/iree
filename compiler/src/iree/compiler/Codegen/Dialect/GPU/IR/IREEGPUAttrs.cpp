@@ -2234,7 +2234,7 @@ DimensionExpansionAttr::get(MLIRContext *context,
                             ArrayRef<int64_t> outputShape) {
   Builder b(context);
   SmallVector<Attribute> reassociationAttrs;
-  for (const auto &indices : reassociations) {
+  for (const ReassociationIndices &indices : reassociations) {
     SmallVector<Attribute> indexAttrs;
     for (int64_t idx : indices) {
       indexAttrs.push_back(b.getI64IntegerAttr(idx));
@@ -2253,58 +2253,56 @@ DimensionExpansionAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   if (reassociations.empty()) {
     return emitError() << "reassociations cannot be empty";
   }
-  llvm::SmallDenseSet<int64_t> coveredDims;
-  int64_t maxDim = -1;
-  for (auto [origDim, attr] : llvm::enumerate(reassociations)) {
+
+  int64_t nextExpected = 0;
+
+  for (auto [groupIdx, attr] : llvm::enumerate(reassociations)) {
     auto indexArray = dyn_cast<ArrayAttr>(attr);
     if (!indexArray) {
-      return emitError() << "reassociation at index " << origDim
+      return emitError() << "reassociation at index " << groupIdx
                          << " must be an array";
     }
+
     if (indexArray.empty()) {
-      return emitError() << "reassociation at index " << origDim
+      return emitError() << "reassociation group " << groupIdx
                          << " cannot be empty";
     }
-    int64_t prevIdx = -1;
-    for (auto [i, idxAttr] : llvm::enumerate(indexArray)) {
+
+    int numDynamicDims = 0;
+    for (auto [innerIdx, idxAttr] : llvm::enumerate(indexArray)) {
       auto intAttr = dyn_cast<IntegerAttr>(idxAttr);
       if (!intAttr) {
-        return emitError() << "reassociation index at [" << origDim << "][" << i
-                           << "] must be an integer";
+        return emitError() << "reassociation index at [" << groupIdx << "]["
+                           << innerIdx << "] must be an integer";
       }
-      int64_t idx = intAttr.getInt();
-      if (idx < 0) {
-        return emitError() << "reassociation index " << idx << " at ["
-                           << origDim << "][" << i << "] must be non-negative";
-      }
-      if (i > 0 && idx != prevIdx + 1) {
-        return emitError() << "reassociation indices at [" << origDim
-                           << "] must be consecutive, but got " << prevIdx
-                           << " followed by " << idx;
-      }
-      if (coveredDims.contains(idx)) {
-        return emitError() << "output dimension " << idx
-                           << " appears in multiple reassociations";
-      }
-      coveredDims.insert(idx);
-      maxDim = std::max(maxDim, idx);
-      prevIdx = idx;
-    }
-  }
 
-  int64_t expectedOutputRank = maxDim + 1;
-  for (int64_t i = 0; i < expectedOutputRank; ++i) {
-    if (!coveredDims.contains(i)) {
-      return emitError() << "output dimension " << i
-                         << " is not covered by any reassociation";
+      int64_t idx = intAttr.getInt();
+      if (idx != nextExpected) {
+        return emitError() << "reassociation indices must form contiguous "
+                           << "sequence; expected dimension " << nextExpected
+                           << " at [" << groupIdx << "][" << innerIdx
+                           << "], got " << idx;
+      }
+
+      if (outputShape[idx] == ShapedType::kDynamic) {
+        numDynamicDims++;
+      }
+
+      nextExpected++;
+    }
+
+    if (numDynamicDims > 1) {
+      return emitError()
+             << "reassociation group " << groupIdx
+             << " has multiple dynamic dimensions; at most 1 allowed";
     }
   }
 
   ArrayRef<int64_t> outputShapeArray = outputShape.asArrayRef();
-  if (outputShapeArray.size() != static_cast<size_t>(expectedOutputRank)) {
-    return emitError() << "output_shape size (" << outputShapeArray.size()
-                       << ") doesn't match number of output dimensions ("
-                       << expectedOutputRank << ")";
+  if (nextExpected != static_cast<int64_t>(outputShapeArray.size())) {
+    return emitError() << "reassociations cover " << nextExpected
+                       << " dimensions, but output_shape has rank "
+                       << outputShapeArray.size();
   }
 
   return success();

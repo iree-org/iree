@@ -930,8 +930,8 @@ def IREEGPU_DimensionExpansionAttr
   let summary = [{Attribute for describing static dimension expansion.}];
   let description = [{
     This attribute describes how dimensions in an iteration space should be
-    expanded. Each original dimension can either remain
-    unchanged or be split into multiple dimensions. The semantics are similar to the familiar
+    expanded. Each original dimension can either remain unchanged or be
+    split into multiple dimensions. The semantics are similar to the familiar
     `tensor.expand_shape` operation.
 
     The reassociations parameter specifies the mapping from original dimensions
