@@ -28,6 +28,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTraits.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -596,32 +597,8 @@ static LogicalResult materializeSlice(
     RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
     SetVector<Operation *> &slice,
     SetVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> &ordinals) {
-  for (auto ordinalOp : ordinals) {
-    // Map `tensor_ext.dispatch.workload.ordinal` op with the corresponding
-    // operand of the `tensor_ext.dispatch.workgroup_count_default` operation.
-    int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
-    if (ordinal >= workloadVals.size()) {
-      return ordinalOp.emitOpError(
-          "ordinal number is higher than the number of workloads captured in "
-          "the workgroup count region");
-    }
-    map.map(ordinalOp.getResult(), workloadVals[ordinal]);
-  }
-  for (auto op : slice) {
-    // TODO(#13038) This is a WAR for ops ending up in workgroup count
-    // computation. They should not. Some pre-processing at MaterializeEncoding
-    // time might make these go away.
-    if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
-      Value constVal =
-          arith::ConstantIndexOp::create(rewriter, op->getLoc(), 16);
-      for (auto result : op->getResults()) {
-        map.map(result, constVal);
-      }
-      continue;
-    }
-    rewriter.clone(*op, map);
-  }
-  return success();
+  return materializeSliceFromOrdinals(
+      rewriter, map, workloadVals, ordinals.getArrayRef(), slice.getArrayRef());
 }
 
 /// Materializes a single combined `scf.if` based on the list of
@@ -750,7 +727,7 @@ static FailureOr<SmallVector<Value, 3>> materializeHint(RewriterBase &rewriter,
 static FailureOr<SmallVector<Value, 3>>
 materializeFunc(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
                 FunctionSlice &funcSlice,
-                llvm::DenseMap<FunctionOpInterface, FunctionSlice> sliceMap);
+                llvm::DenseMap<FunctionOpInterface, FunctionSlice> &sliceMap);
 
 /// Materializes the IR for the provided CallSlice using the given mapping at
 /// the current insertion point. This amounts to cloning all of the IR cached
@@ -762,7 +739,7 @@ materializeFunc(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
 static FailureOr<SmallVector<Value, 3>>
 materializeCall(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
                 CallSlice &callSlice,
-                llvm::DenseMap<FunctionOpInterface, FunctionSlice> sliceMap) {
+                llvm::DenseMap<FunctionOpInterface, FunctionSlice> &sliceMap) {
   Location loc = callSlice.callee.getLoc();
   FailureOr<Operation *> maybePlaceholder = materializeConditions(
       rewriter, map, loc, workloadVals, callSlice.conditions);
@@ -871,7 +848,7 @@ materializeCall(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
 static FailureOr<SmallVector<Value, 3>>
 materializeFunc(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
                 FunctionSlice &funcSlice,
-                llvm::DenseMap<FunctionOpInterface, FunctionSlice> sliceMap) {
+                llvm::DenseMap<FunctionOpInterface, FunctionSlice> &sliceMap) {
   SmallVector<Value, 3> results;
   for (HintSlice &hint : funcSlice.hints) {
     FailureOr<SmallVector<Value, 3>> newVals =
@@ -917,7 +894,7 @@ static LogicalResult replaceFromSliceOpWithFunctionSlice(
     RewriterBase &rewriter,
     IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fromSliceOp,
     FunctionSlice &root,
-    llvm::DenseMap<FunctionOpInterface, FunctionSlice> sliceMap) {
+    llvm::DenseMap<FunctionOpInterface, FunctionSlice> &sliceMap) {
   ValueRange workloadVals = fromSliceOp.getOperands();
   IRMapping map;
   FailureOr<SmallVector<Value, 3>> results =
