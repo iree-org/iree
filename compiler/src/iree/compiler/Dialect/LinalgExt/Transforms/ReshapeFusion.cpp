@@ -8,6 +8,7 @@
 // The content of this file is adapted from linalg's ElemenwiseOpFusion.cpp and
 // modified to work with LinalgExt ops.
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -1125,6 +1126,36 @@ void populateFoldReshapeOpsByExpansionPatterns(
 
 SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
   auto fusionOp = cast<LinalgFusionOpInterface>(op);
+  auto cannotBeCollapsed = [](Type ty) -> bool {
+    auto tensorTy = dyn_cast<RankedTensorType>(ty);
+    if (!tensorTy) {
+      return false;
+    }
+    Attribute encoding = tensorTy.getEncoding();
+    if (!encoding) {
+      return false;
+    }
+    if (auto collapsibleInterface =
+            dyn_cast<Encoding::CollapsibleEncodingAttrInterface>(encoding)) {
+      return !collapsibleInterface.canCollapse();
+    }
+    // If the tensor has an encoding, but it doesn't have the interface, we
+    // can't collapse it.
+    return true;
+  };
+  // If any of the operands or result types are a tensor type with encoding that
+  // doesn't implement the interface or cannot be collapsed (expanded in the
+  // case of results), we do not fold unit dimensions for that operation.
+  // This avoids awkward 0-entries in the affine maps, which some LinalgExt
+  // operations do not allow and some passes don't handle well.
+  if (llvm::any_of(
+          fusionOp->getOperandTypes(),
+          [&cannotBeCollapsed](Type t) { return cannotBeCollapsed(t); }) ||
+      llvm::any_of(fusionOp->getResultTypes(), [&cannotBeCollapsed](Type t) {
+        return cannotBeCollapsed(t);
+      })) {
+    return SmallVector<unsigned>{};
+  }
   return llvm::to_vector(llvm::seq<unsigned>(0, fusionOp.getNumLoops()));
 }
 
