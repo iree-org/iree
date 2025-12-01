@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
@@ -223,6 +224,10 @@ static bool isMatmulLike(linalg::LinalgOp linalgOp) {
          linalgOp.getNumParallelLoops() >= 2;
 }
 
+static bool isScaledMatmulLike(linalg::LinalgOp linalgOp) {
+  return IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp);
+}
+
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   std::string prefix;
 
@@ -291,6 +296,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
     } else if (isPermutationOuts && isProjectedPermIns &&
                numPermutationIn == 0) {
       prefix = "elementwise_broadcast";
+    } else if (isScaledMatmulLike(op)) {
+      prefix = "scaled_matmul_like";
     } else if (isMatvecLike(op)) {
       prefix = "matvec_like";
     } else if (isMatmulLike(op)) {
