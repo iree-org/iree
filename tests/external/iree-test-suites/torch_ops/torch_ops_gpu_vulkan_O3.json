@@ -11,7 +11,8 @@
     "generated/test_a_t_b_float16",
     "generated/test_a_b_plus_c_float16",
     "generated/test_a_b_t_float16",
-    "generated/test_relu_a_b_plus_c_float16"
+    "generated/test_relu_a_b_plus_c_float16",
+    "generated/test_gelu_a_b_plus_c_float16"
   ],
   "skip_run_tests": [
     "generated/test_a_b_float16"
