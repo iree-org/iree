@@ -130,10 +130,10 @@ struct GPUMMASchedule {
 
   // Check if all schedule dimensions are single-element.
   bool hasSingleDimensions() const {
-    return mSubgroupCounts.size() == 1 && nSubgroupCounts.size() == 1 &&
-           mTileSizes.size() == 1 && nTileSizes.size() == 1 &&
-           kTileSizes.size() == 1 && mSizes.size() == 1 && nSizes.size() == 1 &&
-           kSizes.size() == 1;
+    return llvm::all_equal({size_t(1), mSubgroupCounts.size(),
+                            nSubgroupCounts.size(), mTileSizes.size(),
+                            nTileSizes.size(), kTileSizes.size(), mSizes.size(),
+                            nSizes.size(), kSizes.size()});
   }
 };
 

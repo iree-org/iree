@@ -98,7 +98,7 @@ static bool isScheduleAligned(const GPUMatmulShapeType &problem,
     // d*y].
     assert(intrinsicSizes.size() <= sizes.size() &&
            "intrinsic sizes should not exceed tile count sizes");
-    for (auto &&[intrinsicSize, size] :
+    for (auto [intrinsicSize, size] :
          llvm::zip(llvm::reverse(intrinsicSizes), llvm::reverse(sizes))) {
       size *= intrinsicSize;
     }
@@ -175,7 +175,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
            << schedule << "\nShrinking schedule...";
 
     auto decrementIfPossible =
-        [](SmallVector<int64_t, 2> &sizes) -> LogicalResult {
+        [](SmallVectorImpl<int64_t> &sizes) -> LogicalResult {
       for (int64_t &size : sizes) {
         if (size <= 1)
           continue;
