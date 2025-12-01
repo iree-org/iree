@@ -72,7 +72,9 @@ using IREE::GPU::ReorderWorkgroupsStrategy;
 
 struct GPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
-  bool prefetchSharedMemory = false;
+  // Number of software pipelining stages for shared memory prefetching.
+  // 0 or 1 disables prefetching, 2+ enables it with that many stages.
+  unsigned prefetchNumStages = 0;
   bool useIgemmConvolution = false;
   bool enableUkernels = false;
   std::optional<ReorderWorkgroupsStrategy> reorderStrategy;

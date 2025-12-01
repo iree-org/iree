@@ -406,7 +406,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-        context, /*prefetchSharedMemory=*/true,
+        context, /*prefetchNumStages=*/2,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
         /*use_igemm_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
@@ -667,7 +667,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-        context, /*prefetchSharedMemory=*/true,
+        context, /*prefetchNumStages=*/2,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
         /*use_igemm_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
@@ -1497,7 +1497,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
           IREE::GPU::LoweringConfigAttr::get(context, configDict);
       SmallVector<NamedAttribute, 1> pipelineAttrs;
       auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-          context, /*prefetchSharedMemory=*/false,
+          context, /*prefetchNumStages=*/0,
           /*no_reduce_shared_memory_bank_conflicts=*/true,
           /*use_igemm_convolution=*/false,
           /*reorder_workgroups_strategy=*/std::nullopt);
