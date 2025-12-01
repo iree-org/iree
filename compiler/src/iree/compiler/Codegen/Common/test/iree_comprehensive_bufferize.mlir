@@ -3207,3 +3207,16 @@ func.func @retry_constant_bufferize() {
 // CHECK:         %[[CST:.+]] = arith.constant dense<0> : tensor<6xi32>
 // CHECK:         %[[MEMREF:.+]] = bufferization.to_buffer %[[CST]] read_only
 // CHECK:         memref.copy %[[MEMREF]]
+
+// -----
+
+func.func @drop_fusion_barrier() -> memref<6xf32> {
+  %alloc = bufferization.alloc_tensor() : tensor<6xf32>
+  %0 = iree_codegen.fusion_barrier %alloc : tensor<6xf32>
+  %memref = bufferization.to_buffer %0 : tensor<6xf32> to memref<6xf32>
+  return %memref : memref<6xf32>
+}
+
+// CHECK-LABEL: func.func @drop_fusion_barrier
+// CHECK:         %[[ALLOC:.+]] = memref.alloc() : memref<6xf32>
+// CHECK:         return %[[ALLOC]]
