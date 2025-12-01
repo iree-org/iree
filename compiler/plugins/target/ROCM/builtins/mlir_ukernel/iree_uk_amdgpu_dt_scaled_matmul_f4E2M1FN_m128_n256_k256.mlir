@@ -228,6 +228,11 @@ util.func @dt_scaled_matmul_f4f4f32_m128_n256_k256(
         amdgpu.gather_to_lds %lhs_scale_collapse[%i, %lhs_scale_buffer_inner], %lhs_scale_shared[%lhs_scale_shared_outer, %lhs_scale_shared_inner]
           : !lhs_scale_copy_vec_ty, !lhs_scale_buffer_collapse_ty, !lhs_scale_shared_ty
 
+        // Wait on previous group.
+        rocdl.s.waitcnt 5
+        rocdl.s.barrier
+
+
         scf.yield
       }
 
@@ -245,6 +250,9 @@ util.func @dt_scaled_matmul_f4f4f32_m128_n256_k256(
     %ids:2 = affine.delinearize_index %id into (4, 64) : index, index
     %subgroups:2 = affine.delinearize_index %ids#0 into (2, 2) : index, index
     %threads:2 = affine.delinearize_index %ids#1 into (4, 16) : index, index
+
+    // Misalign by one group.
+    rocdl.s.barrier
 
     %loop = scf.for %i = %c0 to %k step %c1 iter_args(%iter = %init) -> !acc_ty {
       // wait till available.
@@ -293,6 +301,7 @@ util.func @dt_scaled_matmul_f4f4f32_m128_n256_k256(
       %rhs_scale_byte_vec_t = vector.shape_cast %rhs_scale_byte_vec : vector<1x16xi8> to !rhs_scale_byte_vec_ty
       %rhs_scale_vec = vector.bitcast %rhs_scale_byte_vec_t : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
 
+      amdgpu.lds_barrier
       rocdl.sched.barrier 0
 
       %dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%iter) {
