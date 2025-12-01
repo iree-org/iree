@@ -288,6 +288,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
 /// attribute.
 StringRef getTilingLevelName(GPU::TilingLevel level);
 
+/// Returns the name of the padding `level`, as used in the `padding_config`
+/// attribute.
+StringRef getPaddingLevelName(GPU::PaddingLevel level);
+
 //===----------------------------------------------------------------------===//
 // Implementations for operand promotion
 //===----------------------------------------------------------------------===//

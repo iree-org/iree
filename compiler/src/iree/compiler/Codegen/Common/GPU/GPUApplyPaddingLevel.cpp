@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Interfaces/TensorMaskingOpInterface.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/DenseSet.h"
@@ -45,15 +46,12 @@ struct GPUApplyPaddingLevelPass final
 } // namespace
 
 static llvm::SmallDenseSet<TilingInterface>
-getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
+getPaddedOps(Operation *funcOp, IREE::GPU::PaddingLevel paddingLevel) {
   llvm::SmallDenseSet<TilingInterface> targets;
-  unsigned opaqueLevel = llvm::to_underlying(tilingLevel);
   funcOp->walk([&](TilingInterface target) {
-    // TODO: This would probably be easier with a lowering config interface
-    // method that checks whether a particular level is tiled.
-    if (IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
-            getLoweringConfig(target)) {
-      if (loweringConfig.hasTilingLevel(opaqueLevel)) {
+    if (auto loweringConfig = 
+            getLoweringConfig<IREE::GPU::LoweringConfigAttr>(target)) {
+      if (loweringConfig.hasPaddingLevel(paddingLevel)) {
         targets.insert(target);
       }
     }
@@ -100,19 +98,20 @@ struct MaskListener final : public RewriterBase::Listener {
 
 static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
                                        TilingInterface tilingInterfaceOp,
-                                       IREE::GPU::TilingLevel tilingLevel) {
+                                       IREE::GPU::PaddingLevel paddingLevel) {
   auto tensorMaskingOp =
       dyn_cast<TensorMaskingOpInterface>(tilingInterfaceOp.getOperation());
   if (!tensorMaskingOp) {
     return failure();
   }
 
-  SmallVector<int64_t> tileSizes =
-      getLoweringConfig(tilingInterfaceOp)
-          .getStaticTilingLevelSizes(llvm::to_underlying(tilingLevel),
-                                     tilingInterfaceOp);
-  SmallVector<OpFoldResult> padSizes =
-      getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
+  auto loweringConfig = 
+      getLoweringConfig<IREE::GPU::LoweringConfigAttr>(tilingInterfaceOp);
+  
+  SmallVector<OpFoldResult> padSizes = getAsIndexOpFoldResult(
+      rewriter.getContext(),
+      loweringConfig.getStaticPaddingLevelSizes(
+          llvm::to_underlying(paddingLevel)));
 
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(tilingInterfaceOp);
@@ -130,13 +129,13 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
 void GPUApplyPaddingLevelPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
   llvm::SmallDenseSet<TilingInterface> targetOps =
-      getTiledOps(funcOp, tilingLevel);
+      getPaddedOps(funcOp, paddingLevel);
 
   MaskListener maskListener;
   IRRewriter rewriter(funcOp, &maskListener);
   for (TilingInterface op : targetOps) {
     // If some op does not get padded, that is fine for now.
-    (void)applyPaddingLevel(rewriter, op, tilingLevel);
+    (void)applyPaddingLevel(rewriter, op, paddingLevel);
   }
 
   // To workaround tensor.pad ops not being DPS and causing issues with dim
