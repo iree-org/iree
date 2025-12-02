@@ -120,6 +120,7 @@ class TargetConverter:
                 "@com_google_googletest//:gtest": ["gmock", "gtest"],
                 "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
                 "@hsa_runtime_headers": ["hsa_runtime::headers"],
+                "@libbacktrace": ["libbacktrace::libbacktrace"],
                 "@webgpu_headers": [],
                 # py_binary targets have no CMake equivalent.
                 # This is the only target bazel needs to execute the lit tests.
