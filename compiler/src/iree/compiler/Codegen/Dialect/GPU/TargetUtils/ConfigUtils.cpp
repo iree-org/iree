@@ -1615,14 +1615,15 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   // This strategy turns non-strided/dilated convolution problems into matmul
   // problems by tiling certain dimensions to 1:
-  //  - Batch dimensions (parallel shared by the image and output)
-  //  - Filter dimensions (reduction on the filter, and convolved on the image)
-  //  - All output image dimensions except the innermost one
+  //  - Filter dimensions (reduction on the filter, and convolved on the image).
+  //  - All parallel dimensions except the innermost output channel dimension
+  //    and output image/batch dimension.
   //
   // After this, the remaining non-unit dimensions are:
-  //  - One output image dimension corresponding to the M dimension of a matmul.
-  //  - The output channel dimension, corresponding to the N dimension.
-  //  - The input channel dimension, corresponding to the K dimension.
+  //  - One output image or batch dimension corresponding to the M dimension of
+  //    a matmul.
+  //  - One output channel dimension, corresponding to the N dimension.
+  //  - One input channel dimension, corresponding to the K dimension.
 
   // TODO: Relax this condition to strictly alignment requirements.
   if (convolutionDims->outputChannel.size() < 1 ||
@@ -1658,8 +1659,15 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
+  SmallVector<unsigned> batchAndImageDims;
+  batchAndImageDims.append(convolutionDims->batch.begin(),
+                           convolutionDims->batch.end());
+  batchAndImageDims.append(convolutionDims->outputImage.begin(),
+                           convolutionDims->outputImage.end());
+  llvm::sort(batchAndImageDims);
+
   // TODO: Support tiling and finding mma schedule on multiple M/N/K dimensions.
-  int64_t mDim = convolutionDims->outputImage.back();
+  int64_t mDim = batchAndImageDims.back();
   int64_t nDim = convolutionDims->outputChannel.back();
   int64_t kDim = convolutionDims->inputChannel.back();
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
@@ -1714,10 +1722,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> workgroupTileSizes(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> subgroupTileSizes(linalgOp.getNumLoops(), 0);
-  // Tile all batch dimensions with unit size.
-  for (int64_t batch : convolutionDims->batch) {
-    workgroupTileSizes[batch] = 1;
-  }
+  // Tile all depth dimensions to 1.
   for (int64_t depth : convolutionDims->depth) {
     workgroupTileSizes[depth] = 1;
   }
@@ -1726,7 +1731,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     reductionTileSizes[f] = 1;
   }
   // Tile all m, n, k dimensions to 1 except the innermost.
-  for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
+  for (int64_t oi : llvm::drop_end(batchAndImageDims)) {
     workgroupTileSizes[oi] = 1;
   }
   for (int64_t oc : llvm::drop_end(convolutionDims->outputChannel)) {
