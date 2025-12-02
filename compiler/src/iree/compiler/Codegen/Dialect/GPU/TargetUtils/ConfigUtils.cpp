@@ -405,7 +405,6 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     problem.gemmSize = GemmSize::MediumGemm;
   }
   LDBG() << "This config is " << problem.gemmSize;
-  llvm::errs() << "problem.gemmSize: " << problem.gemmSize << "\n";
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
       getContractionHeuristicSeeds(problem, isGemm, scaled);
   assert(maybeSeeds.has_value() && "expected seeds to be found");
@@ -1987,8 +1986,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     }
   }
 
-  return os << "{"
-            << "enableReduceSharedMemoryBankConflicts = "
+  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
             << ", prefetchNumStages = " << options.prefetchNumStages
             << ", useIgemmConvolution = " << options.useIgemmConvolution
