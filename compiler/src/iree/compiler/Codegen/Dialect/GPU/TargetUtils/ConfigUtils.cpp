@@ -179,7 +179,7 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   // left to do before any analysis done on tuning data is actionable.
   // See https://github.com/iree-org/iree/issues/22785 for details.
   if (scaled) {
-    return {smallGemmCutoff, 2 * largeGemmCutoff};
+    return {100.0f, 10000.0f};
   }
   if (!target.getChip()) {
     LDBG() << "Target chip is not specified, using default gemm cutoffs: "
@@ -255,11 +255,10 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
   case GemmSize::MediumGemm:
     if (scaled) {
       return GPUMMAHeuristicSeeds(
-          {/*bestSubgroupCountPerWorkgroup=*/4,
-           /*bestMNTileCountPerSubgroup=*/16,
-           /*bestKTileCountPerSubgroup=*/2,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-               inBitWidth});
+          {/*bestSubgroupCountPerWorkgroup=*/8,
+           /*bestMNTileCountPerSubgroup=*/32,
+           /*bestKTileCountPerSubgroup=*/4,
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
     }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
@@ -269,10 +268,10 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
   case GemmSize::LargeGemm:
     if (scaled) {
       return GPUMMAHeuristicSeeds(
-          {/*bestSubgroupCountPerWorkgroup=*/4,
-           /*bestMNTileCountPerSubgroup=*/64,
+          {/*bestSubgroupCountPerWorkgroup=*/8,
+           /*bestMNTileCountPerSubgroup=*/32,
            /*bestKTileCountPerSubgroup=*/2,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / inBitWidth});
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
     }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
