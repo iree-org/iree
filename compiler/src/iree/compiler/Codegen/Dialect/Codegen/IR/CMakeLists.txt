@@ -75,6 +75,7 @@ iree_cc_library(
     MLIRTransformDialectTransforms
     MLIRVectorInterfaces
     MLIRViewLikeInterface
+    iree::compiler::Codegen::Dialect::PCF::IR
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils

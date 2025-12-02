@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCF.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -50,12 +51,12 @@ public:
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<IREE::Codegen::IREECodegenDialect, affine::AffineDialect,
-                gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
-                IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-                bufferization::BufferizationDialect, scf::SCFDialect,
-                spirv::SPIRVDialect, transform::TransformDialect,
-                vector::VectorDialect>();
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::PCF::PCFDialect,
+                affine::AffineDialect, gpu::GPUDialect, IREE::HAL::HALDialect,
+                linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                memref::MemRefDialect, bufferization::BufferizationDialect,
+                scf::SCFDialect, spirv::SPIRVDialect,
+                transform::TransformDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;
