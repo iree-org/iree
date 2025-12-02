@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCF.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
@@ -49,6 +50,7 @@ public:
     // clang-format off
     registry.insert<IREE::HAL::HALDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
+                    IREE::PCF::PCFDialect,
                     bufferization::BufferizationDialect,
                     linalg::LinalgDialect,
                     LLVM::LLVMDialect,
