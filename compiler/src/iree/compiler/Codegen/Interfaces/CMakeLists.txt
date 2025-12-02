@@ -48,6 +48,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::Dialect::GPU::TransformExtensions::IREEGPUExtensions
+    iree::compiler::Codegen::Dialect::PCF::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
