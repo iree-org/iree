@@ -179,7 +179,7 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   // left to do before any analysis done on tuning data is actionable.
   // See https://github.com/iree-org/iree/issues/22785 for details.
   if (scaled) {
-    return {smallGemmCutoff, 2*largeGemmCutoff};
+    return {smallGemmCutoff, 2 * largeGemmCutoff};
   }
   if (!target.getChip()) {
     LDBG() << "Target chip is not specified, using default gemm cutoffs: "
@@ -255,10 +255,11 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
   case GemmSize::MediumGemm:
     if (scaled) {
       return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/4,
-         /*bestMNTileCountPerSubgroup=*/16,
-         /*bestKTileCountPerSubgroup=*/2,
-         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
+          {/*bestSubgroupCountPerWorkgroup=*/4,
+           /*bestMNTileCountPerSubgroup=*/16,
+           /*bestKTileCountPerSubgroup=*/2,
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
+               inBitWidth});
     }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
@@ -378,22 +379,17 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
   int64_t kSize = ShapedType::getNumElements(problem.kSizes);
 
-  llvm::errs() << "mSize: " << mSize << ", nSize: " << nSize << ", kSize: " << kSize << "\n";
   int64_t flops = (2 * mSize * nSize * kSize);
   int64_t bytes = (mSize * nSize + nSize * kSize + mSize * kSize);
 
   // Only support blocking along the last dimension for now.
   int64_t outerK = (kSize / problem.kSizes.back());
   int64_t scalesBytes = mSize * outerK + nSize * outerK;
-  llvm::errs() << "outerK: " << outerK << ", scalesBytes: " << scalesBytes << "\n";
   if (scaled) {
     bytes += scalesBytes;
   }
   int64_t computeIntensity = flops / bytes;
-  llvm::errs() << "computeIntensity: " << computeIntensity << "\n";
-  llvm::errs() << "gemmCutoffs.smallGemmCutoff: " << gemmCutoffs.smallGemmCutoff << ", gemmCutoffs.largeGemmCutoff: " << gemmCutoffs.largeGemmCutoff << "\n";
-  llvm::errs() << "computeIntensity <= gemmCutoffs.smallGemmCutoff: " << (computeIntensity <= gemmCutoffs.smallGemmCutoff) << "\n";
-  llvm::errs() << "computeIntensity >= gemmCutoffs.largeGemmCutoff: " << (computeIntensity >= gemmCutoffs.largeGemmCutoff) << "\n";
+
   if (computeIntensity <= gemmCutoffs.smallGemmCutoff) {
     // For matmuls with small arithmetic intensity, use small
     // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
@@ -1991,7 +1987,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     }
   }
 
-  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
+  return os << "{"
+            << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
             << ", prefetchNumStages = " << options.prefetchNumStages
             << ", useIgemmConvolution = " << options.useIgemmConvolution
