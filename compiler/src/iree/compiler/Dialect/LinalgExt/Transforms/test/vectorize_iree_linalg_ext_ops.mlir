@@ -139,3 +139,17 @@ func.func @map_scatter_f4_mask_depends_on_inner_index(
 }
 // CHECK-LABEL: @map_scatter_f4_mask_depends_on_inner_index
 //   CHECK-NOT:   vector
+
+// -----
+
+func.func @unmask_vectorization(%src: tensor<4x4xf32>, %dst: tensor<4x?xf32>) -> tensor<4x?xf32> {
+  %0 = iree_linalg_ext.unmask %src into %dst : tensor<4x4xf32> -> tensor<4x?xf32>
+  return %0 : tensor<4x?xf32>
+}
+// CHECK-LABEL: func @unmask_vectorization
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK: transfer_read
+// CHECK: %[[DIM:.+]] = tensor.dim %{{.*}}, %{{.*}} : tensor<4x?xf32>
+// CHECK: %[[MASK:.+]] = vector.create_mask %[[C4]], %[[DIM]] : vector<4x4xi1>
+// CHECK: transfer_write
+// CHECK-SAME: %[[MASK]]

@@ -232,3 +232,12 @@ func.func public @convert_identity_map_scatter_into_copy(
 //  CHECK-NOT:   iree_linalg_ext.map_scatter
 //      CHECK:   %[[COPY:.+]] = linalg.copy ins(%[[ARG0]]{{.*}} outs(%[[ARG1]]
 //      CHECK:   return %[[COPY]]
+
+// -----
+
+func.func @unmask(%src: tensor<4x4xf32>, %dst: tensor<4x4xf32>) -> tensor<4x4xf32> {
+  %0 = iree_linalg_ext.unmask %src into %dst : tensor<4x4xf32> -> tensor<4x4xf32>
+  return %0 : tensor<4x4xf32>
+}
+// CHECK-LABEL: func @unmask
+// CHECK-NOT: iree_linalg_ext.unmask
