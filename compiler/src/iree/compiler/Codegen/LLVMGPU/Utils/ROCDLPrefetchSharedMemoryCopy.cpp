@@ -399,7 +399,6 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
 static void
 populateOpToClusterMap(const StageClassification &stages, unsigned numStages,
                        llvm::DenseMap<Operation *, unsigned> &opToCluster) {
-
   unsigned clusterID = 0;
 
   if (numStages == 2) {
@@ -420,7 +419,7 @@ populateOpToClusterMap(const StageClassification &stages, unsigned numStages,
     }
     ++clusterID;
   } else {
-    // 3+ stage pipeline: compute first, then write, then read
+    // 3-stage pipeline: compute first, then write, then read
     // This maximizes distance between read and use
     for (Operation *op : stages.computeStage) {
       opToCluster[op] = clusterID;
@@ -645,6 +644,14 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   // No prefetching needed for single-stage pipelining.
   if (numStages <= 1) {
     return forOp;
+  }
+
+  // For global->shared->register data flow, we have 3 operation groups (read,
+  // write, compute), so 3 stages is the maximum meaningful pipeline depth.
+  if (numStages > 3) {
+    LDBG() << "numStages=" << numStages
+           << " requested but capping to 3 (maximum for read, write, compute)";
+    numStages = 3;
   }
 
   // Compute stage classification using the new refactored approach
