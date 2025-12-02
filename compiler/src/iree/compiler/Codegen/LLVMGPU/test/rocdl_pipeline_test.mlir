@@ -87,7 +87,7 @@ hal.executable @dot_dispatch_0 {
 //           RDNA3:   llvm.br
 //   RDNA3-COUNT-1:    llvm.load {{.*}} : !llvm.ptr<7> -> vector<32xf32>
 //  RDNA3-COUNT-32:    llvm.load {{.*}} : !llvm.ptr<7> -> vector<16xf32>
-//  RDNA3-COUNT-32:    llvm.intr.fmuladd({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
+//  RDNA3-COUNT-32:    llvm.intr.fma({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
 //   RDNA3-COUNT-1:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<7>
 //           RDNA3:   llvm.br
 
