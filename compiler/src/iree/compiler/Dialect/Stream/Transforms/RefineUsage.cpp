@@ -488,6 +488,39 @@ struct ApplyAsyncTransferOp
   }
 };
 
+// Converts async.cast to async.transfer when source and result lifetimes are
+// both concrete but differ. The cast op is a type assertion that should fold
+// away when types match, but when they can't match (e.g., constant->external),
+// we need an actual transfer operation to perform the copy.
+struct ConvertAsyncCastToTransfer
+    : public OpRewritePattern<IREE::Stream::AsyncCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Stream::AsyncCastOp op,
+                                PatternRewriter &rewriter) const override {
+    auto sourceType =
+        llvm::cast<IREE::Stream::ResourceType>(op.getSource().getType());
+    auto resultType =
+        llvm::cast<IREE::Stream::ResourceType>(op.getResult().getType());
+
+    // If either type is still Unknown, wait for refinement to resolve it.
+    if (sourceType.getLifetime() == IREE::Stream::Lifetime::Unknown ||
+        resultType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
+      return failure();
+    }
+
+    // If types match after refinement, let folding handle it.
+    if (sourceType == resultType) {
+      return failure();
+    }
+
+    // Lifetimes are concrete and different - need an actual transfer.
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
+        op, resultType, op.getSource(), op.getSourceSize(), op.getResultSize(),
+        op.getAffinityAttr(), op.getAffinityAttr());
+    return success();
+  }
+};
+
 static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
                                           RewritePatternSet &patterns) {
@@ -500,8 +533,8 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyGenericOp<mlir::scf::ConditionOp>,
                   ApplyGenericOp<mlir::scf::YieldOp>,
                   ApplyGenericOp<IREE::Stream::TimepointAwaitOp>,
-                  ApplyGenericOp<IREE::Stream::TimepointBarrierOp>>(context,
-                                                                    analysis);
+                  ApplyGenericOp<IREE::Stream::TimepointBarrierOp>,
+                  ApplyGenericOp<IREE::Stream::AsyncCastOp>>(context, analysis);
   patterns.insert<ApplyStreamableOp<IREE::Stream::ResourceAllocOp>,
                   ApplyStreamableOp<IREE::Stream::ResourceAllocaOp>,
                   ApplyStreamableOp<IREE::Stream::ResourceTransientsOp>,
@@ -524,6 +557,8 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncExecuteOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncConcurrentOp>,
                   ApplyStreamableOp<IREE::Stream::YieldOp>>(context, analysis);
+  // Convert async.cast to async.transfer when lifetimes can't match.
+  patterns.insert<ConvertAsyncCastToTransfer>(context);
 }
 
 //===----------------------------------------------------------------------===//

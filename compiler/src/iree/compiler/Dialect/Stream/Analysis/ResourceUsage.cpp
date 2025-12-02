@@ -402,6 +402,14 @@ private:
               DFX::Resolution::REQUIRED);
           getState() ^= tiedUsage.getState();
         })
+        .Case([&](IREE::Stream::AsyncCastOp op) {
+          // Cast is a tied passthrough - propagate source usage to result.
+          // The result type's lifetime constraints are set during init.
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getSource()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= sourceUsage.getState();
+        })
         .Case([&](IREE::Stream::AsyncTransferOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
           auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
@@ -748,6 +756,14 @@ private:
           }
         })
         .Case([&](IREE::Stream::AsyncBarrierOp op) {
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::OPTIONAL);
+          getState() ^= resultUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncCastOp op) {
+          // Cast is a tied passthrough - propagate result usage to source.
+          // The source type's lifetime constraints are set during init.
           auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::OPTIONAL);
