@@ -55,7 +55,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     case GemmSize::SmallGemm: return os << "SmallGemm";
     case GemmSize::MediumGemm: return os << "MediumGemm";
     case GemmSize::LargeGemm: return os << "LargeGemm";
-    default: return os << "NotSet";
+    default: 
+      assert(false && "Unhandled gemm size");
+      return os << "NotSet";
   }
 }
 
