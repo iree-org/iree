@@ -28,6 +28,7 @@ iree_cc_library(
     "PatternUtils.h"
     "Permutation.h"
     "RegionOpUtils.h"
+    "RewriteUtils.h"
     "ShapeUtils.h"
     "StringUtils.h"
     "ToolUtils.h"
