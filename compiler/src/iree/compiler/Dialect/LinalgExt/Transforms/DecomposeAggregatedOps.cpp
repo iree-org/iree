@@ -17,6 +17,10 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
 
 namespace {
+
+struct ImplementsAggregatedOps final
+    : DialectInterfaceCollection<linalg::AggregatedOpInterface> {};
+
 struct DecomposeAggregatedOpPass final
     : impl::DecomposeAggregatedOpPassBase<DecomposeAggregatedOpPass> {
   using Base::Base;
@@ -62,8 +66,24 @@ FailureOr<StringSet<>> DecomposeAggregatedOpPass::parseFilterOps() {
   if (filterOps.empty()) {
     return llvm::StringSet{};
   }
+
+  MLIRContext *ctx{&getContext()};
   StringSet<> ret{llvm::from_range, llvm::split(filterOps, ',')};
-  // todo: validate the string
+  for (StringRef op_name : ret.keys()) {
+    std::optional<RegisteredOperationName> registered_operation =
+        RegisteredOperationName::lookup(op_name, ctx);
+    if (!registered_operation) {
+      return getOperation()->emitError("operation '")
+             << op_name << "' does not exist";
+    }
+
+    auto *op_interface =
+        registered_operation->getInterface<linalg::AggregatedOpInterface>();
+    if (!op_interface) {
+      return getOperation()->emitError("operation '")
+             << op_name << "' does not implement AggregatedOpInterface";
+    }
+  }
   return ret;
 }
 
