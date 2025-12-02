@@ -1,5 +1,6 @@
 // RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory),cse,canonicalize)" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
 // RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory{num-stages=1}))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK-1STAGE
+// RUN: iree-opt -pass-pipeline="builtin.module(func.func(iree-llvmgpu-prefetch-shared-memory{num-stages=3}))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK-ALL,CHECK-3STAGE
 
 // CHECK-ALL-LABEL: @prefetch_add
 // CHECK-SAME: (%[[GLOBAL:.*]]: memref<128xf32>)
@@ -20,7 +21,16 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
   // CHECK-1STAGE: scf.for %{{.*}} = %c0 to %c128 step %c1
+  // 3-stage prologue: 2 reads
+  // CHECK-3STAGE: vector.transfer_read %arg0
+  // CHECK-3STAGE: gpu.barrier
+  // CHECK-3STAGE: vector.transfer_write
+  // CHECK-3STAGE: vector.transfer_read %arg0
+  // CHECK-3STAGE: arith.constant 2 : index
+  // CHECK-3STAGE: arith.subi %c128
+  // CHECK-3STAGE: scf.for %{{.*}} = %c0 to %{{.*}} step %c1 iter_args
   %0 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst) -> (vector<1xf32>) {
+    // 2-stage ordering: read -> compute -> write
     // CHECK-DAG: %[[IVPLUS1:.*]] = arith.addi %[[IV]], %[[C1]] : index
     // CHECK: %[[KER_READ:.*]] = vector.transfer_read %[[GLOBAL]][%[[IVPLUS1]]]
     %1 = vector.transfer_read %arg0[%arg1], %cst_0 : memref<128xf32>, vector<1xf32>
@@ -34,12 +44,34 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
     // CHECK: amdgpu.sched_barrier allow = <none>
     // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
     // CHECK: scf.yield %[[COMPUTE]]
+
+    // 3-stage ordering: compute -> write -> read
+    // CHECK-3STAGE: gpu.barrier
+    // CHECK-3STAGE: vector.transfer_read %alloc
+    // CHECK-3STAGE: arith.addf
+    // CHECK-3STAGE: gpu.barrier
+    // CHECK-3STAGE: amdgpu.sched_barrier allow = <none>
+    // CHECK-3STAGE: vector.transfer_write
+    // CHECK-3STAGE: arith.constant 2
+    // CHECK-3STAGE: arith.addi
+    // CHECK-3STAGE: vector.transfer_read %arg0
+    // CHECK-3STAGE: scf.yield
     scf.yield %3 : vector<1xf32>
   }
+  // 2-stage epilogue: 1 iteration
   // CHECK: gpu.barrier
   // CHECK: %[[EPI_READ:.*]] = vector.transfer_read %[[SHARED]][%[[C0]]]
   // CHECK: %[[EPI_COMPUTE:.*]] = arith.addf %[[EPI_READ]], %[[OUT]]
   // CHECK: vector.transfer_write %[[EPI_COMPUTE]], %[[GLOBAL]][%[[C0]]]
+
+  // 3-stage epilogue: 2 iterations
+  // CHECK-3STAGE: gpu.barrier
+  // CHECK-3STAGE: vector.transfer_read %alloc
+  // CHECK-3STAGE: arith.addf
+  // CHECK-3STAGE: vector.transfer_write
+  // CHECK-3STAGE: vector.transfer_read %alloc
+  // CHECK-3STAGE: arith.addf
+  // CHECK-3STAGE: vector.transfer_write
   vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
 }
