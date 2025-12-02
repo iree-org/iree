@@ -850,6 +850,23 @@ void ReconcileTranslationInfoPass::runOnOperation() {
     }
     eraseLoweringConfig(op);
   });
+
+  // Forward operands of WorkgroupCountSplitReductionModifierOp to results.
+  // Now that split-k loops are properly combined via
+  // CombineSplitKWorkgroupLoop, we no longer need these modifiers.
+  for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    Block *workgroupCountBody = exportOp.getWorkgroupCountBody();
+    if (!workgroupCountBody) {
+      continue;
+    }
+    auto splitReduceModifiers = workgroupCountBody->getOps<
+        IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp>();
+    for (auto splitReduceModifier :
+         llvm::make_early_inc_range(splitReduceModifiers)) {
+      rewriter.replaceOp(splitReduceModifier,
+                         splitReduceModifier.getSourceWorkgroupCount());
+    }
+  }
 }
 
 } // namespace mlir::iree_compiler

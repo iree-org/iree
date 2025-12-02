@@ -58,7 +58,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTransforms
     MLIRVectorDialect
-    iree::compiler::Codegen::Dialect::Codegen::IR
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::PCF::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::DFX

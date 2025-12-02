@@ -16,6 +16,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -162,6 +163,11 @@ addSPIRVBufferizePasses(OpPassManager &funcPassManager,
 /// ops with loop nests containing payloads, so it should be invoked after
 /// tiling and vectorization and before buffer transformations.
 static void addLoopMaterializationPasses(OpPassManager &funcPassManager) {
+  // PCF -> SCF lowering
+  funcPassManager.addPass(IREE::PCF::createLowerStructuralPCFPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+
   funcPassManager.addPass(IREE::LinalgExt::createLinalgExtToLoopsPass());
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
   funcPassManager.addPass(createConvertLinalgToLoopsPass());
@@ -319,6 +325,10 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createGPUTilePass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+
+  // Fuse PCF writes before vectorization for better optimization opportunities.
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
+
   {
     GenericVectorizationPassOptions options;
     funcPassManager.addPass(createGenericVectorizationPass(options));
@@ -327,6 +337,10 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createForOpCanonicalizationPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+
+  // PCF token and sref resolution before bufferization
+  funcPassManager.addPass(IREE::PCF::createResolveTokensPass());
+  funcPassManager.addPass(IREE::PCF::createConvertSRefToMemRefPass());
 
   // Bufferize and distribute.
   addSPIRVBufferizePasses(funcPassManager, gpuAllocateFunctionMemoryFn);

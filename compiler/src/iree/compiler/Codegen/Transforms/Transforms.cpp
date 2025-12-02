@@ -507,8 +507,12 @@ LogicalResult createWorkgroupCountHint(RewriterBase &rewriter, Location loc,
                                        ArrayRef<OpFoldResult> workgroupCount,
                                        int maxWorkgroupParallelDims,
                                        bool reverse) {
-  SmallVector<OpFoldResult> results(reverse ? llvm::reverse(workgroupCount)
-                                            : workgroupCount);
+  SmallVector<OpFoldResult> results;
+  if (reverse) {
+    results.append(workgroupCount.rbegin(), workgroupCount.rend());
+  } else {
+    results.append(workgroupCount.begin(), workgroupCount.end());
+  }
   if (results.size() > maxWorkgroupParallelDims) {
     MutableArrayRef<OpFoldResult> resultsRef =
         llvm::MutableArrayRef<OpFoldResult>(results);

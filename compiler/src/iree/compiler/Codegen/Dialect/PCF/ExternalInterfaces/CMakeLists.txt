@@ -22,7 +22,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRArithDialect
-    MLIRBufferizationInterfaces
+    MLIRBufferizationDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRTensorDialect

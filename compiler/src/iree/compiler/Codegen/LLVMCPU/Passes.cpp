@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -123,6 +124,13 @@ static llvm::cl::opt<bool> clPatchFuncOps(
         "used with `--iree-codegen-debug-patched-func-ops-file-name`."),
     llvm::cl::init(false), llvm::cl::Hidden);
 
+// TODO(#pcf): Investigate bf16 test failures with PCF enabled in ASAN builds.
+// The __truncsfbf2 symbol is not available in JIT-compiled code.
+static llvm::cl::opt<bool>
+    clTestPCF("iree-llvmcpu-test-pcf",
+              llvm::cl::desc("tests using pcf for workgroup distributed loops"),
+              llvm::cl::init(true), llvm::cl::Hidden);
+
 // TODO: Enable `TileDispatchUsingForall` for every pipeline.
 static void
 addTileAndDistributePasses(OpPassManager &funcPassManager,
@@ -146,6 +154,9 @@ addTileAndDistributePasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
+  if (clTestPCF) {
+    funcPassManager.addPass(createConvertWorkgroupForallToPCFPass());
+  }
 }
 
 //===---------------------------------------------------------------------===//
@@ -275,6 +286,7 @@ void addMultiTilingExpertPassPipeline(
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
   funcPassManager.addPass(createForallToForPass());
   if (pipelineOpt.enablePeeling) {
     funcPassManager.addPass(createLLVMCPUPeelPass());
@@ -337,6 +349,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
   // Convert forall to for before vectorization preparation.
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
   funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   if (pipelineOpt.enablePeeling) {
@@ -396,6 +409,7 @@ void addMmt4dTilingExpertPassPipeline(
   // level as anchor.
   funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorInnerParallelTiles));
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
   funcPassManager.addPass(iree_compiler::createForallToForPass());
   funcPassManager.addPass(createLLVMCPUTileToVectorSizePass());
 
@@ -484,6 +498,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
   funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   {
@@ -531,7 +546,15 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
   // Lower `ukernel.*` ops to function calls
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
+  // PCF Lowerings
+  modulePassManager.addPass(IREE::PCF::createResolveTokensPass());
+  modulePassManager.addPass(IREE::PCF::createConvertSRefToMemRefPass());
+
   FunctionLikeNest(modulePassManager)
+      // PCF -> SCF
+      .addPass(IREE::PCF::createLowerStructuralPCFPass)
+      .addPass(createCanonicalizerPass)
+      .addPass(createCSEPass)
       // LinalgExt -> SCF
       .addPass(IREE::LinalgExt::createLinalgExtToLoopsPass)
       // Linalg -> SCF
