@@ -292,6 +292,15 @@ func.func @convert_alloc(%d0: index) -> !pcf.sref<?x5xi32, #pcf.sequential> {
 
 // -----
 
+// expected-error@+1 {{failed to legalize operation}}
+func.func @invalid_workgroup_alloc(%d0: index) -> !pcf.sref<?x5xi32, #iree_codegen.workgroup> {
+// expected-error@+1 {{failed to get memory space for allocation}}
+  %0 = pcf.alloc(%d0) : !pcf.sref<?x5xi32, #iree_codegen.workgroup>
+  return %0 : !pcf.sref<?x5xi32, #iree_codegen.workgroup>
+}
+
+// -----
+
 util.func private @convert_get_memref(%arg0: memref<?x?xi32, strided<[?, 1]>, 3>, %s0: index, %s1: index) {
   pcf.generic scope(#pcf.test_scope)
     execute(%ref = %arg0)[%id: index, %n: index]

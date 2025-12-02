@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -66,6 +67,15 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
   if (enableUKernels && clEnableUKernelsDecomposeLinalgGeneric) {
     funcPassManager.addPass(createDecomposeLinalgGenericPass());
   }
+
+  // PCF lowering - convert any PCF operations to sequential execution
+  // since VMVX is a single-threaded fallback backend.
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
+  funcPassManager.addPass(IREE::PCF::createResolveTokensPass());
+  funcPassManager.addPass(IREE::PCF::createConvertSRefToMemRefPass());
+  funcPassManager.addPass(IREE::PCF::createLowerStructuralPCFPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
 
   // Lower to buffers.
   addCPUBufferizePasses(funcPassManager);

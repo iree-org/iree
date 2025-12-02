@@ -862,4 +862,26 @@ void setUKernelDescriptor(Operation *op,
   op->setAttr(kUKernelDescriptorName, descriptor);
 }
 
+//===----------------------------------------------------------------------===//
+// iree_codegen.workgroup
+//===----------------------------------------------------------------------===//
+
+Attribute IREE::Codegen::WorkgroupAttr::parse(AsmParser &parser, Type) {
+  bool linearize = false;
+  if (parser.parseOptionalLess().succeeded()) {
+    if (failed(parser.parseKeyword("linearize")) ||
+        failed(parser.parseGreater())) {
+      return {};
+    }
+    linearize = true;
+  }
+  return WorkgroupAttr::get(parser.getContext(), linearize);
+}
+
+void IREE::Codegen::WorkgroupAttr::print(AsmPrinter &printer) const {
+  if (getLinearize()) {
+    printer << "<" << "linearize" << ">";
+  }
+}
+
 } // namespace mlir::iree_compiler

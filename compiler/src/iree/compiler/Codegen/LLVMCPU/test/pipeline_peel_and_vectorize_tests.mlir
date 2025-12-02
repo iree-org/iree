@@ -106,28 +106,28 @@ func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable
 
 // CHECK-LABEL: func @peel_dynamic_matmul()
 // Distribution:
-// CHECK:         scf.forall
+// CHECK:         pcf.loop
 
 // Vectorization:
+// CHECK:           scf.for
 // CHECK:             scf.for
 // CHECK:               scf.for
-// CHECK:                 scf.for
-// CHECK:                   vector.fma
+// CHECK:                 vector.fma
 
 // 1nd dim peeling:
-// CHECK:                 scf.for
-// CHECK:                   linalg.matmul
+// CHECK:               scf.for
+// CHECK:                 linalg.matmul
 
 // 2nd dim peeling:
-// CHECK:               scf.for
-// CHECK:                 scf.for
-// CHECK:                   linalg.matmul
-
-// 3nd dim peeling:
 // CHECK:             scf.for
 // CHECK:               scf.for
-// CHECK:                 scf.for
-// CHECK:                   linalg.matmul
+// CHECK:                 linalg.matmul
+
+// 3nd dim peeling:
+// CHECK:           scf.for
+// CHECK:             scf.for
+// CHECK:               scf.for
+// CHECK:                 linalg.matmul
 
 // CHECK-NOT: scf.for
 
