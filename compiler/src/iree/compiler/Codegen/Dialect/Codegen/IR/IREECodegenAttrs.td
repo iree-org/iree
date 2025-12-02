@@ -84,8 +84,8 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
 
     // LLVMGPU CodeGen pipelines
     LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
-    LLVMGPU_Vectorize,
-    LLVMGPU_VectorDistribute, LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
+    LLVMGPU_Vectorize, LLVMGPU_VectorDistribute,
+    LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
 
     // SPIR-V CodeGen pipelines
     SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,

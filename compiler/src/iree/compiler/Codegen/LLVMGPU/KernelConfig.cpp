@@ -1944,38 +1944,35 @@ static LogicalResult setTransposeConfig(IREE::GPU::TargetAttr target,
 
   // Workgroup size contains 8 warps. Configured with 8 threads on fastest
   // moving dimension so each thread can execute a vectorized copy of 4
-  // contigious elements at a time from the 32 block.
+  // contiguous elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
   MLIRContext *context = linalgOp.getContext();
-  SmallVector<NamedAttribute, 1> attrs;
   Builder b(context);
-  attrs.emplace_back(StringAttr::get(context, "workgroup"),
-                     b.getI64ArrayAttr(workgroupTileSizes));
-  attrs.emplace_back(StringAttr::get(context, "thread"),
-                     b.getI64ArrayAttr(threadTileSizes));
+  SmallVector<NamedAttribute> attrs{
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes))};
   SmallVector<int64_t> promotedOperands;
-  for (auto operand : transposedOperands) {
+  for (OpOperand *operand : transposedOperands) {
     promotedOperands.push_back(operand->getOperandNumber());
   }
   IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
-  auto configDict = DictionaryAttr::get(context, attrs);
-  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+  DictionaryAttr configDict = DictionaryAttr::get(context, attrs);
+  IREE::GPU::LoweringConfigAttr loweringConfig =
+      IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
-  SmallVector<NamedAttribute, 1> pipelineAttrs;
-  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      linalgOp->getContext(), /*prefetchSharedMemory=*/false,
-      /*no_reduce_shared_memory_bank_conflicts=*/false,
-      /*use_igemm_convolution=*/false,
-      /*reorder_workgroups_strategy=*/std::nullopt);
-  pipelineAttrs.emplace_back(
-      StringAttr::get(linalgOp->getContext(),
-                      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
-      pipelineOptions);
-  auto pipelineConfig =
-      DictionaryAttr::get(linalgOp->getContext(), pipelineAttrs);
+  IREE::GPU::GPUPipelineOptionsAttr pipelineOptions =
+      IREE::GPU::GPUPipelineOptionsAttr::get(
+          context, /*prefetchSharedMemory=*/false,
+          /*no_reduce_shared_memory_bank_conflicts=*/false,
+          /*use_igemm_convolution=*/false,
+          /*reorder_workgroups_strategy=*/std::nullopt);
+  DictionaryAttr pipelineConfig = DictionaryAttr::get(
+      context,
+      {NamedAttribute(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(),
+                      pipelineOptions)});
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
   // TODO(qedawkins): Use a shared pipeline identifier here.
