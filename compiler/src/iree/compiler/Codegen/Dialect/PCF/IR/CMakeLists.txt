@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     IR
   HDRS
+    "PCF.h"
     "PCFAttrInterfaces.h.inc"
     "PCFAttrs.h"
     "PCFAttrs.h.inc"
