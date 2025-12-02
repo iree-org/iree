@@ -843,3 +843,79 @@ util.func public @dont_sink_through_edge_expand_shape(%arg0 : tensor<2x3x4xf32>)
 //       ENABLE-EDGE-PROP:   %[[EXP:.+]] = tensor.expand_shape
 //       ENABLE-EDGE-PROP:   %[[RES:.+]] = linalg.transpose
 //       ENABLE-EDGE-PROP:   util.return %[[RES]]
+
+// -----
+
+// Matmul generic transpose fusion
+#map_lhs = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_rhs = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_out = affine_map<(d0, d1, d2) -> (d0, d1)>
+util.func public @fuse_transpose_through_generic_matmul(
+    %lhs: tensor<16x32xf32>, %transposed_rhs: tensor<16x32xf32>) -> tensor<16x16xf32> {
+  %empty = tensor.empty(): tensor<32x16xf32>
+  %rhs = linalg.transpose ins(%transposed_rhs : tensor<16x32xf32>)
+      outs(%empty : tensor<32x16xf32>) permutation = [1, 0]
+  %init = tensor.empty(): tensor<16x16xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %matmul = linalg.generic {
+      indexing_maps = [#map_lhs, #map_rhs, #map_out],
+      iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%lhs, %rhs : tensor<16x32xf32>, tensor<32x16xf32>)
+      outs(%fill : tensor<16x16xf32>) {
+    ^bb0(%a: f32, %b: f32, %c: f32):
+      %mul = arith.mulf %a, %b : f32
+      %add = arith.addf %c, %mul : f32
+      linalg.yield %add : f32
+  } -> tensor<16x16xf32>
+  util.return %matmul : tensor<16x16xf32>
+}
+//   CHECK-DAG: #[[$MAP_LHS:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+//   CHECK-DAG: #[[$MAP_RHS_TRANSPOSED:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+//   CHECK-DAG: #[[$MAP_OUT:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: util.func public @fuse_transpose_through_generic_matmul
+//  CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>
+//  CHECK-SAME:     %[[TRANSPOSED_RHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>
+//   CHECK-NOT:   linalg.transpose
+//       CHECK:   %[[MATMUL:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps = [#[[$MAP_LHS]], #[[$MAP_RHS_TRANSPOSED]], #[[$MAP_OUT]]]
+//  CHECK-SAME:     ins(%[[LHS]], %[[TRANSPOSED_RHS]] : tensor<16x32xf32>, tensor<16x32xf32>)
+//       CHECK:   util.return %[[MATMUL]]
+
+// -----
+
+// Batch matmul generic transpose fusion
+#map_bmm_lhs = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map_bmm_rhs = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map_bmm_out = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+util.func public @fuse_transpose_through_generic_batch_matmul(
+    %lhs: tensor<2x16x32xf32>, %transposed_rhs: tensor<2x16x32xf32>) -> tensor<2x16x16xf32> {
+  %empty = tensor.empty(): tensor<2x32x16xf32>
+  %rhs = linalg.transpose ins(%transposed_rhs : tensor<2x16x32xf32>)
+      outs(%empty : tensor<2x32x16xf32>) permutation = [0, 2, 1]
+  %init = tensor.empty(): tensor<2x16x16xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
+  %bmm = linalg.generic {
+      indexing_maps = [#map_bmm_lhs, #map_bmm_rhs, #map_bmm_out],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%lhs, %rhs : tensor<2x16x32xf32>, tensor<2x32x16xf32>)
+      outs(%fill : tensor<2x16x16xf32>) {
+    ^bb0(%a: f32, %b: f32, %c: f32):
+      %mul = arith.mulf %a, %b : f32
+      %add = arith.addf %c, %mul : f32
+      linalg.yield %add : f32
+  } -> tensor<2x16x16xf32>
+  util.return %bmm : tensor<2x16x16xf32>
+}
+//   CHECK-DAG: #[[$MAP_BMM_LHS:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+//   CHECK-DAG: #[[$MAP_BMM_RHS_TRANSPOSED:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+//   CHECK-DAG: #[[$MAP_BMM_OUT:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK-LABEL: util.func public @fuse_transpose_through_generic_batch_matmul
+//  CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<2x16x32xf32>
+//  CHECK-SAME:     %[[TRANSPOSED_RHS:[a-zA-Z0-9]+]]: tensor<2x16x32xf32>
+//   CHECK-NOT:   linalg.transpose
+//       CHECK:   %[[BMM:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps = [#[[$MAP_BMM_LHS]], #[[$MAP_BMM_RHS_TRANSPOSED]], #[[$MAP_BMM_OUT]]]
+//  CHECK-SAME:     ins(%[[LHS]], %[[TRANSPOSED_RHS]] : tensor<2x16x32xf32>, tensor<2x16x32xf32>)
+//       CHECK:   util.return %[[BMM]]

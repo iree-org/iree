@@ -1007,7 +1007,24 @@ private:
   SmallVector<int64_t> permutation;
 };
 
-// Fuse transpose through linalg.generic that look like matmul
+// Returns true if the permutation swaps only the last two dimensions.
+static bool isTransposeOfLastTwoDims(ArrayRef<int64_t> perm) {
+  size_t rank = perm.size();
+  if (rank < 2)
+    return false;
+  // Check that all dims except the last two are identity.
+  for (size_t i = 0; i < rank - 2; ++i) {
+    if (perm[i] != static_cast<int64_t>(i))
+      return false;
+  }
+  // Check that the last two dims are swapped.
+  return perm[rank - 2] == static_cast<int64_t>(rank - 1) &&
+         perm[rank - 1] == static_cast<int64_t>(rank - 2);
+}
+
+// Fuses a transpose into a contraction (matmul-like) linalg.generic by
+// absorbing it into the indexing map. Only handles transposes that swap
+// the last two dimensions of an operand for now.
 class FuseTransposeThroughGenericContraction
     : public OpRewritePattern<linalg::GenericOp> {
 public:
@@ -1015,65 +1032,41 @@ public:
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    // Just taken from earlier (Specialize pattern)
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp))
       return failure();
-    }
 
-    auto maybeContractionDims = linalg::inferContractionDims(genericOp);
-    if (failed(maybeContractionDims)) {
+    FailureOr<linalg::ContractionDimensions> maybeContractionDims =
+        linalg::inferContractionDims(genericOp);
+    if (failed(maybeContractionDims))
       return rewriter.notifyMatchFailure(genericOp, "not a contraction");
-    }
-    auto contractionDims = *maybeContractionDims;
 
+    linalg::ContractionDimensions contractionDims =
+        std::move(*maybeContractionDims);
     if (contractionDims.m.size() != 1 || contractionDims.n.size() != 1 ||
-        contractionDims.k.size() != 1) {
+        contractionDims.k.size() != 1 || contractionDims.batch.size() > 1) {
       return rewriter.notifyMatchFailure(genericOp,
                                          "not a simple matmul contraction");
     }
 
-    // This is a suggestion from Claude. Does this make sense?
-    // Should we even care about batch vs. non-batch?
-    SmallVector<int64_t> expectedPerm;
-    if (contractionDims.batch.empty()) {
-      expectedPerm = {1, 0};
-    } else if (contractionDims.batch.size() == 1) {
-      expectedPerm = {0, 2, 1};
-    } else {
-      return rewriter.notifyMatchFailure(genericOp, "unsupported batch size");
-    }
-
-    // Does it make sense to look for and try to directly fuse the transpose?
+    // Look for a transpose on any input that swaps the last two dimensions.
     for (int64_t inputIdx = 0; inputIdx < genericOp.getNumDpsInputs();
          ++inputIdx) {
-      Value input = genericOp.getDpsInputs()[inputIdx];
-      auto transpose = input.getDefiningOp<linalg::TransposeOp>();
-      if (!transpose) {
+      auto transpose = genericOp.getDpsInputs()[inputIdx]
+                           .getDefiningOp<linalg::TransposeOp>();
+      if (!transpose || !isTransposeOfLastTwoDims(transpose.getPermutation()))
         continue;
-      }
 
-      SmallVector<int64_t> transPerm(transpose.getPermutation());
-      if (transPerm != expectedPerm) {
-        continue;
-      }
-
-      // This does the "fusion" part of the pattern.
-      // Not sure if this is actually correct way to accomplish what we want to
-      // do The other sinking patterns just replace the op with a new one
-      // basically It seems to work though; see line 66 in try.mlir (with these
-      // changes) vs/ line 66 in try-old.mlir (without these changes) After
-      // canonicalizing transpose in place (?) This is modifying the OP in order
-      // to fuse, is this what we want?
-      ArrayRef<int64_t> perm = transpose.getPermutation();
-      auto invPerm = invertPermutationVector(perm);
-
-      SmallVector<AffineMap> newIndexingMaps = genericOp.getIndexingMapsArray();
-      AffineMap inputMap = newIndexingMaps[inputIdx];
+      // Update the indexing map according to the transpose.
+      AffineMap inputMap = genericOp.getMatchingIndexingMap(
+          genericOp.getDpsInputOperand(inputIdx));
+      auto invPerm = invertPermutationVector(transpose.getPermutation());
       SmallVector<AffineExpr> newExprs =
           applyPermutation(inputMap.getResults(), invPerm);
       AffineMap transposedMap =
           AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
                          newExprs, rewriter.getContext());
+
+      SmallVector<AffineMap> newIndexingMaps = genericOp.getIndexingMapsArray();
       newIndexingMaps[inputIdx] = transposedMap;
 
       rewriter.startOpModification(genericOp);
