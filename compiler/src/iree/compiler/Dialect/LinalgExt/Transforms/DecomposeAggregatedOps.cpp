@@ -18,9 +18,6 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 
 namespace {
 
-struct ImplementsAggregatedOps final
-    : DialectInterfaceCollection<linalg::AggregatedOpInterface> {};
-
 struct DecomposeAggregatedOpPass final
     : impl::DecomposeAggregatedOpPassBase<DecomposeAggregatedOpPass> {
   using Base::Base;
