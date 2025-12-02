@@ -2634,6 +2634,40 @@ Im2colOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===---------------------------------------------------------------------===//
+// UnMask Op
+//===---------------------------------------------------------------------===//
+
+LogicalResult UnMaskOp::verify() {
+  // Expect result dimensions to be either dynamic, or be less then or equal
+  // to the source dimensions.
+  RankedTensorType srcType = getSrc().getType();
+  RankedTensorType dstType = getDest().getType();
+  for (auto [i, srcDim, dstDim] :
+       llvm::enumerate(srcType.getShape(), dstType.getShape())) {
+    if (srcDim == ShapedType::kDynamic || dstDim == ShapedType::kDynamic) {
+      continue;
+    }
+    if (srcDim < dstDim) {
+      return emitOpError("expected source dimension ")
+             << i << " to be greater than or equal to destination dimension"
+             << "Given source type: " << srcType
+             << ", destination type: " << dstType;
+    }
+  }
+  return success();
+}
+
+OpFoldResult UnMaskOp::fold(FoldAdaptor adaptor) {
+  RankedTensorType srcType = getSrc().getType();
+  RankedTensorType dstType = getDest().getType();
+  if (srcType.hasStaticShape() && dstType.hasStaticShape() &&
+      srcType == dstType) {
+    return getSrc();
+  }
+  return OpFoldResult();
+}
+
+//===---------------------------------------------------------------------===//
 // Custom Op
 //===---------------------------------------------------------------------===//
 

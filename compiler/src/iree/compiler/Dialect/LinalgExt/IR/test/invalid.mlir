@@ -1817,3 +1817,11 @@ func.func @index_op_invalid_dim(%arg0 : tensor<?xindex>) -> tensor<?xindex> {
   } -> tensor<?xindex>
   return %0 : tensor<?xindex>
 }
+
+// -----
+
+func.func @unmask(%src: tensor<4x4xf32>, %dst: tensor<4x5xf32>) -> tensor<4x5xf32> {
+  // expected-error @+1 {{expected source dimension 1 to be greater than or equal to destination dimension}}
+  %0 = iree_linalg_ext.unmask %src into %dst : tensor<4x4xf32> -> tensor<4x5xf32>
+  return %0 : tensor<4x5xf32>
+}
