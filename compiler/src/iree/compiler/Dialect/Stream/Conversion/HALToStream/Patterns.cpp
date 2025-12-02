@@ -97,25 +97,25 @@ struct ConvertTensorImportOp
     }
 
     // If byte_offset was specified, create a subview at that offset before
-    // the transfer. This makes the non-zero offset visible to
+    // the cast. This makes the non-zero offset visible to
     // AnnotateDispatchArguments, which computes alignment as
     // gcd(base_alignment, offset).
-    Value transferSource = resource;
-    Value transferSize = importSize;
+    Value castSource = resource;
+    Value castSize = importSize;
     if (byteOffset) {
-      transferSource = IREE::Stream::ResourceSubviewOp::create(
+      castSource = IREE::Stream::ResourceSubviewOp::create(
           rewriter, op.getLoc(), resource, importSize, byteOffset, tensorSize);
-      transferSize = tensorSize;
+      castSize = tensorSize;
     }
 
+    // Cast to unknown lifetime for use in the program.
+    // This is an async-phase operation that RefineUsage will resolve by
+    // propagating the external constraint. The cast will fold when types match.
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    Value newImport = IREE::Stream::AsyncTransferOp::create(
-        rewriter, op.getLoc(), unknownType, transferSource, transferSize,
-        transferSize,
-        /*source_affinity=*/executionAffinityAttr,
-        /*target_affinity=*/executionAffinityAttr);
-
-    rewriter.replaceOpWithMultiple(op, {{newImport, transferSize}});
+    Value newImport = IREE::Stream::AsyncCastOp::create(
+        rewriter, op.getLoc(), unknownType, castSource, castSize,
+        executionAffinityAttr);
+    rewriter.replaceOpWithMultiple(op, {{newImport, castSize}});
     return success();
   }
 
@@ -184,17 +184,17 @@ struct ConvertTensorExportOp
         transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
                                executionAffinityAttr, rewriter);
 
-    // Exporting a produced value - transfer our source value to an externally
-    // usable resource and directly export it. This will cause an allocation.
-    Value exportSource = adaptor.getSource().front();
+    // Exporting a produced value - cast to external lifetime.
+    // This is an async-phase operation that RefineUsage will resolve by
+    // propagating the external constraint backward and converting to a transfer
+    // if needed. The cast will fold when types match.
+    Value exportSource = source.resource;
     auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
     if (source.resource.getType() != externalType) {
-      exportSource = IREE::Stream::AsyncTransferOp::create(
+      exportSource = IREE::Stream::AsyncCastOp::create(
           rewriter, op.getLoc(), externalType, source.resource,
-          source.resourceSize, source.resourceSize,
-          /*source_affinity=*/source.affinity,
-          /*target_affinity=*/executionAffinityAttr);
+          source.resourceSize, executionAffinityAttr);
     }
 
     // Export (stream resource to buffer view).
