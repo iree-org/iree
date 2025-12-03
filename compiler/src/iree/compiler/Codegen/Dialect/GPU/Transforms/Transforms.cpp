@@ -420,31 +420,36 @@ static void composeParallelInsertSlices(
 }
 
 /// Compose and fuse coalesced gather DMA operations with parallel insert
-/// slices.
+/// slices. Creates a DMA op with a result, then uses parallel_insert_slice
+/// to insert the result into the forall's shared_out at the composed offsets.
 static void composeCoalescedGatherDMA(
     RewriterBase &rewriter,
     SmallVector<std::pair<tensor::ParallelInsertSliceOp,
                           IREE::GPU::CoalescedGatherDMAOp>> &insertPairs) {
   for (auto [warpInsert, laneInsert] : insertPairs) {
-    // Create a new CoalescedGatherDMAOp with composed offsets
     OpBuilder::InsertionGuard g(rewriter);
 
-    // Extract a slice from warpInsert's dest that matches warpInsert's
-    // insertion size and is located at warpInsert's offsets
-    // This is done outside the in_parallel region
+    // Create an extract_slice for the DMA's init to match the source shape.
+    // This is done outside the in_parallel region.
     rewriter.setInsertionPoint(warpInsert->getParentOp());
     auto destSlice = tensor::ExtractSliceOp::create(
         rewriter, warpInsert.getLoc(), warpInsert.getDest(),
         warpInsert.getMixedOffsets(), warpInsert.getMixedSizes(),
         warpInsert.getMixedStrides());
 
+    // Create new CoalescedGatherDMAOp with a result (outside in_parallel).
+    auto dmaOp = IREE::GPU::CoalescedGatherDMAOp::create(
+        rewriter, warpInsert.getLoc(), destSlice.getType(),
+        laneInsert.getSource(), laneInsert.getIndices(), destSlice,
+        laneInsert.getLane());
+
+    // Replace the warp parallel_insert_slice with one that inserts the DMA
+    // result.
     rewriter.setInsertionPoint(warpInsert);
-    // Create new CoalescedGatherDMAOp inside the in_parallel region
-    // No result since it's in forall.in_parallel (in-place update)
-    IREE::GPU::CoalescedGatherDMAOp::create(
-        rewriter, warpInsert.getLoc(), Type(), laneInsert.getSource(),
-        laneInsert.getIndices(), destSlice, laneInsert.getLane());
-    rewriter.eraseOp(warpInsert);
+    rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
+        warpInsert, dmaOp.getResult(), warpInsert.getDest(),
+        warpInsert.getMixedOffsets(), warpInsert.getMixedSizes(),
+        warpInsert.getMixedStrides());
     rewriter.eraseOp(laneInsert);
   }
 }
