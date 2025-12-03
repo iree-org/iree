@@ -485,9 +485,7 @@ struct ChainDependentAwaits : public OpRewritePattern<Op> {
     if (replacements.empty())
       return failure();
     rewriter.modifyOpInPlace(op, [&]() {
-      auto newTimepoint = joinAwaitTimepoints(
-          op.getLoc(), op.getAwaitTimepoint(), newTimepoints, rewriter);
-      op.getAwaitTimepointMutable().assign(newTimepoint);
+      op.setAwaitTimepoints(newTimepoints, rewriter);
       for (auto replacement : replacements) {
         op.getResourceOperandsMutable()
             .slice(replacement.first, 1)
@@ -687,8 +685,13 @@ OpFoldResult ResourceSizeOp::fold(FoldAdaptor operands) {
   auto sizeAwareType =
       cast<IREE::Util::SizeAwareTypeInterface>(getOperand().getType());
   Operation *op = this->getOperation();
-  return sizeAwareType.findSizeValue(getOperand(), op->getBlock(),
-                                     Block::iterator(op));
+  Value sizeValue = sizeAwareType.findSizeValue(getOperand(), op->getBlock(),
+                                                Block::iterator(op));
+  // Do not fold if we found ourselves (would cause infinite fold loop).
+  if (sizeValue != getResult()) {
+    return sizeValue;
+  }
+  return {};
 }
 
 namespace {
@@ -3696,6 +3699,15 @@ OpFoldResult ChannelCountOp::fold(FoldAdaptor operands) {
     return createOp.getCount();
   }
   return {};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.concurrent
+//===----------------------------------------------------------------------===//
+
+void TestTimelineOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<ChainDependentAwaits<TestTimelineOp>>(context);
 }
 
 } // namespace mlir::iree_compiler::IREE::Stream

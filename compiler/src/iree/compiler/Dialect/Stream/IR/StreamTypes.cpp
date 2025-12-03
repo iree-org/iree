@@ -112,6 +112,16 @@ bool AsyncAccessRange::mayOverlap(const AsyncAccessRange &lhs,
   return true;
 }
 
+Value joinTimepoints(Location loc, ValueRange timepoints, OpBuilder &builder) {
+  if (timepoints.empty()) {
+    return {};
+  } else if (timepoints.size() == 1) {
+    return timepoints.front();
+  } else {
+    return IREE::Stream::TimepointJoinOp::join(loc, timepoints, builder);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // custom<ParameterReference>($scope, $key)
 //===----------------------------------------------------------------------===//
