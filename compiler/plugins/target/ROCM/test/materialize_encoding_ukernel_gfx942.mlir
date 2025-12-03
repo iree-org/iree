@@ -39,11 +39,6 @@
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-#pipeline_layout_3 = #hal.pipeline.layout<constants = 3, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
 
 func.func @matmul_f16_f16_f32_large_lowering_ukernel_provider(%arg0: tensor<?x?xf16, #encoding_lhs>, %arg1: tensor<?x?xf16, #encoding_rhs>, %arg2: tensor<?x?xf32, #encoding_result>) -> tensor<?x?xf32, #encoding_result> attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   %0 = linalg.matmul
@@ -96,11 +91,6 @@ func.func @matmul_f16_f16_f32_large_lowering_ukernel_provider(%arg0: tensor<?x?x
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-#pipeline_layout_3 = #hal.pipeline.layout<constants = 3, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
 
 func.func @matmul_f8_f8_f32_medium_lowering_ukernel_provider(%arg0: tensor<?x?xf8E4M3FNUZ, #encoding_lhs>, %arg1: tensor<?x?xf8E4M3FNUZ, #encoding_rhs>, %arg2: tensor<?x?xf32, #encoding_result>) -> tensor<?x?xf32, #encoding_result> attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   %0 = linalg.matmul
@@ -153,11 +143,6 @@ func.func @matmul_f8_f8_f32_medium_lowering_ukernel_provider(%arg0: tensor<?x?xf
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 2048, ?]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 2048, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 2048, ?]>
-#pipeline_layout_3 = #hal.pipeline.layout<constants = 2, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
 
 func.func @matmul_f8_f8_f32_large_lowering_ukernel_provider(%arg0: tensor<?x?xf8E4M3FNUZ, #encoding_lhs>, %arg1: tensor<?x2048xf8E4M3FNUZ, #encoding_rhs>, %arg2: tensor<?x2048xf32, #encoding_result>) -> tensor<?x2048xf32, #encoding_result> attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   %0 = linalg.matmul
@@ -214,11 +199,6 @@ func.func @matmul_f8_f8_f32_large_lowering_ukernel_provider(%arg0: tensor<?x?xf8
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, 4096, 4096]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, 4096, 4096]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, 4096, 4096]>
-#pipeline_layout_3 = #hal.pipeline.layout<constants = 2, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
 
 func.func @matmul_f8_f8_f32_small_m_no_ukernel_match(%arg0: tensor<4x4096xf8E4M3FNUZ, #encoding_lhs>, %arg1: tensor<4096x4096xf8E4M3FNUZ, #encoding_rhs>, %arg2: tensor<4x4096xf32, #encoding_result>) -> tensor<4x4096xf32, #encoding_result> attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   %0 = linalg.matmul
@@ -274,11 +254,6 @@ func.func @matmul_f8_f8_f32_small_m_no_ukernel_match(%arg0: tensor<4x4096xf8E4M3
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [32, 1024, 4096]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [32, 1024, 4096]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [32, 1024, 4096]>
-#pipeline_layout_3 = #hal.pipeline.layout<constants = 2, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
 
 func.func @matmul_f8_f8_f32_m32_medium_ukernel_match(%arg0: tensor<32x4096xf8E4M3FNUZ, #encoding_lhs>, %arg1: tensor<4096x1024xf8E4M3FNUZ, #encoding_rhs>, %arg2: tensor<32x1024xf32, #encoding_result>) -> tensor<32x1024xf32, #encoding_result> attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   %0 = linalg.matmul
