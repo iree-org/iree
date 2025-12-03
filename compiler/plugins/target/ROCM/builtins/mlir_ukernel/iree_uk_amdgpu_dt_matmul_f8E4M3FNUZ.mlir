@@ -30,6 +30,10 @@ util.func @pingpong_dt_large_f8E4M3FNUZ(%lhs_base: !lhs_base_ty, %rhs_base: !rhs
       types = [f8E4M3FNUZ, f8E4M3FNUZ, f32],
       iteration_sizes_constraints = [
         #rocm.ukernel_interation_size_constraint<
+          index = 0,
+          size_min = 64
+        >,
+        #rocm.ukernel_interation_size_constraint<
           index = 1,
           size_min = 2048,
           size_max = 8192
@@ -298,7 +302,13 @@ util.func @pingpong_dt_large_f8E4M3FNUZ(%lhs_base: !lhs_base_ty, %rhs_base: !rhs
 util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs_base: !m_rhs_base_ty, %unused_acc: !m_acc_base_ty) -> !m_acc_base_ty attributes {
   ukernel_info = #rocm.ukernel_info<
     match = {
-      types = [f8E4M3FNUZ, f8E4M3FNUZ, f32]
+      types = [f8E4M3FNUZ, f8E4M3FNUZ, f32],
+      iteration_sizes_constraints = [
+        #rocm.ukernel_interation_size_constraint<
+          index = 0,
+          size_min = 32
+        >
+      ]
     },
     mma = #iree_gpu.data_tiled_mma_layout<
       intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,
