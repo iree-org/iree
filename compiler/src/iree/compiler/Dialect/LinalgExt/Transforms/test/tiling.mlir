@@ -3393,3 +3393,66 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+func.func @tile_unmask(%src: tensor<?x?xf32>, %dst: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.unmask %src into %dst : tensor<?x?xf32> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.unmask"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [8, 8] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+#trait = {
+  indexing_maps = [
+    affine_map<(d0, d1) -> (d0, d1)>,
+    affine_map<(d0, d1) -> (d0, d1)>
+  ],
+  iterator_types = ["parallel", "parallel"]
+}
+
+func.func @unmask_consumer_fusion(%src: tensor<64x64xf32>, %dst: tensor<64x60xf32>) -> tensor<64x60xf32> {
+  %empty = tensor.empty() : tensor<64x64xf32>
+  %0 = linalg.generic #trait
+    ins(%src : tensor<64x64xf32>)
+    outs(%empty : tensor<64x64xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %a = arith.addf %in, %in : f32
+        linalg.yield %a : f32
+  } -> tensor<64x64xf32>
+  %1 = iree_linalg_ext.unmask %0 into %dst : tensor<64x64xf32> -> tensor<64x60xf32>
+  return %1 : tensor<64x60xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %module_op : (!transform.any_op) -> !transform.any_op 
+    %generic = transform.structured.match ops{["linalg.generic"]} in %func : (!transform.any_op) -> !transform.any_op
+    %tiled_generic, %loop = transform.structured.tile_using_forall %generic tile_sizes [8, 8] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %insert_slice = transform.structured.match ops{["tensor.parallel_insert_slice"]} in %func : (!transform.any_op) -> !transform.any_op
+    %tiled_unmask, %loop2 = transform.iree.fuse_consumer %insert_slice in (%loop) : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    // Run affine-simplify-min-max simplification to get a cleaner output for testing.
+    transform.apply_registered_pass "affine-simplify-min-max" to %func : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// CHECK-DAG: #[[$MAP2:.+]] = affine_map<()[s0] -> (s0 * 8)>
+// CHECK-DAG: #[[$MAP3:.+]] = affine_map<()[s0] -> (s0 * -8 + 60, 8)>
+// CHECK-LABEL: func @unmask_consumer_fusion
+// CHECK:         scf.forall (%[[I:.+]], %[[J:.+]]) in (8, 8)
+// CHECK:           %[[C:.+]] = linalg.generic
+// CHECK-DAG:       %[[OFFSET0:.+]] = affine.apply #[[$MAP2]]()[%[[I]]]
+// CHECK-DAG:       %[[OFFSET1:.+]] = affine.apply #[[$MAP2]]()[%[[J]]]
+// CHECK-DAG:       %[[SIZE1:.+]] = affine.min #[[$MAP3]]()[%[[J]]]
+// CHECK:           %[[DST_SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[OFFSET0]], %[[OFFSET1]]] [8, %[[SIZE1]]] [1, 1]
+// CHECK:          %[[UNMASKED:.+]] = iree_linalg_ext.unmask %[[C]] into %[[DST_SLICE]]
+// CHECK:          tensor.parallel_insert_slice %[[UNMASKED]]

@@ -196,3 +196,24 @@ util.func public @map_scatter_all_unit(%input: tensor<1x1xf16>) -> tensor<2x2xf1
 //       SLICE:   iree_linalg_ext.map_scatter %[[INPUT_SLICE]] into %[[DEST]]
 //       SLICE:       %[[C0:.+]] = arith.constant 0 : index
 //       SLICE:       iree_linalg_ext.yield  %[[C0]], %[[C0]]
+
+// -----
+
+util.func public @unmask_unit_dims(%src: tensor<4x1x4xf16>, %dest: tensor<4x1x2xf16>) -> tensor<4x1x2xf16> {
+  %0 = iree_linalg_ext.unmask %src into %dest : tensor<4x1x4xf16> -> tensor<4x1x2xf16>
+  util.return %0 : tensor<4x1x2xf16>
+}
+
+// SLICE-LABEL: util.func public @unmask_unit_dims
+// SLICE-SAME: %[[SRC:.+]]: tensor<4x1x4xf16>, %[[DEST:.+]]: tensor<4x1x2xf16>) -> tensor<4x1x2xf16>
+// SLICE: %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]][0, 0, 0] [4, 1, 4] [1, 1, 1] : tensor<4x1x4xf16> to tensor<4x4xf16>
+// SLICE: %[[DEST_SLICE:.+]] = tensor.extract_slice %[[DEST]][0, 0, 0] [4, 1, 2] [1, 1, 1] : tensor<4x1x2xf16> to tensor<4x2xf16>
+// SLICE: %[[UNMASKED:.+]] = iree_linalg_ext.unmask %[[SRC_SLICE]] into %[[DEST_SLICE]]
+// SLICE: %[[INSERTED:.+]] = tensor.insert_slice %[[UNMASKED]] into %[[DEST]][0, 0, 0] [4, 1, 2] [1, 1, 1] : tensor<4x2xf16> into tensor<4x1x2xf16>
+
+// RESHAPE-LABEL: util.func public @unmask_unit_dims
+// RESHAPE-SAME: %[[SRC:.+]]: tensor<4x1x4xf16>, %[[DEST:.+]]: tensor<4x1x2xf16>) -> tensor<4x1x2xf16>
+// RESHAPE: %[[SRC_SLICE:.+]] = tensor.collapse_shape %[[SRC]] {{.*}} : tensor<4x1x4xf16> into tensor<4x4xf16>
+// RESHAPE: %[[DEST_SLICE:.+]] = tensor.collapse_shape %[[DEST]] {{.*}} : tensor<4x1x2xf16> into tensor<4x2xf16>
+// RESHAPE: %[[UNMASKED:.+]] = iree_linalg_ext.unmask %[[SRC_SLICE]] into %[[DEST_SLICE]]
+// RESHAPE: %[[INSERTED:.+]] = tensor.expand_shape %[[UNMASKED]] {{.*}} : tensor<4x2xf16> into tensor<4x1x2xf16>
