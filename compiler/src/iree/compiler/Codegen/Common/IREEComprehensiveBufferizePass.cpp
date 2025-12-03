@@ -326,6 +326,11 @@ void addIREEComprehensiveBufferizePasses(
     OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+  // Last chance to emplace dispatch results.
+  funcPassManager.addPass(createCombineSplitKWorkgroupLoopPass());
+  funcPassManager.addPass(createFuseTensorToBufferConvertersPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createEliminateEmptyTensorsPass());
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(

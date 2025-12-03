@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=x fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEX --enable-var-scope
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=y fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=x fold-split-reduction-loop-into-workgroup-mapping-loop=false}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEX --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=y fold-split-reduction-loop-into-workgroup-mapping-loop=false}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z fold-split-reduction-loop-into-workgroup-mapping-loop=false}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
 
 #pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
@@ -214,13 +214,13 @@ hal.executable private @split_reduction_executable {
 //    CHECK-ALL-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
 
 //   DISTRIBUTEX-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//       DISTRIBUTEX:     %[[NUMWORKGROUPSX:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * (s2 * (s0 * s1)))>
-//  DISTRIBUTEX-SAME:         [%[[ARG6]], %[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       DISTRIBUTEX:     %[[NUMWORKGROUPSX:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4, s5] -> ((s5 * (s3 * s4)) * ((-s0 + s1) ceildiv s2))>
+//  DISTRIBUTEX-SAME:         [%[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG6]], %[[ARG5]], %[[ARG4]]]
 //       DISTRIBUTEX:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 
 //   DISTRIBUTEY-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//       DISTRIBUTEY:     %[[NUMWORKGROUPSY:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4] -> (((-s2 + s3) ceildiv s4) * (s0 * s1))>
-//  DISTRIBUTEY-SAME:         [%[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       DISTRIBUTEY:     %[[NUMWORKGROUPSY:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4] -> ((s3 * s4) * ((-s0 + s1) ceildiv s2))>
+//  DISTRIBUTEY-SAME:         [%[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG5]], %[[ARG4]]]
 //       DISTRIBUTEY:     hal.return %[[ARG6]], %[[NUMWORKGROUPSY]], %[[C1]]
 
 //       DISTRIBUTEZ:     %[[NUMWORKGROUPSZ:.+]] = affine.apply affine_map<(d0)[s0, s1, s2] -> (d0 * ((-s0 + s1) ceildiv s2))>

@@ -286,6 +286,8 @@ util.func public @inplaceDispatch(
 
 // CHECK-LABEL: @dispatchWithCountRegion
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xi32>)
+builtin.module {
+builtin.module {
 util.func public @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = arith.constant 100
   %x = arith.constant 100 : index
@@ -309,4 +311,6 @@ util.func public @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32>
   }
   // CHECK: util.return %[[OUTER_RET0]] : tensor<4xi32>
   util.return %0 : tensor<4xi32>
+}
+}
 }

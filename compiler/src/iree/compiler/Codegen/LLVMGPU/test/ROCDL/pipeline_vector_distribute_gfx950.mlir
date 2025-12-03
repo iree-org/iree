@@ -571,6 +571,6 @@ hal.executable private @matvec_dispatch_0 {
 }
 //   MEMORY-LABEL: func.func @matvec_dispatch_0_matmul_transpose_b_32000x2x4096_f16xf16xf32
 //    CHECK-LABEL: func.func @matvec_dispatch_0_matmul_transpose_b_32000x2x4096_f16xf16xf32
-//          CHECK:   scf.forall ({{.*}}) = (0, 0) to (32000, 2) step (16, 1)
+//          CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 // CHECK-COUNT-16:     gpu.subgroup_reduce  add {{.*}} cluster(size = 64) : (f32) -> f32
 // CHECK-COUNT-16:     gpu.subgroup_reduce  add {{.*}} cluster(size = 2) : (f32) -> f32

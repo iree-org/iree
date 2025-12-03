@@ -648,35 +648,6 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
         continue;
       }
 
-      // If the offset is static and a multiple of the inner dimensions'
-      // product, we can divide it by the inner product and add it to the first
-      // dimension of the expanded store group. If it's not a multiple, we can't
-      // be sure that we can decompose in a way that the `0 <= offset &&
-      // offset+size <= dim_size` property holds, so we abort the folding. Same
-      // for a dynamic offset.
-      std::optional<int64_t> maybeStaticOffset = getConstantIntValue(offset);
-      if (!maybeStaticOffset.has_value()) {
-        return rewriter.notifyMatchFailure(
-            storeOp, "has dynamic offset in dimension to be expanded");
-      }
-      int64_t staticOffset = maybeStaticOffset.value();
-      if (staticOffset != 0) {
-        int64_t innerDimSize = 1;
-        for (auto i : llvm::drop_begin(group)) {
-          if (ShapedType::isDynamic(reshapeSrcShape[i])) {
-            return rewriter.notifyMatchFailure(
-                storeOp, "has a static offset, but the inner dimension product "
-                         "of the reshape source is dynamic");
-          }
-          innerDimSize *= reshapeSrcShape[i];
-        }
-        if (staticOffset % innerDimSize != 0) {
-          return rewriter.notifyMatchFailure(
-              storeOp, "has a static offset that is not a multiple of the "
-                       "static inner dimension product");
-        }
-      }
-
       // Check that each reassociation group contains at most a single dynamic
       // dimension.
       unsigned numDynamicDims =
@@ -688,6 +659,82 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
             collapseShape,
             "got multiple dynamic dimensions in group: " + std::to_string(i));
       }
+
+      // Compute the inner dimension product. This requires all inner dims to
+      // be static for the offset divisibility and subspan size checks below.
+      int64_t innerDimSize = 1;
+      bool hasStaticInnerDims = true;
+      for (auto j : llvm::drop_begin(group)) {
+        if (ShapedType::isDynamic(reshapeSrcShape[j])) {
+          hasStaticInnerDims = false;
+          break;
+        }
+        innerDimSize *= reshapeSrcShape[j];
+      }
+
+      // Check that the offset is divisible by the inner dimension product.
+      std::optional<int64_t> maybeStaticOffset = getConstantIntValue(offset);
+      if (maybeStaticOffset.has_value()) {
+        // Static offset case: verify it's a multiple of the inner dim product.
+        int64_t staticOffset = maybeStaticOffset.value();
+        if (staticOffset != 0) {
+          if (!hasStaticInnerDims) {
+            return rewriter.notifyMatchFailure(
+                storeOp, "has non-zero static offset but dynamic inner dims");
+          }
+          if (staticOffset % innerDimSize != 0) {
+            return rewriter.notifyMatchFailure(
+                storeOp, "has a static offset that is not a multiple of the "
+                         "inner dimension product");
+          }
+        }
+      } else {
+        // Dynamic offset case: check if it comes from an affine.apply where
+        // the inner dim product is a multiplicand.
+        if (!hasStaticInnerDims) {
+          return rewriter.notifyMatchFailure(
+              storeOp, "has dynamic offset with dynamic inner dimensions");
+        }
+
+        Value offsetValue = cast<Value>(offset);
+        auto applyOp = offsetValue.getDefiningOp<affine::AffineApplyOp>();
+        if (!applyOp) {
+          return rewriter.notifyMatchFailure(
+              storeOp, "has dynamic offset in dimension to be expanded that is "
+                       "not from affine.apply");
+        }
+
+        AffineMap map = applyOp.getAffineMap();
+        AffineExpr expr = map.getResult(0);
+
+        // Helper to check if an affine expression is divisible by innerDimSize.
+        std::function<bool(AffineExpr)> isDivisible =
+            [&](AffineExpr e) -> bool {
+          if (auto constExpr = dyn_cast<AffineConstantExpr>(e)) {
+            return constExpr.getValue() % innerDimSize == 0;
+          }
+          if (auto mulExpr = dyn_cast<AffineBinaryOpExpr>(e)) {
+            if (mulExpr.getKind() == AffineExprKind::Mul) {
+              // For multiplication, check if either operand makes it divisible.
+              return isDivisible(mulExpr.getLHS()) ||
+                     isDivisible(mulExpr.getRHS());
+            }
+            if (mulExpr.getKind() == AffineExprKind::Add) {
+              // For addition, both operands must be divisible.
+              return isDivisible(mulExpr.getLHS()) &&
+                     isDivisible(mulExpr.getRHS());
+            }
+          }
+          return false;
+        };
+
+        if (!isDivisible(expr)) {
+          return rewriter.notifyMatchFailure(
+              storeOp, "dynamic offset from affine.apply is not provably a "
+                       "multiple of inner dimension product");
+        }
+      }
+
       // In case of a single dynamic dimension, check that the subspan size is
       // dynamic as well.
       if (numDynamicDims == 1) {
@@ -699,11 +746,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
         continue;
       }
 
-      // Handle static sizes.
-      int64_t innerDimSize = 1;
-      for (auto i : llvm::drop_begin(group)) {
-        innerDimSize *= reshapeSrcShape[i];
-      }
+      // Handle static sizes - use innerDimSize computed above.
       if (subspanSize % innerDimSize != 0) {
         return rewriter.notifyMatchFailure(
             storeOp, "subspan type indivisible by expanded shape");
@@ -717,9 +760,16 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
     rewriter.setInsertionPoint(subspanOp);
     Location loc = collapseShape.getLoc();
     SmallVector<int64_t> expandedSubspanShape;
-    SmallVector<OpFoldResult> expandedOffsets;
     SmallVector<OpFoldResult> expandedSizes;
     SmallVector<Value> newSubspanDynamicDims;
+    // Store offset info for deferred computation (offset may be defined in
+    // nested region).
+    struct OffsetInfo {
+      OpFoldResult offset;
+      int64_t innerDimSize;
+      bool needsComputation;
+    };
+    SmallVector<OffsetInfo> offsetInfos;
     OpFoldResult zero = rewriter.getIndexAttr(0);
     size_t dynIndex = 0;
     for (auto [subspanSize, group, offset, size] : llvm::zip_equal(
@@ -727,7 +777,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
              storeOp.getMixedOffsets(), storeOp.getMixedSizes())) {
       if (group.size() == 1) {
         expandedSizes.push_back(size);
-        expandedOffsets.push_back(offset);
+        offsetInfos.push_back({offset, 1, false});
         expandedSubspanShape.push_back(subspanSize);
         if (ShapedType::isDynamic(subspanSize)) {
           newSubspanDynamicDims.push_back(dynamicDims[dynIndex++]);
@@ -773,15 +823,14 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
         expandedSubspanShape.push_back(subspanSize / innerDimSize);
       }
 
-      // Earlier it's guaranteed that the offset is divisible by the inner
-      // dimension product and this is the new first offset of the expanded
-      // store. Accordingly, the other offsets are set to zero.
-      OpFoldResult innerDimSizeAttr = rewriter.getIndexAttr(innerDimSize);
-      expandedOffsets.push_back(affine::makeComposedFoldedAffineApply(
-          rewriter, loc, div, {offset, innerDimSizeAttr}));
+      // Store offset info for deferred computation. The offset may be defined
+      // in a nested region (e.g., pcf.loop), so we can't create the
+      // affine.apply here. We'll create it after setting insertion point to
+      // storeOp.
+      offsetInfos.push_back({offset, innerDimSize, true});
 
       for (int64_t reshapeSrcSize : llvm::drop_begin(innerDimSizes)) {
-        expandedOffsets.push_back(zero);
+        offsetInfos.push_back({zero, 1, false});
         expandedSubspanShape.push_back(reshapeSrcSize);
         if (ShapedType::isDynamic(reshapeSrcSize)) {
           OpFoldResult totalSizeAttr = rewriter.getIndexAttr(totalSize);
@@ -820,6 +869,21 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
     dispatchIndexOpFoldResults(expandedSizes, expandedDynamicDims,
                                expandedStaticDims);
     rewriter.setInsertionPoint(storeOp);
+
+    // Now compute the expanded offsets. We deferred this because the offset
+    // values may be defined in a nested region (e.g., pcf.loop).
+    SmallVector<OpFoldResult> expandedOffsets;
+    for (const auto &info : offsetInfos) {
+      if (info.needsComputation) {
+        OpFoldResult innerDimSizeAttr =
+            rewriter.getIndexAttr(info.innerDimSize);
+        expandedOffsets.push_back(affine::makeComposedFoldedAffineApply(
+            rewriter, loc, div, {info.offset, innerDimSizeAttr}));
+      } else {
+        expandedOffsets.push_back(info.offset);
+      }
+    }
+
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
         storeOp, collapseShape.getSrc(), newSubspanOp, expandedDynamicDims,
         expandedOffsets, expandedSizes, expandedStrides);
