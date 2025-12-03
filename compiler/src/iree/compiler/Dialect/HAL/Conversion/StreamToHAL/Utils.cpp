@@ -37,10 +37,10 @@ static std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
 static std::tuple<SmallVector<Value>, SmallVector<Value>>
 lookupDevicesAndQueueAffintiesFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  assert(affinityAttr && "expected an affinitly attribute at this point");
   SmallVector<Value> devices;
   SmallVector<Value> queueAffinities;
-  if (auto optimalAttr =
-          dyn_cast_if_present<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+  if (auto optimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
     for (auto affinity : optimalAttr.getAffinities()) {
       auto [device, queueAffinity] =
           lookupDeviceAndQueueAffinityFor(op->getLoc(), affinity, builder);
