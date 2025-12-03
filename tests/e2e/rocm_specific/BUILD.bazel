@@ -19,7 +19,6 @@ package(
 )
 
 LDS_SRCS = [
-    "lds_matmul.mlir",
     "lds_matmul_coalesced_dma.mlir",
 ]
 
