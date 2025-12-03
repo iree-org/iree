@@ -237,7 +237,7 @@ struct DispatchCreationOptions {
 
   // Enables aggressive reshape movement (bubbling expand/collapse shapes
   // across reduction ops).
-  bool enableAggressiveReshapeMovement = false;
+  bool enableAggressiveReshapeMovement = true;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<DispatchCreationOptions>;
