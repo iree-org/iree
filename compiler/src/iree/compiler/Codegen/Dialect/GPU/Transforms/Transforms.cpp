@@ -373,13 +373,12 @@ static void inlineForallBodies(RewriterBase &rewriter,
   rewriter.eraseOp(threadForallOp.getTerminator());
   SmallVector<Value> replacementArgs(threadForallOp.getInductionVars());
   replacementArgs.pop_back();
-  replacementArgs.append(threadForallOp.getRegionOutArgs().begin(),
-                         threadForallOp.getRegionOutArgs().end());
+  llvm::append_range(replacementArgs, threadForallOp.getRegionOutArgs());
   rewriter.mergeBlocks(warpForallOp.getBody(), threadForallOp.getBody(),
                        replacementArgs);
-  SmallVector<Value> innerReplacementArgs(laneForallOp.getOutputs());
-  innerReplacementArgs.insert(innerReplacementArgs.begin(),
-                              threadForallOp.getInductionVars().back());
+  SmallVector<Value> innerReplacementArgs{
+      threadForallOp.getInductionVars().back()};
+  llvm::append_range(innerReplacementArgs, laneForallOp.getOutputs());
   rewriter.inlineBlockBefore(laneForallOp.getBody(), laneForallOp,
                              innerReplacementArgs);
 }
@@ -457,16 +456,15 @@ static void composeCoalescedGatherDMA(
 /// Check if a forall op uses iree_gpu.coalesced_gather_dma operations
 /// instead of tensor.parallel_insert_slice in its terminator.
 static bool isCoalescedGatherForallOp(scf::ForallOp forallOp) {
-  for (auto outArg : forallOp.getRegionOutArgs()) {
-    auto combiningOps = forallOp.getCombiningOps(outArg);
+  for (BlockArgument outArg : forallOp.getRegionOutArgs()) {
+    SmallVector<Operation *> combiningOps = forallOp.getCombiningOps(outArg);
     if (combiningOps.empty()) {
       continue;
     }
-    // Check if any combining op is a CoalescedGatherDMAOp
-    for (auto *op : combiningOps) {
-      if (isa<IREE::GPU::CoalescedGatherDMAOp>(op)) {
-        return true;
-      }
+    // Check if any combining op is a CoalescedGatherDMAOp.
+    if (llvm::any_of(combiningOps,
+                     llvm::IsaPred<IREE::GPU::CoalescedGatherDMAOp>)) {
+      return true;
     }
   }
   return false;
@@ -524,9 +522,7 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
       if (combiningOps.size() != 1) {
         return false;
       }
-      auto coalescedDMAOp =
-          dyn_cast<IREE::GPU::CoalescedGatherDMAOp>(combiningOps[0]);
-      if (coalescedDMAOp) {
+      if (isa<IREE::GPU::CoalescedGatherDMAOp>(combiningOps[0])) {
         continue;
       }
       auto parallelInsertOp =

@@ -46,17 +46,15 @@ static LogicalResult verifyThreadMapping(scf::ForallOp forallOp) {
     return failure();
   }
 
-  // Verify that all mappings are thread mappings
-  for (Attribute attr : *mappingAttr) {
-    if (!isa<gpu::GPUThreadMappingAttr, IREE::GPU::LaneIdAttr>(attr)) {
-      return failure();
-    }
-  }
-  return success();
+  // Verify that all mappings are thread mappings.
+  return success(llvm::all_of(
+      *mappingAttr,
+      llvm::IsaPred<gpu::GPUThreadMappingAttr, IREE::GPU::LaneIdAttr>));
 }
 
-static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
-                                        PatternRewriter &rewriter) {
+static LogicalResult
+verifyMemoryLayoutContiguous(IREE::GPU::CoalescedGatherDMAOp dmaOp,
+                             PatternRewriter &rewriter) {
   // Important: check that destination memref is contiguous.
   auto destMemRefType = cast<MemRefType>(dmaOp.getInit().getType());
 
@@ -69,19 +67,9 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
   return success();
 }
 
-static bool matchesTargetDmaSize(int64_t transferSizeBytes,
-                                 ArrayRef<int64_t> targetDmaSizes) {
-  for (int64_t dmaSize : targetDmaSizes) {
-    if (transferSizeBytes == dmaSize) {
-      return true;
-    }
-  }
-  return false;
-}
-
-struct LowerCoalescedGatherDMAPattern
+struct LowerCoalescedGatherDMAPattern final
     : public OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LowerCoalescedGatherDMAPattern(MLIRContext *context,
                                  ArrayRef<int64_t> targetDmaSizes)
@@ -103,7 +91,7 @@ struct LowerCoalescedGatherDMAPattern
           dmaOp, "forall does not have proper thread mapping");
     }
 
-    if (failed(verifyMemoryLayout(dmaOp, rewriter))) {
+    if (failed(verifyMemoryLayoutContiguous(dmaOp, rewriter))) {
       return failure();
     }
 
@@ -120,17 +108,10 @@ struct LowerCoalescedGatherDMAPattern
       ArrayRef<int64_t> indicesShape = indicesType.getShape();
       ArrayRef<int64_t> destShape = destType.getShape();
 
-      // Verify that indices dimensions are a prefix of dest dimensions.
-      if (indicesShape.size() > destShape.size()) {
-        return rewriter.notifyMatchFailure(dmaOp,
-                                           "indices rank exceeds dest rank");
-      }
-
-      for (size_t i = 0; i < indicesShape.size(); ++i) {
-        if (indicesShape[i] != destShape[i]) {
-          return rewriter.notifyMatchFailure(
-              dmaOp, "indices shape is not a prefix of dest shape");
-        }
+      // Verify that indices dimensions match dest dimensions.
+      if (indicesShape != destShape) {
+        return rewriter.notifyMatchFailure(
+            dmaOp, "indices shape does not match dest shape");
       }
     }
 
@@ -157,7 +138,7 @@ struct LowerCoalescedGatherDMAPattern
     LDBG() << "Transfer size per lane: " << transferSizePerLane << " bits";
 
     if (!targetDmaSizes.empty() &&
-        !matchesTargetDmaSize(transferSizePerLane, targetDmaSizes)) {
+        !llvm::is_contained(targetDmaSizes, transferSizePerLane)) {
       return rewriter.notifyMatchFailure(
           dmaOp, "transfer size does not match any target DMA size");
     }
@@ -221,17 +202,6 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
           AMDGPULowerCoalescedDMAToGatherLDSPass> {
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
-
-    int count = 0;
-    funcOp.walk([&count](IREE::GPU::CoalescedGatherDMAOp op) {
-      LDBG() << "Found CoalescedGatherDMAOp: " << op;
-      ++count;
-    });
-    LDBG() << "Total CoalescedGatherDMAOps found: " << count;
-    if (count == 0) {
-      LDBG() << "No CoalescedGatherDMAOps found, exiting early";
-      return;
-    }
 
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     LDBG() << "GPU Target attribute: " << target;
