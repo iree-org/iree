@@ -90,12 +90,15 @@ def GPUConvertToCoalescedDMAPass :
   ];
 }
 
-def GPULowerCoalescedDMAToGlobalLoadsPass :
-    InterfacePass<"iree-codegen-gpu-lower-coalesced-dma-to-global-loads", "mlir::FunctionOpInterface"> {
-  let summary = "Lower coalesced DMA operations to global loads instructions.";
+def AMDGPULowerCoalescedDMAToGatherLDSPass :
+    InterfacePass<"iree-codegen-amdgpu-lower-coalesced-dma-to-gather-lds", "mlir::FunctionOpInterface"> {
+  let summary = "Lower coalesced DMA operations to amdgpu.gather_to_lds.";
   let dependentDialects = [
-    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect",
-    "::mlir::amdgpu::AMDGPUDialect", "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::amdgpu::AMDGPUDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 

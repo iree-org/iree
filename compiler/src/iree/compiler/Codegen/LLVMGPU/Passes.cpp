@@ -390,7 +390,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(createGPULowerCoalescedDMAToGlobalLoadsPass());
+  funcPassManager.addPass(createAMDGPULowerCoalescedDMAToGatherLDSPass());
 }
 
 /// Control function for decomposing pack and unpack ops. Returns true if the

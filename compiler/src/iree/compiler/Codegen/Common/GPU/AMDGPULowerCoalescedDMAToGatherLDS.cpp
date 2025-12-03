@@ -24,6 +24,7 @@
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -32,11 +33,11 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-codegen-gpu-lower-coalesced-dma-to-global-loads"
+#define DEBUG_TYPE "iree-codegen-amdgpu-lower-coalesced-dma-to-gather-lds"
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_GPULOWERCOALESCEDDMATOGLOBALLOADSPASS
+#define GEN_PASS_DEF_AMDGPULOWERCOALESCEDDMATOGATHERLDSPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 static LogicalResult verifyThreadMapping(scf::ForallOp forallOp) {
@@ -68,23 +69,6 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
   return success();
 }
 
-static LogicalResult
-isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp,
-                       PatternRewriter &rewriter) {
-  scf::ForallOp forallOp = dmaOp->getParentOfType<scf::ForallOp>();
-
-  // Verify that the forall has the required GPU thread mapping.
-  if (failed(verifyThreadMapping(forallOp))) {
-    return failure();
-  }
-
-  if (failed(verifyMemoryLayout(dmaOp, rewriter))) {
-    return failure();
-  }
-
-  return success();
-}
-
 static bool matchesTargetDmaSize(int64_t transferSizeBytes,
                                  ArrayRef<int64_t> targetDmaSizes) {
   for (int64_t dmaSize : targetDmaSizes) {
@@ -110,35 +94,28 @@ struct LowerCoalescedGatherDMAPattern
 
     auto forallOp = dmaOp->getParentOfType<scf::ForallOp>();
     if (!forallOp) {
-      LDBG() << "FAILED - not inside scf.forall";
       return rewriter.notifyMatchFailure(
           dmaOp, "coalesced_gather_dma not inside scf.forall");
     }
-    LDBG() << "Found parent forall";
 
     if (failed(verifyThreadMapping(forallOp))) {
-      LDBG() << "FAILED - thread mapping verification failed";
       return rewriter.notifyMatchFailure(
           dmaOp, "forall does not have proper thread mapping");
     }
-    LDBG() << "Thread mapping verified";
 
     if (failed(verifyMemoryLayout(dmaOp, rewriter))) {
-      LDBG() << "FAILED - memory layout verification failed";
       return failure();
     }
-    LDBG() << "Memory layout verified";
 
     Value source = dmaOp.getSource();
     Value dest = dmaOp.getInit();
-    auto indicesRange = dmaOp.getIndices();
+    OperandRange indicesRange = dmaOp.getIndices();
 
     auto sourceType = cast<MemRefType>(source.getType());
     auto destType = cast<MemRefType>(dest.getType());
 
     if (!indicesRange.empty()) {
       Value indices = indicesRange.front();
-      LDBG() << "  Indices: " << indices;
       auto indicesType = cast<MemRefType>(indices.getType());
       ArrayRef<int64_t> indicesShape = indicesType.getShape();
       ArrayRef<int64_t> destShape = destType.getShape();
@@ -170,7 +147,6 @@ struct LowerCoalescedGatherDMAPattern
     std::optional<int64_t> subgroupSize =
         getSubgroupSize(dmaOp->getParentOfType<FunctionOpInterface>());
     if (!subgroupSize.has_value()) {
-      LDBG() << "FAILED - unable to determine subgroup size";
       return rewriter.notifyMatchFailure(
           dmaOp, "unable to determine subgroup size from forall");
     }
@@ -182,8 +158,6 @@ struct LowerCoalescedGatherDMAPattern
 
     if (!targetDmaSizes.empty() &&
         !matchesTargetDmaSize(transferSizePerLane, targetDmaSizes)) {
-      LDBG() << "FAILED - transfer size " << transferSizePerLane
-             << " does not match any target DMA size";
       return rewriter.notifyMatchFailure(
           dmaOp, "transfer size does not match any target DMA size");
     }
@@ -195,7 +169,6 @@ struct LowerCoalescedGatherDMAPattern
     ArrayRef<int64_t> sourceShape = sourceType.getShape();
     LDBG() << "Source rank: " << sourceShape.size();
     if (sourceShape.size() < 2) {
-      LDBG() << "FAILED - source rank < 2";
       return rewriter.notifyMatchFailure(
           dmaOp, "source must have at least 2 dimensions");
     }
@@ -219,22 +192,16 @@ struct LowerCoalescedGatherDMAPattern
         arith::ConstantIndexOp::create(rewriter, loc, elementsPerTransfer));
 
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    for (int64_t i = 0; i < secondInnermostDimSize; ++i) {
-      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, i);
+    for (SmallVector<int64_t> offsets :
+         StaticTileOffsetRange({secondInnermostDimSize}, {1})) {
+      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, offsets[0]);
 
-      SmallVector<Value> srcIndices;
-      for (int64_t dim = 0; dim < sourceType.getRank() - 2; ++dim) {
-        srcIndices.push_back(zero);
-      }
-      srcIndices.push_back(iVal);
-      srcIndices.push_back(laneOffset);
+      SmallVector<Value> srcIndices(sourceType.getRank(), zero);
+      srcIndices[sourceType.getRank() - 2] = iVal;
+      srcIndices[sourceType.getRank() - 1] = laneOffset;
 
-      SmallVector<Value> dstIndices;
-      for (int64_t dim = 0; dim < destType.getRank() - 2; ++dim) {
-        dstIndices.push_back(zero);
-      }
-      dstIndices.push_back(iVal);
-      dstIndices.push_back(zero);
+      SmallVector<Value> dstIndices(destType.getRank(), zero);
+      dstIndices[destType.getRank() - 2] = iVal;
 
       amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
                                     dstIndices, TypeAttr::get(transferType));
@@ -249,9 +216,9 @@ private:
 };
 
 namespace {
-struct GPULowerCoalescedDMAToGlobalLoadsPass final
-    : impl::GPULowerCoalescedDMAToGlobalLoadsPassBase<
-          GPULowerCoalescedDMAToGlobalLoadsPass> {
+struct AMDGPULowerCoalescedDMAToGatherLDSPass final
+    : impl::AMDGPULowerCoalescedDMAToGatherLDSPassBase<
+          AMDGPULowerCoalescedDMAToGatherLDSPass> {
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
 
@@ -278,8 +245,8 @@ struct GPULowerCoalescedDMAToGlobalLoadsPass final
     if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
       dmaSizes = dmaSizesAttr.asArrayRef();
     }
-    // dma_sizes is optional - if not specified, skip the size validation.
 
+    // dma_sizes is optional - if not specified, skip the size validation.
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<LowerCoalescedGatherDMAPattern>(context, dmaSizes);
