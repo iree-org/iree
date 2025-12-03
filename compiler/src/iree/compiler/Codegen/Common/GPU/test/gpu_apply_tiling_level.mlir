@@ -71,9 +71,9 @@ module {
 func.func @matmul_transpose_b(%5: tensor<64x64xf32>, %6: tensor<64x1280xf16>, %7: tensor<64x1280xf16>) -> tensor<64x64xf32> {
   %c4 = arith.constant 4 : index
   %c1280 = arith.constant 1280 : index
-  %cst = arith.constant 0.000000e+00 : f16
+  %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %8 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
   %9 = tensor.empty() : tensor<64x1280xf16>
   %10 = tensor.empty() : tensor<64x1280xf16>
   %11 = scf.for %arg0 = %c0 to %c1280 step %c4 iter_args(%arg1 = %8) -> (tensor<64x64xf32>) {
