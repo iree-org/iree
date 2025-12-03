@@ -141,13 +141,19 @@ static iree_status_t iree_tooling_submit_transfer(
 
 iree_status_t iree_tooling_transfer_variants(
     iree_vm_list_t* list, iree_hal_device_t* target_device,
-    iree_hal_allocator_t* target_allocator,
+    iree_hal_allocator_t* default_allocator,
     iree_hal_buffer_params_t target_params, iree_hal_fence_t* wait_fence,
     iree_hal_fence_t* signal_fence) {
   IREE_ASSERT_ARGUMENT(list);
   IREE_ASSERT_ARGUMENT(target_device);
-  IREE_ASSERT_ARGUMENT(target_allocator);
+  IREE_ASSERT_ARGUMENT(default_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Grab the device specific allocator if available:
+  iree_hal_allocator_t* target_allocator = default_allocator;
+  if (target_device) {
+    target_allocator = iree_hal_device_allocator(target_device);
+  }
 
   // If all buffers are already host-accessible we can skip the transfer.
   bool requires_transfer = false;
