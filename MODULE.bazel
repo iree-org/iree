@@ -38,6 +38,9 @@ bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 bazel_dep(name = "zlib-ng", version = "2.0.7", repo_name = "llvm_zlib")
 bazel_dep(name = "zstd", version = "1.5.7", repo_name = "llvm_zstd")
 
+# Stack trace support on Linux.
+bazel_dep(name = "libbacktrace", version = "1.0.0-20250926-7939218")
+
 # LLVM project overlay module
 bazel_dep(name = "llvm-project-overlay", version = "main")
 local_path_override(
