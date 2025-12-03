@@ -77,8 +77,9 @@ void GPUApplyTilingLevelPass::runOnOperation() {
       getTiledOps(funcOp, tilingLevel);
 
   IRRewriter rewriter(funcOp);
-  if (failed(applyTileAndFuseToEachRoot(rewriter, targetOps, tilingLevel,
-                                        allowZeroSlices))) {
+  if (failed(applyTileAndFuseToEachRoot(
+          rewriter, targetOps, tilingLevel, allowZeroSlices,
+          /*targetTileMap=*/std::nullopt, fuseConsumers))) {
     funcOp.emitError() << "tiling of level "
                        << IREE::GPU::stringifyEnum(tilingLevel) << " failed\n";
     return signalPassFailure();
