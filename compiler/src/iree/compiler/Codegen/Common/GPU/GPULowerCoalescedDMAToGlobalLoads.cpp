@@ -46,7 +46,6 @@ static LogicalResult verifyThreadMapping(scf::ForallOp forallOp) {
   }
 
   // Verify that all mappings are thread mappings
-  // Accept both gpu::GPUThreadMappingAttr and iree_gpu.lane_id
   for (Attribute attr : *mappingAttr) {
     if (!isa<gpu::GPUThreadMappingAttr, IREE::GPU::LaneIdAttr>(attr)) {
       return failure();
@@ -57,7 +56,7 @@ static LogicalResult verifyThreadMapping(scf::ForallOp forallOp) {
 
 static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
                                         PatternRewriter &rewriter) {
-  // Check that destination memref is contiguous.
+  // Important: check that destination memref is contiguous.
   auto destMemRefType = cast<MemRefType>(dmaOp.getInit().getType());
 
   if (!destMemRefType.areTrailingDimsContiguous(1)) {
@@ -65,19 +64,6 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
         dmaOp,
         "destination memref does not have contiguous trailing dimension");
   }
-
-  /*
-  auto sourceType = cast<MemRefType>(dmaOp.getSource().getType());
-  auto targetType = cast<MemRefType>(dmaOp.getInit().getType());
-
-  bool hasGlobalSource = hasGlobalMemoryAddressSpace(sourceType);
-  bool hasSharedTarget = hasSharedMemoryAddressSpace(targetType);
-
-  if (!hasGlobalSource || !hasSharedTarget) {
-    return rewriter.notifyMatchFailure(
-        dmaOp, "incompatible source or target memory address space");
-  }
-  */
 
   return success();
 }
@@ -120,46 +106,36 @@ struct LowerCoalescedGatherDMAPattern
 
   LogicalResult matchAndRewrite(IREE::GPU::CoalescedGatherDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override {
-    LLVM_DEBUG(LDBG() << "Processing CoalescedGatherDMAOp: " << dmaOp << "\n");
+    LDBG() << "Processing CoalescedGatherDMAOp: " << dmaOp;
 
-    // Verify the DMA op is inside a scf.forall
     auto forallOp = dmaOp->getParentOfType<scf::ForallOp>();
     if (!forallOp) {
-      LLVM_DEBUG(LDBG() << "FAILED - not inside scf.forall\n");
+      LDBG() << "FAILED - not inside scf.forall";
       return rewriter.notifyMatchFailure(
           dmaOp, "coalesced_gather_dma not inside scf.forall");
     }
-    LLVM_DEBUG(LDBG() << "Found parent forall\n");
+    LDBG() << "Found parent forall";
 
-    // Verify thread mapping
     if (failed(verifyThreadMapping(forallOp))) {
-      LLVM_DEBUG(LDBG() << "FAILED - thread mapping verification failed\n");
+      LDBG() << "FAILED - thread mapping verification failed";
       return rewriter.notifyMatchFailure(
           dmaOp, "forall does not have proper thread mapping");
     }
-    LLVM_DEBUG(LDBG() << "Thread mapping verified\n");
+    LDBG() << "Thread mapping verified";
 
-    // Verify memory layout
     if (failed(verifyMemoryLayout(dmaOp, rewriter))) {
-      LLVM_DEBUG(LDBG() << "FAILED - memory layout verification failed\n");
+      LDBG() << "FAILED - memory layout verification failed";
       return failure();
     }
-    LLVM_DEBUG(LDBG() << "Memory layout verified\n");
+    LDBG() << "Memory layout verified";
 
-    [[maybe_unused]] Location loc = dmaOp.getLoc();
     Value source = dmaOp.getSource();
     Value dest = dmaOp.getInit();
-
-    LDBG() << "  Source: " << source;
-    LDBG() << "  Dest: " << dest;
-
-    // Get all operands
     auto indicesRange = dmaOp.getIndices();
 
     auto sourceType = cast<MemRefType>(source.getType());
     auto destType = cast<MemRefType>(dest.getType());
 
-    // Check if indices operand exists
     if (!indicesRange.empty()) {
       Value indices = indicesRange.front();
       LDBG() << "  Indices: " << indices;
@@ -167,7 +143,7 @@ struct LowerCoalescedGatherDMAPattern
       ArrayRef<int64_t> indicesShape = indicesType.getShape();
       ArrayRef<int64_t> destShape = destType.getShape();
 
-      // Verify that indices dimensions are a prefix of dest dimensions
+      // Verify that indices dimensions are a prefix of dest dimensions.
       if (indicesShape.size() > destShape.size()) {
         return rewriter.notifyMatchFailure(dmaOp,
                                            "indices rank exceeds dest rank");
@@ -179,24 +155,13 @@ struct LowerCoalescedGatherDMAPattern
               dmaOp, "indices shape is not a prefix of dest shape");
         }
       }
-
-      // Get the trailing missing dimension size (innermost dimension only)
-      [[maybe_unused]] int64_t trailingDims =
-          destShape.size() - indicesShape.size();
-      LDBG() << "  Trailing dimensions: " << trailingDims;
-
-      // Get only the innermost dimension size
-      [[maybe_unused]] int64_t trailingSize = destShape.back();
-      LDBG() << "  Trailing size (innermost): " << trailingSize;
     }
 
-    // Get element size
     Type elementType = sourceType.getElementType();
     int64_t elementBits = sourceType.getElementTypeBitWidth();
     LDBG() << "  Element type: " << elementType;
     LDBG() << "  Element bits: " << elementBits;
 
-    // Get innermost dimension size of SOURCE and check against target DMA sizes
     int64_t innermostDimSize = sourceType.getShape().back();
     int64_t transferSizeBits = innermostDimSize * elementBits;
     LDBG() << "  Source innermost dimension size: " << innermostDimSize;
@@ -205,44 +170,35 @@ struct LowerCoalescedGatherDMAPattern
     std::optional<int64_t> subgroupSize =
         getSubgroupSize(dmaOp->getParentOfType<FunctionOpInterface>());
     if (!subgroupSize.has_value()) {
-      LLVM_DEBUG(LDBG() << "FAILED - unable to determine subgroup size\n");
+      LDBG() << "FAILED - unable to determine subgroup size";
       return rewriter.notifyMatchFailure(
           dmaOp, "unable to determine subgroup size from forall");
     }
-    LLVM_DEBUG(LDBG() << "Subgroup size: " << *subgroupSize << "\n");
+    LDBG() << "Subgroup size: " << *subgroupSize;
 
-    // Check that transfer size matches one of the target DMA sizes (if
-    // specified) Note: dma_sizes are in bits
+    // Check that transfer size matches one of the target DMA sizes.
     int64_t transferSizePerLane = transferSizeBits / *subgroupSize;
-    LLVM_DEBUG({
-      LDBG() << "Transfer size per lane: " << transferSizePerLane << " bits\n";
-      LDBG() << "Target DMA sizes: [";
-      for (int64_t dmaSize : targetDmaSizes) {
-        llvm::dbgs() << dmaSize << " ";
-      }
-      llvm::dbgs() << "]\n";
-    });
+    LDBG() << "Transfer size per lane: " << transferSizePerLane << " bits";
 
     if (!targetDmaSizes.empty() &&
         !matchesTargetDmaSize(transferSizePerLane, targetDmaSizes)) {
-      LLVM_DEBUG(LDBG() << "FAILED - transfer size " << transferSizePerLane
-                        << " does not match any target DMA size\n");
+      LDBG() << "FAILED - transfer size " << transferSizePerLane
+             << " does not match any target DMA size";
       return rewriter.notifyMatchFailure(
           dmaOp, "transfer size does not match any target DMA size");
     }
-    LLVM_DEBUG(LDBG() << "Transfer size matches target DMA sizes\n");
+    LDBG() << "Transfer size matches target DMA sizes";
 
     // TODO: Handle indices properly - for now we skip the explicit indices
-    // check The lane parameter is always present but we handle it differently
+    // check The lane parameter is always present but we handle it differently.
 
     ArrayRef<int64_t> sourceShape = sourceType.getShape();
-    LLVM_DEBUG(LDBG() << "Source rank: " << sourceShape.size() << "\n");
+    LDBG() << "Source rank: " << sourceShape.size();
     if (sourceShape.size() < 2) {
-      LLVM_DEBUG(LDBG() << "FAILED - source rank < 2\n");
+      LDBG() << "FAILED - source rank < 2";
       return rewriter.notifyMatchFailure(
           dmaOp, "source must have at least 2 dimensions");
     }
-    LLVM_DEBUG(LDBG() << "Source shape check passed\n");
 
     int64_t secondInnermostDimSize = sourceShape[sourceShape.size() - 2];
     LDBG() << "  Source second innermost dimension size: "
@@ -252,11 +208,13 @@ struct LowerCoalescedGatherDMAPattern
 
     auto transferType = VectorType::get({elementsPerTransfer}, elementType);
 
+    // Actually create the GatherToLDS ops to perform the transfer.
     rewriter.setInsertionPoint(dmaOp);
 
-    auto laneId = dmaOp.getLane();
+    TypedValue<IndexType> laneId = dmaOp.getLane();
 
-    auto laneOffset = arith::MulIOp::create(
+    Location loc = dmaOp.getLoc();
+    Value laneOffset = arith::MulIOp::create(
         rewriter, loc, laneId,
         arith::ConstantIndexOp::create(rewriter, loc, elementsPerTransfer));
 
@@ -264,7 +222,6 @@ struct LowerCoalescedGatherDMAPattern
     for (int64_t i = 0; i < secondInnermostDimSize; ++i) {
       Value iVal = arith::ConstantIndexOp::create(rewriter, loc, i);
 
-      // Build source indices [i, %lane]
       SmallVector<Value> srcIndices;
       for (int64_t dim = 0; dim < sourceType.getRank() - 2; ++dim) {
         srcIndices.push_back(zero);
@@ -272,7 +229,6 @@ struct LowerCoalescedGatherDMAPattern
       srcIndices.push_back(iVal);
       srcIndices.push_back(laneOffset);
 
-      // Build dest indices [i, 0]
       SmallVector<Value> dstIndices;
       for (int64_t dim = 0; dim < destType.getRank() - 2; ++dim) {
         dstIndices.push_back(zero);
@@ -314,7 +270,7 @@ struct GPULowerCoalescedDMAToGlobalLoadsPass final
     LDBG() << "GPU Target attribute: " << target;
     if (!target) {
       LDBG() << "Missing GPU target attribute, pass will fail";
-      // Don't fail if no target attribute - just skip the pass
+      // Don't fail if no target attribute - just skip the pass.
       return;
     }
 
@@ -322,7 +278,7 @@ struct GPULowerCoalescedDMAToGlobalLoadsPass final
     if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
       dmaSizes = dmaSizesAttr.asArrayRef();
     }
-    // dma_sizes is optional - if not specified, skip the size validation
+    // dma_sizes is optional - if not specified, skip the size validation.
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);

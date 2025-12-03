@@ -543,7 +543,8 @@ private:
       if (isInnermostDim && shape[i] != ShapedType::kDynamic) {
         int64_t tileSize =
             (warpDim > 1) ? (shape[i] + warpDim - 1) / warpDim : shape[i];
-        // Ensure tile size is at least subgroup_size, but cap at dimension size
+        // Ensure tile size is at least subgroup_size, but cap at dimension
+        // size.
         tileSize = std::min(std::max(tileSize, *subgroupSize), shape[i]);
         tileSizes.push_back(rewriter.getIndexAttr(tileSize));
         numTiledDims++;
