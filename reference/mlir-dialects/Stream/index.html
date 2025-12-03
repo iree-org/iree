@@ -2704,6 +2704,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#streamtesttimeline_op-streamtesttimelineop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.test.timeline_op (Stream::TestTimelineOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2715,7 +2724,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_66" class="md-nav__link">
+  <a href="#attributes_67" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -7041,6 +7050,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#streamtesttimeline_op-streamtesttimelineop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.test.timeline_op (Stream::TestTimelineOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -7052,7 +7070,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_66" class="md-nav__link">
+  <a href="#attributes_67" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -7662,11 +7680,12 @@ breaking execution correctness.</p>
 </li>
 <li><a href="#test-only-ops-for-stream-dialect-testing">Test-only ops for Stream dialect testing</a><ul>
 <li><a href="#streamtesttimeline_aware-streamtesttimelineawareop">stream.test.timeline_aware (Stream::TestTimelineAwareOp)</a></li>
+<li><a href="#streamtesttimeline_op-streamtesttimelineop">stream.test.timeline_op (Stream::TestTimelineOp)</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_66">Attributes</a><ul>
+<li><a href="#attributes_67">Attributes</a><ul>
 <li><a href="#collectiveattr">CollectiveAttr</a></li>
 <li><a href="#namedparameterattr">NamedParameterAttr</a></li>
 <li><a href="#partitioningconfigattr">PartitioningConfigAttr</a></li>
@@ -11641,7 +11660,7 @@ timeline. As timepoints transitively chain the timepoint must only cover the
 resource availability but not be limited to its original production
 timepoint.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>TimelineOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_48">Attributes:<a class="headerlink" href="#attributes_48" title="Permanent link">link</a></h5>
 <table>
@@ -11929,7 +11948,7 @@ types and those that prior to lowering do not handle them.</p>
 <p>Returns a timepoint that indicates that all of the input timepoints have
 been reached.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TimelineOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
 <table>
@@ -12884,7 +12903,107 @@ requiring HAL/etc dialect dependencies.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_66">Attributes<a class="headerlink" href="#attributes_66" title="Permanent link">link</a></h2>
+<h4 id="streamtesttimeline_op-streamtesttimelineop"><code>stream.test.timeline_op</code> (Stream::TestTimelineOp)<a class="headerlink" href="#streamtesttimeline_op-streamtesttimelineop" title="Permanent link">link</a></h4>
+<p><em>Test op implementing TimelineOpInterface.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `stream.test.timeline_op` (`await_limit` `(` $await_limit^ `)`)?
+              (`await` `(` $await_operands^ `)` `=` `` `&gt;`)?
+              `with` `(` $resource_operands `)` attr-dict `:`
+              custom&lt;ShapedFunctionType&gt;(ref($resource_operands),
+              type($resource_operands), $resource_operand_sizes,
+              type($results), $result_sizes,
+              $tied_operands)
+              `=` `` `&gt;` type($result_timepoint)
+</code></pre></div>
+<p>Test-only operation that implements TimelineOpInterface directly,
+allowing Stream dialect tests to verify timeline behavior without
+requiring execution regions or specific op semantics.</p>
+<p>This op takes zero or more resource operands with their sizes, zero or more
+await timepoints, and produces zero or more resource results with a result
+timepoint. It has no side effects and no execution region - it purely exists
+to test timepoint propagation, coverage analysis, and timeline scheduling.</p>
+<p>The <code>await_limit</code> attribute (default -1) controls how many await timepoints
+this op can accept before forcing join creation:
+- await_limit = -1: Unlimited awaits (default, no joins created)
+- await_limit = 0: No awaits allowed (all timepoints must be joined)
+- await_limit = 1: Max 1 await (mimics stream.async.execute behavior)
+- await_limit = N: Max N awaits</p>
+<p>Use this op when testing passes that operate on TimelineOpInterface methods.
+It's simpler than stream.async.execute (no execution region) but can still
+model resource-timepoint flows. For example:
+- ElideTimepointsPass coverage analysis (elide_timepoints_coverage.mlir)
+- PropagateTimepointsPass scheduling (propagate_timepoints.mlir)
+- SCF region handling with resources (elide_timepoints_scf.mlir)</p>
+<p>Examples:
+  // Simple timeline op with no dependencies or resources.
+  %tp0 = stream.test.timeline_op with() : () -&gt; () =&gt; !stream.timepoint</p>
+<p>// Timeline op awaiting other timepoints.
+  %tp1 = stream.test.timeline_op await(%tp0) =&gt; with() : () -&gt; () =&gt; !stream.timepoint</p>
+<p>// Timeline op with resource operands and results.
+  %r, %tp = stream.test.timeline_op
+    with(%arg) : (!stream.resource<external>{%size}) -&gt; !stream.resource<external>{%size}
+    =&gt; !stream.timepoint</p>
+<p>// Timeline op with await_limit to test join creation.
+  %r, %tp = stream.test.timeline_op await_limit(1) await(%tp0) =&gt;
+    with(%arg) : (!stream.resource<external>{%size}) -&gt; !stream.resource<external>{%size}
+    =&gt; !stream.timepoint</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes_66">Attributes:<a class="headerlink" href="#attributes_66" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
+<tr><td><code>await_limit</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
+</table>
+
+<h5 id="operands_77">Operands:<a class="headerlink" href="#operands_77" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>resource_operands</code></td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>resource_operand_sizes</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_sizes</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>await_operands</code></td>
+<td>variadic of A timepoint indicating execution availability.</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_69">Results:<a class="headerlink" href="#results_69" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>results</code></td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_timepoint</code></td>
+<td>A timepoint indicating execution availability.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="attributes_67">Attributes<a class="headerlink" href="#attributes_67" title="Permanent link">link</a></h2>
 <h3 id="collectiveattr">CollectiveAttr<a class="headerlink" href="#collectiveattr" title="Permanent link">link</a></h3>
 <p><em>Collective operation and specification.</em></p>
 <p>Syntax:</p>
