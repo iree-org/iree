@@ -336,7 +336,9 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
       }
     }
   }
-  if (!newMap) {
+
+  // Fail if there is no mapping or if there are no parallel loops in common.
+  if (!newMap || newMap.getNumInputs() == 0) {
     return failure();
   }
   return newMap;
