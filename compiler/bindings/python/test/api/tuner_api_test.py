@@ -4,23 +4,22 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import pytest
 from iree.compiler import ir
-from iree.compiler.dialects import iree_codegen
-from iree.compiler.dialects import affine
+from iree.compiler.dialects import affine, iree_codegen
 from iree.compiler.ir import AffineMap, AffineDimExpr
 
 
-def run(fn):
+# Pytest fixture to set up IR context for each test.
+@pytest.fixture(autouse=True)
+def ir_context():
     with ir.Context(), ir.Location.unknown():
         module = ir.Module.create()
         with ir.InsertionPoint(module.body):
-            print("\nTEST:", fn.__name__)
-            fn()
-    return fn
+            yield
 
 
-@run
-def root_op():
+def test_root_op():
     module_str = """
         module {
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
@@ -73,8 +72,7 @@ def root_op():
     assert root_op_list[1].name == "linalg.matmul"
 
 
-@run
-def attention_op_detail():
+def test_attention_op_detail():
     dim_exprs = [affine.AffineDimExpr.get(i) for i in range(5)]
 
     q_map = affine.AffineMap.get(5, 0, [dim_exprs[0], dim_exprs[1], dim_exprs[2]])
@@ -108,7 +106,6 @@ def attention_op_detail():
     assert result.n_dims == [3]
 
 
-@run
 def test_isa_attention_op():
     module_str = """
         module {
@@ -144,7 +141,6 @@ def test_isa_attention_op():
     assert iree_codegen.isa_attention_op(root_op_list[0])
 
 
-@run
 def test_igemm_conv_details():
     # Test 1: conv_2d_nhwc_hwcf.
     module_str = """
@@ -330,7 +326,6 @@ def test_igemm_conv_details():
     assert details is None, "IGEMM details should be None for non-conv operation"
 
 
-@run
 def test_isa_scaled_contraction_op():
     # Test 1: Regular matmul is not a scaled contraction.
     module_str = """
@@ -422,7 +417,6 @@ def test_isa_scaled_contraction_op():
     assert dims.batch == [], f"Got {dims.batch}"
 
 
-@run
 def test_infer_scaled_contraction_dimensions():
     # Test 1: Verify dimension inference on a scaled matmul operation.
     module_str = """
