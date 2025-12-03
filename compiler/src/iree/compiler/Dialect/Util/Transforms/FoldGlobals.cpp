@@ -307,6 +307,7 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
             context,
             {
                 global.op.getGlobalInitialValue(),
+                TypeAttr::get(global.op.getGlobalType()),
                 DictionaryAttr::get(
                     context, llvm::to_vector(global.op->getDialectAttrs())),
             }),

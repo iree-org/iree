@@ -330,6 +330,41 @@ def Stream_TimelineOp : Stream_OpInterface<"TimelineOpInterface"> {
       /*methodName=*/"getResultTimepoint",
       /*args=*/(ins)
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Sets a single await timepoint for this operation or clears all
+        await timepoints when nullptr.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setAwaitTimepoint",
+      /*args=*/(ins "Value":$timepoint),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        if (timepoint) {
+          $_op.getAwaitTimepointMutable().assign(timepoint);
+        } else {
+          $_op.getAwaitTimepointMutable().clear();
+        }
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Sets multiple await timepoints for this operation.
+        Most ops do not support multiple timepoints so a join will be emitted
+        when required. Implementers can override if they support multiple awaits
+        directly.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setAwaitTimepoints",
+      /*args=*/(ins "ValueRange":$timepoints, "OpBuilder &":$builder),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        // Most ops do not support multiple timepoints so we emit a join when
+        // required. Implementers can override if they do support multiple.
+        $_op.setAwaitTimepoint(
+            IREE::Stream::joinTimepoints($_op.getLoc(), timepoints, builder));
+      }]
+    >,
   ];
 }
 

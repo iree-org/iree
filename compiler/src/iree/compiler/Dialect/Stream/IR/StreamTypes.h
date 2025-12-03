@@ -47,6 +47,10 @@ class AffinityAttr;
 
 namespace mlir::iree_compiler::IREE::Stream {
 
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
 struct AsyncAccessRange {
   ResourceAccessBitfield access;
   Value resource;
@@ -65,6 +69,11 @@ struct AsyncAccessRange {
   static bool mayOverlap(const AsyncAccessRange &lhs,
                          const AsyncAccessRange &rhs);
 };
+
+// Joins all of |timepoints| with a stream.timepoint.join, representing the
+// timepoint when all timepoints have been reached (AND semantics).
+// Returns nullptr if no timepoints were provided and identity if only one was.
+Value joinTimepoints(Location loc, ValueRange timepoints, OpBuilder &builder);
 
 } // namespace mlir::iree_compiler::IREE::Stream
 
