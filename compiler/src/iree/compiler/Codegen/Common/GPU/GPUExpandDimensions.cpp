@@ -5,20 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallVectorExtras.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
@@ -96,7 +90,7 @@ createDimensionExpansionOps(RewriterBase &rewriter,
 
   Location loc = v.getLoc();
   MLIRContext *ctx = op.getContext();
-  ArrayRef<int64_t> expandedIteratorShape =
+  ArrayRef<int64_t> preprocessedOutputShape =
       config.getOutputShape().asArrayRef();
   SmallVector<OpFoldResult> origShape = tensor::getMixedSizes(rewriter, loc, v);
 
@@ -104,29 +98,33 @@ createDimensionExpansionOps(RewriterBase &rewriter,
   SmallVector<ReassociationIndices> tensorReassociation;
   int64_t expandedDimIdx = 0;
 
-  for (auto [iteratorDim, expandedGroup] :
+  for (auto [origDimIdx, expandedReassocIdx] :
        llvm::enumerate(config.getReassociationIndices())) {
-    AffineExpr dimExpr = getAffineDimExpr(iteratorDim, ctx);
+    AffineExpr dimExpr = getAffineDimExpr(origDimIdx, ctx);
     std::optional<unsigned> tensorDim = indexingMap.getResultPosition(dimExpr);
     if (!tensorDim) {
       continue;
     }
 
+    int64_t start = expandedDimIdx;
+    int64_t count = static_cast<int64_t>(expandedReassocIdx.size());
     auto tensorGroup =
-        llvm::map_to_vector(llvm::seq<int64_t>(0, expandedGroup.size()),
-                            [&](int64_t i) { return expandedDimIdx++; });
+        llvm::to_vector(llvm::seq<int64_t>(start, start + count));
     tensorReassociation.push_back(std::move(tensorGroup));
+    expandedDimIdx += count;
 
-    auto groupTargetShape = llvm::map_to_vector(
-        expandedGroup, [&](int64_t i) { return expandedIteratorShape[i]; });
+    auto preprocessedGroupOutputShape =
+        llvm::map_to_vector(expandedReassocIdx, [&](int64_t i) {
+          return preprocessedOutputShape[i];
+        });
 
     FailureOr<SmallVector<OpFoldResult>> groupShape =
-        computeExpandedGroupShape(rewriter, loc, origShape[*tensorDim],
-                                  groupTargetShape, iteratorDim, op);
+        computeExpandedGroupShape(rewriter, loc, origShape[tensorDim.value()],
+                                  preprocessedGroupOutputShape, origDimIdx, op);
     if (failed(groupShape)) {
       return failure();
     }
-    llvm::append_range(expandedTensorShape, *groupShape);
+    llvm::append_range(expandedTensorShape, groupShape.value());
   }
 
   auto staticExpandedShape =
