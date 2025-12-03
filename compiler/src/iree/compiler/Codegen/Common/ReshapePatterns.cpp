@@ -674,7 +674,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
       // be static for the offset divisibility and subspan size checks below.
       int64_t innerDimSize = 1;
       bool hasStaticInnerDims = true;
-      for (auto j : llvm::drop_begin(group)) {
+      for (int64_t j : llvm::drop_begin(group)) {
         if (ShapedType::isDynamic(reshapeSrcShape[j])) {
           hasStaticInnerDims = false;
           break;
@@ -885,7 +885,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
     // Now compute the expanded offsets at the store's insertion point where the
     // offset values are guaranteed to dominate.
     SmallVector<OpFoldResult> expandedOffsets;
-    for (const auto &info : offsetInfos) {
+    for (const OffsetInfo &info : offsetInfos) {
       if (info.needsComputation) {
         OpFoldResult innerDimSizeAttr =
             rewriter.getIndexAttr(info.innerDimSize);

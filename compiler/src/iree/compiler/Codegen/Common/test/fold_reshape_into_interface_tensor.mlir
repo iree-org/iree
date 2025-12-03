@@ -505,3 +505,33 @@ func.func @no_fold_collapse_dynamic_offset_addition_not_divisible(%arg0 : tensor
 }
 // CHECK-LABEL: func @no_fold_collapse_dynamic_offset_addition_not_divisible
 //       CHECK:   tensor.collapse_shape
+
+// -----
+
+// Test that dynamic offset defined inside a nested region works.
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_collapse_dynamic_offset_in_nested_region(%arg0 : tensor<4x8x4x128xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x20480xf32>>
+  // The offset is computed inside the forall using the induction variable,
+  // forcing expanded offset computation to go inside the region.
+  scf.forall (%iv) in (%c4) {
+    %2 = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<4x8x4x128xf32> into tensor<4x4096xf32>
+    %offset = affine.apply affine_map<(d0) -> (d0 * 512)>(%iv)
+    iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0, %offset], sizes = [4, 4096], strides = [1, 1]
+        : tensor<4x4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x20480xf32>>
+  }
+  return
+}
+// CHECK-LABEL: func @fold_collapse_dynamic_offset_in_nested_region(
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x40x4x128xf32>>
+//       CHECK:   scf.forall (%[[IV:.+]]) in
+//   CHECK-NOT:     tensor.collapse_shape
+//       CHECK:     iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[SUBSPAN]]
+//  CHECK-SAME:       offsets = [0, %[[IV]], 0, 0], sizes = [4, 8, 4, 128], strides = [1, 1, 1, 1]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x40x4x128xf32>>
