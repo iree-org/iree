@@ -1947,8 +1947,6 @@ static LogicalResult setTransposeConfig(IREE::GPU::TargetAttr target,
   // contiguous elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
 
-  // Attach the MMA schedule as an attribute to the entry point export function
-  // for later access in the pipeline.
   MLIRContext *context = linalgOp.getContext();
   Builder b(context);
   SmallVector<NamedAttribute> attrs{
