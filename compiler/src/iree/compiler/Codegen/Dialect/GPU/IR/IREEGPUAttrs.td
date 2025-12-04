@@ -931,7 +931,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
-    OptionalParameter<"IntegerAttr">:$prefetch_num_stages,
+    OptionalParameter<"std::optional<int64_t>">:$prefetch_num_stages,
     OptionalParameter<"BoolAttr">:$no_reduce_shared_memory_bank_conflicts,
     OptionalParameter<"BoolAttr">:$use_igemm_convolution,
     OptionalParameter<"ReorderWorkgroupsStrategyAttr">:$reorder_workgroups_strategy

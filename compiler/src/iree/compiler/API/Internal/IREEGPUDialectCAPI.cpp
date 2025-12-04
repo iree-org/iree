@@ -30,9 +30,9 @@ ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, int64_t *prefetchNumStages,
                               MlirAttribute *reorderWorkgroupsStrategy) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   mlir::Builder b(ctx);
-  auto prefetchNumStagesAttr = mlir::IntegerAttr();
-  if (prefetchNumStages && *prefetchNumStages > 0) {
-    prefetchNumStagesAttr = b.getI64IntegerAttr(*prefetchNumStages);
+  std::optional<int64_t> prefetchNumStagesOpt;
+  if (prefetchNumStages) {
+    prefetchNumStagesOpt = *prefetchNumStages;
   }
   auto noReduceSharedMemoryBankConflictsAttr = mlir::BoolAttr();
   if (noReduceSharedMemoryBankConflicts) {
@@ -51,7 +51,7 @@ ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, int64_t *prefetchNumStages,
         unwrap(*reorderWorkgroupsStrategy));
   }
   return wrap(mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr::get(
-      ctx, prefetchNumStagesAttr, noReduceSharedMemoryBankConflictsAttr,
+      ctx, prefetchNumStagesOpt, noReduceSharedMemoryBankConflictsAttr,
       useIgemmConvolutionAttr, strategyAttr));
 }
 
@@ -60,7 +60,12 @@ ireeGPUPipelineOptionsAttrGetPrefetchNumStages(MlirAttribute attr) {
   auto gpuAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
           unwrap(attr));
-  return wrap(gpuAttr.getPrefetchNumStages());
+  std::optional<int64_t> value = gpuAttr.getPrefetchNumStages();
+  if (!value) {
+    return {nullptr};
+  }
+  mlir::Builder b(unwrap(attr).getContext());
+  return wrap(b.getI64IntegerAttr(*value));
 }
 
 MlirAttribute ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts(

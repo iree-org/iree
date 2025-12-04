@@ -1886,9 +1886,10 @@ getPipelineOptions(FunctionOpInterface funcOp,
     }
     auto pipelineOptionsAttr =
         cast<GPUPipelineOptionsAttr>(maybePipelineOptionsAttr->getValue());
-    IntegerAttr prefetchNumStages = pipelineOptionsAttr.getPrefetchNumStages();
+    std::optional<int64_t> prefetchNumStages =
+        pipelineOptionsAttr.getPrefetchNumStages();
     if (prefetchNumStages) {
-      pipelineOptions.prefetchNumStages = prefetchNumStages.getInt();
+      pipelineOptions.prefetchNumStages = *prefetchNumStages;
     }
     BoolAttr noReduceBankConflicts =
         pipelineOptionsAttr.getNoReduceSharedMemoryBankConflicts();

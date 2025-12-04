@@ -1181,7 +1181,7 @@ hal.executable public @main {
   subgroup_size = 64,
   {
     gpu_pipeline_options = #iree_gpu.pipeline_options<
-      prefetch_num_stages = 2 : i64,
+      prefetch_num_stages = 2,
       no_reduce_shared_memory_bank_conflicts = false,
       use_igemm_convolution = false>
   }
@@ -1252,7 +1252,7 @@ hal.executable public @main {
   subgroup_size = 64,
   {
     gpu_pipeline_options = #iree_gpu.pipeline_options<
-      prefetch_num_stages = 2 : i64,
+      prefetch_num_stages = 2,
       no_reduce_shared_memory_bank_conflicts = false,
       use_igemm_convolution = false>
   }

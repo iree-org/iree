@@ -2299,11 +2299,11 @@ GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
         ReorderWorkgroupsStrategyAttr::get(context, *reorderWorkgroupsStrategy);
   }
   Builder b(context);
-  IntegerAttr prefetchAttr;
+  std::optional<int64_t> prefetchOpt;
   if (prefetchNumStages > 0) {
-    prefetchAttr = b.getI64IntegerAttr(prefetchNumStages);
+    prefetchOpt = prefetchNumStages;
   }
-  return Base::get(context, prefetchAttr,
+  return Base::get(context, prefetchOpt,
                    b.getBoolAttr(noReduceSharedMemoryBankConflicts),
                    b.getBoolAttr(useIgemmConvolution), strategyAttr);
 }
