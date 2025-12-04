@@ -47,7 +47,7 @@ jobs:
             sku: mi250
             target: target_hip
             runs-on: nodai-amdgpu-mi250-x86-64
-          - name: amdgpu_rocm_mi300_gfx942
+          - name: amdgpu_rocm_mi325_gfx942
             rocm-chip: gfx942
             backend: rocm
             iree_test_files: /shark-cache/data/iree-regression-cache
@@ -61,6 +61,13 @@ jobs:
             sku: mi308
             target: target_hip
             runs-on: nodai-amdgpu-mi308-x86-64
+          - name: amdgpu_rocm_mi355_gfx950
+            rocm-chip: gfx950
+            backend: rocm
+            iree_test_files: /shark-cache/data/iree-regression-cache
+            sku: mi355
+            target: target_hip
+            runs-on: linux-mi35x-1gpu-ossci-iree-org
 
     env:
       VENV_DIR: ${{ github.workspace }}/venv
