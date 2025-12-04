@@ -258,7 +258,8 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
           {/*bestSubgroupCountPerWorkgroup=*/8,
            /*bestMNTileCountPerSubgroup=*/32,
            /*bestKTileCountPerSubgroup=*/4,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
+               inBitWidth});
     }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
@@ -271,7 +272,8 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
           {/*bestSubgroupCountPerWorkgroup=*/8,
            /*bestMNTileCountPerSubgroup=*/32,
            /*bestKTileCountPerSubgroup=*/2,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
+               inBitWidth});
     }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
@@ -296,15 +298,17 @@ getConvolutionHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth) {
   case GemmSize::MediumGemm:
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/8,
-         /*bestMNTileCountPerSubgroup=*/8,
-         /*bestKTileCountPerSubgroup=*/2,
-         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
-  case GemmSize::LargeGemm:
-    return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/8,
          /*bestMNTileCountPerSubgroup=*/4,
          /*bestKTileCountPerSubgroup=*/4,
          /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
+  case GemmSize::LargeGemm:
+    // Favor more subgroups for convolution to help latency hiding from global
+    // loads.
+    return GPUMMAHeuristicSeeds(
+        {/*bestSubgroupCountPerWorkgroup=*/8,
+         /*bestMNTileCountPerSubgroup=*/8,
+         /*bestKTileCountPerSubgroup=*/2,
+         /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
   default:
     assert(false && "Unhandled convolution gemm size");
     return std::nullopt;
