@@ -22,7 +22,7 @@ util.func public @linalgext_scatter_dispatch() -> tensor<8192x16x8x128xf32> {
     linalg.yield %10 : f32
   } -> tensor<4x1x16x8x128xf32>
 
-  %8 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%7, %6 : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>) outs(%4 : tensor<8192x16x8x128xf32>) {
+  %8 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false) ins(%7, %6 : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>) outs(%4 : tensor<8192x16x8x128xf32>) {
   ^bb0(%arg0: f32, %arg1: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<8192x16x8x128xf32>

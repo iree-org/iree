@@ -303,6 +303,10 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
       if (failed(composedMap) || (newMap && composedMap != newMap)) {
         return failure();
       }
+      if (composedMap.value().getNumResults() ==
+          composedMap.value().getNumOfZeroResults()) {
+        return failure();
+      }
       newMap = composedMap.value();
     }
   } else {
@@ -338,7 +342,7 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
   }
 
   // Fail if there is no mapping or if there are no parallel loops in common.
-  if (!newMap || newMap.getNumResults() == newMap.getNumOfZeroResults()) {
+  if (!newMap) {
     return failure();
   }
   return newMap;
