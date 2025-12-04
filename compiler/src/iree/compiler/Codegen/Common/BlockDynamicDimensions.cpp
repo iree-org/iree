@@ -103,11 +103,62 @@ static std::optional<ReshapeOps>
 blockDynamicDimensionsOfValue(RewriterBase &rewriter,
                               const TensorDivisibilityInfo &divisibilityInfo,
                               Value v) {
-  llvm::SmallDenseMap<unsigned, int64_t> expansionMap;
-  for (auto [index, divisibility] : divisibilityInfo) {
-    expansionMap[index] = static_cast<int64_t>(divisibility.sdiv());
+  auto tensorType = dyn_cast<RankedTensorType>(v.getType());
+  if (!tensorType) {
+    return std::nullopt;
   }
-  return createDimensionExpansionOps(rewriter, expansionMap, v);
+
+  // Check if we know that the operands have a divisibility information.
+  SmallVector<OpFoldResult> outputShape;
+  SmallVector<ReassociationIndices> reassociation;
+  Location loc = v.getLoc();
+  SmallVector<OpFoldResult> origShape = tensor::getMixedSizes(rewriter, loc, v);
+
+  for (auto [index, dim] : llvm::enumerate(origShape)) {
+    reassociation.emplace_back(ReassociationIndices{});
+
+    // Check if this needs division.
+    if (!tensorType.isDynamicDim(index) || !divisibilityInfo.contains(index)) {
+      reassociation.back().push_back(outputShape.size());
+      outputShape.push_back(dim);
+      continue;
+    }
+
+    // Split the dynamic based on the divisibility info.
+    IREE::Util::ConstantIntDivisibility currDivisibility =
+        divisibilityInfo.lookup(index);
+    uint64_t factor = currDivisibility.sdiv();
+    AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
+    AffineExpr divExpr = s0.floorDiv(factor);
+    OpFoldResult newDynamicDim = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, divExpr, ArrayRef<OpFoldResult>{dim});
+    OpFoldResult newStaticDim = rewriter.getIndexAttr(factor);
+
+    reassociation.back().push_back(outputShape.size());
+    reassociation.back().push_back(outputShape.size() + 1);
+
+    outputShape.push_back(newDynamicDim);
+    outputShape.push_back(newStaticDim);
+  }
+
+  auto staticOutputShape =
+      llvm::map_to_vector(outputShape, [](OpFoldResult ofr) {
+        if (auto staticShapeAttr = dyn_cast<Attribute>(ofr)) {
+          return cast<IntegerAttr>(staticShapeAttr).getInt();
+        }
+        return ShapedType::kDynamic;
+      });
+  auto outputType = RankedTensorType::get(
+      staticOutputShape, tensorType.getElementType(), tensorType.getEncoding());
+
+  auto expandShapeOp = tensor::ExpandShapeOp::create(
+      rewriter, loc, outputType, v, reassociation, outputShape);
+  Value barrier = IREE::Util::OptimizationBarrierOp::create(
+                      rewriter, loc, expandShapeOp.getResult())
+                      .getResult(0);
+  auto collapseShapeOp = tensor::CollapseShapeOp::create(
+      rewriter, loc, tensorType, barrier, reassociation);
+  return ReshapeOps{expandShapeOp, collapseShapeOp};
 }
 
 //===---------------------------------------------------------------------===//

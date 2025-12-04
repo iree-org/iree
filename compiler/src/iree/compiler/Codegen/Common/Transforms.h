@@ -218,30 +218,8 @@ struct ReshapeOps {
   tensor::CollapseShapeOp collapseShapeOp;
 };
 
-/// For a `v` if the dimension is known to be multiple of a compile-time static
-/// value, insert
-///
-/// ```mlir
-/// %v_expand = tensor.expand_shape %v
-/// %barrier = util.optimization.barrier %v
-/// %v_collapse = tensor.collapse_shape %barrier
-/// ```
-///
-/// where the generated `tensor.expand_shape` and `tensor.collapse_shape` are
-/// inverses of each other. The `util.optimization.barrier` avoid these from
-/// getting folded away during reshape propagation. Return the result of the
-/// `tensor.collapse_shape generated.
-std::optional<ReshapeOps> createDimensionExpansionOps(
-    RewriterBase &rewriter,
-    const llvm::SmallDenseMap<unsigned, int64_t> &expansionMap, Value v);
-
 /// Populate patterns to remove optimization barriers.
 void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns);
-
-/// Populate common patterns for reshape propagation used in dimension
-/// expansion passes.
-void populateReshapePropagationPatterns(
-    RewritePatternSet &patterns, linalg::ControlFusionFn controlFn = nullptr);
 
 } // namespace mlir::iree_compiler
 

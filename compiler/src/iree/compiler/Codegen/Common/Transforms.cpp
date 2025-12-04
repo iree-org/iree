@@ -750,84 +750,8 @@ struct RemoveOptimizationBarrier final
 
 } // namespace
 
-std::optional<ReshapeOps> createDimensionExpansionOps(
-    RewriterBase &rewriter,
-    const llvm::SmallDenseMap<unsigned, int64_t> &expansionMap, Value v) {
-  auto tensorType = dyn_cast<RankedTensorType>(v.getType());
-  if (!tensorType) {
-    return std::nullopt;
-  }
-
-  SmallVector<OpFoldResult> outputShape;
-  SmallVector<ReassociationIndices> reassociation;
-  Location loc = v.getLoc();
-  SmallVector<OpFoldResult> origShape = tensor::getMixedSizes(rewriter, loc, v);
-
-  for (auto [index, dim] : llvm::enumerate(origShape)) {
-    reassociation.emplace_back(ReassociationIndices{});
-
-    if (!expansionMap.contains(index)) {
-      reassociation.back().push_back(outputShape.size());
-      outputShape.push_back(dim);
-      continue;
-    }
-
-    int64_t factor = expansionMap.lookup(index);
-    AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
-    AffineExpr divExpr = s0.floorDiv(factor);
-    OpFoldResult newOuterDim = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, divExpr, ArrayRef<OpFoldResult>{dim});
-    OpFoldResult newInnerDim = rewriter.getIndexAttr(factor);
-
-    reassociation.back().push_back(outputShape.size());
-    reassociation.back().push_back(outputShape.size() + 1);
-
-    outputShape.push_back(newOuterDim);
-    outputShape.push_back(newInnerDim);
-  }
-
-  auto staticOutputShape =
-      llvm::map_to_vector(outputShape, [](OpFoldResult ofr) {
-        if (auto staticShapeAttr = dyn_cast<Attribute>(ofr)) {
-          return cast<IntegerAttr>(staticShapeAttr).getInt();
-        }
-        return ShapedType::kDynamic;
-      });
-  auto outputType = RankedTensorType::get(
-      staticOutputShape, tensorType.getElementType(), tensorType.getEncoding());
-
-  auto expandShapeOp = tensor::ExpandShapeOp::create(
-      rewriter, loc, outputType, v, reassociation, outputShape);
-  Value barrier = IREE::Util::OptimizationBarrierOp::create(
-                      rewriter, loc, expandShapeOp.getResult())
-                      .getResult(0);
-  auto collapseShapeOp = tensor::CollapseShapeOp::create(
-      rewriter, loc, tensorType, barrier, reassociation);
-  return ReshapeOps{expandShapeOp, collapseShapeOp};
-}
-
 void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveOptimizationBarrier>(patterns.getContext());
-}
-
-void populateReshapePropagationPatterns(RewritePatternSet &patterns,
-                                        linalg::ControlFusionFn controlFn) {
-  if (!controlFn) {
-    controlFn = [](OpOperand *opOperand) {
-      return !isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(
-          opOperand->get().getDefiningOp());
-    };
-  }
-  linalg::populateFoldReshapeOpsByExpansionPatterns(patterns, controlFn);
-  IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(patterns,
-                                                             controlFn);
-  populateReshapeToInterfaceTensorPatterns(patterns);
-  populateCombineRelayoutOpPatterns(patterns);
-  populateFoldTensorReshapeIntoBufferPatterns(patterns);
-  tensor::populateFoldTensorEmptyPatterns(patterns);
-  tensor::populateBubbleUpExpandShapePatterns(patterns);
-  linalg::FillOp::getCanonicalizationPatterns(patterns, patterns.getContext());
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
 }
 
 } // namespace mlir::iree_compiler

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -170,7 +171,7 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     }
     if (reshapes->has_value()) {
       rewriter.modifyOpInPlace(
-          op, [&]() { operand.set((*reshapes)->collapseShapeOp); });
+          op, [&]() { operand.set(reshapes->value().collapseShapeOp); });
     }
   }
 
@@ -217,7 +218,17 @@ void GPUExpandDimensionsPass::runOnOperation() {
       return !isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(
           opOperand->get().getDefiningOp());
     };
-    populateReshapePropagationPatterns(bubbleExpandShapePatterns, controlFn);
+    linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns, controlFn);
+    IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
+                                                               controlFn);
+    populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
+    populateCombineRelayoutOpPatterns(bubbleExpandShapePatterns);
+    populateFoldTensorReshapeIntoBufferPatterns(bubbleExpandShapePatterns);
+    tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+    tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
+    linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                                bubbleExpandShapePatterns.getContext());
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(bubbleExpandShapePatterns);
     if (failed(applyPatternsGreedily(
             operation, std::move(bubbleExpandShapePatterns), config))) {
       operation->emitOpError(
