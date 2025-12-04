@@ -12,7 +12,7 @@ on:
 
 jobs:
   windows_x64_msvc:
-    runs-on: azure-windows-scale
+    runs-on: azure-windows-scale-test
     env:
       BASE_BUILD_DIR_POWERSHELL: B:\tmpbuild
       SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
