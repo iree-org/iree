@@ -319,13 +319,11 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
     } else {
       // Fallback: use offset 0 if init is not from an extract_slice
       auto initType = cast<ShapedType>(coalescedGather.getInit().getType());
-      for (int64_t i = 0; i < initType.getRank(); ++i) {
-        destIndices.push_back(rewriter.getIndexAttr(0));
-      }
-      for (int64_t dim : initType.getShape()) {
-        sizes.push_back(rewriter.getIndexAttr(dim));
-      }
-      strides.assign(initType.getRank(), rewriter.getIndexAttr(1));
+      int64_t rank = initType.getRank();
+      destIndices.assign(rank, rewriter.getIndexAttr(0));
+      sizes =
+          getAsIndexOpFoldResult(rewriter.getContext(), initType.getShape());
+      strides.assign(rank, rewriter.getIndexAttr(1));
     }
 
     // Get the destination tensor from the loop's iter_args

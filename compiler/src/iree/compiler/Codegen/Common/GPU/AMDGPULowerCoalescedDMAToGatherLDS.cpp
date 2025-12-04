@@ -149,6 +149,8 @@ struct LowerCoalescedGatherDMAPattern final
 
     ArrayRef<int64_t> sourceShape = sourceType.getShape();
     LDBG() << "Source rank: " << sourceShape.size();
+
+    // TODO: Support more general cases such as 1-d.
     if (sourceShape.size() < 2) {
       return rewriter.notifyMatchFailure(
           dmaOp, "source must have at least 2 dimensions");

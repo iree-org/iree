@@ -521,7 +521,7 @@ private:
     // Skip coalesced DMA if the innermost dimension is smaller than subgroup
     // size. Coalesced DMA requires at least one element per lane.
     int64_t innermostDim = shape[rank - 1];
-    if (!ShapedType::isDynamic(innermostDim) && innermostDim < *subgroupSize) {
+    if (ShapedType::isStatic(innermostDim) && innermostDim < *subgroupSize) {
       return failure();
     }
 
@@ -540,7 +540,7 @@ private:
       // For innermost dimension: always tile if we need thread-level
       // distribution, ensuring tile size is at least subgroup_size (but not
       // exceeding the dimension size).
-      if (isInnermostDim && !ShapedType::isDynamic(shape[i])) {
+      if (isInnermostDim && ShapedType::isStatic(shape[i])) {
         int64_t tileSize =
             (warpDim > 1) ? llvm::divideCeil(shape[i], warpDim) : shape[i];
         // Ensure tile size is at least subgroup_size, but cap at dimension
@@ -548,7 +548,7 @@ private:
         tileSize = std::clamp(tileSize, *subgroupSize, shape[i]);
         tileSizes.push_back(rewriter.getIndexAttr(tileSize));
         ++numTiledDims;
-      } else if (warpDim > 1 && !ShapedType::isDynamic(shape[i])) {
+      } else if (warpDim > 1 && ShapedType::isStatic(shape[i])) {
         // For other dimensions: only tile if warpDim > 1.
         int64_t tileSize = llvm::divideCeil(shape[i], warpDim);
         tileSizes.push_back(rewriter.getIndexAttr(tileSize));
