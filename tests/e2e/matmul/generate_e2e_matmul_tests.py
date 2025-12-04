@@ -18,7 +18,7 @@ from tests.e2e.matmul.generate_code import *
 
 # Returns the list of TestShape's to use for the collection of shapes
 # identified by shapes_id.
-def get_test_shapes(shapes_id: ShapesId, acc: bool):
+def get_test_shapes(shapes_id: ShapesId, no_accumulator_arg=False):
     # Notes:
     # 1. Be conservative in adding more shapes, as that can increase both the
     #    build and execution latency of tests. The build latency is nearly the
@@ -92,7 +92,12 @@ def get_test_shapes(shapes_id: ShapesId, acc: bool):
         if ShapesId.custom_mnk_values is None:
             raise ValueError("Custom MNK values not set. Use --mnk=m,n,k")
         m, n, k = ShapesId.custom_mnk_values
-        return [TestShape(m=m, k=k, n=n, accumulate=acc)]
+        if no_accumulator_arg:
+            return [TestShape(m=m, k=k, n=n, accumulate=False)]
+        return [
+            TestShape(m=m, k=k, n=n, accumulate=True),
+            TestShape(m=m, k=k, n=n, accumulate=False),
+        ]
 
     raise ValueError(shapes_id)
 
@@ -106,7 +111,7 @@ def generate(
     shapes_id: ShapesId,
     transpose_rhs: bool,
     compilation_info_id: CompilationInfoId,
-    acc: bool,
+    no_accumulator_arg: bool,
 ):
     functions = {}
     calls = []
@@ -114,7 +119,7 @@ def generate(
     for compilation_info in get_test_compilation_infos(
         compilation_info_id, lhs_rhs_type
     ):
-        for shape in get_test_shapes(shapes_id, acc):
+        for shape in get_test_shapes(shapes_id, no_accumulator_arg):
             for dynamicities in get_dynamicities(shapes_id):
                 function = generate_function(
                     lhs_rhs_type=lhs_rhs_type,
@@ -250,9 +255,9 @@ def parse_arguments():
         required=False,
     )
     parser.add_argument(
-        "--acc",
+        "--no_accumulator_arg",
         action="store_true",
-        help="Customize whether to add an accumulator argument to the function",
+        help="Do not add an accumulator argument to the function, useful for extremely large shapes that may cause memory issues",
         default=False,
         required=False,
     )
@@ -316,7 +321,7 @@ def main(args):
         shapes_id=shapes_id,
         transpose_rhs=args.transpose_rhs,
         compilation_info_id=CompilationInfoId(args.compilation_info),
-        acc=args.acc,
+        no_accumulator_arg=args.no_accumulator_arg,
     )
 
     write_code_file(functions, args.output_matmul_mlir)

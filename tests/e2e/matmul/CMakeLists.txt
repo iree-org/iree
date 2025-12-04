@@ -2013,6 +2013,7 @@ iree_generated_e2e_runner_test(
     "--mnk=10000,1024,16384"
     "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
+    "--no_accumulator_arg"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -2045,6 +2046,7 @@ iree_generated_e2e_runner_test(
     "--mnk=10000,16384,16384"
     "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
+    "--no_accumulator_arg"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -2077,6 +2079,7 @@ iree_generated_e2e_runner_test(
     "--mnk=10000,53248,16384"
     "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
+    "--no_accumulator_arg"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -2109,6 +2112,7 @@ iree_generated_e2e_runner_test(
     "--mnk=10000,53248,53248"
     "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
+    "--no_accumulator_arg"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
