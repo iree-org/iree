@@ -108,11 +108,11 @@ def GenericOp : PCF_Op<"generic", [
   }];
   let description = [{
     Executes a region across a set of workers at a specified scope. When
-    control flow reaches this op, workers with count equal to the native
-    parallelism of the scope are spawned and begin executing the region. The
-    scope is given by an attribute implementing the `ScopeAttr` interface and
-    is responsible for the semantics of all pcf primitives at the same scope.
-    Further details about scopes are included in the docs for the interface.
+    control flow reaches this op, `nproc` workers of the specified scope are
+    spawned and begin executing the region. The scope is given by an attribute
+    implementing the `ScopeAttr` interface and is responsible for the semantics
+    of all pcf primitives at the same scope. Further details about scopes are
+    included in the docs for the interface.
 
     The optional `initialize` region is executed once when control flow first
     reaches the op. Values yielded from the initializer become block arguments
@@ -132,7 +132,7 @@ def GenericOp : PCF_Op<"generic", [
       %1 = pcf.generic scope(#foo.scope)
         execute(%ref = %0)[%id: index, %num_workers: index]
              : (!pcf.sref<4x8xf32, #foo.scope>) -> (tensor<4x8xf32>) {
-        // Each worker can read/write %ref
+        // Each worker can read/write %ref.
         pcf.return
       }
     ```
@@ -146,7 +146,7 @@ def GenericOp : PCF_Op<"generic", [
         } -> (%scratch_arg: !pcf.sref<16xf32, #foo.scope>)
         execute(%ref = %init)[%id: index, %num_workers: index]
              : (!pcf.sref<4x8xf32, #foo.scope>) -> (tensor<4x8xf32>) {
-        // %scratch_arg is available here, initialized once
+        // %scratch_arg is available here, initialized once.
         pcf.return
       }
     ```
@@ -157,7 +157,7 @@ def GenericOp : PCF_Op<"generic", [
       %result = pcf.generic scope(#foo.scope)
         execute[%id: index, %num_workers: index]
              : () -> (tensor<?x?xf32>{%d0, %d1}) {
-        // Result sref is allocated by the op, not tied to any init
+        // Result sref is allocated by the op, not tied to any init.
         pcf.return
       }
     ```
@@ -356,7 +356,7 @@ def LoopOp : PCF_Op<"loop", [
       %1 = pcf.loop scope(#foo.scope) count(%n)
         execute(%ref = %0)[%id: index]
              : (!pcf.sref<4x8xf32, #foo.scope>) -> (tensor<4x8xf32>) {
-        // %id ranges from 0 to %n-1
+        // %id ranges from 0 to %n-1.
         pcf.return
       }
     ```
@@ -367,7 +367,7 @@ def LoopOp : PCF_Op<"loop", [
       %result = pcf.loop scope(#foo.scope) count(%m, %n)
         execute(%ref = %init)[%i: index, %j: index]
              : (!pcf.sref<?x?xf32, #foo.scope>) -> (tensor<?x?xf32>) {
-        // %i ranges from 0 to %m-1, %j ranges from 0 to %n-1
+        // %i ranges from 0 to %m-1, %j ranges from 0 to %n-1.
         pcf.return
       }
     ```
@@ -581,13 +581,13 @@ let opDocGroup = OpGroupWriteOps in {
                                AllElementTypesMatch<["source", "dest"]>,
   ]> {
     let summary = [{
-    Submit a write of a tensor, vector, or memref to a slice of a `pcf.shaped_ref`.
+    Submit a write of a tensor, vector, or memref to a slice of a `pcf.sref`.
   }];
     let description = [{
     The `pcf.write_slice` operation supports the following arguments:
 
     * source: the shaped value that is written.
-    * dest: the shaped_ref into which the source is written.
+    * dest: the sref into which the source is written.
     * offsets: shaped-rank number of offsets into the `dest` into which
                the slice is inserted.
     * sizes: shaped-rank number of sizes which specify the sizes of the source
@@ -683,7 +683,7 @@ def PCF_ReadSliceOp : PCF_Op<"read_slice", [
 
     The `pcf.read_slice` operation supports the following arguments:
     * source: the shaped value that is written.
-    * dest: the shaped_ref into which the source is written.
+    * dest: the sref into which the source is written.
     * offsets: shaped-rank number of offsets into the `dest` into which
                the slice is inserted.
     * sizes: shaped-rank number of sizes which specify the sizes of the source
@@ -764,18 +764,18 @@ def PCF_GetMemrefOp : PCF_Op<"get_memref", [
        AllElementTypesMatch<["source", "result"]>,
   ]> {
   let summary = [{
-    Extract a memref view from a slice of a `pcf.shaped_ref`.
+    Extract a memref view from a slice of a `pcf.sref`.
   }];
   let description = [{
     The `pcf.get_memref` operation extracts a memref view from a slice of a
-    shaped_ref, breaking the synchronization guarantees of the source.
+    sref, breaking the synchronization guarantees of the source.
 
     The returned memref must have a maximally dynamic layout (all strides and
     offset dynamic) and no memory space. Layout and memory space information
     is determined by the ConvertSRefToMemRef analysis pass.
 
     The operation supports the following arguments:
-    * source: the shaped_ref from which to extract a view.
+    * source: the sref from which to extract a view.
     * offsets: shaped-rank number of offsets into the `source` from which
                the slice begins.
     * sizes: shaped-rank number of sizes which specify the sizes of the result

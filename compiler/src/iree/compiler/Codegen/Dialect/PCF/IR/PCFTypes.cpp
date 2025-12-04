@@ -23,48 +23,48 @@ Type ShapedRefType::parse(AsmParser &parser) {
     return {};
   }
 
-  llvm::SmallVector<int64_t> shape;
-  mlir::Type elementType;
+  SmallVector<int64_t> shape;
+  Type elementType;
   Attribute scope;
 
-  auto shapeLoc = parser.getCurrentLocation();
-  if (mlir::failed(parser.parseDimensionList(shape))) {
+  SMLoc shapeLoc = parser.getCurrentLocation();
+  if (failed(parser.parseDimensionList(shape))) {
     parser.emitError(shapeLoc, "failed to parse parameter 'shape'");
     return {};
   }
 
-  auto elemTypeLoc = parser.getCurrentLocation();
-  if (mlir::failed(parser.parseType(elementType))) {
+  SMLoc elemTypeLoc = parser.getCurrentLocation();
+  if (failed(parser.parseType(elementType))) {
     parser.emitError(elemTypeLoc, "failed to parse parameter 'elementType'");
     return {};
   }
 
-  auto commaLoc = parser.getCurrentLocation();
-  if (mlir::failed(parser.parseComma())) {
+  SMLoc commaLoc = parser.getCurrentLocation();
+  if (failed(parser.parseComma())) {
     parser.emitError(commaLoc, "expected comma after 'elementType'");
     return {};
   }
 
   Attribute syncScope;
-  if (mlir::succeeded(parser.parseOptionalKeyword("sync"))) {
-    if (mlir::failed(parser.parseLParen())) {
+  if (succeeded(parser.parseOptionalKeyword("sync"))) {
+    if (failed(parser.parseLParen())) {
       return {};
     }
 
-    auto scopeLoc = parser.getCurrentLocation();
-    if (mlir::failed(parser.parseAttribute(scope))) {
+    SMLoc scopeLoc = parser.getCurrentLocation();
+    if (failed(parser.parseAttribute(scope))) {
       parser.emitError(scopeLoc, "failed to parse parameter 'scope'");
       return {};
     }
 
     // Special parsing for SyncOnParentAttr sync scope.
     syncScope = SyncOnParentAttr::get(parser.getContext());
-    if (mlir::failed(parser.parseRParen())) {
+    if (failed(parser.parseRParen())) {
       return {};
     }
   } else {
-    auto scopeLoc = parser.getCurrentLocation();
-    if (mlir::failed(parser.parseAttribute(scope))) {
+    SMLoc scopeLoc = parser.getCurrentLocation();
+    if (failed(parser.parseAttribute(scope))) {
       parser.emitError(scopeLoc, "failed to parse parameter 'scope'");
       return {};
     }
@@ -75,8 +75,8 @@ Type ShapedRefType::parse(AsmParser &parser) {
       return {};
     }
 
-    if (mlir::succeeded(parser.parseOptionalComma())) {
-      auto syncLoc = parser.getCurrentLocation();
+    if (succeeded(parser.parseOptionalComma())) {
+      SMLoc syncLoc = parser.getCurrentLocation();
       if (failed(parser.parseAttribute(syncScope))) {
         parser.emitError(syncLoc, "failed to parse parameter 'sync_scope'");
         return {};
@@ -96,9 +96,9 @@ Type ShapedRefType::parse(AsmParser &parser) {
 void ShapedRefType::print(AsmPrinter &printer) const {
   printer << "<";
 
-  auto shape = getShape();
+  ArrayRef<int64_t> shape = getShape();
   for (int64_t dim : shape) {
-    if (mlir::ShapedType::isDynamic(dim))
+    if (ShapedType::isDynamic(dim))
       printer << '?';
     else
       printer << dim;

@@ -573,7 +573,7 @@ void LoopOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
 
   // Thread count args.
   Type indexType = b.getIndexType();
-  int64_t numCountArgs = count.size() == 0 ? 1 : count.size();
+  int64_t numCountArgs = count.empty() ? 1 : count.size();
   for (int64_t i = 0; i < numCountArgs; ++i) {
     entryBlock.addArgument(indexType, result.location);
   }
@@ -659,12 +659,12 @@ void WriteSliceOp::build(OpBuilder &b, OperationState &result, Value source,
 void WriteSliceOp::build(OpBuilder &b, OperationState &result, Value source,
                          Value dest, ValueRange offsets, ValueRange sizes,
                          ValueRange strides, ArrayRef<NamedAttribute> attrs) {
-  SmallVector<OpFoldResult> offsetValues = llvm::to_vector<4>(
-      llvm::map_range(offsets, [](Value v) -> OpFoldResult { return v; }));
-  SmallVector<OpFoldResult> sizeValues = llvm::to_vector<4>(
-      llvm::map_range(sizes, [](Value v) -> OpFoldResult { return v; }));
-  SmallVector<OpFoldResult> strideValues = llvm::to_vector<4>(
-      llvm::map_range(strides, [](Value v) -> OpFoldResult { return v; }));
+  auto offsetValues =
+      llvm::map_to_vector(offsets, [](Value v) -> OpFoldResult { return v; });
+  auto sizeValues =
+      llvm::map_to_vector(sizes, [](Value v) -> OpFoldResult { return v; });
+  auto strideValues =
+      llvm::map_to_vector(strides, [](Value v) -> OpFoldResult { return v; });
   build(b, result, source, dest, offsetValues, sizeValues, strideValues);
 }
 
@@ -699,12 +699,12 @@ void ReadSliceOp::build(OpBuilder &b, OperationState &result, Type resultType,
 void ReadSliceOp::build(OpBuilder &b, OperationState &result, Type resultType,
                         Value source, ValueRange offsets, ValueRange sizes,
                         ValueRange strides, ArrayRef<NamedAttribute> attrs) {
-  SmallVector<OpFoldResult> offsetValues = llvm::to_vector<4>(
-      llvm::map_range(offsets, [](Value v) -> OpFoldResult { return v; }));
-  SmallVector<OpFoldResult> sizeValues = llvm::to_vector<4>(
-      llvm::map_range(sizes, [](Value v) -> OpFoldResult { return v; }));
-  SmallVector<OpFoldResult> strideValues = llvm::to_vector<4>(
-      llvm::map_range(strides, [](Value v) -> OpFoldResult { return v; }));
+  auto offsetValues =
+      llvm::map_to_vector(offsets, [](Value v) -> OpFoldResult { return v; });
+  auto sizeValues =
+      llvm::map_to_vector(sizes, [](Value v) -> OpFoldResult { return v; });
+  auto strideValues =
+      llvm::map_to_vector(strides, [](Value v) -> OpFoldResult { return v; });
   build(b, result, resultType, source, offsetValues, sizeValues, strideValues);
 }
 
@@ -739,12 +739,12 @@ void GetMemrefOp::build(OpBuilder &b, OperationState &result, Type resultType,
 void GetMemrefOp::build(OpBuilder &b, OperationState &result, Type resultType,
                         Value source, ValueRange offsets, ValueRange sizes,
                         ValueRange strides, ArrayRef<NamedAttribute> attrs) {
-  SmallVector<OpFoldResult> offsetValues = llvm::to_vector<4>(
-      llvm::map_range(offsets, [](Value v) -> OpFoldResult { return v; }));
-  SmallVector<OpFoldResult> sizeValues = llvm::to_vector<4>(
-      llvm::map_range(sizes, [](Value v) -> OpFoldResult { return v; }));
-  SmallVector<OpFoldResult> strideValues = llvm::to_vector<4>(
-      llvm::map_range(strides, [](Value v) -> OpFoldResult { return v; }));
+  auto offsetValues =
+      llvm::map_to_vector(offsets, [](Value v) -> OpFoldResult { return v; });
+  auto sizeValues =
+      llvm::map_to_vector(sizes, [](Value v) -> OpFoldResult { return v; });
+  auto strideValues =
+      llvm::map_to_vector(strides, [](Value v) -> OpFoldResult { return v; });
   build(b, result, resultType, source, offsetValues, sizeValues, strideValues);
 }
 
@@ -761,10 +761,9 @@ LogicalResult WriteSliceOp::fold(FoldAdaptor adaptor,
   SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
 
   // Try to fold dynamic offsets to static.
-  for (auto &offset : mixedOffsets) {
-    if (auto value = dyn_cast<Value>(offset)) {
-      std::optional<int64_t> constantValue = getConstantIntValue(value);
-      if (constantValue.has_value()) {
+  for (OpFoldResult &offset : mixedOffsets) {
+    if (Value value = dyn_cast<Value>(offset)) {
+      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
         offset = builder.getI64IntegerAttr(*constantValue);
         changed = true;
       }
@@ -772,10 +771,9 @@ LogicalResult WriteSliceOp::fold(FoldAdaptor adaptor,
   }
 
   // Try to fold dynamic strides to static.
-  for (auto &stride : mixedStrides) {
-    if (auto value = dyn_cast<Value>(stride)) {
-      std::optional<int64_t> constantValue = getConstantIntValue(value);
-      if (constantValue.has_value()) {
+  for (OpFoldResult &stride : mixedStrides) {
+    if (Value value = dyn_cast<Value>(stride)) {
+      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
         stride = builder.getI64IntegerAttr(*constantValue);
         changed = true;
       }
@@ -809,10 +807,9 @@ OpFoldResult ReadSliceOp::fold(FoldAdaptor adaptor) {
   SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
 
   // Try to fold dynamic offsets to static.
-  for (auto &offset : mixedOffsets) {
-    if (auto value = dyn_cast<Value>(offset)) {
-      std::optional<int64_t> constantValue = getConstantIntValue(value);
-      if (constantValue.has_value()) {
+  for (OpFoldResult &offset : mixedOffsets) {
+    if (Value value = dyn_cast<Value>(offset)) {
+      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
         offset = builder.getI64IntegerAttr(*constantValue);
         changed = true;
       }
@@ -820,10 +817,9 @@ OpFoldResult ReadSliceOp::fold(FoldAdaptor adaptor) {
   }
 
   // Try to fold dynamic strides to static.
-  for (auto &stride : mixedStrides) {
-    if (auto value = dyn_cast<Value>(stride)) {
-      std::optional<int64_t> constantValue = getConstantIntValue(value);
-      if (constantValue.has_value()) {
+  for (OpFoldResult &stride : mixedStrides) {
+    if (Value value = dyn_cast<Value>(stride)) {
+      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
         stride = builder.getI64IntegerAttr(*constantValue);
         changed = true;
       }
@@ -857,10 +853,9 @@ OpFoldResult GetMemrefOp::fold(FoldAdaptor adaptor) {
   SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
 
   // Try to fold dynamic offsets to static.
-  for (auto &offset : mixedOffsets) {
-    if (auto value = dyn_cast<Value>(offset)) {
-      std::optional<int64_t> constantValue = getConstantIntValue(value);
-      if (constantValue.has_value()) {
+  for (OpFoldResult &offset : mixedOffsets) {
+    if (Value value = dyn_cast<Value>(offset)) {
+      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
         offset = builder.getI64IntegerAttr(*constantValue);
         changed = true;
       }
@@ -868,10 +863,9 @@ OpFoldResult GetMemrefOp::fold(FoldAdaptor adaptor) {
   }
 
   // Try to fold dynamic strides to static.
-  for (auto &stride : mixedStrides) {
-    if (auto value = dyn_cast<Value>(stride)) {
-      std::optional<int64_t> constantValue = getConstantIntValue(value);
-      if (constantValue.has_value()) {
+  for (OpFoldResult &stride : mixedStrides) {
+    if (Value value = dyn_cast<Value>(stride)) {
+      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
         stride = builder.getI64IntegerAttr(*constantValue);
         changed = true;
       }
