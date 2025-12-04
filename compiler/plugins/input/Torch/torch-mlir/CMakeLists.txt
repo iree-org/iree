@@ -8,11 +8,13 @@
 # TODO(#3299): migrate to from member x.cast<T>() to mlir::cast<T>(x)
 # And this is just a copy of what we currently have in torch-mlir upstream.
 if(MSVC)
+  # MSVC: C4996 is the deprecation warning.
   add_compile_options(/wd4996)
 else()
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     add_compile_options(-Wno-error=parentheses)
   endif()
+  # GCC/Clang: Use standard deprecation warning flag.
   add_compile_options(-Wno-deprecated-declarations)
 endif()
 

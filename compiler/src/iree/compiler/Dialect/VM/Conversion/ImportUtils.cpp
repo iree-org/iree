@@ -112,11 +112,11 @@ Value castToImportType(Value value, Type targetType, OpBuilder &builder) {
   auto sourceType = value.getType();
   if (sourceType == targetType)
     return value;
-  bool sourceIsInteger = llvm::isa<IntegerType>(sourceType);
+  bool sourceIsInteger = isa<IntegerType>(sourceType);
 
   // Allow bitcast between same width float/int types. This is used for
   // marshalling to "untyped" VM interfaces, which will have an integer type.
-  if (llvm::isa<FloatType>(sourceType) && llvm::isa<IntegerType>(targetType) &&
+  if (isa<FloatType>(sourceType) && isa<IntegerType>(targetType) &&
       sourceType.getIntOrFloatBitWidth() ==
           targetType.getIntOrFloatBitWidth()) {
     return mlir::arith::BitcastOp::create(builder, value.getLoc(), targetType,
@@ -159,7 +159,7 @@ void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp) {
 namespace detail {
 
 size_t getSegmentSpanSize(Type spanType) {
-  if (auto tupleType = llvm::dyn_cast<TupleType>(spanType)) {
+  if (auto tupleType = dyn_cast<TupleType>(spanType)) {
     return tupleType.size();
   } else {
     return 1;
@@ -170,7 +170,7 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
                                                         Attribute attrValue,
                                                         Type inputType,
                                                         OpBuilder &builder) {
-  if (auto intAttr = llvm::dyn_cast<IntegerAttr>(attrValue)) {
+  if (auto intAttr = dyn_cast<IntegerAttr>(attrValue)) {
     // NOTE: we intentionally go to std.constant ops so that the standard
     // conversions can do their job. If we want to remove the dependency
     // from standard ops in the future we could instead go directly to
@@ -180,16 +180,15 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
         IntegerAttr::get(inputType, APInt(inputType.getIntOrFloatBitWidth(),
                                           intAttr.getValue().getSExtValue())));
     return {{constValue}};
-  } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attrValue)) {
+  } else if (auto floatAttr = dyn_cast<FloatAttr>(attrValue)) {
     bool lossy = false;
     APFloat value = floatAttr.getValue();
-    value.convert(llvm::cast<FloatType>(inputType).getFloatSemantics(),
+    value.convert(cast<FloatType>(inputType).getFloatSemantics(),
                   llvm::RoundingMode::NearestTiesToEven, &lossy);
     auto constValue = mlir::arith::ConstantOp::create(
         builder, loc, inputType, FloatAttr::get(inputType, value));
     return {{constValue}};
-  } else if (auto elementsAttr =
-                 llvm::dyn_cast<DenseIntElementsAttr>(attrValue)) {
+  } else if (auto elementsAttr = dyn_cast<DenseIntElementsAttr>(attrValue)) {
     SmallVector<Value> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
@@ -198,7 +197,7 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
           cast<TypedAttr>(intAttr)));
     }
     return elementValues;
-  } else if (auto arrayAttr = llvm::dyn_cast<ArrayAttr>(attrValue)) {
+  } else if (auto arrayAttr = dyn_cast<ArrayAttr>(attrValue)) {
     SmallVector<Value> allValues;
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
@@ -208,7 +207,7 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
       allValues.append(flattenedValues->begin(), flattenedValues->end());
     }
     return allValues;
-  } else if (auto strAttr = llvm::dyn_cast<StringAttr>(attrValue)) {
+  } else if (auto strAttr = dyn_cast<StringAttr>(attrValue)) {
     return {{IREE::VM::RodataInlineOp::create(builder, loc, strAttr)}};
   }
 
@@ -220,7 +219,7 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
   if (conversionInterface) {
     bool anyFailed = false;
     SmallVector<Value> allValues;
-    if (auto tupleType = llvm::dyn_cast<TupleType>(inputType)) {
+    if (auto tupleType = dyn_cast<TupleType>(inputType)) {
       // Custom dialect type maps into a tuple; we expect 1:1 tuple elements to
       // attribute storage elements.
       auto tupleTypes = llvm::to_vector(tupleType.getTypes());

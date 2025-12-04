@@ -20,7 +20,11 @@ EXPORTS
   ireeGPUGetSingleSubgroupLayout
   ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
+  ireeCodegenInferScaledContractionDimensions
   ireeCodegenMlirOperationIsACodegenAttentionOp
+  ireeCodegenMlirOperationIsAScaledContractionOp
+  ireeCodegenHasIGEMMGenericConvDetails
+  ireeCodegenGetIGEMMGenericConvDetails
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
   ireeCodegenTranslationInfoAttrGetTypeID

@@ -85,10 +85,10 @@ public:
         return WalkResult::advance();
       }
 
-      auto strategy = dyn_cast_or_null<transform::NamedSequenceOp>(
+      auto strategy = dyn_cast_if_present<transform::NamedSequenceOp>(
           SymbolTable::lookupSymbolIn(symbolTableOp, *maybeSymName));
       if (!strategy && parsedLibrary) {
-        strategy = dyn_cast_or_null<transform::NamedSequenceOp>(
+        strategy = dyn_cast_if_present<transform::NamedSequenceOp>(
             SymbolTable::lookupSymbolIn(parsedLibrary->getOperation(),
                                         *maybeSymName));
       }

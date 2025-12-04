@@ -354,7 +354,7 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
-  if (auto defaultConfig = llvm::dyn_cast<LoweringConfigAttr>(loweringConfig)) {
+  if (auto defaultConfig = dyn_cast<LoweringConfigAttr>(loweringConfig)) {
     if (failed(LoweringConfigAttr::verify(emitError,
                                           defaultConfig.getTilingLevels()))) {
       return emitError() << "invalid lowering config: " << defaultConfig;
@@ -416,7 +416,7 @@ LogicalResult WorkgroupMappingAttr::verifyAttrList(MLIRContext *context,
   auto emitError = mlir::detail::getDefaultDiagnosticEmitFn(loc);
   for (auto attr : attrs) {
     auto typedAttr =
-        ::mlir::dyn_cast_or_null<IREE::Codegen::WorkgroupMappingAttr>(attr);
+        dyn_cast_if_present<IREE::Codegen::WorkgroupMappingAttr>(attr);
     if (!typedAttr) {
       return emitError() << "expected all the mapping attribute to be of "
                             "`WorkgroupMappingAttr` type";

@@ -47,11 +47,6 @@ namespace {
 static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
                                    ValueRange encodingDims,
                                    PatternRewriter &rewriter) {
-  if (llvm::isa_and_nonnull<IREE::Encoding::PackedStorageAttr>(
-          encodingType.getEncoding())) {
-    return success();
-  }
-
   auto serializableEncoding = IREE::Encoding::getSerializableAttr(encodingType);
   if (serializableEncoding && !serializableEncoding.isSerialized()) {
     return rewriter.notifyMatchFailure(op, [=](Diagnostic &d) {
@@ -205,7 +200,7 @@ struct EncodeTensorImportOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorImportOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
+    auto resultType = cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -228,7 +223,7 @@ struct EncodeTensorExportOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorExportOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
+    auto sourceType = cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
@@ -251,7 +246,7 @@ struct EncodeTensorSizeOfOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSizeOfOp op,
                                 PatternRewriter &rewriter) const override {
-    auto encodingType = llvm::cast<RankedTensorType>(op.getEncoding());
+    auto encodingType = cast<RankedTensorType>(op.getEncoding());
     auto encodingDims = op.getEncodingDims();
     if (failed(checkEncoding(op, encodingType, encodingDims, rewriter))) {
       return failure();
@@ -279,7 +274,7 @@ struct EncodeTensorEmptyOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorEmptyOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
+    auto resultType = cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -302,7 +297,7 @@ struct EncodeTensorConstantOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
+    auto resultType = cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -327,7 +322,7 @@ struct EncodeTensorConstantOp
     RankedTensorType alignedType = alignTensorType(resultType);
     Attribute encodedAttr = op.getValue();
     if (alignedType != resultType) {
-      if (auto sourceAttr = llvm::dyn_cast<DenseIntElementsAttr>(encodedAttr)) {
+      if (auto sourceAttr = dyn_cast<DenseIntElementsAttr>(encodedAttr)) {
         auto alignedBitWidth = alignedType.getElementTypeBitWidth();
         encodedAttr = sourceAttr.mapValues(
             alignedType.getElementType(), [=](APInt sourceValue) {
@@ -363,7 +358,7 @@ struct EncodeTensorSplatOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSplatOp op,
                                 PatternRewriter &rewriter) const override {
-    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
+    auto resultType = cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -396,12 +391,12 @@ struct EncodeTensorCloneOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorCloneOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
+    auto sourceType = cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
-    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
+    auto resultType = cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -425,12 +420,12 @@ struct EncodeTensorSliceOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSliceOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
+    auto sourceType = cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
     if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
       return failure();
     }
-    auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
+    auto resultType = cast<RankedTensorType>(op.getResultEncoding());
     auto resultDims = op.getResultEncodingDims();
     if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
       return failure();
@@ -458,7 +453,7 @@ struct EncodeTensorFillOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorFillOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = llvm::cast<RankedTensorType>(op.getTargetEncoding());
+    auto targetType = cast<RankedTensorType>(op.getTargetEncoding());
     auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
@@ -497,12 +492,12 @@ struct EncodeTensorUpdateOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
-    auto updateType = llvm::cast<RankedTensorType>(op.getUpdateEncoding());
+    auto updateType = cast<RankedTensorType>(op.getUpdateEncoding());
     auto updateDims = op.getUpdateEncodingDims();
     if (failed(checkEncoding(op, updateType, updateDims, rewriter))) {
       return failure();
     }
-    auto targetType = llvm::cast<RankedTensorType>(op.getTargetEncoding());
+    auto targetType = cast<RankedTensorType>(op.getTargetEncoding());
     auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
@@ -531,7 +526,7 @@ struct EncodeTensorLoadOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
+    auto sourceType = cast<RankedTensorType>(op.getSourceEncoding());
     auto sourceDims = op.getSourceEncodingDims();
     auto loadType = op.getResult().getType();
     if (auto complexTy = dyn_cast<ComplexType>(loadType)) {
@@ -574,7 +569,7 @@ struct EncodeTensorStoreOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = llvm::cast<RankedTensorType>(op.getTargetEncoding());
+    auto targetType = cast<RankedTensorType>(op.getTargetEncoding());
     auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
@@ -680,8 +675,8 @@ struct EncodeBindingSubspanOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::BindingSubspanOp op,
                                 PatternRewriter &rewriter) const override {
-    auto originalType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
-        op.getResult().getType());
+    auto originalType =
+        dyn_cast<IREE::TensorExt::DispatchTensorType>(op.getResult().getType());
     if (!originalType) {
       return rewriter.notifyMatchFailure(op, "binding type not supported");
     }
@@ -710,7 +705,7 @@ struct EncodeDispatchTensorLoadOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
-    auto targetType = llvm::cast<RankedTensorType>(op.getResult().getType());
+    auto targetType = cast<RankedTensorType>(op.getResult().getType());
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(targetType);
@@ -744,7 +739,7 @@ struct EncodeDispatchTensorStoreOp
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
-    auto sourceType = llvm::cast<RankedTensorType>(op.getValue().getType());
+    auto sourceType = cast<RankedTensorType>(op.getValue().getType());
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(sourceType);

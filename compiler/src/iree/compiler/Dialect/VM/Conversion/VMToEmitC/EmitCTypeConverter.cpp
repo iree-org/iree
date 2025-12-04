@@ -33,7 +33,7 @@ EmitCTypeConverter::EmitCTypeConverter(ModuleOp module)
 Type EmitCTypeConverter::convertTypeAsNonPointer(Type type) const {
   Type convertedType = convertType(type);
 
-  if (auto ptrType = llvm::dyn_cast<emitc::PointerType>(convertedType)) {
+  if (auto ptrType = dyn_cast<emitc::PointerType>(convertedType)) {
     return ptrType.getPointee();
   }
 
@@ -47,11 +47,11 @@ emitc::PointerType EmitCTypeConverter::convertTypeAsPointer(Type type) const {
 emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) const {
   Type convertedType = convertTypeAsNonPointer(type);
 
-  if (auto oType = llvm::dyn_cast<emitc::OpaqueType>(convertedType)) {
+  if (auto oType = dyn_cast<emitc::OpaqueType>(convertedType)) {
     return oType;
   }
 
-  if (auto iType = llvm::dyn_cast<IntegerType>(type)) {
+  if (auto iType = dyn_cast<IntegerType>(type)) {
     std::string typeLiteral;
     switch (iType.getWidth()) {
     case 32: {
@@ -68,7 +68,7 @@ emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) const {
     return emitc::OpaqueType::get(type.getContext(), typeLiteral);
   }
 
-  if (auto fType = llvm::dyn_cast<FloatType>(type)) {
+  if (auto fType = dyn_cast<FloatType>(type)) {
     std::string typeLiteral;
     switch (fType.getWidth()) {
     case 32: {

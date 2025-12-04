@@ -1391,15 +1391,16 @@ util.func public @avoid_illegal_consumer_fusion(%arg0: tensor<75600x5120xbf16>) 
   util.return %6 : tensor<75600x1x5120xbf16>
 }
 // CHECK-LABEL: @avoid_illegal_consumer_fusion(
-//       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
+//       CHECK:   %[[DISPATCH0:.+]]:2 = flow.dispatch.region
 //       CHECK:     %[[GENERIC0:.+]] = linalg.generic
 //       CHECK:     %[[GENERIC1:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[GENERIC0]] :
 //       CHECK:     flow.return %[[GENERIC1]], %[[GENERIC0]]
-//       CHECK:   %[[EXPAND_SHAPE:.+]] = tensor.expand_shape %[[DISPATCH]]#1
+//       CHECK:   %[[EXPAND_SHAPE:.+]] = tensor.expand_shape %[[DISPATCH0]]#1
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 //       CHECK:   %[[GENERIC2:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[EXPAND_SHAPE]], %[[DISPATCH]]#0 :
-//       CHECK:   util.return %[[GENERIC2]]
+//  CHECK-SAME:       ins(%[[EXPAND_SHAPE]], %[[DISPATCH0]]#0 :
+//       CHECK:   util.return %[[DISPATCH1]]
 
 // -----
 
@@ -1791,3 +1792,86 @@ util.func public @dont_fuse_producer_matmuls(%arg0 : tensor<4x4x7xf32>, %arg1 : 
 //       CHECK:     %[[OP:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[DISPATCH0]]
 //       CHECK:     flow.return %[[OP]]
+
+// -----
+
+util.func public @no_fusion_across_blocks(%arg0: tensor<3x2xf32>) -> tensor<f32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<f32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<f32>) -> tensor<f32>
+  %2 = tensor.empty() : tensor<3x2xf32>
+  %4 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> ()>],
+      iterator_types = ["reduction", "reduction"]}
+      ins(%arg0 : tensor<3x2xf32>) outs(%1 : tensor<f32>) {
+  ^bb0(%in: f32, %out: f32):
+    %9 = arith.addf %in, %out : f32
+    linalg.yield %9 : f32
+  } -> tensor<f32>
+  // Dispatch region uses the reduction result
+  %5 = flow.dispatch.region -> (tensor<f32>) {
+    %9 = linalg.generic {
+        indexing_maps = [affine_map<() -> ()>,
+                         affine_map<() -> ()>,
+                         affine_map<() -> ()>],
+        iterator_types = []}
+        ins(%4, %1 : tensor<f32>, tensor<f32>) outs(%0 : tensor<f32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %10 = arith.divf %in, %in_0 : f32
+      linalg.yield %10 : f32
+    } -> tensor<f32>
+    flow.return %9 : tensor<f32>
+  }
+  util.return %5 : tensor<f32>
+}
+// CHECK-LABEL: util.func public @no_fusion_across_blocks
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x2xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:     %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]]
+//       CHECK:     flow.return %[[REDUCTION]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
+//       CHECK:     %[[DIV:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[DISPATCH0]], %[[FILL]]
+//       CHECK:     flow.return %[[DIV]]
+//       CHECK:   util.return %[[DISPATCH1]]
+
+// -----
+
+util.func public @no_fusion_use_from_above(%arg0 : tensor<?x?xf32>,
+    %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  %matmul = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %empty2 = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  %consumer = linalg.generic { indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+      ins(%matmul : tensor<?x?xf32>)
+      outs(%empty2 : tensor<?x?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %c0_idx = arith.constant 0 : index
+    %c1_idx = arith.constant 1 : index
+    %extracted = tensor.extract %matmul[%c0_idx, %c1_idx] : tensor<?x?xf32>
+    %sum = arith.addf %in, %extracted : f32
+    linalg.yield %sum : f32
+  } -> tensor<?x?xf32>
+  util.return %consumer : tensor<?x?xf32>
+}
+// CHECK-LABEL: util.func public @no_fusion_use_from_above(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:     flow.return %[[MATMUL]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
+//       CHECK:     %[[CONSUMER:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[DISPATCH0]]
+//       CHECK:       tensor.extract %[[DISPATCH0]]
+//       CHECK:     flow.return %[[CONSUMER]]
+//       CHECK:   util.return %[[DISPATCH1]]

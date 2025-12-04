@@ -73,8 +73,8 @@ getTileSizesForEachDims(linalg::LinalgOp op) {
     unsigned firstOperandDim = operandDimPairs[0].second;
 
     // Trivial case: `dim` size is available in the operand type.
-    int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
-                          .getShape()[firstOperandDim];
+    int64_t dimSize =
+        cast<ShapedType>(firstOperand.getType()).getShape()[firstOperandDim];
     int64_t vectorDimSize = vectorSizes.value()[dim];
     if (ShapedType::isStatic(dimSize) && dimSize > vectorDimSize) {
       LDBG() << "set dim #" << dim << " size (" << dimSize

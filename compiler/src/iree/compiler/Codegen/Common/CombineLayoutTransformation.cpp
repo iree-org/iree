@@ -519,8 +519,7 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
     // Only sink reshape ops, so bail if the consumer operation is a reshape.
     auto controlSinkReshapesFn = [](OpOperand *operand) -> bool {
       Operation *consumer = operand->getOwner();
-      return !llvm::isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(
-          consumer);
+      return !isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(consumer);
     };
     linalg::populateFoldReshapeOpsByExpansionPatterns(propagationPatterns,
                                                       controlSinkReshapesFn);

@@ -5,10 +5,9 @@
 ]>
 
 // CHECK-LABEL: func.func @to_global()
-// CHECK: hal.interface.binding.subspan
-// CHECK-SAME: #gpu.address_space<global>
-// CHECK-NEXT: memref.store
-// CHECK-SAME: #gpu.address_space<global>
+// CHECK: %[[MEM:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset({{.+}})
+// CHECK-SAME: memref<256xi32, strided<[1], offset: ?>, #gpu.address_space<global>>
+// CHECK: memref.store %{{.+}}, %[[MEM]][%{{.+}}] : memref<256xi32, strided<[1], offset: ?>, #gpu.address_space<global>>
 func.func @to_global() {
   %c0_i32 = arith.constant 0 : i32
   %c0 = arith.constant 0 : index

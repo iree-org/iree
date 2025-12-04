@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/Transforms/StructuralTypeConversions.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -42,7 +43,7 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type)))
     return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
@@ -60,7 +61,7 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
                            Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type)))
     return nullptr;
   bool isUnsigned = eTy.isUnsignedInteger();
 
@@ -292,6 +293,8 @@ struct ConvertTypesPass : public Base {
         patterns, typeConverter);
     populateFunctionOpInterfaceTypeConversionPattern<IREE::Util::FuncOp>(
         patterns, typeConverter);
+    cf::populateCFStructuralTypeConversionsAndLegality(typeConverter, patterns,
+                                                       target);
 
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
@@ -313,10 +316,6 @@ struct ConvertTypesPass : public Base {
       }
       for (Type type : op->getOperandTypes()) {
         if (!typeConverter.isLegal(type))
-          return false;
-      }
-      for (auto &region : op->getRegions()) {
-        if (!typeConverter.isLegal(&region))
           return false;
       }
       return true;

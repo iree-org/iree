@@ -12,8 +12,6 @@
 
 // CHECK-LABEL: @distribute_elementwise_nested_layout_f16
 func.func @distribute_elementwise_nested_layout_f16(%a: vector<128x128x128xf16>, %b: vector<128x128x128xf16>) -> vector<128x128x128xf16> {
-  %c0 = arith.constant 0 : index
-  %cst_0 = arith.constant 0.0 : f16
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<8x2x4x1x4x4x1x8x2xf16>
   %root = arith.constant dense<0.0> : vector<128x128x128xf16>
   %rootl = iree_vector_ext.to_layout %root to layout(#nested) : vector<128x128x128xf16>
@@ -50,7 +48,6 @@ func.func @distribute_scf_for(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> v
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
-  %cst_0 = arith.constant 0 : i32
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<1x1x1x1x16x16xi32>
   %root = arith.constant dense<0> : vector<16x16xi32>
   %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xi32>
@@ -83,7 +80,6 @@ func.func @distribute_scf_for_0d(%a: vector<i32>, %b: vector<i32>) -> vector<i32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
-  %cst_0 = arith.constant 0 : i32
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<i32>
   %root = arith.constant dense<0> : vector<i32>
   %rootl = iree_vector_ext.to_layout %root to layout(#layout_0d) : vector<i32>
@@ -103,8 +99,6 @@ func.func @distribute_scf_for_0d(%a: vector<i32>, %b: vector<i32>) -> vector<i32
 
 // CHECK-LABEL: @distribute_scalar_extract
 func.func @distribute_scalar_extract(%a: f16, %b: vector<f16>) -> f16 {
-  %c0 = arith.constant 0 : index
-  %cst_0 = arith.constant 0.0 : f16
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<f16>
   %root = arith.constant dense<0.0> : vector<f16>
   %rootl = iree_vector_ext.to_layout %root to layout(#layout_0d) : vector<f16>
@@ -122,6 +116,82 @@ builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [8],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [64],
+  element_tile = [4],
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+// The lowered reduction works as follows:
+// Step 1: each thread reduces 4 elements to 1 element, then there's a subgroup reduce.
+// Step 2: threads write to their **subgroup** specific locations in LDS.
+// Step 3: each subgroup loads the 8 values from LDS, reduces and writes the final result.
+
+// There are 2 places threads write the same values to memory,
+// - at step 2, there are duplicated writes to LDS.
+// - at step 3, there are duplicated writes to global memory.
+
+// CHECK-LABEL: @reduction
+func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
+
+  // CHECK-DAG: %[[ZERO:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[THREADIDX:.*]] = gpu.thread_id x
+  %cst = arith.constant dense<0.000000e+00> : vector<2048xf32>
+  %0 = ub.poison : f32
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %assume_align = memref.assume_alignment %in, 64 : memref<2048xf32>
+  %2 = amdgpu.fat_raw_buffer_cast %assume_align resetOffset : memref<2048xf32> to memref<2048xf32, #amdgpu.address_space<fat_raw_buffer>>
+  %assume_align_1 = memref.assume_alignment %out, 64 : memref<f32>
+  %4 = amdgpu.fat_raw_buffer_cast %assume_align_1 resetOffset : memref<f32> to memref<f32, #amdgpu.address_space<fat_raw_buffer>>
+  %5 = vector.transfer_read %2[%c0], %0 {in_bounds = [true]} : memref<2048xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<2048xf32>
+  %6 = iree_vector_ext.to_layout %5 to layout(#layout) : vector<2048xf32>
+  %7 = iree_vector_ext.to_layout %cst to layout(#layout) : vector<2048xf32>
+  %8 = arith.addf %6, %7 : vector<2048xf32>
+  %9 = iree_vector_ext.to_layout %8 to layout(#layout) : vector<2048xf32>
+
+  // Guards on duplicated writes to LDS.
+  // Only lane 0 within each subgroup writes.
+  //      CHECK: %[[DELIN:.*]]:4 = affine.delinearize_index %[[THREADIDX]] into (1, 8, 64, 1)
+  // This condition is redundant and will be cleaned up after int
+  // optimizations. This can also be fixed with a fold pattern to
+  // affine.delinearize_index.
+  //  CHECK-DAG: %[[SUBGROUPCOND:.*]] = arith.cmpi eq, %[[DELIN]]#0, %[[ZERO]]
+  //  CHECK-DAG: %[[LANECOND:.*]] = arith.cmpi eq, %[[DELIN]]#2, %[[ZERO]]
+  //      CHECK: %[[COND:.*]] = arith.andi %[[SUBGROUPCOND]], %[[LANECOND]]
+  // CHECK-NEXT: scf.if %[[COND]] {
+  // CHECK-NEXT: linearize_index
+  // CHECK-NEXT: vector.transfer_write {{.*}} #gpu.address_space<workgroup>>
+  // CHECK-NEXT: }
+  %10 = vector.multi_reduction <add>, %9, %cst_0 [0] : vector<2048xf32> to f32
+  %11 = vector.broadcast %10 : f32 to vector<f32>
+
+  // Guards on duplicated writes to global memory.
+  // Only thread 0 writes.
+  //  CHECK-DAG: %[[COND2:.*]] = arith.cmpi eq, %[[THREADIDX]], %[[ZERO]] : index
+  // CHECK-NEXT: scf.if %[[COND2]] {
+  // CHECK-NEXT: vector.broadcast
+  // CHECK-NEXT: vector.transfer_write {{.*}} #amdgpu.address_space<fat_raw_buffer>>
+  // CHECK-NEXT: }
+  vector.transfer_write %11, %4[] : vector<f32>, memref<f32, #amdgpu.address_space<fat_raw_buffer>>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func  {workgroup_size = array<i64: 512, 1, 1>}
+    : !transform.any_op
     transform.yield
   }
 }

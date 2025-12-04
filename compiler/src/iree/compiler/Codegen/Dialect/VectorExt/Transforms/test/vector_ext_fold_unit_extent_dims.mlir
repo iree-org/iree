@@ -17,8 +17,10 @@ func.func @dynamic_shape(%arg0: tensor<1x1x128x?xf16>) -> tensor<1x1x128x?xf16> 
 }
 
 // CHECK-LABEL: func.func @dynamic_shape
-// CHECK-DAG: %[[DIM:.+]] = tensor.dim %arg0, %c3 : tensor<1x1x128x?xf16>
-// CHECK-DAG: %[[SLICE:.+]] = tensor.extract_slice %arg0[0, 0, 0, 0] [1, 1, 128, %[[DIM]]] [1, 1, 1, 1] : tensor<1x1x128x?xf16> to tensor<128x?xf16>
-// CHECK-DAG: %[[LAYOUT:.+]] = iree_vector_ext.to_layout %[[SLICE]]
-// CHECK-DAG: %[[EMPTY:.+]] = tensor.empty(%[[DIM]]) : tensor<1x1x128x?xf16>
-// CHECK-DAG: %[[INSERT_SLICE:.+]] = tensor.insert_slice %[[LAYOUT]] into %[[EMPTY]][0, 0, 0, 0] [1, 1, 128, %dim] [1, 1, 1, 1] : tensor<128x?xf16> into tensor<1x1x128x?xf16>
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[DIM:.+]] = tensor.dim %arg0, %[[C3]] : tensor<1x1x128x?xf16>
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %arg0[0, 0, 0, 0] [1, 1, 128, %[[DIM]]] [1, 1, 1, 1] : tensor<1x1x128x?xf16> to tensor<128x?xf16>
+// CHECK: %[[LAYOUT:.+]] = iree_vector_ext.to_layout %[[SLICE]]
+// CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM]]) : tensor<1x1x128x?xf16>
+// CHECK: %[[INSERT:.+]] = tensor.insert_slice %[[LAYOUT]] into %[[EMPTY]][0, 0, 0, 0] [1, 1, 128, %[[DIM]]] [1, 1, 1, 1] : tensor<128x?xf16> into tensor<1x1x128x?xf16>
+// CHECK: return %[[INSERT]] : tensor<1x1x128x?xf16>

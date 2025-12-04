@@ -53,7 +53,7 @@ module @td_module_0 attributes { transform.with_named_sequence } {
 // CHECK-LABEL: module @td_module_1
 // CHECK:       @foo_module
 // CHECK:       @__kernel_config(
-// CHECK-NOT      transform.include @foo_module::@foo failures(suppress) (%arg0) : (!transform.any_op) -> !transform.any_op
+// CHECK-NOT:     transform.include @foo_module::@foo failures(suppress) (%arg0) : (!transform.any_op) -> !transform.any_op
 // CHECK:         transform.include @foo_module::@bar failures(suppress) (%arg0) : (!transform.any_op) -> !transform.any_op
 // CHECK-NEXT:    transform.yield
 

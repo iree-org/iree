@@ -52,9 +52,16 @@ func.func @load_subspan_with_vector_element(%offset : index, %i0: index, %i1: in
   return %val: vector<4xf32>
 }
 
-//      CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s1 * 56 + s2 * 8 + s3 + s0 floordiv 16)>
+//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 floordiv 16 + 336)>
+//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1, s2, s3] -> (s1 * 56 + s2 * 8 + s3 + s0 floordiv 16)>
 //CHECK-LABEL: func.func @load_subspan_with_vector_element
-//      CHECK:   affine.apply #[[$MAP]]()
+// CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
+//  CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[$MAP0]]()[%[[OFFSET]]]
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) offset(%[[ZERO]]) : memref<?xvector<4xf32>>{%[[SIZE]]}
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP1]]()[%[[OFFSET]], %[[I0]], %[[I1]], %[[I2]]]
+//      CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]]
+//      CHECK:   return %[[LOAD]]
 
 // -----
 
@@ -67,9 +74,16 @@ func.func @load_subspan_with_16bit_element(%offset : index, %i0: index, %i1: ind
   return %val: f16
 }
 
-//      CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s1 * 56 + s2 * 8 + s3 + s0 floordiv 2)>
+//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 floordiv 2 + 336)>
+//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1, s2, s3] -> (s1 * 56 + s2 * 8 + s3 + s0 floordiv 2)>
 //CHECK-LABEL: func.func @load_subspan_with_16bit_element
-//      CHECK:   affine.apply #[[$MAP]]()
+// CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
+//  CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[$MAP0]]()[%[[OFFSET]]]
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) offset(%[[ZERO]]) : memref<?xf16>{%[[SIZE]]}
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP1]]()[%[[OFFSET]], %[[I0]], %[[I1]], %[[I2]]]
+//      CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]]
+//      CHECK:   return %[[LOAD]]
 
 // -----
 
@@ -340,6 +354,8 @@ func.func @load_store_rank_zero_subspan_with_zero_offset() {
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) offset(%[[C0]]) : memref<f32>
 //      CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) offset(%[[C0]]) : memref<f32>
+//      CHECK:   %[[VAL:.+]] = memref.load %[[SPAN0]][] : memref<f32>
+//      CHECK:   memref.store %[[VAL]], %[[SPAN1]][] : memref<f32>
 
 // -----
 
@@ -444,7 +460,7 @@ func.func @expand_shape2(%offset : index, %i0: index, %i1: index) -> f32 {
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @static_collapse_shape_to_1d_static(%offset : index, %i: index) {
+func.func @static_collapse_shape_to_1d_static(%offset : index) {
   %subspan = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%offset) : memref<6x7x8xf32, strided<[56, 8, 1], offset:?>>
   %collapse = memref.collapse_shape %subspan [[0, 1, 2]] : memref<6x7x8xf32, strided<[56, 8, 1], offset:?>> into memref<336xf32, strided<[1], offset: ?>>
   "unregistered.opaque"(%collapse) : (memref<336xf32, strided<[1], offset: ?>>) -> ()
@@ -452,8 +468,7 @@ func.func @static_collapse_shape_to_1d_static(%offset : index, %i: index) {
 //   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 floordiv 4)
 //   CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 floordiv 4 + 336)
 // CHECK-LABEL: func.func @static_collapse_shape_to_1d_static(
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
-//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index)
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index)
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[OFFSET:.+]] = affine.apply #[[$MAP0]]()[%[[ARG0]]
 //   CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[$MAP1]]()[%[[ARG0]]
@@ -569,11 +584,13 @@ func.func @load_uniform_buffer(%offset: index, %i0: index, %i1 : index, %i2: ind
   return %val: i32
 }
 
-//       CHECK: #[[$MAP1:.+]] = affine_map<()[s0, s1, s2, s3] -> (s1 * 12 + s2 * 4 + s3 + s0 floordiv 4)>
+//   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 floordiv 4 + 24)>
+//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1, s2, s3] -> (s1 * 12 + s2 * 4 + s3 + s0 floordiv 4)>
 // CHECK-LABEL: func.func @load_uniform_buffer
 //  CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) offset(%[[C0]]) : memref<?xi32, #hal.descriptor_type<uniform_buffer>>
+//       CHECK:   %[[SIZE:.+]] = affine.apply #[[$MAP0]]()[%[[OFFSET]]]
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) offset(%[[C0]]) : memref<?xi32, #hal.descriptor_type<uniform_buffer>>{%[[SIZE]]}
 //       CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP1]]()[%[[OFFSET]], %[[I0]], %[[I1]], %[[I2]]]
 //       CHECK:   %[[LD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]] : memref<?xi32, #hal.descriptor_type<uniform_buffer>>
 //       CHECK:   return %[[LD]] : i32

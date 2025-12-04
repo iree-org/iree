@@ -55,6 +55,7 @@ iree_lit_test_suite(
             "fold_affine_min_in_distributed_loops.mlir",
             "fold_affine_min_of_block_id.mlir",
             "fold_bitcast_into_interface_tensor.mlir",
+            "fold_bitcast_into_load_from_buffer.mlir",
             "fold_reshape_into_interface_tensor.mlir",
             "fold_split_reduction_workgroup_mapping_loops.mlir",
             "fold_tensor_extract_op.mlir",

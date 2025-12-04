@@ -24,6 +24,7 @@
 //  CHECK-NEXT: }
 
 // CHECK-LABEL: util.func private @_dynamicEntry(
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 util.func public @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) ->
     (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) {
   %0 = arith.addf %arg0, %arg1 : tensor<?x8x8x3xf32>
@@ -41,6 +42,7 @@ util.func public @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3
 // CHECK-SAME:     iree.abi.declaration = "sync func @existingReflection
 // CHECK-SAME:     some.attr = 4 : index
 // CHECK: util.func private @_existingReflection
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 // CHECK-NOT: iree.reflection = {some.attr = 4 : index}
 util.func public @existingReflection() attributes {
   iree.reflection = {
@@ -87,6 +89,7 @@ util.func public @namedEntry(%arg0: tensor<3xf32> {iree.abi.name = "my_input_0"}
 // CHECK: hal.tensor.export {{.+}} : tensor<?x8x8x3xi32> as tensor<?x8x8x3xf32>{{.+}} -> !hal.buffer_view
 
 // CHECK-LABEL: util.func private @_exportEncodings
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 util.func public @exportEncodings(%arg0: tensor<?x8x8x3xf32> {iree.abi.encoding = tensor<?x8x8x3xi32>}) -> (tensor<?x8x8x3xf32> {iree.abi.encoding = tensor<?x8x8x3xi32>}) {
   util.return %arg0 : tensor<?x8x8x3xf32>
 }
@@ -114,6 +117,7 @@ util.func public @exportEncodings(%arg0: tensor<?x8x8x3xf32> {iree.abi.encoding 
 //  CHECK-NEXT: }
 
 // CHECK-LABEL: util.func private @_outputStorage(
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 util.func public @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {iree.abi.output = 1 : index}) ->
     (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) {
   %0 = arith.addf %arg0, %arg0 : tensor<?x8x8x3xf32>
@@ -141,6 +145,7 @@ util.func public @wrappedAlready(%arg0: !hal.buffer_view) -> !hal.buffer_view at
 // CHECK-LABEL: util.func public @exportA(%arg0: !hal.buffer_view) -> !hal.buffer_view
 // CHECK:   call @_exportA
 // CHECK: util.func private @_exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 // CHECK:   util.return %arg0
 util.func public @exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   util.return %arg0 : tensor<?x?xi32>
@@ -149,6 +154,7 @@ util.func public @exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK: util.func public @exportB(%arg0: !hal.buffer_view) -> !hal.buffer_view
 // CHECK:   util.call @_exportB
 // CHECK: util.func private @_exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 // CHECK:   util.call @_exportA
 util.func public @exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %0 = util.call @exportA(%arg0) : (tensor<?x?xi32>) -> tensor<?x?xi32>
@@ -163,14 +169,14 @@ util.func public @exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK-LABEL: util.func private @import(%arg0: !hal.buffer_view) -> !hal.buffer_view
 util.func private @import(tensor<?x2xi32>) -> tensor<2x?xi32>
 
-// CHECK: util.func private @_import(%[[ARG_TENSOR:.+]]: tensor<?x2xi32>) -> tensor<2x?xi32> {
+// CHECK: util.func private @_import(%[[ARG_TENSOR:.+]]: tensor<?x2xi32>) -> tensor<2x?xi32>
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 // CHECK:   %[[ARG_DIM:.+]] = tensor.dim %[[ARG_TENSOR]], %c0
 // CHECK:   %[[ARG_VIEW:.+]] = hal.tensor.export %[[ARG_TENSOR]] : tensor<?x2xi32>{%[[ARG_DIM]]} -> !hal.buffer_view
 // CHECK:   %[[RET_VIEW:.+]] = util.call @import(%[[ARG_VIEW]]) : (!hal.buffer_view) -> !hal.buffer_view
 // CHECK:   %[[RET_DIM:.+]] = hal.buffer_view.dim<%[[RET_VIEW]] : !hal.buffer_view>[1]
 // CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import %[[RET_VIEW]] : !hal.buffer_view -> tensor<2x?xi32>{%[[RET_DIM]]}
 // CHECK:   util.return %[[RET_TENSOR]]
-// CHECK: }
 
 // CHECK: util.func private @caller(%arg0: tensor
 util.func private @caller(%arg0: tensor<?x2xi32>) -> tensor<2x?xi32> {
@@ -187,12 +193,12 @@ util.func private @caller(%arg0: tensor<?x2xi32>) -> tensor<2x?xi32> {
 // CHECK-LABEL: util.func private @pinnedImport(%arg0: !hal.buffer_view) -> !hal.buffer_view
 util.func private @pinnedImport(tensor<2xi32> {iree.abi.affinity = #hal.device.promise<@dev_a>}) -> (tensor<2xi32> {iree.abi.affinity = #hal.device.promise<@dev_b>})
 
-// CHECK: util.func private @_pinnedImport(%[[ARG_TENSOR:.+]]: tensor<2xi32>) -> tensor<2xi32> {
+// CHECK: util.func private @_pinnedImport(%[[ARG_TENSOR:.+]]: tensor<2xi32>) -> tensor<2xi32>
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 // CHECK:   %[[ARG_VIEW:.+]] = hal.tensor.export on(#hal.device.promise<@dev_a>) %[[ARG_TENSOR]] : tensor<2xi32> -> !hal.buffer_view
 // CHECK:   %[[RET_VIEW:.+]] = util.call @pinnedImport(%[[ARG_VIEW]]) : (!hal.buffer_view) -> !hal.buffer_view
 // CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import on(#hal.device.promise<@dev_b>) %[[RET_VIEW]] : !hal.buffer_view -> tensor<2xi32>
 // CHECK:   util.return %[[RET_TENSOR]]
-// CHECK: }
 
 // CHECK: util.func private @pinnedCaller(%arg0: tensor
 util.func private @pinnedCaller(%arg0: tensor<2xi32>) -> tensor<2xi32> {
@@ -208,18 +214,103 @@ util.func private @pinnedCaller(%arg0: tensor<2xi32>) -> tensor<2xi32> {
 // CHECK-LABEL: util.func private @importEncodings(%arg0: !hal.buffer_view) -> !hal.buffer_view
 util.func private @importEncodings(tensor<?x2xi32> {iree.abi.encoding = tensor<?x2xf32>}) -> (tensor<2x?xi32> {iree.abi.encoding = tensor<2x?xf32>})
 
-// CHECK: util.func private @_importEncodings(%[[ARG_TENSOR:.+]]: tensor<?x2xi32>) -> tensor<2x?xi32> {
+// CHECK: util.func private @_importEncodings(%[[ARG_TENSOR:.+]]: tensor<?x2xi32>) -> tensor<2x?xi32>
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
 // CHECK:   %[[ARG_DIM:.+]] = tensor.dim %[[ARG_TENSOR]], %c0
 // CHECK:   %[[ARG_VIEW:.+]] = hal.tensor.export %[[ARG_TENSOR]] : tensor<?x2xf32> as tensor<?x2xi32>{%[[ARG_DIM]]} -> !hal.buffer_view
 // CHECK:   %[[RET_VIEW:.+]] = util.call @importEncodings(%[[ARG_VIEW]]) : (!hal.buffer_view) -> !hal.buffer_view
 // CHECK:   %[[RET_DIM:.+]] = hal.buffer_view.dim<%[[RET_VIEW]] : !hal.buffer_view>[1]
 // CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import %[[RET_VIEW]] : !hal.buffer_view -> tensor<2x?xf32> as tensor<2x?xi32>{%[[RET_DIM]]}
 // CHECK:   util.return %[[RET_TENSOR]]
-// CHECK: }
 
 // CHECK: util.func private @importEncodingsCaller(%arg0: tensor
 util.func private @importEncodingsCaller(%arg0: tensor<?x2xi32>) -> tensor<2x?xi32> {
   // CHECK: call @_importEncodings(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
   %0 = util.call @importEncodings(%arg0) : (tensor<?x2xi32>) -> tensor<2x?xi32>
   util.return %0 : tensor<2x?xi32>
+}
+
+// -----
+
+// Tests that iree.abi.transients attribute wraps results with hal.tensor.transients.
+
+// CHECK-LABEL: util.func public @transientsEntry(
+//  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[STORAGE:.+]]: !hal.buffer) -> !hal.buffer_view
+//  CHECK-NEXT:   %[[ARG0_DIM:.+]] = hal.buffer_view.dim<%[[ARG0]] : !hal.buffer_view>[0]
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] "input0" : !hal.buffer_view -> tensor<?xf32>{%[[ARG0_DIM]]}
+//  CHECK-NEXT:   %[[RET_TENSOR:.+]] = util.call @_transientsEntry(%[[ARG0_TENSOR]], %[[STORAGE]])
+//       CHECK:   %[[RET_DIM:.+]] = tensor.dim %[[RET_TENSOR]]
+//       CHECK:   %[[ANNOTATED:.+]] = hal.tensor.transients %[[RET_TENSOR]] : tensor<?xf32>{%[[RET_DIM]]} from %[[STORAGE]] : !hal.buffer
+//  CHECK-NEXT:   %[[RET_VIEW:.+]] = hal.tensor.export %[[ANNOTATED]] "output0" : tensor<?xf32>{%[[RET_DIM]]} -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[RET_VIEW]] : !hal.buffer_view
+//  CHECK-NEXT: }
+
+// CHECK-LABEL: util.func private @_transientsEntry
+// CHECK-SAME: hal.abi.convention = #hal.abi.convention<synchronous>
+util.func public @transientsEntry(%arg0: tensor<?xf32>, %storage: !hal.buffer {iree.abi.transients}) -> tensor<?xf32> {
+  %0 = arith.addf %arg0, %arg0 : tensor<?xf32>
+  util.return %0 : tensor<?xf32>
+}
+
+// -----
+
+// Tests that iree.abi.transients works with multiple tensor results.
+
+// CHECK-LABEL: util.func public @transientsMultipleResults(
+//  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[STORAGE:.+]]: !hal.buffer) -> (!hal.buffer_view, !hal.buffer_view)
+//  CHECK-NEXT:   %[[ARG0_DIM:.+]] = hal.buffer_view.dim<%[[ARG0]] : !hal.buffer_view>[0]
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] "input0" : !hal.buffer_view -> tensor<?xf32>{%[[ARG0_DIM]]}
+//  CHECK-NEXT:   %[[RET_TENSORS:.+]]:2 = util.call @_transientsMultipleResults(%[[ARG0_TENSOR]], %[[STORAGE]])
+//       CHECK:   %[[RET0_DIM:.+]] = tensor.dim %[[RET_TENSORS]]#0
+//       CHECK:   %[[ANNOTATED0:.+]] = hal.tensor.transients %[[RET_TENSORS]]#0 : tensor<?xf32>{%[[RET0_DIM]]} from %[[STORAGE]] : !hal.buffer
+//       CHECK:   %[[RET1_DIM:.+]] = tensor.dim %[[RET_TENSORS]]#1
+//       CHECK:   %[[ANNOTATED1:.+]] = hal.tensor.transients %[[RET_TENSORS]]#1 : tensor<?xf32>{%[[RET1_DIM]]} from %[[STORAGE]] : !hal.buffer
+//       CHECK:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[ANNOTATED0]] "output0" : tensor<?xf32>{%[[RET0_DIM]]} -> !hal.buffer_view
+//       CHECK:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[ANNOTATED1]] "output1" : tensor<?xf32>{%[[RET1_DIM]]} -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
+//  CHECK-NEXT: }
+
+// CHECK-LABEL: util.func private @_transientsMultipleResults
+util.func public @transientsMultipleResults(%arg0: tensor<?xf32>, %storage: !hal.buffer {iree.abi.transients}) -> (tensor<?xf32>, tensor<?xf32>) {
+  %0 = arith.addf %arg0, %arg0 : tensor<?xf32>
+  %1 = arith.mulf %arg0, %arg0 : tensor<?xf32>
+  util.return %0, %1 : tensor<?xf32>, tensor<?xf32>
+}
+
+// -----
+
+// Tests that iree.abi.transients works with static shapes.
+
+// CHECK-LABEL: util.func public @transientsStaticShapes(
+//  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[STORAGE:.+]]: !hal.buffer) -> !hal.buffer_view
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] "input0" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[RET_TENSOR:.+]] = util.call @_transientsStaticShapes(%[[ARG0_TENSOR]], %[[STORAGE]])
+//  CHECK-NEXT:   %[[ANNOTATED:.+]] = hal.tensor.transients %[[RET_TENSOR]] : tensor<4xf32> from %[[STORAGE]] : !hal.buffer
+//  CHECK-NEXT:   %[[RET_VIEW:.+]] = hal.tensor.export %[[ANNOTATED]] "output0" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[RET_VIEW]] : !hal.buffer_view
+//  CHECK-NEXT: }
+
+// CHECK-LABEL: util.func private @_transientsStaticShapes
+util.func public @transientsStaticShapes(%arg0: tensor<4xf32>, %storage: !hal.buffer {iree.abi.transients}) -> tensor<4xf32> {
+  %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// Tests that iree.abi.transients works with buffer_view storage type.
+
+// CHECK-LABEL: util.func public @transientsBufferView(
+//  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[STORAGE:.+]]: !hal.buffer_view) -> !hal.buffer_view
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] "input0" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[RET_TENSOR:.+]] = util.call @_transientsBufferView(%[[ARG0_TENSOR]], %[[STORAGE]])
+//  CHECK-NEXT:   %[[ANNOTATED:.+]] = hal.tensor.transients %[[RET_TENSOR]] : tensor<4xf32> from %[[STORAGE]] : !hal.buffer_view
+//  CHECK-NEXT:   %[[RET_VIEW:.+]] = hal.tensor.export %[[ANNOTATED]] "output0" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   util.return %[[RET_VIEW]] : !hal.buffer_view
+//  CHECK-NEXT: }
+
+// CHECK-LABEL: util.func private @_transientsBufferView
+util.func public @transientsBufferView(%arg0: tensor<4xf32>, %storage: !hal.buffer_view {iree.abi.transients}) -> tensor<4xf32> {
+  %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
+  util.return %0 : tensor<4xf32>
 }

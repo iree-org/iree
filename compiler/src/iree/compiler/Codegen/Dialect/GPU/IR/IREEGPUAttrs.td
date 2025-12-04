@@ -88,8 +88,9 @@ def IREEGPU_UseGlobalLoadDma :
   }];
   let description = [{
     Lowering config for when using global load DMA is needed. This is intended for
-    tagging operations that are known to be able to use global load DMA, which might
-    also have its own cofiguration.
+    tagging operations that are known to be able to use global load DMA.
+
+    Tiling sizes are derived from the translation_info's workgroup_size and subgroup_size.
   }];
   let assemblyFormat = "";
   let parameters = (ins);
@@ -351,31 +352,59 @@ def IREEGPU_DataTiledMMAAttr :
 
   let description = [{
     This mma variant represents MMA ops with data-tiling details. The
-    |intrinsic| field specifies which particular MMA intrinsic is targeted by
+    `intrinsic` field specifies which particular MMA intrinsic is targeted by
     the data-tiling.
 
-    The other fields default to one, and that default results in a single
-    intrinsic equivalent to MMAAttr, while values greater than one result in
-    wider "kernels" consisting of multiple intrinsics, with the data layout
-    already swizzled into a tile layout that allows each intrinsic to access
-    data at an offset that's as simple as possible a mapping from the thread ID.
+    The `intrinsics_{m,n,k}` parameters control unrolling along M, N, K
+    dimensions. The product of these parameters equals the number of intrinsics
+    generated.
 
-    For intrinsics_k, the extra unrolling dimension is interleaved along the
-    innermost non-internal dimension of the swizzled shape. This means the
-    unrolled K dimension will be the innermost non-internal dimension of the
-    swizzled shape.
+    The `operands_interleaving_intrinsics_{m,n,k}` control the tile layout.
+    By default, intrinsic-level sub-tiles are contiguous and arranged
+    side-by-side in the overall tile layout. When
+    `operands_interleaving_intrinsics_{m,n,k}` is non-empty, each entry
+    indicates an operand (given by its operand index) for which the tile layout
+    has the corresponding intrinsics tiles interleaved. For example, when
+    `intrinsics_k = 2` and `operands_interleaving_intrinsics_k = [0, 1]`, there
+    are two intrinsics along the k-dimension and their layouts are interleaved
+    in operands 0 and 1, meaning LHS and RHS.
+
+    The `subgroups_{m,n,k}` parameters control the number of subgroups and the
+    layout of the tile accesses made by different subgroups. The product of the
+    `subgroups_{m,n,k}` equals the number of subgroups, and for instance
+    subgroups_m is how many subgroups are working in parallel along the M
+    dimension. Code generation supports arbitrary values of subgroups_m and
+    subgroups_n. On the other hand, subgroups_k requires custom kernels to
+    handle the implied cross-subgroup reduction.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
 
-  let parameters = (ins
-    EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
-  );
+  let parameters =
+      (ins EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the M dimension.">:$intrinsics_m,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the M dimension.">:$subgroups_m,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the N dimension.">:$intrinsics_n,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the N dimension.">:$subgroups_n,
+          DefaultValuedParameter<"int64_t", "1",
+                                 "Intrinsic count along the K dimension.">:$intrinsics_k,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the K dimension.">:$subgroups_k,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_m,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_n,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k);
 }
 
 def IREEGPU_DataTiledScaledMMAAttr :
@@ -400,31 +429,38 @@ def IREEGPU_DataTiledScaledMMAAttr :
     types for the scales operands are always Float8E8M0FNUType, so they are not
     specified on the attribute.
 
-    The other fields default to one, and that default results in a single
-    intrinsic, while values greater than one result in wider "kernels"
-    consisting of multiple intrinsic instructions, with the data layout already
-    swizzled into a tile layout that allows each intrinsic to access data at an
-    offset that's as simple as possible a mapping from the thread ID.
-
-    For intrinsics_k, the extra unrolling dimension is interleaved along the
-    innermost dimension for the scales operands, meaning this dimension will
-    become the innermost dimension of the swizzled shape. For non-scales
-    operands, the intrinsics_k dimension is not interleaved at all.
+    The other fields are similar to DataTiledMMAAttr, refer to its documentation.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
 
-  let parameters = (ins
-    EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
-    "::mlir::Type":$lhs_elem_type,
-    "::mlir::Type":$rhs_elem_type,
-    "::mlir::Type":$acc_elem_type,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
-    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
-    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
-  );
+  let parameters =
+      (ins EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
+          "::mlir::Type":$lhs_elem_type, "::mlir::Type":$rhs_elem_type,
+          "::mlir::Type":$acc_elem_type,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the M dimension.">:$intrinsics_m,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the M dimension.">:$subgroups_m,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the N dimension.">:$intrinsics_n,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the N dimension.">:$subgroups_n,
+          DefaultValuedParameter<"int64_t", "1",
+                                 "Intrinsic count along the K dimension.">:$intrinsics_k,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Subgroup count along the K dimension.">:$subgroups_k,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_m,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_n,
+          OptionalParameter<
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k);
 }
 
 def IREEGPU_VirtualMMAIntrinsicAttr

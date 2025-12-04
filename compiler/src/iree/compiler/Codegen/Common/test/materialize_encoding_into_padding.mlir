@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-encoding-into-padding))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding{test-gpu-encoding-resolver=gpu_padding}))" \
 // RUN:   --iree-gpu-test-target=gfx942 \
 // RUN:   --split-input-file %s | FileCheck %s
 
@@ -31,42 +31,6 @@ func.func @set_pad_encoding_and_store() {
 // CHECK-SAME:                  !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<2048x2048xf16>
 // CHECK:         iree_tensor_ext.dispatch.tensor.store %[[LD]], %[[B]], offsets = [0, 0], sizes = [2048, 2048], strides = [1, 1]
 // CHECK-SAME:                  tensor<2048x2048xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
-
-// -----
-
-// This tests that the padding resolver can handle partial loads/stores. The
-// offsets, sizes and strides are arbitrarily chosen in the test.
-// TODO(#20160): Move the test case to materialize_encoding_for_iree_ops.mlir.
-
-#binding_ro = #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">
-#binding = #hal.pipeline.binding<storage_buffer, Indirect>
-#encoding_mmt = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f16, f16, f16]>
-#pad_encoding = #iree_encoding.layout<[#iree_encoding.padding<[0, 64]>]>
-func.func @set_pad_encoding_and_partial_load_store() {
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.constant.load layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) ordinal(0) : i32
-  %1 = arith.index_castui %0 : i32 to index
-  %3 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(0) alignment(64) offset(%1) flags("ReadOnly|Indirect")
-    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>>
-  %4 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#binding_ro, #binding], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect)
-    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2048xf16, #pad_encoding>>
-  %5 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [1024, 1024], strides = [2, 2]
-    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<1024x1024xf16>
-  %6 = iree_encoding.set_encoding %5 : tensor<1024x1024xf16> -> tensor<1024x1024xf16, #encoding_mmt>
-  iree_tensor_ext.dispatch.tensor.store %6, %4, offsets = [0, 0], sizes = [1024, 1024], strides = [2, 2]
-    : tensor<1024x1024xf16, #encoding_mmt> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2048xf16, #pad_encoding>>
-  return
-}
-
-// CHECK-LABEL: @set_pad_encoding_and_partial_load_store
-// CHECK:         %[[A:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-// CHECK-SAME:                  !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>>
-// CHECK:         %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-// CHECK-SAME:                  !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
-// CHECK:         %[[LD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[A]], offsets = [0, 0], sizes = [1024, 1024], strides = [2, 2]
-// CHECK-SAME:                  !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x2048xf16>> -> tensor<1024x1024xf16>
-// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[LD]], %[[B]], offsets = [0, 0], sizes = [1024, 1024], strides = [2, 2]
-// CHECK-SAME:                  tensor<1024x1024xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x2112xf16>>
 
 // -----
 
@@ -287,7 +251,7 @@ func.func @set_pad_encoding_and_store_with_resolved_layout() {
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @materialize_pad_encoding_on_partial_dynamic_shape() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -321,17 +285,16 @@ func.func @materialize_pad_encoding_on_partial_dynamic_shape() {
 // -----
 
 #encoding = #iree_encoding.layout<[#iree_encoding.padding<[0, 32]>]>
-#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
-#pipeline_layout1 = #hal.pipeline.layout<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @materialize_pad_encoding_dynamic_load_store() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i64
   %1 = arith.index_castui %0 : i64 to index
   %2 = util.assume.int %1<umin = 0, umax = 9007199254740991> : index
-  %3 = hal.interface.constant.load layout(#pipeline_layout1) ordinal(0) : i32
+  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
   %4 = arith.index_castui %3 : i32 to index
-  %5 = hal.interface.binding.subspan layout(#pipeline_layout1) binding(0) alignment(64) offset(%4) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>{%2}
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout1) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048xf16, #encoding>>{%2}
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>{%2}
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048xf16, #encoding>>{%2}
   %7 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%2, 2048], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf16>>{%2} -> tensor<?x2048xf16>
   %8 = iree_encoding.set_encoding %7 : tensor<?x2048xf16> -> tensor<?x2048xf16, #iree_encoding.padding<[0, ?]>>
   iree_tensor_ext.dispatch.tensor.store %8, %6, offsets = [0, 0], sizes = [%2, 2048], strides = [1, 1] : tensor<?x2048xf16, #iree_encoding.padding<[0, ?]>> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048xf16, #encoding>>{%2}

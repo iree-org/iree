@@ -328,7 +328,7 @@ struct ElideBranchOperandsPattern
 
           // Operand for this source differs from previous. This is either
           // because it's non-uniform _or_ that it's a cycle.
-          if (auto sourceArg = llvm::dyn_cast<BlockArgument>(operand)) {
+          if (auto sourceArg = dyn_cast<BlockArgument>(operand)) {
             // Operand comes from a block argument. If that is the block
             // argument we are analyzing it means there's a cycle (%0 -> %0) and
             // we can ignore it for the purposes of this analysis.
@@ -470,7 +470,8 @@ struct MergeIndexSwitchPattern : public OpRewritePattern<scf::IndexSwitchOp> {
   LogicalResult matchAndRewrite(scf::IndexSwitchOp nextOp,
                                 PatternRewriter &rewriter) const override {
     // Inspect the previous op to see if it's also a switch.
-    auto prevOp = dyn_cast_or_null<scf::IndexSwitchOp>(nextOp->getPrevNode());
+    auto prevOp =
+        dyn_cast_if_present<scf::IndexSwitchOp>(nextOp->getPrevNode());
     if (!prevOp)
       return failure();
 

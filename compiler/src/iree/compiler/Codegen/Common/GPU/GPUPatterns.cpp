@@ -50,9 +50,9 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
                                 PatternRewriter &rewriter) const override {
     auto loc = transferReadOp.getLoc();
     Value vector = transferReadOp.getVector();
-    VectorType vectorType = llvm::cast<VectorType>(vector.getType());
+    VectorType vectorType = cast<VectorType>(vector.getType());
     Value source = transferReadOp.getBase();
-    MemRefType sourceType = llvm::dyn_cast<MemRefType>(source.getType());
+    MemRefType sourceType = dyn_cast<MemRefType>(source.getType());
     // Contiguity check is valid on tensors only.
     if (!sourceType)
       return failure();
@@ -120,7 +120,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
       subViewStrides.push_back(rewriter.getIndexAttr(1));
     }
     MemRefType resultType =
-        llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
+        cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
             vectorShapeCollapse, sourceType, subViewOffsets, subViewSizes,
             subViewStrides));
     Value subView =
@@ -206,7 +206,7 @@ struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {
     if (!hasSharedMemoryAddressSpace(
-            llvm::cast<MemRefType>(op.getMemref().getType())))
+            cast<MemRefType>(op.getMemref().getType())))
       return failure();
     rewriter.eraseOp(op);
     return success();

@@ -6,7 +6,7 @@
     #hal.pipeline.binding<storage_buffer, "ReadOnly">,
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @split_reduction_executable {
-  hal.executable.variant public @split_reduction_variant target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @split_reduction_variant target(<"", "">) {
     hal.executable.export public @split_reduction layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
@@ -76,11 +76,11 @@ hal.executable private @split_reduction_executable {
 
 // Test resolution of split reduction loop with rank > 1.
 
-#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
     #hal.pipeline.binding<storage_buffer, "ReadOnly">,
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @split_reduction_2d_executable {
-  hal.executable.variant public @split_reduction_2d_variant target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @split_reduction_2d_variant target(<"", "">) {
     hal.executable.export public @split_reduction_2d layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5)
@@ -146,7 +146,7 @@ hal.executable private @split_reduction_2d_executable {
     #hal.pipeline.binding<storage_buffer, "ReadOnly">,
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @split_reduction_2d_permuted_mapping_executable {
-  hal.executable.variant public @split_reduction_2d_permuted_mapping_variant target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @split_reduction_2d_permuted_mapping_variant target(<"", "">) {
     hal.executable.export public @split_reduction_2d_permuted_mapping layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)

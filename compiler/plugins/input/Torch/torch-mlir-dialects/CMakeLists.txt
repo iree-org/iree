@@ -8,6 +8,14 @@ set(_TORCH_MLIR_DIALECTS_DIR "${TORCH_MLIR_ROOT_DIR}")
 list(APPEND IREE_COMPILER_TABLEGEN_INCLUDE_DIRS
     "${_TORCH_MLIR_DIALECTS_DIR}/include")
 
+if(MSVC)
+  # MSVC: C4996 is the deprecation warning.
+  add_compile_options(/wd4996)
+else()
+  # GCC/Clang: Use standard deprecation warning flag.
+  add_compile_options(-Wno-deprecated-declarations)
+endif()
+
 iree_cc_library(
   NAME
     defs

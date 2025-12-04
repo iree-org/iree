@@ -20,6 +20,28 @@ util.func public @tensorSizeOfAlignedPackedI1() -> index {
 
 // -----
 
+// CHECK-LABEL: @tensorSizeOfDynamicPackedI1
+util.func public @tensorSizeOfDynamicPackedI1(%arg0: index, %arg1: index) -> index {
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK: %[[MUL:.+]] = arith.muli %arg0, %arg1 overflow<nsw> : index
+  // CHECK: %[[DIV:.+]] = arith.ceildivui %[[MUL]], %[[C8]] : index
+  %0 = stream.tensor.sizeof tensor<?x?xi1, #iree_encoding.packed_storage>{%arg0, %arg1} : index
+  // CHECK: util.return %[[DIV]] : index
+  util.return %0 : index
+}
+
+// -----
+
+// CHECK-LABEL: @tensorSizeOfUnalignedPackedI4
+util.func public @tensorSizeOfUnalignedPackedI4() -> index {
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 4 : index
+  %0 = stream.tensor.sizeof tensor<7xi4, #iree_encoding.packed_storage> : index
+  // CHECK: return %[[C2]] : index
+  util.return %0 : index
+}
+
+// -----
+
 #encoding_layout = #iree_cpu.vmvx_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [4, 16], outerDimsPerm = [0, 1]}}>
 #encoding = #iree_encoding.layout<[#encoding_layout]>
 util.func public @sizeof_lhs_encoding_dynamic_using_layouts(%arg0: index, %arg1: index) -> index {

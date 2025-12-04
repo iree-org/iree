@@ -38,7 +38,38 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 // Maps a resource usage bitfield to a resource lifetime.
+//
+// The GlobalStorage bit acts as a "storage identity" marker indicating the
+// value is or directly references global storage (not just accessed from it).
+// This enables copy-on-write optimizations by preserving Constant lifetime
+// even when used with External/Staging/Indirect operations.
+//
+// Usage bit semantics:
+// - GlobalRead: Value was loaded from a global (access semantics)
+// - GlobalWrite: Value was stored to a global (access semantics)
+// - GlobalStorage: Value IS/references global storage (identity semantics)
+//
+// Priority order (first match wins):
+// 1. GlobalStorage + Constant -> Constant (preserves constant globals)
+// 2. Indirect | External -> External
+// 3. StagingRead | StagingWrite -> Staging
+// 4. Constant -> Constant
+// 5. GlobalRead | GlobalWrite -> Variable if mutated, else Constant
+// 6. Default -> Transient
+//
+// TODO(benvanik): explode the concept of lifetime so we can just specify these
+// bits directly and avoid needing the mapping - doing this the way we are
+// today is a lossy operation that makes subsequent analysis more difficult.
 static Lifetime convertUsageToLifetime(ResourceUsageBitfield usage) {
+  // Special case: if stored to global and constant, preserve Constant.
+  // This prevents External from overriding the global's type constraint.
+  // This is forward-compatible with the UsageAttr migration where this check
+  // becomes unnecessary (constant|global|external is expressible directly).
+  if (bitEnumContains(usage, ResourceUsageBitfield::GlobalStorage) &&
+      bitEnumContains(usage, ResourceUsageBitfield::Constant)) {
+    return Lifetime::Constant;
+  }
+
   if (bitEnumContains(usage, ResourceUsageBitfield::Indirect) ||
       bitEnumContains(usage, ResourceUsageBitfield::External)) {
     return Lifetime::External;
@@ -100,7 +131,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Updates the |arg| type to the lifetime derived by analysis, if needed.
   // Returns true if a change was made.
   bool applyArgTransition(BlockArgument arg, PatternRewriter &rewriter) const {
-    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(arg.getType());
+    auto oldType = dyn_cast<IREE::Stream::ResourceType>(arg.getType());
     if (!oldType)
       return false;
     auto newUsage = analysis.lookupResourceUsage(arg);
@@ -123,7 +154,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Returns true if a change was made.
   bool applyResultTransition(Operation *op, Value result,
                              PatternRewriter &rewriter) const {
-    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(result.getType());
+    auto oldType = dyn_cast<IREE::Stream::ResourceType>(result.getType());
     if (!oldType)
       return false;
     auto newUsage = analysis.lookupResourceUsage(result);
@@ -161,7 +192,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   bool applyResultTransition(Value result, Value resultSize,
                              IREE::Stream::AffinityAttr affinityAttr,
                              PatternRewriter &rewriter) const {
-    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(result.getType());
+    auto oldType = dyn_cast<IREE::Stream::ResourceType>(result.getType());
     if (!oldType)
       return false;
     auto newUsage = analysis.lookupResourceUsage(result);
@@ -179,7 +210,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
         auto consumerOp =
             dyn_cast<IREE::Stream::AsyncTransferOp>(*result.getUsers().begin());
         if (consumerOp) {
-          auto finalType = llvm::cast<IREE::Stream::ResourceType>(
+          auto finalType = cast<IREE::Stream::ResourceType>(
               consumerOp.getResult().getType());
           if (finalType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
             // Already have a transfer to the new lifetime.
@@ -254,8 +285,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
     // Arguments:
     SmallVector<Type> newInputs;
     for (auto inputType : llvm::enumerate(op.getFunctionType().getInputs())) {
-      auto oldType =
-          llvm::dyn_cast<IREE::Stream::ResourceType>(inputType.value());
+      auto oldType = dyn_cast<IREE::Stream::ResourceType>(inputType.value());
       if (!oldType) {
         newInputs.push_back(inputType.value());
       } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
@@ -274,8 +304,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
     SmallVector<Type> newOutputs;
     auto anyReturnOp = getAnyReturnLikeOp(op);
     for (auto outputType : llvm::enumerate(op.getFunctionType().getResults())) {
-      auto oldType =
-          llvm::dyn_cast<IREE::Stream::ResourceType>(outputType.value());
+      auto oldType = dyn_cast<IREE::Stream::ResourceType>(outputType.value());
       if (!oldType) {
         newOutputs.push_back(outputType.value());
       } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
@@ -320,7 +349,7 @@ struct ApplyScfIfOp : public UsageRefinementPattern<mlir::scf::IfOp> {
     bool didChange = this->applyRegionTransitions(op, rewriter);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
         if (this->applyResultTransition(op, result, rewriter))
           didChange |= true;
       }
@@ -337,7 +366,7 @@ struct ApplyScfForOp : public UsageRefinementPattern<mlir::scf::ForOp> {
     bool didChange = this->applyRegionTransitions(op, rewriter);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
         if (this->applyResultTransition(op, result, rewriter))
           didChange |= true;
       }
@@ -353,7 +382,7 @@ struct ApplyScfWhileOp : public UsageRefinementPattern<mlir::scf::WhileOp> {
     bool didChange = this->applyRegionTransitions(op, rewriter);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
         if (this->applyResultTransition(op, result, rewriter))
           didChange |= true;
       }
@@ -376,7 +405,7 @@ struct ApplyGenericOp : public UsageRefinementPattern<Op> {
     rewriter.setInsertionPointAfter(op);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
         if (this->applyResultTransition(op, result, rewriter))
           didChange = true;
       }
@@ -410,7 +439,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
         cast<IREE::Util::SizeAwareOpInterface>(op.getOperation());
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (!llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+      if (!isa<IREE::Stream::ResourceType>(result.getType())) {
         continue;
       }
       auto resultSize = sizeAwareOp.getResultSize(i);
@@ -429,21 +458,53 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
   }
 };
 
+// Update usage of transferred values when they are unknown.
+// AsyncTransferOps with concrete lifetimes are left alone to prevent creating
+// chaining transfers that fight with canonicalization patterns.
+struct ApplyAsyncTransferOp
+    : public UsageRefinementPattern<IREE::Stream::AsyncTransferOp> {
+  using UsageRefinementPattern<
+      IREE::Stream::AsyncTransferOp>::UsageRefinementPattern;
+  LogicalResult matchAndRewrite(IREE::Stream::AsyncTransferOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only refine if the result is unknown.
+    auto resultType =
+        llvm::cast<IREE::Stream::ResourceType>(op.getResult().getType());
+    if (resultType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      return failure();
+    }
+
+    // Get the refined lifetime from usage analysis.
+    auto newUsage = analysis.lookupResourceUsage(op.getResult());
+    auto newLifetime = convertUsageToLifetime(newUsage);
+    auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
+
+    // Directly update the result type without inserting transfers.
+    rewriter.startOpModification(op);
+    op.getResult().setType(newType);
+    rewriter.finalizeOpModification(op);
+
+    return success();
+  }
+};
+
 static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
                                           RewritePatternSet &patterns) {
   // NOTE: only ops that return values or contain regions need to be handled.
   patterns.insert<ApplyInitializerOp, ApplyFuncOp, ApplyScfForOp, ApplyScfIfOp,
-                  ApplyScfWhileOp>(context, analysis);
+                  ApplyScfWhileOp, ApplyAsyncTransferOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::OptimizationBarrierOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
                   ApplyGenericOp<IREE::Util::CallOp>,
                   ApplyGenericOp<mlir::scf::ConditionOp>,
                   ApplyGenericOp<mlir::scf::YieldOp>,
+                  ApplyGenericOp<IREE::Stream::TimepointAwaitOp>,
                   ApplyGenericOp<IREE::Stream::TimepointBarrierOp>>(context,
                                                                     analysis);
   patterns.insert<ApplyStreamableOp<IREE::Stream::ResourceAllocOp>,
                   ApplyStreamableOp<IREE::Stream::ResourceAllocaOp>,
+                  ApplyStreamableOp<IREE::Stream::ResourceTransientsOp>,
                   ApplyStreamableOp<IREE::Stream::TensorImportOp>,
                   ApplyStreamableOp<IREE::Stream::TensorExportOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncAllocaOp>,
@@ -456,7 +517,6 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncCopyOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncCollectiveOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncBarrierOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncTransferOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncLoadOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncStoreOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncDispatchOp>,
@@ -464,7 +524,6 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncExecuteOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncConcurrentOp>,
                   ApplyStreamableOp<IREE::Stream::YieldOp>>(context, analysis);
-  IREE::Stream::AsyncTransferOp::getCanonicalizationPatterns(patterns, context);
 }
 
 //===----------------------------------------------------------------------===//

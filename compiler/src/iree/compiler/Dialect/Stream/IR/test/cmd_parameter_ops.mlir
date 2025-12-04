@@ -16,11 +16,11 @@ util.func private @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<
   %c51_i64 = arith.constant 51 : i64
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  // CHECK: = stream.parameter.load await(%[[WAIT]]) => {
+  // CHECK: = stream.cmd.parameter.load await(%[[WAIT]]) => {
   // CHECK-NEXT: "scope"::"key0"[%c50_i64] : !stream.resource<constant>{%c100},
   // CHECK-NEXT: "scope"::"key1"[%c51_i64] : !stream.resource<constant>{%c200}
   // CHECK-NEXT: } => !stream.timepoint
-  %results:2, %result_timepoint = stream.parameter.load await(%wait) => {
+  %results:2, %result_timepoint = stream.cmd.parameter.load await(%wait) => {
     "scope"::"key0"[%c50_i64] : !stream.resource<constant>{%c100},
     "scope"::"key1"[%c51_i64] : !stream.resource<constant>{%c200}
   } => !stream.timepoint
@@ -34,10 +34,10 @@ util.func private @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<
 util.func private @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.timepoint) {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
-  // CHECK: = stream.parameter.load await(%[[WAIT]]) => {
+  // CHECK: = stream.cmd.parameter.load await(%[[WAIT]]) => {
   // CHECK-NEXT: "key"[%c50_i64] : !stream.resource<constant>{%c100}
   // CHECK-NEXT: } => !stream.timepoint
-  %result, %result_timepoint = stream.parameter.load await(%wait) => {
+  %result, %result_timepoint = stream.cmd.parameter.load await(%wait) => {
     "key"[%c50_i64] : !stream.resource<constant>{%c100}
   } => !stream.timepoint
   util.return %result, %result_timepoint : !stream.resource<constant>, !stream.timepoint
@@ -52,8 +52,8 @@ util.func private @parameterRead(%wait: !stream.timepoint, %target: !stream.reso
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK: = stream.parameter.read await(%[[WAIT]]) => "scope"::"key"[%c50_i64] -> %[[TARGET]][%c100 for %c200] : !stream.resource<transient>{%c300} => !stream.timepoint
-  %timepoint = stream.parameter.read await(%wait) => "scope"::"key"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300} => !stream.timepoint
+  // CHECK: = stream.cmd.parameter.read await(%[[WAIT]]) => "scope"::"key"[%c50_i64] -> %[[TARGET]][%c100 for %c200] : !stream.resource<transient>{%c300} => !stream.timepoint
+  %timepoint = stream.cmd.parameter.read await(%wait) => "scope"::"key"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300} => !stream.timepoint
   util.return %timepoint : !stream.timepoint
 }
 
@@ -66,8 +66,8 @@ util.func private @parameterWrite(%wait: !stream.timepoint, %source: !stream.res
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK: = stream.parameter.write await(%[[WAIT]]) => %[[SOURCE]][%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
-  %timepoint = stream.parameter.write await(%wait) => %source[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
+  // CHECK: = stream.cmd.parameter.write await(%[[WAIT]]) => %[[SOURCE]][%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
+  %timepoint = stream.cmd.parameter.write await(%wait) => %source[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
   util.return %timepoint : !stream.timepoint
 }
 
@@ -86,12 +86,12 @@ util.func private @parameterGather(%wait: !stream.timepoint, %target: !stream.re
   %c201 = arith.constant 201 : index
   %c202 = arith.constant 202 : index
   %c300 = arith.constant 300 : index
-  // CHECK:    = stream.parameter.gather await(%[[WAIT]]) => {
+  // CHECK:    = stream.cmd.parameter.gather await(%[[WAIT]]) => {
   // CHECK-NEXT:   "scope"::"key0"[%c50_i64] -> %[[TARGET]][%c100 for %c200] : !stream.resource<transient>{%c300},
   // CHECK-NEXT:   "scope"::"key1"[%c51_i64] -> %[[TARGET]][%c101 for %c201] : !stream.resource<transient>{%c300},
   // CHECK-NEXT:   "scope"::"key2"[%c52_i64] -> %[[TARGET]][%c102 for %c202] : !stream.resource<transient>{%c300}
   // CHECK-NEXT: } => !stream.timepoint
-  %timepoint = stream.parameter.gather await(%wait) => {
+  %timepoint = stream.cmd.parameter.gather await(%wait) => {
     "scope"::"key0"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300},
     "scope"::"key1"[%c51_i64] -> %target[%c101 for %c201] : !stream.resource<transient>{%c300},
     "scope"::"key2"[%c52_i64] -> %target[%c102 for %c202] : !stream.resource<transient>{%c300}
@@ -111,11 +111,11 @@ util.func private @parameterGatherNoScope(%wait: !stream.timepoint, %target: !st
   %c200 = arith.constant 200 : index
   %c201 = arith.constant 201 : index
   %c300 = arith.constant 300 : index
-  // CHECK:    = stream.parameter.gather await(%[[WAIT]]) => {
+  // CHECK:    = stream.cmd.parameter.gather await(%[[WAIT]]) => {
   // CHECK-NEXT:   "key0"[%c50_i64] -> %[[TARGET]][%c100 for %c200] : !stream.resource<transient>{%c300},
   // CHECK-NEXT:   "key1"[%c51_i64] -> %[[TARGET]][%c101 for %c201] : !stream.resource<transient>{%c300}
   // CHECK-NEXT: } => !stream.timepoint
-  %timepoint = stream.parameter.gather await(%wait) => {
+  %timepoint = stream.cmd.parameter.gather await(%wait) => {
     "key0"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300},
     "key1"[%c51_i64] -> %target[%c101 for %c201] : !stream.resource<transient>{%c300}
   } => !stream.timepoint
@@ -137,12 +137,12 @@ util.func private @parameterScatter(%wait: !stream.timepoint, %source: !stream.r
   %c201 = arith.constant 201 : index
   %c202 = arith.constant 202 : index
   %c300 = arith.constant 300 : index
-  // CHECK:    = stream.parameter.scatter await(%[[WAIT]]) => {
+  // CHECK:    = stream.cmd.parameter.scatter await(%[[WAIT]]) => {
   // CHECK-NEXT:   %[[SOURCE]][%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key0"[%c50_i64],
   // CHECK-NEXT:   %[[SOURCE]][%c101 for %c201] : !stream.resource<transient>{%c300} -> "scope"::"key1"[%c51_i64],
   // CHECK-NEXT:   %[[SOURCE]][%c102 for %c202] : !stream.resource<transient>{%c300} -> "scope"::"key2"[%c52_i64]
   // CHECK-NEXT: } => !stream.timepoint
-  %timepoint = stream.parameter.scatter await(%wait) => {
+  %timepoint = stream.cmd.parameter.scatter await(%wait) => {
     %source[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key0"[%c50_i64],
     %source[%c101 for %c201] : !stream.resource<transient>{%c300} -> "scope"::"key1"[%c51_i64],
     %source[%c102 for %c202] : !stream.resource<transient>{%c300} -> "scope"::"key2"[%c52_i64]

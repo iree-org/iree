@@ -21,13 +21,11 @@ bool SerializableAttr::areCompatible(Attribute lhs, Attribute rhs) {
   if (lhs == rhs) {
     return true;
   }
-  auto lhsEncoding = llvm::dyn_cast_or_null<SerializableAttr>(lhs);
-  auto rhsEncoding = llvm::dyn_cast_or_null<SerializableAttr>(rhs);
-  if (!lhsEncoding || !rhsEncoding) {
-    return false;
-  }
-  return lhsEncoding.isCompatibleWith(rhsEncoding) &&
-         rhsEncoding.isCompatibleWith(lhsEncoding);
+  auto lhsEncoding = dyn_cast_if_present<SerializableAttr>(lhs);
+  auto rhsEncoding = dyn_cast_if_present<SerializableAttr>(rhs);
+
+  return (!lhsEncoding || lhsEncoding.isCompatibleWith(rhsEncoding)) &&
+         (!rhsEncoding || rhsEncoding.isCompatibleWith(lhsEncoding));
 }
 
 std::string stringifyOperandIndex(IntegerAttr valueAttr) {
@@ -50,7 +48,7 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
   linalg::ContractionDimensions cDims =
       linalg::inferContractionDims(linalgOp).value();
   AffineMap map = linalgOp.getIndexingMapsArray().back();
-  auto outType = llvm::cast<ShapedType>(linalgOp.getDpsInits()[0].getType());
+  auto outType = cast<ShapedType>(linalgOp.getDpsInits()[0].getType());
   auto getOutputSizeAtDimPos = [=](unsigned dimPos) -> int64_t {
     return outType.getDimSize(
         map.getResultPosition(getAffineDimExpr(dimPos, linalgOp->getContext()))

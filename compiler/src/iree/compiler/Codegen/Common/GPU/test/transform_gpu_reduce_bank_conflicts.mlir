@@ -2,11 +2,11 @@
 
 // CHECK-LABEL: func.func @pad_alloc
 // CHECK:         %[[A:.*]] = memref.alloc() : memref<64x68xf16, #gpu.address_space<workgroup>>
-// CHECK:         %[[S1:.*]] = memref.subview %[[A]][0, 0] [64, 64] [1, 1] :
-// CHECK-SAME:    memref<64x68xf16, #gpu.address_space<workgroup>> to memref<64x64xf16, strided<[68, 1]>, #gpu.address_space<workgroup>>
-// CHECK:         vector.transfer_read %[[S1]][%{{.*}}, %{{.*}}], %{{.*}} :
+// CHECK:         %[[S1:.*]] = memref.subview %[[A]][0, 0] [64, 64] [1, 1]
+// CHECK-SAME:      memref<64x68xf16, #gpu.address_space<workgroup>> to memref<64x64xf16, strided<[68, 1]>, #gpu.address_space<workgroup>>
+// CHECK:         vector.transfer_read %[[S1]]
 // CHECK-SAME:      memref<64x64xf16, strided<[68, 1]>, #gpu.address_space<workgroup>>, vector<8xf16>
-// CHECK:         vector.transfer_write %{{.*}}, %[[S1]][%{{.*}}, %{{.*}}] :
+// CHECK:         vector.transfer_write %{{.*}}, %[[S1]]
 // CHECK-SAME:      vector<1x8xf16>, memref<64x64xf16, strided<[68, 1]>, #gpu.address_space<workgroup>>
 func.func @pad_alloc() {
   %alloc = memref.alloc() : memref<64x64xf16, #gpu.address_space<workgroup>>

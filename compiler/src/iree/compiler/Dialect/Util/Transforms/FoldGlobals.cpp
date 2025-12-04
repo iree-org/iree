@@ -120,8 +120,8 @@ static bool renameChainedGlobals(GlobalTable &globalTable) {
     for (auto storeOp : global.storeOps) {
       // Check to see if the stored value comes from another global.
       auto *definingOp = storeOp.getStoredGlobalValue().getDefiningOp();
-      if (auto loadOp =
-              dyn_cast_or_null<IREE::Util::GlobalLoadOpInterface>(definingOp)) {
+      if (auto loadOp = dyn_cast_if_present<IREE::Util::GlobalLoadOpInterface>(
+              definingOp)) {
         if (!aliasName) {
           aliasName = loadOp.getGlobalAttr();
         } else if (aliasName != loadOp.getGlobalAttr()) {
@@ -190,7 +190,7 @@ static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
     return arith::ConstantOp::create(builder, loc, type, cast<TypedAttr>(attr));
   } else if (mlir::func::ConstantOp::isBuildableWith(attr, type)) {
     return mlir::func::ConstantOp::create(builder, loc, type,
-                                          llvm::cast<FlatSymbolRefAttr>(attr));
+                                          cast<FlatSymbolRefAttr>(attr));
   }
   // Fallback that asks a dialect to materialize things. This may fail!
   auto *op = attr.getDialect().materializeConstant(builder, attr, type, loc);
@@ -226,8 +226,7 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
       return GlobalAction::PRESERVE;
     }
 
-    if (llvm::isa<IREE::Util::ReferenceTypeInterface>(
-            global.op.getGlobalType())) {
+    if (isa<IREE::Util::ReferenceTypeInterface>(global.op.getGlobalType())) {
       // We only inline value types; reference types have meaning as globals.
       return GlobalAction::PRESERVE;
     }
@@ -308,6 +307,7 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
             context,
             {
                 global.op.getGlobalInitialValue(),
+                TypeAttr::get(global.op.getGlobalType()),
                 DictionaryAttr::get(
                     context, llvm::to_vector(global.op->getDialectAttrs())),
             }),

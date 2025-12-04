@@ -616,8 +616,18 @@ def MaterializeDeviceEncodingPass :
     InterfacePass<"iree-codegen-materialize-device-encoding", "mlir::FunctionOpInterface"> {
   let summary = "Materialize the encoding for tensor as specified by the backend.";
   let options = [
-    Option<"testCLGPUTarget", "test-cl-gpu-target", "bool", /*default=*/"false",
-           "Flag used for lit-testing GPU target only. Not for general usage">,
+    Option<"testGPUEncodingResolver", "test-gpu-encoding-resolver", "detail::TestingResolverKind",
+           /*default=*/"detail::TestingResolverKind::kNone",
+           "Flag used for lit-testing GPU target only. Not for general usage",
+           [{llvm::cl::values(
+             clEnumValN(detail::TestingResolverKind::kGPUDataTiling, "gpu_data_tiling",
+                        "Use iree_gpu.gpu_encoding_resolver<>."),
+             clEnumValN(detail::TestingResolverKind::kGPUPadding, "gpu_padding",
+                        "Use iree_gpu.gpu_padding_resolver<>."),
+             clEnumValN(detail::TestingResolverKind::kNone, "none",
+                        "Ignore testing resolvers and fall back to identity resolver.")
+      )}]>,
+
   ];
 }
 
@@ -625,17 +635,6 @@ def MaterializeDeviceEncodingPass :
 def MaterializeEncodingIntoNopPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-nop", "mlir::FunctionOpInterface"> {
   let summary = "Drop the encodings from tensor types with encodings.";
-}
-
-def MaterializeEncodingIntoPaddingPass :
-    InterfacePass<"iree-codegen-materialize-encoding-into-padding", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize `#iree_encoding.padding` attributes.";
-  let description = [{
-    Handles padding introduced by `padding` encoding layouts, which
-    requires `iree_tensor_ext.dispatch.tensor.load`/`.store` to be adjusted to account for
-    padding regions.
-    Materializes any other encoding layouts into nop.
-  }];
 }
 
 def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "ModuleOp"> {

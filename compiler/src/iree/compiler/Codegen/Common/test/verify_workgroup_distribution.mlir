@@ -14,7 +14,7 @@ func.func @write_outside_workgroup_forall(%i: i32, %out: memref<32xi32, #hal.des
 
 // -----
 
-// CHECK: func @non_workgroup_write_outside_workgroup_forall
+// CHECK-LABEL: func @non_workgroup_write_outside_workgroup_forall
 func.func @non_workgroup_write_outside_workgroup_forall(
   %i: i32, %out: memref<32xi32, #hal.descriptor_type<storage_buffer>>, %out2: memref<32xi32>) {
   scf.forall (%arg0) in (32) {

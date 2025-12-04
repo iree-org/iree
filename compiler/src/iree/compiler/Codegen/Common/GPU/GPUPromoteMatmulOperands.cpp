@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -95,8 +96,13 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   alloc.setMemorySpaceAttr(addressSpace);
   auto copy =
       linalg::CopyOp::create(rewriter, loc, valToMakeShared, alloc.getResult());
-
   Value replacement = copy.getResult(0);
+
+  // Insert a fusion barrier to prevent the copy to workgroup memory from fusing
+  // into the promoted copy.
+  replacement = IREE::Codegen::FusionBarrierOp::create(
+      rewriter, replacement.getLoc(), replacement.getType(), replacement);
+
   // If in extract slice is present we make it consume the new copy.
   if (extractSliceOp) {
     extractSliceOp.getSourceMutable().assign(replacement);

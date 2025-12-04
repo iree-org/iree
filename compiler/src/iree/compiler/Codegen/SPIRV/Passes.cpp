@@ -89,8 +89,8 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
 
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
-  auto fromType = llvm::cast<MemRefType>(from.getType());
-  auto toType = llvm::cast<MemRefType>(to.getType());
+  auto fromType = cast<MemRefType>(from.getType());
+  auto toType = cast<MemRefType>(to.getType());
 
   bool needsBarrier = hasSharedMemoryAddressSpace(fromType) ||
                       hasSharedMemoryAddressSpace(toType);

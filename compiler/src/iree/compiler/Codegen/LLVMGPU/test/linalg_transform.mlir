@@ -34,7 +34,7 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   // workgroup_size is explicitly set to [10, 11].
   // FOREACH-TO-GPU: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = None workgroup_size = [10, 11, 1] subgroup_size = 32>
   // FOREACH-TO-GPU: func.func @matmul_static_dispatch_0()
-  // FOREACH-TO-GPU-SAME: translation_info = #translation
+  // FOREACH-TO-GPU-SAME: translation_info = #[[TRANSLATION]]
   // FOREACH-TO-GPU-DAG: %[[C0:.*]] = arith.constant 0 : index
   // FOREACH-TO-GPU-DAG: %[[C1:.*]] = arith.constant 1 : index
   // FOREACH-TO-GPU-DAG: %[[C5:.*]] = arith.constant 5 : index

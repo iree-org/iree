@@ -34,10 +34,10 @@ module attributes {transform.with_named_sequence} {
     : (!transform.any_op) -> !transform.any_op
     %loop = transform.structured.match ops{["scf.forall"]} in %arg0
     : (!transform.any_op) -> !transform.any_op
-    %a, %b = transform.iree.fuse_consumer %slice_op in (%loop)
+    %_fused_op, %_new_result = transform.iree.fuse_consumer %slice_op in (%loop)
     : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
     %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-     transform.apply_patterns to %func {
+    transform.apply_patterns to %func {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.apply_cse to %func : !transform.any_op

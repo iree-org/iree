@@ -120,7 +120,6 @@ iree_cc_library(
     "LoweringConfigInterpreter.cpp"
     "MaterializeEncoding.cpp"
     "MaterializeEncodingIntoNop.cpp"
-    "MaterializeEncodingIntoPadding.cpp"
     "MaterializeEncodingPatterns.cpp"
     "MaterializeTuningSpecsPass.cpp"
     "MathTransformPass.cpp"

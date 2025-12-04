@@ -25,10 +25,10 @@ struct GlobalPipelineOptions {
   // There are two data-tiling paths. One starts from GlobalOptimization phase
   // and the other starts from DispatchCreation phase. They are mutually
   // exclusive. Only one of them can be enabled at a time. The default is using
-  // the GlobalOptimization data-tiling path, since the other path is still
-  // being developed. The main differnce is that the DispatchCreation
-  // data-tiling path enables more fusion opportunities. Any feature built on
-  // top of GlobalOptimization path will be deprecated eventually.
+  // the DispatchCreation data-tiling path, which enables more fusion
+  // opportunities.
+  // Note that any feature built on top of GlobalOptimization path will be
+  // deprecated eventually.
   bool dataTiling = false;
 
   void bindOptions(OptionsBinder &binder);
@@ -234,6 +234,10 @@ struct DispatchCreationOptions {
 
   // Enables data tiling in dispatch creation phase.
   bool dataTiling = false;
+
+  // Enables aggressive reshape movement (bubbling expand/collapse shapes
+  // across reduction ops).
+  bool enableAggressiveReshapeMovement = false;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<DispatchCreationOptions>;

@@ -7,14 +7,15 @@
 #ifndef IREE_DIALECT_UTIL_IR_UTIL_INTERFACES
 #define IREE_DIALECT_UTIL_IR_UTIL_INTERFACES
 
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/SymbolInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::ClosureOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_ClosureOpInterface : Util_OpInterface<"ClosureOpInterface"> {
 
   let description = [{
     Interface for ops that follow the util dialect closure semantics (explicit
@@ -112,8 +113,7 @@ def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
   ];
 }
 
-def Util_ClosureYieldOpInterface : OpInterface<"ClosureYieldOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_ClosureYieldOpInterface : Util_OpInterface<"ClosureYieldOpInterface"> {
 
   let description = [{
     Interface for ops that yield results from a closure. These also generally
@@ -142,8 +142,7 @@ def Util_ClosureYieldOpInterface : OpInterface<"ClosureYieldOpInterface"> {
 //===----------------------------------------------------------------------===//
 
 def InferIntDivisibilityOpInterface :
-    OpInterface<"InferIntDivisibilityOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+    Util_OpInterface<"InferIntDivisibilityOpInterface"> {
 
   let description = [{
     Allows operations to participate in integer divisibility analysis.
@@ -167,8 +166,7 @@ def InferIntDivisibilityOpInterface :
 // IREE::Util::InitializerOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_InitializerOpInterface : OpInterface<"InitializerOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_InitializerOpInterface : Util_OpInterface<"InitializerOpInterface"> {
 
   let description = [{
     Interface for ops that behave as module-wide initializers.
@@ -198,8 +196,7 @@ def Util_InitializerOpInterface : OpInterface<"InitializerOpInterface"> {
 // IREE::Util::Global*OpInterface[]
 //===----------------------------------------------------------------------===//
 
-def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_GlobalOpInterface : Util_OpInterface<"GlobalOpInterface"> {
 
   let description = [{
     Interface for ops that define global values.
@@ -387,9 +384,7 @@ def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
   }];
 }
 
-class Util_GlobalAccessorOpInterface<string name> : OpInterface<name> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
-
+class Util_GlobalAccessorOpInterface<string name> : Util_OpInterface<name> {
   let extraClassDeclaration = [{
     // Returns the global name accessed by the op.
     StringRef getGlobalName() {
@@ -579,8 +574,7 @@ def Util_GlobalStoreOpInterface : Util_GlobalAccessorOpInterface<"GlobalStoreOpI
   ];
 }
 
-class Util_GlobalIndirectAccessorOpInterface<string name> : OpInterface<name> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+class Util_GlobalIndirectAccessorOpInterface<string name> : Util_OpInterface<name> {
 }
 
 def Util_GlobalLoadIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface<"GlobalLoadIndirectOpInterface"> {
@@ -657,8 +651,7 @@ def Util_GlobalStoreIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface
 // IREE::Util::NumericCastOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_NumericCastOpInterface : Util_OpInterface<"NumericCastOpInterface"> {
 
   let description = [{
     Applied to numeric casting ops which can convert between different numeric
@@ -752,8 +745,7 @@ def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
 
   let description = [{
     An operation that "ties" one or more results to its operands indicating
@@ -989,8 +981,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
 // IREE::Util::ShapeAware* interfaces
 //===----------------------------------------------------------------------===//
 
-def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_ShapeAwareOp : Util_OpInterface<"ShapeAwareOpInterface"> {
 
   let description = [{
     An operation that is able to provide dynamic shape dimensions for all
@@ -1071,8 +1062,7 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
 // IREE::Util::SizeAware* interfaces
 //===----------------------------------------------------------------------===//
 
-def Util_InferTypeSize : TypeInterface<"InferTypeSizeInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_InferTypeSize : Util_TypeInterface<"InferTypeSizeInterface"> {
 
   let description = [{
     Allows types to be queried for their size by inserting the required logic.
@@ -1088,8 +1078,7 @@ def Util_InferTypeSize : TypeInterface<"InferTypeSizeInterface"> {
   ];
 }
 
-def Util_SizeAwareType : TypeInterface<"SizeAwareTypeInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_SizeAwareType : Util_TypeInterface<"SizeAwareTypeInterface"> {
 
   let description = [{
     Denotes that a type is size-aware and must always have a size value
@@ -1110,8 +1099,7 @@ def Util_SizeAwareType : TypeInterface<"SizeAwareTypeInterface"> {
   }];
 }
 
-def Util_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_SizeAwareOp : Util_OpInterface<"SizeAwareOpInterface"> {
 
   let description = [{
     An operation that is able to provide size values for all size-aware operands
@@ -1140,8 +1128,7 @@ def Util_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
   ];
 }
 
-def Util_SizedStorageAttr : AttrInterface<"SizedStorageAttr"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_SizedStorageAttr : Util_AttrInterface<"SizedStorageAttr"> {
 
   let description = [{
     Interface used to query storage requirements for an attribute that is backed
@@ -1166,8 +1153,7 @@ def Util_SizedStorageAttr : AttrInterface<"SizedStorageAttr"> {
 // IREE::Util::ReferenceTypeInterface
 //===----------------------------------------------------------------------===//
 
-def Util_ReferenceType : TypeInterface<"ReferenceTypeInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_ReferenceType : Util_TypeInterface<"ReferenceTypeInterface"> {
 
   let description = [{
     Interface used to mark types as passed by-reference. These types may have
@@ -1180,8 +1166,7 @@ def Util_ReferenceType : TypeInterface<"ReferenceTypeInterface"> {
 // IREE::Util::GlobalTypeInterface
 //===----------------------------------------------------------------------===//
 
-def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_GlobalType : Util_TypeInterface<"GlobalTypeInterface"> {
 
   let description = [{
     Interface used to mark types as supported for global variables.
@@ -1215,8 +1200,7 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
 // IREE::Util::Hoistable*Interface
 //===----------------------------------------------------------------------===//
 
-def Util_HoistableAttrInterface : AttrInterface<"HoistableAttrInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_HoistableAttrInterface : Util_AttrInterface<"HoistableAttrInterface"> {
 
   let description = [{
     Interface used to control hoisting of dialect attributes associated with
@@ -1256,8 +1240,7 @@ def Util_HoistableAttrInterface : AttrInterface<"HoistableAttrInterface"> {
   }];
 }
 
-def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_HoistableOpInterface : Util_OpInterface<"HoistableOpInterface"> {
 
   let description = [{
     Interface used to control hoisting of ops into globals.
@@ -1319,8 +1302,7 @@ def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {
   ];
 }
 
-def Util_HoistableType : TypeInterface<"HoistableTypeInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_HoistableType : Util_TypeInterface<"HoistableTypeInterface"> {
 
   let description = [{
     Interface used to control hoisting of variables into globals. It can be
@@ -1411,8 +1393,7 @@ def Util_HoistableType : TypeInterface<"HoistableTypeInterface"> {
 // IREE::Util::Subrange*Interface
 //===----------------------------------------------------------------------===//
 
-def Util_SubrangeType : TypeInterface<"SubrangeTypeInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_SubrangeType : Util_TypeInterface<"SubrangeTypeInterface"> {
 
   let description = [{
     Interface used on size-aware types that can represent linear subranges as an
@@ -1439,8 +1420,7 @@ def Util_SubrangeType : TypeInterface<"SubrangeTypeInterface"> {
   ];
 }
 
-def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_SubrangeOp : Util_OpInterface<"SubrangeOpInterface"> {
 
   let description = [{
     A size-aware operation taking a subrange on a resource.
@@ -1496,8 +1476,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
   ];
 }
 
-def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_SubrangeOperandOpInterface : Util_OpInterface<"SubrangeOperandOpInterface"> {
 
   let description = [{
     Interface for operations that consume subranges of size-aware resources.
@@ -1528,11 +1507,36 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::CallAnnotationAttrInterface
+//===----------------------------------------------------------------------===//
+
+def Util_CallAnnotationAttrInterface : Util_AttrInterface<"CallAnnotationAttrInterface"> {
+  let description = [{
+    Interface for attributes annotating a function or function call that should
+    be propagated from functions to their call sites. This allows for local
+    analysis to vary on the behavior of a callee without needing a non-local
+    symbol lookup.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if this attribute should be propagated to call sites.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"shouldPropagateToCallSite",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{ return true; }]
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::InliningPolicyAttrInterface
 //===----------------------------------------------------------------------===//
 
-def Util_InliningPolicyAttrInterface : AttrInterface<"InliningPolicyAttrInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def Util_InliningPolicyAttrInterface : Util_AttrInterface<"InliningPolicyAttrInterface"> {
 
   let description = [{
     Interface allowing attributes to control the inlining behavior of functions
@@ -1561,10 +1565,9 @@ def Util_InliningPolicyAttrInterface : AttrInterface<"InliningPolicyAttrInterfac
 //===----------------------------------------------------------------------===//
 
 def Util_SerializableAttrInterface :
-  AttrInterface<"SerializableAttrInterface", [
+  Util_AttrInterface<"SerializableAttrInterface", [
     Util_SizedStorageAttr,
   ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
     Interface used to serialize constant values in binary format.
@@ -1642,9 +1645,7 @@ def Util_SerializableAttrInterface :
 // IREE::Util::StoredModuleAttrInterface
 //===----------------------------------------------------------------------===//
 
-def Util_StoredModuleAttrInterface : AttrInterface<"StoredModuleAttrInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
-
+def Util_StoredModuleAttrInterface : Util_AttrInterface<"StoredModuleAttrInterface"> {
   let description = [{
     Interface allowing attributes to store a reference to an underlying readonly
     module. Thread safety of accesses to the module are managed by the
@@ -1671,6 +1672,151 @@ def Util_StoredModuleAttrInterface : AttrInterface<"StoredModuleAttrInterface"> 
       ),
       /*methodBody=*/[{}]
     >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::MutableRegionBranchOpInterface
+//===----------------------------------------------------------------------===//
+
+def Util_MutableRegionBranchOpInterface : Util_OpInterface<"MutableRegionBranchOpInterface"> {
+  let description = [{
+    Interface for RegionBranchOpInterface operations that support mutation
+    for type expansion passes (e.g., PropagateTimepoints, PropagateSubviews).
+
+    This interface enables generic SROA-like passes to handle control flow ops
+    like scf.for, scf.if, scf.while without hardcoding each op type.
+
+    The interface separates concerns:
+    - Type expansion policy (provided by the pass via TypeExpander callback)
+    - Op-specific mutation mechanics (provided by this interface)
+    - Metadata tracking (provided by the pass via MetadataMap callback)
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Rebuild this operation with expanded types for operands and results.
+
+        This is the core mutation method that:
+        1. Expands operands using expandOperandFn
+        2. Expands result types using expandTypeFn
+        3. Creates a new op with expanded signature
+        4. Populates block arguments with expansion metadata
+        5. Calls wrapExpandedBlockArgFn to create reconstruction ops
+        6. Recursively processes nested regions
+
+        The pass provides:
+        - expandTypeFn: Type -> SmallVector<Type> (e.g., resource -> [resource, timepoint])
+        - expandOperandFn: Value -> SmallVector<Value> (e.g., lookup+consume timepoint)
+        - wrapExpandedBlockArgFn: Optional callback invoked after block arg expansion.
+          Receives the original block arg, the expanded values (1:N), and a builder.
+          Returns the replacement value to use for all uses of the original arg.
+          If std::nullopt, no wrapping is performed.
+        - expandRegionFn: Region -> void (recursively expand ops in region)
+        - builder: Where to insert the new op
+
+        Returns the new operation that replaces this one, or nullptr if the
+        operation cannot be rebuilt.
+      }],
+      /*retTy=*/"::mlir::Operation *",
+      /*methodName=*/"rebuildWithExpandedTypes",
+      /*args=*/(ins
+        "::llvm::function_ref<void(::mlir::Type, ::llvm::SmallVectorImpl<::mlir::Type> &)>":$expandTypeFn,
+        "::llvm::function_ref<void(::mlir::Value, ::llvm::SmallVectorImpl<::mlir::Value> &, ::mlir::OpBuilder &)>":$expandOperandFn,
+        "::std::optional<::llvm::function_ref<::mlir::Value(::mlir::Location, ::mlir::Value, ::mlir::ValueRange, ::mlir::OpBuilder &)>>":$wrapExpandedBlockArgFn,
+        "::llvm::function_ref<void(::mlir::Region &, bool /*canModifyEntryBlock*/)>":$expandRegionFn,
+        "::mlir::OpBuilder &":$builder
+      )
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns which block arguments should NOT be expanded.
+
+        For scf.for: the induction variable (first arg of body)
+        For scf.while: typically none
+        For scf.if: none (no block args)
+
+        Returns a BitVector with bits set for args that should be preserved.
+        An empty BitVector means all arguments can be expanded.
+      }],
+      /*retTy=*/"::llvm::BitVector",
+      /*methodName=*/"getPreservedBlockArguments",
+      /*args=*/(ins "unsigned":$regionIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // By default, all block arguments can be expanded.
+        if (regionIndex >= $_op->getNumRegions()) {
+          return ::llvm::BitVector();
+        }
+        auto &region = $_op->getRegion(regionIndex);
+        if (region.empty()) {
+          return ::llvm::BitVector();
+        }
+        return ::llvm::BitVector(region.front().getNumArguments());
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the operands that correspond to region entry block arguments.
+
+        For scf.for: iter_args (not lb, ub, step)
+        For scf.if: {} (no operands map to block args)
+        For scf.while: before/after operands
+
+        This enables the interface to map expanded operands to expanded block args.
+      }],
+      /*retTy=*/"::mlir::OperandRange",
+      /*methodName=*/"getRegionEntryOperands",
+      /*args=*/(ins "unsigned":$regionIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // By default, assume all operands map to entry block args.
+        return $_op->getOperands();
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the results that correspond to region exit values.
+
+        For scf.for: all results correspond to yielded values
+        For scf.if: all results correspond to yielded values
+        For scf.while: results correspond to 'after' region yields
+
+        Used to map expanded yields to expanded results.
+      }],
+      /*retTy=*/"::mlir::ResultRange",
+      /*methodName=*/"getRegionExitResults",
+      /*args=*/(ins "unsigned":$regionIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // By default, assume all results correspond to region exit values.
+        return $_op->getResults();
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the terminator operands that should be expanded.
+
+        For scf.yield in scf.for: all operands
+        For scf.yield in scf.if: all operands
+        For scf.condition: all operands except the condition i1
+
+        This is needed because not all terminator operands are iteration values.
+      }],
+      /*retTy=*/"::mlir::OperandRange",
+      /*methodName=*/"getExpandableTerminatorOperands",
+      /*args=*/(ins "::mlir::Operation *":$terminator, "unsigned":$regionIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // By default, all terminator operands are expandable.
+        return terminator->getOperands();
+      }]
+    >
   ];
 }
 

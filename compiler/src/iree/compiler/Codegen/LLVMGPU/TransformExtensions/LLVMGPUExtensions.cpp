@@ -363,7 +363,7 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   MemRefType memrefType;
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
+  if (auto vectorType = dyn_cast<VectorType>(type)) {
     memrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType(),
                         MemRefLayoutAttrInterface{}, addressSpaceAttr);
@@ -487,7 +487,7 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
 
 static AffineMap simpleDistributionFunction(Value val) {
   AffineMap map = AffineMap::get(val.getContext());
-  auto vecType = llvm::dyn_cast<VectorType>(val.getType());
+  auto vecType = dyn_cast<VectorType>(val.getType());
   if (!vecType)
     return map;
   // Create a map (d0, d1) -> (d1) to distribute along the inner
@@ -1451,9 +1451,11 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   Value laneId =
       gpu::ThreadIdOp::create(rewriter, target.getLoc(), gpu::Dimension::x);
   int64_t subgroupSize = getSubgroupSize();
+  ArrayRef<int64_t> workgroupSize = getWorkgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
+                                                workgroupSize);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }
@@ -1482,7 +1484,7 @@ transform_dialect::CreateMatmulMfmaTileSizesOp::apply(
   auto payload = state.getPayloadOps(getTarget());
   Operation *target = *payload.begin();
   ArrayRef<int64_t> shape =
-      llvm::cast<ShapedType>(target->getResult(0).getType()).getShape();
+      cast<ShapedType>(target->getResult(0).getType()).getShape();
   if (shape.size() != 2) {
     return emitDefiniteFailure() << "matmul shape size should be 2";
   }

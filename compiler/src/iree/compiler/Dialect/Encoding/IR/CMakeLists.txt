@@ -63,8 +63,8 @@ iree_tablegen_library(
   TD_FILE
     "EncodingAttrs.td"
   OUTS
-    --gen-enum-decls EncodingEnums.h.inc
-    --gen-enum-defs EncodingEnums.cpp.inc
+    --gen-enum-decls --dialect=iree_encoding EncodingEnums.h.inc
+    --gen-enum-defs --dialect=iree_encoding EncodingEnums.cpp.inc
 )
 
 iree_tablegen_library(

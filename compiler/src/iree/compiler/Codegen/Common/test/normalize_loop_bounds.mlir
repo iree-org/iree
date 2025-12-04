@@ -112,7 +112,7 @@ module {
 
 // CHECK-DAG:   #[[$MAP0:.+]] = affine_map<(d0) -> (d0 * 4 + 4)>
 // CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0) -> (d0 * 2 + 2)>
-// CHECK-LABEL: func.func @forall_normalize_lowerbound
+// CHECK-LABEL: func.func @forall_normalize_lowerbound_and_step
 // CHECK:       scf.forall (%[[ARG0:.+]], %[[ARG1:.+]]) in (3, 3)
 // CHECK-DAG:     affine.apply #[[$MAP1]](%[[ARG0]])
 // CHECK-DAG:     affine.apply #[[$MAP0]](%[[ARG1]])

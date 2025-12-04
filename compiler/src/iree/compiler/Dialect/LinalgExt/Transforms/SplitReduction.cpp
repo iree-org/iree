@@ -661,9 +661,21 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         if (outIdx.getType() != reductionIdx.getType())
           reductionIdx = arith::IndexCastOp::create(b, loc, outIdx.getType(),
                                                     reductionIdx);
-        Value maxVal = arith::MaximumFOp::create(b, loc, in, outVal);
-        Value cmp = arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, in,
-                                          outVal);
+        Value inCast = in;
+        Type inType = in.getType();
+        Type outType = outVal.getType();
+        unsigned inBitWidth = inType.getIntOrFloatBitWidth();
+        unsigned outBitWidth = outType.getIntOrFloatBitWidth();
+
+        if (outBitWidth > inBitWidth) {
+          inCast = arith::ExtFOp::create(b, loc, outVal.getType(), in);
+        } else if (outBitWidth < inBitWidth) {
+          inCast = arith::TruncFOp::create(b, loc, outVal.getType(), in);
+        }
+
+        Value maxVal = arith::MaximumFOp::create(b, loc, inCast, outVal);
+        Value cmp = arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT,
+                                          inCast, outVal);
         Value selIdx =
             arith::SelectOp::create(b, loc, cmp, reductionIdx, outIdx);
         linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});

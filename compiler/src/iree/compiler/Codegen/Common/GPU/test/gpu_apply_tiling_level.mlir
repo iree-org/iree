@@ -71,9 +71,9 @@ module {
 func.func @matmul_transpose_b(%5: tensor<64x64xf32>, %6: tensor<64x1280xf16>, %7: tensor<64x1280xf16>) -> tensor<64x64xf32> {
   %c4 = arith.constant 4 : index
   %c1280 = arith.constant 1280 : index
-  %cst = arith.constant 0.000000e+00 : f16
+  %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %8 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
   %9 = tensor.empty() : tensor<64x1280xf16>
   %10 = tensor.empty() : tensor<64x1280xf16>
   %11 = scf.for %arg0 = %c0 to %c1280 step %c4 iter_args(%arg1 = %8) -> (tensor<64x64xf32>) {
@@ -113,7 +113,6 @@ func.func @matmul_transpose_b(%5: tensor<64x64xf32>, %6: tensor<64x1280xf16>, %7
 // -----
 
 #config = #iree_gpu.lowering_config<{reduction = [0, 8]}>
-#map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #map2 = affine_map<(d0, d1) -> (d0)>
 func.func @reduction(%3: tensor<128x384xf32>) -> tensor<128xf32> {
@@ -163,7 +162,7 @@ func.func @matmul_fuse(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tensor<
 // CHECK-LABEL: func.func @matmul_fuse
 //       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c8
 //       CHECK:     %[[ELEMWISE:.+]] = linalg.generic {{.*}} ins(%{{.*}} : tensor<64x8xf32>)
-//       CHECK:     %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[ELEMWISE]], {{.*}} : tensor<64x8xf32>, tensor<8x64xf32>)
+//       CHECK:     linalg.matmul {{.*}} ins(%[[ELEMWISE]], {{.*}} : tensor<64x8xf32>, tensor<8x64xf32>)
 
 // -----
 
@@ -179,13 +178,13 @@ func.func @matmul_fuse_destination(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>)
 
 // Verify that destinations are not fused for reduction tiling.
 // CHECK-LABEL: func.func @matmul_fuse_destination
-//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%{{.*}} : tensor<64x64xf32>)
-//       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c8 iter_args(%[[ITER:.+]] = %[[FILL]]
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%{{.*}} : f32)
+//       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c8 iter_args({{.+}} = %[[FILL]]
 //       CHECK:     linalg.matmul
 
 // THREAD-LABEL: func.func @matmul_fuse_destination
 //       THREAD:   %[[EMPTY:.+]] = tensor.empty() : tensor<64x64xf32>
-//       THREAD:   scf.forall {{.*}} shared_outs(%[[INIT:.+]] = %[[EMPTY]]
+//       THREAD:   scf.forall {{.*}} shared_outs({{.+}} = %[[EMPTY]]
 //       THREAD:     linalg.fill
 //       THREAD:     linalg.matmul
 
@@ -212,7 +211,7 @@ func.func @matmul_cleanup(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tens
 //       THREAD:     scf.forall
 //   THREAD-DAG:       %[[LHS:.+]] = tensor.extract_slice %[[A]]
 //   THREAD-DAG:       %[[RHS:.+]] = tensor.extract_slice %[[B]]
-//       THREAD:       %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[LHS]], %[[RHS]] : tensor<8x8xf32>, tensor<8x8xf32>)
+//       THREAD:       linalg.matmul {{.*}} ins(%[[LHS]], %[[RHS]] : tensor<8x8xf32>, tensor<8x8xf32>)
 
 // -----
 
@@ -535,8 +534,7 @@ func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
 // check if the tiling implementation itself is correct (it should be tested
 // in the partial tiling unit tests).
 // PARTRED-LABEL: func.func @partial_reduction
-//   PARTRED-DAG:  %[[DIM0:.+]]  = tensor.dim %{{.*}}, %c0
-//   PARTRED-DAG:  %[[DIM1:.+]]  = tensor.dim %{{.*}}, %c1
+//   PARTRED-DAG:   %[[DIM1:.+]]  = tensor.dim %{{.*}}, %c1
 //   PARTRED-DAG:   %[[FULL:.+]] = linalg.fill {{.*}} tensor<?xf32>
 //   PARTRED-DAG:   %[[PART:.+]] = linalg.fill {{.*}} tensor<?x8xf32>
 //       PARTRED:   %[[OUT:.+]] = scf.for %{{.*}} = %c0 to %[[DIM1]] step %c8 iter_args(%{{.*}} = %[[PART]])
@@ -676,6 +674,39 @@ module {
 
 // SERIAL-LABEL: func.func @serial_tiling
 // SERIAL: scf.forall ({{.*}}) = (0) to (256) step (16)
+// SERIAL: linalg.generic
+// SERIAL: scf.forall.in_parallel
+// SERIAL-NOT: mapping
+
+// -----
+
+#config = #iree_gpu.lowering_config<{serial = [0, 16]}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @serial_tiling_consumer_fusion(%3: tensor<4x256xf32>, %4: tensor<4x256xf32>, %5: tensor<4x256xf32>) -> tensor<4x256xf32> {
+    %6 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]
+      } ins(%3, %4 : tensor<4x256xf32>, tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %7 = arith.addf %in, %in_0 : f32
+      linalg.yield %7 : f32
+    } -> tensor<4x256xf32>
+    %out = linalg.generic {
+      indexing_maps = [#map, #map],
+      iterator_types = ["parallel", "parallel"]
+    } ins(%6 : tensor<4x256xf32>) outs(%5 : tensor<4x256xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %8 = arith.mulf %in, %in : f32
+      linalg.yield %8 : f32
+    }-> tensor<4x256xf32>
+    return %out : tensor<4x256xf32>
+  }
+}
+
+// SERIAL-LABEL: func.func @serial_tiling_consumer_fusion
+// SERIAL: scf.forall ({{.*}}) = (0) to (256) step (16)
+// SERIAL: linalg.generic
 // SERIAL: linalg.generic
 // SERIAL: scf.forall.in_parallel
 // SERIAL-NOT: mapping

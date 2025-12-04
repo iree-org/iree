@@ -38,7 +38,7 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
                  8);
   // - Ensure that (K0 * {LHS,RHS} element bits) is a multiple of 8 bits.
   int lhs_bits = iree_uk_type_bit_count(iree_uk_mmt4d_lhs_type(mmt4d_type));
-  int rhs_bits = iree_uk_type_bit_count(iree_uk_mmt4d_lhs_type(mmt4d_type));
+  int rhs_bits = iree_uk_type_bit_count(iree_uk_mmt4d_rhs_type(mmt4d_type));
   IREE_UK_ASSERT(!((params->K0 * lhs_bits) % 8));
   IREE_UK_ASSERT(!((params->K0 * rhs_bits) % 8));
   // - Ensure that {LHS,RHS} strides are multiples of 8 bits.
@@ -85,6 +85,7 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
     char* out_tile = out_tile_row;
     const char* rhs_panel = rhs_panel_start;
     // Prefetches needed on ARM Cortex-X2, Issue #13332.
+    // Reevaluated 2025-11 on AMD Zen5 (x86), also slightly beneficial there.
     IREE_UK_PREFETCH_RW(out_tile_row, IREE_UK_PREFETCH_LOCALITY_L3);
     IREE_UK_PREFETCH_RO(lhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
     IREE_UK_PREFETCH_RO(rhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);

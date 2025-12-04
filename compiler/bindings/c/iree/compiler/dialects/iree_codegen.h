@@ -91,6 +91,53 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
 MLIR_CAPI_EXPORTED bool
 ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op);
 
+struct ireeCodegenIGEMMGenericConvDetails {
+  // Indexing maps for IGEMM contraction (ArrayAttr of AffineMapAttr).
+  MlirAttribute igemmContractionMaps;
+  // Loop bounds for IGEMM indexing (I64ArrayAttr).
+  MlirAttribute igemmLoopBounds;
+  // Loop iterator types for IGEMM indexing (ArrayAttr of StringAttr).
+  MlirAttribute igemmLoopIterators;
+  // Output permutation for im2col tensor (I64ArrayAttr).
+  MlirAttribute im2colOutputPerm;
+  // Filter reassociation indices (ArrayAttr of ArrayAttr of I64).
+  MlirAttribute filterReassocIndices;
+  // True if output channel precedes spatial dims, causing filter and input
+  // operands to be swapped in igemmContractionMaps/igemmOperands.
+  bool isOutputChannelFirst;
+  // Mapping from convolution dimensions to IGEMM dimensions (ArrayAttr of
+  // [conv_dim, igemm_dim] pairs). Many-to-one: multiple conv dims can map to
+  // the same IGEMM dim. IGEMM dims are indices into igemmLoopBounds/Iterators.
+  MlirAttribute convToIgemmDimMap;
+};
+
+// Checks if IGEMM generic convolution details can be queried for the given
+// operation.
+MLIR_CAPI_EXPORTED bool ireeCodegenHasIGEMMGenericConvDetails(MlirOperation op);
+
+// Gets IGEMM generic convolution details for the given operation.
+MLIR_CAPI_EXPORTED ireeCodegenIGEMMGenericConvDetails
+ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op);
+
+struct ireeCodegenScaledContractionDimensions {
+  // Batch dimension for scaled contraction (ArrayAttr).
+  MlirAttribute batch;
+  // M dimension for scaled contraction (ArrayAttr).
+  MlirAttribute m;
+  // N dimension for scaled contraction (ArrayAttr).
+  MlirAttribute n;
+  // K outer reduction dimension for scaled contraction (ArrayAttr).
+  MlirAttribute k;
+  // K blocking dimension for scaled contraction (ArrayAttr).
+  MlirAttribute kB;
+};
+
+MLIR_CAPI_EXPORTED bool
+ireeCodegenMlirOperationIsAScaledContractionOp(MlirOperation op);
+
+MLIR_CAPI_EXPORTED ireeCodegenScaledContractionDimensions
+ireeCodegenInferScaledContractionDimensions(MlirOperation op);
+
 #ifdef __cplusplus
 }
 #endif

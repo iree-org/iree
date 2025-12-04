@@ -32,13 +32,14 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRArithDialect
+    MLIRControlFlowInterfaces
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgOpsIncGenLib
     MLIRLinalgStructuredOpsIncGenLib
     MLIRMLProgramDialect
-    MLIRMemRefDialect
+    MLIRSCFDialect
     MLIRTensorDialect
     MLIRValueBoundsOpInterface
     iree::compiler::Dialect::Encoding::IR

@@ -105,7 +105,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK: #[[$MAP:.+]] = affine_map<(d0) -> (d0)>
 // CHECK: #[[$MAP1:.+]] = affine_map<(d0) -> ()>
 
-// CHECK-LABEL: func @convert_to_mfma_16x16x16
+// CHECK-LABEL: func @convert_to_mfma_16x16x16_transpose_b
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<2x16x16xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<2x16x16xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<16x16xf32>

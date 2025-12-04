@@ -3,9 +3,10 @@
 // RUN:   | FileCheck %s
 
 // Check that we do not materialize any tuning spec when there's no default spec for the given
-// target (since we do not set any target)
-// CHECK:        module {
-// CHECK-LABEL:    func.func @main_0
+// target (since we do not set any target).
+
+// CHECK-LABEL: func.func @main_0
+// CHECK-NOT:   iree_codegen.tuning_spec_mlirbc
 
 module {
   func.func @main_0() {

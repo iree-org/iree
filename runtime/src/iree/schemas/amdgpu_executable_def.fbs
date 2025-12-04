@@ -51,6 +51,10 @@ table ModuleDef {
 }
 
 table ExecutableDef {
+  // Canonical ISA name this executable has been compiled for.
+  // E.g. `amdgcn-amd-amdhsa--gfx1100`
+  isa:string;
+
   // Exported functions in canonical executable entry point order.
   exports:[ExportDef];
 

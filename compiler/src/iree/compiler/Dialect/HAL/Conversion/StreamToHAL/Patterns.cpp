@@ -268,7 +268,7 @@ struct ResourceTryMapOpPattern
   matchAndRewrite(IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto resourceType =
-        llvm::cast<IREE::Stream::ResourceType>(tryMapOp.getResult().getType());
+        cast<IREE::Stream::ResourceType>(tryMapOp.getResult().getType());
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
@@ -476,7 +476,7 @@ struct TensorImportBufferOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!llvm::isa<IREE::HAL::BufferType>(importOp.getSource().getType())) {
+    if (!isa<IREE::HAL::BufferType>(importOp.getSource().getType())) {
       return failure();
     }
 
@@ -490,7 +490,7 @@ struct TensorImportBufferOpPattern
     // Assert the storage is compatible with our expected device and usage.
     auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
     auto resourceType =
-        llvm::cast<IREE::Stream::ResourceType>(importOp.getResult().getType());
+        cast<IREE::Stream::ResourceType>(importOp.getResult().getType());
     if (failed(buildStorageAssertions(
             importOp.getLoc(), adaptor.getSource(), message, targetAllocator,
             adaptor.getResultSize(), resourceType, rewriter))) {
@@ -508,8 +508,8 @@ struct TensorImportBufferViewOpPattern
   matchAndRewrite(IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto sourceType = importOp.getSource().getType();
-    if (!llvm::isa<IREE::HAL::BufferViewType>(sourceType) &&
-        !llvm::isa<TensorType>(sourceType)) {
+    if (!isa<IREE::HAL::BufferViewType>(sourceType) &&
+        !isa<TensorType>(sourceType)) {
       return failure();
     }
 
@@ -526,7 +526,7 @@ struct TensorImportBufferViewOpPattern
     // Assert the storage is compatible with our expected device and usage.
     auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
     auto resourceType =
-        llvm::cast<IREE::Stream::ResourceType>(importOp.getResult().getType());
+        cast<IREE::Stream::ResourceType>(importOp.getResult().getType());
     if (failed(buildStorageAssertions(loc, bufferOp.getResult(), message,
                                       targetAllocator, adaptor.getResultSize(),
                                       resourceType, rewriter))) {
@@ -543,7 +543,7 @@ struct TensorExportBufferOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!llvm::isa<IREE::HAL::BufferType>(exportOp.getResult().getType())) {
+    if (!isa<IREE::HAL::BufferType>(exportOp.getResult().getType())) {
       return failure();
     }
     rewriter.replaceOp(exportOp, adaptor.getSource());
@@ -558,13 +558,13 @@ struct TensorExportBufferViewOpPattern
   matchAndRewrite(IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto targetType = exportOp.getResult().getType();
-    if (!llvm::isa<IREE::HAL::BufferViewType>(targetType) &&
-        !llvm::isa<TensorType>(targetType)) {
+    if (!isa<IREE::HAL::BufferViewType>(targetType) &&
+        !isa<TensorType>(targetType)) {
       return failure();
     }
 
     auto loc = exportOp.getLoc();
-    auto tensorType = llvm::cast<RankedTensorType>(adaptor.getSourceEncoding());
+    auto tensorType = cast<RankedTensorType>(adaptor.getSourceEncoding());
     auto dynamicDims = adaptor.getSourceEncodingDims();
 
     // NOTE: we should have verified supported encodings/types at entry into the
@@ -1105,7 +1105,7 @@ struct CmdCallOpPattern
     size_t resourceIndex = 0;
     for (auto [originalOperand, convertedOperand] : llvm::zip_equal(
              callOp.getResourceOperands(), adaptor.getResourceOperands())) {
-      if (llvm::isa<IREE::Stream::ResourceType>(originalOperand.getType())) {
+      if (isa<IREE::Stream::ResourceType>(originalOperand.getType())) {
         // Resource type, pass binding index or buffer and offset/length.
         auto binding = commandBufferMapping.resolveBinding(
             callOp.getLoc(), originalOperand, convertedOperand,
@@ -1487,7 +1487,7 @@ struct TimepointImportOpPattern
     // Only handle imports from HAL semaphores _or_ fences.
     auto operands = adaptor.getOperands();
     if (operands.size() == 1 &&
-        llvm::isa<IREE::HAL::FenceType>(operands[0].getType())) {
+        isa<IREE::HAL::FenceType>(operands[0].getType())) {
       rewriter.replaceOp(importOp, operands[0]);
       return success();
     } else {
@@ -1505,7 +1505,7 @@ struct TimepointExportOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle exports into HAL fences.
     if (exportOp.getNumResults() != 1 ||
-        !llvm::isa<IREE::HAL::FenceType>(exportOp.getResult(0).getType())) {
+        !isa<IREE::HAL::FenceType>(exportOp.getResult(0).getType())) {
       return rewriter.notifyMatchFailure(
           exportOp, "only exports to HAL fences are supported");
     }
@@ -1524,7 +1524,7 @@ struct TimepointChainExternalOpPattern
     // Only handle exports into HAL fences.
     auto externalValues = exportOp.getExternalValues();
     if (externalValues.size() != 1 ||
-        !llvm::isa<IREE::HAL::FenceType>(externalValues[0].getType())) {
+        !isa<IREE::HAL::FenceType>(externalValues[0].getType())) {
       return rewriter.notifyMatchFailure(
           exportOp, "only exports to HAL fences are supported");
     }
@@ -1713,7 +1713,7 @@ struct GlobalTimepointConversionPattern
     auto initialValue = op.getInitialValue();
     if (!initialValue.has_value())
       return failure();
-    if (!llvm::isa<IREE::Stream::TimepointAttr>(*initialValue))
+    if (!isa<IREE::Stream::TimepointAttr>(*initialValue))
       return failure();
     rewriter.modifyOpInPlace(op, [&]() { op.removeInitialValueAttr(); });
     return success();

@@ -22,15 +22,15 @@ func.func @eliminate_empty_tensors_with_store_op() {
 }
 
 // CHECK-LABEL: @eliminate_empty_tensors_with_store_op
-// CHECK: %[[C0:.+]] = arith.constant 0 : index
-// CHECK: %[[C8:.+]] = arith.constant 8 : index
-// CHECK: %[[C32:.+]] = arith.constant 32 : index
-// CHECK: %[[C128:.+]] = arith.constant 128 : index
-// CHECK: %[[SPAN:.+]] = hal.interface.binding.subspan
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C128:.+]] = arith.constant 128 : index
+// CHECK: %[[SPAN:.+]] = hal.interface.binding.subspan{{.+}}binding(0){{.+}}: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x384xf32>>
 // CHECK: scf.for %[[ARG0:.+]] = %[[C0]] to %[[C128]] step %[[C32]]
-// CHECK:   %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SPAN]], offsets = [%[[ARG0]], 0]
-// CHECK:   %[[RES:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C8]] iter_args(%{{.+}} = %[[LOAD]])
-// CHECK:   iree_tensor_ext.dispatch.tensor.store %[[RES]], %[[SPAN]]
+// CHECK:   %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SPAN]], offsets = [%[[ARG0]], 0], sizes = [32, 384], strides = [1, 1]
+// CHECK:   %[[RES:.+]] = scf.for {{.+}} = %[[C0]] to %[[C32]] step %[[C8]] iter_args({{.+}} = %[[LOAD]])
+// CHECK:   iree_tensor_ext.dispatch.tensor.store %[[RES]], %[[SPAN]], offsets = [%[[ARG0]], 0], sizes = [32, 384], strides = [1, 1]
 
 // -----
 
@@ -50,12 +50,12 @@ func.func @eliminate_empty_tensors_with_store_to_buffer_op() {
 }
 
 // CHECK-LABEL: @eliminate_empty_tensors_with_store_to_buffer_op
-//     CHECK: %[[INPUT_SPAN:.+]] = hal.interface.binding.subspan{{.*}}binding(0)
-//     CHECK: %[[RESULT_SPAN:.+]] = hal.interface.binding.subspan{{.*}}binding(1)
-// CHECK-DAG: %[[INPUT:.+]] = iree_codegen.load_from_buffer %[[INPUT_SPAN]]
-// CHECK-DAG: %[[INIT:.+]] = iree_codegen.load_from_buffer %[[RESULT_SPAN]]
+//     CHECK: %[[INPUT_SPAN:.+]] = hal.interface.binding.subspan{{.+}}binding(0){{.+}}: memref<128xf32
+//     CHECK: %[[RESULT_SPAN:.+]] = hal.interface.binding.subspan{{.+}}binding(1){{.+}}: memref<128xf32
+// CHECK-DAG: %[[INPUT:.+]] = iree_codegen.load_from_buffer %[[INPUT_SPAN]] : memref<128xf32{{.+}} -> tensor<128xf32>
+// CHECK-DAG: %[[INIT:.+]] = iree_codegen.load_from_buffer %[[RESULT_SPAN]] : memref<128xf32{{.+}} -> tensor<128xf32>
 //     CHECK: %[[COPY:.+]] = linalg.copy ins(%[[INPUT]] : tensor<128xf32>) outs(%[[INIT]] : tensor<128xf32>)
-//     CHECK: iree_codegen.store_to_buffer %[[COPY]], %[[RESULT_SPAN]]
+//     CHECK: iree_codegen.store_to_buffer %[[COPY]], %[[RESULT_SPAN]] : tensor<128xf32> into memref<128xf32
 
 // -----
 
@@ -76,10 +76,10 @@ func.func @eliminate_empty_tensors_store_to_buffer_op_with_reshape() {
 }
 
 // CHECK-LABEL: @eliminate_empty_tensors_store_to_buffer_op_with_reshape
-//     CHECK: %[[INPUT_SPAN:.+]] = hal.interface.binding.subspan{{.*}}binding(0)
-//     CHECK: %[[RESULT_SPAN:.+]] = hal.interface.binding.subspan{{.*}}binding(1)
-// CHECK-DAG: %[[RESULT_RESHAPE:.+]] = memref.collapse_shape %[[RESULT_SPAN]]
-// CHECK-DAG: %[[INPUT:.+]] = iree_codegen.load_from_buffer %[[INPUT_SPAN]]
-// CHECK-DAG: %[[INIT:.+]] = iree_codegen.load_from_buffer %[[RESULT_RESHAPE]]
+//     CHECK: %[[INPUT_SPAN:.+]] = hal.interface.binding.subspan{{.+}}binding(0){{.+}}: memref<128xf32>
+//     CHECK: %[[RESULT_SPAN:.+]] = hal.interface.binding.subspan{{.+}}binding(1){{.+}}: memref<4x32xf32>
+// CHECK-DAG: %[[RESULT_RESHAPE:.+]] = memref.collapse_shape %[[RESULT_SPAN]] {{.+}} : memref<4x32xf32> into memref<128xf32>
+// CHECK-DAG: %[[INPUT:.+]] = iree_codegen.load_from_buffer %[[INPUT_SPAN]] : memref<128xf32> -> tensor<128xf32>
+// CHECK-DAG: %[[INIT:.+]] = iree_codegen.load_from_buffer %[[RESULT_RESHAPE]] : memref<128xf32> -> tensor<128xf32>
 //     CHECK: %[[COPY:.+]] = linalg.copy ins(%[[INPUT]] : tensor<128xf32>) outs(%[[INIT]] : tensor<128xf32>)
-//     CHECK: iree_codegen.store_to_buffer %[[COPY]], %[[RESULT_RESHAPE]]
+//     CHECK: iree_codegen.store_to_buffer %[[COPY]], %[[RESULT_RESHAPE]] : tensor<128xf32> into memref<128xf32>

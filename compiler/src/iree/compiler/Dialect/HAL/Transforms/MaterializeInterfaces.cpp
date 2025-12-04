@@ -246,7 +246,7 @@ static void materializeExecutableFromSourceOp(
 static LogicalResult
 verifyEntryPointTypes(mlir::FunctionOpInterface entryFuncOp) {
   for (auto inputType : llvm::enumerate(entryFuncOp.getArgumentTypes())) {
-    if (llvm::isa<IREE::Stream::BindingType>(inputType.value()) ||
+    if (isa<IREE::Stream::BindingType>(inputType.value()) ||
         inputType.value().isInteger(32)) {
       // OK - directly translates to a HAL interface binding.
     } else {
@@ -332,14 +332,14 @@ cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
   // for use by the binding accessors.
   unsigned operandIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
+    if (!isa<IREE::Stream::BindingType>(arg.getType())) {
       convertOperandUsage(sourceFuncOp, arg, layoutAttr, operandIdx++,
                           entryBuilder);
     }
   }
   unsigned resourceIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
+    if (!isa<IREE::Stream::BindingType>(arg.getType())) {
       continue; // unhandled arg type (primitive/etc)
     }
     auto binding = resourceMap[resourceIdx++];

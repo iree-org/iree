@@ -182,7 +182,8 @@ module {
     %dummy1 = tensor.empty() : tensor<10xf32>
     %dummy2 = tensor.empty() : tensor<10xf32>
     %dummy3 = tensor.empty() : tensor<10xf32>
-    %operand = tensor.empty() : tensor<10xf32>
+    %c0 = arith.constant 0.0 : f32
+    %operand = linalg.fill ins(%c0 : f32) outs(%dummy1 : tensor<10xf32>) -> tensor<10xf32>
 
     // expected-remark @below {{first}}
     %first = linalg.generic {

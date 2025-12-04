@@ -118,8 +118,8 @@ iree_tablegen_library(
   OUTS
     --gen-attrdef-decls IREECodegenAttrs.h.inc
     --gen-attrdef-defs IREECodegenAttrs.cpp.inc
-    --gen-enum-decls IREECodegenEnums.h.inc
-    --gen-enum-defs IREECodegenEnums.cpp.inc
+    --gen-enum-decls --dialect=iree_codegen IREECodegenEnums.h.inc
+    --gen-enum-defs --dialect=iree_codegen IREECodegenEnums.cpp.inc
 )
 
 iree_tablegen_library(

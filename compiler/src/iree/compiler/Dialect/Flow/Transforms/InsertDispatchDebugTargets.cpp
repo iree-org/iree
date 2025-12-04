@@ -29,7 +29,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 static SmallVector<Value> filterNonTensorValues(ValueRange &&range) {
   SmallVector<Value> result;
   for (auto value : range) {
-    if (llvm::isa<TensorType>(value.getType()))
+    if (isa<TensorType>(value.getType()))
       result.push_back(value);
   }
   return result;
@@ -100,7 +100,7 @@ static LogicalResult replaceReturnWithOpResults(mlir::ModuleOp moduleOp,
   SmallVector<Value> exports;
   SmallVector<Type> newTypes;
   for (auto retVal : op->getResults()) {
-    if (llvm::isa<TensorType>(retVal.getType())) {
+    if (isa<TensorType>(retVal.getType())) {
       auto type = IREE::HAL::BufferViewType::get(context);
       auto exportOp = IREE::HAL::TensorExportOp::create(
           builder, loc, type, retVal, TypeAttr::get(retVal.getType()),
@@ -150,7 +150,7 @@ struct InsertDebugTargetAtOrdinalPass
       Operation *operation = op;
 
       // Only look for dispatches in util func ops.
-      auto funcOp = llvm::dyn_cast<IREE::Util::FuncOp>(operation);
+      auto funcOp = dyn_cast<IREE::Util::FuncOp>(operation);
       if (!funcOp)
         continue;
 

@@ -10,22 +10,22 @@ func.func @simple_example_1dmapping(%0 : index, %1 : index, %2 : index, %3 : ind
   } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
   return
 }
-//      CHECK: func @simple_example_1dmapping
-// CHECK-SAME:     %[[SPLIT_LB:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[SPLIT_UB:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[SPLIT_STEP:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[WG_LB:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[WG_UB:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[WG_STEP:[a-zA-Z0-9_]+]]: index
-//      CHECK:   scf.forall
-// CHECK-SAME:       %[[IV0:[a-zA-Z0-9]+]]
-// CHECK-SAME:       %[[IV1:[a-zA-Z0-9]+]]
-// CHECK-SAME:       = (%[[SPLIT_LB]], %[[WG_LB]])
-// CHECK-SAME:       to (%[[SPLIT_UB]], %[[WG_UB]])
-// CHECK-SAME:       step (%[[SPLIT_STEP]], %[[WG_STEP]])
-//      CHECK:     "use1"(%[[IV0]])
-//      CHECK:     "use2"(%[[IV0]], %[[IV1]])
-//      CHECK:     mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+// CHECK-LABEL: func @simple_example_1dmapping(
+//  CHECK-SAME:     %[[SPLIT_LB:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[SPLIT_UB:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[SPLIT_STEP:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[WG_LB:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[WG_UB:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[WG_STEP:[a-zA-Z0-9_]+]]: index)
+//       CHECK:   scf.forall (
+//  CHECK-SAME:       %[[IV0:[a-zA-Z0-9]+]]
+//  CHECK-SAME:       %[[IV1:[a-zA-Z0-9]+]])
+//  CHECK-SAME:       = (%[[SPLIT_LB]], %[[WG_LB]])
+//  CHECK-SAME:       to (%[[SPLIT_UB]], %[[WG_UB]])
+//  CHECK-SAME:       step (%[[SPLIT_STEP]], %[[WG_STEP]])
+//       CHECK:     "use1"(%[[IV0]])
+//       CHECK:     "use2"(%[[IV0]], %[[IV1]])
+//       CHECK:     mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
 
 // -----
 
@@ -39,22 +39,22 @@ func.func @simple_example_2dmapping(%0 : index, %1 : index, %2 : index, %3 : ind
   } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
   return
 }
-//      CHECK: func @simple_example_2dmapping
-// CHECK-SAME:     %[[SPLIT_LB:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[SPLIT_UB:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[SPLIT_STEP:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[WG_UB0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[WG_UB1:[a-zA-Z0-9_]+]]: index
-//      CHECK:   scf.forall
-// CHECK-SAME:       %[[IV0:[a-zA-Z0-9]+]]
-// CHECK-SAME:       %[[IV1:[a-zA-Z0-9]+]]
-// CHECK-SAME:       %[[IV2:[a-zA-Z0-9]+]]
-// CHECK-SAME:       = (%[[SPLIT_LB]], 0, 0)
-// CHECK-SAME:       to (%[[SPLIT_UB]], %[[WG_UB0]], %[[WG_UB1]])
-// CHECK-SAME:       step (%[[SPLIT_STEP]], 1, 1)
-//      CHECK:     "use1"(%[[IV0]])
-//      CHECK:     "use2"(%[[IV0]], %[[IV1]], %[[IV2]])
-//      CHECK:     mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+// CHECK-LABEL: func @simple_example_2dmapping(
+//  CHECK-SAME:     %[[SPLIT_LB:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[SPLIT_UB:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[SPLIT_STEP:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[WG_UB0:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[WG_UB1:[a-zA-Z0-9_]+]]: index)
+//       CHECK:   scf.forall (
+//  CHECK-SAME:       %[[IV0:[a-zA-Z0-9]+]]
+//  CHECK-SAME:       %[[IV1:[a-zA-Z0-9]+]]
+//  CHECK-SAME:       %[[IV2:[a-zA-Z0-9]+]])
+//  CHECK-SAME:       = (%[[SPLIT_LB]], 0, 0)
+//  CHECK-SAME:       to (%[[SPLIT_UB]], %[[WG_UB0]], %[[WG_UB1]])
+//  CHECK-SAME:       step (%[[SPLIT_STEP]], 1, 1)
+//       CHECK:     "use1"(%[[IV0]])
+//       CHECK:     "use2"(%[[IV0]], %[[IV1]], %[[IV2]])
+//       CHECK:     mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
 
 // -----
 
@@ -68,24 +68,24 @@ func.func @simple_example_3dmapping(%0 : index, %1 : index, %2 : index, %3 : ind
   } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
   return
 }
-//      CHECK: func @simple_example_3dmapping
-// CHECK-SAME:     %[[SPLIT_LB:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[SPLIT_UB:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[SPLIT_STEP:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[ORIG_UB0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[ORIG_UB1:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[ORIG_UB2:[a-zA-Z0-9_]+]]: index
-//      CHECK:   scf.forall
-// CHECK-SAME:       %[[IV0:[a-zA-Z0-9]+]]
-// CHECK-SAME:       %[[IV1:[a-zA-Z0-9]+]]
-// CHECK-SAME:       %[[IV2:[a-zA-Z0-9]+]]
-// CHECK-SAME:       %[[IV3:[a-zA-Z0-9]+]]
-// CHECK-SAME:       = (%[[SPLIT_LB]], 0, 0, 0)
-// CHECK-SAME:       to (%[[SPLIT_UB]], %[[ORIG_UB0]], %[[ORIG_UB1]], %[[ORIG_UB2]])
-// CHECK-SAME:       step (%[[SPLIT_STEP]], 1, 1, 1)
-//      CHECK:     "use1"(%[[IV0]])
-//      CHECK:     "use2"(%[[IV1]], %[[IV2]], %[[IV3]])
-//      CHECK:     mapping = [#iree_codegen.workgroup_mapping<z:1>, #iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+// CHECK-LABEL: func @simple_example_3dmapping(
+//  CHECK-SAME:     %[[SPLIT_LB:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:     %[[SPLIT_UB:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:     %[[SPLIT_STEP:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:     %[[ORIG_UB0:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:     %[[ORIG_UB1:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:     %[[ORIG_UB2:[a-zA-Z0-9_]+]]: index)
+//       CHECK:   scf.forall (
+//  CHECK-SAME:       %[[IV0:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV1:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV2:[a-zA-Z0-9]+]],
+//  CHECK-SAME:       %[[IV3:[a-zA-Z0-9]+]])
+//  CHECK-SAME:       = (%[[SPLIT_LB]], 0, 0, 0)
+//  CHECK-SAME:       to (%[[SPLIT_UB]], %[[ORIG_UB0]], %[[ORIG_UB1]], %[[ORIG_UB2]])
+//  CHECK-SAME:       step (%[[SPLIT_STEP]], 1, 1, 1)
+//       CHECK:     "use1"(%[[IV0]])
+//       CHECK:     "use2"(%[[IV1]], %[[IV2]], %[[IV3]])
+//       CHECK:     mapping = [#iree_codegen.workgroup_mapping<z:1>, #iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
 
 // -----
 

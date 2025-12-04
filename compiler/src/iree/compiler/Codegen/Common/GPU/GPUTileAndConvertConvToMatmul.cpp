@@ -65,7 +65,7 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
   // Check that all filter loop dimensions are unit and then make them zero.
   DenseMap<AffineExpr, AffineExpr> dimMap;
   Value filter = linalgOp.getDpsInputs()[1];
-  auto filterType = llvm::cast<ShapedType>(filter.getType());
+  auto filterType = cast<ShapedType>(filter.getType());
   ArrayRef<int64_t> filterShape = filterType.getShape();
   for (auto filterLoop : convDims.filterLoop) {
     std::optional<int64_t> maybeDim = filterMap.getResultPosition(

@@ -1029,7 +1029,7 @@ func.func @unpack_mismatch_inner_tile_size_and_output_shape(
 
 // -----
 
-func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+func.func @exp_reduction_non_zero(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
 
@@ -1057,7 +1057,7 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
 
 // -----
 
-func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+func.func @exp_reduction_index_check(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
 
@@ -1085,6 +1085,117 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
 
 // -----
 
+func.func @exp_reduction_shaped_input(%S: f32) -> tensor<2xf32> {
+  %M = tensor.empty() : tensor<2xf32>
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{operand #0 must be variadic of ranked tensor of any type values, but got 'f32'}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->()>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: f32)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    iree_linalg_ext.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
+func.func @exp_reduction_shaped_init(%S: tensor<2x3xf32>, %M : f32) -> tensor<2xf32> {
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{operand #1 must be variadic of ranked tensor of any type values, but got 'f32'}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->(M,N)>,
+      affine_map<(M,N)->()>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: f32, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    iree_linalg_ext.yield %m, %add: f32, f32
+  } -> f32, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
+func.func @exp_reduction_projected(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+  %M = tensor.empty() : tensor<2xf32>
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{all indexing maps must be projected permutations}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)[s0]->(M,N)>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    iree_linalg_ext.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
+func.func @exp_reduction_index(%S: tensor<2x3xf32>, %M : tensor<2xf32>) -> tensor<2xf32> {
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{linalg.index is not supported in body}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->(M,N)>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    %v = linalg.index 0: index
+    iree_linalg_ext.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
 func.func @illegal_im2col_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected strides rank to be equal to the kernel rank}}
@@ -1092,6 +1203,7 @@ func.func @illegal_im2col_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x10
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1106,6 +1218,7 @@ func.func @illegal_im2col_dilations(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1120,6 +1233,7 @@ func.func @illegal_im2col_kernel_size(%arg0: tensor<2x34x34x640xf32>) -> tensor<
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1134,6 +1248,7 @@ func.func @illegal_im2col_m_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
            m_offset = [0, 0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1148,6 +1263,7 @@ func.func @illegal_im2col_k_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
            m_offset = [0] * [1] k_offset = [0, 0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1162,6 +1278,7 @@ func.func @illegal_im2col_m_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
            m_offset = [0] * [0] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1176,6 +1293,7 @@ func.func @illegal_im2col_k_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
            m_offset = [0] * [1] k_offset = [0] * [2]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1190,6 +1308,7 @@ func.func @illegal_im2col_input_rank(%arg0: tensor<1x2x34x34x640xf32>) -> tensor
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<1x2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1204,6 +1323,7 @@ func.func @illegal_im2col_output_rank(%arg0: tensor<2x34x34x640xf32>) -> tensor<
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2, 3]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x9x640xf32>) -> tensor<2x1024x9x640xf32>
   return %1 : tensor<2x1024x9x640xf32>
@@ -1218,6 +1338,7 @@ func.func @illegal_im2col_perm_num(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [0, 1]
+           output_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1225,13 +1346,45 @@ func.func @illegal_im2col_perm_num(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
 
 // -----
 
-func.func @illegal_im2col_perm_value(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+func.func @illegal_im2col_k_perm_value(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected input_k_perm to be a permutation of [0, 3)}}
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            input_k_perm = [1, 2, 3]
+           output_perm = [0, 1, 2]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_output_perm_value(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected output_perm to be a permutation}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [1, 2, 3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+
+// -----
+
+func.func @illegal_im2col_output_perm_rank(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected output_perm to have the same rank as the result}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
+           output_perm = [0, 1, 2, 3]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>

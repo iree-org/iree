@@ -48,19 +48,10 @@ func.func @pad_alloc_expand_shape(%a: memref<1024x1024xf32>) {
 }
 
 // -----
+// Verify that collapse_shape prevents padding.
 // CHECK-LABEL: func.func @no_pad_alloc_collapse_shape
-// CHECK:         %[[A:.*]] = memref.alloc() : memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>>
-// CHECK:         %[[C:.*]] = memref.collapse_shape %[[A]] {{\[}}[0], [1, 2], [3, 4]]
-// CHECK-SAME:      memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>> into
-// CHECK-SAME:      memref<4x32x64xf32, #gpu.address_space<workgroup>>
-// CHECK:         %[[C0:.*]] = arith.constant 0 : index
-// CHECK:         %[[CST_0:.*]] = arith.constant 0.000000e+00 : f32
-// CHECK:         %[[VEC_READ:.*]] = vector.transfer_read %{{.*}}[%[[C0]], %[[C0]]], %[[CST_0]] {in_bounds = [true]} :
-// CHECK-SAME:      memref<1024x1024xf32>, vector<4xf32>
-// CHECK:         vector.transfer_write %[[VEC_READ]], %[[C]][%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true]} :
-// CHECK-SAME:      vector<4xf32>, memref<4x32x64xf32, #gpu.address_space<workgroup>>
-
-
+// CHECK:         memref.alloc() : memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     memref.subview
 func.func @no_pad_alloc_collapse_shape(%a: memref<1024x1024xf32>) {
   %0 = memref.alloc() : memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>>
   %1 = memref.collapse_shape %0 [[0], [1, 2], [3, 4]]
@@ -133,8 +124,9 @@ func.func @pad_alloc_rank_zero() {
 // -----
 
 // CHECK-LABEL: func.func @no_padding_when_close_to_limit
-// CHECK: memref.alloc() : memref<4x32x127xf32, #gpu.address_space<workgroup>>
-func.func @no_padding_when_close_to_limit(%a: memref<1024x1024xf32>) {
+// CHECK:         memref.alloc() : memref<4x32x127xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     memref.subview
+func.func @no_padding_when_close_to_limit() {
   %0 = memref.alloc() : memref<4x32x127xf32, #gpu.address_space<workgroup>>
   return
 }
@@ -142,8 +134,9 @@ func.func @no_padding_when_close_to_limit(%a: memref<1024x1024xf32>) {
 // -----
 
 // CHECK-LABEL: func.func @no_padding_if_at_limit
-// CHECK: memref.alloc() : memref<4x32x128xf32, #gpu.address_space<workgroup>>
-func.func @no_padding_if_at_limit(%a: memref<1024x1024xf32>) {
+// CHECK:         memref.alloc() : memref<4x32x128xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     memref.subview
+func.func @no_padding_if_at_limit() {
   %0 = memref.alloc() : memref<4x32x128xf32, #gpu.address_space<workgroup>>
   return
 }
@@ -151,8 +144,11 @@ func.func @no_padding_if_at_limit(%a: memref<1024x1024xf32>) {
 // -----
 
 // CHECK-LABEL: func.func @pad_if_below_limit
-// CHECK: memref.alloc() : memref<4x32x128xf32, #gpu.address_space<workgroup>>
-func.func @pad_if_below_limit(%a: memref<1024x1024xf32>) {
+// CHECK:         %[[A:.*]] = memref.alloc() : memref<4x32x128xf32, #gpu.address_space<workgroup>>
+// CHECK:         memref.subview %[[A]][0, 0, 0] [4, 32, 126] [1, 1, 1] :
+// CHECK-SAME:      memref<4x32x128xf32, #gpu.address_space<workgroup>> to
+// CHECK-SAME:      memref<4x32x126xf32, strided<[4096, 128, 1]>, #gpu.address_space<workgroup>>
+func.func @pad_if_below_limit() {
   %0 = memref.alloc() : memref<4x32x126xf32, #gpu.address_space<workgroup>>
   return
 }

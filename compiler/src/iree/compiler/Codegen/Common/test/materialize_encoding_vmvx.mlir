@@ -7,18 +7,18 @@
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 func.func @matmul_lowering_i8i8i32_vmvx_ukernel(
-  %3: tensor<?x?xi8, #encoding_lhs>,
-  %4: tensor<?x?xi8, #encoding_rhs>,
-  %5: tensor<?x?xi32, #encoding_result>
+  %lhs: tensor<?x?xi8, #encoding_lhs>,
+  %rhs: tensor<?x?xi8, #encoding_rhs>,
+  %result: tensor<?x?xi32, #encoding_result>
 ) -> tensor<?x?xi32, #encoding_result> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = "all", iree.encoding.resolver = #iree_cpu.vmvx_encoding_resolver<>}>
 } {
-  %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #encoding_lhs>,
-                   tensor<?x?xi8, #encoding_rhs>)
-      outs(%5 : tensor<?x?xi32, #encoding_result>)
+  %0 = linalg.matmul
+      ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
+                       tensor<?x?xi8, #encoding_rhs>)
+      outs(%result : tensor<?x?xi32, #encoding_result>)
       -> tensor<?x?xi32, #encoding_result>
-  return %6 : tensor<?x?xi32, #encoding_result>
+  return %0 : tensor<?x?xi32, #encoding_result>
 }
 //      CHECK: func @matmul_lowering_i8i8i32_vmvx_ukernel(
 // CHECK-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
@@ -74,8 +74,6 @@ func.func @set_encoding_dynamic(%input: tensor<?x?xf32>) -> tensor<?x?xf32, #enc
   %0 = iree_encoding.set_encoding %input : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
   return %0 : tensor<?x?xf32, #encoding_lhs>
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
 //       CHECK: func @set_encoding_dynamic(
 //  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //       CHECK:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32

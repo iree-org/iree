@@ -39,7 +39,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     Value input = op.getOperand();
     Type resultType = op.getType();
 
-    VectorType resVecType = llvm::dyn_cast<VectorType>(resultType);
+    VectorType resVecType = dyn_cast<VectorType>(resultType);
     if (!(resultType.isF32() ||
           (resVecType && resVecType.getElementType().isF32()))) {
       return rewriter.notifyMatchFailure(

@@ -499,7 +499,7 @@ public:
       }
 
       // Read the PTX from the object file.
-      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
+      auto objectAttr = cast<IREE::HAL::ExecutableObjectAttr>(
           variantOp.getObjects()->getValue().front());
       if (auto data = objectAttr.loadData()) {
         targetPTX = data.value();
@@ -697,7 +697,10 @@ public:
     auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
-        builder.getBufferAttr(executableBuilder.getContext()));
+        builder.getHeaderPrefixedBufferAttr(
+            executableBuilder.getContext(),
+            /*magic=*/iree_hal_cuda_ExecutableDef_file_identifier,
+            /*version=*/0));
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 

@@ -22,6 +22,74 @@ on:
         default: ""
 
 jobs:
+  test_torch_ops:
+    name: "test_torch_ops :: ${{ matrix.name }}"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CPU
+          - name: cpu_task
+            markers: "cpu"
+            config-file: torch_ops_cpu_llvm_sync.json
+            runs-on: ubuntu-24.04
+          - name: amdgpu_hip_gfx1100_O3
+            config-file:  torch_ops_gpu_hip_gfx1100_O3.json
+            runs-on: [Linux, X64, gfx1100]
+          - name: amdgpu_vulkan_O3
+            config-file: torch_ops_gpu_vulkan_O3.json
+            # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
+            runs-on: [Linux, X64, rdna3, shark10-ci]
+          - name: amdgpu_rocm_mi300_gfx942_O3
+            config-file: torch_ops_gpu_hip_gfx942_O3.json
+            runs-on: linux-mi325-1gpu-ossci-iree-org
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
+      VENV_DIR: ${{ github.workspace }}/venv
+      GH_TOKEN: ${{ github.token }}
+      CONFIG_FILE_PATH: tests/external/iree-test-suites/torch_ops/${{ matrix.config-file }}
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          submodules: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+
+      - name: Checkout test suites repository
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          repository: iree-org/iree-test-suites
+          ref: 132f91e49d629c35f98492a9f619017b83782aba
+          path: iree-test-suites
+      - name: Install Torch ops test suite requirements
+        run: |
+          source ${VENV_DIR}/bin/activate
+          python -m pip install -r iree-test-suites/torch_ops/requirements.txt
+      - name: Run Torch ops test suite
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest iree-test-suites/torch_ops/ \
+              -rpfE \
+              --timeout=30 \
+              --durations=20 \
+              --report-log=${LOG_FILE_PATH} \
+              --config-files=${CONFIG_FILE_PATH}
+
   tests:
     name: "torch_models tests :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
@@ -39,6 +107,7 @@ jobs:
               - persistent-cache
               - Linux
               - X64
+              - threadripper
           # MI325
           - name: amdgpu_mi325_gfx942
             markers: "gfx942 or mi325"
@@ -50,7 +119,7 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           submodules: false
 
@@ -66,10 +135,10 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 6407d0c7573c4f76ce0aaea3c6a642475713c68a
+          ref: 17a391dc3882f136e567bf2687806ef6af46ad64
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false

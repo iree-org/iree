@@ -37,7 +37,7 @@ static LogicalResult parseEnumAttr(AsmParser &parser, StringRef attrName,
     return parser.emitError(loc)
            << "failed to parse '" << attrName << "' enum string value";
   }
-  auto stringAttr = llvm::dyn_cast<StringAttr>(genericAttr);
+  auto stringAttr = dyn_cast<StringAttr>(genericAttr);
   if (!stringAttr) {
     return parser.emitError(loc)
            << "expected " << attrName << " attribute specified as string";
@@ -208,7 +208,7 @@ ExecutableTargetAttr ExecutableTargetAttr::lookup(Operation *op,
   auto attrId = StringAttr::get(context, "hal.executable.target");
   while (op) {
     // Take directly from the enclosing variant.
-    if (auto variantOp = llvm::dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
+    if (auto variantOp = dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
       if (annotationSite) {
         *annotationSite = variantOp;
       }
@@ -242,10 +242,9 @@ Attribute ExecutableObjectAttr::parse(AsmParser &p, Type type) {
       failed(p.parseGreater())) {
     return {};
   }
-  auto pathAttr = llvm::dyn_cast_if_present<StringAttr>(dict.get("path"));
-  auto dataAttr =
-      llvm::dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
-          dict.get("data"));
+  auto pathAttr = dyn_cast_if_present<StringAttr>(dict.get("path"));
+  auto dataAttr = dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
+      dict.get("data"));
   return get(p.getContext(), pathAttr, dataAttr);
 }
 
@@ -371,13 +370,13 @@ LogicalResult ExecutableObjectsAttr::verify(
     return emitError() << "targets and objects must be 1:1";
   }
   for (auto targetAttr : targetsAttr) {
-    if (!llvm::isa<IREE::HAL::ExecutableTargetAttr>(targetAttr)) {
+    if (!isa<IREE::HAL::ExecutableTargetAttr>(targetAttr)) {
       return emitError()
              << "target keys must be #hal.executable.target attributes";
     }
   }
   for (auto objectsAttr : targetObjectsAttr) {
-    auto objectsArrayAttr = llvm::dyn_cast<ArrayAttr>(objectsAttr);
+    auto objectsArrayAttr = dyn_cast<ArrayAttr>(objectsAttr);
     if (!objectsArrayAttr) {
       return emitError() << "target objects must be an array of "
                             "#hal.executable.object attributes";
@@ -433,10 +432,9 @@ std::optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
   SmallVector<Attribute> allObjectAttrs;
   for (auto [targetAttr, objectsAttr] :
        llvm::zip_equal(getTargets(), getTargetObjects())) {
-    auto genericTargetAttr =
-        llvm::cast<IREE::HAL::ExecutableTargetAttr>(targetAttr);
+    auto genericTargetAttr = cast<IREE::HAL::ExecutableTargetAttr>(targetAttr);
     if (genericTargetAttr.isGenericOf(specificTargetAttr)) {
-      auto objectsArrayAttr = llvm::cast<ArrayAttr>(objectsAttr);
+      auto objectsArrayAttr = cast<ArrayAttr>(objectsAttr);
       allObjectAttrs.append(objectsArrayAttr.begin(), objectsArrayAttr.end());
     }
   }
@@ -575,7 +573,7 @@ void DeviceTargetAttr::getExecutableTargets(
 
 void IREE::HAL::DeviceTargetAttr::printStatusDescription(
     llvm::raw_ostream &os) const {
-  mlir::cast<Attribute>(this)->print(os, /*elideType=*/true);
+  cast<Attribute>(this)->print(os, /*elideType=*/true);
 }
 
 // Produces a while-loop that enumerates each device available and tries to
@@ -752,7 +750,7 @@ Value DeviceTargetAttr::buildExecutableFormatMatch(
 
 void IREE::HAL::DeviceOrdinalAttr::printStatusDescription(
     llvm::raw_ostream &os) const {
-  mlir::cast<Attribute>(this)->print(os, /*elideType=*/true);
+  cast<Attribute>(this)->print(os, /*elideType=*/true);
 }
 
 Value IREE::HAL::DeviceOrdinalAttr::buildDeviceEnumeration(
@@ -769,7 +767,7 @@ Value IREE::HAL::DeviceOrdinalAttr::buildDeviceEnumeration(
 
 void IREE::HAL::DeviceFallbackAttr::printStatusDescription(
     llvm::raw_ostream &os) const {
-  mlir::cast<Attribute>(this)->print(os, /*elideType=*/true);
+  cast<Attribute>(this)->print(os, /*elideType=*/true);
 }
 
 Value IREE::HAL::DeviceFallbackAttr::buildDeviceEnumeration(
@@ -801,8 +799,8 @@ DeviceSelectAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
     return emitError() << "must have at least one device to select";
   }
   for (auto deviceAttr : devicesAttr) {
-    if (!mlir::isa<IREE::HAL::DeviceAliasAttr>(deviceAttr) &&
-        !mlir::isa<IREE::HAL::DeviceInitializationAttrInterface>(deviceAttr)) {
+    if (!isa<IREE::HAL::DeviceAliasAttr>(deviceAttr) &&
+        !isa<IREE::HAL::DeviceInitializationAttrInterface>(deviceAttr)) {
       return emitError() << "can only select between #hal.device.alias, "
                             "#hal.device.target, #hal.device.ordinal, "
                             "#hal.device.fallback, or other device "
@@ -817,7 +815,7 @@ DeviceSelectAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
 void IREE::HAL::DeviceSelectAttr::printStatusDescription(
     llvm::raw_ostream &os) const {
   // TODO(benvanik): print something easier to read (newline per device, etc).
-  mlir::cast<Attribute>(this)->print(os, /*elideType=*/true);
+  cast<Attribute>(this)->print(os, /*elideType=*/true);
 }
 
 // Builds a recursive nest of try-else blocks for each device specified.
@@ -914,7 +912,7 @@ bool DeviceAffinityAttr::isExecutableWith(
   // peering model to allow operations to move across devices in a peered set
   // but that may be best done at higher levels and avoided once we get to the
   // "are these the same device" stage.
-  auto otherAffinityAttr = llvm::dyn_cast_if_present<DeviceAffinityAttr>(other);
+  auto otherAffinityAttr = dyn_cast_if_present<DeviceAffinityAttr>(other);
   if (!otherAffinityAttr || getDevice() != otherAffinityAttr.getDevice()) {
     return false;
   }
@@ -1037,7 +1035,7 @@ bool DevicePromiseAttr::isExecutableWith(
   // peering model to allow operations to move across devices in a peered set
   // but that may be best done at higher levels and avoided once we get to the
   // "are these the same device" stage.
-  auto otherPromiseAttr = llvm::dyn_cast_if_present<DevicePromiseAttr>(other);
+  auto otherPromiseAttr = dyn_cast_if_present<DevicePromiseAttr>(other);
   if (!otherPromiseAttr || getDevice() != otherPromiseAttr.getDevice()) {
     return false;
   }
@@ -1169,8 +1167,8 @@ DeviceOptimalAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
     return emitError() << "must have at least one device affinity";
   }
   for (auto affinityAttr : affinityAttrs) {
-    if (!mlir::isa<IREE::HAL::DeviceAffinityAttr>(affinityAttr) &&
-        !mlir::isa<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
+    if (!isa<IREE::HAL::DeviceAffinityAttr>(affinityAttr) &&
+        !isa<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
       return emitError() << "can only select between HAL affinity attrs";
     }
   }

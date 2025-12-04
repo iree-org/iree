@@ -368,7 +368,6 @@ const WgpDetails *getRDNA4WgpDetails() {
       MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN,
       MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2,
       MMAIntrinsic::WMMAR4_I32_16x16x16_I8,
-
   };
   static const WgpDetails rdna4Wgp = {allComputeBits,
                                       allStorageBits,
@@ -451,20 +450,49 @@ const WgpDetails *getRDNA1WgpDetails() {
   return &rdna1Wgp;
 }
 
-// Experimental gfx1250 WGP details. This uses placeholder values from RDNA4.
+// Experimental gfx1250 WGP details.
 const WgpDetails *getGfx1250WgpDetails() {
+  static const MMAIntrinsic gfx1250MMAOps[] = {
+      // K=4.
+      MMAIntrinsic::WMMA_F32_16x16x4_F32,
+      // K=32.
+      MMAIntrinsic::WMMA_F32_16x16x32_F16,
+      MMAIntrinsic::WMMA_F32_16x16x32_BF16,
+      MMAIntrinsic::WMMA_F16_16x16x32_F16,
+      MMAIntrinsic::WMMA_BF16_16x16x32_BF16,
+      // K=64.
+      MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN,
+      MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2,
+      MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN,
+      MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2,
+      MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMA_I32_16x16x64_I8,
+      // K=128.
+      MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2,
+      MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN,
+      MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2,
+      MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN,
+      MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN_F8E5M2,
+  };
+
   static const WgpDetails gfx1250Wgp = {allComputeBits,
                                         allStorageBits,
                                         allSubgroupOps,
                                         DotProductOps::None,
-                                        /*mmaCount=*/0,
-                                        /*mmaOps=*/nullptr,
+                                        /*mmaCount=*/std::size(gfx1250MMAOps),
+                                        /*mmaOps=*/gfx1250MMAOps,
                                         /*scaledMmaCount=*/0,
                                         /*scaledMmaOps=*/nullptr,
                                         {32, 32},
                                         {1024, 1024, 1024},
                                         1024,
-                                        64 * 1024,
+                                        320 * 1024,
                                         {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                         /*maxLoadInstructionBits=*/128,
                                         /*simdsPerWgp=*/4,

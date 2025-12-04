@@ -276,9 +276,8 @@ func.func @early_bufferized_copy_cst_ops() {
   %cst = arith.constant dense<0> : tensor<2x3xi32>
   %0 = bufferization.to_buffer %cst : tensor<2x3xi32> to memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2x5xi32>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<2x5xi32>>
-  %3 = memref.subview %1[%c0, %c2] [2, 3] [%c1, %c1] : memref<2x5xi32> to memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0 : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>) outs(%3 : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>) {
+  %2 = memref.subview %1[%c0, %c2] [2, 3] [%c1, %c1] : memref<2x5xi32> to memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0 : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>) outs(%2 : memref<2x3xi32, affine_map<(d0, d1)[s0, s1, s2] -> (d0 * s1 + s0 + d1 * s2)>>) {
   ^bb0(%arg0: i32, %arg1: i32):
     linalg.yield %arg0 : i32
   }
@@ -2175,7 +2174,6 @@ func.func @operand_fusion() {
 #map5 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 func.func @dot_general_nontrivial_batching_multiple_parallel_dimension() {
   %cst = arith.constant dense<0.000000e+00> : vector<1x4x2xf32>
-  %c1 = arith.constant 1 : index
   %c6 = arith.constant 6 : index
   %c2 = arith.constant 2 : index
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -2384,7 +2382,6 @@ func.func @scatter_update_scalar_1D() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @topk() {
-  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<200x8xf32>>
   %input_values = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [200, 8], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<200x8xf32>> -> tensor<200x8xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<200x8xi32>>
@@ -3126,6 +3123,43 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 
 // -----
 
+func.func @swizzle_hint(%arg0: tensor<1024xf32>) -> tensor<1024xf32> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c64 = arith.constant 63 : index
+  %c512 = arith.constant 512 : index
+  %temp = bufferization.alloc_tensor() : tensor<512xf32>
+  %swizzled.temp = iree_codegen.swizzle_hint %temp[#iree_codegen.rotate_rows<256, 4>] : tensor<512xf32>
+  %1 = scf.forall (%arg2) in (64) shared_outs(%arg3 = %swizzled.temp) -> tensor<512xf32> {
+    %off = arith.muli %arg2, %c4 : index
+    %slice = tensor.extract_slice %arg0[%off] [4] [1] : tensor<1024xf32> to tensor<4xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %slice into %arg3[%off] [4] [1] : tensor<4xf32> into tensor<512xf32>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  // Somewhat convoluted swap-things-around "kernel" to provide a minimal example
+  // showing that swizzle hints persist on a tensor.
+  %ret.init = tensor.empty() : tensor<1024xf32>
+  %ret = scf.forall (%arg2) in (64) shared_outs(%arg3 = %ret.init) -> tensor<1024xf32> {
+    %arg2.reversed = arith.subi %c64, %arg2 : index
+    %off.rev = arith.muli %arg2.reversed, %c4 : index
+    %off = arith.muli %arg2, %c4 : index
+    %slice = tensor.extract_slice %1[%off.rev] [4] [1] : tensor<512xf32> to tensor<4xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %slice into %arg3[%off] [4] [1] : tensor<4xf32> into tensor<1024xf32>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+
+  return %ret : tensor<1024xf32>
+}
+
+// CHECK-LABEL: func.func @swizzle_hint
+// CHECK: %[[SHARED:.+]] = memref.alloc() : memref<512xf32>
+// CHECK: %[[SWIZZLED:.+]] = iree_codegen.swizzle_hint %[[SHARED]][{{.*}}] : memref<512xf32>
+// CHECK-COUNT-2: memref.subview %[[SWIZZLED]]
+
+// -----
+
 func.func @convert_to_buffer() -> memref<6xf32> {
   %alloc = bufferization.alloc_tensor() : tensor<6xf32>
   %memref = bufferization.to_buffer %alloc : tensor<6xf32> to memref<6xf32>
@@ -3173,3 +3207,16 @@ func.func @retry_constant_bufferize() {
 // CHECK:         %[[CST:.+]] = arith.constant dense<0> : tensor<6xi32>
 // CHECK:         %[[MEMREF:.+]] = bufferization.to_buffer %[[CST]] read_only
 // CHECK:         memref.copy %[[MEMREF]]
+
+// -----
+
+func.func @drop_fusion_barrier() -> memref<6xf32> {
+  %alloc = bufferization.alloc_tensor() : tensor<6xf32>
+  %0 = iree_codegen.fusion_barrier %alloc : tensor<6xf32>
+  %memref = bufferization.to_buffer %0 : tensor<6xf32> to memref<6xf32>
+  return %memref : memref<6xf32>
+}
+
+// CHECK-LABEL: func.func @drop_fusion_barrier
+// CHECK:         %[[ALLOC:.+]] = memref.alloc() : memref<6xf32>
+// CHECK:         return %[[ALLOC]]

@@ -22,13 +22,13 @@ namespace mlir::iree_compiler::IREE::Codegen {
 struct IREECodegenDialectOpAsmInterface : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (llvm::isa<TranslationInfoAttr>(attr)) {
+    if (isa<TranslationInfoAttr>(attr)) {
       os << "translation";
       return AliasResult::OverridableAlias;
-    } else if (llvm::isa<CompilationInfoAttr>(attr)) {
+    } else if (isa<CompilationInfoAttr>(attr)) {
       os << "compilation";
       return AliasResult::OverridableAlias;
-    } else if (llvm::isa<LoweringConfigAttr>(attr)) {
+    } else if (isa<LoweringConfigAttr>(attr)) {
       os << "config";
       return AliasResult::OverridableAlias;
     }

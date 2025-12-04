@@ -11,6 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/utils/executable_debug_info.h"
+#include "iree/hal/utils/executable_header.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
@@ -45,6 +46,36 @@ static const iree_hal_metal_executable_t* iree_hal_metal_executable_const_cast(
   return (const iree_hal_metal_executable_t*)base_value;
 }
 
+iree_status_t iree_hal_metal_executable_infer_format(iree_const_byte_span_t executable_data,
+                                                     iree_host_size_t executable_format_capacity,
+                                                     char* executable_format,
+                                                     iree_host_size_t* out_inferred_size) {
+  // Read the header prefix (with unsafe inference if size is unknown).
+  const bool unsafe_infer_size = (executable_data.data_length == 0);
+  iree_const_byte_span_t flatbuffer_data = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_hal_read_executable_flatbuffer_header(
+      executable_data, unsafe_infer_size, iree_hal_metal_ExecutableDef_file_identifier,
+      &flatbuffer_data));
+
+  // Verify the flatbuffer structure.
+  if (!iree_hal_metal_ExecutableDef_verify_as_root(flatbuffer_data.data,
+                                                   flatbuffer_data.data_length)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to verify executable flatbuffer structure");
+  }
+
+  // Write the format string.
+  iree_string_view_t format = IREE_SV("PTXE");
+  if (format.size >= executable_format_capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "executable format buffer too small");
+  }
+  memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
+
+  // Return the total size (header + flatbuffer).
+  *out_inferred_size = sizeof(iree_flatbuffer_file_header_t) + flatbuffer_data.data_length;
+  return iree_ok_status();
+}
+
 // Verifies the structure of the flatbuffer so that we can avoid doing so during runtime.
 //
 // There are still some conditions we must be aware of (such as omitted names on functions with
@@ -52,11 +83,7 @@ static const iree_hal_metal_executable_t* iree_hal_metal_executable_const_cast(
 // after this succeeds.
 static iree_status_t iree_hal_metal_executable_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data) {
-  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "flatbuffer data is not present or less than 16 bytes (%zu total)",
-                            flatbuffer_data.data_length);
-  }
+  IREE_ASSERT(flatbuffer_data.data && flatbuffer_data.data_length >= 16);
 
   // Run flatcc generated verification. This ensures all pointers are in-bounds and that we can
   // safely walk the file, but not that the actual contents of the flatbuffer meet our expectations.
@@ -380,11 +407,18 @@ iree_status_t iree_hal_metal_executable_create(
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_RETURN_IF_ERROR(
-      iree_hal_metal_executable_flatbuffer_verify(executable_params->executable_data));
+  // Read and strip the flatbuffer header prefix.
+  iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_read_executable_flatbuffer_header(executable_params->executable_data,
+                                                     /*unsafe_infer_size=*/false,
+                                                     iree_hal_metal_ExecutableDef_file_identifier,
+                                                     &executable_flatbuffer));
+
+  IREE_RETURN_IF_ERROR(iree_hal_metal_executable_flatbuffer_verify(executable_flatbuffer));
 
   iree_hal_metal_ExecutableDef_table_t executable_def =
-      iree_hal_metal_ExecutableDef_as_root(executable_params->executable_data.data);
+      iree_hal_metal_ExecutableDef_as_root(executable_flatbuffer.data);
 
   iree_hal_metal_PipelineDef_vec_t pipelines_vec =
       iree_hal_metal_ExecutableDef_pipelines_get(executable_def);

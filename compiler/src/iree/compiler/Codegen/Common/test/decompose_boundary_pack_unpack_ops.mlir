@@ -16,7 +16,12 @@ func.func @pack_at_source() {
   return
 }
 // CHECK-LABEL: func.func @pack_at_source
-// CHECK-NOT:     linalg.pack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SRC]] {{\[}}[0, 1], [2, 3]{{\]}} output_shape [4, 4, 4, 4] : tensor<16x16xf32> into tensor<4x4x4x4xf32>
+//       CHECK:   %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[EXPANDED]] : tensor<4x4x4x4xf32>) outs(%[[DEST]] : tensor<4x4x4x4xf32>) permutation = [0, 2, 1, 3]
+//       CHECK:   util.optimization_barrier %[[TRANSPOSED]]
+//   CHECK-NOT:   linalg.pack
 
 // -----
 
@@ -35,8 +40,12 @@ func.func @unpack_at_source() {
   iree_tensor_ext.dispatch.tensor.store %barrier, %1, offsets = [0, 0], sizes = [16, 16], strides = [1, 1] : tensor<16x16xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<16x16xf32>>
   return
 }
+// Unpack is not decomposed because the barrier blocks the source side transformation.
 // CHECK-LABEL: func.func @unpack_at_source
-// CHECK:         linalg.unpack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[SRC]] {{.+}} into %[[DEST]]
+//       CHECK:   util.optimization_barrier %[[UNPACK]]
 
 // -----
 
@@ -55,8 +64,12 @@ func.func @pack_at_dest() {
   iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [4, 4, 4, 4], strides = [1, 1, 1, 1] : tensor<4x4x4x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4x4x4xf32>>
   return
 }
+// Pack is not decomposed because the barrier blocks the destination side transformation.
 // CHECK-LABEL: func.func @pack_at_dest
-// CHECK:         linalg.pack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[SRC]]
+//       CHECK:   linalg.pack %[[BARRIER]] {{.+}} into %[[DEST]]
 
 // -----
 
@@ -75,8 +88,17 @@ func.func @unpack_at_dest() {
   iree_tensor_ext.dispatch.tensor.store %unpack, %1, offsets = [0, 0], sizes = [16, 16], strides = [1, 1] : tensor<16x16xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<16x16xf32>>
   return
 }
+// Unpack is decomposed to transpose + collapse_shape + copy.
 // CHECK-LABEL: func.func @unpack_at_dest
-// CHECK-NOT:     linalg.unpack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[SRC]]
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<4x4x4x4xf32>
+//       CHECK:   %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[BARRIER]] : tensor<4x4x4x4xf32>) outs(%[[EMPTY]] : tensor<4x4x4x4xf32>) permutation = [0, 2, 1, 3]
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRANSPOSED]] {{\[}}[0, 1], [2, 3]{{\]}} : tensor<4x4x4x4xf32> into tensor<16x16xf32>
+//       CHECK:   %[[COPY:.+]] = linalg.copy ins(%[[COLLAPSED]] : tensor<16x16xf32>) outs(%[[DEST]] : tensor<16x16xf32>)
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[COPY]]
+//   CHECK-NOT:   linalg.unpack
 
 // -----
 
@@ -95,8 +117,11 @@ func.func @padded_pack() {
   iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [4, 4, 4, 4], strides = [1, 1, 1, 1] : tensor<4x4x4x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4x4x4xf32>>
   return
 }
+// Pack is not decomposed because it has padding.
 // CHECK-LABEL: func.func @padded_pack
-// CHECK:         linalg.pack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<15x15xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   linalg.pack %[[SRC]] padding_value({{.+}}) {{.+}} into %[[DEST]]
 
 // -----
 
@@ -114,8 +139,11 @@ func.func @padded_unpack() {
   iree_tensor_ext.dispatch.tensor.store %unpack, %1, offsets = [0, 0], sizes = [15, 15], strides = [1, 1] : tensor<15x15xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<15x15xf32>>
   return
 }
+// Unpack is not decomposed because it unpacks to a smaller tensor (15x15 from 4x4x4x4).
 // CHECK-LABEL: func.func @padded_unpack
-// CHECK:         linalg.unpack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<15x15xf32>
+//       CHECK:   linalg.unpack %[[SRC]] {{.+}} into %[[DEST]]
 
 // -----
 
@@ -138,8 +166,11 @@ func.func @dynamic_pack() {
   iree_tensor_ext.dispatch.tensor.store %pack, %5, offsets = [0, 0, 0, 0], sizes = [%3, %3, 4, 4], strides = [1, 1, 1, 1] : tensor<?x?x4x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x4x4xf32>>{%3, %3}
   return
 }
+// Pack is not decomposed because it has dynamic shapes.
 // CHECK-LABEL: func.func @dynamic_pack
-// CHECK:         linalg.pack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<?x?xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<?x?x4x4xf32>
+//       CHECK:   linalg.pack %[[SRC]] padding_value({{.+}}) {{.+}} into %[[DEST]]
 
 // -----
 
@@ -161,8 +192,11 @@ func.func @dynamic_unpack() {
   iree_tensor_ext.dispatch.tensor.store %unpack, %5, offsets = [0, 0], sizes = [%3, %3], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32>>{%3, %3}
   return
 }
+// Unpack is not decomposed because it has dynamic shapes.
 // CHECK-LABEL: func.func @dynamic_unpack
-// CHECK:         linalg.unpack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<?x?x4x4xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<?x?xf32>
+//       CHECK:   linalg.unpack %[[SRC]] {{.+}} into %[[DEST]]
 
 // -----
 
@@ -180,8 +214,14 @@ func.func @load_non_full_slice() {
   iree_tensor_ext.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [4, 4, 4, 4], strides = [1, 1, 1, 1] : tensor<4x4x4x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4x4x4xf32>>
   return
 }
+// Pack is decomposed because source is a non-full slice (16x16 from 17x17).
 // CHECK-LABEL: func.func @load_non_full_slice
-// CHECK-NOT:     linalg.pack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SRC]] {{\[}}[0, 1], [2, 3]{{\]}} output_shape [4, 4, 4, 4] : tensor<16x16xf32> into tensor<4x4x4x4xf32>
+//       CHECK:   %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[EXPANDED]] : tensor<4x4x4x4xf32>) outs(%[[DEST]] : tensor<4x4x4x4xf32>) permutation = [0, 2, 1, 3]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[TRANSPOSED]]
+//   CHECK-NOT:   linalg.pack
 
 // -----
 
@@ -199,8 +239,16 @@ func.func @store_non_full_slice() {
   iree_tensor_ext.dispatch.tensor.store %unpack, %1, offsets = [0, 0], sizes = [16, 16], strides = [1, 1] : tensor<16x16xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<17x17xf32>>
   return
 }
+// Unpack is decomposed because destination is a non-full slice (16x16 to 17x17).
 // CHECK-LABEL: func.func @store_non_full_slice
-// CHECK-NOT:     linalg.unpack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<4x4x4x4xf32>
+//       CHECK:   %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[SRC]] : tensor<4x4x4x4xf32>) outs(%[[EMPTY]] : tensor<4x4x4x4xf32>) permutation = [0, 2, 1, 3]
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRANSPOSED]] {{\[}}[0, 1], [2, 3]{{\]}} : tensor<4x4x4x4xf32> into tensor<16x16xf32>
+//       CHECK:   %[[COPY:.+]] = linalg.copy ins(%[[COLLAPSED]] : tensor<16x16xf32>) outs(%[[DEST]] : tensor<16x16xf32>)
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[COPY]]
+//   CHECK-NOT:   linalg.unpack
 
 // -----
 
@@ -221,8 +269,17 @@ func.func @multi_use_unpack_fold() {
   iree_tensor_ext.dispatch.tensor.store %unpack, %2, offsets = [0, 0], sizes = [16, 16], strides = [1, 1] : tensor<16x16xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<16x16xf32>>
   return
 }
+// Unpack is decomposed because all uses are stores (multiple stores to same value is fine).
 // CHECK-LABEL: func.func @multi_use_unpack_fold
-// CHECK-NOT:     linalg.unpack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<4x4x4x4xf32>
+//       CHECK:   %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[SRC]] : tensor<4x4x4x4xf32>) outs(%[[EMPTY]] : tensor<4x4x4x4xf32>) permutation = [0, 2, 1, 3]
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRANSPOSED]] {{\[}}[0, 1], [2, 3]{{\]}} : tensor<4x4x4x4xf32> into tensor<16x16xf32>
+//       CHECK:   %[[COPY:.+]] = linalg.copy ins(%[[COLLAPSED]] : tensor<16x16xf32>) outs(%[[DEST]] : tensor<16x16xf32>)
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[COPY]], {{.+}}, {{.+}} : tensor<16x16xf32>
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[COPY]], {{.+}}, {{.+}} : tensor<16x16xf32>
+//   CHECK-NOT:   linalg.unpack
 
 // -----
 
@@ -245,5 +302,12 @@ func.func @multi_use_unpack_no_fold() {
   iree_tensor_ext.dispatch.tensor.store %copy, %2, offsets = [0, 0], sizes = [16, 16], strides = [1, 1] : tensor<16x16xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<16x16xf32>>
   return
 }
+// Unpack is not decomposed because it has a non-store use (linalg.copy).
 // CHECK-LABEL: func.func @multi_use_unpack_no_fold
-// CHECK:         linalg.unpack
+//       CHECK:   %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<4x4x4x4xf32>
+//       CHECK:   %[[DEST:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[DEST2:.+]] = iree_tensor_ext.dispatch.tensor.load {{.+}} -> tensor<16x16xf32>
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[SRC]] {{.+}} into %[[DEST]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[UNPACK]]
+//       CHECK:   %[[COPY:.+]] = linalg.copy ins(%[[UNPACK]] : tensor<16x16xf32>) outs(%[[DEST2]] : tensor<16x16xf32>)
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[COPY]]

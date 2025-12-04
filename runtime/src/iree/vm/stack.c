@@ -438,6 +438,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_wait_enter(
   iree_host_size_t header_size = sizeof(iree_vm_stack_frame_header_t);
   iree_host_size_t new_top =
       stack->frame_storage_size + header_size + frame_size;
+  IREE_ASSERT_ALIGNED(new_top, sizeof(iree_max_align_t));
   if (IREE_UNLIKELY(new_top > stack->frame_storage_capacity)) {
     IREE_RETURN_IF_ERROR(iree_vm_stack_grow(stack, new_top));
   }
@@ -547,6 +548,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
   iree_host_size_t header_size = sizeof(iree_vm_stack_frame_header_t);
   iree_host_size_t new_top =
       stack->frame_storage_size + header_size + frame_size;
+  IREE_ASSERT_ALIGNED(new_top, sizeof(iree_max_align_t));
   if (IREE_UNLIKELY(new_top > stack->frame_storage_capacity)) {
     IREE_RETURN_IF_ERROR(iree_vm_stack_grow(stack, new_top));
   }

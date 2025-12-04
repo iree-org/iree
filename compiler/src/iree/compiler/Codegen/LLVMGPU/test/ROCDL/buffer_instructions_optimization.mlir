@@ -134,7 +134,7 @@ func.func @no_simplify_mask_no_fat_raw_buffer(%1 : memref<1x?x?x8xbf16>, %index1
 }
 
 // CHECK-LABEL: @no_simplify_mask_no_fat_raw_buffer
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16>, %{{.+}}: index, %{{.+}}: index)
 //   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
 //       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
 //  CHECK-SAME: %[[MASK]]
@@ -153,7 +153,7 @@ func.func @no_simplify_mask_tensor(%1 : tensor<1x?x?x8xbf16>, %index1 : index, %
 }
 
 // CHECK-LABEL: @no_simplify_mask_tensor
-//  CHECK-SAME:   (%[[ARG0:.+]]: tensor<1x?x?x8xbf16>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
+//  CHECK-SAME:   (%[[ARG0:.+]]: tensor<1x?x?x8xbf16>, %{{.+}}: index, %{{.+}}: index)
 //   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
 //       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
 //  CHECK-SAME: %[[MASK]]
@@ -172,7 +172,7 @@ func.func @no_simplify_mask_outofbounds(%1 : memref<1x?x?x6xbf16, #amdgpu.addres
 }
 
 // CHECK-LABEL: @no_simplify_mask_outofbounds
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x6xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x6xbf16, #amdgpu.address_space<fat_raw_buffer>>, %{{.+}}: index, %{{.+}}: index)
 //   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
 //       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
 //  CHECK-SAME: %[[MASK]]
@@ -191,7 +191,7 @@ func.func @no_simplify_partial_mask(%1 : memref<1x?x?x8xbf16, #amdgpu.address_sp
 }
 
 // CHECK-LABEL: @no_simplify_partial_mask
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %{{.+}}: index, %{{.+}}: index)
 //   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
 //       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
 //  CHECK-SAME: %[[MASK]]
@@ -210,7 +210,7 @@ func.func @no_simplify_mask_nonunit(%1 : memref<1x?x?x8xbf16, #amdgpu.address_sp
 }
 
 // CHECK-LABEL: @no_simplify_mask_nonunit
-//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?x?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %{{.+}}: index, %{{.+}}: index)
 //   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
 //       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
 //  CHECK-SAME: %[[MASK]]

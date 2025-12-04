@@ -415,7 +415,7 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   SmallVector<Attribute> blockMapping =
       llvm::to_vector(forallOp.getMapping()->getValue());
   if (llvm::any_of(blockMapping, [](Attribute map) {
-        return !llvm::isa<gpu::GPUBlockMappingAttr>(map);
+        return !isa<gpu::GPUBlockMappingAttr>(map);
       })) {
     return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
   }
@@ -435,10 +435,8 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   }
   // Step 2. sort the values by the corresponding GPUBlockMappingAttr.
   auto comparator = [](Attribute a, Attribute b) -> bool {
-    return static_cast<int64_t>(
-               llvm::cast<gpu::GPUBlockMappingAttr>(a).getBlock()) <
-           static_cast<int64_t>(
-               llvm::cast<gpu::GPUBlockMappingAttr>(b).getBlock());
+    return static_cast<int64_t>(cast<gpu::GPUBlockMappingAttr>(a).getBlock()) <
+           static_cast<int64_t>(cast<gpu::GPUBlockMappingAttr>(b).getBlock());
   };
   SmallVector<Value> gridDimValues =
       getValuesSortedByKey(blockMapping, numBlocks, comparator);
@@ -447,8 +445,8 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   IRMapping bvm;
   SmallVector<Value> workgroupIdOps, workgroupCountOps;
   for (Attribute attr : blockMapping) {
-    auto idx = static_cast<int64_t>(
-        llvm::cast<gpu::GPUBlockMappingAttr>(attr).getBlock());
+    auto idx =
+        static_cast<int64_t>(cast<gpu::GPUBlockMappingAttr>(attr).getBlock());
     workgroupIdOps.push_back(
         HAL::InterfaceWorkgroupIDOp::create(rewriter, loc, idx));
     workgroupCountOps.push_back(
@@ -549,7 +547,7 @@ transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
       return;
 
     auto destSpace =
-        dyn_cast_or_null<gpu::AddressSpaceAttr>(destType.getMemorySpace());
+        dyn_cast_if_present<gpu::AddressSpaceAttr>(destType.getMemorySpace());
     if (!destSpace)
       return;
 
@@ -643,8 +641,7 @@ transform_dialect::PopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
     // Get the mapping IDs.
     auto mappingIds = llvm::map_to_vector(
         blockMapping.value(), [](Attribute mappingAttr) -> int {
-          return llvm::cast<DeviceMappingAttrInterface>(mappingAttr)
-              .getMappingId();
+          return cast<DeviceMappingAttrInterface>(mappingAttr).getMappingId();
         });
     int maxId = 0;
     for (auto id : mappingIds) {
@@ -802,8 +799,8 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Value to) {
   // Insert barriers for copies from and to shared memory.
   bool needsBarrier = false;
-  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(from.getType())) !=
-      hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
+  if (hasSharedMemoryAddressSpace(cast<MemRefType>(from.getType())) !=
+      hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
   if (needsBarrier)
@@ -1079,9 +1076,11 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   Value laneId =
       gpu::ThreadIdOp::create(rewriter, target.getLoc(), gpu::Dimension::x);
   int64_t subgroupSize = getSubgroupSize();
+  ArrayRef<int64_t> workgroupSize = getWorkgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
+                                                workgroupSize);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);

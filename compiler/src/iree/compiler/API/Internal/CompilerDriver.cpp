@@ -54,12 +54,14 @@
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/Support/Regex.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
@@ -74,8 +76,10 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Remarks.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Remark/RemarkStreamer.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -738,6 +742,10 @@ struct Invocation {
                              void *userData) = nullptr;
   void *diagnosticCallbackUserData = nullptr;
   int diagnosticCallbackFlags = 0;
+
+  // Remark options.
+  std::string remarksFilter;
+  std::string remarksOutputFile;
 };
 
 Invocation::Invocation(Session &session) : session(session) {
@@ -778,6 +786,7 @@ std::unique_ptr<PassManager> Invocation::createPassManager() {
   }
   passManager->addInstrumentation(std::make_unique<PassTracing>());
   passManager->enableVerifier(enableVerifier);
+
   for (auto &init : passManagerInitializers) {
     init(*passManager);
   }
@@ -838,6 +847,22 @@ bool Invocation::initializeInvocation() {
         }
         diag << ")";
       }
+      return false;
+    }
+  }
+
+  // Setup remarks.
+  if (!remarksFilter.empty()) {
+    // Only use remarksFilter for now.
+    mlir::remark::RemarkCategories cats{/*all=*/remarksFilter, /*passed=*/"",
+                                        /*missed=*/"", /*analysis=*/"",
+                                        /*failed=*/""};
+    // Always use YAML streamer and REMARK_POLICY_ALL for now.
+    if (failed(mlir::remark::enableOptimizationRemarksWithLLVMStreamer(
+            session.context, remarksOutputFile, llvm::remarks::Format::YAML,
+            std::make_unique<mlir::remark::RemarkEmittingPolicyAll>(), cats))) {
+      emitError(UnknownLoc::get(&session.context))
+          << "Failed to enable optimization remarks with YAML streamer";
       return false;
     }
   }
@@ -1468,6 +1493,13 @@ void ireeCompilerInvocationSetDumpCompilationPhasesTo(
 void ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv,
                                        bool enable) {
   unwrap(inv)->enableVerifier = enable;
+}
+
+void ireeCompilerInvocationSetupRemarks(iree_compiler_invocation_t *inv,
+                                        const char *remarksFilter,
+                                        const char *remarksOutputFile) {
+  unwrap(inv)->remarksFilter = remarksFilter;
+  unwrap(inv)->remarksOutputFile = remarksOutputFile;
 }
 
 bool ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,

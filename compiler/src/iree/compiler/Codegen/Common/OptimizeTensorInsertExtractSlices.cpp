@@ -292,8 +292,8 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     }
 
     // Try to get the producing write op.
-    auto writeOp =
-        dyn_cast_or_null<vector::TransferWriteOp>(op.getBase().getDefiningOp());
+    auto writeOp = dyn_cast_if_present<vector::TransferWriteOp>(
+        op.getBase().getDefiningOp());
     // Fail to match if the write doesn't have pure tensor semantics.
     if (!writeOp || !writeOp.hasPureTensorSemantics()) {
       return failure();

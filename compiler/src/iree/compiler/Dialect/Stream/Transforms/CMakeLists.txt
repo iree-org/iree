@@ -17,6 +17,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AnnotateAffinities.cpp"
+    "AnnotateConstantTransientSize.cpp"
     "AnnotateDispatchArguments.cpp"
     "AnnotateDispatchAssumptions.cpp"
     "AutomaticReferenceCounting.cpp"
@@ -27,6 +28,7 @@ iree_cc_library(
     "ElideAsyncTransfers.cpp"
     "ElideTimepoints.cpp"
     "EmplaceAllocations.cpp"
+    "EmplaceTransients.cpp"
     "EncodeTensors.cpp"
     "FoldUniformOperands.cpp"
     "FuseDispatchBindings.cpp"
@@ -34,13 +36,13 @@ iree_cc_library(
     "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"
     "MaterializeEncodings.cpp"
+    "MaterializeTransientSizeQueries.cpp"
     "PackConstants.cpp"
     "PackDispatchOperands.cpp"
     "Passes.cpp"
     "Passes.h.inc"
     "PropagateTimepoints.cpp"
     "RefineUsage.cpp"
-    "ReplicateGlobalsPerAffinity.cpp"
     "ReuseAllocations.cpp"
     "ScheduleAllocation.cpp"
     "ScheduleConcurrency.cpp"
@@ -59,6 +61,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
+    MLIRControlFlowInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR

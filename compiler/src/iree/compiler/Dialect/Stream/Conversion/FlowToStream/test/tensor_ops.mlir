@@ -100,6 +100,30 @@ util.func public @tensorBitCastWithSingleUse(%input: tensor<5x24x48xi8>) -> tens
 
 // -----
 
+// CHECK-LABEL: @tensorBitCastToEncoding
+//  CHECK-SAME: (%[[INPUT:.*]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
+util.func public @tensorBitCastToEncoding(%input: tensor<4x16x8xi1>) -> tensor<4x16x8xi1, #iree_encoding.packed_storage> {
+  // CHECK: %[[RESULT_SIZE:.*]] = stream.tensor.sizeof tensor<4x16x8xi1, #iree_encoding.packed_storage> : index
+  // CHECK: %[[BITCAST:.*]] = stream.tensor.clone %[[INPUT]] : tensor<4x16x8xi1> in !stream.resource<*>{%[[INPUT_SIZE]]} -> tensor<4x16x8xi1, #iree_encoding.packed_storage> in !stream.resource<*>{%[[RESULT_SIZE]]}
+  %0 = flow.tensor.bitcast %input : tensor<4x16x8xi1> -> tensor<4x16x8xi1, #iree_encoding.packed_storage>
+  // CHECK: util.return %[[BITCAST]], %[[RESULT_SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4x16x8xi1, #iree_encoding.packed_storage>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorBitCastFromEncoding
+//  CHECK-SAME: (%[[INPUT:.*]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
+util.func public @tensorBitCastFromEncoding(%input: tensor<4x16x8xi1, #iree_encoding.packed_storage>) -> tensor<4x16x8xi1> {
+  // CHECK: %[[RESULT_SIZE:.*]] = stream.tensor.sizeof tensor<4x16x8xi1> : index
+  // CHECK: %[[BITCAST:.*]] = stream.tensor.clone %[[INPUT]] : tensor<4x16x8xi1, #iree_encoding.packed_storage> in !stream.resource<*>{%[[INPUT_SIZE]]} -> tensor<4x16x8xi1> in !stream.resource<*>{%[[RESULT_SIZE]]}
+  %0 = flow.tensor.bitcast %input : tensor<4x16x8xi1, #iree_encoding.packed_storage> -> tensor<4x16x8xi1>
+  // CHECK: util.return %[[BITCAST]], %[[RESULT_SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4x16x8xi1>
+}
+
+// -----
+
 // CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL: @tensorEncodeStatic
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]

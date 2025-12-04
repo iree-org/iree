@@ -68,6 +68,45 @@ OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.tensor.transients
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds consecutive transients ops into one.
+// %1 = hal.tensor.transients %0 : tensor<?xf32>{%dim} from %storage1
+// %2 = hal.tensor.transients %1 : tensor<?xf32>{%dim} from %storage2
+// =>
+// %2 = hal.tensor.transients %0 : tensor<?xf32>{%dim} from %storage2
+struct FoldConsecutiveTransientsOps
+    : public OpRewritePattern<TensorTransientsOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorTransientsOp op,
+                                PatternRewriter &rewriter) const override {
+    // Check if the source is another transients op.
+    auto sourceOp = op.getSource().getDefiningOp<TensorTransientsOp>();
+    if (!sourceOp) {
+      return failure();
+    }
+
+    // Fold by using the original source from the inner transients op,
+    // but keeping the outer storage (outer annotation wins).
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceMutable().assign(sourceOp.getSource());
+      op.getSourceDimsMutable().assign(sourceOp.getSourceDims());
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void TensorTransientsOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.add<FoldConsecutiveTransientsOps>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.tensor.barrier
 //===----------------------------------------------------------------------===//
 
@@ -181,8 +220,8 @@ struct FoldBufferViewCreateSubspan
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
-    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
+    auto newSourceOffset = cast<Value>(op.getSourceOffset());
+    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
       newSourceOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -240,7 +279,7 @@ struct SkipCommandBufferDeviceOp
 
   LogicalResult matchAndRewrite(CommandBufferDeviceOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto createOp = dyn_cast_or_null<CommandBufferCreateOp>(
+    if (auto createOp = dyn_cast_if_present<CommandBufferCreateOp>(
             op.getCommandBuffer().getDefiningOp())) {
       rewriter.replaceOp(op, createOp.getDevice());
       return success();
@@ -269,8 +308,8 @@ struct FoldCommandBufferFillBufferSubspans
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newTargetBuffer = op.getTargetBuffer();
-    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
-    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
+    auto newTargetOffset = cast<Value>(op.getTargetOffset());
+    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
       newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -309,8 +348,8 @@ struct FoldCommandBufferUpdateBufferSubspans
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newTargetBuffer = op.getTargetBuffer();
-    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
-    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
+    auto newTargetOffset = cast<Value>(op.getTargetOffset());
+    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
       newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -349,8 +388,8 @@ struct FoldCommandBufferCopyBufferSubspans
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
-    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
+    auto newSourceOffset = cast<Value>(op.getSourceOffset());
+    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
       newSourceOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -359,8 +398,8 @@ struct FoldCommandBufferCopyBufferSubspans
       needsUpdate = true;
     }
     auto newTargetBuffer = op.getTargetBuffer();
-    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
-    if (auto subspanOp = dyn_cast_or_null<IREE::HAL::BufferSubspanOp>(
+    auto newTargetOffset = cast<Value>(op.getTargetOffset());
+    if (auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
             op.getTargetBuffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.getSourceBuffer();
       newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -565,8 +604,8 @@ struct HoistDeviceQueueBarrierChain
                                 PatternRewriter &rewriter) const override {
     // See if we can observe the original fence creation in the local scope.
     auto waitFence = barrierOp.getWaitFence();
-    auto createOp =
-        dyn_cast_or_null<IREE::HAL::FenceCreateOp>(waitFence.getDefiningOp());
+    auto createOp = dyn_cast_if_present<IREE::HAL::FenceCreateOp>(
+        waitFence.getDefiningOp());
     if (!createOp) {
       return rewriter.notifyMatchFailure(barrierOp,
                                          "cannot analyze wait fence creation");
@@ -1103,7 +1142,7 @@ struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
                                 PatternRewriter &rewriter) const override {
     auto fence = signalOp.getFence();
     auto createOp =
-        dyn_cast_or_null<IREE::HAL::FenceCreateOp>(fence.getDefiningOp());
+        dyn_cast_if_present<IREE::HAL::FenceCreateOp>(fence.getDefiningOp());
     if (!createOp)
       return failure();
 

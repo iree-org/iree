@@ -85,7 +85,7 @@ static void convertAndDecomposeToI32s(
   // If the value complex from a complex::BitcastOp we should grab the
   // real / complex values instead.
   if (auto bitcast =
-          dyn_cast_or_null<complex::BitcastOp>(operand.getDefiningOp())) {
+          dyn_cast_if_present<complex::BitcastOp>(operand.getDefiningOp())) {
     auto complexOperand = bitcast.getOperand();
     auto complexTy = cast<ComplexType>(complexOperand.getType());
     auto real = builder.createOrFold<complex::ReOp>(
@@ -244,7 +244,7 @@ static Value recomposeFromI32sAndConvert(
   }
 
   // i16 -> bf16, i32 -> f32, i64 -> f64 ...
-  if (auto floatType = llvm::dyn_cast<FloatType>(oldArgType)) {
+  if (auto floatType = dyn_cast<FloatType>(oldArgType)) {
     value = arith::BitcastOp::create(builder, loc, oldArgType, value);
   }
 

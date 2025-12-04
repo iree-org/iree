@@ -46,7 +46,7 @@ let opDocGroup = OpGroupNonStructuredOps in {
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
@@ -178,7 +178,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 
 def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
@@ -295,7 +295,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
     dimension `i` of the `input` value). The block is terminated by an
     iree_linalg_ext.yield op, which yields one index for each dimension in
     the `output`, and an additional `i1` Value, which represents a mask on
-    whether or not to write to the `output` at the yielded set of indices. Iff
+    whether or not to write to the `output` at the yielded set of indices. If
     the mask value is true, the input value will be written.
   }];
   let arguments = (ins
@@ -325,6 +325,15 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
     int64_t getOutputRank() {
       return getOutputType().getRank();
     }
+
+    // Return the input index at the provided position.
+    Value getInputIndex(int64_t position);
+
+    // Return the output index at the provided position.
+    Value getOutputIndex(int64_t position);
+
+    // Returns the mask value.
+    Value getMask();
 
     // Return true if the map_scatter op has vector semantics.
     bool isVectorized() {
@@ -375,7 +384,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
 
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",
          "getIterationDomain",
@@ -429,7 +438,7 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 
 def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
@@ -500,7 +509,7 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
@@ -557,7 +566,7 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["generateScalarImplementation",
@@ -635,7 +644,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<LinalgFusionInterface,
    ["getIndexingMapsForResults", "getIndexingMapsForOperands",
     "getStaticLoopRanges"]>,
@@ -769,7 +778,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
      DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
@@ -876,7 +885,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     [IndexingMapOpInterface,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
@@ -1007,8 +1016,18 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
 // ExpReduction
 //===----------------------------------------------------------------------===//
 
-def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction",
-    [AttrSizedOperandSegments]> {
+def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<IndexingMapOpInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+  [
+    "getLoopIteratorTypes",
+    "getIterationDomain",
+    "getTiledImplementation",
+    "getResultTilePosition",
+    "generateResultTileValue"
+  ]>
+]> {
   let summary = [{
     A linalg.generic extension with support for exponential reduction.
   }];
@@ -1164,7 +1183,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction",
 
 def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
@@ -1196,6 +1215,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
           strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
           m_offset = [0] * [1] k_offset = [0] * [1]
           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
           ins(%in : tensor<2x34x34x640xf32>)
           outs(%out : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
     ```
@@ -1244,6 +1264,11 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     indicates that the input layout is already aligned with the filter layout
     in terms of reduction dimensions, so no transposition of indices is necessary
     before slice extraction.
+
+    The `output_perm` attribute defines the layout of the result with respect to
+    the canonical `BxMxK` layout. The layout of the result can be determined by
+    applying the permutation to the `BxMxK` layout. For instance, an
+    `output_perm = [2, 0, 1]` indicates the result is in a `KxMxB` layout.
   }];
 
   let arguments = (ins AnyShaped:$input, AnyShaped:$output,
@@ -1262,7 +1287,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
                        DenseI64ArrayAttr:$batch_pos,
                        DenseI64ArrayAttr:$m_pos,
                        DenseI64ArrayAttr:$k_pos,
-                       DenseI64ArrayAttr:$input_k_perm);
+                       DenseI64ArrayAttr:$input_k_perm,
+                       DenseI64ArrayAttr:$output_perm);
 
   let results = (outs Variadic<AnyShaped>:$results);
   let hasFolder = 1;
@@ -1282,6 +1308,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     `m_pos` `=` $m_pos
     `k_pos` `=` $k_pos
     `input_k_perm` `=` $input_k_perm
+    `output_perm` `=` $output_perm
     `ins` `(` $input `:` type($input) `)`
     `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
@@ -1299,7 +1326,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       "ArrayRef<int64_t>":$batch_dimensions,
       "ArrayRef<int64_t>":$m_dimensions,
       "ArrayRef<int64_t>":$k_dimensions,
-      "ArrayRef<int64_t>":$input_k_perm)>
+      "ArrayRef<int64_t>":$input_k_perm,
+      "ArrayRef<int64_t>":$output_perm)>
   ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
@@ -1320,6 +1348,21 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     SmallVector<int64_t> getBatchOutputDims();
     SmallVector<int64_t> getMOutputDims();
     SmallVector<int64_t> getKOutputDims();
+
+    // Returns the mapping from input dimensions to the corresponding set of
+    // output dimensions that can vectorize along with them. A pair of input and
+    // output dims are vectorizable together if incrementing the output
+    // dimension by 1 will also increment the input dimension by exactly 1.
+    // Each input dim can have zero or more corresponding output dims. If an
+    // input dim maps to multiple output dims, then the input dim can vectorize
+    // with any one of the corresponding output dims.
+    //
+    // This method does not find vectorizable dims if output dims are partially
+    // collapsed. For example, it computes K dim mapping for standard conv_2d if
+    // the K dim is fully collapsed or fully expanded (inlcuding all input
+    // channel and filter loop dims), but otherwise omits mappings for the K
+    // dims.
+    SmallVector<SmallVector<int64_t>> getInputToOutputDimVectorizationMap();
 
     // Return op metadata.
     SmallVector<OpFoldResult> getMixedKernelSize();
@@ -1360,7 +1403,7 @@ let opDocGroup = OpGroupDataTilingOps in {
 
 def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
@@ -1524,7 +1567,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
 def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
@@ -1659,7 +1702,7 @@ let opDocGroup = OpGroupWinogradOps in {
 
 def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_transform",
     [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -1765,7 +1808,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
 
 def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_transform",
     [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -1876,7 +1919,7 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
 
 def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_transform",
     [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -1995,7 +2038,7 @@ def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
   DeclareOpInterfaceMethods<AggregatedOpInterface, [
     "decomposeOperation"]>,
   DeclareOpInterfaceMethods<LinalgFusionInterface>,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
      "getLoopIteratorTypes",

@@ -34,6 +34,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:version",
         "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Remarks",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
@@ -42,6 +43,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Debug",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:RemarkStreamer",
         "@llvm-project//mlir:Support",
     ],
 )
@@ -162,7 +164,9 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:CAPIIRHeaders",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Support",
     ],
 )

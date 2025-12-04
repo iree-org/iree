@@ -132,9 +132,9 @@ bool mayExtI8ToI32(Value op) {
   Operation *def = stripElementBitPatternPreservingParents(op);
   Type inTy;
 
-  if (auto ext = dyn_cast_or_null<arith::ExtSIOp>(def)) {
+  if (auto ext = dyn_cast_if_present<arith::ExtSIOp>(def)) {
     inTy = getElementTypeOrSelf(ext.getIn().getType());
-  } else if (auto ext = dyn_cast_or_null<arith::ExtUIOp>(def)) {
+  } else if (auto ext = dyn_cast_if_present<arith::ExtUIOp>(def)) {
     inTy = getElementTypeOrSelf(ext.getIn().getType());
   } else {
     return false;
@@ -232,7 +232,10 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::GatherOp op) {
 std::optional<SmallVector<int64_t>>
 getNativeVectorShape(Operation *op, bool targetSupportsDotProd) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
-    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
+    if (auto vecType = dyn_cast<VectorType>(op->getResultTypes()[0])) {
+      if (vecType.getRank() == 0) {
+        return SmallVector<int64_t>{1};
+      }
       SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
       nativeSize.back() = getComputeVectorSize(vecType.getShape().back());
       return nativeSize;

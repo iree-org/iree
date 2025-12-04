@@ -59,7 +59,7 @@ iree_lit_test_suite(
             "split_reduction.mlir",
             "synchronize_symbol_visibility.mlir",
             "tile.mlir",
-            "tile_and_fuse_producer_consumer_anchoring_last_op.mlir",
+            "tile_and_fuse_producer_consumer_anchoring_non_root_op.mlir",
             "tile_and_fuse_producer_consumer_anchoring_root_op.mlir",
             "tile_to_vector_size.mlir",
             "unfused_fma.mlir",

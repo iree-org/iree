@@ -113,8 +113,6 @@ func.func @named_op_unit_dim(%lhs : tensor<1x?xf32>, %rhs : tensor<?x?xf32>,
       outs(%init : tensor<1x?xf32>) -> tensor<1x?xf32>
   return %0 : tensor<1x?xf32>
 }
-
-
 // CHECK-LABEL: func.func @named_op_unit_dim(
 //       CHECK:   util.unfoldable_constant dense<1> : tensor<1xi32>
 

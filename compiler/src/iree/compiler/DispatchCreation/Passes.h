@@ -48,6 +48,14 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable split reduction for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
+  Option<bool> enableAggressiveReshapeMovement{
+      *this,
+      "aggressive-reshape-movement",
+      llvm::cl::desc(
+          "Enable aggressive reshape movement (bubbling expand/collapse "
+          "shapes across reduction ops)"),
+      llvm::cl::init(false),
+  };
   Option<bool> constExprHoisting{
       *this,
       "const-expr-hoisting",

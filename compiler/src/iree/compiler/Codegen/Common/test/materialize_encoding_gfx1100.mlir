@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding{test-cl-gpu-target}))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding{test-gpu-encoding-resolver=gpu_data_tiling}))" \
 // RUN:   --iree-gpu-test-target=gfx1100 \
 // RUN:   --split-input-file %s | FileCheck %s
 
@@ -23,11 +23,11 @@ func.func @matmul_lowering_WMMAR3_F32_16x16x16_F16(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK:     func.func @matmul_lowering_WMMAR3_F32_16x16x16_F16(
-// CHECK-SAME:   %[[LHS:.+]]: tensor<?x?x4x1x16x16xf16>, %[[RHS:.+]]: tensor<?x?x4x1x16x16xf16>
-// CHECK-SAME:   %[[ACC:.+]]: tensor<?x?x4x4x8x2x16xf32>
-// CHECK-SAME: ) -> tensor<?x?x4x4x8x2x16xf32>
+// CHECK-SAME:   %[[LHS:.+]]: tensor<?x?x2x2x1x16x16xf16>, %[[RHS:.+]]: tensor<?x?x2x2x1x16x16xf16>
+// CHECK-SAME:   %[[ACC:.+]]: tensor<?x?x2x2x2x2x8x2x16xf32>
+// CHECK-SAME: ) -> tensor<?x?x2x2x2x2x8x2x16xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = WMMAR3_F32_16x16x16_F16, intrinsics_m = 4, subgroups_n = 4>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = WMMAR3_F32_16x16x16_F16, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, operands_interleaving_intrinsics_k = [0, 1]>
 // CHECK:       return %[[MMA]]

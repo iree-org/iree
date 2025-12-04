@@ -48,7 +48,8 @@ LogicalResult applyTileAndFuseToEachRoot(
     IREE::GPU::TilingLevel tilingLevel, bool allowZeroSlices,
     std::optional<
         llvm::SmallDenseMap<TilingInterface, SmallVector<OpFoldResult>>>
-        targetTileMap = std::nullopt);
+        targetTileMap = std::nullopt,
+    bool fuseConsumers = true);
 
 } // namespace mlir::iree_compiler
 

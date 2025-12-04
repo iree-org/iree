@@ -38,9 +38,9 @@ public:
     Value rhs = linalgOp.getDpsInputOperand(1)->get();
     Value result = linalgOp.getDpsInitOperand(0)->get();
 
-    auto lhsType = llvm::dyn_cast<RankedTensorType>(lhs.getType());
-    auto rhsType = llvm::dyn_cast<RankedTensorType>(rhs.getType());
-    auto resultType = llvm::dyn_cast<RankedTensorType>(result.getType());
+    auto lhsType = dyn_cast<RankedTensorType>(lhs.getType());
+    auto rhsType = dyn_cast<RankedTensorType>(rhs.getType());
+    auto resultType = dyn_cast<RankedTensorType>(result.getType());
 
     if (!lhsType || !rhsType)
       return failure();

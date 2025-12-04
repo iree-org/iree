@@ -15,18 +15,21 @@ func.func @transpose_matmul(%arg0: tensor<1x4096xf32>, %arg1: tensor<32000x4096x
   return %2 : tensor<1x32000xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK:      func.func @transpose_matmul(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x4096xf32>, %[[ARG1:[a-zA-Z0-9_]+]]: tensor<32000x4096xf32>) -> tensor<1x32000xf32>
+// CHECK-DAG:  #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:  #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG:  #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @transpose_matmul(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x4096xf32>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: tensor<32000x4096xf32>
+// CHECK-SAME:  ) -> tensor<1x32000xf32>
 // CHECK:      %[[FILL:.+]] = linalg.fill
 // CHECK-SAME: -> tensor<1x32000xf32>
 // CHECK:      %[[GEN:.+]] = linalg.generic
-// CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME: indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]
 // CHECK-SAME: ins(%[[ARG0]], %[[ARG1]] : tensor<1x4096xf32>, tensor<32000x4096xf32>)
 // CHECK-SAME: outs(%[[FILL]] : tensor<1x32000xf32>)
-// CHECK:      ^bb0(%[[IN:.+]]: f32, %[[IN0:.+]]: f32, %[[OUT:.+]]: f32)
+// CHECK:      ^bb0(%[[IN:.+]]: f32, %[[IN0:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:      %[[A0:.+]] = arith.mulf %[[IN]], %[[IN0]] : f32
 // CHECK:      %[[A1:.+]] = arith.addf %[[OUT]], %[[A0]] : f32
 // CHECK:      linalg.yield %[[A1]] : f32
@@ -42,18 +45,17 @@ func.func @matvec(%arg0: tensor<32000x4096xf32>, %arg1: tensor<4096xf32>) -> ten
   return %2 : tensor<32000xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
-// CHECK:      func.func @matvec
+// CHECK-DAG:  #[[$MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:  #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG:  #[[$MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-LABEL: func.func @matvec
 // CHECK:        linalg.generic
-// CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME:   indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
 // CHECK-SAME:   iterator_types = ["parallel", "reduction"]
-// CHECK:        ^bb0(%[[IN:.+]]: f32, %[[IN0:.+]]: f32, %[[OUT:.+]]: f32)
+// CHECK:        ^bb0(%[[IN:.+]]: f32, %[[IN0:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:          %[[A0:.+]] = arith.mulf %[[IN]], %[[IN0]] : f32
 // CHECK:          %[[A1:.+]] = arith.addf %[[OUT]], %[[A0]] : f32
 // CHECK:          linalg.yield %[[A1]] : f32
-
 
 // -----
 
@@ -65,14 +67,14 @@ func.func @vecmat(%arg0: tensor<4096xf32>, %arg1: tensor<4096x32000xf32>) -> ten
   return %2 : tensor<32000xf32>
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1) -> (d1)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1, d0)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
-// CHECK:      func.func @vecmat
+// CHECK-DAG:  #[[$MAP:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG:  #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK-DAG:  #[[$MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-LABEL: func.func @vecmat
 // CHECK:        linalg.generic
-// CHECK-SAME:   indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+// CHECK-SAME:   indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
 // CHECK-SAME:   iterator_types = ["parallel", "reduction"]
-// CHECK:        ^bb0(%[[IN:.+]]: f32, %[[IN0:.+]]: f32, %[[OUT:.+]]: f32)
+// CHECK:        ^bb0(%[[IN:.+]]: f32, %[[IN0:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:          %[[A0:.+]] = arith.mulf %[[IN]], %[[IN0]] : f32
 // CHECK:          %[[A1:.+]] = arith.addf %[[OUT]], %[[A0]] : f32
 // CHECK:          linalg.yield %[[A1]] : f32
@@ -145,3 +147,24 @@ func.func @transpose_op(%arg0: tensor<16x32xf16>) -> tensor<32x16xf16> {
 
 // CHECK-LABEL: func.func @transpose_op
 //       CHECK:   linalg.generic
+
+// -----
+
+func.func @reduce_op(%arg0: tensor<32x128xf32>, %arg1: tensor<32xf32>) -> tensor<32xf32> {
+  %reduced = linalg.reduce ins(%arg0 : tensor<32x128xf32>) outs(%arg1 : tensor<32xf32>) dimensions = [1]
+    (%in: f32, %out: f32) {
+      %sum = arith.addf %in, %out : f32
+      linalg.yield %sum : f32
+    }
+  return %reduced : tensor<32xf32>
+}
+
+// CHECK-DAG:  #[[$MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:  #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-LABEL: func.func @reduce_op
+// CHECK:        linalg.generic
+// CHECK-SAME:   indexing_maps = [#[[$MAP]], #[[$MAP1]]]
+// CHECK-SAME:   iterator_types = ["parallel", "reduction"]
+// CHECK:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
+// CHECK:          %[[SUM:.+]] = arith.addf %[[IN]], %[[OUT]] : f32
+// CHECK:          linalg.yield %[[SUM]] : f32

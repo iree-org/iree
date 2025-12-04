@@ -19,7 +19,6 @@ func.func @unused_result_copied(%arg0: !iree_tensor_ext.dispatch.tensor<readonly
 // CHECK-LABEL: func.func @big_result_not_copied
 // CHECK-NOT: bufferization.alloc_tensor()
 func.func @big_result_not_copied(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x33xf32>>, %arg1: tensor<1x33xi64>) -> tensor<1x33xi64> {
-  %cst = arith.constant dense<1.000000e+00> : tensor<1x33xf32>
   %2 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [1, 33], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x33xf32>> -> tensor<1x33xf32>
   %3:2 = iree_linalg_ext.sort dimension(1) outs(%2, %arg1 :tensor<1x33xf32>, tensor<1x33xi64>) {
     ^bb0(%arg4: f32, %arg5: f32, %arg6: i64, %arg7: i64):
@@ -45,9 +44,9 @@ func.func @used_result_not_copied(%arg0: !iree_tensor_ext.dispatch.tensor<readon
 
 // -----
 
-// CHECK-LABEL: func @memref_semantics(
+// CHECK-LABEL: func.func @memref_semantics(
 //  CHECK-SAME:   %[[DEST:.+]]: memref<?x?xf32>
-//       CHECK:   linalg.fill {{.*}} outs(%[[DEST]]
+//       CHECK:   linalg.fill ins(%{{.+}}) outs(%[[DEST]]
 func.func @memref_semantics(%dest: memref<?x?xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   linalg.fill ins(%cst : f32) outs(%dest : memref<?x?xf32>)

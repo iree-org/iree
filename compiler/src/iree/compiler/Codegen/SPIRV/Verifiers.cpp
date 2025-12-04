@@ -100,9 +100,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> lhsShape =
-      llvm::cast<ShapedType>(op->getOperand(0).getType()).getShape();
+      cast<ShapedType>(op->getOperand(0).getType()).getShape();
   ArrayRef<int64_t> rhsShape =
-      llvm::cast<ShapedType>(op->getOperand(1).getType()).getShape();
+      cast<ShapedType>(op->getOperand(1).getType()).getShape();
 
   if (loweringConfig.getTilingLevels().size() != 1) {
     return op->emitOpError("expected 1 levels of tiling sizes, got ")
@@ -209,9 +209,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> lhsShape =
-      llvm::cast<ShapedType>(op->getOperand(0).getType()).getShape();
+      cast<ShapedType>(op->getOperand(0).getType()).getShape();
   ArrayRef<int64_t> rhsShape =
-      llvm::cast<ShapedType>(op->getOperand(1).getType()).getShape();
+      cast<ShapedType>(op->getOperand(1).getType()).getShape();
 
   SmallVector<int64_t> workgroupTileSizes =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
@@ -233,7 +233,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   auto getElementType = [](Value v) {
-    return llvm::cast<ShapedType>(v.getType()).getElementType();
+    return cast<ShapedType>(v.getType()).getElementType();
   };
 
   Type lhsType = getElementType(op->getOperand(0));
@@ -324,7 +324,7 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> outputShape =
-      llvm::cast<ShapedType>(op->getOperand(2).getType()).getShape();
+      cast<ShapedType>(op->getOperand(2).getType()).getShape();
   const int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
 
   // Verify the first level tile size divides the Convolution

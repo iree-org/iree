@@ -319,19 +319,19 @@ public:
         // preferred to fuse those with producers (and the consumer fusion is
         // arguably the less canonical form).
         auto canFoldCast = [&]() {
-          if (llvm::isa<arith::ExtFOp>(*castOp))
+          if (isa<arith::ExtFOp>(*castOp))
             return true;
           // Signed operations can only be folded with (implicitly) signed
           // linalg named ops
-          if (llvm::isa<arith::ExtSIOp>(*castOp)) {
+          if (isa<arith::ExtSIOp>(*castOp)) {
             if (auto matmul =
-                    llvm::dyn_cast<linalg::MatmulOp>(namedOp.getOperation())) {
+                    dyn_cast<linalg::MatmulOp>(namedOp.getOperation())) {
               return matmul.getCast() != linalg::TypeFn::cast_unsigned;
             }
-            return !llvm::isa<linalg::PoolingNhwcMaxUnsignedOp,
-                              linalg::PoolingNhwcMinUnsignedOp,
-                              linalg::PoolingNwcMaxUnsignedOp,
-                              linalg::PoolingNwcMinUnsignedOp>(namedOp);
+            return !isa<linalg::PoolingNhwcMaxUnsignedOp,
+                        linalg::PoolingNhwcMinUnsignedOp,
+                        linalg::PoolingNwcMaxUnsignedOp,
+                        linalg::PoolingNwcMinUnsignedOp>(namedOp);
           }
           return false;
         };

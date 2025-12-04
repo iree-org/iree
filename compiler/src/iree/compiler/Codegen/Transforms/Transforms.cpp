@@ -847,8 +847,7 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
     maxAlloc = std::max(maxAlloc, allocSize);
   }
   Attribute memorySpace =
-      llvm::cast<MemRefType>(aliasGroups[0][0]->getResultTypes()[0])
-          .getMemorySpace();
+      cast<MemRefType>(aliasGroups[0][0]->getResultTypes()[0]).getMemorySpace();
   MemRefType allocType = MemRefType::get({maxAlloc}, builder.getI8Type(),
                                          AffineMap(), memorySpace);
   Value packedAlloc =
@@ -1020,8 +1019,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
     int64_t numInductionVars = forallOp.getInductionVars().size();
     for (auto &yieldingOp : parallelTerminator.getYieldingOps()) {
       auto parallelInsert = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
-      BlockArgument destBbArg =
-          llvm::cast<BlockArgument>(parallelInsert.getDest());
+      BlockArgument destBbArg = cast<BlockArgument>(parallelInsert.getDest());
       tensor::ExtractSliceOp destSlice;
       for (auto user : destBbArg.getUsers()) {
         if (user == parallelInsert)
@@ -1258,12 +1256,13 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
                                 PatternRewriter &rewriter) const final {
     Operation *currentOp = padOp.getSource().getDefiningOp();
     auto maybeExtractSlice =
-        dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+        dyn_cast_if_present<tensor::ExtractSliceOp>(currentOp);
     while (currentOp && maybeExtractSlice) {
       currentOp = maybeExtractSlice.getSource().getDefiningOp();
-      maybeExtractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+      maybeExtractSlice =
+          dyn_cast_if_present<tensor::ExtractSliceOp>(currentOp);
     }
-    auto fillOp = dyn_cast_or_null<linalg::FillOp>(currentOp);
+    auto fillOp = dyn_cast_if_present<linalg::FillOp>(currentOp);
     if (!fillOp) {
       return rewriter.notifyMatchFailure(
           padOp, "not coming from a linalg.fill op via tensor.extract_slice*");

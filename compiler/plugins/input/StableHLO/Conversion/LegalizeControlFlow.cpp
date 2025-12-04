@@ -90,7 +90,7 @@ std::optional<ScfForBounds> extractForBounds(mlir::stablehlo::WhileOp op) {
   if (!iterArg)
     return std::nullopt;
 
-  auto add = dyn_cast_or_null<mlir::stablehlo::AddOp>(
+  auto add = dyn_cast_if_present<mlir::stablehlo::AddOp>(
       body.getTerminator()->getOperand(*iterArg).getDefiningOp());
   if (!add || matchBbArg(add.getLhs(), body) != iterArg ||
       add.getRhs().getParentBlock() == &body) {

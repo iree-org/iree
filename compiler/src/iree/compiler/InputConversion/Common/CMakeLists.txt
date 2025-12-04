@@ -49,6 +49,7 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRArithDialect
+    MLIRControlFlowTransforms
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR

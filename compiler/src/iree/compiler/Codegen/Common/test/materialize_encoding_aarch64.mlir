@@ -28,7 +28,7 @@ func.func @matmul_RHS(%arg0: tensor<8x16xbf16>) -> tensor<8x16xbf16, #encoding> 
   %0 = iree_encoding.set_encoding %arg0 : tensor<8x16xbf16> -> tensor<8x16xbf16, #encoding>
   return %0 : tensor<8x16xbf16, #encoding>
 }
-/// NOTE: For RHS, the inner tile correspondong to the "N" dimension is
+/// NOTE: For RHS, the inner tile corresponding to the "N" dimension is
 /// scalable, hence NO-SVE and WITH-SVE differ!
 
 // WITH-SVE: #[[$MAP:.+]] = affine_map<()[s0] -> (16 ceildiv s0)>
@@ -76,7 +76,7 @@ func.func @batch_matmul_RHS(%arg0: tensor<128x32x320xf32>) -> tensor<128x32x320x
   return %0 : tensor<128x32x320xf32, #encoding>
 }
 
-/// NOTE: For RHS, the inner tile correspondong to the "N" dimension is
+/// NOTE: For RHS, the inner tile corresponding to the "N" dimension is
 /// scalable, hence NO-SVE and WITH-SVE differ!
 
 // WITH-SVE: #[[$MAP:.+]] = affine_map<()[s0] -> (320 ceildiv s0)>
@@ -122,7 +122,7 @@ func.func @batch_matmul_RETURN_unset(%arg0: tensor<128x80x320xf32, #encoding>) -
   return %0 : tensor<128x80x320xf32>
 }
 
-/// NOTE: For RETURN, the inner tile correspondong to the "N" dimension is
+/// NOTE: For RETURN, the inner tile corresponding to the "N" dimension is
 /// scalable, hence NO-SVE and WITH-SVE differ!
 
 // CHECK-LABEL: func.func @batch_matmul_RETURN_unset
@@ -145,9 +145,6 @@ func.func @batch_matmul_RETURN_unset(%arg0: tensor<128x80x320xf32, #encoding>) -
 
 // -----
 
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iteration_sizes = [16, 1, 16]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iteration_sizes = [16, 1, 16]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iteration_sizes = [16, 1, 16]>
@@ -225,7 +222,6 @@ func.func @matmul_lowering_f32f32f32_aarch64() attributes {
 //     CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //  WITH-SVE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
 //   CHECK-LABEL: func @matmul_lowering_f32f32f32_aarch64()
-//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  WITH-SVE-DAG:   %[[C8:.+]] = arith.constant 8 : index
 //     CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
 //     CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
@@ -265,9 +261,6 @@ func.func @matmul_lowering_f32f32f32_aarch64() attributes {
 
 // -----
 
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0)>], iteration_sizes = [16, 16]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0)>], iteration_sizes= [16, 16]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0)>], iteration_sizes = [16, 16]>

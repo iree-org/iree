@@ -64,7 +64,7 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
 
     // Detect whether assumptions need to be normalized or can fold to a single
     // value.
-    ArrayAttr assumptionRow = llvm::cast<ArrayAttr>(assumptions[idx]);
+    ArrayAttr assumptionRow = cast<ArrayAttr>(assumptions[idx]);
     if (assumptionRow.size() > 1) {
       bool allAssumptionsSame = true;
       for (unsigned i = 1; i < assumptionRow.size(); ++i) {
@@ -86,7 +86,7 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
 
   // Need to rewrite the assumption.
   auto normalizeAssumptions = [](Attribute row, bool &madeChange) {
-    auto rowArray = llvm::cast<ArrayAttr>(row);
+    auto rowArray = cast<ArrayAttr>(row);
     if (rowArray.size() <= 1)
       return rowArray;
 
@@ -332,7 +332,7 @@ OpFoldResult NullOp::fold(FoldAdaptor operands) {
 //===----------------------------------------------------------------------===//
 
 OpFoldResult CastOp::fold(FoldAdaptor operands) {
-  if (auto castOp = dyn_cast_or_null<CastOp>(getOperand().getDefiningOp())) {
+  if (auto castOp = dyn_cast_if_present<CastOp>(getOperand().getDefiningOp())) {
     if (castOp.getOperand().getType() == getResult().getType()) {
       return castOp.getOperand();
     }
@@ -348,7 +348,8 @@ struct FoldCastIntoNullOp : public OpRewritePattern<CastOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(CastOp castOp,
                                 PatternRewriter &rewriter) const override {
-    auto nullOp = dyn_cast_or_null<NullOp>(castOp.getOperand().getDefiningOp());
+    auto nullOp =
+        dyn_cast_if_present<NullOp>(castOp.getOperand().getDefiningOp());
     if (!nullOp)
       return failure();
     rewriter.replaceOpWithNewOp<NullOp>(castOp, castOp.getResult().getType());
@@ -423,7 +424,7 @@ static OpFoldResult foldRangeOp(Type type, ValueRange operands,
   // If all operands are constant then fold into a constant.
   int64_t value = initialValue;
   for (auto operand : attrOperands) {
-    auto intValue = llvm::dyn_cast_if_present<IntegerAttr>(operand);
+    auto intValue = dyn_cast_if_present<IntegerAttr>(operand);
     if (!intValue)
       return {};
     value = expr(value, intValue.getValue().getSExtValue());
@@ -782,7 +783,7 @@ OpFoldResult AlignOp::fold(FoldAdaptor operands) {
 
 OpFoldResult SizeOfOp::fold(FoldAdaptor operands) {
   Type t = getSizedType();
-  if (llvm::isa<IntegerType>(t) || llvm::isa<FloatType>(t)) {
+  if (isa<IntegerType>(t) || isa<FloatType>(t)) {
     return IntegerAttr::get(IndexType::get(getContext()),
                             getRoundedElementByteWidth(t));
   }
@@ -1022,7 +1023,7 @@ struct PropagateGlobalLoadAddress : public OpRewritePattern<IndirectOpT> {
   using OpRewritePattern<IndirectOpT>::OpRewritePattern;
   LogicalResult matchAndRewrite(IndirectOpT op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<GlobalAddressOpInterface>(
+    if (auto addressOp = dyn_cast_if_present<GlobalAddressOpInterface>(
             op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DirectOpT>(
           op, op.getResult().getType(), addressOp.getGlobalAttr(),
@@ -1052,7 +1053,7 @@ struct EraseUnusedGlobalStoreOp : public OpRewritePattern<GlobalStoreOp> {
 
   LogicalResult matchAndRewrite(GlobalStoreOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto loadOp = dyn_cast_or_null<GlobalLoadOpInterface>(
+    if (auto loadOp = dyn_cast_if_present<GlobalLoadOpInterface>(
             op.getValue().getDefiningOp())) {
       if (loadOp.getGlobalName() == op.getGlobal()) {
         rewriter.eraseOp(op);
@@ -1080,7 +1081,7 @@ class PropagateGlobalStoreAddress
 public:
   LogicalResult matchAndRewrite(GlobalStoreIndirectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<GlobalAddressOpInterface>(
+    if (auto addressOp = dyn_cast_if_present<GlobalAddressOpInterface>(
             op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<GlobalStoreOp>(op, op.getValue(),
                                                  addressOp.getGlobalAttr());
@@ -1192,11 +1193,11 @@ struct SinkSubspanAcrossSelectOps
   using Base::Base;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!llvm::isa<IREE::Util::BufferType>(op.getType()))
+    if (!isa<IREE::Util::BufferType>(op.getType()))
       return failure();
-    auto trueSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
+    auto trueSubspan = dyn_cast_if_present<IREE::Util::BufferSubspanOp>(
         op.getTrueValue().getDefiningOp());
-    auto falseSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
+    auto falseSubspan = dyn_cast_if_present<IREE::Util::BufferSubspanOp>(
         op.getFalseValue().getDefiningOp());
     if (!trueSubspan || !falseSubspan)
       return failure();
@@ -1244,7 +1245,7 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   }
 
   // If the source is a constant then we can calculate that immediately.
-  if (auto constantOp = dyn_cast_or_null<IREE::Util::BufferConstantOp>(
+  if (auto constantOp = dyn_cast_if_present<IREE::Util::BufferConstantOp>(
           operand.getDefiningOp())) {
     if (auto storageAttr = dyn_cast_if_present<IREE::Util::SizedStorageAttr>(
             constantOp.getValue())) {

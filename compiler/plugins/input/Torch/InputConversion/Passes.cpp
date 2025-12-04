@@ -44,6 +44,7 @@ void createTorchToIREEPipeline(
     // now be simplified.
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   }
+  pm.addNestedPass<func::FuncOp>(torch::Torch::createRecomposeComplexOpsPass());
   pm.addNestedPass<func::FuncOp>(createBitCastTensorPass());
   pm.addNestedPass<func::FuncOp>(
       torch::Torch::createReduceOpVariantsPass(llvm::StringRef()));

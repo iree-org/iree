@@ -60,7 +60,7 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   // For now, this assumes that we only pull in constants.
   // TODO: Iteratively pull operations that are only consuming IndexType.
   for (Value v : forallOp.getUpperBound(rewriter)) {
-    auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
+    auto op = dyn_cast_if_present<arith::ConstantIndexOp>(v.getDefiningOp());
     if (!op)
       return failure();
     results.push_back(
@@ -94,8 +94,7 @@ static void rewriteParallelInsertSlices(RewriterBase &rewriter,
     rewriter.setInsertionPoint(block.getTerminator());
     auto dynamicDims = IREE::Util::findDynamicDimsInList(
         resultIndex, resultTensorOperands, resultTensorsDynamicDims);
-    BlockArgument destBbArg =
-        llvm::cast<BlockArgument>(parallelInsertOp.getDest());
+    BlockArgument destBbArg = cast<BlockArgument>(parallelInsertOp.getDest());
     assert(destBbArg.getOwner()->getParentOp() == forallOp &&
            "expected that dest is an output bbArg");
     Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
@@ -125,7 +124,7 @@ static void rewriteExtractSlices(RewriterBase &rewriter, scf::ForallOp forallOp,
                                  IRMapping tensorToFlowBvm) {
   dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
     Value source = extractSliceOp.getSource();
-    if (auto sourceBbArg = llvm::dyn_cast<BlockArgument>(source))
+    if (auto sourceBbArg = dyn_cast<BlockArgument>(source))
       if (sourceBbArg.getOwner()->getParentOp() == forallOp.getOperation())
         source = forallOp.getTiedOpOperand(sourceBbArg)->get();
 
@@ -211,7 +210,7 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
       if (forallOp->isProperAncestor(use.getOwner()))
         uses.push_back(&use);
     for (OpOperand *use : uses) {
-      unsigned resultNum = llvm::cast<OpResult>(use->get()).getResultNumber();
+      unsigned resultNum = cast<OpResult>(use->get()).getResultNumber();
       rewriter.modifyOpInPlace(
           use->getOwner(), [&]() { use->set(cloned->getOpResult(resultNum)); });
     }
@@ -262,14 +261,13 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
   llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
   for (const Operation &yieldingOp : InParallelOp.getYieldingOps()) {
     auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
-    BlockArgument destBbArg =
-        llvm::cast<BlockArgument>(parallelInsertOp.getDest());
+    BlockArgument destBbArg = cast<BlockArgument>(parallelInsertOp.getDest());
     Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
     bool inserted = resultTensorOperands.insert(dest);
     if (!inserted)
       continue;
     auto dynamicDims =
-        getIndicesOfDynamicDims(llvm::cast<ShapedType>(dest.getType()));
+        getIndicesOfDynamicDims(cast<ShapedType>(dest.getType()));
     for (int64_t dim : dynamicDims)
       resultTensorsDynamicDims.insert(
           tensor::DimOp::create(rewriter, loc, dest, dim));
@@ -286,7 +284,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
 
   SmallVector<Value> nonTensorOperands, tensorOperands, tensorDynamicDims;
   for (Value v : valuesDefinedAbove) {
-    auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType());
+    auto tensorType = dyn_cast<RankedTensorType>(v.getType());
     if (!tensorType) {
       nonTensorOperands.push_back(v);
       continue;
@@ -300,7 +298,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
   // Also add shared outputs. (These are usually already added as result
   // tensor operands.)
   for (Value v : forallOp.getOutputs()) {
-    auto tensorType = llvm::cast<RankedTensorType>(v.getType());
+    auto tensorType = cast<RankedTensorType>(v.getType());
     if (resultTensorOperands.contains(v))
       continue;
     tensorOperands.push_back(v);
@@ -411,7 +409,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
     auto dynamicDims = IREE::Util::findDynamicDimsInList(
         en.index(), allTensorOperands, allTensorDimsBBArgs);
     auto loadOp = IREE::TensorExt::DispatchTensorLoadOp::create(
-        rewriter, loc, llvm::cast<RankedTensorType>(en.value().getType()),
+        rewriter, loc, cast<RankedTensorType>(en.value().getType()),
         tensorToFlowBvm.lookup(en.value()), dynamicDims);
     // Replace the tensor -> iree_tensor_ext.dispatch.tensor entry by a
     // tensor -> iree_tensor_ext.dispatch.tensor.load entry.

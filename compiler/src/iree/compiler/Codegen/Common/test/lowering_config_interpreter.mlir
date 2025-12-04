@@ -15,7 +15,7 @@ module attributes { transform.with_named_sequence } {
 }
 
 //      CHECK: IR printer:
-// CHECK-NEXT:   arith.addi
+// CHECK-NEXT: %{{.*}} = arith.addi
 
 // -----
 
@@ -44,10 +44,9 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-//     CHECK: IR printer:
-// CHECK-DAG:   one
-// CHECK-DAG:   two
-// CHECK-DAG:   three
+// CHECK-DAG: IR printer: one
+// CHECK-DAG: IR printer: two
+// CHECK-DAG: IR printer: three
 
 // -----
 
@@ -62,7 +61,7 @@ module {
 // See ./external_strategy_spec.mlir for the implementation of
 // "lowering_strategy" annotated for this test.
 //
-// CHECK: IR printer: I am external
+// CHECK: IR printer: I am external top-level
 
 // -----
 
@@ -79,4 +78,4 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: IR printer: I am internal
+// CHECK: IR printer: I am internal top-level

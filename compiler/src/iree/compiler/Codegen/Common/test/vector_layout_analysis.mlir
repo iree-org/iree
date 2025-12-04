@@ -92,7 +92,6 @@ func.func @transfer_write_mask(%arr: memref<32x32x32x32xf16>, %d: vector<16x8x4x
 // Enforce the layout from the transfer_write to everyone
 func.func @enforce_simple(%arr: memref<16x16xf16>, %a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
   %c0 = arith.constant 0 : index
-  %cst_0 = arith.constant 0.0 : f16
   %cst0 = arith.constant dense<0.0> : vector<16x16xf16>
   // expected-remark @above {{element_tile = [16, 16]}}
   %c = arith.mulf %cst0, %b : vector<16x16xf16>
@@ -149,7 +148,7 @@ func.func @propagate_and_enforce(%arr: memref<16x16xf16>, %arr2: memref<16x16xf1
 >
 
 // Propagate and enforce through reduction.
-func.func @reduction(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16xf16>, %b: vector<16xf16>) -> vector<16xf16> {
+func.func @reduction_dim0(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16xf16>, %b: vector<16xf16>) -> vector<16xf16> {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
   %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
@@ -401,7 +400,7 @@ func.func @scffor(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16x
 // Propagate and enforce through reduction along dim 0.
 // The printing of this layout is too long for a remark. Just verify that
 // the subgroup/thread bases are what we expect.
-func.func @reduction(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16xf16>, %b: vector<16xf16>) -> vector<16xf16> {
+func.func @reduction_thread_strides_dim0(%arr: memref<16x16xf16>, %a: vector<16xf16>) -> vector<16xf16> {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
   %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
@@ -432,7 +431,7 @@ func.func @reduction(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<
 // Propagate and enforce through reduction along dim 1.
 // The printing of this layout is too long for a remark. Just verify that
 // the subgroup/thread bases are what we expect.
-func.func @reduction(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16xf16>, %b: vector<16xf16>) -> vector<16xf16> {
+func.func @reduction_thread_strides_dim1(%arr: memref<16x16xf16>, %a: vector<16xf16>) -> vector<16xf16> {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
   %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
@@ -460,13 +459,12 @@ func.func @reduction(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<
   thread_strides   = [1, 4, 32]
 >
 
-// Propagate and enforce through reduction along dim 1.
+// Propagate through transpose.
 // The printing of this layout is too long for a remark. Just verify that
 // the subgroup/thread bases are what we expect.
 func.func @transpose_3d(%arr: memref<32x32x32xf16>) -> () {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
-  %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
   // expected-remark-re @below {{thread_strides = [1, 4, 32]}}
   %root = vector.transfer_read %arr[%c0, %c0, %c0], %cst_0 {
     in_bounds = [true, true, true]

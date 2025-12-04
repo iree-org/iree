@@ -33,8 +33,8 @@ module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: func @flatten_forall_thread_mapping
 //       CHECK:   scf.forall (%[[FLAT_ID:.+]]) in (64)
 //       CHECK:     %[[IDS:.+]]:2 = affine.delinearize_index %[[FLAT_ID]] into (4, 16) : index, index
-//   CHECK-DAG:     %[[IDX:.+]] = affine.apply #[[$MAP]](%[[IDS]]#0)
-//   CHECK-DAG:     %[[IDY:.+]] = affine.apply #[[$MAP1]](%[[IDS]]#1)
+//   CHECK-DAG:     affine.apply #[[$MAP]](%[[IDS]]#0)
+//   CHECK-DAG:     affine.apply #[[$MAP1]](%[[IDS]]#1)
 //       CHECK:   } {mapping = [#gpu.thread<linear_dim_0>]}
 
 // -----
@@ -76,6 +76,6 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[FLAT_UB:.+]] = affine.apply #[[$MAP2]]()[%[[DIMX]], %[[DIMY]]]
 //       CHECK:   scf.forall (%[[FLAT_ID:.+]]) in (%[[FLAT_UB]])
 //       CHECK:     %[[IDS:.+]]:2 = affine.delinearize_index %[[FLAT_ID]] into (%[[DIMX]], %[[DIMY]]) : index, index
-//   CHECK-DAG:     %[[IDX:.+]] = affine.apply #[[$MAP]](%[[IDS]]#0)
-//   CHECK-DAG:     %[[IDY:.+]] = affine.apply #[[$MAP1]](%[[IDS]]#1)
+//   CHECK-DAG:     affine.apply #[[$MAP]](%[[IDS]]#0)
+//   CHECK-DAG:     affine.apply #[[$MAP1]](%[[IDS]]#1)
 //       CHECK:   } {mapping = [#gpu.warp<linear_dim_0>]}

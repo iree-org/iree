@@ -245,6 +245,7 @@ func.func @swizzle_gather_to_lds_scalar(%src: memref<?xf32>, %offset: index) {
 //       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJ]], %[[IELEM]] : index
 //       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[DSTOFFSET]]]
 
+// -----
 
 func.func @swizzle_load_xor(%src: memref<?xi8>) -> vector<16xi8> {
   %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
@@ -282,7 +283,6 @@ func.func @swizzle_load_xor_phase2(%src: memref<?xi8>) -> vector<16xi8> {
 
 func.func @swizzle_raw_buffer_to_lds(%global : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>) {
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
   //1 row, 3rd tile : 1*8192+2*128 = 8448 -> (0 XOR 1)*16+8448 = 8464
   %offset = arith.constant 8448 : index
   %lds = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
@@ -305,7 +305,6 @@ func.func @swizzle_raw_buffer_to_lds(%global : memref<32768xi8, #amdgpu.address_
 
 func.func @swizzle_raw_buffer_to_lds_ignore_dst_op(%global : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>) {
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
   //1 row, 3rd tile : 1*8192+2*128 = 8448 -> (0 XOR 1)*16+8448 = 8464
   %offset = arith.constant 8448 : index
   %lds = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
