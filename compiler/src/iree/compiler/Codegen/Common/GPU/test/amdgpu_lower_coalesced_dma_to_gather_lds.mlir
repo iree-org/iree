@@ -15,7 +15,8 @@
     max_load_instruction_bits = 128, simds_per_wgp = 4,
     vgpr_space_bits = 8192>>}>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation_64 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation_32 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 // CHECK-LABEL: func.func @lower_coalesced_gather_dma_multiple
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>
@@ -25,7 +26,7 @@ func.func @lower_coalesced_gather_dma_multiple(
     %dest: memref<4x128xf32, #gpu.address_space<workgroup>>)
   attributes {
     hal.executable.target = #executable_target_rocm_hsaco_fb,
-    translation_info = #translation} {
+    translation_info = #translation_64} {
   // CHECK: scf.forall (%[[THREAD_IDX:.+]]) in (32)
   scf.forall (%arg6) in (32) {
     // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
@@ -40,23 +41,6 @@ func.func @lower_coalesced_gather_dma_multiple(
   return
 }
 
-// -----
-
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
-  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx1250", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
-    max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024,
-    max_workgroup_memory_bytes = 65536,
-    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-    max_load_instruction_bits = 128, simds_per_wgp = 4,
-    vgpr_space_bits = 8192>>}>
-
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
-
 // Test case for coalesced DMA without explicit indices (copy operation)
 // CHECK-LABEL: func.func @lower_coalesced_copy_dma_basic
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<2x64xf16, #amdgpu.address_space<fat_raw_buffer>>
@@ -66,7 +50,7 @@ func.func @lower_coalesced_copy_dma_basic(
     %dest: memref<2x64xf16, #gpu.address_space<workgroup>>)
   attributes {
     hal.executable.target = #executable_target_rocm_hsaco_fb,
-    translation_info = #translation} {
+    translation_info = #translation_32} {
   // CHECK: scf.forall (%[[THREAD_IDX:.+]]) in (32)
   scf.forall (%arg6) in (32) {
     // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
