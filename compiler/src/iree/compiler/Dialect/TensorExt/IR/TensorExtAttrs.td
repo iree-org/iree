@@ -4,11 +4,45 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_TENSOR_EXT_ATTRS
-#define IREE_DIALECT_TENSOR_EXT_ATTRS
+#ifndef IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXT_ATTRS
+#define IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXT_ATTRS
 
 include "iree/compiler/Dialect/TensorExt/IR/TensorExtBase.td"
 include "iree/compiler/Dialect/TensorExt/IR/TensorExtInterfaces.td"
+include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
+
+//===----------------------------------------------------------------------===//
+// Barrier Enums and Attributes
+//===----------------------------------------------------------------------===//
+
+// Transformation flags that control which operations can move through barriers
+def IREETensorExt_TransformationFlag_None : I32BitEnumAttrCase<"None", 0x0000>;
+def IREETensorExt_TransformationFlag_AllowExpand : I32BitEnumAttrCase<"AllowExpand", 0x0001>;
+def IREETensorExt_TransformationFlag_AllowCollapse : I32BitEnumAttrCase<"AllowCollapse", 0x0002>;
+def IREETensorExt_TransformationFlagBitfieldAttr :
+    I32BitEnumAttr<"TransformationFlagBitfield", "valid TransformationFlag", [
+      IREETensorExt_TransformationFlag_None,
+      IREETensorExt_TransformationFlag_AllowExpand,
+      IREETensorExt_TransformationFlag_AllowCollapse,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::TensorExt";
+}
+
+// Direction that operations can move through the barrier
+def IREETensorExt_BarrierDirection_Up : I32EnumAttrCase<"Up", 0, "up">;
+def IREETensorExt_BarrierDirection_Down : I32EnumAttrCase<"Down", 1, "down">;
+def IREETensorExt_BarrierDirectionAttr :
+    I32EnumAttr<"BarrierDirection", "valid BarrierDirection", [
+      IREETensorExt_BarrierDirection_Up,
+      IREETensorExt_BarrierDirection_Down,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::TensorExt";
+}
+
+//===----------------------------------------------------------------------===//
+// RaggedShape Attribute
+//===----------------------------------------------------------------------===//
 
 def RaggedShapeAttr :
   AttrDef<IREETensorExt_Dialect, "RaggedShape", [
@@ -46,4 +80,4 @@ def RaggedShapeAttr :
   }];
 }
 
-#endif // IREE_DIALECT_TENSOR_EXT_ATTRS
+#endif  // IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXT_ATTRS

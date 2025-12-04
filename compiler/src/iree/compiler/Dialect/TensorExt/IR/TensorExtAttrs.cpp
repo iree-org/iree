@@ -7,11 +7,15 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrs.h"
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtEnums.cpp.inc"
 
 // clang-format off
 #define GET_ATTRDEF_CLASSES

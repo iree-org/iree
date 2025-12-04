@@ -51,13 +51,16 @@ def InsertTensorBarriersPass :
                   "mlir::FunctionOpInterface"> {
   let summary = "Insert tensor barrier markers around computation regions.";
   let description = [{
-    Walks from function boundaries and inserts iree_tensor_ext.compute_barrier.start
-    and iree_tensor_ext.compute_barrier.end operations at the boundaries of
-    computation regions (tensor/linalg/linalgext ops). These barriers allow
-    controlling where certain transformations like reshape propagation can occur.
+    Walks from function boundaries and inserts iree_tensor_ext.compute_barrier
+    operations at the boundaries of computation regions (tensor/linalg/linalgext ops).
 
-    The pass identifies compute operations and wraps tensor values flowing
-    into and out of the compute region with the barrier operations.
+    These barriers allow controlling where certain transformations like reshape
+    propagation can occur. Barriers with direction "up" are inserted for values
+    flowing into compute regions, while barriers with direction "down" are inserted
+    for values flowing out of compute regions.
+
+    By default, barriers are configured to allow both expand_shape and collapse_shape
+    operations to move through them.
   }];
   let dependentDialects = [
     "IREE::TensorExt::IREETensorExtDialect",
@@ -69,10 +72,10 @@ def RemoveTensorBarriersPass :
                   "mlir::FunctionOpInterface"> {
   let summary = "Remove tensor barrier markers from the program.";
   let description = [{
-    Removes iree_tensor_ext.compute_barrier.start and iree_tensor_ext.compute_barrier.end
-    operations from the program. These are identity operations that simply
-    pass through their operands, so they can be safely removed by replacing
-    all uses of their results with their operands.
+    Removes iree_tensor_ext.compute_barrier operations from the program.
+    These are identity operations that simply pass through their operands,
+    so they can be safely removed by replacing all uses of their results
+    with their operands.
   }];
   let dependentDialects = [
     "IREE::TensorExt::IREETensorExtDialect",
@@ -105,8 +108,15 @@ def FoldReshapesIntoTensorBarriersPass :
   let summary = "Fold reshape operations into tensor barriers.";
   let description = [{
     Moves tensor.expand_shape and tensor.collapse_shape operations through
-    iree_tensor_ext.compute_barrier.start and iree_tensor_ext.compute_barrier.end operations.
-    This blocks reshapes on the edge of the program from being propagated.
+    iree_tensor_ext.compute_barrier operations based on the barrier's direction
+    and transformation flags.
+
+    - For barriers with direction "up", reshapes can move above the barrier
+    - For barriers with direction "down", reshapes can move below the barrier
+    - Only reshapes matching the barrier's flags (AllowExpand, AllowCollapse) are moved
+
+    This allows precise control over where reshapes can propagate, blocking them
+    from moving across program boundaries while allowing controlled movement elsewhere.
   }];
   let dependentDialects = [
     "IREE::TensorExt::IREETensorExtDialect",
