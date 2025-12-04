@@ -917,8 +917,9 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let summary = [{Options attribute for linalg + tensors -> vector + memref GPU pipelines.}];
   let description = [{
     This attributes describes lowering pipeline specific configuration options:
-    * prefetch_shared_memory: Boolean option indicating whether or not to run
-      the loop prefetching pass in the lowering pipeline.
+    * prefetch_num_stages: Integer option controlling the software pipelining
+      stages for shared memory prefetching. 0 or 1 disables prefetching, 2+
+      enables prefetching with that many pipeline stages.
     * no_reduce_shared_memory_bank_conflicts: Boolean option indicating whether
       or not to skip the bank conflict reduction pass in the lowering pipeline.
     * reorder_workgroups_strategy: Enum attribute indicating which strategy to
@@ -930,7 +931,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
-    OptionalParameter<"BoolAttr">:$prefetch_shared_memory,
+    OptionalParameter<"std::optional<int64_t>">:$prefetch_num_stages,
     OptionalParameter<"BoolAttr">:$no_reduce_shared_memory_bank_conflicts,
     OptionalParameter<"BoolAttr">:$use_igemm_convolution,
     OptionalParameter<"ReorderWorkgroupsStrategyAttr">:$reorder_workgroups_strategy
@@ -938,7 +939,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
 
   let builders = [
     AttrBuilder<(ins
-        CArg<"bool", "false">:$prefetch_shared_memory,
+        CArg<"unsigned", "0">:$prefetch_num_stages,
         CArg<"bool", "false">:$no_reduce_shared_memory_bank_conflicts,
         CArg<"bool", "false">:$use_igemm_convolution,
         CArg<"std::optional<ReorderWorkgroupsStrategy>", "{}">:$reorder_workgroups_strategy)>

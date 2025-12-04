@@ -106,7 +106,7 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   // is already what we want.
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      context, /*prefetchSharedMemory=*/false,
+      context, /*prefetchNumStages=*/0,
       /*no_reduce_shared_memory_bank_conflicts=*/true,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
@@ -926,7 +926,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      linalgOp->getContext(), /*prefetchSharedMemory=*/true,
+      linalgOp->getContext(), /*prefetchNumStages=*/2,
       /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
@@ -985,7 +985,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      linalgOp->getContext(), /*prefetchSharedMemory=*/true,
+      linalgOp->getContext(), /*prefetchNumStages=*/2,
       /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
@@ -1773,7 +1773,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   // Prefetch shared memory is kept off.
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      context, /*prefetchSharedMemory=*/false,
+      context, /*prefetchNumStages=*/0,
       /*no_reduce_shared_memory_bank_conflicts=*/false,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
@@ -1886,10 +1886,10 @@ getPipelineOptions(FunctionOpInterface funcOp,
     }
     auto pipelineOptionsAttr =
         cast<GPUPipelineOptionsAttr>(maybePipelineOptionsAttr->getValue());
-    BoolAttr prefetchSharedMemory =
-        pipelineOptionsAttr.getPrefetchSharedMemory();
-    if (prefetchSharedMemory) {
-      pipelineOptions.prefetchSharedMemory = prefetchSharedMemory.getValue();
+    std::optional<int64_t> prefetchNumStages =
+        pipelineOptionsAttr.getPrefetchNumStages();
+    if (prefetchNumStages) {
+      pipelineOptions.prefetchNumStages = *prefetchNumStages;
     }
     BoolAttr noReduceBankConflicts =
         pipelineOptionsAttr.getNoReduceSharedMemoryBankConflicts();
@@ -1933,7 +1933,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 
   return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
-            << ", prefetchSharedMemory = " << options.prefetchSharedMemory
+            << ", prefetchNumStages = " << options.prefetchNumStages
             << ", useIgemmConvolution = " << options.useIgemmConvolution
             << ", reorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";
