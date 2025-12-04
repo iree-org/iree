@@ -8,6 +8,7 @@
 #define IREE_CODEGEN_DIALECT_PCF_OPS
 
 include "iree/compiler/Codegen/Dialect/PCF/IR/PCFBase.td"
+include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/Properties.td"
@@ -150,17 +151,13 @@ def GenericOp : PCF_Op<"generic", [
       }
     ```
   }];
-  let arguments = (ins
-    PCF_ScopeAttr:$scope,
-    Variadic<PCF_AnyTensorOrMemRef>:$inits,
-    Variadic<Index>:$dynamic_sizes,
-    ArrayProp<BoolProp>:$is_tied,
-    DefaultValuedProp<BoolProp, "false">:$sync_on_return,
-    IntProp<"int64_t">:$num_index_args,
-    IntProp<"int64_t">:$num_leading_args
-  );
+  let arguments = (ins PCF_ScopeAttr:$scope,
+      Variadic<AnyRankedTensorOrMemRef>:$inits, Variadic<Index>:$dynamic_sizes,
+      ArrayProp<BoolProp>:$is_tied,
+      DefaultValuedProp<BoolProp, "false">:$sync_on_return,
+      IntProp<"int64_t">:$num_index_args, IntProp<"int64_t">:$num_leading_args);
 
-  let results = (outs Variadic<PCF_AnyTensorOrMemRef>:$results);
+  let results = (outs Variadic<AnyRankedTensorOrMemRef>:$results);
   let regions = (region
     MaxSizedRegion<1>:$initializer,
     MinSizedRegion<1>:$region
@@ -314,16 +311,12 @@ def LoopOp : PCF_Op<"loop", [
       }
     ```
   }];
-  let arguments = (ins
-    PCF_ScopeAttr:$scope,
-    Variadic<Index>:$count,
-    Variadic<PCF_AnyTensorOrMemRef>:$inits,
-    Variadic<Index>:$dynamic_sizes,
-    ArrayProp<BoolProp>:$is_tied,
-    DefaultValuedProp<BoolProp, "false">:$sync_on_return
-  );
+  let arguments = (ins PCF_ScopeAttr:$scope, Variadic<Index>:$count,
+      Variadic<AnyRankedTensorOrMemRef>:$inits, Variadic<Index>:$dynamic_sizes,
+      ArrayProp<BoolProp>:$is_tied,
+      DefaultValuedProp<BoolProp, "false">:$sync_on_return);
 
-  let results = (outs Variadic<PCF_AnyTensorOrMemRef>:$results);
+  let results = (outs Variadic<AnyRankedTensorOrMemRef>:$results);
   let regions = (region AnyRegion:$region);
 
   let assemblyFormat = [{
@@ -490,7 +483,7 @@ let opDocGroup = OpGroupWriteOps in {
                dimension.
   }];
 
-    let arguments = (ins PCF_AnyTensorVectorOrMemRef:$source,
+    let arguments = (ins AnyRankedTensorVectorOrMemRef:$source,
         PCF_AnyShapedRef:$dest, Variadic<Index>:$offsets,
         Variadic<Index>:$sizes, Variadic<Index>:$strides,
         DenseI64ArrayAttr:$static_offsets, DenseI64ArrayAttr:$static_sizes,

@@ -111,10 +111,8 @@ def PCF_Dialect : Dialect {
 // Base pcf dialect op classes
 //===----------------------------------------------------------------------===//
 
-class PCF_Op<string mnemonic, list<Trait> traits = []> :
-    Op<PCF_Dialect, mnemonic, traits> {
-  let hasCustomAssemblyFormat = 1;
-}
+class PCF_Op<string mnemonic, list<Trait> traits = []>
+    : Op<PCF_Dialect, mnemonic, traits> {}
 
 //===----------------------------------------------------------------------===//
 // Base pcf types
@@ -139,7 +137,7 @@ def PCF_ShapedRef : TypeDef<PCF_Dialect, "ShapedRef", [
       // Access is pointwise within the coordinate space implied by the shape.
       // Element type determines the minimum access bitwidth.
       eltype *getElementPtr(int a, ...) // |rank| operands.
-      int shape[rank];
+      size_t shape[rank];
 
       // Scope this referenced memory was allocated at. Defines memory space.
       alloc_scope_ty alloc_scope;
@@ -193,9 +191,9 @@ def PCF_DummyScopeAttr :
       DeclareAttrInterfaceMethods<PCF_ScopeAttr>
     ]> {
   let mnemonic = "dummy_scope";
-  let summary = [{Dummy scope attribute used for testing }];
+  let summary = [{Dummy scope attribute used for testing.}];
   let description = [{
-    Scope that fails on all interface uses to use in testing where the scope
+    Scope that fails on all interface uses. For use in testing where the scope
     is not relevant.
   }];
   let parameters = (ins);
@@ -272,9 +270,6 @@ def PCF_SyncOnParentAttr :
 // Misc aliases
 //===----------------------------------------------------------------------===//
 
-def PCF_AnyRef: AnyTypeOf<[PCF_ShapedRef, AnyMemRef]>;
-def PCF_AnyShapedRef: AnyTypeOf<[PCF_ShapedRef]>;
-def PCF_AnyTensorOrMemRef: AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
-def PCF_AnyTensorVectorOrMemRef: AnyTypeOf<[AnyRankedTensor, AnyVectorOfAnyRank, AnyMemRef]>;
+def PCF_AnyShapedRef : AnyTypeOf<[PCF_ShapedRef]>;
 
 #endif  // IREE_CODEGEN_DIALECT_PCF_DIALECT

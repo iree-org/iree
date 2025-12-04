@@ -30,17 +30,8 @@ LogicalResult AllocOp::verify() {
 }
 
 SmallVector<OpFoldResult> AllocOp::getMixedSizes() {
-  SmallVector<OpFoldResult> result;
-  unsigned ctr = 0;
-  OpBuilder b(getContext());
-  for (int64_t i = 0, e = getResultType().getRank(); i < e; ++i) {
-    if (getResultType().isDynamicDim(i)) {
-      result.push_back(getDynamicSizes()[ctr++]);
-    } else {
-      result.push_back(b.getIndexAttr(getResultType().getShape()[i]));
-    }
-  }
-  return result;
+  Builder b(getContext());
+  return getMixedValues(getResultType().getShape(), getDynamicSizes(), b);
 }
 
 //===----------------------------------------------------------------------===//
@@ -175,44 +166,34 @@ static ParseResult parseParallelExecutionBody(
   }
 
   SmallVector<OpAsmParser::Argument> indexArgs;
-  if (failed(parser.parseLSquare())) {
-    return failure();
-  }
-
   if (failed(parser.parseArgumentList(
-          indexArgs, /*delimiter=*/OpAsmParser::Delimiter::None,
+          indexArgs, /*delimiter=*/OpAsmParser::Delimiter::Square,
           /*allowType=*/true, /*allowAttrs=*/true))) {
-    return failure();
-  }
-
-  if (failed(parser.parseRSquare())) {
     return failure();
   }
 
   // If there is at least one region arg the arg types and op result types need
   // to be parsed.
   if (!regionRefArgs.empty()) {
-    if (failed(parser.parseColon()) || failed(parser.parseLParen())) {
+    if (failed(parser.parseColon())) {
       return failure();
     }
 
-    // Parse all types except the last followed by commas.
-    for (OpAsmParser::Argument &arg :
-         MutableArrayRef<OpAsmParser::Argument>(regionRefArgs.begin(),
-                                                regionRefArgs.end())
-             .drop_back()) {
-      if (failed(parser.parseType(arg.type)) || failed(parser.parseComma())) {
-        return failure();
-      }
-    }
-
-    // Parse the last type.
-    if (failed(parser.parseType(regionRefArgs.back().type))) {
+    // Parse "(<type list>)" directly into the type fields of `regionRefArgs`.
+    auto it = regionRefArgs.begin();
+    if (failed(parser.parseCommaSeparatedList(
+            OpAsmParser::Delimiter::Paren, [&]() -> ParseResult {
+              if (it == regionRefArgs.end()) {
+                return failure();
+              }
+              ParseResult p = parser.parseType(it->type);
+              ++it;
+              return p;
+            }))) {
       return failure();
     }
 
-    if (failed(parser.parseRParen()) || failed(parser.parseArrow()) ||
-        failed(parser.parseLParen())) {
+    if (failed(parser.parseArrow()) || failed(parser.parseLParen())) {
       return failure();
     }
 
@@ -461,12 +442,10 @@ void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
   result.addOperands(dynamicSizes);
   result.addTypes(resultTypes);
 
-  result.addAttribute(
-      "operandSegmentSizes",
-      b.getDenseI32ArrayAttr({static_cast<int32_t>(inits.size()),
-                              static_cast<int32_t>(dynamicSizes.size())}));
-
   Properties &inherentAttrs = result.getOrAddProperties<Properties>();
+  inherentAttrs.setOperandSegmentSizes(
+      {static_cast<int32_t>(inits.size()),
+       static_cast<int32_t>(dynamicSizes.size())});
   inherentAttrs.setIsTied(isTied);
   inherentAttrs.setSyncOnReturn(syncOnReturn);
   inherentAttrs.setNumIndexArgs(2 * numIterators);
@@ -625,13 +604,10 @@ void LoopOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
   result.addOperands(dynamicSizes);
   result.addTypes(resultTypes);
 
-  result.addAttribute(
-      "operandSegmentSizes",
-      b.getDenseI32ArrayAttr({static_cast<int32_t>(count.size()),
-                              static_cast<int32_t>(inits.size()),
-                              static_cast<int32_t>(dynamicSizes.size())}));
-
   Properties &inherentAttrs = result.getOrAddProperties<Properties>();
+  inherentAttrs.setOperandSegmentSizes(
+      {static_cast<int32_t>(count.size()), static_cast<int32_t>(inits.size()),
+       static_cast<int32_t>(dynamicSizes.size())});
   inherentAttrs.setIsTied(isTied);
   inherentAttrs.setSyncOnReturn(syncOnReturn);
 
@@ -839,11 +815,11 @@ void ReadSliceOp::build(OpBuilder &b, OperationState &result, Type resultType,
                         Value source, ValueRange offsets, ValueRange sizes,
                         ValueRange strides, ArrayRef<NamedAttribute> attrs) {
   auto offsetValues =
-      llvm::map_to_vector(offsets, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(offsets, llvm::StaticCastTo<OpFoldResult>);
   auto sizeValues =
-      llvm::map_to_vector(sizes, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(sizes, llvm::StaticCastTo<OpFoldResult>);
   auto strideValues =
-      llvm::map_to_vector(strides, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(strides, llvm::StaticCastTo<OpFoldResult>);
   build(b, result, resultType, source, offsetValues, sizeValues, strideValues);
 }
 
@@ -879,11 +855,11 @@ void GetMemrefOp::build(OpBuilder &b, OperationState &result, Type resultType,
                         Value source, ValueRange offsets, ValueRange sizes,
                         ValueRange strides, ArrayRef<NamedAttribute> attrs) {
   auto offsetValues =
-      llvm::map_to_vector(offsets, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(offsets, llvm::StaticCastTo<OpFoldResult>);
   auto sizeValues =
-      llvm::map_to_vector(sizes, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(sizes, llvm::StaticCastTo<OpFoldResult>);
   auto strideValues =
-      llvm::map_to_vector(strides, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(strides, llvm::StaticCastTo<OpFoldResult>);
   build(b, result, resultType, source, offsetValues, sizeValues, strideValues);
 }
 
