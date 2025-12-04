@@ -309,7 +309,7 @@ util.func private @explicitIndeterminateAlloca(%input_timepoint: !stream.timepoi
 util.func private @ignoreNonAllocaProducers(%size: index) -> () {
   %c0 = arith.constant 0 : i64
   // CHECK-NOT: stream.resource.dealloca
-  %load_resource, %load_timepoint = stream.parameter.load {
+  %load_resource, %load_timepoint = stream.cmd.parameter.load {
     "scope"::"name"[%c0] : !stream.resource<constant>{%size}
   } => !stream.timepoint
   util.return

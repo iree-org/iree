@@ -36,7 +36,7 @@ struct UtilOpAsmInterface : public OpAsmDialectInterface {
   /// end with a numeric digit([0-9]+). Returns success if an alias was
   /// provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (auto compositeAttr = llvm::dyn_cast<CompositeAttr>(attr)) {
+    if (auto compositeAttr = dyn_cast<CompositeAttr>(attr)) {
       os << "composite_of_" << compositeAttr.getTotalLength() << "b";
       return AliasResult::OverridableAlias;
     }
@@ -158,7 +158,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
       source = assumeAlignmentOp.getViewSource();
     }
     auto shapeAwareOp =
-        dyn_cast_or_null<ShapeAwareOpInterface>(source.getDefiningOp());
+        dyn_cast_if_present<ShapeAwareOpInterface>(source.getDefiningOp());
     if (!shapeAwareOp)
       return failure();
 
@@ -173,7 +173,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     }
 
     // If it's a static dim then just fold to that.
-    auto type = llvm::cast<ShapedType>(source.getType());
+    auto type = cast<ShapedType>(source.getType());
     int64_t staticDim = type.getDimSize(index.getZExtValue());
     if (ShapedType::isStatic(staticDim)) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op, staticDim);

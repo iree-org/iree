@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -282,6 +283,166 @@ struct MaterializeTensorExtDispatchTensorStoreOp
 };
 
 //===---------------------------------------------------------------------===//
+// Patterns for layout transfers. They decompse load/store ops into
+// set_encoding/unset_encoding + load/store, if the converted types mismatch.
+//===---------------------------------------------------------------------===//
+
+/// Returns the value that brings `src` to `destType` by inserting the necessary
+/// encoding ops.
+static Value generateEncodingTransferOps(RewriterBase &rewriter, Value src,
+                                         ArrayRef<Value> dynamicDims,
+                                         RankedTensorType destType) {
+  auto srcType = cast<RankedTensorType>(src.getType());
+  if (srcType == destType) {
+    return src;
+  }
+  Value value = src;
+  if (srcType.getEncoding()) {
+    value = IREE::Encoding::UnsetEncodingOp::create(
+        rewriter, src.getLoc(), srcType.dropEncoding(), value, dynamicDims);
+  }
+  if (destType.getEncoding()) {
+    value = IREE::Encoding::SetEncodingOp::create(rewriter, src.getLoc(),
+                                                  destType, value);
+  }
+  return value;
+}
+
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.load` operation when
+/// materializing the encoding.
+struct DecomposeMismatchEncodingTensorLoadOp
+    : public OpRewritePattern<IREE::TensorExt::DispatchTensorLoadOp> {
+  using OpRewritePattern<
+      IREE::TensorExt::DispatchTensorLoadOp>::OpRewritePattern;
+
+  DecomposeMismatchEncodingTensorLoadOp(
+      MaterializeEncodingTypeConverter &converter, MLIRContext *ctx,
+      PatternBenefit benefit = 0)
+      : OpRewritePattern<IREE::TensorExt::DispatchTensorLoadOp>(ctx, benefit),
+        typeConverter(converter) {}
+
+  LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    if (!loadOp.isLoadOfWholeSource()) {
+      return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
+    }
+
+    IREE::TensorExt::DispatchTensorType srcType = loadOp.getSourceType();
+    auto boundTensorType = dyn_cast<RankedTensorType>(srcType.getBoundType());
+    if (!boundTensorType) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "source bound type is not a RankedTensorType");
+    }
+
+    // Only decompose if there's an encoding involved. If neither the source
+    // nor the destination has an encoding, this pattern should not match.
+    // This can happen when isLoadOfWholeSource() returns true but the load
+    // reshapes the tensor (e.g., loading a 4D tensor from a 5D source).
+    RankedTensorType destType = loadOp.getResult().getType();
+    if (!boundTensorType.getEncoding() && !destType.getEncoding()) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "no encoding involved in source or destination");
+    }
+
+    // We have to check the bound type from converted DispatchTensorType because
+    // it is what we'll see in encoding materialization. E.g.,
+    // GPUPaddingResolver converts RankedTensorType into the same type, but it
+    // creates different IREE::TensorExt::DispatchTensorType that may have
+    // larger tensor shape for bound type.
+    auto convertedSrcType =
+        typeConverter.convertType<IREE::TensorExt::DispatchTensorType>(srcType);
+    if (typeConverter.convertType(convertedSrcType.getBoundType()) ==
+        typeConverter.convertType(destType)) {
+      return rewriter.notifyMatchFailure(
+          loadOp, "the source type and the result type match after conversion");
+    }
+
+    LDBG() << "Performance warning: decomposing mismatched encoding load op: "
+           << loadOp;
+    Location loc = loadOp.getLoc();
+    Value result = IREE::TensorExt::DispatchTensorLoadOp::create(
+        rewriter, loc, boundTensorType, loadOp.getSource(),
+        loadOp.getSourceDims(), loadOp.getMixedOffsets(),
+        loadOp.getMixedSizes(), loadOp.getMixedStrides());
+    SmallVector<Value> dynamicDims = llvm::to_vector(loadOp.getSizes());
+    result =
+        generateEncodingTransferOps(rewriter, result, dynamicDims, destType);
+    rewriter.replaceOp(loadOp, result);
+    return success();
+  }
+
+private:
+  MaterializeEncodingTypeConverter &typeConverter;
+};
+
+/// Pattern to convert `iree_tensor_ext.dispatch.tensor.store` operation when
+/// materializing the encoding.
+struct DecomposeMismatchEncodingTensorStoreOp
+    : public OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
+  using OpRewritePattern<
+      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
+
+  DecomposeMismatchEncodingTensorStoreOp(
+      MaterializeEncodingTypeConverter &converter, MLIRContext *ctx,
+      PatternBenefit benefit = 0)
+      : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp>(ctx, benefit),
+        typeConverter(converter) {}
+
+  LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    if (!storeOp.isStoreToWholeTarget()) {
+      return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
+    }
+
+    IREE::TensorExt::DispatchTensorType targetType = storeOp.getTargetType();
+    auto boundTensorType =
+        dyn_cast<RankedTensorType>(targetType.getBoundType());
+    if (!boundTensorType) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "target bound type is not a RankedTensorType");
+    }
+
+    // Only decompose if there's an encoding involved. If neither the value
+    // nor the target has an encoding, this pattern should not match.
+    // This can happen when isStoreToWholeTarget() returns true but the store
+    // reshapes the tensor (e.g., storing a 4D tensor to a 5D target).
+    RankedTensorType valueType = storeOp.getValue().getType();
+    if (!boundTensorType.getEncoding() && !valueType.getEncoding()) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "no encoding involved in value or target");
+    }
+
+    // Similar to DecomposeMismatchEncodingTensorLoadOp, we have to check with
+    // the bound type from converted DispatchTensorType.
+    auto convertedTargetType =
+        typeConverter.convertType<IREE::TensorExt::DispatchTensorType>(
+            targetType);
+    if (typeConverter.convertType(convertedTargetType.getBoundType()) ==
+        typeConverter.convertType(valueType)) {
+      return rewriter.notifyMatchFailure(
+          storeOp, "the value type and the target type match");
+    }
+
+    LDBG() << "Performance warning: decomposing mismatched encoding store op: "
+           << storeOp;
+    Location loc = storeOp.getLoc();
+    Value valueToStore = storeOp.getValue();
+    SmallVector<Value> dynamicDims = llvm::to_vector(storeOp.getSizes());
+    valueToStore = generateEncodingTransferOps(rewriter, valueToStore,
+                                               dynamicDims, boundTensorType);
+    IREE::TensorExt::DispatchTensorStoreOp::create(
+        rewriter, loc, valueToStore, storeOp.getTarget(),
+        storeOp.getTargetDims(), storeOp.getMixedOffsets(),
+        storeOp.getMixedSizes(), storeOp.getMixedStrides());
+    rewriter.eraseOp(storeOp);
+    return success();
+  }
+
+private:
+  MaterializeEncodingTypeConverter &typeConverter;
+};
+
+//===---------------------------------------------------------------------===//
 // Patterns to lower ops with encodings. These are written as
 // dialect conversion patterns for now. These are just drivers around
 // the core conversion utilities.
@@ -526,13 +687,21 @@ struct MaterializeFuncReturnOp final
 
 } // namespace
 
+void populateDecomposeMismatchedLayoutLoadStoreOpsPatterns(
+    RewritePatternSet &patterns,
+    MaterializeEncodingTypeConverter &typeConverter) {
+  patterns.insert<DecomposeMismatchEncodingTensorLoadOp,
+                  DecomposeMismatchEncodingTensorStoreOp>(
+      typeConverter, patterns.getContext());
+}
+
 void populateMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter) {
   MLIRContext *context = patterns.getContext();
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+        auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
             subspanOp.getResult().getType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)
@@ -543,7 +712,7 @@ void populateMaterializeEncodingPatterns(
                       IREE::Encoding::UnsetEncodingOp>();
   target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorStoreOp>(
       [&typeConverter](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
-        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+        auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
             storeOp.getTargetType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)
@@ -552,7 +721,7 @@ void populateMaterializeEncodingPatterns(
       });
   target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorLoadOp>(
       [&typeConverter](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
-        auto resultType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+        auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
             loadOp.getSourceType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
         if (!resultType)

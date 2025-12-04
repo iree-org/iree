@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file -pass-pipeline"=builtin.module(func.func(iree-codegen-hoist-statically-bound-allocations,iree-codegen-gpu-reuse-shared-memory-allocs))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file -pass-pipeline="builtin.module(func.func(iree-codegen-hoist-statically-bound-allocations,iree-codegen-gpu-reuse-shared-memory-allocs))" %s | FileCheck %s
 
 func.func @trivial_reuse() {
     %c0 = arith.constant 0 : index
@@ -58,14 +58,11 @@ func.func @shared_reuse_scf_for(%in0: memref<128x128xf16>, %in1: memref<1x4096x1
     %c4096 = arith.constant 4096 : index
     %c64 = arith.constant 64 : index
     gpu.barrier
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
     %5 = vector.transfer_read %in0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<128x128xf16>, vector<128x128xf16>
     %alloc = memref.alloc() : memref<128x128xf16, #gpu.address_space<workgroup>>
     vector.transfer_write %5, %alloc[%c0, %c0] {in_bounds = [true, true]} : vector<128x128xf16>, memref<128x128xf16, #gpu.address_space<workgroup>>
     gpu.barrier
-    %8 = vector.transfer_read %alloc[%c0, %c0], %cst {in_bounds = [true, true]} : memref<128x128xf16, #gpu.address_space<workgroup>>, vector<128x128xf16>
+    vector.transfer_read %alloc[%c0, %c0], %cst {in_bounds = [true, true]} : memref<128x128xf16, #gpu.address_space<workgroup>>, vector<128x128xf16>
 
     %11 = scf.for %arg0 = %c0 to %c4096 step %c64 iter_args(%arg1 = %cst_0) -> vector<64x128xf16> {
         %17 = vector.transfer_read %in1[%c0, %arg0, %c0], %cst {in_bounds = [true, true]} : memref<1x4096x128xf16>, vector<64x128xf16>
@@ -99,12 +96,9 @@ func.func @shared_no_reuse_scf_for(%in0: memref<128x128xf16>, %in1: memref<1x409
     %c4096 = arith.constant 4096 : index
     %c64 = arith.constant 64 : index
     gpu.barrier
-    %workgroup_id_y = hal.interface.workgroup.id[1] : index
-    %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
-    %5 = vector.transfer_read %in0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<128x128xf16>, vector<128x128xf16>
+    vector.transfer_read %in0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<128x128xf16>, vector<128x128xf16>
 
-    %11 = scf.for %arg0 = %c0 to %c4096 step %c64 iter_args(%arg1 = %cst_0) -> vector<64x128xf16> {
+    scf.for %arg0 = %c0 to %c4096 step %c64 iter_args(%arg1 = %cst_0) -> vector<64x128xf16> {
         %17 = vector.transfer_read %in1[%c0, %arg0, %c0], %cst {in_bounds = [true, true]} : memref<1x4096x128xf16>, vector<64x128xf16>
         %19 = vector.transfer_read %in2[%c0, %arg0, %c0], %cst {in_bounds = [true, true]} : memref<1x4096x128xf16>, vector<64x128xf16>
         %alloc_10 = memref.alloc() : memref<64x128xf16, #gpu.address_space<workgroup>>

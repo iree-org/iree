@@ -68,8 +68,8 @@ iree_tablegen_library(
   TD_FILE
     "VectorExtAttrs.td"
   OUTS
-    --gen-enum-decls VectorExtEnums.h.inc
-    --gen-enum-defs VectorExtEnums.cpp.inc
+    --gen-enum-decls --dialect=iree_vector_ext VectorExtEnums.h.inc
+    --gen-enum-defs --dialect=iree_vector_ext VectorExtEnums.cpp.inc
 )
 
 iree_tablegen_library(

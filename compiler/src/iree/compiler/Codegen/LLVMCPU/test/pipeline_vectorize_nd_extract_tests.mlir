@@ -87,4 +87,4 @@ func.func @main_dispatch_77_generic_1x257x257x21() attributes {hal.executable.ta
 }
 
 // CHECK-LABEL: func.func @main_dispatch_77_generic_1x257x257x21
-//     CHECK-8: vector.load
+// CHECK-COUNT-8: vector.load

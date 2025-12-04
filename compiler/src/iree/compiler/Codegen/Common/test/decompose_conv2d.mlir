@@ -1,31 +1,26 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-convolution-to-lower-dim-ops))" --split-input-file %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 0, 0], [1, 1, 1, 4, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
-#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}>
-#translation = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
 module {
-  func.func @restrict_num_workgroups() attributes {hal.executable.target = #executable_target_system_elf_arm_64_, translation_info = #translation} {
+  func.func @restrict_num_workgroups(%input: tensor<1x1x4x4xf32>, %filter: tensor<1x4x4xf32>) -> tensor<1x1x1x4xf32> {
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1x4x4xf32>>
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x4x4xf32>>
-    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1x1x4xf32>>
-    %input = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 1, 4, 4], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1x4x4xf32>> -> tensor<1x1x4x4xf32>
-    %filter = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [1, 4, 4], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x4x4xf32>> -> tensor<1x4x4xf32>
-    %5 = tensor.empty() : tensor<1x1x1x4xf32>
-    %output = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x1x1x4xf32>) -> tensor<1x1x1x4xf32>
-    %7 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, lowering_config = #config,
-            strides = dense<1> : tensor<2xi64>} ins(%input, %filter : tensor<1x1x4x4xf32>, tensor<1x4x4xf32>) outs(%output : tensor<1x1x1x4xf32>) -> tensor<1x1x1x4xf32>
-    iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 1, 1, 4], strides = [1, 1, 1, 1] : tensor<1x1x1x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1x1x4xf32>>
-    return
+    %empty = tensor.empty() : tensor<1x1x1x4xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x1x1x4xf32>) -> tensor<1x1x1x4xf32>
+    %conv = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, lowering_config = #config,
+            strides = dense<1> : tensor<2xi64>} ins(%input, %filter : tensor<1x1x4x4xf32>, tensor<1x4x4xf32>) outs(%fill : tensor<1x1x1x4xf32>) -> tensor<1x1x1x4xf32>
+    return %conv : tensor<1x1x1x4xf32>
   }
 }
 
-//   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0], [1, 1, 4, 0], [0, 0, 0, 4], [0, 0, 0, 0]]>
-//   CHECK:    linalg.depthwise_conv_1d_nwc_wc
-//   CHECK-SAME: lowering_config = #[[CONFIG]]
-//   CHECK-SAME: ins({{.*}}, {{.*}} : tensor<1x4x4xf32>, tensor<4x4xf32>) outs({{.*}} : tensor<1x1x4xf32>) -> tensor<1x1x4xf32>
+// Verify that depthwise_conv_2d is decomposed to depthwise_conv_1d with updated tile sizes.
+// The height dimension is collapsed, reducing tile sizes from 6D to 4D.
+
+// CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0], [1, 1, 4, 0], [0, 0, 0, 4], [0, 0, 0, 0]]>
+// CHECK-LABEL: func.func @restrict_num_workgroups
+// CHECK-SAME:    %[[INPUT:.+]]: tensor<1x1x4x4xf32>
+// CHECK-SAME:    %[[FILTER:.+]]: tensor<1x4x4xf32>
+// CHECK-DAG:   %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[INPUT]]{{.+}} : tensor<1x1x4x4xf32> to tensor<1x4x4xf32>
+// CHECK-DAG:   %[[FILTER_SLICE:.+]] = tensor.extract_slice %[[FILTER]]{{.+}} : tensor<1x4x4xf32> to tensor<4x4xf32>
+// CHECK:       linalg.depthwise_conv_1d_nwc_wc
+// CHECK-SAME:    ins(%[[INPUT_SLICE]], %[[FILTER_SLICE]] : tensor<1x4x4xf32>, tensor<4x4xf32>)
+// CHECK-SAME:    outs({{.+}} : tensor<1x1x4xf32>) -> tensor<1x1x4xf32>

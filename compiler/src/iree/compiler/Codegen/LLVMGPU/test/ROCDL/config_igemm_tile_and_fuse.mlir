@@ -7,19 +7,12 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-igemm-pad-convolution=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=PAD-CONV-GFX942
 
-func.func @nhwc_conv_mfma() {
+func.func @nhwc_conv_mfma(%3: tensor<2x34x34x128xf32>, %4: tensor<3x3x128x64xf32>) -> tensor<2x32x32x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x34x34x128xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x64xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32x32x64xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 34, 34, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x34x34x128xf32>> -> tensor<2x34x34x128xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 128, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x64xf32>> -> tensor<3x3x128x64xf32>
   %5 = tensor.empty() : tensor<2x32x32x64xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x32x32x64xf32>) -> tensor<2x32x32x64xf32>
   %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x34x34x128xf32>, tensor<3x3x128x64xf32>) outs(%6 : tensor<2x32x32x64xf32>) -> tensor<2x32x32x64xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 32, 32, 64], strides = [1, 1, 1, 1] : tensor<2x32x32x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32x32x64xf32>>
-  return
+  return %7 : tensor<2x32x32x64xf32>
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_mfma
@@ -41,19 +34,12 @@ func.func @nhwc_conv_mfma() {
 
 // -----
 
-func.func @nchw_conv_mfma() {
+func.func @nchw_conv_mfma(%3: tensor<2x128x34x34xf32>, %4: tensor<64x128x3x3xf32>) -> tensor<2x64x32x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x34x34xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x128x3x3xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x64x32x32xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 128, 34, 34], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x34x34xf32>> -> tensor<2x128x34x34xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [64, 128, 3, 3], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x128x3x3xf32>> -> tensor<64x128x3x3xf32>
   %5 = tensor.empty() : tensor<2x64x32x32xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x64x32x32xf32>) -> tensor<2x64x32x32xf32>
   %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x128x34x34xf32>, tensor<64x128x3x3xf32>) outs(%6 : tensor<2x64x32x32xf32>) -> tensor<2x64x32x32xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 64, 32, 32], strides = [1, 1, 1, 1] : tensor<2x64x32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x64x32x32xf32>>
-  return
+  return %7 : tensor<2x64x32x32xf32>
 }
 
 // CHECK-LABEL: func.func @nchw_conv_mfma
@@ -75,19 +61,12 @@ func.func @nchw_conv_mfma() {
 
 // -----
 
-func.func @nhwc_conv_unaligned_mfma() {
+func.func @nhwc_conv_unaligned_mfma(%3: tensor<2x33x33x128xf32>, %4: tensor<3x3x128x64xf32>) -> tensor<2x31x31x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x33x33x128xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x64xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x31x31x64xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 33, 33, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x33x33x128xf32>> -> tensor<2x33x33x128xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 128, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x64xf32>> -> tensor<3x3x128x64xf32>
   %5 = tensor.empty() : tensor<2x31x31x64xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x31x31x64xf32>) -> tensor<2x31x31x64xf32>
   %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x33x33x128xf32>, tensor<3x3x128x64xf32>) outs(%6 : tensor<2x31x31x64xf32>) -> tensor<2x31x31x64xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 31, 31, 64], strides = [1, 1, 1, 1] : tensor<2x31x31x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x31x31x64xf32>>
-  return
+  return %7 : tensor<2x31x31x64xf32>
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_unaligned_mfma
@@ -114,19 +93,12 @@ func.func @nhwc_conv_unaligned_mfma() {
 
 // -----
 
-func.func @nchw_conv_unaligned_mfma() {
+func.func @nchw_conv_unaligned_mfma(%3: tensor<2x128x34x34xf32>, %4: tensor<63x128x3x3xf32>) -> tensor<2x63x32x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x34x34xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<63x128x3x3xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x63x32x32xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 128, 34, 34], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x34x34xf32>> -> tensor<2x128x34x34xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [63, 128, 3, 3], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<63x128x3x3xf32>> -> tensor<63x128x3x3xf32>
   %5 = tensor.empty() : tensor<2x63x32x32xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x63x32x32xf32>) -> tensor<2x63x32x32xf32>
   %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x128x34x34xf32>, tensor<63x128x3x3xf32>) outs(%6 : tensor<2x63x32x32xf32>) -> tensor<2x63x32x32xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 63, 32, 32], strides = [1, 1, 1, 1] : tensor<2x63x32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x63x32x32xf32>>
-  return
+  return %7 : tensor<2x63x32x32xf32>
 }
 
 // CHECK-LABEL: func.func @nchw_conv_unaligned_mfma

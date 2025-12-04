@@ -19,7 +19,7 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
          "expected FFT length to be a power of two");
   Location loc = op->getLoc();
 
-  auto operandType = llvm::dyn_cast<RankedTensorType>(operand.getType());
+  auto operandType = dyn_cast<RankedTensorType>(operand.getType());
   if (!operandType || !operandType.hasStaticShape()) {
     return failure();
   }
@@ -32,7 +32,7 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
 
   auto getBitReversalOrder = [](ImplicitLocOpBuilder &b, Value real,
                                 int64_t fftLength) -> SmallVector<Value> {
-    ShapedType realType = llvm::cast<ShapedType>(real.getType());
+    ShapedType realType = cast<ShapedType>(real.getType());
     int64_t rank = realType.getRank();
 
     SmallVector<OpFoldResult> mixedSizes =
@@ -79,7 +79,7 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
             arith::ConstantOp::create(
                 b, realType,
                 DenseFPElementsAttr::get(
-                    realType, llvm::cast<Attribute>(b.getF32FloatAttr(0.0))))};
+                    realType, cast<Attribute>(b.getF32FloatAttr(0.0))))};
   };
 
   SmallVector<Value> results = getBitReversalOrder(b, operand, fftLength);

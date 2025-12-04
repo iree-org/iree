@@ -69,7 +69,7 @@ jobs:
       IREE_TEST_FILES: ${{ matrix.iree_test_files }}
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           submodules: false
 
@@ -85,10 +85,10 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 615c14ea2dd082d132cd64cd92806bcc7fdb5c75
+          ref: 17a391dc3882f136e567bf2687806ef6af46ad64
           path: iree-test-suites
           lfs: true
 
@@ -171,14 +171,14 @@ jobs:
           - name: rocm_hip_w7900
             rocm-chip: gfx1100
             target: target_hip
-            runs-on: nodai-amdgpu-w7900-x86-64
+            runs-on: [Linux, X64, iree-w7900x2, persistent-cache]
     env:
       VENV_DIR: ${{ github.workspace }}/venv
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           submodules: false
 
@@ -194,10 +194,10 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 615c14ea2dd082d132cd64cd92806bcc7fdb5c75
+          ref: 17a391dc3882f136e567bf2687806ef6af46ad64
           path: iree-test-suites
           lfs: true
 

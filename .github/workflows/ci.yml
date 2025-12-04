@@ -76,7 +76,7 @@ jobs:
     env:
       BUILD_DIR: build-runtime
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: "3.11"
@@ -132,7 +132,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
@@ -174,7 +174,7 @@ jobs:
     env:
       BUILD_DIR: build-tracing
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
 
       - name: (Linux) Install requirements
         if: contains(matrix.runs-on, 'ubuntu')
@@ -241,6 +241,12 @@ jobs:
     uses: ./.github/workflows/ci_linux_x64_clang_asan.yml
     secrets: inherit
 
+  linux_x64_clang_ubsan:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_ubsan')
+    uses: ./.github/workflows/ci_linux_x64_clang_ubsan.yml
+    secrets: inherit
+
   windows_x64_msvc:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'windows_x64_msvc')
@@ -264,6 +270,7 @@ jobs:
       - linux_x64_bazel
       - linux_x64_clang
       - linux_x64_clang_asan
+      - linux_x64_clang_ubsan
       - windows_x64_msvc
     uses: ./.github/workflows/workflow_summary.yml
     secrets: inherit

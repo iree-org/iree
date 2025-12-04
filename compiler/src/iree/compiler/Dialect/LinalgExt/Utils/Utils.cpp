@@ -415,6 +415,48 @@ bool isGatherlikeOp(Operation *op) {
 // IGEMM details for generic convolutions
 //===---------------------------------------------------------------------===//
 
+/// Computes the output permutation for the im2col tensor to match the
+/// dimension order of the input tensor.
+static SmallVector<int64_t> computeIm2colOutputPermutation(
+    AffineMap inputMap, AffineMap inputMapGEMM,
+    const DenseMap<int64_t, AffineExpr> &convToIgemmDimMap) {
+  llvm::SetVector<int64_t> capturedDims;
+  SmallVector<int64_t> colTensorDimsInConvInputOrder;
+  for (int64_t dim = 0; dim < inputMap.getNumResults(); ++dim) {
+    llvm::SetVector<int64_t> convDimsForInputDim;
+    AffineExpr dimExpr = inputMap.getResult(dim);
+    dimExpr.walk([&](AffineExpr expr) {
+      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+        convDimsForInputDim.insert(dimExpr.getPosition());
+      }
+    });
+    for (int64_t convDim : convDimsForInputDim) {
+      if (capturedDims.contains(convDim)) {
+        continue;
+      }
+      capturedDims.insert(convDim);
+      auto iGEMMDim = cast<AffineDimExpr>(convToIgemmDimMap.at(convDim));
+      int64_t colTensorDim = inputMapGEMM.getResultPosition(iGEMMDim).value();
+      colTensorDimsInConvInputOrder.push_back(colTensorDim);
+    }
+  }
+  llvm::SetVector<int64_t> capturedOutputPermDims;
+  SmallVector<int64_t> im2colOutputPerm;
+  // Iterate over the dimensions in reverse order, removing duplicates. The
+  // reverse order is used to ensure that we capture the innermost occurrences
+  // of each dimension when there are duplicates, because the innermost
+  // dimension has impact on contiguity of memory accesses.
+  for (int64_t dim : llvm::reverse(colTensorDimsInConvInputOrder)) {
+    if (capturedOutputPermDims.contains(dim)) {
+      continue;
+    }
+    capturedOutputPermDims.insert(dim);
+    im2colOutputPerm.push_back(dim);
+  }
+  std::reverse(im2colOutputPerm.begin(), im2colOutputPerm.end());
+  return im2colOutputPerm;
+}
+
 FailureOr<IGEMMGenericConvDetails>
 getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
@@ -441,9 +483,9 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   Value input = linalgOp.getDpsInputs()[0];
   Value filter = linalgOp.getDpsInputs()[1];
   Value output = linalgOp.getDpsInits()[0];
-  auto inputType = llvm::cast<ShapedType>(input.getType());
-  auto filterType = llvm::cast<ShapedType>(filter.getType());
-  auto outputType = llvm::cast<ShapedType>(output.getType());
+  auto inputType = cast<ShapedType>(input.getType());
+  auto filterType = cast<ShapedType>(filter.getType());
+  auto outputType = cast<ShapedType>(output.getType());
 
   if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
     LDBG() << "[unimplemented] expected 'filterType' and 'inputType' to have "
@@ -619,6 +661,16 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto filterMapGEMM =
       AffineMap::get(numParallelDims + numKDims, 0, filterDims, ctx);
 
+  // Compute the output permutation for the im2col tensor to match the
+  // dimension order of the input tensor.
+  SmallVector<int64_t> im2colOutputPerm = computeIm2colOutputPermutation(
+      indexingMaps[0], inputMapGEMM, convToIgemmDimMap);
+  SmallVector<AffineExpr> colTensorResultExprs(inputMapGEMM.getResults());
+  applyPermutationToVector(colTensorResultExprs, im2colOutputPerm);
+  inputMapGEMM =
+      AffineMap::get(inputMapGEMM.getNumDims(), 0, colTensorResultExprs,
+                     inputMapGEMM.getContext());
+
   SmallVector<AffineMap> indexingGEMMMaps;
   if (isOutputChannelFirst) {
     indexingGEMMMaps.push_back(filterMapGEMM);
@@ -629,6 +681,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   }
   indexingGEMMMaps.push_back(resultMap);
   IGEMMGenericConvDetails igemmDetails;
+  igemmDetails.im2colOutputPerm = im2colOutputPerm;
   igemmDetails.igemmContractionMaps = indexingGEMMMaps;
   igemmDetails.igemmOperands = isOutputChannelFirst
                                    ? SmallVector<Value>({filter, input})
@@ -712,9 +765,9 @@ isContractionOpSequence(Value yielded,
     return std::nullopt;
   }
 
-  auto elementwiseLHS = dyn_cast_or_null<BlockArgument>(
+  auto elementwiseLHS = dyn_cast_if_present<BlockArgument>(
       getSourceSkipUnary(elementwiseOp->getOperand(0)));
-  auto elementwiseRHS = dyn_cast_or_null<BlockArgument>(
+  auto elementwiseRHS = dyn_cast_if_present<BlockArgument>(
       getSourceSkipUnary(elementwiseOp->getOperand(1)));
   if (!elementwiseLHS || !elementwiseRHS) {
     return std::nullopt;
@@ -750,7 +803,7 @@ isContractionOpSequence(Value yielded) {
 /// TODO: The logic below is quite convoluted. Might be better
 /// off having a dedicated operation for this.
 bool isaHorizontallyFusedContraction(Operation *op) {
-  auto linalgOp = dyn_cast_or_null<linalg::LinalgOp>(op);
+  auto linalgOp = dyn_cast_if_present<linalg::LinalgOp>(op);
   if (!linalgOp) {
     return false;
   }
@@ -966,13 +1019,13 @@ bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {
 }
 
 bool isPureMatmul(Operation *op) {
-  auto matmulOp = dyn_cast_or_null<linalg::MatmulOp>(op);
+  auto matmulOp = dyn_cast_if_present<linalg::MatmulOp>(op);
   return matmulOp &&
          linalg::MatmulOp::isDefaultIndexingMaps(matmulOp.getIndexingMaps());
 }
 
 bool isPureBatchMatmul(Operation *op) {
-  auto batchMatmulOp = dyn_cast_or_null<linalg::BatchMatmulOp>(op);
+  auto batchMatmulOp = dyn_cast_if_present<linalg::BatchMatmulOp>(op);
   return batchMatmulOp && linalg::BatchMatmulOp::isDefaultIndexingMaps(
                               batchMatmulOp.getIndexingMaps());
 }

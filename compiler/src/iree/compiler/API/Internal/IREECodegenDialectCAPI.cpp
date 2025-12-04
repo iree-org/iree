@@ -13,17 +13,20 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/AffineMap.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/Support/LogicalResult.h"
 
 using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
@@ -243,4 +246,121 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
 bool ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op) {
   return llvm::isa<mlir::iree_compiler::IREE::LinalgExt::AttentionOp>(
       unwrap(op));
+}
+
+bool ireeCodegenHasIGEMMGenericConvDetails(MlirOperation op) {
+  auto linalgOp = llvm::dyn_cast<mlir::linalg::LinalgOp>(unwrap(op));
+  if (!linalgOp) {
+    return false;
+  }
+
+  return succeeded(
+      mlir::iree_compiler::IREE::LinalgExt::getIGEMMGenericConvDetails(
+          linalgOp));
+}
+
+ireeCodegenIGEMMGenericConvDetails
+ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
+  auto linalgOp = llvm::cast<mlir::linalg::LinalgOp>(unwrap(op));
+
+  llvm::FailureOr<mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails>
+      maybeDetails =
+          mlir::iree_compiler::IREE::LinalgExt::getIGEMMGenericConvDetails(
+              linalgOp);
+  assert(succeeded(maybeDetails) &&
+         "Failed to get IGEMM details; must check with "
+         "ireeCodegenHasIGEMMGenericConvDetails first");
+
+  const mlir::iree_compiler::IREE::LinalgExt::IGEMMGenericConvDetails &details =
+      *maybeDetails;
+
+  mlir::Builder builder(linalgOp.getContext());
+
+  ireeCodegenIGEMMGenericConvDetails result;
+
+  result.igemmContractionMaps = wrap(builder.getArrayAttr(llvm::map_to_vector(
+      details.igemmContractionMaps, [](auto map) -> mlir::Attribute {
+        return mlir::AffineMapAttr::get(map);
+      })));
+
+  result.igemmLoopBounds =
+      wrap(builder.getI64ArrayAttr(details.igemmLoopBounds));
+
+  llvm::SmallVector<mlir::Attribute> iteratorAttrs;
+  for (mlir::utils::IteratorType iterType : details.igemmLoopIterators) {
+    iteratorAttrs.push_back(
+        builder.getStringAttr(mlir::utils::stringifyIteratorType(iterType)));
+  }
+  result.igemmLoopIterators = wrap(builder.getArrayAttr(iteratorAttrs));
+
+  result.im2colOutputPerm =
+      wrap(builder.getI64ArrayAttr(details.im2colOutputPerm));
+
+  llvm::SmallVector<mlir::Attribute> reassocAttrs;
+  for (const mlir::ReassociationIndices &indices :
+       details.filterReassocIndices) {
+    reassocAttrs.push_back(builder.getI64ArrayAttr(
+        llvm::map_to_vector(indices, llvm::StaticCastTo<int64_t>)));
+  }
+  result.filterReassocIndices = wrap(builder.getArrayAttr(reassocAttrs));
+
+  result.isOutputChannelFirst = details.isOutputChannelFirst;
+
+  // Mapping from conv dimensions to IGEMM dimensions.
+  // Encode as ArrayAttr of [conv_dim, igemm_dim] pairs.
+  llvm::SmallVector<mlir::Attribute> dimMapAttrs;
+  for (const auto &[convDim, igemmExpr] : details.convToIgemmDimMap) {
+    // All entries in convToIgemmDimMap must be AffineDimExpr.
+    auto dimExpr = llvm::cast<mlir::AffineDimExpr>(igemmExpr);
+    llvm::SmallVector<mlir::Attribute> pairAttrs;
+    pairAttrs.push_back(builder.getI64IntegerAttr(convDim));
+    pairAttrs.push_back(builder.getI64IntegerAttr(dimExpr.getPosition()));
+    dimMapAttrs.push_back(builder.getArrayAttr(pairAttrs));
+  }
+  result.convToIgemmDimMap = wrap(builder.getArrayAttr(dimMapAttrs));
+
+  return result;
+}
+
+bool ireeCodegenMlirOperationIsAScaledContractionOp(MlirOperation op) {
+  auto linalgOp = llvm::cast<mlir::linalg::LinalgOp>(unwrap(op));
+  return mlir::iree_compiler::IREE::LinalgExt::isaScaledContractionOpInterface(
+      linalgOp);
+}
+
+ireeCodegenScaledContractionDimensions
+ireeCodegenInferScaledContractionDimensions(MlirOperation op) {
+  ireeCodegenScaledContractionDimensions result{};
+  auto linalgOp = llvm::dyn_cast<mlir::linalg::LinalgOp>(unwrap(op));
+  if (!linalgOp) {
+    return result;
+  }
+
+  llvm::FailureOr<
+      mlir::iree_compiler::IREE::LinalgExt::ScaledContractionDimensions>
+      maybeDims =
+          mlir::iree_compiler::IREE::LinalgExt::inferScaledContractionDims(
+              linalgOp);
+  if (failed(maybeDims)) {
+    return result;
+  }
+
+  const mlir::iree_compiler::IREE::LinalgExt::ScaledContractionDimensions
+      &scaledContractionDims = *maybeDims;
+  mlir::MLIRContext *ctx = linalgOp.getContext();
+  mlir::Builder b(ctx);
+  auto toAttr = [&b](llvm::ArrayRef<unsigned> vals) -> MlirAttribute {
+    llvm::SmallVector<mlir::Attribute, 2> attrs =
+        llvm::map_to_vector(vals, [&b](unsigned val) -> mlir::Attribute {
+          return b.getI32IntegerAttr(val);
+        });
+    return wrap(b.getArrayAttr(attrs));
+  };
+
+  result.batch = toAttr(scaledContractionDims.batch);
+  result.m = toAttr(scaledContractionDims.m);
+  result.n = toAttr(scaledContractionDims.n);
+  result.k = toAttr(scaledContractionDims.k);
+  result.kB = toAttr(scaledContractionDims.kB);
+  return result;
 }

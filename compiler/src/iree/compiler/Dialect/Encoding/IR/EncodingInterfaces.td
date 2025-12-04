@@ -163,8 +163,8 @@ def IREEEncoding_SerializableAttr :
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         auto attr =
-          llvm::dyn_cast_or_null<SerializableAttr>($_attr);
-        if (!attr) {
+          dyn_cast_if_present<SerializableAttr>($_attr);
+        if (!attr || !other) {
           return false;
         }
         if (attr.isSerialized() && other.isSerialized()) {

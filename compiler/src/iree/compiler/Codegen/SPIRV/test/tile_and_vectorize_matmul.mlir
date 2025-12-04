@@ -50,7 +50,7 @@ hal.executable private @matmul_static_shape_f16 {
   }
 }
 
-//    CHECK-LABEL: func.func @matmul_static_shape_f16
+//    CHECK-LABEL: func.func @matmul_static_shape_f16()
 //      CHECK-NOT:   vector.transfer
 //          CHECK:   %{{.+}}:8 = scf.for
 // CHECK-COUNT-12:     vector.transfer_read
@@ -110,7 +110,7 @@ hal.executable private @matmul_static_shape_f32 {
   }
 }
 
-//    CHECK-LABEL: func.func @matmul_static_shape_f32
+//    CHECK-LABEL: func.func @matmul_static_shape_f32()
 //      CHECK-NOT:   vector.transfer
 //          CHECK:   %{{.+}}:8 = scf.for
 // CHECK-COUNT-12:     vector.transfer_read

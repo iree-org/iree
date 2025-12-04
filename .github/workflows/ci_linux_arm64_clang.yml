@@ -37,7 +37,7 @@ jobs:
       BUILD_DIR: build-arm64
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           submodules: true
       - name: Install Python requirements
@@ -54,6 +54,8 @@ jobs:
             -DIREE_BUILD_PYTHON_BINDINGS=ON \
             -DIREE_ENABLE_LLD=ON \
             -DIREE_ENABLE_ASSERTIONS=ON \
+            -DIREE_ENABLE_SPLIT_DWARF=ON \
+            -DIREE_ENABLE_THIN_ARCHIVES=ON \
             -DIREE_BUILD_DOCS=ON \
             -DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
       - name: CMake - build
@@ -70,7 +72,7 @@ jobs:
         run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 
       - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@11a0bfe3b50977e38aa2bd4a4ebd296415e83c19 # v1.15.4
+        uses: sarisia/actions-status-discord@b8381b25576cb341b2af39926ab42c5056cc44ed # v1.15.5
         if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}

@@ -70,8 +70,8 @@ iree_tablegen_library(
   TD_FILE
     "FlowBase.td"
   OUTS
-    --gen-enum-decls FlowEnums.h.inc
-    --gen-enum-defs FlowEnums.cpp.inc
+    --gen-enum-decls --dialect=flow FlowEnums.h.inc
+    --gen-enum-defs --dialect=flow FlowEnums.cpp.inc
 )
 
 iree_tablegen_library(

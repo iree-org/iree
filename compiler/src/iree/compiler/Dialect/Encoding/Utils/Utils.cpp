@@ -15,15 +15,15 @@
 namespace mlir::iree_compiler::IREE::Encoding {
 
 SerializableAttr getSerializableAttr(RankedTensorType type) {
-  return dyn_cast_or_null<SerializableAttr>(type.getEncoding());
+  return dyn_cast_if_present<SerializableAttr>(type.getEncoding());
 }
 
 EncodingAttr getEncodingAttr(RankedTensorType type) {
-  return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
+  return dyn_cast_if_present<EncodingAttr>(type.getEncoding());
 }
 
 bool hasPackedStorageAttr(RankedTensorType type) {
-  return dyn_cast_or_null<PackedStorageAttr>(type.getEncoding()) != nullptr;
+  return dyn_cast_if_present<PackedStorageAttr>(type.getEncoding()) != nullptr;
 }
 
 FailureOr<linalg::ContractionDimensions>
@@ -53,29 +53,58 @@ getEncodingScaledContractionDims(EncodingAttr encoding) {
       ArrayRef<AffineMap>(indexingMaps));
 }
 
-MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
-  if (encoding.getOpType().getValue() != EncodingOpType::matmul) {
-    return {};
-  }
+FailureOr<BxMxNxKxKb> getEncodingContractionLikeSizes(EncodingAttr encoding) {
   SmallVector<int64_t> iterationSizes = encoding.getIterationSizesArray();
   if (iterationSizes.empty()) {
-    return {};
+    return failure();
   }
-  std::optional<linalg::ContractionDimensions> maybeCDims =
-      getEncodingContractionDims(encoding);
-  if (!maybeCDims) {
-    return {};
+  // Try to get scaled contraction dimensions first (which includes kB),
+  // otherwise fall back to regular contraction dimensions.
+  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> maybeScaledCDims =
+      getEncodingScaledContractionDims(encoding);
+  IREE::LinalgExt::ScaledContractionDimensions cDims;
+  if (succeeded(maybeScaledCDims)) {
+    cDims = *maybeScaledCDims;
+  } else {
+    // Fall back to regular contraction dimensions and convert to scaled format
+    // with an empty kB dimension.
+    FailureOr<linalg::ContractionDimensions> maybeCDims =
+        getEncodingContractionDims(encoding);
+    if (failed(maybeCDims)) {
+      return failure();
+    }
+    // Convert ContractionDimensions to ScaledContractionDimensions.
+    cDims.m = maybeCDims->m;
+    cDims.n = maybeCDims->n;
+    cDims.k = maybeCDims->k;
+    cDims.kB = {}; // Empty for non-scaled matmuls
+    cDims.batch = maybeCDims->batch;
   }
-  linalg::ContractionDimensions cDims = maybeCDims.value();
-  // The following expects M, N, K, and Batch sizes of at most 1 for now.
-  // TODO: Extend this to multiple M/N/K/Batch dims.
+  // The following expects M, N, K, KB, and Batch sizes of at most 1 for now.
+  // TODO: Extend this to multiple M/N/K/KB/Batch dims.
   assert(cDims.m.size() <= 1 && cDims.n.size() <= 1 && cDims.k.size() == 1 &&
-         cDims.batch.size() <= 1 &&
-         "Expected at most one M, N, K, and Batch dimension");
-  // M or N can be empty instead of having an explicit dim size of 1 for matvec
-  // and vecmat, so set to 1 if empty.
+         cDims.kB.size() <= 1 && cDims.batch.size() <= 1 &&
+         "Expected at most one M, N, K, KB, and Batch dimension");
+  const int64_t k = iterationSizes[cDims.k[0]];
+  // M, N, or Batch can be empty instead of having an explicit dim size of 1
+  // for matvec and vecmat, so set to 1 if empty.
   const int64_t m = cDims.m.empty() ? 1 : iterationSizes[cDims.m[0]];
   const int64_t n = cDims.n.empty() ? 1 : iterationSizes[cDims.n[0]];
+  const int64_t batch =
+      cDims.batch.empty() ? 1 : iterationSizes[cDims.batch[0]];
+  // KB can be empty if the encoding is not a scaled matmul.
+  const int64_t kb = cDims.kB.empty() ? 1 : iterationSizes[cDims.kB[0]];
+  return BxMxNxKxKb{batch, m, n, k, kb};
+}
+
+MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
+  // Get the matmul sizes for the given encoding.
+  FailureOr<BxMxNxKxKb> matmulSizes = getEncodingContractionLikeSizes(encoding);
+  if (failed(matmulSizes)) {
+    return {};
+  }
+  const int64_t m = matmulSizes->M;
+  const int64_t n = matmulSizes->N;
 
   // If both dimensions are dynamic, return empty.
   if (ShapedType::isDynamic(m) && ShapedType::isDynamic(n)) {

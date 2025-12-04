@@ -86,7 +86,7 @@ class BindSymbolicShapesPass final
     auto operand = bindOp.getOperand();
     // Torch programs are single block and use structured control flow, so
     // presume this is an entrypoint.
-    if (llvm::isa<BlockArgument>(operand))
+    if (isa<BlockArgument>(operand))
       return true;
 
     // Mutable tensors can exist at the boundary and must be "copied" to a
@@ -252,7 +252,7 @@ class BindSymbolicShapesPass final
       for (auto [index, expr] : llvm::enumerate(shapeMap.getResults())) {
         if (expr.getKind() != AffineExprKind::SymbolId)
           continue;
-        auto symbolPos = llvm::cast<AffineSymbolExpr>(expr).getPosition();
+        auto symbolPos = cast<AffineSymbolExpr>(expr).getPosition();
         Value symbol = symbols[symbolPos];
         auto symbolInfoIt = symbolInfos.find(symbol);
         assert(symbolInfoIt != symbolInfos.end() &&
@@ -265,7 +265,7 @@ class BindSymbolicShapesPass final
     Value materializeDimExpr(Location loc, OpBuilder &builder,
                              AffineExpr genericExpr,
                              llvm::DenseMap<Value, SymbolInfo> &symbolInfos) {
-      if (auto binaryExpr = llvm::dyn_cast<AffineBinaryOpExpr>(genericExpr)) {
+      if (auto binaryExpr = dyn_cast<AffineBinaryOpExpr>(genericExpr)) {
         auto lhs =
             materializeDimExpr(loc, builder, binaryExpr.getLHS(), symbolInfos);
         if (!lhs)
@@ -296,12 +296,12 @@ class BindSymbolicShapesPass final
         return arith::ConstantOp::create(
             builder, loc,
             builder.getIndexAttr(
-                llvm::cast<AffineConstantExpr>(genericExpr).getValue()));
+                cast<AffineConstantExpr>(genericExpr).getValue()));
       case AffineExprKind::DimId:
         // Unsupported.
         break;
       case AffineExprKind::SymbolId: {
-        auto symExpr = llvm::cast<AffineSymbolExpr>(genericExpr);
+        auto symExpr = cast<AffineSymbolExpr>(genericExpr);
         auto pos = symExpr.getPosition();
         if (pos >= symbols.size())
           break;
@@ -406,18 +406,17 @@ class BindSymbolicShapesPass final
 
     // Walk the ops we care about and stash for analysis.
     getOperation()->walk([&](Operation *childOp) {
-      if (auto symbolOp = llvm::dyn_cast<Torch::SymbolicIntOp>(childOp)) {
+      if (auto symbolOp = dyn_cast<Torch::SymbolicIntOp>(childOp)) {
         cleanupOpList.push_back(symbolOp);
         symbolInfos.insert_or_assign(symbolOp.getResult(),
                                      SymbolInfo(symbolOp));
-      } else if (auto bindOp =
-                     llvm::dyn_cast<Torch::BindSymbolicShapeOp>(childOp)) {
+      } else if (auto bindOp = dyn_cast<Torch::BindSymbolicShapeOp>(childOp)) {
         cleanupOpList.push_back(bindOp);
         if (!isEligibleBinding(bindOp))
           return;
         auto torchType =
-            llvm::cast<Torch::ValueTensorType>(bindOp.getOperand().getType());
-        auto builtinType = llvm::dyn_cast_or_null<RankedTensorType>(
+            cast<Torch::ValueTensorType>(bindOp.getOperand().getType());
+        auto builtinType = dyn_cast_if_present<RankedTensorType>(
             typeConverter.convertType(torchType));
         if (!builtinType) {
           emitError(childOp->getLoc())

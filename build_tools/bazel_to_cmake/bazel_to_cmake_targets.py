@@ -120,7 +120,11 @@ class TargetConverter:
                 "@com_google_googletest//:gtest": ["gmock", "gtest"],
                 "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
                 "@hsa_runtime_headers": ["hsa_runtime::headers"],
+                "@libbacktrace": ["libbacktrace::libbacktrace"],
                 "@webgpu_headers": [],
+                # py_binary targets have no CMake equivalent.
+                # This is the only target bazel needs to execute the lit tests.
+                ":python_with_numpy": [],
             }
         )
 
@@ -202,6 +206,9 @@ class TargetConverter:
             return self._convert_mlir_target(target)
         if target.startswith("@iree_cuda//"):
             return self._convert_iree_cuda_target(target)
+        # pip dependencies don't exist in CMake (system Python is used).
+        if target.startswith("@pip//"):
+            return []
         if target.startswith(f"{iree_core_repo}//"):
             return self._convert_iree_core_target(target)
         if target.startswith("@"):

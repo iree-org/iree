@@ -5,7 +5,6 @@
 func.func @simple_forall(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c4 = arith.constant 4 : index
   %dim0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %dim1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   // CHECK: scf.for %[[IV0:.+]] = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%[[ITER0:.+]] = %[[ARG1]]) -> (tensor<?x?xf32>) {
@@ -26,7 +25,6 @@ func.func @simple_forall(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tens
 
 // CHECK-LABEL: func.func @forall_with_mapping_not_converted
 func.func @forall_with_mapping_not_converted(%arg0: tensor<32x32xf32>) -> tensor<32x32xf32> {
-  %c4 = arith.constant 4 : index
   // CHECK: scf.forall
   %0 = scf.forall (%i, %j) = (0, 0) to (32, 32) step (4, 4) shared_outs(%arg1 = %arg0) -> (tensor<32x32xf32>) {
     %slice = tensor.extract_slice %arg1[%i, %j] [4, 4] [1, 1] : tensor<32x32xf32> to tensor<4x4xf32>
@@ -52,11 +50,11 @@ func.func @nested_forall_inner_only(%arg0: tensor<?x?x16x1xf32>, %arg1: tensor<?
   // CHECK: scf.forall
   %1 = scf.forall (%arg3, %arg4) in (%dim, %dim_1) shared_outs(%arg5 = %0) -> (tensor<?x?x16x16xf32>) {
     %extracted_slice = tensor.extract_slice %arg5[%arg3, %arg4, 0, 0] [1, 1, 16, 16] [1, 1, 1, 1] : tensor<?x?x16x16xf32> to tensor<1x1x16x16xf32>
-    // CHECK: %[[FOR:.+]] = scf.for %[[IV:.+]] = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%[[ITER:.+]] = %{{.+}}) -> (tensor<1x1x16x16xf32>) {
+    // CHECK: {{.+}} = scf.for %[[IV:.+]] = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%[[ITER:.+]] = %{{.+}}) -> (tensor<1x1x16x16xf32>) {
     %2 = scf.forall (%arg6) = (0) to (16) step (2) shared_outs(%arg7 = %extracted_slice) -> (tensor<1x1x16x16xf32>) {
       %3 = tensor.empty() : tensor<1x1x2x16xf32>
       %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<1x1x2x16xf32>) -> tensor<1x1x2x16xf32>
-      // CHECK: %[[INNER_FOR:.+]] = scf.for
+      // CHECK: scf.for
       %5 = scf.for %arg8 = %c0 to %dim_0 step %c1 iter_args(%arg9 = %4) -> (tensor<1x1x2x16xf32>) {
         %extracted_slice_2 = tensor.extract_slice %arg0[%arg3, %arg8, %arg6, 0] [1, 1, 2, 1] [1, 1, 1, 1] : tensor<?x?x16x1xf32> to tensor<1x1x2x1xf32>
         %extracted_slice_3 = tensor.extract_slice %arg1[%arg4, %arg8, 0, 0] [1, 1, 16, 1] [1, 1, 1, 1] : tensor<?x?x16x1xf32> to tensor<1x1x16x1xf32>
@@ -96,7 +94,6 @@ func.func @nested_forall_inner_only(%arg0: tensor<?x?x16x1xf32>, %arg1: tensor<?
 
 // CHECK-LABEL: func.func @multiple_results
 func.func @multiple_results(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> (tensor<32x32xf32>, tensor<32x32xf32>) {
-  %c4 = arith.constant 4 : index
   %cst = arith.constant 1.0 : f32
   // CHECK: %{{.+}}:2 = scf.for %[[IV0:.+]] = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%[[ITER0:.+]] = %arg0, %[[ITER1:.+]] = %arg1) -> (tensor<32x32xf32>, tensor<32x32xf32>) {
   // CHECK:   %{{.+}}:2 = scf.for %[[IV1:.+]] = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%[[INNER_ITER0:.+]] = %[[ITER0]], %[[INNER_ITER1:.+]] = %[[ITER1]]) -> (tensor<32x32xf32>, tensor<32x32xf32>) {

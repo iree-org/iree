@@ -107,8 +107,8 @@ collapseExtractSlice(tensor::ExtractSliceOp sliceOp,
 /// with "reduction" types. It is expected that the `op` has projected
 /// permutations only as indexing maps. (Checked using `isEligibleForCollapse`).
 static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
-  auto fusionInterfaceOp = llvm::cast<LinalgFusionOpInterface>(op);
-  auto tilingInterfaceOp = llvm::cast<TilingInterface>(op);
+  auto fusionInterfaceOp = cast<LinalgFusionOpInterface>(op);
+  auto tilingInterfaceOp = cast<TilingInterface>(op);
 
   SmallVector<ReassociationIndices> contiguousLoops;
   SmallVector<unsigned> pDims, rDims;
@@ -682,7 +682,7 @@ findRootOps(IREE::Flow::DispatchRegionOp regionOp) {
       continue;
     }
 
-    if (auto forallOp = dyn_cast_or_null<scf::ForallOp>(collapsibleOp)) {
+    if (auto forallOp = dyn_cast_if_present<scf::ForallOp>(collapsibleOp)) {
       mlir::visitUsedValuesDefinedAbove(
           MutableArrayRef<Region>{forallOp.getTerminator().getRegion()},
           [&](OpOperand *operand) {

@@ -20,6 +20,7 @@ iree_cc_library(
   SRCS
     "AnnotateOpOrdinals.cpp"
     "ApplyPatterns.cpp"
+    "AttributeCallGraph.cpp"
     "CombineInitializers.cpp"
     "DropCompilerHints.cpp"
     "DumpModule.cpp"

@@ -98,7 +98,7 @@ static void convertAccGemmToGemm(RewriterBase &rewriter,
       ValueRange{initOp}, maps, iterators,
       [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
         Value result;
-        if (llvm::isa<FloatType>(elementType)) {
+        if (isa<FloatType>(elementType)) {
           result = arith::AddFOp::create(b, nestedLoc, args[0], args[1]);
         } else {
           result = arith::AddIOp::create(b, nestedLoc, args[0], args[1]);

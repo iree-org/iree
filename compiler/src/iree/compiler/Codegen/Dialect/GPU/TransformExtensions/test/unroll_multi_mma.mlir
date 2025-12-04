@@ -92,8 +92,8 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-//    CHECK-LABEL: func @unroll_multi_mma_count
-// CHECK-COUNT-30:   %[[MMA:.+]] = iree_codegen.inner_tiled {{.*}} : vector<1x1x4xf16>, vector<1x1x4xf16> into vector<1x1x4xf32>
+//   CHECK-LABEL: func @unroll_multi_mma_count
+// CHECK-COUNT-30:   {{.+}} = iree_codegen.inner_tiled {{.*}} : vector<1x1x4xf16>, vector<1x1x4xf16> into vector<1x1x4xf32>
 // CHECK-COUNT-10:   vector.insert_strided_slice {{.*}} : vector<1x1x4xf32> into vector<2x5x4xf32>
 
 // -----
@@ -130,7 +130,7 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @unroll_scaled_multi_mma
-// CHECK-SAME: %[[LHS_SCALE:[A-Za-z0-9]+]]: vector<1x2x1xf8E8M0FNU>
+//  CHECK-SAME:   %[[LHS_SCALE:[A-Za-z0-9]+]]: vector<1x2x1xf8E8M0FNU>
 // CHECK-COUNT-2: vector.extract_strided_slice %[[LHS_SCALE]] {offsets = [0, 0]
 // CHECK-NOT: vector.extract_strided_slice %[[LHS_SCALE]] {offsets = [0, 0]
 // CHECK-COUNT-2: vector.extract_strided_slice %[[LHS_SCALE]] {offsets = [0, 1]

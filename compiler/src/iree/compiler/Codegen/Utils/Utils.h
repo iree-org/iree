@@ -336,6 +336,15 @@ struct VectorizationTileSizes {
 /// chain.
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
 
+/// Returns the inferred input-vector-sizes for the `op`, given the provided
+/// vector sizes for the read operation of the outer dimensions.
+/// Returns std::nullopt, if it fails to compute the sizes.
+/// For now, it only supports non-scalable vectors.
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromUnpackedDomain(linalg::PackOp op,
+                                      ArrayRef<int64_t> readVectorSizes,
+                                      ArrayRef<bool> scalableFlags);
+
 /// Returns the inferred input-vector-sizes for the `op` (for read + write
 /// operations), given the provided vector sizes for the write operation.
 /// Returns std::nullopt, if it fails to compute the sizes.

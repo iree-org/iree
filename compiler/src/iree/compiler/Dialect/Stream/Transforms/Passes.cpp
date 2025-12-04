@@ -22,12 +22,6 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clReplicateGlobalsPerAffinity(
-    "iree-stream-experimental-replicate-globals-per-affinity",
-    llvm::cl::desc(
-        "Replicates globals for each unique affinity they are used with."),
-    llvm::cl::init(false));
-
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -104,10 +98,6 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // debugging of analysis errors in end-user tooling.
   if (clAnnotateInputAffinities) {
     passManager.addPass(IREE::Stream::createAnnotateAffinitiesPass());
-  }
-
-  if (clReplicateGlobalsPerAffinity) {
-    passManager.addPass(IREE::Stream::createReplicateGlobalsPerAffinityPass());
   }
 
   // Converts from all input dialects into various levels of the stream dialect.
@@ -227,6 +217,14 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
 
+  // Cleanup junk inserted by usage refinement (mostly lifetime transfers).
+  FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
+
+  // Elide copies again after refinement resolves unknown lifetimes. Some of the
+  // lifetime transfers inserted during usage refinement are only possible to
+  // detect with full analysis (vs. our simple canonicalizer patterns).
+  passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
+
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Verify all stream.async.* op access ranges that we can by taking advantage
@@ -286,6 +284,13 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // lifetime allocations.
   passManager.addPass(IREE::Stream::createScheduleAllocationPass());
 
+  // Tries to emplace transient allocations in user-provided storage, if any.
+  // This will find stream.resource.alloca (and matching dealloca) ops and try
+  // to remove them.
+  passManager.addPass(IREE::Stream::createEmplaceTransientsPass());
+  passManager.addPass(
+      IREE::Stream::createMaterializeTransientSizeQueriesPass());
+
   FunctionLikeNest(passManager)
       // Allocate backing storage for fused constant resources.
       // This expands packed constants into explicit forms with partitioned
@@ -314,6 +319,11 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // TODO(benvanik): run another cleanup after ARC? Today the pass does not
   // generate much garbage and what it does (mostly around timepoints) will be
   // handled during the optimization pipeline below.
+
+  // If there are any external transient memory size query functions that folded
+  // into constants after our layout/propagation/cleanup then tag them now. This
+  // is a no-op if none of the functions exist.
+  passManager.addPass(IREE::Stream::createAnnotateConstantTransientSizePass());
 
   // Everything must now be in explicit stream.cmd.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());

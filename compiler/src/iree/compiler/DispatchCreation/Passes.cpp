@@ -61,6 +61,12 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
         "Enables horizontal fusion of contractions with one common operand"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clExperimentalMultiUseEncodingFusion(
+    "iree-dispatch-creation-experimental-multi-use-encoding-fusion",
+    llvm::cl::desc(
+        "Enable encoding op fusion if the producer has more than one use"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-dispatch-creation-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
@@ -125,7 +131,12 @@ static void addDispatchRegionCreationPreprocessingPasses(
       // 2. Bubble up expand_shape ops (or sink collapse_shape ops) to get
       //    elementwise operation into higher dimensions for more fusion
       //    opportunities.
-      .addPass(DispatchCreation::createBubbleUpExpandShapesPass)
+      .addPass([&]() {
+        return DispatchCreation::createBubbleUpExpandShapesPass(
+            DispatchCreation::BubbleUpExpandShapesPassOptions{
+                /*enableReshapeMovementAcrossReductions=*/
+                dispatchOptions.enableAggressiveReshapeMovement});
+      })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
@@ -282,7 +293,13 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
   }
   FunctionLikeNest(passManager)
-      .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
+      .addPass([&]() {
+        FuseEncodingOpsIntoDispatchRegionsPassOptions passOptions;
+        passOptions.enableAggressiveFusion =
+            clExperimentalMultiUseEncodingFusion;
+        return DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass(
+            passOptions);
+      })
       .addPass(DispatchCreation::createConvertEncodingToFlowPass);
   // Hoist encoding operations into initializers when possible.
   if (options.constExprHoisting) {
@@ -296,6 +313,10 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     passManager.addPass(
         IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
   }
+
+  // Remove tensor compute_barriers at the end of dispatch region creation.
+  FunctionLikeNest(passManager)
+      .addPass(DispatchCreation::createRemoveTensorBarriersPass);
 }
 
 // Apply preprocessing and form dispatch regions

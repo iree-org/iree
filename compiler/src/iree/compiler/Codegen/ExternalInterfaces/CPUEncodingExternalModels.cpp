@@ -686,8 +686,8 @@ struct CPUEncodingPackedLayoutMaterializerAttr
                                               RankedTensorType type) const {
     auto layoutAttr = cast<CPUEncodingResolverAttr>(attr);
 
-    auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
-        type.getEncoding());
+    auto encoding =
+        dyn_cast_if_present<IREE::Encoding::EncodingAttr>(type.getEncoding());
 
     MaterializeEncodingInfo info;
     if (!encoding) {
@@ -737,7 +737,7 @@ struct CPUEncodingResolverMaterializerAttr final
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
     auto layoutAttr = cast<CPUEncodingResolverAttr>(attr);
-    auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
     }
@@ -845,8 +845,8 @@ struct VMVXEncodingPackedLayoutMaterializerAttr final
                                               RankedTensorType type) const {
     auto layoutAttr = cast<VMVXEncodingResolverAttr>(attr);
 
-    auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
-        type.getEncoding());
+    auto encoding =
+        dyn_cast_if_present<IREE::Encoding::EncodingAttr>(type.getEncoding());
 
     MaterializeEncodingInfo info;
     if (!encoding) {
@@ -891,7 +891,7 @@ struct VMVXEncodingResolverMaterializerAttr final
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
     auto layoutAttr = cast<VMVXEncodingResolverAttr>(attr);
-    auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
     }

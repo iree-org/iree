@@ -70,7 +70,7 @@ static bool canUsersHandleSubviews(Operation *op) {
 static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
   Operation *definingOp = v.getDefiningOp();
   if (!definingOp) {
-    auto arg = llvm::cast<BlockArgument>(v);
+    auto arg = cast<BlockArgument>(v);
     return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           Value initOperand = forOp.getTiedLoopInit(arg)->get();
@@ -88,7 +88,7 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
 /// here).
 static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
                                        BufferizationPlan &plan) {
-  if (!llvm::isa<ShapedType>(constantOp.getResult().getType()))
+  if (!isa<ShapedType>(constantOp.getResult().getType()))
     return success();
   plan.insert(constantOp.getResult());
   return success();
@@ -173,7 +173,7 @@ static bool canSetStoreValueAndTargetAsEquivalent(
   }
   // If the binding and offsets are the same, make sure that the
   // !iree_tensor_ext.dispatch.tensor is read-write.
-  auto sourceType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+  auto sourceType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
       valueInterfaceBinding.getType());
   return sourceType &&
          sourceType.getAccess() == IREE::TensorExt::TensorAccess::ReadWrite;
@@ -333,7 +333,7 @@ static LogicalResult analyseScfIfOp(scf::IfOp ifOp, BufferizationPlan &plan) {
   for (auto [result, thenOperand, elseOperand] :
        llvm::zip_equal(ifOp.getResults(), ifOp.thenYield().getOperands(),
                        ifOp.elseYield().getOperands())) {
-    if (!llvm::isa<RankedTensorType>(result.getType()))
+    if (!isa<RankedTensorType>(result.getType()))
       continue;
     // All results and yields of the if-then-else are tied together.
     plan.unionSets(result, thenOperand);
@@ -347,7 +347,7 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
   if (forOp.getResults().empty())
     return success();
   if (!llvm::all_of(forOp->getResultTypes(), [](Type resultType) {
-        return llvm::isa<RankedTensorType>(resultType);
+        return isa<RankedTensorType>(resultType);
       })) {
     return success();
   }
@@ -584,16 +584,14 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         })
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
-              if (llvm::isa<RankedTensorType>(
-                      transferReadOp.getBase().getType())) {
+              if (isa<RankedTensorType>(transferReadOp.getBase().getType())) {
                 plan.insert(transferReadOp.getBase());
               }
               return success();
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
-              if (!llvm::isa<RankedTensorType>(
-                      transferWriteOp.getBase().getType())) {
+              if (!isa<RankedTensorType>(transferWriteOp.getBase().getType())) {
                 return success();
               }
               return analyseDestructiveUpdateOp(

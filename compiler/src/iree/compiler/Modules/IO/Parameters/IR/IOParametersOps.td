@@ -8,15 +8,13 @@
 #define IREE_DIALECT_MODULES_IO_PARAMETERS_OPS
 
 include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
+include "iree/compiler/Dialect/HAL/IR/HALTypes.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Modules/IO/Parameters/IR/IOParametersBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-
-class IOParameters_PureOp<string mnemonic, list<Trait> traits = []> :
-    IOParameters_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // Parameter I/O

@@ -8,9 +8,6 @@ module attributes {transform.with_named_sequence} {
 
   func.func @shared_mem_cpy(%m0 : memref<64x16xf32, #hal.descriptor_type<storage_buffer>>)
   attributes {hal.executable.target = #executable_target, translation_info = #translation_info} {
-    %c0 = arith.constant 0 : index
-
-    %0 = "affine.apply"(%c0) {map = affine_map<(d0) -> (d0)>} : (index) -> (index)
     %sm0 = memref.get_global @__shared_memory__ : memref<64x16xf32, #gpu.address_space<workgroup>>
     gpu.barrier
 

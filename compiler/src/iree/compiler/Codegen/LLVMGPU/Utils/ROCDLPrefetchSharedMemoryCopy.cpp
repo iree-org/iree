@@ -9,10 +9,12 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -31,375 +33,669 @@
 namespace mlir::iree_compiler {
 
 namespace {
-
-class LoopPrefetcher {
-public:
-  /// Creates an instance that plans the given scf.for |op| to be ready for
-  /// prefetching. Returns failure if unable to support the given |op|.
-  static FailureOr<LoopPrefetcher> get(scf::ForOp op) {
-    if (!op.getOps<scf::ForOp>().empty()) {
-      LDBG() << "Loop prefetcher does not support nested loops yet";
-      return failure();
-    }
-
-    LoopPrefetcher prefetcher;
-    prefetcher.mapping = SmallVector<IRMapping>(4);
-    prefetcher.forOp = op;
-    prefetcher.lb = prefetcher.ub = prefetcher.step = 0;
-
-    if (failed(prefetcher.initializeLoopInfo())) {
-      LDBG() << "Failed to initialize loop info (unsupported loop)";
-      return failure();
-    }
-
-    if (failed(prefetcher.initializeStages())) {
-      LDBG() << "Failed to initialize stage info (unsupported loop)";
-      return failure();
-    }
-
-    return prefetcher;
-  }
-
-  // Emits the prologue before the main pipelined loop.
-  void emitPrologue(RewriterBase &rewriter) {
-    Location loc = forOp.getLoc();
-    Value zero = arith::ConstantIndexOp::create(rewriter, loc, lb);
-    // Directly write in the prologue and use the shared memory to communicate
-    // data instead of the loop carried values. Read (0)
-    emitRead(mapping[0], rewriter, zero);
-    // Write(0)
-    emitWrite(mapping[0], rewriter, zero);
-  }
-
-  /// Emits the main pipelined loop structure.
-  scf::ForOp createKernelLoop(RewriterBase &rewriter) {
-    Location loc = forOp.getLoc();
-    int64_t newUpperBound = ub - step;
-    auto newUb = arith::ConstantIndexOp::create(rewriter, loc, newUpperBound);
-
-    // Keep original iter args and then add some for what's being loaded to
-    // registers.
-    auto iterArgs = llvm::to_vector_of<Value>(forOp.getInitArgs());
-    auto newForOp = scf::ForOp::create(rewriter, loc, forOp.getLowerBound(),
-                                       newUb, forOp.getStep(), iterArgs);
-
-    // When there are no iter args, the loop body terminator will be created.
-    // Since we always create it below, remove the terminator if it was created.
-    if (!newForOp.getBody()->empty())
-      rewriter.eraseOp(newForOp.getBody()->getTerminator());
-
-    return newForOp;
-  }
-
-  /// Emits contents into the main pipelined loop structure.
-  void createKernel(RewriterBase &rewriter, scf::ForOp newForOp) {
-    rewriter.setInsertionPoint(newForOp.getBody(), newForOp.getBody()->begin());
-    Location loc = forOp.getLoc();
-    Value indVar = newForOp.getInductionVar();
-    Value increment = arith::ConstantIndexOp::create(rewriter, loc, step);
-    Value iPlusOne = arith::AddIOp::create(rewriter, loc, indVar, increment,
-                                           arith::IntegerOverflowFlags::nsw);
-
-    for (int i = 0; i < 3; ++i) {
-      for (auto [idx, arg] : llvm::enumerate(forOp.getRegionIterArgs())) {
-        mapping[i].map(arg, newForOp.getRegionIterArgs()[idx]);
-      }
-    }
-
-    emitRead(mapping[1], rewriter, iPlusOne);
-    emitBarrier(loc, rewriter);
-    emitCompute(mapping[0], rewriter, indVar);
-    emitBarrier(loc, rewriter);
-    emitSchedBarrier(loc, rewriter);
-    emitWrite(mapping[1], rewriter, iPlusOne);
-    updateYield(mapping[0], rewriter);
-    return;
-  }
-
-  // Emits the epilogue after the main pipelined loop and returns the final
-  // results to replace the original loop results main loop.
-  SmallVector<Value> emitEpilogue(RewriterBase &rewriter, scf::ForOp newForOp) {
-    rewriter.setInsertionPointAfter(newForOp);
-    Location loc = forOp.getLoc();
-    Value nMinusOne =
-        arith::ConstantIndexOp::create(rewriter, loc, ub - 1 * step);
-
-    // Map iter_args to results of newForOp.
-    for (unsigned i = 0, e = forOp->getNumResults(); i != e; ++i) {
-      mapping[0].map(forOp.getRegionIterArg(i), newForOp.getResult(i));
-    }
-
-    emitBarrier(loc, rewriter);
-    return emitCompute(mapping[0], rewriter, nMinusOne);
-  }
-
-private:
-  LogicalResult initializeLoopInfo() {
-    std::optional<int64_t> lbCst = getConstantIndex(forOp.getLowerBound());
-    std::optional<int64_t> ubCst = getConstantIndex(forOp.getUpperBound());
-    std::optional<int64_t> stepCst = getConstantIndex(forOp.getStep());
-    if (!lbCst || !ubCst || !stepCst)
-      return failure();
-
-    lb = *lbCst;
-    ub = *ubCst;
-    step = *stepCst;
-
-    int64_t numIters = llvm::divideCeil(ub - lb, step);
-    if (numIters <= 2)
-      return failure();
-
-    return success();
-  }
-
-  void getValueDependencies(Operation *op, DenseSet<Operation *> &dependencies,
-                            bool noTransferReads = false) {
-    if (!op || dependencies.contains(op)) {
-      return;
-    }
-
-    if (!forOp->isProperAncestor(op)) {
-      return;
-    }
-
-    dependencies.insert(op);
-    op->walk([&](Operation *nested) {
-      for (Value val : nested->getOperands()) {
-        getValueDependencies(val.getDefiningOp(), dependencies,
-                             noTransferReads);
-      }
-    });
-  }
-
-  void getValueDependenciesForIf(scf::IfOp ifOp,
-                                 DenseSet<Operation *> &readDependencies,
-                                 DenseSet<Operation *> &writeDependencies) {
-    // scf.if with results should be supported directly through the usual
-    // handling so bail-out here in that case
-    if (ifOp->getNumResults() != 0)
-      return;
-    bool hasGlobalRead = false;
-    bool hasSharedWrite = false;
-    bool hasPrivateOrSharedWrite = false;
-    // Else region not yet supported.
-    if (!ifOp.getElseRegion().empty()) {
-      return;
-    }
-    ifOp->walk([&](Operation *op) {
-      if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
-        auto sourceType = dyn_cast<MemRefType>(readOp.getBase().getType());
-        if (hasGlobalMemoryAddressSpace(sourceType)) {
-          hasGlobalRead = true;
-        }
-      }
-      if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
-        auto dstType = dyn_cast<MemRefType>(writeOp.getBase().getType());
-        if (hasSharedMemoryAddressSpace(dstType)) {
-          hasSharedWrite = true;
-        }
-        if (!hasGlobalMemoryAddressSpace(dstType)) {
-          hasPrivateOrSharedWrite = true;
-        }
-      }
-    });
-    // if op has both read and write stages and hence we cannot do prefetching.
-    if (hasGlobalRead && hasSharedWrite) {
-      return;
-    }
-    // Note that the order matters here, if we have a global read and a private
-    // write the global read getting assigned to read stage takes precedence.
-    // But private write by itself will be assigned write stage. This is becuase
-    // private writes are transient values which are typically produced by the
-    // read stage and consumed  by the write stage and moving this to write
-    // stage makes sure the read stage doesnt get blocked.
-    if (hasGlobalRead) {
-      getValueDependencies(ifOp, readDependencies);
-    } else if (hasPrivateOrSharedWrite) {
-      getValueDependencies(ifOp, writeDependencies);
-    }
-    // Bail-out for unahndled if ops.
-  }
-
-  // We only support loops whose bodies can be divided into 3 stages (read,
-  // write, compute). If there are any remaining ops with side effects (except
-  // for gpu.barrier and certain scf.if ops), the loop is not supported.
-  // For scf.if we only support them if we can analyze the region and
-  // identify which stage the if op should belong to.
-  LogicalResult initializeStages() {
-    DenseSet<Operation *> readDependencies;
-    DenseSet<Operation *> writeDependencies;
-    DenseSet<Operation *> computeDependencies;
-
-    for (Operation &op : forOp.getBody()->getOperations()) {
-      if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
-        auto srcType = dyn_cast<MemRefType>(read.getBase().getType());
-        // only global memory reads should be selected as root ops of read
-        // stage. Reads from shared memory are picked by compute stage and reads
-        // from private memory can belong to any stage.
-        if (!hasGlobalMemoryAddressSpace(srcType)) {
-          continue;
-        }
-        getValueDependencies(read, readDependencies);
-      } else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
-        getValueDependencies(write, writeDependencies);
-      } else if (auto compute = dyn_cast<scf::YieldOp>(op)) {
-        getValueDependencies(compute, computeDependencies);
-      } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-        getValueDependenciesForIf(ifOp, readDependencies, writeDependencies);
-      }
-    }
-    // If `scf.yeild` is the only compute op then there is no value in doing
-    // prefetching.
-    if (computeDependencies.size() == 1) {
-      LDBG() << "Loop does not have compute so not doing prefetching." << forOp;
-      return failure();
-    }
-
-    // Restore the original order.
-    for (auto &op : forOp.getBody()->getOperations()) {
-      bool hasStage = false;
-      if (readDependencies.contains(&op)) {
-        readStage.push_back(&op);
-        hasStage = true;
-      }
-      // We do not need to duplicate read stage ops in write stage as the
-      // iteration count of both stages is always same.
-      if (writeDependencies.contains(&op) && !hasStage) {
-        writeStage.push_back(&op);
-        hasStage = true;
-      }
-      if (computeDependencies.contains(&op)) {
-        computeStage.push_back(&op);
-        hasStage = true;
-      }
-
-      // Ops with a stage will be cloned over to the new for op, while barriers
-      // will be re-written.
-      if (!hasStage && !isa<gpu::BarrierOp>(op)) {
-        if (!isPure(&op)) {
-          LDBG() << "Found a non-pure loop body op not assigned to any stage "
-                    "(unsupported loop): "
-                 << op;
-          return failure();
-        }
-      }
-    }
-
-    LLVM_DEBUG({
-      // Stages cannot have overlapping operations.
-      llvm::dbgs() << "--- Read Stage ---\n";
-      for (Operation *op : readStage)
-        llvm::dbgs() << *op << "\n";
-      llvm::dbgs() << "--- Write Stage ---\n";
-      for (Operation *op : writeStage)
-        llvm::dbgs() << *op << "\n";
-      llvm::dbgs() << "--- Compute Stage ---\n";
-      for (Operation *op : computeStage)
-        llvm::dbgs() << *op << "\n";
-    });
-
-    return success();
-  }
-
-  /// Creates all read stage ops for a loop iteration with |rewriter| and maps
-  /// the original loop induction variable to |iv| in |mapping|.
-  void emitRead(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), iv);
-
-    for (Operation *op : readStage) {
-      rewriter.clone(*op, mapping);
-    }
-  }
-
-  /// Creates all write stage ops for a loop iteration with |rewriter| and maps
-  /// the original loop induction variable to |iv| in |mapping|.
-  void emitWrite(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), iv);
-
-    for (Operation *op : writeStage) {
-      rewriter.clone(*op, mapping);
-    }
-  }
-
-  /// Creates a gpu.barrier op with |rewriter|.
-  void emitBarrier(Location loc, RewriterBase &rewriter) {
-    gpu::BarrierOp::create(rewriter, loc);
-  }
-
-  void emitSchedBarrier(Location loc, RewriterBase &rewriter) {
-    amdgpu::SchedBarrierOp::create(
-        rewriter, loc,
-        amdgpu::sched_barrier_opt_enumAttr::get(
-            rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
-  }
-
-  /// Creates all compute stage ops for a loop iteration with |rewriter| and
-  /// maps the original loop induction variable to |iv| in |mapping|.
-  SmallVector<Value> emitCompute(IRMapping &mapping, RewriterBase &rewriter,
-                                 Value indVar) {
-    // Map the original loop induction variable to |iv| for later op rewrites.
-    mapping.map(forOp.getInductionVar(), indVar);
-
-    SmallVector<Value> results;
-    for (Operation *op : computeStage) {
-      if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
-        // On yield, return the operands of the yield converted.
-        results =
-            llvm::map_to_vector<4>(yieldOp.getOperands(), [&](Value operand) {
-              return mapping.lookup(operand);
-            });
-        break;
-      }
-
-      rewriter.clone(*op, mapping);
-    }
-
-    return results;
-  }
-
-  void updateYield(IRMapping &mapping, RewriterBase &rewriter) {
-    for (Operation *op : computeStage) {
-      if (auto yield = dyn_cast<scf::YieldOp>(op)) {
-        rewriter.clone(*op, mapping);
-        break;
-      }
-    }
-  }
-
-private:
-  // Mapping for each pipelined stage.
-  SmallVector<IRMapping, 4> mapping;
-  // The original scf.for loop to prefetch shared memory copy from.
-  scf::ForOp forOp;
-  // Original static loop range and step.
-  int64_t lb, ub, step;
-
-  // Ops in the original scf.for loop that belongs to different classes.
+// Structure to hold the stage classification result.
+struct StageClassification {
   SmallVector<Operation *> readStage;
   SmallVector<Operation *> writeStage;
   SmallVector<Operation *> computeStage;
 };
-
 } // namespace
 
-FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
-                                               scf::ForOp forOp) {
-  rewriter.setInsertionPoint(forOp);
-
-  auto prefetcherOr = LoopPrefetcher::get(forOp);
-  if (failed(prefetcherOr))
-    return failure();
-  LoopPrefetcher &prefetcher = *prefetcherOr;
-
-  prefetcher.emitPrologue(rewriter);
-  scf::ForOp newForOp = prefetcher.createKernelLoop(rewriter);
-  prefetcher.createKernel(rewriter, newForOp);
-
-  SmallVector<Value> results = prefetcher.emitEpilogue(rewriter, newForOp);
-  rewriter.replaceOp(forOp, results);
-  return newForOp;
+// Helper function to check if a transfer_read is from global memory.
+static bool isGlobalMemoryRead(vector::TransferReadOp read) {
+  auto srcType = dyn_cast<MemRefType>(read.getBase().getType());
+  return hasGlobalMemoryAddressSpace(srcType);
 }
 
+// Helper function to check if a transfer_write is to shared memory.
+static bool isSharedMemoryWrite(vector::TransferWriteOp write) {
+  auto dstType = dyn_cast<MemRefType>(write.getBase().getType());
+  return hasSharedMemoryAddressSpace(dstType);
+}
+
+// Analyzes the contents of an scf.if operation in a single pass.
+// Identifies what types of operations exist, adds the appropriate root
+// operation, and validates that the scf.if doesn't have conflicting operations.
+// Returns failure if the scf.if has both global reads and shared writes.
+static LogicalResult analyzeIfOp(scf::IfOp ifOp,
+                                 SmallVector<Operation *> &readRoots,
+                                 SmallVector<Operation *> &writeRoots) {
+  bool hasGlobalRead = false;
+  bool hasSharedWrite = false;
+  bool hasPrivateOrSharedWrite = false;
+
+  // Walk once to collect flags and candidate operations
+  ifOp->walk([&](Operation *nestedOp) {
+    if (auto read = dyn_cast<vector::TransferReadOp>(nestedOp)) {
+      if (!hasGlobalRead && isGlobalMemoryRead(read)) {
+        hasGlobalRead = true;
+        readRoots.push_back(nestedOp);
+        LDBG() << "  Found global read in scf.if: " << *nestedOp;
+      }
+    } else if (auto write = dyn_cast<vector::TransferWriteOp>(nestedOp)) {
+      if (!hasSharedWrite && isSharedMemoryWrite(write)) {
+        hasSharedWrite = true;
+      }
+      auto dstType = dyn_cast<MemRefType>(write.getBase().getType());
+      if (!hasGlobalMemoryAddressSpace(dstType) && !hasPrivateOrSharedWrite) {
+        hasPrivateOrSharedWrite = true;
+        writeRoots.push_back(nestedOp);
+        LDBG() << "  Found private/shared write in scf.if: " << *nestedOp;
+      }
+    }
+  });
+
+  // Validate: Cannot pipeline if scf.if has both global read and shared write
+  if (hasGlobalRead && hasSharedWrite) {
+    LDBG() << "  ERROR: scf.if has both global read and shared write - "
+           << "unpipelineable: " << ifOp;
+    return failure();
+  }
+
+  return success();
+}
+
+// Checks if a loop has sufficient iterations for prefetching.
+static LogicalResult checkLoopIterations(scf::ForOp forOp) {
+  std::optional<int64_t> lbCst = getConstantIndex(forOp.getLowerBound());
+  std::optional<int64_t> ubCst = getConstantIndex(forOp.getUpperBound());
+  std::optional<int64_t> stepCst = getConstantIndex(forOp.getStep());
+
+  if (!lbCst || !ubCst || !stepCst) {
+    LDBG() << "Loop bounds are not constant";
+    return failure();
+  }
+
+  int64_t numIters = llvm::divideCeil(*ubCst - *lbCst, *stepCst);
+  if (numIters <= 2) {
+    LDBG() << "Loop has too few iterations: " << numIters;
+    return failure();
+  }
+
+  return success();
+}
+
+// Step 1: Identify root operations for each stage.
+// Root operations are the anchors from which we compute backward slices.
+// This function looks inside scf.if blocks to find roots, so that backward
+// slice computation works naturally without special handling.
+// Returns failure if any scf.if has conflicting operations (both global reads
+// and shared writes).
+static LogicalResult
+identifyRootOperations(scf::ForOp forOp, SmallVector<Operation *> &readRoots,
+                       SmallVector<Operation *> &writeRoots,
+                       SmallVector<Operation *> &computeRoots) {
+
+  LDBG() << "\n=== Step 1: Identifying Root Operations ===";
+
+  for (Operation &op : forOp.getBody()->getOperations()) {
+    // Read stage roots: vector.transfer_read from global memory
+    if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
+      if (isGlobalMemoryRead(read)) {
+        readRoots.push_back(&op);
+        LDBG() << "  Read root: " << op;
+      }
+    }
+    // Write stage roots: all vector.transfer_write operations
+    else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
+      writeRoots.push_back(&op);
+      LDBG() << "  Write root: " << op;
+    }
+    // Compute stage roots: scf.yield (carries loop-carried dependencies)
+    else if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
+      computeRoots.push_back(&op);
+      LDBG() << "  Compute root: " << op;
+    }
+    // Look inside scf.if blocks to find nested transfer operations
+    // Treat the scf.if as a single unit - add it to only one stage
+    else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+      // Analyze the scf.if contents and add roots in a single pass
+      // The scf.if itself will be added to slices via parent walking
+      if (failed(analyzeIfOp(ifOp, readRoots, writeRoots))) {
+        return failure();
+      }
+    }
+  }
+
+  LDBG() << "Found " << readRoots.size() << " read roots, " << writeRoots.size()
+         << " write roots, " << computeRoots.size() << " compute roots";
+
+  // Validate that we have at least one read root - pipelining requires
+  // global memory reads to prefetch
+  if (readRoots.empty()) {
+    LDBG() << "No global memory reads found - cannot pipeline";
+    return failure();
+  }
+
+  return success();
+}
+
+// Step 2: Compute backward slice for a set of root operations.
+// Returns failure if unsupported nested operations are encountered.
+static LogicalResult computeBackwardSlice(ArrayRef<Operation *> roots,
+                                          scf::ForOp forOp,
+                                          SetVector<Operation *> &slice) {
+
+  BackwardSliceOptions options;
+  // Only include operations within the loop body
+  options.filter = [&](Operation *op) { return forOp->isProperAncestor(op); };
+
+  for (Operation *root : roots) {
+    SetVector<Operation *> rootSlice;
+    (void)getBackwardSlice(root, &rootSlice, options);
+    // getBackwardSlice doesn't include the root itself, so add it explicitly
+    slice.insert(root);
+    slice.insert_range(rootSlice);
+
+    // Also add any parent scf.if operations that contain this root
+    // This is necessary because roots inside scf.if need the if to be scheduled
+    // We also need to compute backward slices of ALL operations inside the
+    // scf.if to capture dependencies like memref.alloca that nested ops use
+    Operation *parent = root->getParentOp();
+    while (parent != forOp.getOperation()) {
+      if (auto ifOp = dyn_cast<scf::IfOp>(parent)) {
+        slice.insert(ifOp.getOperation());
+
+        // Compute backward slice OF the scf.if itself to capture its condition
+        SetVector<Operation *> ifSlice;
+        (void)getBackwardSlice(ifOp.getOperation(), &ifSlice, options);
+        slice.insert_range(ifSlice);
+
+        // Compute backward slices of all nested operations to get dependencies
+        // This approach ensures correctness by capturing all transitive
+        // dependencies like memref.alloca that nested operations may use.
+        ifOp.getOperation()->walk([&](Operation *nestedOp) {
+          if (nestedOp != ifOp.getOperation()) {
+            SetVector<Operation *> nestedSlice;
+            (void)getBackwardSlice(nestedOp, &nestedSlice, options);
+            slice.insert_range(nestedSlice);
+          }
+        });
+      } else if (parent->getNumRegions() > 0) {
+        // If we encounter a region-bearing op that's not scf.if, fail
+        LDBG() << "  ERROR: Unsupported nested region-bearing operation: "
+               << parent->getName();
+        return failure();
+      }
+      // else: Non-region-bearing intermediate operation, continue walking up
+      parent = parent->getParentOp();
+    }
+  }
+
+  return success();
+}
+
+// Step 3: Classify all operations into stages and restore original order.
+static LogicalResult classifyOperationsIntoStages(
+    scf::ForOp forOp, const SetVector<Operation *> &readSlice,
+    const SetVector<Operation *> &writeSlice,
+    const SetVector<Operation *> &computeSlice, StageClassification &result) {
+
+  LDBG() << "\n=== Step 3: Classifying Operations into Stages ===";
+  LDBG() << "  Read slice size: " << readSlice.size();
+  LDBG() << "  Write slice size: " << writeSlice.size();
+  LDBG() << "  Compute slice size: " << computeSlice.size();
+
+  // If compute slice only has the yield, there's no real compute
+  if (computeSlice.size() == 1) {
+    LDBG() << "Loop has no meaningful compute operations";
+    return failure();
+  }
+
+  // Restore original order while assigning to stages
+  for (Operation &op : forOp.getBody()->getOperations()) {
+    bool assigned = false;
+
+    if (readSlice.contains(&op)) {
+      result.readStage.push_back(&op);
+      assigned = true;
+      LDBG() << "  READ: " << op;
+    }
+
+    // Don't duplicate ops that are in read stage
+    if (writeSlice.contains(&op) && !assigned) {
+      result.writeStage.push_back(&op);
+      assigned = true;
+      LDBG() << "  WRITE: " << op;
+    }
+
+    // Don't duplicate ops already assigned to read or write stages. The compute
+    // slice (from scf.yield) naturally includes all operations, but we want to
+    // classify them based on their primary purpose
+    if (computeSlice.contains(&op) && !assigned) {
+      result.computeStage.push_back(&op);
+      assigned = true;
+      LDBG() << "  COMPUTE: " << op;
+    }
+
+    // Check for unassigned operations with side effects
+    if (!assigned && !isPure(&op) && !isa<gpu::BarrierOp>(op)) {
+      LDBG() << "  ERROR: Unassigned op with side effects: " << op;
+      return failure();
+    }
+  }
+
+  LDBG() << "\n=== Final Stage Classification ===";
+  LDBG() << "--- Read Stage (" << result.readStage.size() << " ops) ---";
+  for (Operation *op : result.readStage)
+    LDBG() << *op;
+  LDBG() << "--- Write Stage (" << result.writeStage.size() << " ops) ---";
+  for (Operation *op : result.writeStage)
+    LDBG() << *op;
+  LDBG() << "--- Compute Stage (" << result.computeStage.size() << " ops) ---";
+  for (Operation *op : result.computeStage)
+    LDBG() << *op;
+
+  return success();
+}
+
+// Main function to compute stage classification for a loop.
+static FailureOr<StageClassification>
+computeStageClassification(scf::ForOp forOp) {
+  LDBG() << "\n=== Computing Stage Classification for Loop ===";
+
+  // Check for nested loops
+  if (!forOp.getOps<scf::ForOp>().empty()) {
+    LDBG() << "Nested loops not supported";
+    return failure();
+  }
+
+  // Check loop has sufficient iterations
+  if (failed(checkLoopIterations(forOp))) {
+    return failure();
+  }
+
+  // Step 1: Identify root operations (with inline validation)
+  SmallVector<Operation *> readRoots, writeRoots, computeRoots;
+  if (failed(
+          identifyRootOperations(forOp, readRoots, writeRoots, computeRoots))) {
+    return failure();
+  }
+
+  // Step 2: Compute backward slices
+  LDBG() << "\n=== Step 2: Computing Backward Slices ===";
+  SetVector<Operation *> readSlice, writeSlice, computeSlice;
+
+  if (failed(computeBackwardSlice(readRoots, forOp, readSlice))) {
+    return failure();
+  }
+  LDBG() << "  Read slice: " << readSlice.size() << " operations";
+
+  if (failed(computeBackwardSlice(writeRoots, forOp, writeSlice))) {
+    return failure();
+  }
+  LDBG() << "  Write slice: " << writeSlice.size() << " operations";
+
+  if (failed(computeBackwardSlice(computeRoots, forOp, computeSlice))) {
+    return failure();
+  }
+  LDBG() << "  Compute slice: " << computeSlice.size() << " operations";
+
+  // Step 3: Classify operations into stages
+  StageClassification result;
+  if (failed(classifyOperationsIntoStages(forOp, readSlice, writeSlice,
+                                          computeSlice, result))) {
+    return failure();
+  }
+
+  return result;
+}
+
+// Removes all barrier operations from the loop body.
+// Original barriers are designed for the unpipelined loop structure and will
+// be replaced with barriers appropriate for the pipelined structure.
+static void removeBarriers(scf::ForOp forOp) {
+  SmallVector<Operation *> toErase;
+  // Only remove barriers from the direct loop body, not from nested regions.
+  // Nested loops might not be pipelined and should keep their barriers.
+  for (Operation &op : forOp.getBody()->without_terminator()) {
+    if (isa<gpu::BarrierOp>(op)) {
+      toErase.push_back(&op);
+    }
+  }
+  for (Operation *op : toErase) {
+    op->erase();
+  }
+}
+
+// Populates the opToStage map by assigning stages to operations based on
+// stage classification and number of stages.
+static void
+populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
+                     unsigned numStages,
+                     llvm::DenseMap<Operation *, unsigned> &opToStage) {
+  auto assignOp = [&](Operation *op, unsigned stage) {
+    if (!op || isa<scf::YieldOp>(op))
+      return;
+    opToStage[op] = stage;
+  };
+
+  if (numStages == 2) {
+    // Two-stage pipelining: read+write in stage 0, compute in stage 1.
+    for (Operation *op : stages.readStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : stages.writeStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : stages.computeStage)
+      assignOp(op, /*stage=*/1);
+  } else {
+    // Three-stage pipelining: read in stage 0, write in stage 1, compute in
+    // stage 2.
+    for (Operation *op : stages.readStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : stages.writeStage)
+      assignOp(op, /*stage=*/1);
+    for (Operation *op : stages.computeStage)
+      assignOp(op, /*stage=*/2);
+  }
+}
+
+// Populates cluster IDs for each operation based on stage groupings.
+// Cluster ordering determines execution order within each iteration:
+// - 2-stage pipeline: read -> compute -> write
+//   (read i+1, compute i, write i+1)
+// - 3-stage pipeline: compute -> write -> read
+//   (compute i, write i+1, read i+2)
+static void
+populateOpToClusterMap(const StageClassification &stages, unsigned numStages,
+                       llvm::DenseMap<Operation *, unsigned> &opToCluster) {
+  unsigned clusterID = 0;
+
+  if (numStages == 2) {
+    // 2-stage pipeline: read first, then compute, then write
+    // This allows reading for next iteration while computing current
+    for (Operation *op : stages.readStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.computeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.writeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+  } else {
+    // 3-stage pipeline: compute first, then write, then read
+    // This maximizes distance between read and use
+    for (Operation *op : stages.computeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.writeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.readStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+  }
+
+  LDBG() << "Built opToCluster map with " << clusterID << " clusters "
+         << "(numStages=" << numStages << ")";
+}
+
+// Builds the final schedule using opToCluster and opToStage mappings.
+// Sorts operations by cluster ID, maintaining original order within each
+// cluster.
+static void buildFinalSchedule(
+    const StageClassification &stages,
+    const llvm::DenseMap<Operation *, unsigned> &opToStage,
+    const llvm::DenseMap<Operation *, unsigned> &opToCluster,
+    std::vector<std::pair<Operation *, unsigned>> &finalSchedule) {
+
+  // Collect all operations from all stages with their cluster IDs
+  SmallVector<Operation *> allOps;
+  allOps.append(stages.readStage.begin(), stages.readStage.end());
+  allOps.append(stages.computeStage.begin(), stages.computeStage.end());
+  allOps.append(stages.writeStage.begin(), stages.writeStage.end());
+
+  // Sort by cluster ID, maintaining original order within each cluster
+  llvm::stable_sort(allOps, [&](Operation *a, Operation *b) {
+    unsigned clusterA = opToCluster.lookup(a);
+    unsigned clusterB = opToCluster.lookup(b);
+    return clusterA < clusterB;
+  });
+
+  // Build the final schedule from the sorted operations
+  for (Operation *op : allOps) {
+    if (opToStage.count(op)) {
+      unsigned stage = opToStage.lookup(op);
+      finalSchedule.push_back({op, stage});
+    }
+  }
+
+  LDBG() << "Built final schedule with " << finalSchedule.size()
+         << " operations";
+}
+
+// Builds the PipeliningOption with getScheduleFn.
+static scf::PipeliningOption buildPipeliningOption(
+    const std::vector<std::pair<Operation *, unsigned>> &finalSchedule) {
+  scf::PipeliningOption options;
+  options.getScheduleFn =
+      [finalSchedule](scf::ForOp loop,
+                      std::vector<std::pair<Operation *, unsigned>> &outSched) {
+        outSched = finalSchedule;
+      };
+
+  options.peelEpilogue = true;
+  // TODO: Enable dynamic trip count support. We'll want to run in-range
+  // analysis to restrict to cases where we know K is large enough to benefit
+  // from pipelining.
+  options.supportDynamicLoops = false;
+  options.predicateFn = nullptr;
+
+  return options;
+}
+
+// Invokes the pipelineForLoop transformation.
+static FailureOr<scf::ForOp>
+invokePipelineForLoop(scf::ForOp forOp, const scf::PipeliningOption &options) {
+  IRRewriter irRewriter(forOp);
+  bool modifiedIR = false;
+  FailureOr<scf::ForOp> newForOpOrFail =
+      scf::pipelineForLoop(irRewriter, forOp, options, &modifiedIR);
+
+  if (failed(newForOpOrFail)) {
+    return failure();
+  }
+
+  return *newForOpOrFail;
+}
+
+// Helper to check for shared memory.
+static bool hasSharedMemory(Value val) {
+  auto memrefType = dyn_cast<MemRefType>(val.getType());
+  if (!memrefType)
+    return false;
+  auto addrSpace =
+      dyn_cast_if_present<gpu::AddressSpaceAttr>(memrefType.getMemorySpace());
+  return addrSpace && addrSpace.getValue() == gpu::AddressSpace::Workgroup;
+}
+
+// Helper to check if operation or its nested ops have shared memory reads.
+static bool hasNestedSharedRead(Operation *op) {
+  bool found = false;
+  op->walk([&](vector::TransferReadOp readOp) {
+    if (hasSharedMemory(readOp.getBase())) {
+      found = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return found;
+}
+
+// Helper to check if operation or its nested ops have shared memory writes.
+static bool hasNestedSharedWrite(Operation *op) {
+  bool found = false;
+  op->walk([&](vector::TransferWriteOp writeOp) {
+    if (hasSharedMemory(writeOp.getBase())) {
+      found = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return found;
+}
+
+struct SharedBarrierState {
+  bool needBarrierBeforeWrite = false;
+  bool needBarrierBeforeRead = false;
+};
+
+// Inserts synchronization barriers before shared memory accesses in the given
+// range using a running `SharedBarrierState`. Conceptually, we track whether
+// the next shared read (or write) must be preceded by a barrier, and only emit
+// one when that flag is set. For example, if the iteration sequence observes a
+// shared read (R) followed by another read, nothing is inserted; the state only
+// toggles `needBarrierBeforeWrite`, so the next shared write (W) will emit a
+// barrier before it. Conversely, seeing a write first toggles
+// `needBarrierBeforeRead`, so the following read receives the barrier. This
+// keeps the minimum number of synchronizations while still enforcing the R↔W
+// ordering required by the pipelined schedule.
+static SharedBarrierState insertBarriersInRange(RewriterBase &rewriter,
+                                                Location loc,
+                                                Block::iterator begin,
+                                                Block::iterator end,
+                                                SharedBarrierState state) {
+  for (auto it = begin; it != end; ++it) {
+    Operation &op = *it;
+    bool hasSharedRead = hasNestedSharedRead(&op);
+    bool hasSharedWrite = hasNestedSharedWrite(&op);
+
+    if (hasSharedRead && state.needBarrierBeforeRead) {
+      rewriter.setInsertionPoint(&op);
+      gpu::BarrierOp::create(rewriter, loc);
+      state.needBarrierBeforeRead = false;
+    }
+
+    if (hasSharedWrite && state.needBarrierBeforeWrite) {
+      rewriter.setInsertionPoint(&op);
+      gpu::BarrierOp::create(rewriter, loc);
+      amdgpu::SchedBarrierOp::create(
+          rewriter, loc,
+          amdgpu::sched_barrier_opt_enumAttr::get(
+              rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
+      state.needBarrierBeforeWrite = false;
+    }
+
+    if (hasSharedRead)
+      state.needBarrierBeforeWrite = true;
+    if (hasSharedWrite)
+      state.needBarrierBeforeRead = true;
+  }
+
+  return state;
+}
+
+// Inserts synchronization barriers in the pipelined loop.
+static void insertPipelineBarriers(RewriterBase &rewriter,
+                                   scf::ForOp newForOp) {
+  Block *parentBlock = newForOp->getBlock();
+  Location loc = newForOp.getLoc();
+  SharedBarrierState state;
+
+  // Prologue (operations before the loop).
+  state.needBarrierBeforeWrite = true;
+  state = insertBarriersInRange(rewriter, loc, parentBlock->begin(),
+                                newForOp->getIterator(), state);
+
+  // Loop body (exclude terminator).
+  Block *body = newForOp.getBody();
+  state = insertBarriersInRange(rewriter, loc, body->begin(),
+                                std::prev(body->end()), state);
+
+  // Epilogue (operations after the loop).
+  Block::iterator epilogueStart = std::next(newForOp->getIterator());
+  insertBarriersInRange(rewriter, loc, epilogueStart, parentBlock->end(),
+                        state);
+}
+
+// Dumps the planned schedule before pipelining for debugging purposes.
+static void
+dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
+             const llvm::DenseMap<Operation *, unsigned> &opToCluster) {
+  LDBG() << "\n=== Planned Pipeline Schedule (before pipelining) ===";
+  LDBG() << "Total operations in schedule: " << finalSchedule.size();
+
+  for (size_t i = 0; i < finalSchedule.size(); ++i) {
+    Operation *op = finalSchedule[i].first;
+    unsigned stage = finalSchedule[i].second;
+    unsigned cluster = opToCluster.lookup(op);
+
+    LDBG() << "  [" << i << "] cluster=" << cluster << " stage=" << stage
+           << " op: " << *op;
+  }
+
+  LDBG() << "=== End Planned Schedule ===\n";
+}
+
+FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
+                                               scf::ForOp forOp,
+                                               unsigned numStages) {
+  // No prefetching needed for single-stage pipelining.
+  if (numStages <= 1) {
+    return forOp;
+  }
+
+  // For global->shared->register data flow, we have 3 operation groups (read,
+  // write, compute), so 3 stages is the maximum meaningful pipeline depth.
+  if (numStages > 3) {
+    LDBG() << "numStages=" << numStages
+           << " requested but capping to 3 (maximum for read, write, compute)";
+    numStages = 3;
+  }
+
+  // Compute stage classification using the new refactored approach
+  auto stagesOr = computeStageClassification(forOp);
+  if (failed(stagesOr)) {
+    return failure();
+  }
+  const StageClassification &stages = *stagesOr;
+
+  // For multi-stage pipelining, remove original barriers as they're designed
+  // for unpipelined structure. New barriers will be inserted appropriately.
+  removeBarriers(forOp);
+
+  llvm::DenseMap<Operation *, unsigned> opToStage;
+  populateOpToStageMap(stages, forOp, numStages, opToStage);
+
+  // Step 1: Populate standalone opToCluster map
+  llvm::DenseMap<Operation *, unsigned> opToCluster;
+  populateOpToClusterMap(stages, numStages, opToCluster);
+
+  // Step 2: Use opToCluster + opToStage to build the final schedule
+  std::vector<std::pair<Operation *, unsigned>> finalSchedule;
+  finalSchedule.reserve(opToStage.size());
+  buildFinalSchedule(stages, opToStage, opToCluster, finalSchedule);
+
+  if (finalSchedule.empty()) {
+    return failure();
+  }
+
+  // Dump the planned schedule before pipelining (while ops are still valid)
+  LLVM_DEBUG(dumpSchedule(finalSchedule, opToCluster));
+
+  scf::PipeliningOption options = buildPipeliningOption(finalSchedule);
+
+  FailureOr<scf::ForOp> newForOpOr = invokePipelineForLoop(forOp, options);
+  if (failed(newForOpOr)) {
+    return failure();
+  }
+
+  scf::ForOp newForOp = *newForOpOr;
+
+  // Insert barriers in the pipelined loop
+  insertPipelineBarriers(rewriter, newForOp);
+
+  return newForOp;
+}
 } // namespace mlir::iree_compiler

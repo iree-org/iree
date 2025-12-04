@@ -39,7 +39,7 @@ public:
         rewriter, op.getLoc(), rewriter.getI1Type(), rewriter.getI64Type(),
         adaptor.getDevice(), op.getCategoryAttr(), op.getKeyAttr(),
         TypedAttr{});
-    auto ok = llvm::cast<Value>(queryOp.getOk());
+    auto ok = cast<Value>(queryOp.getOk());
     auto value = queryOp.getValue();
 
     // Truncate or extend based on the target type.

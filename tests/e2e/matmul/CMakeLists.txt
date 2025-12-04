@@ -1815,7 +1815,7 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--shapes=custom_mnk"
-    "--mnk=1024,1024,1024"
+    "--mnk=1024,32832,1024"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1989,6 +1989,37 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     --iree-dispatch-creation-data-tiling=true
     --iree-hip-encoding-layout-resolver=data-tiling
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna4"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna4_mxfp4_llama
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f4E2M1FN"
+    "--acc_type=f32"
+    "--mx_scale_type=f8E8M0FNU"
+    "--mx_block_size=32"
+    "--shapes=custom_mnk"
+    "--mnk=10000,16384,16384"
+    "--transpose_rhs"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
   LABELS
     "noasan"
     "nomsan"

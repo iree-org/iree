@@ -9,7 +9,6 @@ hal.executable private @matmul  {
 builtin.module {
 // CHECK-LABEL: func.func @matmul
 func.func @matmul() {
-  %c8 = arith.constant 8 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant dense<0.000000e+00> : vector<16x16xf32>
   %c16 = arith.constant 16 : index
@@ -81,7 +80,6 @@ hal.executable private @gathered_matmul  {
 builtin.module {
 // CHECK-LABEL: func.func @gathered_matmul
 func.func @gathered_matmul() {
-  %c8 = arith.constant 8 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant dense<0.000000e+00> : vector<16x16xf32>
   %cst_mask = arith.constant dense<true> : vector<4x4xi1>

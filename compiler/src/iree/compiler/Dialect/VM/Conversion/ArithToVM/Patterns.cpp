@@ -36,8 +36,8 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
       return srcOp.emitError() << "could not convert type: " << srcOp.getType()
                                << " (check -iree-vm-target-* options)";
     }
-    if (llvm::isa<IntegerType>(targetType)) {
-      auto integerAttr = llvm::dyn_cast<IntegerAttr>(srcOp.getValue());
+    if (isa<IntegerType>(targetType)) {
+      auto integerAttr = dyn_cast<IntegerAttr>(srcOp.getValue());
       if (!integerAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -64,8 +64,8 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
         return srcOp.emitRemark()
                << "unsupported const integer bit width for dialect";
       }
-    } else if (llvm::isa<FloatType>(targetType)) {
-      auto floatAttr = llvm::dyn_cast<FloatAttr>(srcOp.getValue());
+    } else if (isa<FloatType>(targetType)) {
+      auto floatAttr = dyn_cast<FloatAttr>(srcOp.getValue());
       if (!floatAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -621,8 +621,8 @@ struct ExtendFOpConversion : public OpConversionPattern<arith::ExtFOp> {
   LogicalResult
   matchAndRewrite(arith::ExtFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto srcType = dyn_cast_or_null<FloatType>(srcOp.getIn().getType());
-    auto resultType = dyn_cast_or_null<FloatType>(srcOp.getType());
+    auto srcType = dyn_cast_if_present<FloatType>(srcOp.getIn().getType());
+    auto resultType = dyn_cast_if_present<FloatType>(srcOp.getType());
     if (!srcType || !resultType)
       return failure();
     auto dstType = getTypeConverter()->convertType(resultType);
@@ -835,7 +835,7 @@ struct SelectOpConversion : public OpConversionPattern<arith::SelectOp> {
           srcOp, valueType, adaptor.getCondition(), adaptor.getTrueValue(),
           adaptor.getFalseValue());
       return success();
-    } else if (llvm::isa<IREE::VM::RefType>(valueType)) {
+    } else if (isa<IREE::VM::RefType>(valueType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::SelectRefOp>(
           srcOp, valueType, adaptor.getCondition(), adaptor.getTrueValue(),
           adaptor.getFalseValue());

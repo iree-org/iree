@@ -11,13 +11,11 @@ include "iree/compiler/Dialect/Encoding/IR/EncodingBase.td"
 include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/IR/TensorEncoding.td"
 
 //===---------------------------------------------------------------------===//
 // Data layout encoding attributes
 //===---------------------------------------------------------------------===//
-
-class IREEEncoding_Attr<string name, list<Trait> traits = []>
-  : AttrDef<IREEEncoding_Dialect, name, traits>;
 
 class IREEEncoding_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
     : I32EnumAttr<name, summary, cases> {
@@ -44,11 +42,11 @@ def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
 //===---------------------------------------------------------------------===//
-// iree_encoding.packed_storage
+// iree_encoding.layout
 //===---------------------------------------------------------------------===//
 
 def LayoutAttr :
-    IREEEncoding_Attr<"Layout", [
+    IREEEncoding_AttrDef<"Layout", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "isIdentityLayout",
@@ -85,12 +83,22 @@ def LayoutAttr :
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
 
-def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
+def PackedStorageAttr :
+    IREEEncoding_AttrDef<"PackedStorage", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+          "isSerialized",
+          "calculateStorageSizeInBytes",
+          "isCompatibleWith",
+      ]>,
+      DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
+    ]> {
   let mnemonic = "packed_storage";
   let summary = [{Indicates packed storage data type.}];
   let description = [{
     This attribute indicates this is a back-to-back packed storage in memory.
     This attribute takes no arguments.
+    The element type of the encoded tensors must be sub-byte (i.e., <8 bits)
+    types with power-of-two bitwidth.
   }];
   let genVerifyDecl = 0;
 }
@@ -100,7 +108,7 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
 //===---------------------------------------------------------------------===//
 
 def EncodingAttr :
-    IREEEncoding_Attr<"Encoding", [
+    IREEEncoding_AttrDef<"Encoding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
@@ -190,7 +198,7 @@ def EncodingAttr :
 // iree_encoding.padding
 //===---------------------------------------------------------------------===//
 
-def PaddingAttr : IREEEncoding_Attr<"Padding", [
+def PaddingAttr : IREEEncoding_AttrDef<"Padding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "calculateStorageSizeInBytes",
         "cloneWithLayouts",
@@ -242,7 +250,7 @@ def PaddingAttr : IREEEncoding_Attr<"Padding", [
 // iree_encoding.identity
 //===---------------------------------------------------------------------===//
 
-def IdentityAttr : IREEEncoding_Attr<"Identity", [
+def IdentityAttr : IREEEncoding_AttrDef<"Identity", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "calculateStorageSizeInBytes",
         "isIdentityLayout",
@@ -265,7 +273,7 @@ def IdentityAttr : IREEEncoding_Attr<"Identity", [
 //===---------------------------------------------------------------------===//
 
 def IdentityResolverAttr :
-    IREEEncoding_Attr<"IdentityResolver", [
+    IREEEncoding_AttrDef<"IdentityResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
@@ -291,7 +299,7 @@ def IdentityResolverAttr :
 //===---------------------------------------------------------------------===//
 
 def UnsupportedResolverAttr :
-    IREEEncoding_Attr<"UnsupportedResolver", [
+    IREEEncoding_AttrDef<"UnsupportedResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
@@ -313,7 +321,7 @@ def UnsupportedResolverAttr :
 //===---------------------------------------------------------------------===//
 
 def TestingAttr :
-    IREEEncoding_Attr<"Testing", [
+    IREEEncoding_AttrDef<"Testing", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
@@ -336,7 +344,7 @@ def TestingAttr :
   let genVerifyDecl = 0;
 }
 
-def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
+def UnknownAttr : IREEEncoding_AttrDef<"Unknown"> {
   let mnemonic = "unknown";
   let summary = [{A pure encoding attribute for testing purpose.}];
 
@@ -348,7 +356,7 @@ def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
 }
 
 def SpecializationResolverAttr :
-    IREEEncoding_Attr<"SpecializationResolver", [
+    IREEEncoding_AttrDef<"SpecializationResolver", [
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
@@ -376,7 +384,7 @@ def SpecializationResolverAttr :
 }
 
 def SpecializedAttr :
-    IREEEncoding_Attr<"Specialized", [
+    IREEEncoding_AttrDef<"Specialized", [
       IREEEncoding_SerializableAttr
     ]> {
   let mnemonic = "specialized";

@@ -58,14 +58,11 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:     %[[WG_TARGET:.+]] = memref.subview %[[ARG2]]
 //       CHECK:     %[[TID_X:.+]] = gpu.thread_id x
 //       CHECK:     %[[DIM_X:.+]] = gpu.block_dim x
-//       CHECK:     %[[TID_Y:.+]] = gpu.thread_id y
-//       CHECK:     %[[DIM_Y:.+]] = gpu.block_dim y
-//       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
-//       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
-//       CHECK:         %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][%[[IV_Y]], %[[IV_X]]] [1, 1] [1, 1]
-//       CHECK:         %[[T_INDEX:.+]] = memref.subview %[[WG_INDEX]][%[[IV_Y]], 0] [1, 1] [1, 1]
-//       CHECK:         %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV_X]]] [100, 1] [1, 1]
-//       CHECK:         iree_linalg_ext.scatter
-//  CHECK-SAME:           unique_indices(true)
-//  CHECK-SAME:           ins(%[[T_UPDATE]], %[[T_INDEX]]
-//  CHECK-SAME:           outs(%[[T_TARGET]]
+//       CHECK:     scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
+//       CHECK:       %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][0, %[[IV_X]]] [1, 1] [1, 1]
+//       CHECK:       %[[T_INDEX:.+]] = memref.cast %[[WG_INDEX]]
+//       CHECK:       %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV_X]]] [100, 1] [1, 1]
+//       CHECK:       iree_linalg_ext.scatter
+//  CHECK-SAME:         unique_indices(true)
+//  CHECK-SAME:         ins(%[[T_UPDATE]], %[[T_INDEX]]
+//  CHECK-SAME:         outs(%[[T_TARGET]]

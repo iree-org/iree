@@ -28,7 +28,7 @@ int getNextPotBitWidth(int bitWidth, int minBitWidth = 8) {
 }
 
 Type withNewElementType(Type originalType, Type elementType) {
-  if (auto st = llvm::dyn_cast<ShapedType>(originalType)) {
+  if (auto st = dyn_cast<ShapedType>(originalType)) {
     return st.clone(elementType);
   } else {
     return elementType;
@@ -47,15 +47,14 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
   Type origElementType = getElementTypeOrSelf(origValue.getType());
   Type toElementType = getElementTypeOrSelf(toType);
 
-  if (llvm::isa<FloatType>(origElementType) &&
-      llvm::isa<IntegerType>(toElementType)) {
+  if (isa<FloatType>(origElementType) && isa<IntegerType>(toElementType)) {
     if (isSigned) {
       return arith::FPToSIOp::create(builder, loc, toType, origValue);
     } else {
       return arith::FPToUIOp::create(builder, loc, toType, origValue);
     }
-  } else if (llvm::isa<IntegerType>(origElementType) &&
-             llvm::isa<FloatType>(toElementType)) {
+  } else if (isa<IntegerType>(origElementType) &&
+             isa<FloatType>(toElementType)) {
     if (isSigned) {
       return arith::SIToFPOp::create(builder, loc, toType, origValue);
     } else {
@@ -73,7 +72,7 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
 struct NarrowParams {
   static std::optional<NarrowParams> forValue(Value value) {
     if (auto narrowOp =
-            llvm::dyn_cast_or_null<IREE::Util::NumericOptionalNarrowOp>(
+            dyn_cast_if_present<IREE::Util::NumericOptionalNarrowOp>(
                 value.getDefiningOp())) {
       NarrowParams params;
       params.producer = narrowOp.getOperand();
@@ -86,19 +85,13 @@ struct NarrowParams {
     return {};
   }
 
-  bool isFromFloat() {
-    return llvm::isa<FloatType>(getElementTypeOrSelf(fromType));
-  }
+  bool isFromFloat() { return isa<FloatType>(getElementTypeOrSelf(fromType)); }
 
-  bool isToInteger() { return llvm::isa<IntegerType>(toElementType); }
+  bool isToInteger() { return isa<IntegerType>(toElementType); }
 
-  bool isToSigned() {
-    return llvm::cast<IntegerType>(toElementType).isSigned();
-  }
+  bool isToSigned() { return cast<IntegerType>(toElementType).isSigned(); }
 
-  int getToBitWidth() {
-    return llvm::cast<IntegerType>(toElementType).getWidth();
-  }
+  int getToBitWidth() { return cast<IntegerType>(toElementType).getWidth(); }
 
   Value producer;
   Type fromType;

@@ -13,11 +13,14 @@ func.func @distribute_thread_forall(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall
+//   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1024:.+]] = arith.constant 1024 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
 //       CHECK:   gpu.barrier
-//       CHECK:   scf.for %[[I:.+]] = %c0 to %c1024 step %c128 {
+//       CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[C1024]] step %[[C128]] {
 //       CHECK:     %[[LINID:.+]] = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%[[I]])[%[[TFLAT]]]
 //       CHECK:     memref.store {{.*}}[%[[LINID]]]
 //       CHECK:   gpu.barrier
@@ -36,12 +39,15 @@ func.func @distribute_warp_forall(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_warp_forall
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
 //       CHECK:   %[[WARPSPLIT:.+]]:2 = affine.delinearize_index %[[TFLAT]] into (4, 32)
 //       CHECK:   gpu.barrier
-//       CHECK:   scf.for %[[I:.+]] = %c0 to %c32 step %c4 {
+//       CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C4]] {
 //       CHECK:     %[[LINID:.+]] = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%[[I]])[%[[WARPSPLIT]]#0]
 //       CHECK:     memref.store {{.*}}[%[[LINID]]]
 //       CHECK:   gpu.barrier
@@ -98,12 +104,13 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall_single_thread
+//   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
 //       CHECK:   gpu.barrier
-//       CHECK:   scf.for %[[I:.+]] = %[[TFLAT]] to %c1 step %c128 {
+//       CHECK:   scf.for %[[I:.+]] = %[[TFLAT]] to %[[C1]] step %[[C128]] {
 //       CHECK:     memref.store {{.*}}[%[[I]]]
 //       CHECK:   gpu.barrier
 
@@ -121,12 +128,13 @@ func.func @distribute_thread_forall_overhang(%out : memref<?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall_overhang
+//   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
 //   CHECK-DAG:   %[[C513:.+]] = arith.constant 513 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
 //       CHECK:   gpu.barrier
-//       CHECK:   scf.for %[[I:.+]] = %[[TFLAT]] to %[[C513]] step %c128 {
+//       CHECK:   scf.for %[[I:.+]] = %[[TFLAT]] to %[[C513]] step %[[C128]] {
 //       CHECK:     memref.store {{.*}}[%[[I]]]
 //       CHECK:   gpu.barrier
 
@@ -144,11 +152,14 @@ func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
 }
 
 // CHECK-LABEL: func @distribute_thread_forall_multi_dim
+//   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
+//   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[TX:.+]] = gpu.thread_id x
 //   CHECK-DAG:   %[[TY:.+]] = gpu.thread_id y
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [%[[TY]], %[[TX]]] by (2, 64)
 //       CHECK:   gpu.barrier
-//       CHECK:   scf.for %[[I:.+]] = %c0 to %c512 step %c128 {
+//       CHECK:   scf.for %[[I:.+]] = %[[C0]] to %[[C512]] step %[[C128]] {
 //       CHECK:     %[[LINID:.+]] = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%[[I]])[%[[TFLAT]]]
 //       CHECK:     %[[DELIN:.+]]:3 = affine.delinearize_index %[[LINID]] into (16, 8, 4) : index
 //       CHECK:     memref.store {{.*}}[%[[DELIN]]#0, %[[DELIN]]#1, %[[DELIN]]#2]

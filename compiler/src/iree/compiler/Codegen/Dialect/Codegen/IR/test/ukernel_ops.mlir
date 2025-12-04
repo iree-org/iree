@@ -63,7 +63,7 @@ func.func @ukernel_generic_optional_input(
   return %0#0, %0#1 : tensor<?xf32>, tensor<?x?xf32>
 }
 //      CHECK: func @ukernel_generic_optional_input(
-//      CHECK:   %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic
+//      CHECK:   %{{.+}}:2 = iree_codegen.ukernel.generic
 //  CHECK-NOT:       ins
 
 // -----
@@ -92,7 +92,7 @@ func.func @ukernel_generic_optional_other_operands(
   return %0#0, %0#1 : tensor<?xf32>, tensor<?x?xf32>
 }
 //      CHECK: func @ukernel_generic_optional_other_operands(
-//      CHECK:   %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic
+//      CHECK:   %{{.+}}:2 = iree_codegen.ukernel.generic
 // CHECK-SAME:       outs(%{{.+}}, %{{.+}} : tensor<?xf32>, tensor<?x?xf32>) ->
 
 // -----

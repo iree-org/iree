@@ -34,7 +34,7 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
   }
 }
 //         CHECK-ALL:   hal.executable.export
-//    CHECK-ALL-SAME:       %[[ARG0:[a-zA-Z0-9]+]]: !hal.device
+//    CHECK-ALL-SAME:       {{.+}}: !hal.device
 //    CHECK-ALL-SAME:       %[[ARG1:[a-zA-Z0-9]+]]: index
 //    CHECK-ALL-SAME:       %[[ARG2:[a-zA-Z0-9]+]]: index
 //    CHECK-ALL-SAME:       %[[ARG3:[a-zA-Z0-9]+]]: index
@@ -93,7 +93,7 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
 //   DISTRIBUTEZ-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%[[IDX]], %[[ARG5]], %[[ARG1]]]
 //       DISTRIBUTEZ:     "use"(%[[IV0]], %[[IV1]])
 
-// // -----
+// -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
@@ -266,7 +266,7 @@ hal.executable private @split_reduction_executable {
 
 // Check for case where the max workgroup count is specified.
 
-#pipeline_layout = #hal.pipeline.layout<constants = 12, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @bounded_scf_forall_4D {
   hal.executable.variant public @bounded_scf_forall_4D target(#hal.executable.target<"", "", {

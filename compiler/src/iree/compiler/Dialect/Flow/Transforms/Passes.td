@@ -255,6 +255,30 @@ def OutlineDispatchRegionsPass :
   ];
 }
 
+def ReplicateGlobalsPerAffinityPass :
+    Pass<"iree-flow-replicate-globals-per-affinity", "mlir::ModuleOp"> {
+  let summary = "Replicates globals for each unique affinity and rewires their uses.";
+  let description = [{
+    Replicates IREE::Util::GlobalOps that are used on multiple affinities
+    and rewires their uses to the associated global. This allows for
+    specialization of globals for each affinity instead of having unspecialized
+    and a copy each use.
+  }];
+  let dependentDialects = [
+    "IREE::Flow::FlowDialect",
+    "IREE::Util::UtilDialect",
+  ];
+
+  let options = [
+    Option<
+      "useTransfers", "use-transfers",
+      "bool",
+      /*default=*/"false",
+      "Use transfers instead of replicating globals"
+    >,
+  ];
+}
+
 def TopLevelSCFToCFGPass :
     InterfacePass<"iree-top-level-scf-to-cfg", "mlir::FunctionOpInterface"> {
   let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";

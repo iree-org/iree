@@ -22,15 +22,16 @@
 .DS_Store
 
 # CMake artifacts
-build/
-build-*/
+/build/
+/build-*/
 Testing/
-# Include iree.build package
-!compiler/bindings/python/iree/compiler/build/
+/compiler/build/
+/runtime/build/
+/integrations/tensorflow/python_projects/iree_tf/build/
+/integrations/tensorflow/python_projects/iree_tflite/build/
 
 # Bazel artifacts
 **/bazel-*
-MODULE.bazel
 MODULE.bazel.lock
 
 # Executables

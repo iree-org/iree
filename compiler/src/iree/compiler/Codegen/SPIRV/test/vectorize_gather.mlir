@@ -57,4 +57,4 @@ func.func @vector_gather(%arg0: memref<16x1082x1922xi8>, %index_vec: vector<16xi
 // CHECK:       %[[VEC:.+]] = vector.from_elements %[[EXTRACT0]], %[[EXTRACT1]], %[[EXTRACT2]], %[[EXTRACT3]] : vector<4xi8>
 
 // CHECK:       vector.insert_strided_slice %[[VEC]], %[[INIT]] {offsets = [0], strides = [1]} : vector<4xi8> into vector<16xi8>
-// CHECK-12:    vector.load %[[ARG0]][%[[C0]], %[[C0]], %{{.*}}] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK-COUNT-12: vector.load %[[ARG0]][%[[C0]], %[[C0]], %{{.*}}] : memref<16x1082x1922xi8>, vector<1xi8>

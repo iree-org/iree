@@ -30,8 +30,7 @@ namespace {
 template <bool UseIndirectBindings>
 std::optional<spirv::StorageClass>
 mapHALDescriptorTypeForVulkan(Attribute attr) {
-  if (auto dtAttr =
-          llvm::dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(attr)) {
+  if (auto dtAttr = dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(attr)) {
     switch (dtAttr.getValue()) {
     case IREE::HAL::DescriptorType::UniformBuffer:
       return spirv::StorageClass::Uniform;
@@ -42,7 +41,7 @@ mapHALDescriptorTypeForVulkan(Attribute attr) {
       return std::nullopt;
     }
   }
-  if (auto gpuAttr = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(attr)) {
+  if (auto gpuAttr = dyn_cast_if_present<gpu::AddressSpaceAttr>(attr)) {
     switch (gpuAttr.getValue()) {
     case gpu::AddressSpace::Workgroup:
       return spirv::StorageClass::Workgroup;
@@ -55,8 +54,7 @@ mapHALDescriptorTypeForVulkan(Attribute attr) {
 
 std::optional<spirv::StorageClass>
 mapHALDescriptorTypeForOpenCL(Attribute attr) {
-  if (auto dtAttr =
-          llvm::dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(attr)) {
+  if (auto dtAttr = dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(attr)) {
     switch (dtAttr.getValue()) {
     case IREE::HAL::DescriptorType::UniformBuffer:
       return spirv::StorageClass::Uniform;
@@ -64,7 +62,7 @@ mapHALDescriptorTypeForOpenCL(Attribute attr) {
       return spirv::StorageClass::CrossWorkgroup;
     }
   }
-  if (auto gpuAttr = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(attr)) {
+  if (auto gpuAttr = dyn_cast_if_present<gpu::AddressSpaceAttr>(attr)) {
     switch (gpuAttr.getValue()) {
     case gpu::AddressSpace::Workgroup:
       return spirv::StorageClass::Workgroup;

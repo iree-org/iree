@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -133,11 +134,11 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     Value outputVal = output->get();
 
     ArrayRef<int64_t> inputShape =
-        llvm::cast<ShapedType>(inputVal.getType()).getShape();
+        cast<ShapedType>(inputVal.getType()).getShape();
     ArrayRef<int64_t> filterShape =
-        llvm::cast<ShapedType>(filterVal.getType()).getShape();
+        cast<ShapedType>(filterVal.getType()).getShape();
     ArrayRef<int64_t> outputShape =
-        llvm::cast<ShapedType>(outputVal.getType()).getShape();
+        cast<ShapedType>(outputVal.getType()).getShape();
 
     // TODO(vivian): Once the matmul shape check below is dropped, the
     // dynamic-shape check can also be removed.
@@ -215,12 +216,17 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     AffineMap transposedFilterMap = applyPermutationToResults(filterMap, perm);
     Value transposedFilter = createTransposeOp(rewriter, loc, filterVal, perm);
 
+    // Insert compute_barrier.start to avoid propagation of reshape ops and
+    // undesirable fusion.
+    auto barrierStartOp = IREE::TensorExt::ComputeBarrierStartOp::create(
+        rewriter, loc, transposedFilter);
+
     SmallVector<utils::IteratorType> iterators =
         linalgOp.getIteratorTypesArray();
 
     auto genericOp = linalg::GenericOp::create(
         rewriter, loc, outputVal.getType(),
-        ValueRange{inputVal, transposedFilter}, outputVal,
+        ValueRange{inputVal, barrierStartOp.getResult()}, outputVal,
         ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
         iterators);
 

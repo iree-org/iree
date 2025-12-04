@@ -22,7 +22,7 @@ func.func @hal_storage_buffer() {
 
 // -----
 
-// CHECK: func.func @default_address_space()
+// CHECK-LABEL: func.func @default_address_space()
 func.func @default_address_space() {
   // CHECK: %[[P:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32>
   // CHECK: "dialect.memref_consumer"(%[[P]]) : (memref<?x8xf32>) -> ()
@@ -33,7 +33,7 @@ func.func @default_address_space() {
 
 // -----
 
-// CHECK: func.func @shared_memory_address_space()
+// CHECK-LABEL: func.func @shared_memory_address_space()
 func.func @shared_memory_address_space() {
   // CHECK: %[[P:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32, 3>
   // CHECK: "dialect.memref_consumer"(%[[P]]) : (memref<?x8xf32, 3>) -> ()

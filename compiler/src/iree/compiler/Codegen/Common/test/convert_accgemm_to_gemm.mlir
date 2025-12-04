@@ -75,11 +75,6 @@ func.func @accumulate_scaled_gemm(
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
 
 func.func @accumulate_inner_tiled(%1 : tensor<?x?x4xf16>, %2 : tensor<?x?x4xf16>, %3 : memref<?x?x4xf32>) -> tensor<?x?x4xf32> {
   %4 = iree_codegen.load_from_buffer %3 : memref<?x?x4xf32> -> tensor<?x?x4xf32>
@@ -95,8 +90,13 @@ func.func @accumulate_inner_tiled(%1 : tensor<?x?x4xf16>, %2 : tensor<?x?x4xf16>
 }
 
 // CHECK-LABEL: func.func @accumulate_inner_tiled
-//       CHECK: %[[FILL:.+]] = linalg.fill
-//       CHECK: %[[GEMM:.+]] = iree_codegen.inner_tiled {{.*}} outs(%[[FILL]]
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[EMPTY:.+]] = tensor.empty
+//       CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : f32) outs(%[[EMPTY]] : tensor<?x?x4xf32>) -> tensor<?x?x4xf32>
+//       CHECK: %[[GEMM:.+]] = iree_codegen.inner_tiled {{.*}} outs(%[[FILL]])
+//       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[GEMM]]
+//  CHECK-SAME:   outs(%[[EMPTY]]
+//       CHECK: return %[[ADD]]
 
 // -----
 
@@ -128,7 +128,6 @@ func.func @acc_conv_nchw(%1 : tensor<1x64x58x58xf32>, %2 : tensor<64x64x3x3xf32>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
-
 
 func.func @nonacc_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>) {
   %c0_i32 = arith.constant 0 : i32

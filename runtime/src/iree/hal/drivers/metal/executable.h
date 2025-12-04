@@ -79,6 +79,14 @@ typedef struct iree_hal_metal_pipeline_t {
   IREE_TRACE(iree_hal_metal_source_location_t source_location;)
 } iree_hal_metal_pipeline_t;
 
+// Infers the format of the executable and calculates its total size.
+// If executable_data.data_length is 0 attempts to infer size from the data.
+// Returns the canonical format string and total size of the executable data.
+iree_status_t iree_hal_metal_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size);
+
 // Creates a Metal kernel library as an IREE executable. The Metal library may
 // contain several kernel functions that can be extracted along with the
 // associated block size.

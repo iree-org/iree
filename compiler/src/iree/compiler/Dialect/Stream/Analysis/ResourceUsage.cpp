@@ -52,17 +52,17 @@ static constexpr bool kFavorTransients = false;
 // Worst state: used for all kinds of things.
 template <typename ElementT>
 class AbstractResourceUsage
-    : public DFX::StateWrapper<DFX::BitIntegerState<uint16_t, 4095, 0>,
+    : public DFX::StateWrapper<DFX::BitIntegerState<uint16_t, 8191, 0>,
                                ElementT> {
 public:
   using BaseType =
-      DFX::StateWrapper<DFX::BitIntegerState<uint16_t, 4095, 0>, ElementT>;
+      DFX::StateWrapper<DFX::BitIntegerState<uint16_t, 8191, 0>, ElementT>;
 
   // Inverted bits matching ResourceUsageBitfield.
   enum {
     NOT_INDIRECT = 1u << 0,
     NOT_EXTERNAL = 1u << 1,
-    NOT_MUTATED = 1u << 2, // beyond definition
+    NOT_MUTATED = 1u << 2,
     NOT_CONSTANT = 1u << 3,
     NOT_TRANSFER_READ = 1u << 4,
     NOT_TRANSFER_WRITE = 1u << 5,
@@ -72,11 +72,12 @@ public:
     NOT_DISPATCH_WRITE = 1u << 9,
     NOT_GLOBAL_READ = 1u << 10,
     NOT_GLOBAL_WRITE = 1u << 11,
+    NOT_GLOBAL_STORAGE = 1u << 12,
 
     BEST_STATE = NOT_INDIRECT | NOT_EXTERNAL | NOT_MUTATED | NOT_CONSTANT |
                  NOT_TRANSFER_READ | NOT_TRANSFER_WRITE | NOT_STAGING_READ |
                  NOT_STAGING_WRITE | NOT_DISPATCH_READ | NOT_DISPATCH_WRITE |
-                 NOT_GLOBAL_READ | NOT_GLOBAL_WRITE,
+                 NOT_GLOBAL_READ | NOT_GLOBAL_WRITE | NOT_GLOBAL_STORAGE,
   };
   static_assert(BEST_STATE == BaseType::getBestState(),
                 "unexpected BEST_STATE value");
@@ -160,6 +161,8 @@ public:
       append("global_read");
     if (!this->isAssumed(NOT_GLOBAL_WRITE))
       append("global_write");
+    if (!this->isAssumed(NOT_GLOBAL_STORAGE))
+      append("global_storage");
     return str.empty() ? "*" : str;
   }
 
@@ -238,7 +241,7 @@ private:
 
   // Starts analysis of the |value| with known bits based on its resource type.
   void initializeValue(Value value, DFX::Solver &solver) override {
-    auto resourceType = llvm::cast<IREE::Stream::ResourceType>(value.getType());
+    auto resourceType = cast<IREE::Stream::ResourceType>(value.getType());
     initializeFromType(resourceType);
   }
 
@@ -247,7 +250,7 @@ private:
   // itself is under analysis.
   void updateFromDefiningOp(Value value, OpResult result, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType()))
+    if (!isa<IREE::Stream::ResourceType>(result.getType()))
       return;
 
     TypeSwitch<Operation *, void>(result.getOwner())
@@ -268,7 +271,7 @@ private:
           getState() ^= sourceUsage.getState();
         })
         .Case([&](IREE::Util::GlobalLoadOpInterface op) {
-          removeAssumedBits(NOT_GLOBAL_READ);
+          removeAssumedBits(NOT_GLOBAL_READ | NOT_GLOBAL_STORAGE);
           auto globalType = cast<IREE::Stream::ResourceType>(
               op.getLoadedGlobalValue().getType());
           switch (globalType.getLifetime()) {
@@ -285,7 +288,8 @@ private:
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Util::GlobalLoadIndirectOpInterface op) {
-          removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_READ);
+          removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_READ |
+                            NOT_GLOBAL_STORAGE);
           auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getLoadedGlobalValue()),
               DFX::Resolution::REQUIRED);
@@ -300,7 +304,7 @@ private:
         })
         .Case([&](IREE::Stream::TensorImportOp op) {
           auto targetType =
-              llvm::cast<IREE::Stream::ResourceType>(op.getResult().getType());
+              cast<IREE::Stream::ResourceType>(op.getResult().getType());
           switch (targetType.getLifetime()) {
           default:
           case IREE::Stream::Lifetime::External:
@@ -513,7 +517,7 @@ private:
   // This walks through tied uses as well.
   void updateFromUse(Value value, OpOperand &operand, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!llvm::isa<IREE::Stream::ResourceType>(operand.get().getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.get().getType()))
       return;
 
     auto *userOp = operand.getOwner();
@@ -573,7 +577,7 @@ private:
               DFX::Resolution::REQUIRED);
           getState() ^= parentUsage.getState();
           if (auto whileOp =
-                  dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+                  dyn_cast_if_present<scf::WhileOp>(op->getParentOp())) {
             auto value = Position::forValue(
                 whileOp.getAfter().getArgument(operandIdx - 1));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
@@ -637,7 +641,7 @@ private:
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Util::GlobalStoreOpInterface op) {
-          removeAssumedBits(NOT_GLOBAL_WRITE);
+          removeAssumedBits(NOT_GLOBAL_WRITE | NOT_GLOBAL_STORAGE);
           auto globalType = cast<IREE::Stream::ResourceType>(
               op.getStoredGlobalValue().getType());
           switch (globalType.getLifetime()) {
@@ -650,11 +654,12 @@ private:
           }
         })
         .Case([&](IREE::Util::GlobalStoreIndirectOpInterface op) {
-          removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_WRITE);
+          removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_WRITE |
+                            NOT_GLOBAL_STORAGE);
         })
         .Case([&](IREE::Stream::TensorExportOp op) {
           auto sourceType =
-              llvm::cast<IREE::Stream::ResourceType>(op.getSource().getType());
+              cast<IREE::Stream::ResourceType>(op.getSource().getType());
           switch (sourceType.getLifetime()) {
           default:
           case IREE::Stream::Lifetime::External:

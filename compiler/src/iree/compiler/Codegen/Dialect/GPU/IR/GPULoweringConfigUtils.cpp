@@ -57,7 +57,7 @@ void setBasis(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
 
 FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
                           IREE::GPU::TilingLevel level) {
-  auto basisAttr = dyn_cast_or_null<ArrayAttr>(
+  auto basisAttr = dyn_cast_if_present<ArrayAttr>(
       config.getAttributes().get(getBasisLevelName(level)));
   if (!basisAttr) {
     return failure();
@@ -69,9 +69,9 @@ FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
   }
 
   std::optional<SmallVector<int64_t>> maybeCounts =
-      getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[0]));
+      getIntegerVector(dyn_cast_if_present<ArrayAttr>(attrs[0]));
   std::optional<SmallVector<int64_t>> maybeMapping =
-      getIntegerVector(dyn_cast_or_null<ArrayAttr>(attrs[1]));
+      getIntegerVector(dyn_cast_if_present<ArrayAttr>(attrs[1]));
 
   if (!maybeCounts.has_value() || !maybeMapping.has_value()) {
     return failure();

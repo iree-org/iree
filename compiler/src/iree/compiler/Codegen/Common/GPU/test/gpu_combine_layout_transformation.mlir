@@ -27,7 +27,7 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
 
 // Low padding
 
-//       CHECK:   scf.forall (%[[WG_LOOP0_IV:.+]]) = (0) to (2) step (64) {
+//       CHECK:   scf.forall ({{.+}}) = (0) to (2) step (64) {
 //       CHECK:     scf.forall (%[[THREAD_LOOP0_IV:.+]]) in (2) {
 //       CHECK:       %[[THREAD_TILE0_UB:.+]] = affine.min #[[$MAP]](%[[THREAD_LOOP0_IV]])
 //       CHECK:       scf.for %[[LOW_IDX:.+]] = %[[THREAD_LOOP0_IV]] to %[[THREAD_TILE0_UB]] step %[[C1]] {
@@ -38,7 +38,7 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
 
 // High padding
 
-//       CHECK:   scf.forall (%[[WG_LOOP1_IV:.+]]) = (252) to (256) step (64) {
+//       CHECK:   scf.forall ({{.+}}) = (252) to (256) step (64) {
 //       CHECK:     scf.forall (%[[THREAD_LOOP1_IV:.+]]) = (252) to (256) step (1) {
 //       CHECK:       %[[THREAD_TILE1_UB:.+]] = affine.min #[[$MAP1]](%[[THREAD_LOOP1_IV]])
 //       CHECK:       scf.for %[[HIGH_IDX:.+]] = %[[THREAD_LOOP1_IV]] to %[[THREAD_TILE1_UB]] step %[[C1]] {

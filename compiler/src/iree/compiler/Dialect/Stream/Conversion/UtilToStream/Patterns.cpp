@@ -113,7 +113,7 @@ struct CallOpConversion
     SmallVector<Value> results;
     SmallVector<Value> resourceSizes;
     for (auto result : resultMap) {
-      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
+      if (isa<IREE::Stream::ResourceType>(result.newType)) {
         auto resource = callOp.getResult(result.newIndex + 0);
         auto resourceSize = callOp.getResult(result.newIndex + 1);
         results.push_back(resource);
@@ -158,9 +158,9 @@ struct GlobalExpansionState {
 };
 
 static bool isExpandedType(Type type) {
-  if (llvm::isa<TensorType>(type))
+  if (isa<TensorType>(type))
     return true;
-  if (auto ptrType = llvm::dyn_cast<IREE::Util::PtrType>(type)) {
+  if (auto ptrType = dyn_cast<IREE::Util::PtrType>(type)) {
     return isExpandedType(ptrType);
   }
   return false;
@@ -216,8 +216,7 @@ struct GlobalOpExpansion
     // current conversion to pick up the expanded initialization ops.
     auto initialValueAttr = globalOp.getInitialValueAttr();
     bool tensorInitializerRequired =
-        initialValueAttr ? llvm::isa<TensorType>(initialValueAttr.getType())
-                         : false;
+        initialValueAttr ? isa<TensorType>(initialValueAttr.getType()) : false;
 
     // New global holding the initial value only if it is not a tensor type.
     auto resourceOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(

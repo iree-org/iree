@@ -40,6 +40,45 @@ util.func public @foldTensorExportImport(%arg0: tensor<5xi32>) -> tensor<5xi32> 
 
 // -----
 
+// CHECK-LABEL: @FoldConsecutiveTransientsSameStorage
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>, %[[STORAGE:.+]]: !hal.buffer)
+util.func public @FoldConsecutiveTransientsSameStorage(%arg0: tensor<4xf32>, %storage: !hal.buffer) -> tensor<4xf32> {
+  // CHECK-NOT: hal.tensor.transients
+  %0 = hal.tensor.transients %arg0 : tensor<4xf32> from %storage : !hal.buffer
+  // CHECK: %[[RESULT:.+]] = hal.tensor.transients %[[ARG0]] : tensor<4xf32> from %[[STORAGE]] : !hal.buffer
+  %1 = hal.tensor.transients %0 : tensor<4xf32> from %storage : !hal.buffer
+  // CHECK: util.return %[[RESULT]] : tensor<4xf32>
+  util.return %1 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldConsecutiveTransientsDifferentStorage
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>, %[[STORAGE1:.+]]: !hal.buffer, %[[STORAGE2:.+]]: !hal.buffer)
+util.func public @FoldConsecutiveTransientsDifferentStorage(%arg0: tensor<4xf32>, %storage1: !hal.buffer, %storage2: !hal.buffer) -> tensor<4xf32> {
+  // CHECK-NOT: hal.tensor.transients %[[ARG0]] : tensor<4xf32> from %[[STORAGE1]]
+  %0 = hal.tensor.transients %arg0 : tensor<4xf32> from %storage1 : !hal.buffer
+  // CHECK: %[[RESULT:.+]] = hal.tensor.transients %[[ARG0]] : tensor<4xf32> from %[[STORAGE2]] : !hal.buffer
+  %1 = hal.tensor.transients %0 : tensor<4xf32> from %storage2 : !hal.buffer
+  // CHECK: util.return %[[RESULT]] : tensor<4xf32>
+  util.return %1 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldConsecutiveTransientsDynamic
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x4xf32>, %[[DIM:.+]]: index, %[[STORAGE1:.+]]: !hal.buffer, %[[STORAGE2:.+]]: !hal.buffer)
+util.func public @FoldConsecutiveTransientsDynamic(%arg0: tensor<?x4xf32>, %dim: index, %storage1: !hal.buffer, %storage2: !hal.buffer) -> tensor<?x4xf32> {
+  // CHECK-NOT: hal.tensor.transients %[[ARG0]] : tensor<?x4xf32>{%[[DIM]]} from %[[STORAGE1]]
+  %0 = hal.tensor.transients %arg0 : tensor<?x4xf32>{%dim} from %storage1 : !hal.buffer
+  // CHECK: %[[RESULT:.+]] = hal.tensor.transients %[[ARG0]] : tensor<?x4xf32>{%[[DIM]]} from %[[STORAGE2]] : !hal.buffer
+  %1 = hal.tensor.transients %0 : tensor<?x4xf32>{%dim} from %storage2 : !hal.buffer
+  // CHECK: util.return %[[RESULT]] : tensor<?x4xf32>
+  util.return %1 : tensor<?x4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @DeduplicateTensorBarrierSources
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<5xi32>, %[[ARG1:.+]]: tensor<6xi32>, %[[FENCE:.+]]: !hal.fence)
 util.func public @DeduplicateTensorBarrierSources(%arg0: tensor<5xi32>, %arg1: tensor<6xi32>, %fence: !hal.fence) -> (tensor<5xi32>, tensor<6xi32>, tensor<5xi32>) {

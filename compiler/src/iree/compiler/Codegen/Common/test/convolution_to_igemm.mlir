@@ -22,8 +22,11 @@ func.func public @conv_with_consumer(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor
 // CHECK-DAG:    %[[FILL:.+]] = linalg.fill {{.*}} -> tensor<1x14x14x16xf32>
 // CHECK:        %[[MATMUL:.+]] = linalg.generic
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:     ins(%[[IM2COL]], %{{.*}} : tensor<1x14x14x36xf32>
+// CHECK-SAME:     outs(%[[FILL]] : tensor<1x14x14x16xf32>)
 // CHECK:        %[[TRUNCF:.+]] = linalg.generic
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:     ins(%[[MATMUL]] : tensor<1x14x14x16xf32>)
 // CHECK:        return %[[TRUNCF]] : tensor<1x14x14x16xf16>
 
 // -----
@@ -33,7 +36,6 @@ func.func public @conv_with_consumer(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @fold_with_interface_tensor() {
@@ -85,9 +87,10 @@ func.func @conv_with_lowering_config() attributes {translation_info = #iree_code
 }
 
 // CHECK:      func.func @conv_with_lowering_config
-// CHECK:        iree_linalg_ext.im2col
-// CHECK:        linalg.generic
-// CHECK-SAME:     lowering_config = {{.*}}
+// CHECK:        %[[FILL:.+]] = linalg.fill
+// CHECK:        %[[IM2COL:.+]] = iree_linalg_ext.im2col
+// CHECK:        %[[MATMUL:.+]] = linalg.generic {{.*}} ins(%[[IM2COL]], {{.*}}) outs(%[[FILL]] : {{.*}}) {{.*}}lowering_config = {{.*}}
+// CHECK:        iree_tensor_ext.dispatch.tensor.store %[[MATMUL]]
 
 // -----
 
@@ -106,5 +109,7 @@ func.func public @no_conv_contraction(%arg0: tensor<128x128xf32>, %arg1: tensor<
   } -> tensor<128x128xf32>
   return %matmul : tensor<128x128xf32>
 }
-// CHECK: func.func public @no_conv_contraction
-// CHECK:   linalg.generic
+// CHECK:       func.func public @no_conv_contraction
+// CHECK-NOT:     iree_linalg_ext.im2col
+// CHECK:         linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "reduction"]

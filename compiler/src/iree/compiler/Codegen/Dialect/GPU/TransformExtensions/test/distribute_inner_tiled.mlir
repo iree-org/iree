@@ -80,9 +80,6 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 // CHECK-LABEL: func @distribute_inner_tiled_I8_16x16x32_I32
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<2x2x16x32xi8>

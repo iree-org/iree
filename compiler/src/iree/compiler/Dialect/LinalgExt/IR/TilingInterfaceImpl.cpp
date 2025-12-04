@@ -67,6 +67,43 @@ getStaticOrReifiedInputDims(OpBuilder &builder, Location loc, Value input,
   return success();
 }
 
+/// Returns the rank of the Value's type, and 0 if it is not a ShapedType.
+static int64_t getRank(Value v) {
+  auto type = dyn_cast<ShapedType>(v.getType());
+  if (type) {
+    return type.getRank();
+  }
+  return 0;
+}
+
+/// Method similar to `LinalgOp`s that concatenates shapes of all operands.
+static SmallVector<OpFoldResult>
+createFlatListOfOperandDims(OpBuilder &b, Location loc, Operation *op) {
+  SmallVector<OpFoldResult> res;
+  for (OpOperand &opOperand : op->getOpOperands()) {
+    for (auto dim : llvm::seq(getRank(opOperand.get()))) {
+      res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), dim));
+    }
+  }
+  return res;
+}
+
+/// Permutes the offset and size arrays by the result indexes of the provided
+/// affine map.
+static SmallVector<Range> getPermutedRange(AffineMap permutation,
+                                           ArrayRef<OpFoldResult> offsets,
+                                           ArrayRef<OpFoldResult> sizes) {
+  auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
+  assert(permutation.isProjectedPermutation() &&
+         "Affine map should be a projected permutation");
+  SmallVector<Range> output;
+  for (AffineExpr dimExpr : permutation.getResults()) {
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    output.push_back(Range{offsets[dim], sizes[dim], one});
+  }
+  return output;
+}
+
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
@@ -1892,6 +1929,101 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
 }
 
 //===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<utils::IteratorType> ExpReductionOp::getLoopIteratorTypes() {
+  return llvm::to_vector(getIteratorTypes()
+                             .getAsValueRange<IREE::LinalgExt::IteratorTypeAttr,
+                                              utils::IteratorType>());
+}
+
+SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
+  Location loc = getLoc();
+  OpFoldResult zero = b.getIndexAttr(0);
+  OpFoldResult one = b.getIndexAttr(1);
+
+  SmallVector<OpFoldResult> allShapesSizes =
+      createFlatListOfOperandDims(b, loc, getOperation());
+  AffineMap map = getShapesToLoopsMap();
+  return llvm::map_to_vector(map.getResults(), [&](AffineExpr loopExpr) {
+    OpFoldResult ofr =
+        affine::makeComposedFoldedAffineApply(b, loc, loopExpr, allShapesSizes);
+    return Range{zero, ofr, one};
+  });
+}
+
+FailureOr<TilingResult>
+ExpReductionOp::getTiledImplementation(OpBuilder &b,
+                                       ArrayRef<OpFoldResult> offsets,
+                                       ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  auto indexingMapOp = cast<IndexingMapOpInterface>(getOperation());
+  SmallVector<Value> tiledOperands;
+  SmallVector<Operation *> generatedSlices;
+  for (OpOperand &opOperand : getOperation()->getOpOperands()) {
+    AffineMap map = indexingMapOp.getMatchingIndexingMap(&opOperand);
+    SmallVector<Range> slice = getPermutedRange(map, offsets, sizes);
+    Operation *sliceOp = getSlice(b, loc, opOperand.get(), slice);
+    tiledOperands.emplace_back(sliceOp->getResult(0));
+    generatedSlices.push_back(sliceOp);
+  }
+
+  SmallVector<Type, 4> resultTensorTypes;
+  if (getNumResults()) {
+    resultTensorTypes = llvm::map_to_vector<4>(
+        getDpsInitsMutable(), [&generatedSlices](OpOperand &opOperand) {
+          return generatedSlices[opOperand.getOperandNumber()]
+              ->getResultTypes()[0];
+        });
+  }
+
+  Operation *tiledOp = mlir::clone(b, *this, resultTensorTypes, tiledOperands);
+  return TilingResult{
+      {tiledOp}, SmallVector<Value>(tiledOp->getResults()), generatedSlices};
+}
+
+LogicalResult ExpReductionOp::getResultTilePosition(
+    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  auto indexingMapOp = cast<IndexingMapOpInterface>(getOperation());
+  OpOperand *outOperand = getDpsInitOperand(resultNumber);
+  AffineMap indexingMap = indexingMapOp.getMatchingIndexingMap(outOperand);
+  SmallVector<Range> range = getPermutedRange(indexingMap, offsets, sizes);
+  resultOffsets.resize(range.size());
+  resultSizes.resize(range.size());
+  for (auto [index, r] : llvm::enumerate(range)) {
+    resultOffsets[index] = r.offset;
+    resultSizes[index] = r.size;
+  }
+  return success();
+}
+
+FailureOr<TilingResult>
+ExpReductionOp::generateResultTileValue(OpBuilder &b, unsigned resultNumber,
+                                        ArrayRef<OpFoldResult> offsets,
+                                        ArrayRef<OpFoldResult> sizes) {
+  SmallVector<OpFoldResult> mappedOffsets, mappedSizes;
+  if (failed(getIterationDomainTileFromResultTile(
+          b, resultNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
+    return failure();
+  }
+  FailureOr<TilingResult> tilingResult =
+      getTiledImplementation(b, mappedOffsets, mappedSizes);
+  if (failed(tilingResult)) {
+    return failure();
+  }
+  if (tilingResult->tiledOps.size() != 1) {
+    return emitOpError("failed to generate tiled implementation");
+  }
+  return TilingResult{
+      tilingResult->tiledOps,
+      SmallVector<Value>{tilingResult->tiledValues[resultNumber]},
+      tilingResult->generatedSlices};
+}
+
+//===----------------------------------------------------------------------===//
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
@@ -2447,24 +2579,6 @@ getAttentionIteratorTypes(int64_t domainRank, AffineMap qMap, AffineMap kMap,
   }
 
   return iteratorTypes;
-}
-
-static SmallVector<Range> getPermutedRange(AffineMap permutation,
-                                           ArrayRef<OpFoldResult> offsets,
-                                           ArrayRef<OpFoldResult> sizes) {
-  auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
-  assert(permutation.isProjectedPermutation() &&
-         "Indexing map should be a projected permutation");
-  SmallVector<Range> output;
-  for (AffineExpr dimExpr : permutation.getResults()) {
-    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-    Range dimRange;
-    dimRange.offset = offsets[dim];
-    dimRange.size = sizes[dim];
-    dimRange.stride = one;
-    output.push_back(dimRange);
-  }
-  return output;
 }
 
 static Operation *getPermutedSlice(OpBuilder &b, Location loc, Value val,
@@ -3086,19 +3200,6 @@ SmallVector<utils::IteratorType> CustomOp::getLoopIteratorTypes() {
   return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
     return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
   });
-}
-
-/// Method similar to `LinalgOp`s that concatenates shapes of all operands.
-static SmallVector<OpFoldResult>
-createFlatListOfOperandDims(OpBuilder &builder, Location loc,
-                            CustomOp customOp) {
-  SmallVector<OpFoldResult> result;
-  for (Value operand : customOp->getOperands()) {
-    for (auto dim : llvm::seq<unsigned>(customOp.getRank(operand))) {
-      result.push_back(getDim(builder, loc, operand, dim));
-    }
-  }
-  return result;
 }
 
 SmallVector<Range> CustomOp::getIterationDomainForDimensions(

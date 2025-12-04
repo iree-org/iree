@@ -72,6 +72,12 @@ function(iree_native_test)
   if(DEFINED _RULE_DRIVER)
     list(APPEND _RULE_ARGS "--device=${_RULE_DRIVER}")
     list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER}")
+
+    # Suppress known ROCm library leaks for HIP tests.
+    if(_RULE_DRIVER STREQUAL "hip" AND IREE_ENABLE_ASAN)
+      set(_LSAN_SUPP_FILE "${CMAKE_SOURCE_DIR}/build_tools/sanitizer/lsan_suppressions_rocm.txt")
+      list(APPEND _TEST_ENVIRONMENT_VARS "LSAN_OPTIONS=suppressions=${_LSAN_SUPP_FILE}")
+    endif()
   endif()
 
   if(ANDROID)
@@ -156,6 +162,11 @@ function(iree_native_test)
         ${_TEST_ARGS}
     )
     iree_configure_test(${_TEST_NAME})
+
+    # Apply test environment variables after we add the test.
+    if(DEFINED _TEST_ENVIRONMENT_VARS)
+      set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_TEST_ENVIRONMENT_VARS})
+    endif()
   endif()
 
   if (NOT DEFINED _RULE_TIMEOUT)

@@ -102,7 +102,7 @@ Value convertToBuiltinTensor(OpBuilder &builder, Value possibleTorchTensor) {
   if (isa<TensorType>(ty))
     return possibleTorchTensor;
 
-  if (auto defining = dyn_cast_or_null<TorchConversion::FromBuiltinTensorOp>(
+  if (auto defining = dyn_cast_if_present<TorchConversion::FromBuiltinTensorOp>(
           possibleTorchTensor.getDefiningOp())) {
     return defining.getOperand();
   }

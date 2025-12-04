@@ -80,7 +80,7 @@ static void computeRegionValueAliases(Operation *regionOp,
   // things like stream.async.execute returning a timepoint.
   auto resourceResults =
       llvm::filter_to_vector(regionOp->getResults(), [](OpResult result) {
-        return llvm::isa<IREE::Stream::ResourceType>(result.getType());
+        return isa<IREE::Stream::ResourceType>(result.getType());
       });
 
   // Start with outputs so that we handle tied values that may lead all the way
@@ -110,7 +110,7 @@ static void computeRegionValueAliases(Operation *regionOp,
     // Tied results reuse their operand buffer.
     auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
     for (auto result : op.getResults()) {
-      if (!llvm::isa<IREE::Stream::ResourceType>(result.getType()))
+      if (!isa<IREE::Stream::ResourceType>(result.getType()))
         continue;
       if (tiedOp) {
         auto tiedOperand = tiedOp.getTiedResultOperand(result);
@@ -181,7 +181,7 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
   SmallPtrSet<Value, 16> liveOuts;
   auto yieldOp = cast<IREE::Stream::YieldOp>(streamBlock->back());
   for (auto returnValue : yieldOp.getResourceOperands()) {
-    if (!llvm::isa<IREE::Stream::ResourceType>(returnValue.getType()))
+    if (!isa<IREE::Stream::ResourceType>(returnValue.getType()))
       continue;
     liveOuts.insert(returnValue);
   }
@@ -191,7 +191,7 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
   LivenessIntervalMap valueIntervals;
   int ordinal = 0;
   for (Value value : streamBlock->getArguments()) {
-    if (!llvm::isa<IREE::Stream::ResourceType>(value.getType()))
+    if (!isa<IREE::Stream::ResourceType>(value.getType()))
       continue;
     LivenessInterval interval;
     interval.start = LIVE_IN;
@@ -218,7 +218,7 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
       // the duration of the region.
       concurrentOp.walk([&](Operation *op) {
         for (auto value : op->getResults()) {
-          if (!llvm::isa<IREE::Stream::ResourceType>(value.getType()))
+          if (!isa<IREE::Stream::ResourceType>(value.getType()))
             continue;
           if (auto tiedOp = dyn_cast<Util::TiedOpInterface>(op)) {
             // Skip tied results as their liveness is determined by the tied
@@ -238,7 +238,7 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
       });
     }
     for (auto value : op.getResults()) {
-      if (!llvm::isa<IREE::Stream::ResourceType>(value.getType()))
+      if (!isa<IREE::Stream::ResourceType>(value.getType()))
         continue;
       LivenessInterval interval;
       interval.start = start;
@@ -666,8 +666,8 @@ applyAsyncTransferOp(IREE::Stream::AffinityAttr executionAffinityAttr,
   // Lookup the affinity for where we are executing. This lets us determine if
   // this transfer is incoming or outgoing.
   auto isStaging = [](Value value) {
-    return llvm::cast<IREE::Stream::ResourceType>(value.getType())
-               .getLifetime() == IREE::Stream::Lifetime::Staging;
+    return cast<IREE::Stream::ResourceType>(value.getType()).getLifetime() ==
+           IREE::Stream::Lifetime::Staging;
   };
   auto sourceAffinityAttr = asyncOp.getSourceAffinityAttr();
   auto resultAffinityAttr = asyncOp.getResultAffinityAttr();
@@ -720,7 +720,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   unsigned resourceIndex = 0;
   for (auto it : llvm::enumerate(asyncOp.getResourceOperands())) {
     auto operand = it.value();
-    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
+    if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
       // Primitive operand.
       newOperands.push_back(operand);
       continue;
@@ -788,7 +788,7 @@ static void convertAsyncFuncOp(IREE::Stream::AsyncFuncOp asyncOp) {
   SmallVector<DictionaryAttr> newArgAttrs;
   for (auto [i, oldInput] : llvm::enumerate(oldFunctionType.getInputs())) {
     auto oldArgAttr = asyncOp.getArgAttrDict(i);
-    if (llvm::isa<IREE::Stream::ResourceType>(oldInput)) {
+    if (isa<IREE::Stream::ResourceType>(oldInput)) {
       newInputs.push_back(oldInput); // resource
       newArgAttrs.push_back(oldArgAttr);
       newInputs.push_back(indexType); // offset
@@ -805,7 +805,7 @@ static void convertAsyncFuncOp(IREE::Stream::AsyncFuncOp asyncOp) {
   SmallVector<DictionaryAttr> newResultAttrs;
   for (auto [i, oldResult] : llvm::enumerate(oldFunctionType.getResults())) {
     auto oldResultAttr = asyncOp.getResultAttrDict(i);
-    if (llvm::isa<IREE::Stream::ResourceType>(oldResult)) {
+    if (isa<IREE::Stream::ResourceType>(oldResult)) {
       if (asyncOp.isResultTied(i)) {
         // Tied results reuse the operands they are tied to.
         continue;
@@ -845,7 +845,7 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
 
   unsigned resourceIndex = 0;
   for (auto [i, operand] : llvm::enumerate(asyncOp.getResourceOperands())) {
-    if (!llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
+    if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
       // Primitive operand.
       newResourceOperands.push_back(operand);
       continue;
@@ -874,7 +874,7 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
   }
 
   for (auto result : asyncOp.getResults()) {
-    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+    if (!isa<IREE::Stream::ResourceType>(result.getType())) {
       // Primitive result.
       newResultTypes.push_back(result.getType());
       continue;
@@ -1052,8 +1052,7 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   for (auto valueInterval : livenessIntervals) {
     auto value = valueInterval.value;
     assert(value && "must have value for interval");
-    auto valueType =
-        llvm::dyn_cast<IREE::Stream::ResourceType>(value.getType());
+    auto valueType = dyn_cast<IREE::Stream::ResourceType>(value.getType());
     if (!valueType)
       continue;
 
@@ -1550,7 +1549,7 @@ static SmallVector<IREE::Util::SubrangeOperand>
 gatherSubranges(Value derivedValue) {
   SmallVector<IREE::Util::SubrangeOperand> subrangeStack;
   Value baseValue = derivedValue;
-  while (auto definingOp = dyn_cast_or_null<IREE::Util::TiedOpInterface>(
+  while (auto definingOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
              baseValue.getDefiningOp())) {
     auto tiedValue = definingOp.getTiedResultOperand(baseValue);
     if (!tiedValue)
@@ -1755,8 +1754,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
   ResultAllocationMap resultReservations;
   for (auto [resultValue, resultSize] :
        llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
-    auto resultType =
-        llvm::cast<IREE::Stream::ResourceType>(resultValue.getType());
+    auto resultType = cast<IREE::Stream::ResourceType>(resultValue.getType());
     if (handledResults.contains(resultValue)) {
       resultReplacements.push_back(std::make_pair(resultValue, Value{}));
       continue;
@@ -1820,7 +1818,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
     if (!definingOp) {
       // Directly returning an operand; this usually gets canonicalized away but
       // may be introduced by intermediate transformations.
-      auto arg = llvm::cast<BlockArgument>(definingValue);
+      auto arg = cast<BlockArgument>(definingValue);
       auto operand = newOperands[arg.getArgNumber()];
       LLVM_DEBUG({
         AsmState asmState(executeOp->getParentOp());
@@ -2049,14 +2047,16 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
     joinTimepoints.push_back(newExecuteOp.getResultTimepoint());
     auto fusedLoc = builder.getFusedLoc(llvm::map_to_vector(
         joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); }));
-    auto joinOp = IREE::Stream::TimepointJoinOp::create(
-        builder, fusedLoc, newExecuteOp.getResultTimepoint().getType(),
-        joinTimepoints);
-    executeTimepointUsers.insert(joinOp);
-    newExecuteOp.getResultTimepoint().replaceUsesWithIf(
-        joinOp.getResultTimepoint(), [&](OpOperand &operand) {
-          return !executeTimepointUsers.contains(operand.getOwner());
-        });
+    Value joinedTimepoint =
+        IREE::Stream::TimepointJoinOp::join(fusedLoc, joinTimepoints, builder);
+    // Only replace uses if a join was actually created (size > 1).
+    if (joinedTimepoint != newExecuteOp.getResultTimepoint()) {
+      executeTimepointUsers.insert(joinedTimepoint.getDefiningOp());
+      newExecuteOp.getResultTimepoint().replaceUsesWithIf(
+          joinedTimepoint, [&](OpOperand &operand) {
+            return !executeTimepointUsers.contains(operand.getOwner());
+          });
+    }
   }
 
   return success();

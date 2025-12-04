@@ -568,11 +568,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Infer if lhs or rhs is transposed to help generate better schedule.
   SmallVector<AffineMap> maps = op.getIndexingMapsArray();
   bool transposedLhs =
-      kDim !=
-      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+      kDim != cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
   bool transposedRhs =
-      nDim !=
-      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+      nDim != cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   std::optional<int64_t> wgpCount = std::nullopt;
   if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
@@ -823,15 +821,15 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   LDBG() << "Attention Vector Distribution Config";
 
   // Infer if Q, K and V are transposed to help generate better schedule.
-  bool transposedQ = k1Dims.back() != llvm::cast<AffineDimExpr>(
-                                          op.getQueryMap().getResults().back())
-                                          .getPosition();
-  bool transposedK = k1Dims.back() != llvm::cast<AffineDimExpr>(
-                                          op.getKeyMap().getResults().back())
-                                          .getPosition();
-  bool transposedV = k2Dims.back() != llvm::cast<AffineDimExpr>(
-                                          op.getValueMap().getResults().back())
-                                          .getPosition();
+  bool transposedQ =
+      k1Dims.back() !=
+      cast<AffineDimExpr>(op.getQueryMap().getResults().back()).getPosition();
+  bool transposedK =
+      k1Dims.back() !=
+      cast<AffineDimExpr>(op.getKeyMap().getResults().back()).getPosition();
+  bool transposedV =
+      k2Dims.back() !=
+      cast<AffineDimExpr>(op.getValueMap().getResults().back()).getPosition();
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
   // First try to find a schedule with an exactly matching intrinsic.
@@ -1521,11 +1519,9 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
   };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
-      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType())
-          .getShape();
+      cast<ShapedType>(op.getDpsInputOperand(0)->get().getType()).getShape();
   auto rhsShape =
-      llvm::cast<ShapedType>(op.getDpsInputOperand(1)->get().getType())
-          .getShape();
+      cast<ShapedType>(op.getDpsInputOperand(1)->get().getType()).getShape();
   int64_t sizeM = ShapedType::kDynamic;
   int64_t sizeN = ShapedType::kDynamic;
   int64_t sizeK = ShapedType::kDynamic;
@@ -1762,7 +1758,7 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
         break;
       }
       ArrayRef<int64_t> shape =
-          llvm::cast<ShapedType>(outputOperand.get().getType()).getShape();
+          cast<ShapedType>(outputOperand.get().getType()).getShape();
       if (ShapedType::isDynamicShape(shape)) {
         vectorSize = 1;
         break;
@@ -1897,7 +1893,8 @@ static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
 // Transpose Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
+static LogicalResult setTransposeConfig(IREE::GPU::TargetAttr target,
+                                        mlir::FunctionOpInterface entryPoint,
                                         linalg::LinalgOp linalgOp) {
   LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
 
@@ -1926,12 +1923,16 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 
   int32_t tileM = 32;
   int32_t tileN = 32;
-  TileSizesListType tileSizes;
   // Set all tile sizes to 1 except for fastest moving dimensions.
-  SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
-  tileSizesTemp[outputFastestDim] = 32;
-  tileSizesTemp[inputFastestDim] = 32;
-  tileSizes.push_back(tileSizesTemp);
+  SmallVector<int64_t> workgroupTileSizes(linalgOp.getNumLoops(), 1);
+  workgroupTileSizes[outputFastestDim] = 32;
+  workgroupTileSizes[inputFastestDim] = 32;
+
+  // Set the thread tile sizes to 1 for all dims except the fastest varying
+  // output dim which we set to 4. Because we promote the tranposed input
+  // operands, this gives both vectorized global reads and writes.
+  SmallVector<int64_t> threadTileSizes(linalgOp.getNumLoops(), 1);
+  threadTileSizes[outputFastestDim] = 4;
 
   // Check alignment with tile size for each transpose. Only the fastest moving
   // dims need to match the transpose tile.
@@ -1945,9 +1946,38 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
   // moving dimension so each thread can execute a vectorized copy of 4
   // contiguous elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
+
+  MLIRContext *context = linalgOp.getContext();
+  Builder b(context);
+  SmallVector<NamedAttribute> attrs{
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes))};
+  SmallVector<int64_t> promotedOperands;
+  for (OpOperand *operand : transposedOperands) {
+    promotedOperands.push_back(operand->getOperandNumber());
+  }
+  IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
+  DictionaryAttr configDict = DictionaryAttr::get(context, attrs);
+  IREE::GPU::LoweringConfigAttr loweringConfig =
+      IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  IREE::GPU::GPUPipelineOptionsAttr pipelineOptions =
+      IREE::GPU::GPUPipelineOptionsAttr::get(
+          context, /*prefetchSharedMemory=*/false,
+          /*no_reduce_shared_memory_bank_conflicts=*/false,
+          /*use_igemm_convolution=*/false,
+          /*reorder_workgroups_strategy=*/std::nullopt);
+  DictionaryAttr pipelineConfig = DictionaryAttr::get(
+      context,
+      {NamedAttribute(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(),
+                      pipelineOptions)});
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, linalgOp, tileSizes,
-      CodeGenPipeline::LLVMGPUTransposeSharedMem, workgroupSize);
+      entryPoint, linalgOp, loweringConfig,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
 //====---------------------------------------------------------------------===//
@@ -2114,9 +2144,9 @@ static LogicalResult setConvolutionConfig(
   const int ocIndex = isNHWC ? 3 : 1;
 
   Type inputType = linalgOp.getDpsInputOperand(0)->get().getType();
-  ArrayRef<int64_t> inputShape = llvm::cast<ShapedType>(inputType).getShape();
+  ArrayRef<int64_t> inputShape = cast<ShapedType>(inputType).getShape();
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
-  ArrayRef<int64_t> outputShape = llvm::cast<ShapedType>(outputType).getShape();
+  ArrayRef<int64_t> outputShape = cast<ShapedType>(outputType).getShape();
   if (ShapedType::isDynamic(inputShape[3]) ||
       ShapedType::isDynamicShape(outputShape.drop_front())) {
     return failure();
@@ -2261,7 +2291,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp) {
-      if (succeeded(setTransposeConfig(entryPointFn, genericOp))) {
+      if (genericOp &&
+          succeeded(setTransposeConfig(target, entryPointFn, genericOp))) {
         LDBG() << "Transpose Config";
         return success();
       } else if (ukernelConfig &&

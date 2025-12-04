@@ -221,6 +221,10 @@ static std::optional<int64_t> expensivelyEvaluateSharedMemoryBytes(
         "Bitcode does not contain a function named {}.", queryFuncName));
     return {};
   }
+  if (mma.getSubgroupsK() != 1) {
+    // SubgroupsK not supported by current bitcode ukernels.
+    return {};
+  }
   auto constI32 = [](int32_t val) {
     llvm::GenericValue v;
     v.IntVal = APInt(32, val);

@@ -119,35 +119,19 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
       // own quirks.
       builtin.module {
         // External function declaration using a user-chosen calling convention.
-        // NOTE: MLIR->LLVM conversion expands each memref to a tuple and
-        // there's currently no way to change that behavior.
-        // Each memref becomes:
-        // (%base_ptr: !llvm.ptr<f32>, %aligned_ptr: !llvm.ptr<f32>,
-        //  %offset: i64, %size: i64, %stride: i64)
-        // That results in the following llvm.func:
-        // (!llvm.ptr<f32>, !llvm.ptr<f32>, i64, i64, i64,  // binding0
-        //  !llvm.ptr<f32>, !llvm.ptr<f32>, i64, i64, i64,  // binding1
-        //  !llvm.ptr<f32>, !llvm.ptr<f32>, i64, i64, i64,  // binding2
-        //  i64,                                            // dim
-        //  i64)                                            // tid
-        // And required external C function:
-        // (float*, float*, size_t, size_t, size_t,
-        //  float*, float*, size_t, size_t, size_t,
-        //  float*, float*, size_t, size_t, size_t,
-        //  size_t,
-        //  size_t)
-        // This is not a good state to be in as we can't then map to external
-        // functions that have signatures we don't want to change. Please file
-        // upstream MLIR bugs about this behavior and the ability to just pass
-        // bare pointers if you care!
-        //
-        // NOTE: index will convert to i32 when targeting an ABI with 32-bit
-        // pointers and i64 otherwise. Use size_t on the C side to allow the
-        // same source code to work when compiled in either mode.
-        func.func private @simple_mul_workgroup(%binding0: memref<?xf32>, %binding1: memref<?xf32>, %binding2: memref<?xf32>, %dim: index, %tid: index) attributes {
+        // Using llvm.bareptr=true and iree_codegen.extract_strided_metadata to get
+        // a simplified signature with just base pointers and offsets.
+        // This results in a clean C function signature:
+        // (float*, size_t, float*, size_t, float*, size_t, size_t, size_t)
+        func.func private @simple_mul_workgroup(
+            %binding0: memref<f32>, %binding0_offset: index,
+            %binding1: memref<f32>, %binding1_offset: index,
+            %binding2: memref<f32>, %binding2_offset: index,
+            %dim: index, %tid: index) attributes {
           // Ensures that we try to statically link this external function and
           // pull it in from the object file.
-          hal.import.static
+          hal.import.static,
+          llvm.bareptr = true
         }
 
         // IREE exported function using a HAL interface.
@@ -172,14 +156,19 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %binding1 = hal.interface.binding.subspan layout(#pipeline_layout_0) binding(1) alignment(64) offset(%c0) : memref<?xf32>{%dim}
           %binding2 = hal.interface.binding.subspan layout(#pipeline_layout_0) binding(2) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
-          // Call the externally defined C function with an (almost) plain C
-          // calling convention (see above for details about the mess memrefs
-          // turn into).
-          //
-          // TODO: there are ways of accessing CPU information here such as
-          // active architecture and feature bits but it is not yet exposed to
-          // the HAL level.
-          func.call @simple_mul_workgroup(%binding0, %binding1, %binding2, %dim, %tid) : (memref<?xf32>, memref<?xf32>, memref<?xf32>, index, index) -> ()
+          // Extract base pointers and offsets from the bindings.
+          // This preserves the SSA values through buffer aliasing optimizations.
+          %base0, %offset0, %sizes0, %strides0 = iree_codegen.extract_strided_metadata %binding0
+              : memref<?xf32> -> memref<f32>, index, index, index
+          %base1, %offset1, %sizes1, %strides1 = iree_codegen.extract_strided_metadata %binding1
+              : memref<?xf32> -> memref<f32>, index, index, index
+          %base2, %offset2, %sizes2, %strides2 = iree_codegen.extract_strided_metadata %binding2
+              : memref<?xf32> -> memref<f32>, index, index, index
+
+          // Call the externally defined C function with a simplified calling
+          // convention using bareptr (base pointer + offset per buffer).
+          func.call @simple_mul_workgroup(%base0, %offset0, %base1, %offset1, %base2, %offset2, %dim, %tid)
+              : (memref<f32>, index, memref<f32>, index, memref<f32>, index, index, index) -> ()
 
           // NOTE: this is code generated as normal - other MLIR ops can be used
           // here for looping/control flow, vector operations, linalg, etc.
@@ -189,8 +178,12 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           return
         }
 
-        func.func private @simple_mul_inplace_workgroup(%binding0: memref<?xf32>, %binding1: memref<?xf32>, %dim: index, %tid: index) attributes {
-          hal.import.static
+        func.func private @simple_mul_inplace_workgroup(
+            %binding0: memref<f32>, %binding0_offset: index,
+            %binding1: memref<f32>, %binding1_offset: index,
+            %dim: index, %tid: index) attributes {
+          hal.import.static,
+          llvm.bareptr = true
         }
         func.func @simple_mul_inplace() {
           %c0 = arith.constant 0 : index
@@ -205,7 +198,14 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %binding0 = hal.interface.binding.subspan layout(#pipeline_layout_1) binding(0) alignment(64) offset(%c0) : memref<?xf32>{%dim}
           %binding1 = hal.interface.binding.subspan layout(#pipeline_layout_1) binding(1) alignment(64) offset(%c0) : memref<?xf32>{%dim}
 
-          func.call @simple_mul_inplace_workgroup(%binding0, %binding1, %dim, %tid) : (memref<?xf32>, memref<?xf32>, index, index) -> ()
+          // Extract base pointers and offsets from the bindings.
+          %base0, %offset0, %sizes0, %strides0 = iree_codegen.extract_strided_metadata %binding0
+              : memref<?xf32> -> memref<f32>, index, index, index
+          %base1, %offset1, %sizes1, %strides1 = iree_codegen.extract_strided_metadata %binding1
+              : memref<?xf32> -> memref<f32>, index, index, index
+
+          func.call @simple_mul_inplace_workgroup(%base0, %offset0, %base1, %offset1, %dim, %tid)
+              : (memref<f32>, index, memref<f32>, index, index, index) -> ()
 
           return
         }

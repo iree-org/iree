@@ -5,7 +5,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: llvm.func @binding_ptrs(
+// CHECK-LABEL: llvm.func @binding_ptrs
 func.func @binding_ptrs() {
   // CHECK-DAG: %[[C2:.+]] = llvm.mlir.constant(2
   // CHECK-DAG: %[[C5:.+]] = llvm.mlir.constant(5
@@ -43,7 +43,7 @@ llvm.func @sink(%arg0: f32) {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: llvm.func @binding_ptrs_dynamic(
+// CHECK-LABEL: llvm.func @binding_ptrs_dynamic
 func.func @binding_ptrs_dynamic() {
   // CHECK-DAG: %[[C1:.+]] = llvm.mlir.constant(1 :
   // CHECK-DAG: %[[C8:.+]] = llvm.mlir.constant(8 :
@@ -68,7 +68,7 @@ func.func @binding_ptrs_dynamic() {
   // CHECK: %[[DIM2_PTR:.+]] = llvm.getelementptr %[[CONSTANT_BASEPTR0]][3]
   // CHECK: %[[DIM2:.+]] = llvm.load %[[DIM2_PTR]]
   // CHECK: %[[DIM2_ZEXT:.+]] = llvm.zext %[[DIM2]]
-  %dim0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1): index
+  %dim0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %dim1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
   %dim2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
 
@@ -109,7 +109,7 @@ llvm.func @sink(%arg0: f32) {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// CHECK-LABEL: llvm.func @binding_ptrs_sub_byte_dynamic(
+// CHECK-LABEL: llvm.func @binding_ptrs_sub_byte_dynamic
 func.func @binding_ptrs_sub_byte_dynamic() {
   // CHECK-DAG: %[[C8:.+]] = llvm.mlir.constant(8 :
   // CHECK-DAG: %[[C4:.+]] = llvm.mlir.constant(4 :
@@ -119,7 +119,7 @@ func.func @binding_ptrs_sub_byte_dynamic() {
   // CHECK: %[[OFFSET:.+]] = llvm.load %[[CONSTANT_BASEPTR]]
   // CHECK: %[[OFFSET_ZEXT:.+]] = llvm.zext %[[OFFSET]]
   %offset = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
-  %dim0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1): index
+  %dim0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
 
   // CHECK: %[[STATE3:.+]] = llvm.load %arg1
   // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE3]][10]

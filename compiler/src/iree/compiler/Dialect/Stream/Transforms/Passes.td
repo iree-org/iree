@@ -12,22 +12,6 @@ include "mlir/Pass/PassBase.td"
 //===----------------------------------------------------------------------===//
 // Tensor lowering and resource management
 //===----------------------------------------------------------------------===//
-
-def ReplicateGlobalsPerAffinityPass :
-    Pass<"iree-stream-replicate-globals-per-affinity", "mlir::ModuleOp"> {
-  let summary = "Replicates globals for each unique affinity and rewires their uses.";
-  let description = [{
-    Replicates IREE::Util::GlobalOps that are used on multiple affinities
-    and rewires their uses to the associated global. This allows for
-    specialization of globals for each affinity instead of having unspecialized
-    and a copy each use.
-  }];
-  let dependentDialects = [
-    "IREE::Flow::FlowDialect",
-    "IREE::Util::UtilDialect",
-  ];
-}
-
 def ConvertToStreamPass :
     Pass<"iree-stream-conversion", "mlir::ModuleOp"> {
   let summary = "Converts from flow and other input dialects into the stream dialect.";
@@ -218,6 +202,14 @@ def ElideAsyncCopiesPass :
     of a value. This eliminates copies both from input programs and those
     materialized by the `iree-stream-materialize-copy-on-write` pass.
   }];
+  let statistics = [
+    Statistic<"numClonesElided", "num-clones-elided",
+              "Number of async clone operations elided">,
+    Statistic<"numSlicesElided", "num-slices-elided",
+              "Number of async slice operations elided">,
+    Statistic<"numIterations", "num-iterations",
+              "Number of fixed-point iterations required for convergence">
+  ];
 }
 
 def ElideAsyncTransfersPass :
@@ -466,6 +458,59 @@ def ReuseAllocationsPass :
   }];
   let dependentDialects = [
     "IREE::Stream::StreamDialect",
+  ];
+}
+
+def EmplaceTransientsPass :
+    Pass<"iree-stream-emplace-transients", "mlir::ModuleOp"> {
+  let summary = "Emplaces transient allocations into user-provided storage buffers.";
+  let description = [{
+    Experimental implementation for validating the transient storage IR design.
+
+    Limitations:
+    - Only handles public functions with `stream.resource.transients` ops
+    - Assumes no function calls (single function only)
+    - No complex timeline analysis (uses non-overlapping liveness intervals)
+    - Only supports a single unique transient storage buffer
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
+def MaterializeTransientSizeQueriesPass :
+    Pass<"iree-stream-materialize-transient-size-queries", "mlir::ModuleOp"> {
+  let summary = "Generates size query functions for transient storage.";
+  let description = [{
+    Experimental implementation for generating transient storage size query
+    functions.
+
+    For now, handles simple cases where sizes are constant or easily computable
+    from function inputs. Later it will handle complex call graphs and dynamic
+    size computation with hoisting. Only runs on IR produced by
+    `EmplaceTransientsPass` that adds the `stream.experimental.transients`
+    attribute to `stream.resource.pack` ops.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::Stream::StreamDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
+def AnnotateConstantTransientSizePass :
+    Pass<"iree-stream-annotate-constant-transient-size", "mlir::ModuleOp"> {
+  let summary = "Annotates constant transient sizes in reflection metadata.";
+  let description = [{
+    Detects when transient size query functions have folded to constant returns
+    and adds reflection metadata with the constant size values. At runtime a
+    user can query the reflection information and skip calling the size query
+    function when sizes are statically known.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::Util::UtilDialect",
   ];
 }
 

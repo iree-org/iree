@@ -77,7 +77,6 @@ func.func @shared_memory_joint_subview() {
   %c1 = arith.constant 1 : index
   %c64 = arith.constant 64 : index
   %cst_f32 = arith.constant 0.000000e+00 : f32
-  %cst_i8 = arith.constant 0 : i8
   %a = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
   %b = memref.alloc() : memref<256xf32, #gpu.address_space<workgroup>>
   %c = memref.alloc() : memref<32xf32, #gpu.address_space<workgroup>>
@@ -112,8 +111,6 @@ func.func @shared_memory_joint_subview() {
 
 func.func @view_like_ops() {
   %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c64 = arith.constant 64 : index
   %cst_f32 = arith.constant 0.000000e+00 : f32
   %a = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
   %b = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
@@ -144,7 +141,6 @@ func.func @view_like_ops() {
 func.func @select_alloc(%val : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c128 = arith.constant 128 : index
   %cst_f32 = arith.constant 0.000000e+00 : f32
   %a = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
   %b = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
@@ -157,18 +153,24 @@ func.func @select_alloc(%val : index) {
 }
 // CHECK-LABEL: func.func @select_alloc
 //   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc() : memref<1024xi8, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_A:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_B:.+]] = memref.view %[[ALLOC]][%[[C512]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_C:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   %[[CMP:.+]] = arith.cmpi eq, %{{.*}}, %[[C1]] : index
+//       CHECK:   %[[SELECT:.+]] = arith.select %[[CMP]], %[[VIEW_A]], %[[VIEW_B]] : memref<128xf32, #gpu.address_space<workgroup>>
+//       CHECK:   memref.store %{{.*}}, %[[SELECT]][%[[C0]]] : memref<128xf32, #gpu.address_space<workgroup>>
+//       CHECK:   gpu.barrier
+//       CHECK:   memref.store %{{.*}}, %[[VIEW_C]][%[[C0]]] : memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   return
 
 // -----
 
 func.func @select_alloc_with_if(%val : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c128 = arith.constant 128 : index
   %cst_f32 = arith.constant 0.000000e+00 : f32
   %a = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
   %b = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
@@ -185,18 +187,24 @@ func.func @select_alloc_with_if(%val : index) {
 }
 // CHECK-LABEL: func.func @select_alloc_with_if
 //   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc() : memref<1024xi8, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_A:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_B:.+]] = memref.view %[[ALLOC]][%[[C512]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_C:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   %[[CMP:.+]] = arith.cmpi eq, %{{.*}}, %[[C1]] : index
+//       CHECK:   %[[SELECT:.+]] = arith.select %[[CMP]], %[[VIEW_A]], %[[VIEW_B]] : memref<128xf32, #gpu.address_space<workgroup>>
+//       CHECK:   memref.store %{{.*}}, %[[SELECT]][%[[C0]]] : memref<128xf32, #gpu.address_space<workgroup>>
+//       CHECK:   gpu.barrier
+//       CHECK:   memref.store %{{.*}}, %[[VIEW_C]][%[[C0]]] : memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   return
 
 // -----
 
 func.func @alloc_with_if(%val : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c128 = arith.constant 128 : index
   %cst_f32 = arith.constant 0.000000e+00 : f32
   %a = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
   %b = memref.alloc() : memref<128xf32, #gpu.address_space<workgroup>>
@@ -212,8 +220,18 @@ func.func @alloc_with_if(%val : index) {
 }
 // CHECK-LABEL: func.func @alloc_with_if
 //   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc() : memref<1024xi8, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_A:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_B:.+]] = memref.view %[[ALLOC]][%[[C512]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   %[[VIEW_C:.+]] = memref.view %[[ALLOC]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   %[[CMP:.+]] = arith.cmpi eq, %{{.*}}, %[[C1]] : index
+//       CHECK:   scf.if %[[CMP]] {
+//       CHECK:     memref.store %{{.*}}, %[[VIEW_A]][%[[C0]]] : memref<128xf32, #gpu.address_space<workgroup>>
+//       CHECK:   } else {
+//       CHECK:     memref.store %{{.*}}, %[[VIEW_B]][%[[C0]]] : memref<128xf32, #gpu.address_space<workgroup>>
+//       CHECK:   }
+//       CHECK:   gpu.barrier
+//       CHECK:   memref.store %{{.*}}, %[[VIEW_C]][%[[C0]]] : memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   return

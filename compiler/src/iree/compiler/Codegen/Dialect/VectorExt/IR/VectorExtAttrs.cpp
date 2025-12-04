@@ -304,7 +304,7 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
                                       AffineMap resultMap) {
   constexpr int64_t kInvalid = -1;
   if (llvm::any_of(layouts, [](VectorLayoutInterface layout) {
-        return !mlir::isa<NestedLayoutAttr>(layout);
+        return !isa<NestedLayoutAttr>(layout);
       })) {
     return NestedLayoutAttr();
   }
@@ -313,7 +313,7 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
   SmallVector<NestedLayoutAttr> nestedLayouts;
   llvm::transform(layouts, std::back_inserter(nestedLayouts),
                   [&](VectorLayoutInterface layout) {
-                    return mlir::cast<NestedLayoutAttr>(layout);
+                    return cast<NestedLayoutAttr>(layout);
                   });
 
   int64_t resRank = resultMap.getNumResults();

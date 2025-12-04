@@ -102,7 +102,7 @@ func.func @custom_op_compilation_info(%arg0 : tensor<384x512xf32>, %arg1 : tenso
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[24, 32]]>
 //  CHECK-DAG: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = CPUDefault>
 //      CHECK: func @custom_op_compilation_info(
-// CHECK-SAME:     translation_info = #translation
+// CHECK-SAME:     translation_info = #[[TRANSLATION_INFO]]
 //      CHECK:   iree_linalg_ext.custom_op
 // CHECK-SAME:       attributes {lowering_config = #[[CONFIG]]}
 //  CHECK-NOT:   compilation_info

@@ -69,6 +69,18 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
         "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clReplicateGlobalsPerAffinity(
+    "iree-flow-experimental-replicate-globals-per-affinity",
+    llvm::cl::desc(
+        "Replicates globals for each unique affinity they are used with."),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clTransferToReplicateGlobals(
+    "iree-stream-experimental-transfer-to-replicate-globals",
+    llvm::cl::desc(
+        "Use transfers to replicate globals for each unique affinity."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Flow {
 
 using FunctionLikeNest =
@@ -117,6 +129,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // on it being correct (and we maintain it as correct from this point on, so
   // this is our gate).
   passManager.addPass(IREE::Util::createVerifyInitializationOrderPass());
+
+  // Propagate attributes from callees to call sites for local analysis.
+  passManager.addPass(IREE::Util::createAttributeCallGraphPass());
 
   FunctionLikeNest(passManager)
       .addPass([&]() {
@@ -229,6 +244,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
     auto executablePassManager = passManager.nest<IREE::Flow::ExecutableOp>();
     executablePassManager.addPass(IREE::Flow::createCanonicalizePass());
     executablePassManager.addPass(mlir::createCSEPass());
+  }
+
+  // Replicate globals per affinity if requested.
+  if (clReplicateGlobalsPerAffinity) {
+    passManager.addPass(IREE::Flow::createReplicateGlobalsPerAffinityPass(
+        IREE::Flow::ReplicateGlobalsPerAffinityPassOptions{
+            clTransferToReplicateGlobals}));
   }
 
   // Symbol DCE any remaining variables/functions that are now no longer

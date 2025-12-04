@@ -59,7 +59,7 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
   auto entryPoint = matmul->getParentOfType<mlir::FunctionOpInterface>();
 
   auto getResultBits = [](linalg::LinalgOp linalgOp) {
-    auto shapedType = llvm::cast<ShapedType>(linalgOp->getResult(0).getType());
+    auto shapedType = cast<ShapedType>(linalgOp->getResult(0).getType());
     return IREE::Util::getTypeBitWidth(shapedType.getElementType());
   };
   auto matmulResultBits = getResultBits(matmul);
@@ -161,9 +161,9 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as convolution...\n");
 
   Type inputType = linalgOp.getDpsInputOperand(0)->get().getType();
-  ArrayRef<int64_t> inputShape = llvm::cast<ShapedType>(inputType).getShape();
+  ArrayRef<int64_t> inputShape = cast<ShapedType>(inputType).getShape();
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
-  ArrayRef<int64_t> outputShape = llvm::cast<ShapedType>(outputType).getShape();
+  ArrayRef<int64_t> outputShape = cast<ShapedType>(outputType).getShape();
   // Restrict to pure 4-D input/output shapes for now. This excludes convolution
   // ops with 1- or 3-D window sizes. It also excludes 2-D-window convolution
   // ops like `linalg.depthwise_conv_2d_nhwc_hwcm`.
@@ -225,8 +225,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     return failure();
   }
 
-  const int bitwidth =
-      llvm::cast<ShapedType>(outputType).getElementTypeBitWidth();
+  const int bitwidth = cast<ShapedType>(outputType).getElementTypeBitWidth();
   const int vectorSize = kMaxVectorNumBits / bitwidth;
 
   // We use `vectorSize` as the tile size along IC dimension. If smaller than
@@ -335,8 +334,8 @@ std::tuple<int, int, int, int> getMatmulBMNKIndex(linalg::LinalgOp op,
                                                   int *lastParallelDim) {
   OpOperand *lhs = op.getDpsInputOperand(0);
   OpOperand *rhs = op.getDpsInputOperand(1);
-  auto lhsShape = llvm::cast<ShapedType>(lhs->get().getType()).getShape();
-  auto rhsShape = llvm::cast<ShapedType>(rhs->get().getType()).getShape();
+  auto lhsShape = cast<ShapedType>(lhs->get().getType()).getShape();
+  auto rhsShape = cast<ShapedType>(rhs->get().getType()).getShape();
 
   auto lhsLoopIndices =
       llvm::map_to_vector(llvm::seq<int>(0, lhsShape.size()), [&](int i) {
@@ -605,8 +604,8 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
   OpOperand *lhs = op.getDpsInputOperand(0);
   OpOperand *rhs = op.getDpsInputOperand(1);
 
-  auto lhsType = llvm::cast<ShapedType>(lhs->get().getType());
-  auto rhsType = llvm::cast<ShapedType>(rhs->get().getType());
+  auto lhsType = cast<ShapedType>(lhs->get().getType());
+  auto rhsType = cast<ShapedType>(rhs->get().getType());
   auto elementBits =
       static_cast<int>(IREE::Util::getTypeBitWidth(lhsType.getElementType()));
   if (!llvm::is_contained({8, 16, 32}, elementBits))
@@ -810,7 +809,7 @@ bool isCooperativeMatrixFusable(linalg::GenericOp genericOp) {
   // matrix loads can only happen from StorageBuffer or Workgroup storage
   // classes.
   for (Value input : genericOp.getInputs()) {
-    if (llvm::isa<TensorType>(input.getType())) {
+    if (isa<TensorType>(input.getType())) {
       if (matchPattern(input, m_Constant()))
         return false;
       continue;
@@ -888,7 +887,7 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // vectorization.
 
   auto getElementType = [](Value v) {
-    return llvm::cast<ShapedType>(v.getType()).getElementType();
+    return cast<ShapedType>(v.getType()).getElementType();
   };
 
   Type lhsElem = getElementType(lhs);
@@ -922,11 +921,9 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // Infer if lhs or rhs is transposed to help generate better schedule.
   SmallVector<AffineMap> maps = op.getIndexingMapsArray();
   bool transposedLhs =
-      kIndex !=
-      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+      kIndex != cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
   bool transposedRhs =
-      nIndex !=
-      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+      nIndex != cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   FailureOr<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
@@ -1175,7 +1172,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     return failure();
 
   const Type elementType =
-      llvm::cast<ShapedType>(op.getDpsInits()[0].getType()).getElementType();
+      cast<ShapedType>(op.getDpsInits()[0].getType()).getElementType();
   if (!elementType.isIntOrFloat())
     return failure();
   unsigned bitWidth = IREE::Util::getTypeBitWidth(elementType);

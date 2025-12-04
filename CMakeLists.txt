@@ -6,14 +6,6 @@
 
 cmake_minimum_required(VERSION 3.21...3.24)
 
-# LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
-# CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
-# New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
-set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
-if(POLICY CMP0116)
-  cmake_policy(SET CMP0116 OLD)
-endif()
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # NOTE: ASM is at the end of the list so CMake can test whether the C/CXX
@@ -71,6 +63,14 @@ endif()
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
+
+# Enable libbacktrace for Linux stack traces by default on Linux.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(IREE_ENABLE_LIBBACKTRACE_DEFAULT ON)
+else()
+  set(IREE_ENABLE_LIBBACKTRACE_DEFAULT OFF)
+endif()
+option(IREE_ENABLE_LIBBACKTRACE "Enables libbacktrace for Linux stack traces." ${IREE_ENABLE_LIBBACKTRACE_DEFAULT})
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
@@ -1077,8 +1077,19 @@ endif()
 
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
-  iree_set_spirv_cross_cmake_options()
-  add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
+  function(iree_add_spirv_cross_subdirectory)
+    if(IREE_ENABLE_UBSAN)
+      # Disable vptr sanitizer for spirv_cross to avoid UBSan warnings.
+      # Modification is in function scope only, so parent scope is unaffected.
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-sanitize=vptr")
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-sanitize=vptr")
+    endif()
+
+    iree_set_spirv_cross_cmake_options()
+    add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
+  endfunction()
+
+  iree_add_spirv_cross_subdirectory()
 endif()
 
 #-------------------------------------------------------------------------------
@@ -1131,6 +1142,10 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   set(_PYTHONPATH_ENV_PS1 "$env:PYTHONPATH = '$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>'\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env.ps1" CONTENT "${_PYTHONPATH_ENV_PS1}")
 endif()
+
+# Build libbacktrace from source for Linux stack traces.
+# Creates an empty target if disabled or not on Linux.
+add_subdirectory(build_tools/third_party/libbacktrace EXCLUDE_FROM_ALL)
 
 if(IREE_BUILD_BINDINGS_TFLITE)
   add_subdirectory(runtime/bindings/tflite)

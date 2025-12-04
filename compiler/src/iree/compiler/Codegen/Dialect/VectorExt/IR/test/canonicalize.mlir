@@ -136,14 +136,14 @@ func.func @transfer_gather_fold_single_element(%scalar: vector<1xindex>,
   return %out : vector<64x1xf16>
 }
 
-// CHECK-LABEL: transfer_gather_fold_single_element
+// CHECK-LABEL: @transfer_gather_fold_single_element
 // CHECK-SAME: %{{.*}}: vector<1xindex>, %[[ARG1:.*]]: vector<64x1xindex>
 // CHECK: transfer_gather
 // CHECK-SAME: [None, %[[ARG1]]
 
 // -----
 
-func.func @transfer_gather_fold_contigious_load(%scalar: vector<64x1xindex>,
+func.func @transfer_gather_fold_contiguous_load(%scalar: vector<64x1xindex>,
   %indices: vector<64x1xindex>,
   %source: tensor<4096x64xf16>)
   -> vector<64x1xf16> {
@@ -157,8 +157,6 @@ func.func @transfer_gather_fold_contigious_load(%scalar: vector<64x1xindex>,
   return %out : vector<64x1xf16>
 }
 
-// CHECK-LABEL: @transfer_gather_fold_contigious_load
+// CHECK-LABEL: @transfer_gather_fold_contiguous_load
 // CHECK: vector.transfer_read
 // CHECK-NOT: transfer_gather
-
-// -----

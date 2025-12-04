@@ -167,7 +167,7 @@ createExportOp(RewriterBase &rewriter, Location loc,
   SmallVector<Location> workloadLocs;
   for (auto argument : encodeOp.getSourceEncodingDims()) {
     Type argumentType = argument.getType();
-    if (!llvm::isa<IndexType>(argumentType)) {
+    if (!isa<IndexType>(argumentType)) {
       continue;
     }
     workloadTypes.push_back(argumentType);
@@ -175,7 +175,7 @@ createExportOp(RewriterBase &rewriter, Location loc,
   }
   for (auto argument : encodeOp.getResultEncodingDims()) {
     Type argumentType = argument.getType();
-    if (!llvm::isa<IndexType>(argumentType)) {
+    if (!isa<IndexType>(argumentType)) {
       continue;
     }
     workloadTypes.push_back(argumentType);

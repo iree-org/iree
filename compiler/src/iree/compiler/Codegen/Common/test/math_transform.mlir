@@ -218,10 +218,9 @@ func.func @rewrite_fpowi_const_exponent_on_rocm(%arg0: f32) -> f32 attributes {
   hal.executable.target =  #hal.executable.target<"rocm", "rocm-hsaco-fb", {}>
 } {
   // math.fpowi with constant exponent should always be rewritten to muls.
-  // CHECK-NOT:    math.fpowi
-  // CHECK:        arith.mulf {{.*}} : f32
-  // CHECK:        arith.mulf {{.*}} : f32
-  %c2 = arith.constant 3 : i32
-  %0 = math.fpowi %arg0, %c2 : f32, i32
+  // CHECK-NOT:     math.fpowi
+  // CHECK-COUNT-2: arith.mulf {{.*}} : f32
+  %c3 = arith.constant 3 : i32
+  %0 = math.fpowi %arg0, %c3 : f32, i32
   return %0 : f32
 }

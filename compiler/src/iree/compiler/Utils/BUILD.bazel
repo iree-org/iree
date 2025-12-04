@@ -20,6 +20,7 @@ iree_td_library(
     srcs = enforce_glob(
         [
             "CommonTypeConstraints.td",
+            "DocMetadata.td",
         ],
         include = ["*.td"],
     ),

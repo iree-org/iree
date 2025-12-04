@@ -84,9 +84,11 @@ def GPUConvertToCoalescedDMAPass :
   let summary = "Convert operations to coalesced DMA operations.";
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::arith::ArithDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
-    "::mlir::tensor::TensorDialect"
+    "::mlir::tensor::TensorDialect",
+    "::mlir::vector::VectorDialect"
   ];
 }
 
@@ -259,6 +261,7 @@ def GPUPromoteMatmulOperandsPass :
     "::mlir::bufferization::BufferizationDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::linalg::LinalgDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
@@ -356,7 +359,9 @@ def GPUApplyTilingLevelPass :
            /*default=*/"true",
            "Allow pad fusion to generate zero size slices">,
     Option<"normalizeLoops", "normalize-loops", "bool", "false",
-           "Enable normalization for scf loops">
+           "Enable normalization for scf loops">,
+    Option<"fuseConsumers", "fuse-consumers", "bool", /*default=*/"true",
+           "Enable fusing consumers into scf.forall during tiling">
   ];
 }
 

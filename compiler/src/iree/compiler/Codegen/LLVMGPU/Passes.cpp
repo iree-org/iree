@@ -165,10 +165,10 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   bool needsBarrier = false;
-  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(from.getType()))) {
+  if (hasSharedMemoryAddressSpace(cast<MemRefType>(from.getType()))) {
     needsBarrier = true;
   }
-  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
+  if (hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
   if (needsBarrier)
@@ -335,8 +335,7 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
   // Bail out if the memref type specifies a nonnull memory space that is not
   // #gpu.address_space.
   if (memorySpace &&
-      !llvm::isa<gpu::AddressSpaceAttr, amdgpu::AddressSpaceAttr>(
-          memorySpace)) {
+      !isa<gpu::AddressSpaceAttr, amdgpu::AddressSpaceAttr>(memorySpace)) {
     return failure();
   }
 
@@ -465,6 +464,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCSEPass());
   }
 
+  funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
+
   // Step 3. Decompose pack and unpack ops and propagate the resulting reshapes.
   funcPassManager.addPass(createDecomposePackUnPackOpsPass(
       DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/false,
@@ -490,6 +491,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Thread;
     options.normalizeLoops = pipelineOptions.useIgemmConvolution;
+    // TileAndFuse currently relies on no consumer fusion to order fusion.
+    // Disable consumer fusion to maintain this.
+    // TODO: Fix this by choosing which consumers to fuse to what.
+    options.fuseConsumers = false;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -497,6 +502,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Subgroup;
+    // TileAndFuse currently relies on no consumer fusion to order fusion.
+    // Disable consumer fusion to maintain this.
+    // TODO: Fix this by choosing which consumers to fuse to what.
+    options.fuseConsumers = false;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
   }
   funcPassManager.addPass(IREE::GPU::createDistributeInnerTiledToLanesPass());
@@ -641,49 +650,6 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
 }
 
 //===---------------------------------------------------------------------===//
-// Transpose
-//===---------------------------------------------------------------------===//
-
-void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
-                                 const GPUPipelineOptions &options) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
-
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(
-      createGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
-  funcPassManager.addPass(createGPUTensorTilePass());
-
-  // Linalg -> vector
-  addGPUVectorizationPasses(funcPassManager);
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-
-  // tensor to memref
-  addBufferizePasses(funcPassManager);
-
-  // distribute foreach threads
-  funcPassManager.addPass(createGPUDistributePass());
-
-  funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  if (options.enableReduceSharedMemoryBankConflicts) {
-    // May or may not need to reduce shared mememory conflicts.
-    GPUReduceBankConflictsPassOptions options = {};
-    options.paddingBits = 32;
-    funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
-  }
-
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-}
-
-//===---------------------------------------------------------------------===//
 // Vector Distribution
 //===---------------------------------------------------------------------===//
 
@@ -717,11 +683,11 @@ void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
 static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
   bool needsBarrier = false;
-  MemRefType fromType = llvm::cast<MemRefType>(from.getType());
+  MemRefType fromType = cast<MemRefType>(from.getType());
   if (hasSharedMemoryAddressSpace(fromType)) {
     needsBarrier = true;
   }
-  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
+  if (hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
   if (needsBarrier)
@@ -1117,9 +1083,6 @@ static void buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createMaterializeDeviceEncodingPass);
-    // TODO(#20160): Combine the EncodingToPaddingPasses with the
-    // MaterializeDeviceEncodingPass.
-    addEncodingToPaddingPasses(funcPassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);

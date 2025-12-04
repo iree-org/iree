@@ -218,8 +218,8 @@ struct ConvertGetRawInterfaceBindingBufferOp
            "entry point not conforming to requirements");
 
     IndexSet indexSet(op.getLoc(), rewriter);
-    auto bindingType = llvm::cast<IREE::Util::ListType>(bindingsArg.getType())
-                           .getElementType();
+    auto bindingType =
+        cast<IREE::Util::ListType>(bindingsArg.getType()).getElementType();
     rewriter
         .replaceOpWithNewOp<IREE::Util::ListGetOp>(
             op, bindingType, bindingsArg,
@@ -245,8 +245,8 @@ struct ConvertHALInterfaceBindingSubspanOp
            "entry point not conforming to requirements");
 
     IndexSet indexSet(op.getLoc(), rewriter);
-    auto bindingType = llvm::cast<IREE::Util::ListType>(bindingsArg.getType())
-                           .getElementType();
+    auto bindingType =
+        cast<IREE::Util::ListType>(bindingsArg.getType()).getElementType();
     auto sourceBuffer = IREE::Util::ListGetOp::create(
                             rewriter, op.getLoc(), bindingType, bindingsArg,
                             rewriter.createOrFold<arith::ConstantIndexOp>(
@@ -260,7 +260,7 @@ struct ConvertHALInterfaceBindingSubspanOp
 
       // Compute the dest size by multiplying the element size by all extents
       // (static and dynamic).
-      auto memRefType = llvm::cast<MemRefType>(op.getResult().getType());
+      auto memRefType = cast<MemRefType>(op.getResult().getType());
       Value destSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
           op.getLoc(), memRefType.getElementType());
       auto dynamicExtentIt = adaptor.getDynamicDims().begin();

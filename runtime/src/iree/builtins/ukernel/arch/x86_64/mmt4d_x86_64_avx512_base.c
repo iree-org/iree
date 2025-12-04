@@ -16,13 +16,6 @@ iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base(
   float* IREE_UK_RESTRICT out_ptr = out_tile;
   const float* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const float* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
-  // The prefetches in this function are motivated by benchmarking on
-  // Skylake; their effect was a > 1.3x speedup on 1024x1024 matmuls. The
-  // prefetch-ahead offset of 128*sizeof(float) in the loop was empirically
-  // determined. Similar prefetches did not produce any benefit in other
-  // kernels, even though they are very similar to this one.
-  _mm_prefetch((const char*)lhs_ptr, _MM_HINT_T0);
-  _mm_prefetch((const char*)rhs_ptr, _MM_HINT_T0);
   __m512 acc[16];
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
@@ -36,12 +29,10 @@ iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base(
 
   for (int k = 0; k < params->K; ++k) {
     __m512 rhs = _mm512_loadu_ps(rhs_ptr);
-    _mm_prefetch((const char*)(rhs_ptr + 128), _MM_HINT_T0);
     rhs_ptr += 16;
     IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
       acc[i] = _mm512_fmadd_ps(rhs, _mm512_set1_ps(lhs_ptr[i]), acc[i]);
     }
-    _mm_prefetch((const char*)(lhs_ptr + 128), _MM_HINT_T0);
     lhs_ptr += M0;
   }
 
@@ -79,10 +70,6 @@ iree_uk_mmt4d_tile_f16f16fXX_1x16x1_to_16x16x1_x86_64_avx512_base(
   IREE_UK_ASSERT(M0 >= 1 && M0 <= 16 && iree_uk_is_po2_u32(M0));
   const iree_uk_uint16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_uint16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
-  // The prefetches in this function are carried over from
-  // iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base.
-  _mm_prefetch((const char*)lhs_ptr, _MM_HINT_T0);
-  _mm_prefetch((const char*)rhs_ptr, _MM_HINT_T0);
   __m512 acc[16];
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     if (acc_type == IREE_UK_TYPE_FLOAT_32) {
@@ -105,13 +92,11 @@ iree_uk_mmt4d_tile_f16f16fXX_1x16x1_to_16x16x1_x86_64_avx512_base(
 
   for (int k = 0; k < params->K; ++k) {
     __m512 rhs = _mm512_cvtph_ps(_mm256_loadu_si256((const __m256i*)rhs_ptr));
-    _mm_prefetch((const char*)(rhs_ptr + 128), _MM_HINT_T0);
     rhs_ptr += 16;
     IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
       acc[i] = _mm512_fmadd_ps(_mm512_cvtph_ps(_mm256_set1_epi16(lhs_ptr[i])),
                                rhs, acc[i]);
     }
-    _mm_prefetch((const char*)(lhs_ptr + 128), _MM_HINT_T0);
     lhs_ptr += M0;
   }
   if (acc_type == IREE_UK_TYPE_FLOAT_32) {

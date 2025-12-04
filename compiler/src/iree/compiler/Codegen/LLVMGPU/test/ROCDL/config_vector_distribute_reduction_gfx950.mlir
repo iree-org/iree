@@ -35,7 +35,7 @@ func.func @skinny_scaled_matmul() {
   %13 = linalg.generic {
     indexing_maps = [#lhs_map, #rhs_map, #scale_m, #scale_n, #out_map],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]
-  } ins(%6, %8, %9, %10 : tensor<4x512x32xf4E2M1FN>, tensor<1024x512x32xf4E2M1FN>, tensor<4x512xf8E8M0FNU>, tensor<1024x512xf8E8M0FNU>) outs(%11 : tensor<4x1024xf32>) {
+  } ins(%6, %8, %9, %10 : tensor<4x512x32xf4E2M1FN>, tensor<1024x512x32xf4E2M1FN>, tensor<4x512xf8E8M0FNU>, tensor<1024x512xf8E8M0FNU>) outs(%12 : tensor<4x1024xf32>) {
   ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
     %14 = arith.scaling_extf %a, %a_scale : f4E2M1FN, f8E8M0FNU to f32
     %15 = arith.scaling_extf %b, %b_scale : f4E2M1FN, f8E8M0FNU to f32

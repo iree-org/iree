@@ -71,7 +71,7 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
           "function");
     }
     int allocaSize = 1;
-    auto allocaType = llvm::cast<ShapedType>(allocaOp.getType());
+    auto allocaType = cast<ShapedType>(allocaOp.getType());
     for (auto dimSize : allocaType.getShape()) {
       if (ShapedType::isDynamic(dimSize))
         continue;

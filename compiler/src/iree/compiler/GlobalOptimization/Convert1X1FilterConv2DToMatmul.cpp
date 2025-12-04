@@ -27,7 +27,7 @@ public:
 
   LogicalResult matchAndRewrite(Conv2DOpType convOp,
                                 PatternRewriter &rewriter) const override {
-    auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
+    auto filterShapeType = dyn_cast<RankedTensorType>(
         convOp.getDpsInputOperand(1)->get().getType());
     if (!filterShapeType)
       return failure();

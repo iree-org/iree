@@ -15,10 +15,11 @@ hal.executable public @generic_static {
       func.func @generic_static() {
 // CHECK-LABEL: func.func @generic_static
 //   CHECK-NOT:   affine.min
-//   CHECK-NOT:   affine.min
-//       CHECK: linalg.generic
-//       CHECK:} -> tensor<32x32xf32>
-//       CHECK: iree_tensor_ext.dispatch.tensor.store {{.*}} sizes = [32, 32], strides = [1, 1] : tensor<32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096x4096xf32>>
+//       CHECK:   iree_tensor_ext.dispatch.tensor.load {{.*}} sizes = [32, 32], strides = [1, 1] : {{.*}} -> tensor<32x32xf32>
+//       CHECK:   tensor.empty() : tensor<32x32xf32>
+//       CHECK:   linalg.generic
+//       CHECK:   } -> tensor<32x32xf32>
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store {{.*}} sizes = [32, 32], strides = [1, 1] : tensor<32x32xf32>
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x4096xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096x4096xf32>>

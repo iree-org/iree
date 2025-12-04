@@ -108,16 +108,16 @@ func.func @to_simd_op(%simt: vector<4x4x4xf16>) -> vector<64x64xf16> {
   func.return %simd : vector<64x64xf16>
 }
 // CHECK-LABEL: func.func @to_simd_op
-// CHECK:      iree_vector_ext.to_simd
+// CHECK:      iree_vector_ext.to_simd %{{.+}} : vector<4x4x4xf16> -> vector<64x64xf16>
 
 // -----
 
 func.func @to_simt_op(%simd: vector<64x64xf32>) -> vector<4x4x4xf32> {
-  %simt = iree_vector_ext.to_simd %simd : vector<64x64xf32> -> vector<4x4x4xf32>
+  %simt = iree_vector_ext.to_simt %simd : vector<64x64xf32> -> vector<4x4x4xf32>
   func.return %simt : vector<4x4x4xf32>
 }
 // CHECK-LABEL: func.func @to_simt_op
-// CHECK:      iree_vector_ext.to_simd
+// CHECK:      iree_vector_ext.to_simt %{{.+}} : vector<64x64xf32> -> vector<4x4x4xf32>
 
 // -----
 
@@ -125,17 +125,17 @@ func.func @to_simd_op_0d(%simt: vector<f16>) -> vector<f16> {
   %simd = iree_vector_ext.to_simd %simt : vector<f16> -> vector<f16>
   func.return %simd : vector<f16>
 }
-// CHECK-LABEL: func.func @to_simd_op
-// CHECK:      iree_vector_ext.to_simd
+// CHECK-LABEL: func.func @to_simd_op_0d
+// CHECK:      iree_vector_ext.to_simd %{{.+}} : vector<f16> -> vector<f16>
 
 // -----
 
 func.func @to_simt_op_0d(%simd: vector<f32>) -> vector<f32> {
-  %simt = iree_vector_ext.to_simd %simd : vector<f32> -> vector<f32>
+  %simt = iree_vector_ext.to_simt %simd : vector<f32> -> vector<f32>
   func.return %simt : vector<f32>
 }
-// CHECK-LABEL: func.func @to_simt_op
-// CHECK:      iree_vector_ext.to_simd
+// CHECK-LABEL: func.func @to_simt_op_0d
+// CHECK:      iree_vector_ext.to_simt %{{.+}} : vector<f32> -> vector<f32>
 
 // -----
 
@@ -177,5 +177,15 @@ func.func @transfer_gather(%indices: vector<128xindex>,
   return %out, %out1, %out2, %out3 : vector<128x64xf16>, vector<128x64xf16>, vector<128x64xf16>, vector<128x64xf16>
 }
 
+// CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+
 // CHECK-LABEL: func.func @transfer_gather
-// CHECK: iree_vector_ext.transfer_gather
+// CHECK-SAME:    %[[INDICES0:.+]]: vector<128xindex>, %[[INDICES1:.+]]: vector<64xindex>, %[[INDICES2:.+]]: vector<128x64xindex>, %[[SOURCE:.+]]: tensor<4096x64xf16>
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][None, %[[INDICES1]]: vector<64xindex>], %[[PAD]] {indexed_maps = [#[[$MAP0]]]} : tensor<4096x64xf16>, vector<128x64xf16>
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][%[[INDICES0]]: vector<128xindex>, None], %[[PAD]] {indexed_maps = [#[[$MAP1]]]} : tensor<4096x64xf16>, vector<128x64xf16>
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][%[[INDICES0]]: vector<128xindex>, %[[INDICES1]]: vector<64xindex>], %[[PAD]] {indexed_maps = [#[[$MAP1]], #[[$MAP0]]]} : tensor<4096x64xf16>, vector<128x64xf16>
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][None, %[[INDICES2]]: vector<128x64xindex>], %[[PAD]] {indexed_maps = [#[[$MAP2]]]} : tensor<4096x64xf16>, vector<128x64xf16>

@@ -1,12 +1,13 @@
 // RUN: iree-opt --iree-codegen-lower-memref-ukernels %s | FileCheck %s
 
 // CHECK-LABEL: @ukernel_impl
+// CHECK-LABEL: @test
 // CHECK-LABEL: @replace_generic_with_ukernel_impl
 // CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: memref<16x32xf32>
 // CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: memref<16x32xf32>
 // CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: memref<16x16xf32>
-// CHECK-NOT:     linalg.generic
 // CHECK:         linalg.fill
+// CHECK-NOT:     linalg.generic
 // CHECK:         call @ukernel_impl(%[[LHS]], %[[RHS]], %[[OUT]]) : (memref<16x32xf32>, memref<16x32xf32>, memref<16x16xf32>) -> ()
 // CHECK:         return
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.ukernel_provider = #iree_codegen.symbolic_ukernel_provider}>

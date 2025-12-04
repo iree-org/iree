@@ -120,6 +120,23 @@ public:
   // as a shaped `vector<SIZExi8>` dense attr. The builder is left unmodified.
   DenseIntElementsAttr getBufferAttr(MLIRContext *context);
 
+  // Captures the current contents of the flatbuffer builder and returns them
+  // as a shaped `vector<SIZExi8>` dense attr. The builder is left unmodified.
+  // A 64-byte prefix structure is prepended to the buffer containing the file
+  // magic number for identification, a coarse version, and an 8 byte size
+  // (excluding the header). See iree_flatbuffer_file_header_t.
+  DenseIntElementsAttr getHeaderPrefixedBufferAttr(MLIRContext *context,
+                                                   uint32_t magic,
+                                                   uint32_t version);
+  DenseIntElementsAttr getHeaderPrefixedBufferAttr(MLIRContext *context,
+                                                   const char *magic,
+                                                   uint32_t version) {
+    assert(strlen(magic) == 4 && "must be a flatbuffers 4 character code");
+    uint32_t magic_value = 0;
+    memcpy(&magic_value, magic, sizeof(magic_value));
+    return getHeaderPrefixedBufferAttr(context, magic_value, version);
+  }
+
   // Copies the current contents of the flatbuffer builder to the target output
   // stream. The builder is left unmodified.
   //

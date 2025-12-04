@@ -67,8 +67,7 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
     }
 
     // Only DimOps with ranked tensors are supported.
-    auto tensorType =
-        llvm::dyn_cast<RankedTensorType>(dimOp.getSource().getType());
+    auto tensorType = dyn_cast<RankedTensorType>(dimOp.getSource().getType());
     if (!tensorType)
       continue;
 

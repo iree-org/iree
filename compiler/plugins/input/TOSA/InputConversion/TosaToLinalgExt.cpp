@@ -35,11 +35,11 @@ public:
   LogicalResult matchAndRewrite(tosa::ScatterOp op,
                                 PatternRewriter &rewriter) const final {
     auto values = op.getValuesIn();
-    auto indices = llvm::cast<Value>(op.getIndices());
-    auto updates = llvm::cast<Value>(op.getInput());
-    auto valuesTy = llvm::dyn_cast<RankedTensorType>(values.getType());
-    auto indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
-    auto updatesTy = llvm::dyn_cast<RankedTensorType>(updates.getType());
+    auto indices = cast<Value>(op.getIndices());
+    auto updates = cast<Value>(op.getInput());
+    auto valuesTy = dyn_cast<RankedTensorType>(values.getType());
+    auto indicesTy = dyn_cast<RankedTensorType>(indices.getType());
+    auto updatesTy = dyn_cast<RankedTensorType>(updates.getType());
     ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
 
     if (!valuesTy || !indicesTy || !updatesTy)
@@ -63,7 +63,7 @@ public:
 
     indices = tensor::ExpandShapeOp::create(
         builder, indicesTy.clone(expandIndShape), indices, expandIndMap);
-    indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
+    indicesTy = dyn_cast<RankedTensorType>(indices.getType());
 
     // Materialize the batch indice as LinalgExt scatter is not batched.
     {
@@ -101,7 +101,7 @@ public:
                 .getResult(0);
       }
 
-      indicesTy = llvm::cast<RankedTensorType>(indicesTy.clone(
+      indicesTy = cast<RankedTensorType>(indicesTy.clone(
           {indicesTy.getDimSize(0), indicesTy.getDimSize(1), 2}));
       indices = tosa::ConcatOp::create(builder, indicesTy,
                                        ValueRange{batchIdx, indices},
@@ -109,7 +109,7 @@ public:
     }
 
     auto collapseBatch = [](Value value, ImplicitLocOpBuilder &b) -> Value {
-      auto valueTy = llvm::cast<ShapedType>(value.getType());
+      auto valueTy = cast<ShapedType>(value.getType());
       llvm::SmallVector<int64_t> collapseShape(valueTy.getShape().drop_front());
       llvm::SmallVector<ReassociationExprs> collapseMap(valueTy.getRank() - 1);
       collapseMap.front().push_back(b.getAffineDimExpr(0));

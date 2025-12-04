@@ -2,9 +2,9 @@
 
 #nested = #iree_vector_ext.nested_layout<
   subgroup_tile = [2, 1],
-  batch_tile = [2, 1],
+  batch_tile = [8, 1],
   outer_tile = [2, 1],
-  thread_tile = [16, 16],
+  thread_tile = [4, 16],
   element_tile = [2, 8],
 
   subgroup_strides = [1, 0],
@@ -34,13 +34,13 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: func @masked_read_write
 // CHECK: %[[DIM:.+]] = memref.dim %arg0, %c0 : memref<?x128xf16>
 // CHECK: %[[VSID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64) : index, index, index
-// CHECK: %[[VTID:.+]]:3 = affine.delinearize_index %thread_id_x into (16, 16) : index, index, index
+// CHECK: %[[VTID:.+]]:3 = affine.delinearize_index %thread_id_x into (4, 16) : index, index, index
 // CHECK: %[[LASTIDX:.+]] = arith.subi %[[DIM]], %c1 : index
-// CHECK: %[[PACKED_LASTIDX:.+]]:4 = affine.delinearize_index %[[LASTIDX]] into (2, 4, 16, 2) : index, index, index, index
+// CHECK: %[[PACKED_LASTIDX:.+]]:4 = affine.delinearize_index %[[LASTIDX]] into (2, 16, 4, 2) : index, index, index, index
 
-// CHECK: %[[ETILE_VALID:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %c1] by (4, 2) : index
+// CHECK: %[[ETILE_VALID:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %c1] by (16, 2) : index
 // CHECK: %[[ETILE_VALID_BOUND:.+]] = arith.addi %[[ETILE_VALID]], %c1 : index
-// CHECK: %[[DISTR_LASTIDX:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %[[PACKED_LASTIDX]]#3] by (4, 2) : index
+// CHECK: %[[DISTR_LASTIDX:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %[[PACKED_LASTIDX]]#3] by (16, 2) : index
 // CHECK: %[[DISTR_BOUND:.+]] = arith.addi %[[DISTR_LASTIDX]], %c1 : index
 
 // CHECK: %[[EQ_BOUND_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %[[PACKED_LASTIDX]]#2 : index
@@ -50,7 +50,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK: %[[SELTREE0:.+]] = arith.select %[[LT_BOUND_TID]], %[[ETILE_VALID_BOUND]], %c0 : index
 // CHECK: %[[SELTREE1:.+]] = arith.select %[[EQ_BOUND_TID]], %[[DISTR_BOUND]], %[[SELTREE0]] : index
-// CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c8, %c0 : index
+// CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c32, %c0 : index
 // CHECK: %[[SELTREE3:.+]] = arith.select %[[EQ_BOUND_SID]], %[[SELTREE1]], %[[SELTREE2]] : index
 // CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c8 : vector<2x8xi1>
 
@@ -381,7 +381,6 @@ func.func @paged_transfer_gather_mask(%indices: vector<16xindex>,
   %cst0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
   %c7 = arith.constant 7 : index
-  %dim = memref.dim %source, %c0 : memref<4096x512x8xf16>
   %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
@@ -405,15 +404,11 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: @paged_transfer_gather_mask
-// CHECK: %[[MASK0:.+]] = vector.create_mask %{{.*}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read
-// CHECK-SAME: %[[MASK0]]
-// CHECK: %[[MASK1:.+]] = vector.create_mask %{{.*}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read
-// CHECK-SAME: %[[MASK1]]
-// CHECK: %[[MASK2:.+]] = vector.create_mask %{{.*}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read
-// CHECK-SAME: %[[MASK2]]
-// CHECK: %[[MASK3:.+]] = vector.create_mask %{{.*}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read
-// CHECK-SAME: %[[MASK3]]
+// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[MASK]]
+// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[MASK]]
+// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[MASK]]
+// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[MASK]]

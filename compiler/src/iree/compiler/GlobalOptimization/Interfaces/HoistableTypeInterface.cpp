@@ -32,13 +32,13 @@ struct HoistableTensorTypeInterface
     : public IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableTensorTypeInterface, RankedTensorType> {
   bool isHoistableType(Type type) const {
-    auto tensorType = llvm::cast<RankedTensorType>(type);
+    auto tensorType = cast<RankedTensorType>(type);
     unsigned bitWidth =
         IREE::Util::getTypeBitWidth(tensorType.getElementType());
     return llvm::isPowerOf2_32(bitWidth) && bitWidth <= 64;
   }
   bool isHoistableLeafType(Type type) const {
-    auto tensorType = llvm::cast<RankedTensorType>(type);
+    auto tensorType = cast<RankedTensorType>(type);
     unsigned bitWidth =
         IREE::Util::getTypeBitWidth(tensorType.getElementType());
     // Never hoist boolean values; IREE still does implicit extension of
@@ -46,7 +46,7 @@ struct HoistableTensorTypeInterface
     return bitWidth != 1;
   }
   Type getPreferredStorageType(Type type) const {
-    auto tensorType = llvm::cast<RankedTensorType>(type);
+    auto tensorType = cast<RankedTensorType>(type);
     // Constant data should be statically shaped.
     if (!tensorType.hasStaticShape()) {
       return type;

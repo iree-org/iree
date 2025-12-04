@@ -1,9 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-global-loads))" %s | FileCheck %s
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64,
-                                                  {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
-                                                                                                     no_reduce_shared_memory_bank_conflicts = false,
-                                                                                                     use_igemm_convolution = false>}>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 func.func @matmul_copy_16x64xi8(%src: memref<16x64xi8>, %dest : memref<16x64xi8, #gpu.address_space<workgroup>>) attributes {translation_info = #translation_info} {
   %1 = amdgpu.fat_raw_buffer_cast %src resetOffset : memref<16x64xi8> to memref<16x64xi8, #amdgpu.address_space<fat_raw_buffer>>
@@ -21,12 +18,12 @@ func.func @matmul_copy_16x64xi8(%src: memref<16x64xi8>, %dest : memref<16x64xi8,
 // CHECK-SAME: %[[SRC:.*]]: memref<16x64xi8>
 // CHECK-SAME: %[[DEST:.*]]: memref<16x64xi8, #gpu.address_space<workgroup>>
 
-// CHECK: %[[C1:.*]] = arith.constant 1 : index
-// CHECK: %[[C4:.*]] = arith.constant 4 : index
-// CHECK: %[[C0:.*]] = arith.constant 0 : index
-// CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast %[[SRC]]
-// CHECK: %[[SGID:.*]] = gpu.subgroup_id
-// CHECK: %[[LID:.*]] = gpu.lane_id
+// CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
+// CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast %[[SRC]]
+// CHECK-DAG: %[[SGID:.*]] = gpu.subgroup_id
+// CHECK-DAG: %[[LID:.*]] = gpu.lane_id
 // CHECK: scf.for %[[ARG0:.*]] = %[[C0]] to %[[C4]] step %[[C1]] {
 // CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (1, 4, 64, 4)
 // CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (16, 64)
@@ -36,10 +33,7 @@ func.func @matmul_copy_16x64xi8(%src: memref<16x64xi8>, %dest : memref<16x64xi8,
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64,
-                                                  {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
-                                                                                                     no_reduce_shared_memory_bank_conflicts = false,
-                                                                                                     use_igemm_convolution = false>}>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 func.func @matmul_copy_64x16xi8(%src: memref<64x16xi8>, %dest: memref<64x16xi8, #gpu.address_space<workgroup>>) attributes {translation_info = #translation_info} {
   %1 = amdgpu.fat_raw_buffer_cast %src resetOffset : memref<64x16xi8> to memref<64x16xi8, #amdgpu.address_space<fat_raw_buffer>>
@@ -51,12 +45,12 @@ func.func @matmul_copy_64x16xi8(%src: memref<64x16xi8>, %dest: memref<64x16xi8, 
 // CHECK-SAME: %[[SRC:.*]]: memref<64x16xi8>
 // CHECK-SAME: %[[DEST:.*]]: memref<64x16xi8, #gpu.address_space<workgroup>>
 
-// CHECK: %[[C1:.*]] = arith.constant 1 : index
-// CHECK: %[[C4:.*]] = arith.constant 4 : index
-// CHECK: %[[C0:.*]] = arith.constant 0 : index
-// CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast %[[SRC]]
-// CHECK: %[[SGID:.*]] = gpu.subgroup_id
-// CHECK: %[[LID:.*]] = gpu.lane_id
+// CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
+// CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast %[[SRC]]
+// CHECK-DAG: %[[SGID:.*]] = gpu.subgroup_id
+// CHECK-DAG: %[[LID:.*]] = gpu.lane_id
 // CHECK: scf.for %[[ARG0:.*]] = %[[C0]] to %[[C4]] step %[[C1]] {
 // CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (1, 4, 64, 4)
 // CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (64, 16)
@@ -66,12 +60,7 @@ func.func @matmul_copy_64x16xi8(%src: memref<64x16xi8>, %dest: memref<64x16xi8, 
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-                                                   workgroup_size = [64, 1, 1]
-                                                   subgroup_size = 32,
-                                                   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
-                                                                                                      no_reduce_shared_memory_bank_conflicts = false,
-                                                                                                      use_igemm_convolution = false>}>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
 
 func.func @matmul_copy_32x64xi16(%src: memref<32x64xi16>, %dest: memref<32x64xi16, #gpu.address_space<workgroup>>) attributes {translation_info = #translation_info} {
   %1 = amdgpu.fat_raw_buffer_cast %src resetOffset : memref<32x64xi16> to memref<32x64xi16, #amdgpu.address_space<fat_raw_buffer>>
@@ -89,12 +78,13 @@ func.func @matmul_copy_32x64xi16(%src: memref<32x64xi16>, %dest: memref<32x64xi1
 // CHECK-LABEL: func.func @matmul_copy_32x64xi16
 // CHECK-SAME: %[[SRC:.*]]: memref<32x64xi16>
 // CHECK-SAME: %[[DEST:.*]]: memref<32x64xi16, #gpu.address_space<workgroup>>
-// CHECK: %[[C1:.*]] = arith.constant 1 : index
-// CHECK: %[[C16:.*]] = arith.constant 16 : index
-// CHECK: %[[C0:.*]] = arith.constant 0 : index
-// CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast %[[SRC]]
-// CHECK: %[[SGID:.*]] = gpu.subgroup_id
-// CHECK: %[[LID:.*]] = gpu.lane_id
+
+// CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[C16:.*]] = arith.constant 16 : index
+// CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast %[[SRC]]
+// CHECK-DAG: %[[SGID:.*]] = gpu.subgroup_id
+// CHECK-DAG: %[[LID:.*]] = gpu.lane_id
 // CHECK: scf.for %[[ARG0:.*]] = %[[C0]] to %[[C16]] step %[[C1]] {
 // CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (2, 16, 32, 2)
 // CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (32, 64)
@@ -104,12 +94,7 @@ func.func @matmul_copy_32x64xi16(%src: memref<32x64xi16>, %dest: memref<32x64xi1
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-                                                   workgroup_size = [64, 1, 1]
-                                                   subgroup_size = 32,
-                                                   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
-                                                                                                      no_reduce_shared_memory_bank_conflicts = false,
-                                                                                                      use_igemm_convolution = false>}>
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
 
 func.func @matmul_copy_32x128xi16(%src: memref<32x128xi16>, %dest: memref<32x128xi16, #gpu.address_space<workgroup>>) attributes {translation_info = #translation_info} {
   %1 = amdgpu.fat_raw_buffer_cast %src resetOffset : memref<32x128xi16> to memref<32x128xi16, #amdgpu.address_space<fat_raw_buffer>>
@@ -128,12 +113,12 @@ func.func @matmul_copy_32x128xi16(%src: memref<32x128xi16>, %dest: memref<32x128
 // CHECK-SAME: %[[SRC:.*]]: memref<32x128xi16>
 // CHECK-SAME: %[[DEST:.*]]: memref<32x128xi16, #gpu.address_space<workgroup>>
 
-// CHECK: %[[C1:.*]] = arith.constant 1 : index
-// CHECK: %[[C32:.*]] = arith.constant 32 : index
-// CHECK: %[[C0:.*]] = arith.constant 0 : index
-// CHECK: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast %[[SRC]]
-// CHECK: %[[SGID:.*]] = gpu.subgroup_id
-// CHECK: %[[LID:.*]] = gpu.lane_id
+// CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[C32:.*]] = arith.constant 32 : index
+// CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[BUFFER:.*]] = amdgpu.fat_raw_buffer_cast %[[SRC]]
+// CHECK-DAG: %[[SGID:.*]] = gpu.subgroup_id
+// CHECK-DAG: %[[LID:.*]] = gpu.lane_id
 // CHECK: scf.for %[[ARG0:.*]] = %[[C0]] to %[[C32]] step %[[C1]] {
 // CHECK:   %[[GATHER_ADDR:.*]] = affine.linearize_index disjoint [%[[SGID]], %[[ARG0]], %[[LID]], %[[C0]]] by (2, 32, 32, 2)
 // CHECK:   %[[DELI_GATHER:.*]]:2 = affine.delinearize_index %[[GATHER_ADDR]] into (32, 128)

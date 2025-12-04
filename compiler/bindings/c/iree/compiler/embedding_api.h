@@ -248,6 +248,12 @@ IREE_EMBED_EXPORTED void ireeCompilerInvocationSetDumpCompilationPhasesTo(
 IREE_EMBED_EXPORTED void
 ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv, bool enable);
 
+// Setup remark filtering and output yaml file.
+IREE_EMBED_EXPORTED void
+ireeCompilerInvocationSetupRemarks(iree_compiler_invocation_t *inv,
+                                   const char *remarksFilter,
+                                   const char *remarksOutputFile);
+
 // Runs a compilation pipeline.
 // Returns false and emits diagnostics on failure.
 enum iree_compiler_pipeline_t {

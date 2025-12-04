@@ -68,7 +68,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @contract_to_mfma_32x32x8_mm
 // CHECK-SAME: (%[[A:.+]]: vector<32x8xf16>, %[[B:.+]]: vector<8x32xf16>, %[[C:.+]]: vector<32x32xf32>)
-// CHECK:       %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<32x32xf32> -> vector<1x1x4x1x4x1xf32
+// CHECK:       %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<32x32xf32> -> vector<1x1x4x1x4x1xf32>
 // CHECK:       %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<32x8xf16>  -> vector<1x1x1x1x1x4xf16>
 // CHECK:       %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<8x32xf16>  -> vector<1x1x1x1x4x1xf16>
 // CHECK:       %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<4x1x4x1xf32> from vector<1x1x4x1x4x1xf32>
@@ -232,7 +232,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: func.func @contract_to_mfma_32x32x8_mm_mnbatch
 //       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %{{.+}} : vector<64x32xf32> -> vector<2x1x4x1x4x1xf32>
 //       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %{{.+}} : vector<64x8xf16> -> vector<2x1x1x1x1x4xf16>
-//       CHECK:   %[[C_SLICE0:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<4x1x4x1xf32> from vector<2x1x4x1x4x1xf32
+//       CHECK:   %[[C_SLICE0:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<4x1x4x1xf32> from vector<2x1x4x1x4x1xf32>
 //       CHECK:   %[[A_SLICE0:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x4xf16> from vector<2x1x1x1x1x4xf16>
 //       CHECK:   %[[A0_CAST:.+]] = vector.shape_cast %[[A_SLICE0]] : vector<1x1x1x4xf16> to vector<4xf16>
 //       CHECK:   %[[C0_CAST:.+]] = vector.shape_cast %[[C_SLICE0]] : vector<4x1x4x1xf32> to vector<16xf32>
@@ -504,7 +504,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// RDNA3 V_WMMA_F32_16X16X16_F32
+// RDNA3 V_WMMA_F32_16X16X16_F16
 
 #map1 = affine_map<(m, n, k) -> (m, k)>
 #map2 = affine_map<(m, n, k) -> (k, n)>
@@ -579,8 +579,8 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<8x1x1x1xf32> from vector<1x1x8x1x1x1xf32>
 //       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x16xf16> from vector<1x1x1x1x1x16xf16>
 //       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x16x1xf16> from vector<1x1x1x1x16x1xf16>
-//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x16xf16> to vector<16xf1
-//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x16x1xf16> to vector<16xf1
+//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x16xf16> to vector<16xf16>
+//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x16x1xf16> to vector<16xf16>
 //       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<8x1x1x1xf32> to vector<8xf32>
 //       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x16 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]]
 //       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<8x1x1x1xf32>
@@ -590,7 +590,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// RDNA4 V_WMMA_F32_16X16X16_F32
+// RDNA4 V_WMMA_F32_16X16X16_F16
 
 #map1 = affine_map<(m, n, k) -> (m, k)>
 #map2 = affine_map<(m, n, k) -> (k, n)>
@@ -673,6 +673,342 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<1x1x8x1xf32> to vector<1x1x1x1x8x1xf32>
 //       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
 //       CHECK:   return %[[R_SIMD]]
+
+// -----
+
+// gfx1250 V_WMMA_F32_16X16X4_F32
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (k, n)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+// A: shape = 16x4, layout = layoutA
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [16, 2],
+  element_tile     = [1, 2],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 16]
+>
+
+// B: shape = 4x16, layout = layoutB
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
+  element_tile     = [2, 1],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
+>
+
+// C: shape = 16x16, layout = layoutC
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
+  element_tile     = [8, 1],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
+>
+
+func.func @contract_to_gfx1250_WMMA_16x16x4_mm(%a : vector<16x4xf32>, %b : vector<4x16xf32>, %c : vector<16x16xf32>) -> vector<16x16xf32> {
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<16x4xf32>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<4x16xf32>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<16x16xf32>
+
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x4_F32>
+  } %A, %B, %C : vector<16x4xf32>, vector<4x16xf32> into vector<16x16xf32>
+
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
+  return %O : vector<16x16xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func.func @contract_to_gfx1250_WMMA_16x16x4_mm
+//  CHECK-SAME: (%[[A:.+]]: vector<16x4xf32>, %[[B:.+]]: vector<4x16xf32>, %[[C:.+]]: vector<16x16xf32>)
+//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x4xf32> -> vector<1x1x1x1x1x2xf32>
+//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<4x16xf32> -> vector<1x1x1x1x2x1xf32>
+//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x2xf32> from vector<1x1x1x1x1x2xf32>
+//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x2x1xf32> from vector<1x1x1x1x2x1xf32>
+//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x2xf32> to vector<2xf32>
+//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x2x1xf32> to vector<2xf32>
+//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x4 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]] : vector<2xf32>, vector<2xf32>, vector<8xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x8x1xf32>
+//       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<1x1x8x1xf32> to vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
+//       CHECK:   return %[[R_SIMD]]
+
+// -----
+
+// gfx1250 V_WMMA_F32_16X16X32_F16
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (k, n)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+// A: shape = 16x32, layout = layoutA
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [16, 2],
+  element_tile     = [1, 16],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 16]
+>
+
+// B: shape = 32x16, layout = layoutB
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
+  element_tile     = [16, 1],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
+>
+
+// C: shape = 16x16, layout = layoutC
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
+  element_tile     = [8, 1],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
+>
+
+func.func @contract_to_gfx1250_WMMA_16x16x32_mm(%a : vector<16x32xf16>, %b : vector<32x16xf16>, %c : vector<16x16xf32>) -> vector<16x16xf32> {
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<16x32xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<32x16xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<16x16xf32>
+
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x32_F16>
+  } %A, %B, %C : vector<16x32xf16>, vector<32x16xf16> into vector<16x16xf32>
+
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
+  return %O : vector<16x16xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func.func @contract_to_gfx1250_WMMA_16x16x32_mm
+//  CHECK-SAME: (%[[A:.+]]: vector<16x32xf16>, %[[B:.+]]: vector<32x16xf16>, %[[C:.+]]: vector<16x16xf32>)
+//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x32xf16> -> vector<1x1x1x1x1x16xf16>
+//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<32x16xf16> -> vector<1x1x1x1x16x1xf16>
+//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x16xf16> from vector<1x1x1x1x1x16xf16>
+//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x16x1xf16> from vector<1x1x1x1x16x1xf16>
+//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x16xf16> to vector<16xf16>
+//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x16x1xf16> to vector<16xf16>
+//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x32 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]] : vector<16xf16>, vector<16xf16>, vector<8xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x8x1xf32>
+//       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<1x1x8x1xf32> to vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
+//       CHECK:   return %[[R_SIMD]]
+
+// -----
+
+// gfx1250 V_WMMA_F32_16X16X64_F8
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (k, n)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+// A: shape = 16x64, layout = layoutA
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [16, 2],
+  element_tile     = [1, 32],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 16]
+>
+
+// B: shape = 64x16, layout = layoutB
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
+  element_tile     = [32, 1],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
+>
+
+// C: shape = 16x16, layout = layoutC
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
+  element_tile     = [8, 1],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
+>
+
+func.func @contract_to_gfx1250_WMMA_16x16x64_mm(%a : vector<16x64xf8E4M3FN>, %b : vector<64x16xf8E4M3FN>, %c : vector<16x16xf32>) -> vector<16x16xf32> {
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<16x64xf8E4M3FN>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<64x16xf8E4M3FN>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<16x16xf32>
+
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x64_F8E4M3FN>
+  } %A, %B, %C : vector<16x64xf8E4M3FN>, vector<64x16xf8E4M3FN> into vector<16x16xf32>
+
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
+  return %O : vector<16x16xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func.func @contract_to_gfx1250_WMMA_16x16x64_mm
+//  CHECK-SAME: (%[[A:.+]]: vector<16x64xf8E4M3FN>, %[[B:.+]]: vector<64x16xf8E4M3FN>, %[[C:.+]]: vector<16x16xf32>)
+//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x64xf8E4M3FN> -> vector<1x1x1x1x1x32xf8E4M3FN>
+//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<64x16xf8E4M3FN> -> vector<1x1x1x1x32x1xf8E4M3FN>
+//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x32xf8E4M3FN> from vector<1x1x1x1x1x32xf8E4M3FN>
+//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x32x1xf8E4M3FN> from vector<1x1x1x1x32x1xf8E4M3FN>
+//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x32xf8E4M3FN> to vector<32xf8E4M3FN>
+//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x32x1xf8E4M3FN> to vector<32xf8E4M3FN>
+//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x64 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]] : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<8xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x8x1xf32>
+//       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<1x1x8x1xf32> to vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
+//       CHECK:   return %[[R_SIMD]]
+
+// -----
+
+// gfx1250 V_WMMA_F32_16X16X128_F8
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (k, n)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+// A: shape = 16x128, layout = layoutA
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [16, 2],
+  element_tile     = [1, 64],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [1, 16]
+>
+
+// B: shape = 128x16, layout = layoutB
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
+  element_tile     = [64, 1],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
+>
+
+// C: shape = 16x16, layout = layoutC
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [2, 16],
+  element_tile     = [8, 1],
+
+  subgroup_strides = [1, 1],
+  thread_strides   = [16, 1]
+>
+
+func.func @contract_to_gfx1250_WMMA_16x16x128_mm(%a : vector<16x128xf8E4M3FN>, %b : vector<128x16xf8E4M3FN>, %c : vector<16x16xf32>) -> vector<16x16xf32> {
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<16x128xf8E4M3FN>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<128x16xf8E4M3FN>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<16x16xf32>
+
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x128_F8E4M3FN>
+  } %A, %B, %C : vector<16x128xf8E4M3FN>, vector<128x16xf8E4M3FN> into vector<16x16xf32>
+
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
+  return %O : vector<16x16xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func.func @contract_to_gfx1250_WMMA_16x16x128_mm
+//  CHECK-SAME: (%[[A:.+]]: vector<16x128xf8E4M3FN>, %[[B:.+]]: vector<128x16xf8E4M3FN>, %[[C:.+]]: vector<16x16xf32>)
+//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x128xf8E4M3FN> -> vector<1x1x1x1x1x64xf8E4M3FN>
+//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<128x16xf8E4M3FN> -> vector<1x1x1x1x64x1xf8E4M3FN>
+//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x64xf8E4M3FN> from vector<1x1x1x1x1x64xf8E4M3FN>
+//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x64x1xf8E4M3FN> from vector<1x1x1x1x64x1xf8E4M3FN>
+//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x64xf8E4M3FN> to vector<64xf8E4M3FN>
+//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x64x1xf8E4M3FN> to vector<64xf8E4M3FN>
+//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x128 %[[A_CAST]] * %[[B_CAST]]
 
 // -----
 

@@ -58,7 +58,7 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
 
 // Returns true if |value| is definitely empty at runtime.
 static bool isTensorZeroElements(Value value) {
-  auto type = llvm::dyn_cast<ShapedType>(value.getType());
+  auto type = dyn_cast<ShapedType>(value.getType());
   if (!type)
     return false;
   // Any static dimension being zero is definitely empty.
@@ -121,7 +121,7 @@ struct ReplaceOpIfTensorOperandEmpty : public OpRewritePattern<Op> {
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op->getOperand(OperandIdx);
-    auto emptyOp = dyn_cast_or_null<TensorEmptyOp>(operand.getDefiningOp());
+    auto emptyOp = dyn_cast_if_present<TensorEmptyOp>(operand.getDefiningOp());
     if (!emptyOp)
       return failure();
     auto result = op->getResult(ResultIdx);
@@ -145,7 +145,7 @@ static SmallVector<Value> refreshDimsOnTypeChange(Operation *op, Type oldType,
   // Build an expanded list of all the dims - constants will be nullptr.
   // This lets us map back the new types without worrying about whether some
   // subset become static or dynamic.
-  auto oldShapedType = llvm::cast<ShapedType>(oldType);
+  auto oldShapedType = cast<ShapedType>(oldType);
   SmallVector<Value> allOldDims(oldShapedType.getRank());
   for (unsigned i = 0; i < oldShapedType.getRank(); ++i) {
     if (oldShapedType.isDynamicDim(i)) {
@@ -154,7 +154,7 @@ static SmallVector<Value> refreshDimsOnTypeChange(Operation *op, Type oldType,
     }
   }
 
-  auto newShapedType = llvm::cast<ShapedType>(newType);
+  auto newShapedType = cast<ShapedType>(newType);
   SmallVector<Value> newDims;
   for (unsigned i = 0; i < newShapedType.getRank(); ++i) {
     if (newShapedType.isDynamicDim(i)) {
@@ -502,8 +502,8 @@ void TensorTieShapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorReshapeOp::fold(FoldAdaptor operands) {
-  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
-  auto resultType = llvm::cast<ShapedType>(getResult().getType());
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto resultType = cast<ShapedType>(getResult().getType());
   if (sourceType.getElementType() != resultType.getElementType()) {
     // Element type mismatch, this is a bitcast.
     return {};
@@ -532,11 +532,11 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
     // intermediate reshapes.
     Value source;
     ValueRange sourceDims;
-    if (auto sourceOp = dyn_cast_or_null<TensorReshapeOp>(
+    if (auto sourceOp = dyn_cast_if_present<TensorReshapeOp>(
             reshapeOp.getSource().getDefiningOp())) {
       source = sourceOp.getSource();
       sourceDims = sourceOp.getSourceDims();
-    } else if (auto sourceOp = dyn_cast_or_null<TensorBitCastOp>(
+    } else if (auto sourceOp = dyn_cast_if_present<TensorBitCastOp>(
                    reshapeOp.getSource().getDefiningOp())) {
       source = sourceOp.getSource();
       sourceDims = sourceOp.getSourceDims();
@@ -545,8 +545,8 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
       return failure();
     }
 
-    auto sourceType = llvm::cast<ShapedType>(source.getType());
-    auto resultType = llvm::cast<ShapedType>(reshapeOp.getResult().getType());
+    auto sourceType = cast<ShapedType>(source.getType());
+    auto resultType = cast<ShapedType>(reshapeOp.getResult().getType());
 
     // If the element types don't match, this is a bitcast, else we can use
     // reshape.
@@ -567,7 +567,7 @@ struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::RankOp op,
                                 PatternRewriter &rewriter) const override {
-    auto shapedType = llvm::cast<ShapedType>(op.getTensor().getType());
+    auto shapedType = cast<ShapedType>(op.getTensor().getType());
     rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op,
                                                         shapedType.getRank());
     return success();
@@ -585,7 +585,7 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
     auto idx = op.getConstantIndex().value();
 
     // Fold static dims from the type.
-    auto shapedType = llvm::cast<ShapedType>(op.getSource().getType());
+    auto shapedType = cast<ShapedType>(op.getSource().getType());
     if (!shapedType.isDynamicDim(idx)) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(
           op, shapedType.getDimSize(idx));
@@ -628,8 +628,8 @@ void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorBitCastOp::fold(FoldAdaptor operands) {
-  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
-  auto resultType = llvm::cast<ShapedType>(getResult().getType());
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto resultType = cast<ShapedType>(getResult().getType());
   if (sourceType.getElementType() != resultType.getElementType()) {
     // Element type mismatch, this is a bitcast.
     return {};
@@ -657,13 +657,12 @@ void TensorBitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
-  if (auto source =
-          llvm::dyn_cast_if_present<ElementsAttr>(operands.getSource())) {
+  if (auto source = dyn_cast_if_present<ElementsAttr>(operands.getSource())) {
     // Load directly from the constant source tensor.
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
       return source.getValues<Attribute>()[llvm::map_to_vector(
           operands.getIndices(), [](Attribute value) {
-            return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
+            return cast<IntegerAttr>(value).getValue().getZExtValue();
           })];
     }
   }
@@ -679,7 +678,7 @@ struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
   LogicalResult matchAndRewrite(TensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp =
-        dyn_cast_or_null<TensorSplatOp>(loadOp.getSource().getDefiningOp());
+        dyn_cast_if_present<TensorSplatOp>(loadOp.getSource().getDefiningOp());
     if (!sourceOp)
       return failure();
     rewriter.replaceOp(loadOp, sourceOp.getValue());
@@ -702,8 +701,7 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
   auto value = operands.getValue();
   if (!value)
     return {};
-  if (auto target =
-          llvm::dyn_cast_if_present<ElementsAttr>(operands.getTarget())) {
+  if (auto target = dyn_cast_if_present<ElementsAttr>(operands.getTarget())) {
     // Store into the constant target tensor.
     auto targetType = cast<ShapedType>(target.getType());
     if (targetType.getRank() == 0) {
@@ -713,7 +711,7 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
       uint64_t offset = getFlattenedIndex(
           targetType,
           llvm::map_to_vector(operands.getIndices(), [](Attribute value) {
-            return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
+            return cast<IntegerAttr>(value).getValue().getZExtValue();
           }));
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
       newContents[offset] = value;
@@ -962,15 +960,15 @@ OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
       return {};
     }
     // Fully constant arguments so we can perform the slice here.
-    auto tensor = llvm::cast<ElementsAttr>(operands.getSource());
-    int64_t rank = llvm::cast<ShapedType>(getSource().getType()).getRank();
+    auto tensor = cast<ElementsAttr>(operands.getSource());
+    int64_t rank = cast<ShapedType>(getSource().getType()).getRank();
     auto start =
         llvm::map_to_vector(operands.getStartIndices(), [](Attribute value) {
-          return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
+          return cast<IntegerAttr>(value).getValue().getZExtValue();
         });
     auto length =
         llvm::map_to_vector(operands.getLengths(), [](Attribute value) {
-          return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
+          return cast<IntegerAttr>(value).getValue().getZExtValue();
         });
     for (int64_t dim = 0; dim < rank; ++dim) {
       tensor = tensorSlice(tensor, dim, start[dim], length[dim]);
@@ -996,8 +994,8 @@ void TensorSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
                                  ArrayRef<Attribute> startIndicesAttrs) {
-  auto updateType = llvm::cast<ShapedType>(update.getType());
-  auto targetType = llvm::cast<ShapedType>(target.getType());
+  auto updateType = cast<ShapedType>(update.getType());
+  auto targetType = cast<ShapedType>(target.getType());
   // If either target or update has zero element, then no update happens.
   if (updateType.getNumElements() == 0 || targetType.getNumElements() == 0) {
     return target;
@@ -1010,7 +1008,7 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
   }
 
   auto startIndex = llvm::map_to_vector(startIndicesAttrs, [](Attribute value) {
-    return llvm::cast<IntegerAttr>(value).getValue().getZExtValue();
+    return cast<IntegerAttr>(value).getValue().getZExtValue();
   });
   auto targetValues = llvm::to_vector(target.getValues<Attribute>());
   // target indices start from startIndicesAttrs and update indices start from
@@ -1044,13 +1042,13 @@ OpFoldResult TensorUpdateOp::fold(FoldAdaptor operands) {
       llvm::count(operands.getStartIndices(), nullptr) == 0;
   if (operands.getUpdate() && operands.getTarget() && allIndicesConstant) {
     // Fully constant arguments so we can perform the update here.
-    return tensorUpdate(llvm::cast<ElementsAttr>(operands.getUpdate()),
-                        llvm::cast<ElementsAttr>(operands.getTarget()),
+    return tensorUpdate(cast<ElementsAttr>(operands.getUpdate()),
+                        cast<ElementsAttr>(operands.getTarget()),
                         operands.getStartIndices());
   } else {
     // Replace the entire tensor when the sizes match.
-    auto updateType = llvm::cast<ShapedType>(getUpdate().getType());
-    auto targetType = llvm::cast<ShapedType>(getTarget().getType());
+    auto updateType = cast<ShapedType>(getUpdate().getType());
+    auto targetType = cast<ShapedType>(getTarget().getType());
     if (updateType.hasStaticShape() && targetType.hasStaticShape() &&
         updateType == targetType) {
       return getUpdate();

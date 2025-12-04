@@ -125,9 +125,10 @@ func.func @promote_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %mdim : in
 //       CHECK:   %[[COPY1:.+]] = linalg.copy
 //  CHECK-SAME:       ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
 //  CHECK-SAME:       -> tensor<?x?xf32>
+//       CHECK:   %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
 //       CHECK:   %[[COPY2:.+]] = linalg.copy
 //  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
-//  CHECK-SAME:       ins(%[[COPY1]] : tensor<?x?xf32>)
+//  CHECK-SAME:       ins(%[[BARRIER]] : tensor<?x?xf32>)
 //       CHECK:   return %[[COPY2]] : tensor<?x?xf32>
 
 // -----
@@ -152,7 +153,8 @@ func.func @promote_padded_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %md
 //       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor
 //       CHECK:   %[[COPY1:.+]] = linalg.copy
 //  CHECK-SAME:       ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
-//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[COPY1]]
+//       CHECK:   %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[BARRIER]]
 //       CHECK:   %[[COPY2:.+]] = linalg.copy
 //  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
 //  CHECK-SAME:       ins(%[[EXTRACT]] : tensor<?x?xf32>)
@@ -173,7 +175,7 @@ func.func @matmul_global_load_dma(%a: tensor<32x1024xf32>, %b: tensor<1024x128xf
   return %mm : tensor<32x128xf32>
 }
 
-// CHECK-LABEL: func.func @matmul
+// CHECK-LABEL: func.func @matmul_global_load_dma
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<32x1024xf32>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<1024x128xf32>
 //       CHECK:   %[[PA:.+]] = linalg.copy
@@ -201,7 +203,7 @@ func.func @promote_with_cache_swizzle(%a: tensor<2x34x34x128xf32>, %b: tensor<2x
     strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
     m_offset = [0] * [1] k_offset = [0] * [1]
     batch_pos = [0] m_pos = [2, 3] k_pos = [1]
-    input_k_perm = [0, 1, 2]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
     ins(%a : tensor<2x34x34x128xf32>)
     outs(%im2col_empty : tensor<2x128x8xf32>) -> tensor<2x128x8xf32>
 
@@ -242,7 +244,7 @@ func.func @promote_with_cache_swizzle_f4(%a: tensor<2x34x34x128xf4E2M1FN>, %b: t
     strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
     m_offset = [0] * [1] k_offset = [0] * [1]
     batch_pos = [0] m_pos = [2, 3] k_pos = [1]
-    input_k_perm = [0, 1, 2]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
     ins(%a : tensor<2x34x34x128xf4E2M1FN>)
     outs(%im2col_empty : tensor<2x128x8xf4E2M1FN>) -> tensor<2x128x8xf4E2M1FN>
 
@@ -281,7 +283,7 @@ func.func @promote_with_cache_swizzle_f4_no_stride(%a: tensor<2x34x34x129xf4E2M1
     strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
     m_offset = [0] * [1] k_offset = [0] * [1]
     batch_pos = [0] m_pos = [2, 3] k_pos = [1]
-    input_k_perm = [0, 1, 2]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
     ins(%a : tensor<2x34x34x129xf4E2M1FN>)
     outs(%im2col_empty : tensor<2x129x8xf4E2M1FN>) -> tensor<2x129x8xf4E2M1FN>
 

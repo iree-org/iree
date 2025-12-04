@@ -208,13 +208,13 @@ private:
     int64_t largeAttrLimit = getLargeAttributeSizeLimit();
 
     // Always emit splat attributes.
-    if (llvm::isa<SplatElementsAttr>(attr)) {
+    if (isa<SplatElementsAttr>(attr)) {
       attr.print(os);
       return;
     }
 
     // Elide "big" elements attributes.
-    auto elements = llvm::dyn_cast<ElementsAttr>(attr);
+    auto elements = dyn_cast<ElementsAttr>(attr);
     if (elements && elements.getNumElements() > largeAttrLimit) {
       auto type = cast<ShapedType>(elements.getType());
       os << std::string(type.getRank(), '[') << "..."
@@ -222,7 +222,7 @@ private:
       return;
     }
 
-    auto array = llvm::dyn_cast<ArrayAttr>(attr);
+    auto array = dyn_cast<ArrayAttr>(attr);
     if (array && static_cast<int64_t>(array.size()) > largeAttrLimit) {
       os << "[...]";
       return;
@@ -421,9 +421,9 @@ private:
 
       if (op && isScalarConstantOp(op)) {
         auto ty = operand.getType();
-        if (llvm::isa<IntegerType>(ty)) {
+        if (isa<IntegerType>(ty)) {
           os << cast<arith::ConstantIntOp>(op).value();
-        } else if (llvm::isa<FloatType>(ty)) {
+        } else if (isa<FloatType>(ty)) {
           cast<arith::ConstantFloatOp>(op).value().print(os);
         } else {
           os << cast<arith::ConstantIndexOp>(op).value();

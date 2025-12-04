@@ -134,7 +134,7 @@ static Type getElementTypeForUKernel(Value input) {
   auto genericOp = input.getDefiningOp<linalg::GenericOp>();
   std::optional<CastOpInterface> castOp = getCastOpOfElementWiseCast(genericOp);
   if (!castOp) {
-    return llvm::cast<ShapedType>(input.getType()).getElementType();
+    return cast<ShapedType>(input.getType()).getElementType();
   }
   Type castOpSrcType = castOp.value()->getOperand(0).getType();
   if (isa<arith::ExtUIOp>(*castOp)) {
@@ -172,7 +172,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   Value lhs = getInputForUKernel(op.getDpsInputOperand(0)->get());
   Value rhs = getInputForUKernel(op.getDpsInputOperand(1)->get());
   Value out = op.getDpsInitOperand(0)->get();
-  auto outType = llvm::cast<ShapedType>(out.getType());
+  auto outType = cast<ShapedType>(out.getType());
   Type lhsElemType = getElementTypeForUKernel(op.getDpsInputOperand(0)->get());
   Type rhsElemType = getElementTypeForUKernel(op.getDpsInputOperand(1)->get());
   Type outElemType = outType.getElementType();
@@ -275,8 +275,8 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
   }
   Value in = op.getSource();
   Value out = op.getDest();
-  auto inType = llvm::cast<ShapedType>(in.getType());
-  auto outType = llvm::cast<ShapedType>(out.getType());
+  auto inType = cast<ShapedType>(in.getType());
+  auto outType = cast<ShapedType>(out.getType());
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
   uint32_t flags = 0;
@@ -398,8 +398,8 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::UnPackOp op,
   }
   Value in = op.getSource();
   Value out = op.getDest();
-  auto inType = llvm::cast<ShapedType>(in.getType());
-  auto outType = llvm::cast<ShapedType>(out.getType());
+  auto inType = cast<ShapedType>(in.getType());
+  auto outType = cast<ShapedType>(out.getType());
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
   uint32_t flags = 0;

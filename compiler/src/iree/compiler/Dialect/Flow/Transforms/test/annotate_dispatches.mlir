@@ -820,3 +820,37 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_scaled_matmul_like_16x32x8x32_f4E2M1FNxf4E2M1FNxf8E8M0FNUxf8E8M0FNUxf32
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x32xf32>>) {
+      %lhs = tensor.empty() : tensor<16x8x32xf4E2M1FN>
+      %rhs = tensor.empty() : tensor<32x8x32xf4E2M1FN>
+      %lhs_scales = tensor.empty() : tensor<16x8xf8E8M0FNU>
+      %rhs_scales = tensor.empty() : tensor<32x8xf8E8M0FNU>
+      %init = tensor.empty() : tensor<16x32xf32>
+      %result = linalg.generic {
+        indexing_maps = [#map, #map1, #map2, #map3, #map4],
+        iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+      } ins(%lhs, %rhs, %lhs_scales, %rhs_scales : tensor<16x8x32xf4E2M1FN>, tensor<32x8x32xf4E2M1FN>, tensor<16x8xf8E8M0FNU>, tensor<32x8xf8E8M0FNU>) outs(%init : tensor<16x32xf32>) {
+      ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
+        %scaled_a = arith.scaling_extf %a, %a_scale : f4E2M1FN, f8E8M0FNU to f32
+        %scaled_b = arith.scaling_extf %b, %b_scale : f4E2M1FN, f8E8M0FNU to f32
+        %mul = arith.mulf %scaled_a, %scaled_b : f32
+        %add = arith.addf %out, %mul : f32
+        linalg.yield %add : f32
+      } -> tensor<16x32xf32>
+      iree_tensor_ext.dispatch.tensor.store %result, %arg0, offsets = [0, 0], sizes = [16, 32], strides = [1, 1] : tensor<16x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x32xf32>>
+      return
+    }
+  }
+}

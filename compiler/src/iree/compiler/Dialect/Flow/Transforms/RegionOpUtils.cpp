@@ -220,7 +220,7 @@ static void createWorkgroupCountFromDagRootRegion(
 /// Return `true` if the given type is a ShapedType and has at least one
 /// dynamic dimension.
 static bool hasDynamicShape(Type t) {
-  auto shapedType = llvm::dyn_cast<ShapedType>(t);
+  auto shapedType = dyn_cast<ShapedType>(t);
   if (!shapedType)
     return false;
   return !shapedType.hasStaticShape();
@@ -238,7 +238,7 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
     return success();
 
   // There is at least one dynamic dimension, continue...
-  ShapedType shapedType = llvm::cast<ShapedType>(value.getType());
+  ShapedType shapedType = cast<ShapedType>(value.getType());
 
   // Helper function that generates tensor.dim ops.
   auto emitTensorDimOps = [&]() {
@@ -251,7 +251,7 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
   };
 
   // Case 2: Value is a block argument.
-  if (auto bbArg = llvm::dyn_cast<BlockArgument>(value)) {
+  if (auto bbArg = dyn_cast<BlockArgument>(value)) {
     if (!createTensorDimOps)
       return failure();
 
@@ -262,7 +262,7 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
 
   // Value is an OpResult.
   Operation *op = value.getDefiningOp();
-  OpResult opResult = llvm::cast<OpResult>(value);
+  OpResult opResult = cast<OpResult>(value);
 
   // Case 3: Query ShapeAwareOpInterface.
   auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(op);
@@ -434,8 +434,8 @@ clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   // Replace all uses in the dispatch region.
   for (OpOperand *use : usesInsideOfRegion) {
     rewriter.modifyOpInPlace(use->getOwner(), [&]() {
-      use->set(newTargetOp->getResult(
-          llvm::cast<OpResult>(use->get()).getResultNumber()));
+      use->set(
+          newTargetOp->getResult(cast<OpResult>(use->get()).getResultNumber()));
     });
   }
 
@@ -543,20 +543,14 @@ moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   rewriter.setInsertionPoint(body.getTerminator());
   Operation *clonedTarget = rewriter.clone(*target);
 
-  // Replace any operands returned by the `regionOp` with the results yielded
-  // inside of the `regionOp`.
-  for (OpOperand &operand : clonedTarget->getOpOperands()) {
-    if (operand.get().getDefiningOp() != regionOp) {
-      continue;
-    }
-    auto returnOp =
-        cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
-    auto opResult = cast<OpResult>(operand.get());
-    Value yieldedValue = returnOp->getOperand(opResult.getResultNumber());
-    rewriter.modifyOpInPlace(clonedTarget, [&]() {
-      clonedTarget->setOperand(operand.getOperandNumber(), yieldedValue);
-    });
-  }
+  // Replace all of `clonedTarget` uses of `regionOp` with the values yielded
+  // from inside the region.
+  auto returnOp =
+      cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+  rewriter.replaceOpUsesWithIf(
+      regionOp, returnOp.getOperands(), [&](OpOperand &operand) {
+        return clonedTarget->isAncestor(operand.getOwner());
+      });
 
   // Gather all uses of `target`.
   for (auto [index, result] : llvm::enumerate(target->getResults())) {
@@ -890,10 +884,10 @@ bool isClonableIntoDispatchOp(Operation *op,
     }
 
     auto constantType = op->getResult(0).getType();
-    if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
+    if (isa<SplatElementsAttr>(constantValueAttr)) {
       return true;
-    } else if (auto attr = llvm::dyn_cast<ElementsAttr>(constantValueAttr)) {
-      auto shapedType = llvm::cast<ShapedType>(constantType);
+    } else if (auto attr = dyn_cast<ElementsAttr>(constantValueAttr)) {
+      auto shapedType = cast<ShapedType>(constantType);
       uint64_t estimatedByteLength =
           (shapedType.getNumElements() *
            IREE::Util::getTypeBitWidth(shapedType.getElementType())) /
