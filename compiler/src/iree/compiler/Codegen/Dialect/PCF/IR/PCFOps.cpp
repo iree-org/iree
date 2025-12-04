@@ -60,8 +60,7 @@ static LogicalResult verifyParallelBodyOp(OpTy op, int64_t numLeadingArgs,
            << numResults;
   }
 
-  int64_t numInits =
-      std::accumulate(isTied.begin(), isTied.end(), (int64_t)(0));
+  int64_t numInits = llvm::sum_of(isTied, (int64_t)(0));
   if (op.getInits().size() != numInits) {
     return op.emitOpError("number of inits ")
            << op.getInits().size()
@@ -800,11 +799,11 @@ void WriteSliceOp::build(OpBuilder &b, OperationState &result, Value source,
                          Value dest, ValueRange offsets, ValueRange sizes,
                          ValueRange strides, ArrayRef<NamedAttribute> attrs) {
   auto offsetValues =
-      llvm::map_to_vector(offsets, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(offsets, llvm::StaticCastTo<OpFoldResult>);
   auto sizeValues =
-      llvm::map_to_vector(sizes, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(sizes, llvm::StaticCastTo<OpFoldResult>);
   auto strideValues =
-      llvm::map_to_vector(strides, [](Value v) -> OpFoldResult { return v; });
+      llvm::map_to_vector(strides, llvm::StaticCastTo<OpFoldResult>);
   build(b, result, source, dest, offsetValues, sizeValues, strideValues);
 }
 
@@ -1032,7 +1031,7 @@ OpFoldResult GetMemrefOp::fold(FoldAdaptor adaptor) {
 }
 
 LogicalResult GetMemrefOp::verify() {
-  auto resultType = getResultType();
+  MemRefType resultType = getResultType();
 
   // Check that the result has no memory space.
   if (resultType.getMemorySpace()) {
