@@ -167,3 +167,22 @@ util.func @affine_apply_chained_operations(%arg0 : index) -> index {
   %3 = "iree_unregistered.test_int_divisibility"(%2) : (index) -> index
   util.return %3 : index
 }
+
+// -----
+
+// CHECK-LABEL: @complex_chained_affine_ops
+util.func @complex_chained_affine_ops(%arg0 : index, %arg1 : index, %arg2 : index) -> index {
+  %0:3 = util.assume.int %arg0<udiv = 210>,
+                         %arg1<udiv = 7>,
+                         %arg2<udiv = 15> : index, index, index
+  %1 = affine.apply affine_map<(d0, d1) -> (d0 + 2 * d1)>(%0#0, %0#1)
+  // CHECK: divisibility = "udiv = 14, sdiv = 14"
+  %div_1 = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
+  %2 = affine.max affine_map<(d0, d1) -> (d0 floordiv 6, d1 * 3)>(%0#0, %0#2)
+  // CHECK: divisibility = "udiv = 5, sdiv = 5"
+  %div_2 = "iree_unregistered.test_int_divisibility"(%2) : (index) -> index
+  %3 = affine.min affine_map<(d0)[s0] -> (2 * (s0 * d0 - 14) ceildiv 7, d0 floordiv 3 * 2)>(%2)[%1]
+  // CHECK: divisibility = "udiv = 2, sdiv = 2"
+  %div_3 = "iree_unregistered.test_int_divisibility"(%3) : (index) -> index
+  util.return %div_3 : index
+}

@@ -156,11 +156,10 @@ private:
     if (!constRhs || constRhs.getValue() == 0) {
       return IREE::Util::ConstantIntDivisibility(1, 1);
     }
-    int64_t constValue = std::abs(constRhs.getValue());
+    auto constValue = static_cast<uint64_t>(std::abs(constRhs.getValue()));
     IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
-    uint64_t divUDiv = lhsDiv.udiv() % static_cast<uint64_t>(constValue) == 0
-                           ? lhsDiv.udiv() / static_cast<uint64_t>(constValue)
-                           : 1;
+    uint64_t divUDiv =
+        lhsDiv.udiv() % constValue == 0 ? lhsDiv.udiv() / constValue : 1;
     uint64_t divSDiv =
         lhsDiv.sdiv() % constValue == 0 ? lhsDiv.sdiv() / constValue : 1;
     return IREE::Util::ConstantIntDivisibility(divUDiv, divSDiv);
