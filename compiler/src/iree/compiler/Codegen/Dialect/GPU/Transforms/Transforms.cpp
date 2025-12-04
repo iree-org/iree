@@ -456,18 +456,10 @@ static void composeCoalescedGatherDMA(
 /// Check if a forall op uses iree_gpu.coalesced_gather_dma operations
 /// instead of tensor.parallel_insert_slice in its terminator.
 static bool isCoalescedGatherForallOp(scf::ForallOp forallOp) {
-  for (BlockArgument outArg : forallOp.getRegionOutArgs()) {
-    SmallVector<Operation *> combiningOps = forallOp.getCombiningOps(outArg);
-    if (combiningOps.empty()) {
-      continue;
-    }
-    // Check if any combining op is a CoalescedGatherDMAOp.
-    if (llvm::any_of(combiningOps,
-                     llvm::IsaPred<IREE::GPU::CoalescedGatherDMAOp>)) {
-      return true;
-    }
-  }
-  return false;
+  return llvm::any_of(forallOp.getRegionOutArgs(), [&](BlockArgument outArg) {
+    return llvm::any_of(forallOp.getCombiningOps(outArg),
+                        llvm::IsaPred<IREE::GPU::CoalescedGatherDMAOp>);
+  });
 }
 
 FailureOr<scf::ForallOp>
