@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "amdgpu_lower_coalesced_dma_to_gather_lds.mlir",
             "decompose_horizontally_fused_gemms.mlir",
             "gpu_alloc_private_memory_for_dps_ops.mlir",
             "gpu_apply_derived_thread_config.mlir",
