@@ -78,11 +78,11 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
         getAffineConstantExpr(0, filterMap.getContext());
   }
   ArrayRef<AffineExpr> newResults = inputMap.replace(dimMap).getResults();
-  AffineMap newInputMap = AffineMap::get(inputMap.getNumDims(), 0, newResults,
-                                         inputMap.getContext());
+  auto newInputMap = AffineMap::get(inputMap.getNumDims(), 0, newResults,
+                                    inputMap.getContext());
 
   // No changes to the filter and output map.
-  SmallVector<AffineMap> newIndexingMaps = {newInputMap, filterMap, outputMap};
+  AffineMap newIndexingMaps[] = {newInputMap, filterMap, outputMap};
 
   // Create the new contraction op and replace the old convolution op.
   auto newOp = linalg::GenericOp::create(
