@@ -62,6 +62,7 @@ jobs:
         env:
           CTEST_PARALLEL_LEVEL: 2
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=hip$
+          IREE_AMD_CDNA3_TESTS_DISABLE: 0
           IREE_AMD_RDNA3_TESTS_DISABLE: 1
           IREE_NVIDIA_GPU_TESTS_DISABLE: 0
           IREE_NVIDIA_SM80_TESTS_DISABLE: 1
