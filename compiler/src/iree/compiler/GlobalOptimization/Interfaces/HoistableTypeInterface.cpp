@@ -9,13 +9,12 @@
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "iree-hoistable-type-interface"
-
 
 namespace mlir::iree_compiler {
 
@@ -78,7 +77,8 @@ struct HoistableTensorTypeInterface
     //   return RankedTensorType::get({numElements * elementBitWidth / 8},
     //     Builder(type.getContext()).getIntegerType(8));
     // }
-    LLVM_DEBUG(llvm::dbgs() << "convertEncodingForBitcast: " << tensorType.getEncoding() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "convertEncodingForBitcast: "
+                            << tensorType.getEncoding() << "\n");
     return RankedTensorType::get({numElements * elementBitWidth / 8},
                                  Builder(type.getContext()).getIntegerType(8),
                                  tensorType.getEncoding());

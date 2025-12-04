@@ -236,7 +236,8 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
   auto iterationSizesAttr =
       iterationSizes.empty() ? ArrayAttr() : b.getI64ArrayAttr(iterationSizes);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
+             b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr,
+             nullptr);
 }
 
 /// Parse a list of integer values and/or dynamic values ('?')
@@ -298,7 +299,7 @@ EncodingAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
                      IntegerAttr operandIndexAttr,
                      EncodingOpTypeAttr opTypeAttr, ArrayAttr elementTypesAttr,
                      ArrayAttr userIndexingMapsAttr,
-                     ArrayAttr iterationSizesAttr) {
+                     ArrayAttr iterationSizesAttr, Type underlyingType) {
   AffineMap indexingMap;
   if (userIndexingMapsAttr) {
     unsigned operandIndex = operandIndexAttr.getValue().getZExtValue();
@@ -421,7 +422,8 @@ EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
   maps.push_back(AffineMapAttr::get(newIndexingMap));
   newMaps[operandIndex] = ArrayAttr::get(getContext(), maps);
   return get(getContext(), getOperandIndex(), getOpType(), getElementTypes(),
-             ArrayAttr::get(getContext(), newMaps), getIterationSizes());
+             ArrayAttr::get(getContext(), newMaps), getIterationSizes(),
+             getUnderlyingType());
 }
 
 bool EncodingAttr::isSerialized() const { return false; }
@@ -432,16 +434,21 @@ Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
 }
 
 Attribute EncodingAttr::convertForBitcast(Type type) const {
-  auto encoding = dyn_cast_or_null<EncodingAttr>(type.getEncoding());
+  auto tensorType = dyn_cast<RankedTensorType>(type);
+  if (!tensorType) {
+    return {};
+  }
+  auto encoding = dyn_cast_or_null<EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
     return {};
   }
   if (encoding.getUnderlyingType()) {
     return {};
   }
-  return EncodingAttr::get(type.getContext(), encoding.getOperandIndex(), 
-    encoding.getOpType(), encoding.getElementTypes(), encoding.getUserIndexingMaps(),
-    encoding.getIterationSizes(), type.getElementType());
+  return EncodingAttr::get(
+      tensorType.getContext(), encoding.getOperandIndex(), encoding.getOpType(),
+      encoding.getElementTypes(), encoding.getUserIndexingMaps(),
+      encoding.getIterationSizes(), tensorType.getElementType());
 }
 
 std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
