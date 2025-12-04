@@ -2,7 +2,7 @@
 
 #config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>}>
 module {
-  func.func @conv_generic(%a: tensor<1x3x66x8xf32>, %b: tensor<32x3x3x8xf32>, %c: tensor<1x1x64x32xf32>) -> tensor<1x1x64x32xf32> {
+  func.func @conv_nhwc_generic(%a: tensor<1x3x66x8xf32>, %b: tensor<32x3x3x8xf32>, %c: tensor<1x1x64x32xf32>) -> tensor<1x1x64x32xf32> {
     %conv = linalg.generic {
       indexing_maps =
         [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>,
@@ -20,7 +20,7 @@ module {
   }
 }
 
-// CHECK-LABEL: func.func @conv_generic
+// CHECK-LABEL: func.func @conv_nhwc_generic
 //       CHECK:  scf.for %{{.*}} = %c0 to %c3 step %c1
 //       CHECK:    scf.for %{{.*}} = %c0 to %c3 step %c1
 //       CHECK:      linalg.generic
@@ -43,3 +43,31 @@ module {
 //       CHECK:    scf.for %{{.*}} = %c0 to %c3 step %c1
 //       CHECK:      linalg.generic
 //  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
+
+// -----
+
+#config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>}>
+module {
+  func.func @conv_chwn_generic(%a: tensor<16x24x16x16xf32>, %b: tensor<16x24x16x16xf32>, %c: tensor<16x1x1x16xf32>) -> tensor<16x1x1x16xf32> {
+    %conv = linalg.generic {
+      indexing_maps =
+        [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5, d2 + d6, d3)>,
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>,
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%a, %b : tensor<16x24x16x16xf32>, tensor<16x24x16x16xf32>) outs(%c : tensor<16x1x1x16xf32>)
+      attrs = {lowering_config = #config} {
+      ^bb0(%in: f32, %in_2: f32, %out: f32):
+        %14 = arith.mulf %in, %in_2 : f32
+        %15 = arith.addf %out, %14 : f32
+        linalg.yield %15 : f32
+      } -> tensor<16x1x1x16xf32>
+    return %conv : tensor<16x1x1x16xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @conv_chwn_generic
+//       CHECK:  scf.for %{{.*}} = %c0 to %c24 step %c1
+//       CHECK:    scf.for %{{.*}} = %c0 to %c16 step %c1
+//       CHECK:      linalg.generic
+//  CHECK-SAME:        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1, d2, d3)>

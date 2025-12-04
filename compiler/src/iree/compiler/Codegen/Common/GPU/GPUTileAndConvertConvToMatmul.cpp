@@ -61,6 +61,7 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
     return;
   AffineMap inputMap = indexingMaps[0];
   AffineMap filterMap = indexingMaps[1];
+  AffineMap outputMap = indexingMaps[2];
 
   // Check that all filter loop dimensions are unit and then make them zero.
   DenseMap<AffineExpr, AffineExpr> dimMap;
@@ -76,11 +77,13 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
     dimMap[rewriter.getAffineDimExpr(filterLoop)] =
         getAffineConstantExpr(0, filterMap.getContext());
   }
-  SmallVector<AffineMap> newIndexingMaps;
-  newIndexingMaps.push_back(inputMap.replace(dimMap));
+  ArrayRef<AffineExpr> newResults = inputMap.replace(dimMap).getResults();
+  auto newInputMap = AffineMap::get(inputMap.getNumDims(), 0, newResults,
+                                    inputMap.getContext());
+
   // No changes to the filter and output map.
-  newIndexingMaps.push_back(filterMap);
-  newIndexingMaps.push_back(indexingMaps[2]);
+  AffineMap newIndexingMaps[] = {newInputMap, filterMap, outputMap};
+
   // Create the new contraction op and replace the old convolution op.
   auto newOp = linalg::GenericOp::create(
       rewriter, linalgOp.getLoc(), linalgOp.getDpsInits().getType(),
