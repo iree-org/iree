@@ -19,6 +19,9 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "iree-codegen-external-interfaces"
 
 namespace mlir::iree_compiler::IREE {
 using IREE::Codegen::MaterializeEncodingInfo;
@@ -29,6 +32,8 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
                                             ValueRange dynamicDims) {
   auto deviceLayoutAttr =
       cast<IREE::Codegen::PackedLayoutMaterializerAttr>(attr);
+  LLVM_DEBUG(llvm::dbgs() << "deviceLayoutAttr: " << deviceLayoutAttr << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "type: " << type << "\n");
   MaterializeEncodingInfo encodingInfo = deviceLayoutAttr.getEncodingInfo(type);
   SmallVector<int64_t> paddedShape(type.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims);

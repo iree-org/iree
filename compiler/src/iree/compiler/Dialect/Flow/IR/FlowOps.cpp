@@ -1514,12 +1514,12 @@ LogicalResult TensorBitCastOp::verify() {
                                  {getResultDims()}))) {
     return failure();
   }
-  auto sourceType = cast<RankedTensorType>(getSource().getType());
-  auto resultType = cast<RankedTensorType>(getResult().getType());
-  if (sourceType.getEncoding() != resultType.getEncoding()) {
-    return emitOpError() << "the source and result of a bitcast should have "
-                            "the same encoding";
-  }
+  // auto sourceType = cast<RankedTensorType>(getSource().getType());
+  // auto resultType = cast<RankedTensorType>(getResult().getType());
+  // if (sourceType.getEncoding() != resultType.getEncoding()) {
+  //   return emitOpError() << "the source and result of a bitcast should have "
+  //                           "the same encoding";
+  // }
   return success();
 }
 

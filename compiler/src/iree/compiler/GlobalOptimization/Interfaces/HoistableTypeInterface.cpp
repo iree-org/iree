@@ -71,6 +71,9 @@ struct HoistableTensorTypeInterface
     // TODO(jtuyls): We might need to account for the preferred storage type in
     // the encoding itself as well to avoid different materializations of the
     // same encoding on different types?
+    return RankedTensorType::get({numElements * elementBitWidth / 8},
+      Builder(type.getContext()).getIntegerType(8),
+      tensorType.getEncoding());
     // IREE::Encoding::SerializableAttr attr =
     //     IREE::Encoding::getSerializableAttr(tensorType);
     // if (!attr) {
