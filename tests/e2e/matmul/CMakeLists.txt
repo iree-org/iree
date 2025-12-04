@@ -1168,6 +1168,102 @@ iree_generated_e2e_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cuda_vecdist_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUVectorDistributeCUDA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-target=sm_80"
+  LABELS
+    "requires-gpu-sm80"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cuda_tileandfuse_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUTileAndFuseCUDA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-target=sm_80"
+  LABELS
+    "requires-gpu-sm80"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cuda_vecdist_f16_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f16"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUVectorDistributeCUDA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-target=sm_80"
+  LABELS
+    "requires-gpu-sm80"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cuda_tileandfuse_f16_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f16"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUTileAndFuseCUDA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-target=sm_80"
+  LABELS
+    "requires-gpu-sm80"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # To distinguish between CDNA(gfx9), RDNA3(gfx11), and RDNA4(gfx12)
