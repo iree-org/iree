@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-propagate-encodings))" --split-input-file %s | FileCheck %s
 
-#encoding = #iree_encoding.layout<[#iree_encoding.testing<[]>]>
+#encoding = #iree_encoding.layout<[#iree_encoding.testing<layouts = []>]>
 util.func @propagate_encoding_through_tensor_cast(%src: tensor<1024x?xf16>) -> tensor<?x512xf16, #encoding> {
   %cast = tensor.cast %src : tensor<1024x?xf16> to tensor<?x512xf16>
   %0 = iree_encoding.set_encoding %cast : tensor<?x512xf16> -> tensor<?x512xf16, #encoding>

@@ -340,7 +340,7 @@ def TestingAttr :
     "layouts.">:$layouts
   );
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = "`<` struct(params) `>`";
   let genVerifyDecl = 0;
 }
 
