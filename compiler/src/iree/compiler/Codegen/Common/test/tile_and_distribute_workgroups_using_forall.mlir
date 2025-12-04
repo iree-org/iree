@@ -1364,3 +1364,63 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:     tensor.parallel_insert_slice %[[RES]] into %[[OUT0]][%[[OFFSET0]], 0, %[[OFFSET1]]]
 //   CHECK: {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+// Test MergeExtractSliceThroughBlockArg pattern with arg_compare and split reduction.
+// Since extract_slice does not implement TilingInterface, it won't be fused automatically.
+// This pattern merges consecutive extract_slice ops through block arguments (from operations
+// like broadcast that do implement TilingInterface), enabling direct access to the outer source.
+
+func.func @arg_compare_split_reduction(%arg0 : tensor<4x1x128256xf16>) -> (tensor<4x1x96xf16>, tensor<4x1x96xi32>)
+attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [128, 1, 1] subgroup_size = 64>} {
+  %c0_i32 = arith.constant 0 : i32
+  %cst = arith.constant 0xFC00 : f16
+  %c1336 = arith.constant 1336 : index
+  %5 = tensor.empty() : tensor<4x1x96xi32>
+  %6 = tensor.empty() : tensor<4x1x96xf16>
+  %7 = tensor.empty() : tensor<4x1xi32>
+  %8 = tensor.empty() : tensor<4x1xf16>
+  %9 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 128]]>} ins(%cst : f16) outs(%8 : tensor<4x1xf16>) -> tensor<4x1xf16>
+  %10 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 128]]>} ins(%c0_i32 : i32) outs(%7 : tensor<4x1xi32>) -> tensor<4x1xi32>
+  %11:2 = scf.forall (%arg1) = (0) to (128256) step (1336) shared_outs(%arg2 = %6, %arg3 = %5) -> (tensor<4x1x96xf16>, tensor<4x1x96xi32>) {
+    %12 = tensor.extract_slice %arg0[0, 0, %arg1] [4, 1, 1336] [1, 1, 1] : tensor<4x1x128256xf16> to tensor<4x1x1336xf16>
+    %13 = tensor.extract_slice %arg2[0, 0, 0] [4, 1, 1] [1, 1, 1] : tensor<4x1x96xf16> to tensor<4x1x1xf16>
+    %14 = linalg.broadcast ins(%9 : tensor<4x1xf16>) outs(%13 : tensor<4x1x1xf16>) dimensions = [2] {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 128]]>}
+    %15 = tensor.extract_slice %14[0, 0, 0] [4, 1, 1] [1, 1, 1] : tensor<4x1x1xf16> to tensor<4x1xf16>
+    %16 = tensor.extract_slice %arg3[0, 0, 0] [4, 1, 1] [1, 1, 1] : tensor<4x1x96xi32> to tensor<4x1x1xi32>
+    %17 = linalg.broadcast ins(%10 : tensor<4x1xi32>) outs(%16 : tensor<4x1x1xi32>) dimensions = [2] {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 128]]>}
+    %18 = tensor.extract_slice %17[0, 0, 0] [4, 1, 1] [1, 1, 1] : tensor<4x1x1xi32> to tensor<4x1xi32>
+    %19:2 = iree_linalg_ext.arg_compare {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 128]]>} dimension(2) ins(%12 : tensor<4x1x1336xf16>) outs(%15, %18 : tensor<4x1xf16>, tensor<4x1xi32>) {
+    ^bb0(%arg4: f16, %arg5: f16):
+      %20 = arith.cmpf ogt, %arg4, %arg5 : f16
+      iree_linalg_ext.yield %20 : i1
+    } -> tensor<4x1xf16>, tensor<4x1xi32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %19#0 into %arg2[0, 0, 0] [4, 1, 1] [1, 1, 1] : tensor<4x1xf16> into tensor<4x1x96xf16>
+      tensor.parallel_insert_slice %19#1 into %arg3[0, 0, 0] [4, 1, 1] [1, 1, 1] : tensor<4x1xi32> into tensor<4x1x96xi32>
+    }
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
+  return %11#0, %11#1 : tensor<4x1x96xf16>, tensor<4x1x96xi32>
+}
+// CHECK-LABEL: func.func @arg_compare_split_reduction(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1x128256xf16>)
+//       CHECK:   %[[FILL0:.+]] = linalg.fill
+//       CHECK:   %[[FILL1:.+]] = linalg.fill
+//       CHECK:   %[[OUTER:.+]]:2 = scf.forall (%[[OUTER_IV:.+]]) = (0) to (128256) step (1336)
+//  CHECK-SAME:       shared_outs(%[[OUTER_OUT0:.+]] = %{{.+}}, %[[OUTER_OUT1:.+]] = %{{.+}})
+//       CHECK:     %[[INNER:.+]]:2 = scf.forall (%[[INNER_IV0:.+]], %[[INNER_IV1:.+]]) = (0, 0) to (4, 1) step (1, 128)
+//       CHECK:       %[[INPUT:.+]] = tensor.extract_slice %[[ARG0]][%[[INNER_IV0]], 0, %[[OUTER_IV]]] [1, 1, 1336]
+// Verify MergeExtractSliceThroughBlockArg: init values extract directly from outer shared_outs
+//       CHECK:       %[[INIT_EXTRACT0:.+]] = tensor.extract_slice %[[OUTER_OUT0]][%[[INNER_IV0]], 0, 0] [1, 1, 1]
+//       CHECK:       %[[INIT0:.+]] = tensor.extract_slice
+//       CHECK:       %[[INIT_EXTRACT1:.+]] = tensor.extract_slice %[[OUTER_OUT1]][%[[INNER_IV0]], 0, 0] [1, 1, 1]
+//       CHECK:       %[[INIT1:.+]] = tensor.extract_slice
+//       CHECK:       iree_linalg_ext.arg_compare
+//  CHECK-SAME:         ins(%[[INPUT]] :
+//  CHECK-SAME:         outs(%[[INIT0]], %[[INIT1]] :
+//       CHECK:       scf.forall.in_parallel
+//       CHECK:     {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
+//       CHECK:   return %[[OUTER]]#0, %[[OUTER]]#1

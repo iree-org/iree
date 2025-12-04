@@ -197,6 +197,11 @@ void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
 /// `tensor.collapse_shape(tensor.extract_slice)`.
 void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns);
 
+/// Populate pattern to merge consecutive tensor.extract_slice operations
+/// through block arguments (e.g., scf.forall shared_outs).
+void populateMergeExtractSliceThroughBlockArgPattern(
+    RewritePatternSet &patterns);
+
 /// Populate patterns to fold relayout operations into map_scatter ops. If a
 /// `padDistributionConfigFn` is passed, then the tensor.pad folding pattern
 /// will be added, using the padDistributionConfigFn for distribution.
