@@ -672,17 +672,30 @@ Attribute TestingAttr::parse(AsmParser &p, Type type) {
     p.emitError(p.getNameLoc()) << "expected array attribute";
     return {};
   }
+  Type underlyingType;
+  OptionalParseResult typeResult = p.parseOptionalType(underlyingType);
+  if (typeResult.has_value() && typeResult.value().failed()) {
+    p.emitError(p.getNameLoc()) << "expected type";
+    return {};
+  }
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(p.getContext(), layouts);
+  return get(p.getContext(), layouts, underlyingType);
 }
 
 void TestingAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
-  if (auto layouts = getLayouts()) {
+  ArrayAttr layouts = getLayouts();
+  if (layouts) {
     p.printAttribute(layouts);
+  }
+  if (auto underlyingType = getUnderlyingType()) {
+    if (layouts) {
+      os << ", ";
+    }
+    os << underlyingType;
   }
   os << ">";
 }
@@ -691,7 +704,17 @@ bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
 Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
-  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts),
+                          getUnderlyingType());
+}
+
+Attribute TestingAttr::convertForBitcast(Type type) const {
+  auto tensorType = dyn_cast<RankedTensorType>(type);
+  if (!tensorType) {
+    return {};
+  }
+  return TestingAttr::get(tensorType.getContext(), getLayouts(),
+                          tensorType.getElementType());
 }
 
 Attribute

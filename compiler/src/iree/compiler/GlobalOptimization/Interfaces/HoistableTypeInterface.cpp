@@ -79,10 +79,20 @@ struct HoistableTensorTypeInterface
     // }
     LLVM_DEBUG(llvm::dbgs() << "convertEncodingForBitcast: "
                             << tensorType.getEncoding() << "\n");
+    auto serializableAttr = dyn_cast_or_null<IREE::Encoding::SerializableAttr>(
+        tensorType.getEncoding());
+    if (!serializableAttr) {
+      return RankedTensorType::get(
+          {numElements * elementBitWidth / 8},
+          Builder(type.getContext()).getIntegerType(8));
+    }
+    Attribute newSerializableAttr =
+        serializableAttr.convertForBitcast(tensorType);
     return RankedTensorType::get({numElements * elementBitWidth / 8},
                                  Builder(type.getContext()).getIntegerType(8),
-                                 tensorType.getEncoding());
+                                 newSerializableAttr);
   }
+
   static Value encodeStorageType(OpBuilder &builder, Location loc,
                                  Type storageType, Value init) {
     auto storageTensorType = dyn_cast<RankedTensorType>(storageType);
