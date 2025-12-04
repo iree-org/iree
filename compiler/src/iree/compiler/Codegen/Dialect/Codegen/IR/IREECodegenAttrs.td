@@ -9,6 +9,7 @@
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
+include "iree/compiler/Codegen/Dialect/PCF/IR/PCFInterfaces.td"
 include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
 
@@ -627,6 +628,23 @@ def DenormalFpMathAttr :
       return "iree_codegen.denormal_fp_math_f32";
     }
   }];
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.workgroup
+//===---------------------------------------------------------------------===//
+
+def WorkgroupAttr :
+    AttrDef<IREECodegen_Dialect, "Workgroup", []> {
+  let mnemonic = "workgroup";
+  let summary = [{Attribute representing parallel execution across workgroups}];
+  let description = [{
+    Scope that maps to workgroup execution.
+  }];
+  let parameters = (ins "bool":$linearize);
+  let hasCustomAssemblyFormat = 1;
+
+  // Interface is registered as an external model to avoid HAL dep.
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

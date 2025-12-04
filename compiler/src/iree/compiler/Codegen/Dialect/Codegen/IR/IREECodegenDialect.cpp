@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCFInterfaces.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -50,6 +51,8 @@ void IREECodegenDialect::initialize() {
       >();
 
   addTypes<IREE::Codegen::NullPointerType>();
+
+  declarePromisedInterface<PCF::ScopeAttr, WorkgroupAttr>();
 }
 
 static LogicalResult

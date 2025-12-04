@@ -36,13 +36,15 @@ hal.executable private @conv2d_1x230x230x3_7x7x3x64_dispatch_0 {
 //   CHECK-LABEL:  func.func @conv2d_1x230x230x3_7x7x3x64
 //     CHECK-NOT:    vector.transfer_write
 //     CHECK-NOT:    vector.transfer_read
+//         CHECK:    %[[ALLOCA:.+]] = memref.alloca() : memref<1x1x4x4xf32, #gpu.address_space<private>>
 //         CHECK:    scf.for
 //         CHECK:      scf.for
 // CHECK-COUNT-2:        vector.transfer_read
 // CHECK-COUNT-4:        vector.contract
 //         CHECK:      scf.yield %{{.*}} : vector<1x4x4xf32>
 //         CHECK:    scf.yield %{{.*}} : vector<1x4x4xf32>
-//         CHECK:    vector.transfer_write {{.*}} : vector<4x4xf32>, memref<1x112x112x64xf32, #hal.descriptor_type<storage_buffer>>
+//         CHECK:    vector.transfer_write {{.*}} : vector<4x4xf32>, memref<1x1x4x4xf32, #gpu.address_space<private>>
+//         CHECK:    memref.copy %[[ALLOCA]], %{{.*}} : memref<1x1x4x4xf32, #gpu.address_space<private>> to memref<1x1x4x4xf32, strided<{{.+}}>, #hal.descriptor_type<storage_buffer>>
 
 // -----
 

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCF.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -38,10 +39,10 @@ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<IREE::HAL::HALDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                IREE::GPU::IREEGPUDialect, amdgpu::AMDGPUDialect,
-                bufferization::BufferizationDialect, gpu::GPUDialect,
-                linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect,
-                vector::VectorDialect>();
+                IREE::GPU::IREEGPUDialect, IREE::PCF::PCFDialect,
+                amdgpu::AMDGPUDialect, bufferization::BufferizationDialect,
+                gpu::GPUDialect, linalg::LinalgDialect, scf::SCFDialect,
+                tensor::TensorDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override {
