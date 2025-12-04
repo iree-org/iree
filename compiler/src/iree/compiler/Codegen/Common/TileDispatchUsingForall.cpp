@@ -308,6 +308,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   // TODO(Max191): Replace populateSwapExtractWithExpandPattern with upstream
   // MLIR version once it is available (llvm-project/pull/126898).
   populateSwapExtractWithExpandPattern(cleanupPatterns);
+  populateMergeExtractSliceThroughBlockArgPattern(cleanupPatterns);
   // When fusing pads we do not want to generate zeroSliceGuards when doing
   // workgroup tiling. In `GPUApplyTilingLevelPass` we do have an option called
   // `allowZeroSlices` that can control this but we do not want these

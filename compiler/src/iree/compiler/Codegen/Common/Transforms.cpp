@@ -705,4 +705,149 @@ void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns) {
   patterns.add<SwapCollapseShapeWithSlicePattern>(patterns.getContext());
 }
 
+namespace {
+
+/// Merges consecutive tensor.extract_slice ops where the first is used as a
+/// block argument (e.g., in scf.forall shared_outs).
+///
+/// Motivation: In nested scf.forall loops, extract_slice operations from the
+/// outer loop may block fusion in the inner loop because tensor.extract_slice
+/// does NOT implement TilingInterface. By bypassing these intermediate
+/// extracts, we enable the inner loop to directly access tileable operations
+/// (like linalg.broadcast or linalg.fill) that DO implement TilingInterface,
+/// allowing successful producer fusion.
+///
+/// Example:
+/// ```
+/// scf.forall (%i) ... {
+///   %broadcast = linalg.broadcast ins(%fill) ...
+///   %outer = tensor.extract_slice %broadcast[0, 0] [4, 1] [1, 1]
+///   scf.forall (%j, %k) ... shared_outs(%arg = %outer) {
+///     %inner = tensor.extract_slice %arg[%j, %k] [1, %n] [1, 1]
+///
+/// // Cannot fuse %broadcast because %arg resolves to %outer (extract_slice)
+/// // which does NOT implement TilingInterface
+///   }
+/// }
+///
+/// // After transformation:
+///
+/// scf.forall (%i) ... {
+///   %broadcast = linalg.broadcast ins(%fill) ...
+///   %outer = tensor.extract_slice %broadcast[0, 0] [4, 1] [1, 1]
+///   scf.forall (%j, %k) ... shared_outs(%arg = %outer) {
+///     %inner = tensor.extract_slice %broadcast[%j, %k] [1, %n] [1, 1]
+///
+/// // CAN NOW fuse %broadcast because it implements TilingInterface!
+///   }
+/// }
+/// ```
+struct MergeExtractSliceThroughBlockArg
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp innerExtractOp,
+                                PatternRewriter &rewriter) const override {
+    auto blockArg = dyn_cast<BlockArgument>(innerExtractOp.getSource());
+    if (!blockArg) {
+      return rewriter.notifyMatchFailure(innerExtractOp,
+                                         "source is not a block argument");
+    }
+
+    Operation *ownerOp = blockArg.getOwner()->getParentOp();
+    auto forallOp = dyn_cast<scf::ForallOp>(ownerOp);
+    if (!forallOp) {
+      return rewriter.notifyMatchFailure(innerExtractOp,
+                                         "parent operation is not scf.forall");
+    }
+
+    unsigned argIndex = blockArg.getArgNumber();
+    unsigned numIVs = forallOp.getRank();
+    if (argIndex < numIVs) {
+      return rewriter.notifyMatchFailure(
+          innerExtractOp,
+          "block argument is an induction variable, not a shared_out");
+    }
+
+    unsigned sharedOutIndex = argIndex - numIVs;
+    Value sharedOutValue = forallOp.getOutputs()[sharedOutIndex];
+
+    auto outerExtractOp =
+        sharedOutValue.getDefiningOp<tensor::ExtractSliceOp>();
+    if (!outerExtractOp) {
+      return rewriter.notifyMatchFailure(
+          innerExtractOp, "shared_out is not defined by an extract_slice op");
+    }
+
+    SmallVector<OpFoldResult> outerOffsets = outerExtractOp.getMixedOffsets();
+    SmallVector<OpFoldResult> outerSizes = outerExtractOp.getMixedSizes();
+    SmallVector<OpFoldResult> outerStrides = outerExtractOp.getMixedStrides();
+
+    SmallVector<OpFoldResult> innerOffsets = innerExtractOp.getMixedOffsets();
+    SmallVector<OpFoldResult> innerSizes = innerExtractOp.getMixedSizes();
+    SmallVector<OpFoldResult> innerStrides = innerExtractOp.getMixedStrides();
+
+    assert(innerOffsets.size() <= outerOffsets.size() &&
+           "inner extract has more dimensions than outer extract");
+    assert(innerSizes.size() <= outerSizes.size() &&
+           "inner extract has more dimensions than outer extract");
+    assert(innerStrides.size() <= outerStrides.size() &&
+           "inner extract has more dimensions than outer extract");
+
+    Location loc = innerExtractOp.getLoc();
+    SmallVector<OpFoldResult> mergedOffsets = llvm::map_to_vector(
+        llvm::zip(outerOffsets, innerOffsets), [&](auto pair) -> OpFoldResult {
+          auto [outer, inner] = pair;
+          std::optional<int64_t> outerConst = getConstantIntValue(outer);
+          std::optional<int64_t> innerConst = getConstantIntValue(inner);
+          if (outerConst && innerConst) {
+            return rewriter.getIndexAttr(*outerConst + *innerConst);
+          }
+          Value outerVal =
+              getValueOrCreateConstantIndexOp(rewriter, loc, outer);
+          Value innerVal =
+              getValueOrCreateConstantIndexOp(rewriter, loc, inner);
+          return arith::AddIOp::create(rewriter, loc, outerVal, innerVal)
+              .getResult();
+        });
+    llvm::append_range(mergedOffsets,
+                       llvm::drop_begin(outerOffsets, innerOffsets.size()));
+
+    SmallVector<OpFoldResult> mergedSizes = innerSizes;
+    llvm::append_range(mergedSizes,
+                       llvm::drop_begin(outerSizes, innerSizes.size()));
+
+    SmallVector<OpFoldResult> mergedStrides = llvm::map_to_vector(
+        llvm::zip(outerStrides, innerStrides), [&](auto pair) -> OpFoldResult {
+          auto [outer, inner] = pair;
+          std::optional<int64_t> outerConst = getConstantIntValue(outer);
+          std::optional<int64_t> innerConst = getConstantIntValue(inner);
+          if (outerConst && innerConst) {
+            return rewriter.getIndexAttr(*outerConst * *innerConst);
+          }
+          Value outerVal =
+              getValueOrCreateConstantIndexOp(rewriter, loc, outer);
+          Value innerVal =
+              getValueOrCreateConstantIndexOp(rewriter, loc, inner);
+          return arith::MulIOp::create(rewriter, loc, outerVal, innerVal)
+              .getResult();
+        });
+    llvm::append_range(mergedStrides,
+                       llvm::drop_begin(outerStrides, innerStrides.size()));
+
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+        innerExtractOp, innerExtractOp.getType(), outerExtractOp.getSource(),
+        mergedOffsets, mergedSizes, mergedStrides);
+
+    return success();
+  }
+};
+
+} // namespace
+
+void populateMergeExtractSliceThroughBlockArgPattern(
+    RewritePatternSet &patterns) {
+  patterns.add<MergeExtractSliceThroughBlockArg>(patterns.getContext());
+}
+
 } // namespace mlir::iree_compiler
