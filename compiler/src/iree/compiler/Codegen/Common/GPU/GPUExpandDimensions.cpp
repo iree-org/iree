@@ -22,7 +22,6 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-
 #define DEBUG_TYPE "iree-codegen-gpu-expand-dimensions"
 
 namespace mlir::iree_compiler {
@@ -218,17 +217,19 @@ void GPUExpandDimensionsPass::runOnOperation() {
       return !isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(
           opOperand->get().getDefiningOp());
     };
-    linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns, controlFn);
-    IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
-                                                               controlFn);
+    linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
+                                                      controlFn);
+    IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
+        bubbleExpandShapePatterns, controlFn);
     populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
     populateCombineRelayoutOpPatterns(bubbleExpandShapePatterns);
     populateFoldTensorReshapeIntoBufferPatterns(bubbleExpandShapePatterns);
     tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
     tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
-    linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
-                                                bubbleExpandShapePatterns.getContext());
-    memref::populateResolveRankedShapedTypeResultDimsPatterns(bubbleExpandShapePatterns);
+    linalg::FillOp::getCanonicalizationPatterns(
+        bubbleExpandShapePatterns, bubbleExpandShapePatterns.getContext());
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
+        bubbleExpandShapePatterns);
     if (failed(applyPatternsGreedily(
             operation, std::move(bubbleExpandShapePatterns), config))) {
       operation->emitOpError(
