@@ -940,7 +940,7 @@ def IREEGPU_DimensionExpansionAttr
     - Original dimension 1 maps to output dimension 1
     - Original dimension 2 is split into output dimensions 2 and 3
 
-    The output_shape parameter specifies the sizes of the expanded dimensions.
+    The output_shape parameter specifies the sizes of the expanded dimensions. If the size is ShapedType::kDynamic, the size is determined from the product of the rest of the static tile sizes in the respective reassociation group. There can be at most one dynamic size per reassociation group.
 
     Example: #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>
   }];
