@@ -119,7 +119,7 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
 >>
 
 #exec_target_small_inner = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_small_inner}>
-#translation_small_inner = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+#translation_small_inner = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_small_innermost_dim
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x32xf32>
