@@ -18,7 +18,7 @@ func.func @conv_nhwc_fhwc(%arg0: tensor<16x50x34x576xf16>, %arg1: tensor<576x3x3
 
 // CHECK-LABEL: func.func @conv_nhwc_fhwc
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = false
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -48,7 +48,7 @@ func.func @conv_nhwc_fhwc_unaligned(%arg0: tensor<16x26x19x287xf16>, %arg1: tens
 
 // CHECK-LABEL: func.func @conv_nhwc_fhwc_unaligned
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = false
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -79,7 +79,7 @@ func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg
 
 // CHECK-LABEL: func.func @group_conv_hwgc_gfhwc_unaligned
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = false
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -109,7 +109,7 @@ func.func @conv_nhwc_fhc_two_batch_dims(%arg0: tensor<16x50x32x576xf16>, %arg1: 
 
 // CHECK-LABEL: func.func @conv_nhwc_fhc_two_batch_dims
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = false
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config

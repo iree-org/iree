@@ -591,10 +591,12 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
-  if (forROCDL && pipelineOptions.prefetchSharedMemory) {
+  if (forROCDL && pipelineOptions.prefetchNumStages >= 2) {
     funcPassManager.addPass(createFissionTransferOpsInControlFlowPass());
     funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass());
+    ROCDLPrefetchSharedMemoryPassOptions prefetchOpts;
+    prefetchOpts.numStages = pipelineOptions.prefetchNumStages;
+    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass(prefetchOpts));
   }
 
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
@@ -848,8 +850,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
-  if (forROCDL && options.prefetchSharedMemory) {
-    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass());
+  if (forROCDL && options.prefetchNumStages >= 2) {
+    ROCDLPrefetchSharedMemoryPassOptions prefetchOpts;
+    prefetchOpts.numStages = options.prefetchNumStages;
+    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass(prefetchOpts));
   }
   if (clLLVMGPUEnableSharedMemoryReuse) {
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());

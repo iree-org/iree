@@ -15,7 +15,7 @@
   subgroup_size = 64,
   {
     gpu_pipeline_options = #iree_gpu.pipeline_options<
-      prefetch_shared_memory = false,
+      prefetch_num_stages = 0,
       no_reduce_shared_memory_bank_conflicts = true>
   }
 >

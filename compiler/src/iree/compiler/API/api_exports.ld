@@ -100,7 +100,7 @@ VER_0 {
     ireeGPUMMAAttrGetVirtualMMAIntrinsic;
     ireeGPUPipelineOptionsAttrGet;
     ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts;
-    ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory;
+    ireeGPUPipelineOptionsAttrGetPrefetchNumStages;
     ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy;
     ireeGPUPipelineOptionsAttrGetTypeID;
     ireeGPUPipelineOptionsAttrGetUseIgemmConvolution;

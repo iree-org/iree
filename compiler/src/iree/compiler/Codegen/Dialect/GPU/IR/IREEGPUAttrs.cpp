@@ -2290,7 +2290,7 @@ int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 //===----------------------------------------------------------------------===//
 
 GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
-    MLIRContext *context, bool prefetchSharedMemory,
+    MLIRContext *context, unsigned prefetchNumStages,
     bool noReduceSharedMemoryBankConflicts, bool useIgemmConvolution,
     std::optional<ReorderWorkgroupsStrategy> reorderWorkgroupsStrategy) {
   auto strategyAttr = ReorderWorkgroupsStrategyAttr();
@@ -2299,7 +2299,11 @@ GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
         ReorderWorkgroupsStrategyAttr::get(context, *reorderWorkgroupsStrategy);
   }
   Builder b(context);
-  return Base::get(context, b.getBoolAttr(prefetchSharedMemory),
+  std::optional<int64_t> prefetchOpt;
+  if (prefetchNumStages > 0) {
+    prefetchOpt = prefetchNumStages;
+  }
+  return Base::get(context, prefetchOpt,
                    b.getBoolAttr(noReduceSharedMemoryBankConflicts),
                    b.getBoolAttr(useIgemmConvolution), strategyAttr);
 }
