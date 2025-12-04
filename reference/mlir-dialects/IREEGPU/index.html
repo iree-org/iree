@@ -6733,15 +6733,16 @@ See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 <p><em>Options attribute for linalg + tensors -&gt; vector + memref GPU pipelines.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.pipeline_options&lt;
-  BoolAttr,   # prefetch_shared_memory
+  std::optional&lt;int64_t&gt;,   # prefetch_num_stages
   BoolAttr,   # no_reduce_shared_memory_bank_conflicts
   BoolAttr,   # use_igemm_convolution
   ReorderWorkgroupsStrategyAttr   # reorder_workgroups_strategy
 &gt;
 </code></pre></div>
 <p>This attributes describes lowering pipeline specific configuration options:
-* prefetch_shared_memory: Boolean option indicating whether or not to run
-  the loop prefetching pass in the lowering pipeline.
+* prefetch_num_stages: Integer option controlling the software pipelining
+  stages for shared memory prefetching. 0 or 1 disables prefetching, 2+
+  enables prefetching with that many pipeline stages.
 * no_reduce_shared_memory_bank_conflicts: Boolean option indicating whether
   or not to skip the bank conflict reduction pass in the lowering pipeline.
 * reorder_workgroups_strategy: Enum attribute indicating which strategy to
@@ -6758,8 +6759,8 @@ See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;">prefetch_shared_memory</td>
-<td style="text-align: center;"><code>BoolAttr</code></td>
+<td style="text-align: center;">prefetch_num_stages</td>
+<td style="text-align: center;"><code>std::optional&lt;int64_t&gt;</code></td>
 <td></td>
 </tr>
 <tr>
