@@ -66,19 +66,7 @@ def AllocOp : PCF_Op<"alloc", []> {
     ShapedRefType getResultType() {
       return cast<ShapedRefType>(getResult().getType());
     }
-    SmallVector<OpFoldResult> getMixedSizes() {
-      SmallVector<OpFoldResult> result;
-      unsigned ctr = 0;
-      OpBuilder b(getContext());
-      for (int64_t i = 0, e = getResultType().getRank(); i < e; ++i) {
-        if (getResultType().isDynamicDim(i)) {
-          result.push_back(getDynamicSizes()[ctr++]);
-        } else {
-          result.push_back(b.getIndexAttr(getResultType().getShape()[i]));
-        }
-      }
-      return result;
-    }
+    SmallVector<OpFoldResult> getMixedSizes();
   }];
 
   let hasVerifier = 1;
@@ -220,99 +208,53 @@ def GenericOp : PCF_Op<"generic", [
     int64_t getNumIterators() {
       return getNumIndexArgs() / 2;
     }
-    MutableArrayRef<BlockArgument> getLeadingArgs() {
+    MutableArrayRef<BlockArgument> getLeadingArgsMutable() {
       return getRegion().getArguments().take_front(getNumLeadingArgs());
     }
-    MutableArrayRef<BlockArgument> getIdArgs() {
+    ArrayRef<BlockArgument> getLeadingArgs() {
+      return getLeadingArgsMutable();
+    }
+    MutableArrayRef<BlockArgument> getIdArgsMutable() {
       return getRegion().getArguments().take_back(getNumIndexArgs()).take_front(getNumIterators());
     }
-    MutableArrayRef<BlockArgument> getCountArgs() {
+    ArrayRef<BlockArgument> getIdArgs() {
+      return getIdArgsMutable();
+    }
+    MutableArrayRef<BlockArgument> getCountArgsMutable() {
       return getRegion().getArguments().take_back(getNumIterators());
     }
-    MutableArrayRef<BlockArgument> getIdAndCountArgs() {
+    ArrayRef<BlockArgument> getCountArgs() {
+      return getCountArgsMutable();
+    }
+    MutableArrayRef<BlockArgument> getIdAndCountArgsMutable() {
       return getRegion().getArguments().take_back(getNumIndexArgs());
     }
-    MutableArrayRef<BlockArgument> getRegionRefArgs() {
+    ArrayRef<BlockArgument> getIdAndCountArgs() {
+      return getIdAndCountArgsMutable();
+    }
+    MutableArrayRef<BlockArgument> getRegionRefArgsMutable() {
       return getRegion().getArguments().drop_front(getNumLeadingArgs()).take_front(getNumResults());
     }
-
-    bool isRegionRefArg(BlockArgument b) {
-      assert(b.getOwner() == &getRegion().front() && "unexpected non-entry block arg");
-      int64_t rangeBegin = getNumLeadingArgs();
-      int64_t rangeEnd = getNumLeadingArgs() + getNumResults();
-      return b.getArgNumber() >= rangeBegin && b.getArgNumber() < rangeEnd;
+    ArrayRef<BlockArgument> getRegionRefArgs() {
+      return getRegionRefArgsMutable();
     }
 
+    bool isRegionRefArg(BlockArgument b);
     bool isInitializedArg(BlockArgument b) {
       assert(b.getOwner() == &getRegion().front() && "unexpected non-entry block arg");
       return b.getArgNumber() < getNumLeadingArgs();
     }
-
-    SmallVector<int64_t> getInitTiedResultIndices() {
-      SmallVector<int64_t> tiedResults;
-      for (auto [i, isTied] : llvm::enumerate(getIsTied())) {
-        if (isTied) {
-          tiedResults.push_back(i);
-        }
-      }
-      return tiedResults;
-    }
-
-    OpResult getTiedResult(OpOperand &operand) {
-      int64_t beginIndex = getInits().getBeginOperandIndex();
-      int64_t operandIndex = operand.getOperandNumber();
-      if (operandIndex < beginIndex || operandIndex >= getInits().size() + beginIndex) {
-        return OpResult();
-      }
-
-      int64_t initIndex = operandIndex - beginIndex;
-      for (auto [i, isTied] : llvm::enumerate(getIsTied())) {
-        if (isTied) {
-          if (initIndex == 0) {
-            return (*this)->getOpResult(i);
-          }
-          --initIndex;
-        }
-      }
-
-      return OpResult();
-    }
-
+    SmallVector<int64_t> getInitTiedResultIndices();
+    OpResult getTiedResult(OpOperand &operand);
     OpResult getTiedResult(BlockArgument b) {
       assert(isRegionRefArg(b) && "unexpected non region ref arg");
       return (*this)->getOpResult(b.getArgNumber() - getNumLeadingArgs());
     }
-
-    OpOperand *getTiedInit(int64_t i) {
-      if (i < 0 || i >= getNumResults() || !getIsTied()[i]) {
-        return nullptr;
-      }
-
-      int64_t initIndex = llvm::count(getIsTied().take_front(i), true);
-      return &getInitsMutable()[initIndex];
-    }
-
+    OpOperand *getTiedInit(int64_t i);
     ShapedType getResultType(int64_t i) {
       return cast<ShapedType>(getResults()[i].getType());
     }
-
-    ValueRange getResultDims(int64_t i) {
-      if (getIsTied()[i]) {
-        return {};
-      }
-
-      int64_t startIndex = 0;
-      for (auto [curr, isTied] : llvm::enumerate(getIsTied())) {
-        if (curr == i) {
-          break;
-        }
-        if (!isTied) {
-          startIndex += getResultType(curr).getNumDynamicDims();
-        }
-      }
-
-      return ValueRange(getDynamicSizes().slice(startIndex, startIndex + getResultType(i).getNumDynamicDims()));
-    }
+    ValueRange getResultDims(int64_t i);
   }];
 }
 
@@ -424,77 +366,29 @@ def LoopOp : PCF_Op<"loop", [
     int64_t getNumIdArgs() {
       return getCount().size();
     }
-    MutableArrayRef<BlockArgument> getIdArgs() {
+    MutableArrayRef<BlockArgument> getIdArgsMutable() {
       return getRegion().getArguments().take_back(getNumIdArgs());
     }
-    MutableArrayRef<BlockArgument> getRegionRefArgs() {
+    ArrayRef<BlockArgument> getIdArgs() {
+      return getIdArgsMutable();
+    }
+    MutableArrayRef<BlockArgument> getRegionRefArgsMutable() {
       return getRegion().getArguments().take_front(getNumResults());
     }
-
-    SmallVector<int64_t> getInitTiedResultIndices() {
-      SmallVector<int64_t> tiedResults;
-      for (auto [i, isTied] : llvm::enumerate(getIsTied())) {
-        if (isTied) {
-          tiedResults.push_back(i);
-        }
-      }
-      return tiedResults;
+    ArrayRef<BlockArgument> getRegionRefArgs() {
+      return getRegionRefArgsMutable();
     }
 
-    OpResult getTiedResult(OpOperand &operand) {
-      int64_t beginIndex = getInits().getBeginOperandIndex();
-      int64_t operandIndex = operand.getOperandNumber();
-      if (operandIndex < beginIndex || operandIndex >= getInits().size() + beginIndex) {
-        return OpResult();
-      }
-
-      int64_t initIndex = operandIndex - beginIndex;
-      for (auto [i, isTied] : llvm::enumerate(getIsTied())) {
-        if (isTied) {
-          if (initIndex == 0) {
-            return (*this)->getOpResult(i);
-          }
-          --initIndex;
-        }
-      }
-
-      return OpResult();
-    }
-
+    SmallVector<int64_t> getInitTiedResultIndices();
+    OpResult getTiedResult(OpOperand &operand);
     OpResult getTiedResult(BlockArgument b) {
       return (*this)->getOpResult(b.getArgNumber());
     }
-
-    OpOperand *getTiedInit(int64_t i) {
-      if (i < 0 || i >= getNumResults() || !getIsTied()[i]) {
-        return nullptr;
-      }
-
-      int64_t initIndex = llvm::count(getIsTied().take_front(i), true);
-      return &getInitsMutable()[initIndex];
-    }
-
+    OpOperand *getTiedInit(int64_t i);
     ShapedType getResultType(int64_t i) {
       return cast<ShapedType>(getResults()[i].getType());
     }
-
-    ValueRange getResultDims(int64_t i) {
-      if (getIsTied()[i]) {
-        return {};
-      }
-
-      int64_t startIndex = 0;
-      for (auto [curr, isTied] : llvm::enumerate(getIsTied())) {
-        if (curr == i) {
-          break;
-        }
-        if (!isTied) {
-          startIndex += getResultType(curr).getNumDynamicDims();
-        }
-      }
-
-      return ValueRange(getDynamicSizes().slice(startIndex, startIndex + getResultType(i).getNumDynamicDims()));
-    }
+    ValueRange getResultDims(int64_t i);
   }];
 }
 

@@ -29,6 +29,20 @@ LogicalResult AllocOp::verify() {
   return success();
 }
 
+SmallVector<OpFoldResult> AllocOp::getMixedSizes() {
+  SmallVector<OpFoldResult> result;
+  unsigned ctr = 0;
+  OpBuilder b(getContext());
+  for (int64_t i = 0, e = getResultType().getRank(); i < e; ++i) {
+    if (getResultType().isDynamicDim(i)) {
+      result.push_back(getDynamicSizes()[ctr++]);
+    } else {
+      result.push_back(b.getIndexAttr(getResultType().getShape()[i]));
+    }
+  }
+  return result;
+}
+
 //===----------------------------------------------------------------------===//
 // StructuralOps
 //===----------------------------------------------------------------------===//
@@ -485,6 +499,73 @@ void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
   }
 }
 
+bool GenericOp::isRegionRefArg(BlockArgument b) {
+  assert(b.getOwner() == &getRegion().front() &&
+         "unexpected non-entry block arg");
+  int64_t rangeBegin = getNumLeadingArgs();
+  int64_t rangeEnd = getNumLeadingArgs() + getNumResults();
+  return b.getArgNumber() >= rangeBegin && b.getArgNumber() < rangeEnd;
+}
+
+SmallVector<int64_t> GenericOp::getInitTiedResultIndices() {
+  SmallVector<int64_t> tiedResults;
+  for (auto [i, isTied] : llvm::enumerate(getIsTied())) {
+    if (isTied) {
+      tiedResults.push_back(i);
+    }
+  }
+  return tiedResults;
+}
+
+OpResult GenericOp::getTiedResult(OpOperand &operand) {
+  int64_t beginIndex = getInits().getBeginOperandIndex();
+  int64_t operandIndex = operand.getOperandNumber();
+  if (operandIndex < beginIndex ||
+      operandIndex >= getInits().size() + beginIndex) {
+    return OpResult();
+  }
+
+  int64_t initIndex = operandIndex - beginIndex;
+  for (auto [i, isTied] : llvm::enumerate(getIsTied())) {
+    if (isTied) {
+      if (initIndex == 0) {
+        return (*this)->getOpResult(i);
+      }
+      --initIndex;
+    }
+  }
+
+  return OpResult();
+}
+
+OpOperand *GenericOp::getTiedInit(int64_t i) {
+  if (i < 0 || i >= getNumResults() || !getIsTied()[i]) {
+    return nullptr;
+  }
+
+  int64_t initIndex = llvm::count(getIsTied().take_front(i), true);
+  return &getInitsMutable()[initIndex];
+}
+
+ValueRange GenericOp::getResultDims(int64_t i) {
+  if (getIsTied()[i]) {
+    return {};
+  }
+
+  int64_t startIndex = 0;
+  for (auto [curr, isTied] : llvm::enumerate(getIsTied())) {
+    if (curr == i) {
+      break;
+    }
+    if (!isTied) {
+      startIndex += getResultType(curr).getNumDynamicDims();
+    }
+  }
+
+  return ValueRange(getDynamicSizes().slice(
+      startIndex, startIndex + getResultType(i).getNumDynamicDims()));
+}
+
 //===----------------------------------------------------------------------===//
 // LoopOp
 //===----------------------------------------------------------------------===//
@@ -589,6 +670,65 @@ void LoopOp::getSuccessorRegions(RegionBranchPoint point,
 
   // Otherwise, the region branches back to the parent operation.
   regions.push_back(RegionSuccessor(getOperation(), getResults()));
+}
+
+SmallVector<int64_t> LoopOp::getInitTiedResultIndices() {
+  SmallVector<int64_t> tiedResults;
+  for (auto [i, isTied] : llvm::enumerate(getIsTied())) {
+    if (isTied) {
+      tiedResults.push_back(i);
+    }
+  }
+  return tiedResults;
+}
+
+OpResult LoopOp::getTiedResult(OpOperand &operand) {
+  int64_t beginIndex = getInits().getBeginOperandIndex();
+  int64_t operandIndex = operand.getOperandNumber();
+  if (operandIndex < beginIndex ||
+      operandIndex >= getInits().size() + beginIndex) {
+    return OpResult();
+  }
+
+  int64_t initIndex = operandIndex - beginIndex;
+  for (auto [i, isTied] : llvm::enumerate(getIsTied())) {
+    if (isTied) {
+      if (initIndex == 0) {
+        return (*this)->getOpResult(i);
+      }
+      --initIndex;
+    }
+  }
+
+  return OpResult();
+}
+
+OpOperand *LoopOp::getTiedInit(int64_t i) {
+  if (i < 0 || i >= getNumResults() || !getIsTied()[i]) {
+    return nullptr;
+  }
+
+  int64_t initIndex = llvm::count(getIsTied().take_front(i), true);
+  return &getInitsMutable()[initIndex];
+}
+
+ValueRange LoopOp::getResultDims(int64_t i) {
+  if (getIsTied()[i]) {
+    return {};
+  }
+
+  int64_t startIndex = 0;
+  for (auto [curr, isTied] : llvm::enumerate(getIsTied())) {
+    if (curr == i) {
+      break;
+    }
+    if (!isTied) {
+      startIndex += getResultType(curr).getNumDynamicDims();
+    }
+  }
+
+  return ValueRange(getDynamicSizes().slice(
+      startIndex, startIndex + getResultType(i).getNumDynamicDims()));
 }
 
 //===----------------------------------------------------------------------===//
