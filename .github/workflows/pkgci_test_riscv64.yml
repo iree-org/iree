@@ -40,7 +40,7 @@ jobs:
       CC: clang
       CXX: clang++
       BOOTSTRAP_WORK_DIR: ${{ github.workspace }}/.bootstrap
-      RISCV_RV64_LINUX_TOOLCHAIN_ROOT: ${{ github.workspace }}/riscv/toolchain
+      RISCV_TOOLCHAIN_ROOT: ${{ github.workspace }}/riscv/toolchain
       QEMU_PATH_PREFIX: ${{ github.workspace }}/riscv/qemu
     steps:
       # General setup.
@@ -78,10 +78,10 @@ jobs:
           QEMU_FILE_NAME: "qemu-riscv_8.1.2_manylinux_2.28_20231026.tar.gz"
         run: |
           mkdir -p ${{ env.BOOTSTRAP_WORK_DIR }}
-          mkdir -p ${{ env.RISCV_RV64_LINUX_TOOLCHAIN_ROOT }}
+          mkdir -p ${{ env.RISCV_TOOLCHAIN_ROOT }}
           mkdir -p ${{ env.QEMU_PATH_PREFIX }}
           wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}"
-          tar -C "${{ env.RISCV_RV64_LINUX_TOOLCHAIN_ROOT }}" -xf "${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" --no-same-owner --strip-components=1
+          tar -C "${{ env.RISCV_TOOLCHAIN_ROOT }}" -xf "${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" --no-same-owner --strip-components=1
           wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${QEMU_FILE_NAME}"
           tar -C "${{ env.QEMU_PATH_PREFIX }}" -xf "${BOOTSTRAP_WORK_DIR}/${QEMU_FILE_NAME}" --no-same-owner --strip-components=1
       - name: Build riscv64
