@@ -6,6 +6,7 @@
 
 #include "iree/vm/native_module_test.h"
 
+#include <string>
 #include <vector>
 
 #include "iree/base/api.h"
@@ -158,6 +159,309 @@ TEST_F(VMNativeModuleTest, Fork) {
 
   iree_vm_context_release(child_context);
 }
+
+//===----------------------------------------------------------------------===//
+// Parameterized alignment tests for C and C++ native modules
+//===----------------------------------------------------------------------===//
+// Tests alignment-sensitive parameter unpacking and result packing patterns.
+// Both C (module_c) and C++ (module_cpp) implementations are tested to ensure
+// consistent behavior across both APIs.
+
+enum class ModuleImpl { kC, kCpp };
+
+std::string ModuleImplName(const ::testing::TestParamInfo<ModuleImpl>& info) {
+  return info.param == ModuleImpl::kC ? "C" : "Cpp";
+}
+
+class VMNativeModuleAlignmentTest
+    : public ::testing::TestWithParam<ModuleImpl> {
+ protected:
+  virtual void SetUp() {
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
+  }
+
+  virtual void TearDown() { iree_vm_instance_release(instance_); }
+
+  // Returns the module name based on the test parameter.
+  std::string module_name() const {
+    return GetParam() == ModuleImpl::kC ? "module_c" : "module_cpp";
+  }
+
+  iree_vm_context_t* CreateAlignContext() {
+    iree_vm_module_t* module = nullptr;
+    if (GetParam() == ModuleImpl::kC) {
+      IREE_CHECK_OK(
+          module_c_align_create(instance_, iree_allocator_system(), &module));
+    } else {
+      IREE_CHECK_OK(
+          module_cpp_create(instance_, iree_allocator_system(), &module));
+    }
+
+    iree_vm_context_t* context = NULL;
+    std::vector<iree_vm_module_t*> modules = {module};
+    IREE_CHECK_OK(iree_vm_context_create_with_modules(
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
+        iree_allocator_system(), &context));
+
+    iree_vm_module_release(module);
+    return context;
+  }
+
+  iree_vm_instance_t* instance_ = nullptr;
+};
+
+// Test: (i32) -> i32 - basic entry point.
+TEST_P(VMNativeModuleAlignmentTest, Entry) {
+  iree_vm_context_t* context = CreateAlignContext();
+
+  std::string func_name = module_name() + ".entry";
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_string_view(func_name.data(), func_name.size()),
+      &function));
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(5);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  // counter = 0 + (5 + 1) = 6, return 6 - 1 = 5
+  EXPECT_EQ(result.i32, 5);
+
+  iree_vm_context_release(context);
+}
+
+// Test: (i32, ref<buffer>) -> i32 - ref after i32 triggers alignment.
+// Uses null ref to test alignment without buffer type registration.
+TEST_P(VMNativeModuleAlignmentTest, MixedI32Ref) {
+  iree_vm_context_t* context = CreateAlignContext();
+
+  std::string func_name = module_name() + ".mixed_i32_ref";
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_string_view(func_name.data(), func_name.size()),
+      &function));
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 2,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(7);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  // Push null ref to test alignment without type registration complexity.
+  iree_vm_ref_t null_ref = iree_vm_ref_null();
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &null_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  // 7 + 0 (null buffer) = 7
+  EXPECT_EQ(result.i32, 7);
+
+  iree_vm_context_release(context);
+}
+
+// Test: (ref<buffer>, i32, ref<buffer>) -> i32 - ref/i32/ref pattern.
+// Uses null refs to test alignment without buffer type registration.
+TEST_P(VMNativeModuleAlignmentTest, MixedRefI32Ref) {
+  iree_vm_context_t* context = CreateAlignContext();
+
+  std::string func_name = module_name() + ".mixed_ref_i32_ref";
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_string_view(func_name.data(), func_name.size()),
+      &function));
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 3,
+                                     iree_allocator_system(), &inputs));
+  iree_vm_ref_t null_ref1 = iree_vm_ref_null();
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &null_ref1));
+  auto arg1 = iree_vm_value_make_i32(3);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  iree_vm_ref_t null_ref2 = iree_vm_ref_null();
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &null_ref2));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  // 0 + 3 + 0 = 3
+  EXPECT_EQ(result.i32, 3);
+
+  iree_vm_context_release(context);
+}
+
+// Test: (i32, i64) -> i64 - i64 after i32 triggers alignment.
+TEST_P(VMNativeModuleAlignmentTest, MixedI32I64) {
+  iree_vm_context_t* context = CreateAlignContext();
+
+  std::string func_name = module_name() + ".mixed_i32_i64";
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_string_view(func_name.data(), func_name.size()),
+      &function));
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 2,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(100);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i64(0x100000000LL);  // 4 billion
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  // 100 + 0x100000000 = 0x100000064
+  EXPECT_EQ(result.i64, 0x100000064LL);
+
+  iree_vm_context_release(context);
+}
+
+// Test: (i32, i32, i32, ref<buffer>) -> i32 - ref after 12 bytes of i32s.
+// Uses null ref to test alignment without buffer type registration.
+TEST_P(VMNativeModuleAlignmentTest, MixedI32x3Ref) {
+  iree_vm_context_t* context = CreateAlignContext();
+
+  std::string func_name = module_name() + ".mixed_i32x3_ref";
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_string_view(func_name.data(), func_name.size()),
+      &function));
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 4,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(1);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i32(2);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  auto arg2 = iree_vm_value_make_i32(3);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg2));
+  iree_vm_ref_t null_ref = iree_vm_ref_null();
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &null_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  // 1 + 2 + 3 + 0 = 6
+  EXPECT_EQ(result.i32, 6);
+
+  iree_vm_context_release(context);
+}
+
+// Test: (i64, i32) -> i32 - i32 after i64.
+TEST_P(VMNativeModuleAlignmentTest, MixedI64I32) {
+  iree_vm_context_t* context = CreateAlignContext();
+
+  std::string func_name = module_name() + ".mixed_i64_i32";
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_string_view(func_name.data(), func_name.size()),
+      &function));
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 2,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i64(42);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i32(8);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  // 42 + 8 = 50
+  EXPECT_EQ(result.i32, 50);
+
+  iree_vm_context_release(context);
+}
+
+// Test: (i32, i64, i32) -> i64 - i64 sandwiched between i32s.
+TEST_P(VMNativeModuleAlignmentTest, MixedI32I64I32) {
+  iree_vm_context_t* context = CreateAlignContext();
+
+  std::string func_name = module_name() + ".mixed_i32_i64_i32";
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_string_view(func_name.data(), func_name.size()),
+      &function));
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 3,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(10);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i64(1000);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  auto arg2 = iree_vm_value_make_i32(20);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg2));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  // 10 + 1000 + 20 = 1030
+  EXPECT_EQ(result.i64, 1030);
+
+  iree_vm_context_release(context);
+}
+
+INSTANTIATE_TEST_SUITE_P(ModuleImpls, VMNativeModuleAlignmentTest,
+                         ::testing::Values(ModuleImpl::kC, ModuleImpl::kCpp),
+                         ModuleImplName);
 
 }  // namespace
 }  // namespace iree

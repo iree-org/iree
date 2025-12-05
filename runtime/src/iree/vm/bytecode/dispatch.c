@@ -148,6 +148,12 @@ static iree_status_t iree_vm_bytecode_function_enter(
   return iree_ok_status();
 }
 
+// Aligns a pointer up to the given alignment.
+static inline uint8_t* iree_vm_bytecode_align_ptr(uint8_t* p,
+                                                  iree_host_size_t alignment) {
+  return (uint8_t*)iree_host_align((uintptr_t)p, alignment);
+}
+
 // Enters an internal bytecode stack frame from an external caller.
 // A new |out_callee_frame| will be pushed to the stack with storage space for
 // the registers used by the function and |arguments| will be marshaled into the
@@ -182,6 +188,7 @@ static iree_status_t iree_vm_bytecode_external_enter(
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
+        p = iree_vm_bytecode_align_ptr((uint8_t*)p, sizeof(int64_t));
         i32_reg = iree_host_align(i32_reg, 2);  // ensure aligned
         uint16_t dst_reg = i32_reg;
         i32_reg += 2;
@@ -189,6 +196,8 @@ static iree_status_t iree_vm_bytecode_external_enter(
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
+        p = iree_vm_bytecode_align_ptr((uint8_t*)p,
+                                       iree_alignof(iree_vm_ref_t));
         uint16_t dst_reg = ref_reg++;
         iree_vm_ref_retain(
             (iree_vm_ref_t*)p,
@@ -230,14 +239,16 @@ static iree_status_t iree_vm_bytecode_external_leave(
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
         memcpy(p, &callee_registers->i32[src_reg], sizeof(int64_t));
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
         iree_vm_ref_retain_or_move(
             src_reg & IREE_REF_REGISTER_MOVE_BIT,
             &callee_registers->ref[src_reg & IREE_REF_REGISTER_MASK],
-            (iree_vm_ref_t*)p);  // safe unaligned
+            (iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
       } break;
     }
@@ -384,15 +395,17 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
         memcpy(p, &caller_registers.i32[src_reg_list->registers[reg_i++]],
                sizeof(int64_t));
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
         uint16_t src_reg = src_reg_list->registers[reg_i++];
         iree_vm_ref_assign(
             &caller_registers.ref[src_reg & IREE_REF_REGISTER_MASK],
-            (iree_vm_ref_t*)p);  // safe unaligned
+            (iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
       } break;
       case IREE_VM_CCONV_TYPE_SPAN_START: {
@@ -427,16 +440,18 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
               } break;
               case IREE_VM_CCONV_TYPE_I64:
               case IREE_VM_CCONV_TYPE_F64: {
+                p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
                 memcpy(p,
                        &caller_registers.i32[src_reg_list->registers[reg_i++]],
                        sizeof(int64_t));
                 p += sizeof(int64_t);
               } break;
               case IREE_VM_CCONV_TYPE_REF: {
+                p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
                 uint16_t src_reg = src_reg_list->registers[reg_i++];
                 iree_vm_ref_assign(
                     &caller_registers.ref[src_reg & IREE_REF_REGISTER_MASK],
-                    (iree_vm_ref_t*)p);  // safe unaligned
+                    (iree_vm_ref_t*)p);
                 p += sizeof(iree_vm_ref_t);
               } break;
             }
@@ -493,12 +508,14 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
         break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64:
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
         memcpy(&caller_registers.i32[dst_reg], p, sizeof(int64_t));
         p += sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
         iree_vm_ref_move(
-            (iree_vm_ref_t*)p,  // safe unaligned
+            (iree_vm_ref_t*)p,
             &caller_registers.ref[dst_reg & IREE_REF_REGISTER_MASK]);
         p += sizeof(iree_vm_ref_t);
         break;
