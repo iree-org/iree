@@ -62,12 +62,12 @@
 /compiler/src/iree/compiler/Codegen/Dialect/CPU @hanhanW
 /compiler/src/iree/compiler/Codegen/Dialect/GPU @qedawkins @Max191 @Groverkss @nirvedhmeshram @krzysz00
 /compiler/src/iree/compiler/Codegen/Dialect/VectorExt @Groverkss
-/compiler/src/iree/compiler/Codegen/ExternalInterfaces @hanhanW @Max191
+/compiler/src/iree/compiler/Codegen/ExternalInterfaces @hanhanW @Max191 @jtuyls
 /compiler/src/iree/compiler/Codegen/LLVMCPU/ @hanhanW
 /compiler/src/iree/compiler/Codegen/LLVMGPU/ @qedawkins @kuhar @Groverkss @nirvedhmeshram @krzysz00 @Max191
 /compiler/src/iree/compiler/Codegen/SPIRV/ @kuhar
 /compiler/src/iree/compiler/ConstEval/ @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Dialect/Encoding/ @bjacob @hanhanW @Max191
+/compiler/src/iree/compiler/Dialect/Encoding/ @bjacob @hanhanW @Max191 @jtuyls
 /compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar @IanWood1
 /compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar @Groverkss @Max191 @IanWood1
 /compiler/src/iree/compiler/Dialect/Stream/ @benvanik @hanhanW @MaheshRavishankar
@@ -81,7 +81,7 @@
 # Compiler Plugins
 /compiler/plugins/input/StableHLO/ @MaheshRavishankar @rsuderman
 /compiler/plugins/input/TOSA/ @MaheshRavishankar @rsuderman
-/compiler/plugins/target/ROCM/ @kuhar @krzysz00
+/compiler/plugins/target/ROCM/ @kuhar @krzysz00 @jtuyls @Yu-Zhewen
 
 # Runtime
 /runtime/src/iree/ @benvanik
