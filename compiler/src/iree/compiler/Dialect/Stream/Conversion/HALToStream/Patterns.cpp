@@ -84,11 +84,13 @@ struct ConvertTensorImportOp
                      .getResult(0);
     }
 
+    // Cast to unknown lifetime for use in the program.
+    // This is an async-phase operation that RefineUsage will resolve by
+    // propagating the external constraint. The cast will fold when types match.
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    Value newImport = IREE::Stream::AsyncTransferOp::create(
-        rewriter, op.getLoc(), unknownType, resource, resultSize, resultSize,
-        /*source_affinity=*/executionAffinityAttr,
-        /*target_affinity=*/executionAffinityAttr);
+    Value newImport = IREE::Stream::AsyncCastOp::create(
+        rewriter, op.getLoc(), unknownType, resource, resultSize,
+        executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{newImport, resultSize}});
     return success();
   }
@@ -158,17 +160,17 @@ struct ConvertTensorExportOp
         transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
                                executionAffinityAttr, rewriter);
 
-    // Exporting a produced value - transfer our source value to an externally
-    // usable resource and directly export it. This will cause an allocation.
+    // Exporting a produced value - cast to external lifetime.
+    // This is an async-phase operation that RefineUsage will resolve by
+    // propagating the external constraint backward and converting to a transfer
+    // if needed. The cast will fold when types match.
     Value exportSource = adaptor.getSource().front();
     auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
     if (source.resource.getType() != externalType) {
-      exportSource = IREE::Stream::AsyncTransferOp::create(
+      exportSource = IREE::Stream::AsyncCastOp::create(
           rewriter, op.getLoc(), externalType, source.resource,
-          source.resourceSize, source.resourceSize,
-          /*source_affinity=*/source.affinity,
-          /*target_affinity=*/executionAffinityAttr);
+          source.resourceSize, executionAffinityAttr);
     }
 
     // Export (stream resource to buffer view).
