@@ -1233,7 +1233,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
 
-  // Check if the reduction has fused consumers incompatible with warp
+  // Check if the reduction has consumers incompatible with warp
   // distribution. The reduction itself may be distributable, but since
   // distribution patterns work bottom-up from the yield, if a consumer shape
   // fails distribution, it stays inside the region, which keeps its operands
