@@ -2011,6 +2011,7 @@ iree_generated_e2e_runner_test(
     "--mx_block_size=32"
     "--shapes=custom_mnk"
     "--mnk=10000,16384,16384"
+    "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
