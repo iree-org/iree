@@ -510,6 +510,41 @@ private:
                 getState() ^= tiedUsage.getState();
               }
             })
+        .Case([&](IREE::Stream::AsyncParameterLoadOp op) {
+          removeAssumedBits(NOT_CONSTANT | NOT_TRANSFER_WRITE);
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterReadOp op) {
+          removeAssumedBits(NOT_TRANSFER_WRITE);
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getTarget()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= targetUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterWriteOp op) {
+          removeAssumedBits(NOT_TRANSFER_READ);
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getSource()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= sourceUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterGatherOp op) {
+          removeAssumedBits(NOT_TRANSFER_WRITE);
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getTarget()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= targetUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterScatterOp op) {
+          removeAssumedBits(NOT_TRANSFER_READ);
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getSource()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= sourceUsage.getState();
+        })
         .Default([&](Operation *op) {});
   }
 
@@ -864,6 +899,26 @@ private:
                 getState() ^= resultUsage.getState();
               }
             })
+        .Case([&](IREE::Stream::AsyncParameterReadOp op) {
+          removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterWriteOp op) {
+          removeAssumedBits(NOT_TRANSFER_READ);
+        })
+        .Case([&](IREE::Stream::AsyncParameterGatherOp op) {
+          removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterScatterOp op) {
+          removeAssumedBits(NOT_TRANSFER_READ);
+        })
         .Case([&](IREE::Stream::YieldOp op) {
           // Take on the traits of the result of the parent operation.
           Value result = op->getParentOp()->getResult(operandIdx);

@@ -137,7 +137,7 @@ util.func private @parameterScatter(%wait: !stream.timepoint, %source: !stream.r
   %c201 = arith.constant 201 : index
   %c202 = arith.constant 202 : index
   %c300 = arith.constant 300 : index
-  // CHECK:    = stream.cmd.parameter.scatter await(%[[WAIT]]) => {
+  //      CHECK: stream.cmd.parameter.scatter await(%[[WAIT]]) => {
   // CHECK-NEXT:   %[[SOURCE]][%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key0"[%c50_i64],
   // CHECK-NEXT:   %[[SOURCE]][%c101 for %c201] : !stream.resource<transient>{%c300} -> "scope"::"key1"[%c51_i64],
   // CHECK-NEXT:   %[[SOURCE]][%c102 for %c202] : !stream.resource<transient>{%c300} -> "scope"::"key2"[%c52_i64]
