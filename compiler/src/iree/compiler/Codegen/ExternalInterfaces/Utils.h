@@ -49,6 +49,68 @@ public:
     }
     return impl->getEncodingInfoImpl(attr, type);
   }
+
+  LogicalResult verifyPackedLayoutWithType(
+      Attribute attr, ArrayRef<int64_t> shape, Type elementType,
+      function_ref<InFlightDiagnostic()> emitError) const {
+    const EncodingPackedLayoutMaterializerAttr *impl =
+        static_cast<const EncodingPackedLayoutMaterializerAttr *>(this);
+    DictionaryAttr config = impl->getConfiguration(attr);
+    if (!config) {
+      return success();
+    }
+
+    auto encodingInfoAttr = config.getNamed(kEncodingInfoAttrName);
+    if (!encodingInfoAttr) {
+      return success();
+    }
+
+    std::optional<IREE::Codegen::MaterializeEncodingInfo> info =
+        IREE::Codegen::deserializeEncodingInfo(
+            cast<DictionaryAttr>(encodingInfoAttr->getValue()));
+    if (!info) {
+      return emitError() << "invalid encoding_info in configuration";
+    }
+
+    // Identity layouts are always valid.
+    if (IREE::Codegen::isIdentityLayout(info.value())) {
+      return success();
+    }
+
+    if (info->innerDimsPos.size() != info->innerTileSizes.size()) {
+      return emitError() << "innerDimsPos size (" << info->innerDimsPos.size()
+                         << ") does not match innerTileSizes size ("
+                         << info->innerTileSizes.size() << ")";
+    }
+
+    int64_t rank = shape.size();
+
+    // Utility to check that indices are valid (in bounds) and unique.
+    auto verifyIndices = [&](ArrayRef<int64_t> indices,
+                             StringRef fieldName) -> LogicalResult {
+      llvm::SmallDenseSet<int64_t> seenIndices;
+      for (int64_t pos : indices) {
+        if (pos < 0 || pos >= rank) {
+          return emitError() << fieldName << " index " << pos
+                             << " is out of bounds for tensor rank " << rank;
+        }
+        if (!seenIndices.insert(pos).second) {
+          return emitError()
+                 << fieldName << " contains duplicate index " << pos;
+        }
+      }
+      return success();
+    };
+
+    if (failed(verifyIndices(info->innerDimsPos, "innerDimsPos"))) {
+      return failure();
+    }
+    if (failed(verifyIndices(info->outerDimsPerm, "outerDimsPerm"))) {
+      return failure();
+    }
+
+    return success();
+  }
 };
 
 template <typename EncodingLayoutMaterializerAttr, typename EncodingLayoutAttr>
