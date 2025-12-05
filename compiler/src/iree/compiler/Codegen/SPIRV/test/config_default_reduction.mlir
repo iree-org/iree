@@ -112,14 +112,17 @@ func.func @subgroup_reduce_dynamic(%10: tensor<8x?xf32>) -> tensor<8xf32> attrib
 #map1 = affine_map<(d0) -> ()>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> ()>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
+#map5 = affine_map<(d0, d1) -> (d0)>
+#map6 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map7 = affine_map<(d0, d1, d2, d3) -> (d0)>
+
 func.func @reduction_with_elementwise_consumer(
     %input: tensor<6144xf32>,
-    %other: tensor<64x3x32xf32>
+    %other: tensor<64x3x32xf32>,
+    %filled: tensor<f32>,
+    %empty_out: tensor<64x3x32xf32>
 ) -> tensor<64x3x32xf32> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %cst = arith.constant 0.000000e+00 : f32
-  %empty_f32 = tensor.empty() : tensor<f32>
-  %empty_out = tensor.empty() : tensor<64x3x32xf32>
-  %filled = linalg.fill ins(%cst : f32) outs(%empty_f32 : tensor<f32>) -> tensor<f32>
   %reduction = linalg.generic {
     indexing_maps = [#map, #map1],
     iterator_types = ["reduction"]
@@ -141,36 +144,14 @@ func.func @reduction_with_elementwise_consumer(
   return %epilogue : tensor<64x3x32xf32>
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [128]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [32, 1, 1]>
-//      CHECK: func.func @reduction_with_elementwise_consumer(
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
-
-// -----
-
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = shuffle,
-    subgroup_size_choices = [32], max_workgroup_sizes = [512, 512, 512],
-    max_thread_count_per_workgroup = 512, max_workgroup_memory_bytes = 16384,
-    max_workgroup_counts = [65535, 65535, 65535]>>
-}>
-#map = affine_map<(d0, d1) -> (d0, d1)>
-#map1 = affine_map<(d0, d1) -> (d0)>
-#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map3 = affine_map<(d0, d1, d2, d3) -> (d0)>
-func.func @reduction_with_parallel_and_elementwise_consumer(
+func.func @batch_reduction_and_elementwise_consumer(
     %input: tensor<128x6144xf32>,
-    %other: tensor<128x64x3x32xf32>
+    %other: tensor<128x64x3x32xf32>,
+    %filled: tensor<128xf32>,
+    %empty_out: tensor<128x64x3x32xf32>
 ) -> tensor<128x64x3x32xf32> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %cst = arith.constant 0.000000e+00 : f32
-  %empty_f32 = tensor.empty() : tensor<128xf32>
-  %empty_out = tensor.empty() : tensor<128x64x3x32xf32>
-  %filled = linalg.fill ins(%cst : f32) outs(%empty_f32 : tensor<128xf32>) -> tensor<128xf32>
   %reduction = linalg.generic {
-    indexing_maps = [#map, #map1],
+    indexing_maps = [#map4, #map5],
     iterator_types = ["parallel", "reduction"]
   } ins(%input : tensor<128x6144xf32>) outs(%filled : tensor<128xf32>) {
   ^bb0(%in: f32, %out: f32):
@@ -179,7 +160,7 @@ func.func @reduction_with_parallel_and_elementwise_consumer(
     linalg.yield %1 : f32
   } -> tensor<128xf32>
   %epilogue = linalg.generic {
-    indexing_maps = [#map2, #map3, #map2],
+    indexing_maps = [#map6, #map7, #map6],
     iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   } ins(%other, %reduction : tensor<128x64x3x32xf32>, tensor<128xf32>)
     outs(%empty_out : tensor<128x64x3x32xf32>) {
@@ -190,12 +171,21 @@ func.func @reduction_with_parallel_and_elementwise_consumer(
   return %epilogue : tensor<128x64x3x32xf32>
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 128]{{\]}}>
+//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [128]{{\]}}>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 128]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [32, 1, 1]>
-//      CHECK: func.func @reduction_with_parallel_and_elementwise_consumer(
+//      CHECK: func.func @reduction_with_elementwise_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
+// CHECK-SAME:       lowering_config = #[[CONFIG1]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG1]]
+//      CHECK: func.func @batch_reduction_and_elementwise_consumer(
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG2]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG2]]
 
 // -----
 
@@ -214,12 +204,10 @@ func.func @reduction_with_parallel_and_elementwise_consumer(
 #map3 = affine_map<(d0, d1) -> ()>
 func.func @reduction_with_distributable_elementwise_consumer(
     %input: tensor<6144xf32>,
-    %other: tensor<512x12xf32>
+    %other: tensor<512x12xf32>,
+    %filled: tensor<f32>,
+    %empty_out: tensor<512x12xf32>
 ) -> tensor<512x12xf32> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
-  %cst = arith.constant 0.000000e+00 : f32
-  %empty_f32 = tensor.empty() : tensor<f32>
-  %empty_out = tensor.empty() : tensor<512x12xf32>
-  %filled = linalg.fill ins(%cst : f32) outs(%empty_f32 : tensor<f32>) -> tensor<f32>
   %reduction = linalg.generic {
     indexing_maps = [#map, #map1],
     iterator_types = ["reduction"]
@@ -245,5 +233,7 @@ func.func @reduction_with_distributable_elementwise_consumer(
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [512, 1, 1]>
 //      CHECK: func.func @reduction_with_distributable_elementwise_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
