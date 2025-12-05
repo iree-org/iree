@@ -2221,6 +2221,58 @@ void BufferConstantOp::getAsmResultNames(
   setNameFn(getResult(), getName().value_or("buffer_cst"));
 }
 
+void BufferConstantOp::build(OpBuilder &builder, OperationState &state,
+                             Attribute value) {
+  state.addTypes({builder.getType<IREE::Util::BufferType>()});
+  state.addAttribute("value", value);
+}
+
+void BufferConstantOp::build(OpBuilder &builder, OperationState &state,
+                             StringRef value) {
+  state.addTypes({builder.getType<IREE::Util::BufferType>()});
+  state.addAttribute("value", builder.getStringAttr(value));
+}
+
+void BufferConstantOp::build(OpBuilder &builder, OperationState &state,
+                             ArrayRef<uint8_t> value) {
+  state.addTypes({builder.getType<IREE::Util::BufferType>()});
+  state.addAttribute("value",
+                     DenseIntElementsAttr::get(
+                         VectorType::get(static_cast<int64_t>(value.size()),
+                                         builder.getI8Type()),
+                         value));
+}
+
+// static
+Value BufferConstantOp::createOrNull(OpBuilder &builder, Location loc,
+                                     Attribute value) {
+  if (!value) {
+    auto bufferType = builder.getType<IREE::Util::BufferType>();
+    return IREE::Util::NullOp::create(builder, loc, bufferType).getResult();
+  }
+  return IREE::Util::BufferConstantOp::create(builder, loc, value);
+}
+
+// static
+Value BufferConstantOp::createOrNull(OpBuilder &builder, Location loc,
+                                     StringRef value) {
+  if (value.empty()) {
+    auto bufferType = builder.getType<IREE::Util::BufferType>();
+    return IREE::Util::NullOp::create(builder, loc, bufferType).getResult();
+  }
+  return IREE::Util::BufferConstantOp::create(builder, loc, value);
+}
+
+// static
+Value BufferConstantOp::createOrNull(OpBuilder &builder, Location loc,
+                                     ArrayRef<uint8_t> value) {
+  if (value.empty()) {
+    auto bufferType = builder.getType<IREE::Util::BufferType>();
+    return IREE::Util::NullOp::create(builder, loc, bufferType).getResult();
+  }
+  return IREE::Util::BufferConstantOp::create(builder, loc, value);
+}
+
 LogicalResult BufferConstantOp::verify() {
   if (!isa<IREE::Util::SerializableAttrInterface>(getValue())) {
     return emitOpError("unsupported non-serializable constant attribute type");

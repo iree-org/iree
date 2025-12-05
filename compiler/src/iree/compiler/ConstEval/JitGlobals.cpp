@@ -73,6 +73,7 @@ struct CompileOptions {
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
+  ParameterOptions parameterOptions;
   GlobalOptimizationOptions globalOptimizationOptions;
   DispatchCreationOptions dispatchCreationOptions;
   SchedulingOptions schedulingOptions;
@@ -631,7 +632,7 @@ public:
     buildIREEVMTransformPassPipeline(
         *targetRegistry.value, compileOptions->pipelineOptions,
         compileOptions->bindingOptions, compileOptions->inputOptions,
-        compileOptions->preprocessingOptions,
+        compileOptions->preprocessingOptions, compileOptions->parameterOptions,
         compileOptions->globalOptimizationOptions,
         compileOptions->dispatchCreationOptions,
         compileOptions->schedulingOptions, compileOptions->executableOptions,

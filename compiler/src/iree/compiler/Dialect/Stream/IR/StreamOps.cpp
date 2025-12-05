@@ -1712,17 +1712,10 @@ ResourceAllocOp::createSuballocations(
   // small enough workloads and our target devices are relatively lax on
   // things so long as we stay under UINT32_MAX boundaries.
 
-  // All slices are 0-0 (overlapping).
-  size_t sliceCount = locs.size();
-  SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
-
   // Compute total size and the offsets of all suballocated resources via the
   // pack op.
-  auto indexType = builder.getIndexType();
-  SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
   auto packOp = IREE::Stream::ResourcePackOp::create(
-      builder, fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
-      builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
+      builder, fusedLoc, /*offset=*/nullptr, storageSizes, affinityAttr);
 
   // Create the new alloca based on the total required size.
   auto allocOp = IREE::Stream::ResourceAllocOp::create(
@@ -1882,6 +1875,18 @@ void ResourcePackOp::getAsmResultNames(
   // setNameFn(packedOffset.value(),
   //           "offset" + std::to_string(packedOffset.index()));
   // }
+}
+
+void ResourcePackOp::build(OpBuilder &builder, OperationState &state,
+                           Value offset, ValueRange valueSizes,
+                           IREE::Stream::AffinityAttr affinity) {
+  // All slices are 0-0 (overlapping).
+  size_t sliceCount = valueSizes.size();
+  SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
+  auto indexType = builder.getIndexType();
+  SmallVector<Type> indexTypes(sliceCount, indexType);
+  build(builder, state, indexType, indexTypes, offset,
+        builder.getIndexArrayAttr(lifetimeIntervals), valueSizes, affinity);
 }
 
 LogicalResult ResourcePackOp::verify() {
@@ -2907,6 +2912,11 @@ void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
 
 IREE::Stream::AffinityAttr AsyncTransferOp::getResultAffinityAttr() {
   return getTargetAffinityAttr();
+}
+
+void AsyncTransferOp::removeAffinityAttrs() {
+  removeSourceAffinityAttr();
+  removeTargetAffinityAttr();
 }
 
 void AsyncTransferOp::getAsyncAccessRanges(

@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Flow/Conversion/ShardToFlow/Patterns.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Utils/Folding.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/OpVisitor.h"
 #include "iree/compiler/Utils/Permutation.h"
@@ -26,6 +25,20 @@ namespace mlir::iree_compiler::IREE::Flow {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
+
+// Convert a `Value` or an `Attribute` range to a range of `OpFoldResult`.
+template <typename Range, typename OutIt>
+static void toOpFoldResults(Range &&range, OutIt outIt) {
+  llvm::transform(std::forward<Range>(range), outIt,
+                  [](auto v) { return OpFoldResult(v); });
+}
+
+template <typename Range>
+static SmallVector<OpFoldResult> toOpFoldResults(Range &&range) {
+  SmallVector<OpFoldResult> res;
+  toOpFoldResults(std::forward<Range>(range), std::back_inserter(res));
+  return res;
+}
 
 static bool hasMoreThanOneShard(Operation *op) {
   int shardCount = 0;

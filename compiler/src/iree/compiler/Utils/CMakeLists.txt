@@ -18,7 +18,6 @@ iree_cc_library(
     "EmbeddedDataDirectory.h"
     "EquivalenceUtils.h"
     "FlatbufferUtils.h"
-    "Folding.h"
     "Indexing.h"
     "IntegerSet.h"
     "ModuleUtils.h"
@@ -51,6 +50,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAnalysis
     MLIRArithDialect
+    MLIRBytecodeWriter
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR

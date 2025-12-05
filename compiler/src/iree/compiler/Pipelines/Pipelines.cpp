@@ -76,6 +76,7 @@ void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
     GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
     InputDialectOptions inputOptions, PreprocessingOptions preprocessingOptions,
+    ParameterOptions parameterOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
@@ -175,18 +176,14 @@ void buildIREEPrecompileTransformPassPipeline(
                                                   halAssignmentOptions);
 
   GlobalOptimization::TransformOptions globalTransformOptions;
-  globalTransformOptions.parameterImportPaths =
-      globalOptimizationOptions.parameterImportPaths;
-  globalTransformOptions.parameterImportKeys =
-      globalOptimizationOptions.parameterImportKeys;
+  globalTransformOptions.parameterImportPaths = parameterOptions.importPaths;
+  globalTransformOptions.parameterImportKeys = parameterOptions.importKeys;
   globalTransformOptions.parameterImportMaximumSize =
-      globalOptimizationOptions.parameterImportMaximumSize;
-  globalTransformOptions.parameterExportPath =
-      globalOptimizationOptions.parameterExportPath;
+      parameterOptions.importMaximumSize;
+  globalTransformOptions.parameterExportPath = parameterOptions.exportPath;
   globalTransformOptions.parameterExportMinimumSize =
-      globalOptimizationOptions.parameterExportMinimumSize;
-  globalTransformOptions.parameterSplatExportFile =
-      globalOptimizationOptions.parameterSplatExportFile;
+      parameterOptions.exportMinimumSize;
+  globalTransformOptions.parameterSplatPath = parameterOptions.splatPath;
   globalTransformOptions.aggressiveTransposePropagation =
       globalOptimizationOptions.aggressiveTransposePropagation;
   globalTransformOptions.outerDimConcat =
@@ -277,6 +274,7 @@ void buildIREEVMTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
     GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
     InputDialectOptions inputOptions, PreprocessingOptions preprocessingOptions,
+    ParameterOptions parameterOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
@@ -286,9 +284,9 @@ void buildIREEVMTransformPassPipeline(
     IREEVMPipelinePhase compileTo) {
   buildIREEPrecompileTransformPassPipeline(
       targetRegistry, pipelineOptions, bindingOptions, inputOptions,
-      preprocessingOptions, globalOptimizationOptions, dispatchCreationOptions,
-      schedulingOptions, halTargetOptions, hooks, passManager, compileFrom,
-      compileTo);
+      preprocessingOptions, parameterOptions, globalOptimizationOptions,
+      dispatchCreationOptions, schedulingOptions, halTargetOptions, hooks,
+      passManager, compileFrom, compileTo);
 
   if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
     return; // early-exit
@@ -301,6 +299,17 @@ void buildIREEVMTransformPassPipeline(
   streamOptions.dumpStatisticsFormat =
       (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
   streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
+
+  // Set parameter encoder options.
+  if (!parameterOptions.encoderOutputFile.empty()) {
+    streamOptions.parameterEncoderMode =
+        (IREE::Stream::ParameterEncoderMode)parameterOptions.encoderMode;
+    streamOptions.parameterEncoderTarget = parameterOptions.encoderTarget;
+    streamOptions.parameterEncoderOutputFile =
+        parameterOptions.encoderOutputFile;
+    streamOptions.parameterEncoderOutputScope =
+        parameterOptions.encoderOutputScope;
+  }
 
   switch (schedulingOptions.executionModel) {
   case SchedulingOptions::ExecutionModel::HostOnly:
@@ -444,7 +453,8 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
       IREE::HAL::TargetRegistry::getGlobal(),
       GlobalPipelineOptions::FromFlags::get(), BindingOptions::FromFlags::get(),
       InputDialectOptions::FromFlags::get(),
-      PreprocessingOptions::FromFlags::get(), highLevelOptimizations,
+      PreprocessingOptions::FromFlags::get(),
+      ParameterOptions::FromFlags::get(), highLevelOptimizations,
       DispatchCreationOptions::FromFlags::get(),
       SchedulingOptions::FromFlags::get(),
       IREE::HAL::TargetOptions::FromFlags::get(),

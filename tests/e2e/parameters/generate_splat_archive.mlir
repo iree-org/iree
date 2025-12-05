@@ -2,7 +2,7 @@
 // RUN: iree-compile %s \
 // RUN:   --iree-hal-target-device=local \
 // RUN:   --iree-hal-local-target-device-backends=vmvx \
-// RUN:   --iree-opt-splat-parameters=%t.irpa | \
+// RUN:   --iree-parameter-splat=%t.irpa | \
 // RUN: iree-run-module \
 // RUN:   --device=local-sync \
 // RUN:   --module=- \

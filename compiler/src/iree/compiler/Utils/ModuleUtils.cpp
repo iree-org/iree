@@ -7,13 +7,17 @@
 #include "iree/compiler/Utils/ModuleUtils.h"
 
 #include "iree/compiler/Utils/StringUtils.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler {
@@ -219,6 +223,36 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
 
   // Merge all of the module contents.
   return mergeModuleInto(*sourceModuleRef, targetOp, targetBuilder);
+}
+
+LogicalResult writeModule(mlir::ModuleOp moduleOp, StringRef path) {
+  // Ensure the parent paths exist.
+  llvm::sys::fs::create_directories(llvm::sys::path::parent_path(path));
+
+  // Attempt to open file - should succeed as long as permissions are ok.
+  std::string error;
+  auto file = mlir::openOutputFile(path, &error);
+  if (!file) {
+    return mlir::emitError(moduleOp.getLoc())
+           << "while dumping to '" << path << "': " << error << "\n";
+  }
+
+  // If going to binary serialize out and otherwise print as text.
+  if (llvm::sys::path::extension(path) == ".mlirbc") {
+    BytecodeWriterConfig config;
+    if (failed(mlir::writeBytecodeToFile(moduleOp, file->os(), config))) {
+      return mlir::emitError(moduleOp.getLoc())
+             << "failed to serialize module to '" << path << "'\n";
+    }
+  } else {
+    OpPrintingFlags flags;
+    moduleOp.print(file->os(), flags);
+  }
+
+  // Keep the temporary file after the write succeeds.
+  file->keep();
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler

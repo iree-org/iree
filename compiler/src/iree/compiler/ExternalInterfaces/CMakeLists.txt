@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRLinalgOpsIncGenLib
     MLIRLinalgStructuredOpsIncGenLib
     MLIRMLProgramDialect
+    MLIRMemRefDialect
     MLIRSCFDialect
     MLIRTensorDialect
     MLIRValueBoundsOpInterface

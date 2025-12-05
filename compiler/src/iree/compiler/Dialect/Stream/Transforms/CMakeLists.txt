@@ -48,6 +48,7 @@ iree_cc_library(
     "ScheduleExecution.cpp"
     "SpecializeDispatches.cpp"
     "SpecializeEncodings.cpp"
+    "SplitParameterEncoder.cpp"
     "SyncInitializers.cpp"
     "VerifyAffinities.cpp"
     "VerifyAsyncAccessRanges.cpp"
@@ -69,6 +70,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils

@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -55,6 +56,15 @@ enum class DumpOutputFormat {
   JSON = 4,
 };
 
+// Controls how the encoder manages parameters.
+enum class ParameterEncoderMode {
+  // Merge all encoded parameters and original parameters into a single
+  // consolidated scope.
+  Consolidate = 0,
+  // Only produce encoded parameters and leave original parameters untouched.
+  Overlay = 1,
+};
+
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   Option<InitializationMode> initializationMode{
       *this,
@@ -70,6 +80,55 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
                      "Asynchronously initialize all parameters and globals and "
                      "return immediately from the module initializer without "
                      "waiting for them to complete.")),
+  };
+
+  Option<ParameterEncoderMode> parameterEncoderMode{
+      *this,
+      "parameter-encoder-mode",
+      llvm::cl::desc("Controls how the encoder manages parameters."),
+      llvm::cl::init(ParameterEncoderMode::Consolidate),
+      llvm::cl::values(
+          clEnumValN(ParameterEncoderMode::Consolidate, "consolidate",
+                     "Merge all encoded parameters and original parameters "
+                     "into a single consolidated scope."),
+          clEnumValN(ParameterEncoderMode::Overlay, "overlay",
+                     "Only produce encoded parameters and leave original "
+                     "parameters untouched.")),
+  };
+  Option<std::string> parameterEncoderTarget{
+      *this,
+      "parameter-encoder-target",
+      llvm::cl::init(""),
+      llvm::cl::desc("Name of a device global to embed in the produced "
+                     "parameter file. Omit to leave unspecified."),
+  };
+  Option<unsigned> parameterEncoderPipelineDepth{
+      *this,
+      "parameter-encoder-pipeline-depth",
+      llvm::cl::desc(
+          "Overlap between I/O and compute operations. 0 for no pipelining."),
+      llvm::cl::init(1),
+  };
+  Option<llvm::cl::PowerOf2ByteSize> parameterEncoderMaxSlabSize{
+      *this,
+      "parameter-encoder-max-slab-size",
+      llvm::cl::desc("Power-of-two byte size of the maximum size of a slab of "
+                     "parameters. 0 to disable packing into slabs."),
+      llvm::cl::init(llvm::cl::PowerOf2ByteSize(4ll * 1024 * 1024 * 1024)),
+  };
+  Option<std::string> parameterEncoderOutputScope{
+      *this,
+      "parameter-encoder-output-scope",
+      llvm::cl::desc(
+          "Parameter scope for the output parameters. Omit for global."),
+      llvm::cl::init("encoded"),
+  };
+  Option<std::string> parameterEncoderOutputFile{
+      *this,
+      "parameter-encoder-output-file",
+      llvm::cl::desc(".mlir/.mlirbc file path to write the split parameter "
+                     "encoder module to."),
+      llvm::cl::init(""),
   };
 
   Option<bool> optimizeBindings{
