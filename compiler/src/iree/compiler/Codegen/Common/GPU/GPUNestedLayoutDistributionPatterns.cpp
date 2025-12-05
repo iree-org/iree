@@ -1424,12 +1424,12 @@ struct DistributeContract final
       return rewriter.notifyMatchFailure(contractOp, "not a contraction");
     }
     // If mmaAttr exists, defer the lowering to use MMA.
-    // Notify failure if the "iree.amdgpu.mma" intrinsic attribute is present.
-    auto mmaAttr = contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>(
-        "iree.amdgpu.mma");
+    // Notify failure if the "iree.gpu.mma" intrinsic attribute is present.
+    auto mmaAttr =
+        contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>("iree.gpu.mma");
     if (mmaAttr) {
       return rewriter.notifyMatchFailure(
-          contractOp, "iree.amdgpu.mma intrinsic attribute exists");
+          contractOp, "iree.gpu.mma intrinsic attribute exists");
     }
 
     auto lhsLayout = dyn_cast<NestedLayoutAttr>(signature[contractOp.getLhs()]);
