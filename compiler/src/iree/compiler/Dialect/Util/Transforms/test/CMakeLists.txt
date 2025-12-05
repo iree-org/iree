@@ -39,6 +39,7 @@ iree_lit_test_suite(
     "strip_debug_ops.mlir"
     "test_float_range_analysis.mlir"
     "test_float_range_analysis_linalg.mlir"
+    "test_integer_divisibility_analysis.mlir"
     "verify_initialization_order.mlir"
     "verify_structured_control_flow.mlir"
   TOOLS

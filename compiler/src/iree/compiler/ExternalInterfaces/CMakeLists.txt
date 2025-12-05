@@ -31,6 +31,7 @@ iree_cc_library(
     "UtilExternalModels.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRControlFlowInterfaces
     MLIRGPUDialect
