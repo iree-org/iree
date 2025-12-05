@@ -2245,6 +2245,24 @@ private:
     return {result};
   }
 
+  // Returns the required alignment for a type (4 or 8 bytes).
+  size_t getTypeAlignment(Type type) const {
+    // 64-bit types and refs require 8-byte alignment.
+    if (auto intType = dyn_cast<IntegerType>(type)) {
+      return intType.getWidth() > 32 ? 8 : 4;
+    }
+    if (isa<Float64Type>(type)) {
+      return 8;
+    }
+    if (auto opaqueType = dyn_cast<emitc::OpaqueType>(type)) {
+      // iree_vm_ref_t contains pointers, so needs 8-byte alignment.
+      if (opaqueType.getValue() == "iree_vm_ref_t") {
+        return 8;
+      }
+    }
+    return 4;
+  }
+
   MaybeZeroValue buildSizeExpression(ArrayRef<Type> types, OpBuilder &builder,
                                      Location loc) const {
     auto ctx = builder.getContext();
@@ -2258,8 +2276,19 @@ private:
                                   /*value=*/emitc::OpaqueAttr::get(ctx, "0"))
             .getResult();
     bool isZero = true;
+    size_t maxAlignment = 4;
     for (Type type : types) {
       Type valueType = typeConverter.convertTypeAsNonPointer(type);
+
+      // Align before adding this element if it requires 8-byte alignment.
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > maxAlignment) {
+        maxAlignment = alignment;
+      }
+      if (alignment > 4) {
+        result = emitc_builders::alignTo(builder, loc, result, alignment);
+      }
+
       Value size =
           emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
@@ -2269,6 +2298,12 @@ private:
                                     /*operands=*/ArrayRef<Value>{result, size})
                    .getResult();
       isZero = false;
+    }
+
+    // Add trailing padding to match struct size (sizeof(struct) is always a
+    // multiple of its alignment).
+    if (maxAlignment > 4 && !isZero) {
+      result = emitc_builders::alignTo(builder, loc, result, maxAlignment);
     }
 
     return MaybeZeroValue{result, isZero};
@@ -2399,6 +2434,13 @@ private:
       Type argType = arg.getType();
       assert(!isa<IREE::VM::RefType>(argType));
 
+      // Align pointer before accessing types that require 8-byte alignment.
+      Type valueType = typeConverter.convertTypeAsNonPointer(argType);
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > 4) {
+        uint8Ptr = emitc_builders::alignPtr(builder, loc, uint8Ptr, alignment);
+      }
+
       if (argType == emitc::PointerType::get(
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
@@ -2427,7 +2469,6 @@ private:
 
       // Skip the addition in the last iteration.
       if (i < inputTypes.size() - 1) {
-        Type valueType = typeConverter.convertTypeAsNonPointer(argType);
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
@@ -2473,6 +2514,21 @@ private:
       Type argType = arg.getType();
       assert(!isa<IREE::VM::RefType>(argType));
 
+      // Get the value type and its alignment requirement.
+      Type valueType;
+      if (argType == emitc::PointerType::get(
+                         emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
+        valueType = emitc::OpaqueType::get(ctx, "iree_vm_ref_t");
+      } else {
+        valueType = cast<emitc::PointerType>(argType).getPointee();
+      }
+
+      // Align pointer before accessing types that require 8-byte alignment.
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > 4) {
+        uint8Ptr = emitc_builders::alignPtr(builder, loc, uint8Ptr, alignment);
+      }
+
       if (argType == emitc::PointerType::get(
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
@@ -2489,7 +2545,6 @@ private:
                                     /*callee=*/"iree_vm_ref_move",
                                     /*operands=*/ArrayRef<Value>{refPtr, arg});
       } else {
-        Type valueType = cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
@@ -2499,7 +2554,6 @@ private:
 
       // Skip the addition in the last iteration.
       if (i < resultTypes.size() - 1) {
-        Type valueType = cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
         uint8Ptr =
