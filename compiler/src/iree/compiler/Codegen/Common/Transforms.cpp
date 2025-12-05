@@ -779,6 +779,18 @@ struct MergeExtractSliceThroughBlockArg
           innerExtractOp, "shared_out is not defined by an extract_slice op");
     }
 
+    // Disable merging if the extract_slice is used by a fill operation.
+    // This ensures the fill op writes to the correct buffer - the inner loop's
+    // shared_outs accumulator, not the outer source tensor. Merging would
+    // change where the fill writes, breaking correctness in reduction contexts.
+    for (Operation *user : innerExtractOp->getUsers()) {
+      if (isa<linalg::FillOp>(user)) {
+        return rewriter.notifyMatchFailure(
+            innerExtractOp, "extract_slice is used by fill op - merging would "
+                            "write to wrong buffer");
+      }
+    }
+
     SmallVector<OpFoldResult> outerOffsets = outerExtractOp.getMixedOffsets();
     SmallVector<OpFoldResult> outerSizes = outerExtractOp.getMixedSizes();
     SmallVector<OpFoldResult> outerStrides = outerExtractOp.getMixedStrides();
