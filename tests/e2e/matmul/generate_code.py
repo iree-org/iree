@@ -218,14 +218,7 @@ def generate_call(
 
     for arg_name, arg_shape, arg_elemtype in matmul_args:
         op = op + generate_random_matrix(arg_name, arg_shape, arg_elemtype)
-        # TODO(#16168): there's a bug with in-place input->output aliasing and
-        # we work around it here by passing in a unique copy.
-        if arg_name == "acc":
-            # TODO(#16168): there's a bug with in-place input->output aliasing and
-            # we work around it here by passing in a unique copy.
-            op = op + generate_random_matrix(
-                "acc_copy", arg_shape, arg_elemtype, increment_seed=False
-            )
+
     gen_names_and_types = lambda args_list: (
         ", ".join(["%" + name for name, shape, ty in args_list]),
         ", ".join(["!hal.buffer_view" for a in args_list]),
@@ -238,7 +231,7 @@ def generate_call(
         f"  %k = arith.constant {shape.k} : i64\n"
         f"  %n = arith.constant {shape.n} : i64\n"
         f"  %transpose_rhs = arith.constant {transpose_rhs} : i32\n"
-        f"  util.call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, {check_argnames}, {'%acc_copy' if shape.accumulate else '%acc'}, %result) : (!hal.device, i64, i64, i64, i32,  {check_argtypes}, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        f"  util.call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, {check_argnames}, %acc, %result) : (!hal.device, i64, i64, i64, i32,  {check_argtypes}, !hal.buffer_view, !hal.buffer_view) -> ()\n"
         f"  util.return\n"
         f"}}\n"
     )
