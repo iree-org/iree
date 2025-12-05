@@ -1243,10 +1243,12 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   auto canDistributeShape = [](ArrayRef<int64_t> shape,
                                int64_t groupSize) -> bool {
     for (int64_t dim : shape) {
-      if (ShapedType::isDynamic(dim))
+      if (ShapedType::isDynamic(dim)) {
         return false;
-      if (dim >= groupSize && dim % groupSize == 0)
+      }
+      if (dim >= groupSize && dim % groupSize == 0) {
         return true;
+      }
       if (groupSize % dim == 0) {
         groupSize /= dim;
         continue;
