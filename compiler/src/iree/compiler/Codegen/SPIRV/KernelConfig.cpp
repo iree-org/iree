@@ -1059,6 +1059,9 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
       workgroupSize);
 }
 
+//===----------------------------------------------------------------------===//
+// Reduction Default Configuration
+//===----------------------------------------------------------------------===//
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
