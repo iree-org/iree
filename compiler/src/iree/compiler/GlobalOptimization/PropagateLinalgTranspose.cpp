@@ -1048,6 +1048,11 @@ public:
                                          "not a simple matmul contraction");
     }
 
+    DenseSet<int64_t> mnkDims;
+    mnkDims.insert(contractionDims.m.begin(), contractionDims.m.end());
+    mnkDims.insert(contractionDims.n.begin(), contractionDims.n.end());
+    mnkDims.insert(contractionDims.k.begin(), contractionDims.k.end());
+
     // Look for a transpose on any input that swaps the last two dimensions.
     for (int64_t inputIdx = 0; inputIdx < genericOp.getNumDpsInputs();
          ++inputIdx) {
@@ -1059,6 +1064,21 @@ public:
       // Update the indexing map according to the transpose.
       AffineMap inputMap = genericOp.getMatchingIndexingMap(
           genericOp.getDpsInputOperand(inputIdx));
+
+      // In the case that the there is a batch dimension in the last two
+      // dimensions, we need to check that the last 2 dims in the indexing map
+      // are m, n, or k.
+      ArrayRef<AffineExpr> results = inputMap.getResults();
+      size_t rank = results.size();
+      if (rank < 2)
+        continue;
+      AffineDimExpr dim0 = dyn_cast<AffineDimExpr>(results[rank - 2]);
+      AffineDimExpr dim1 = dyn_cast<AffineDimExpr>(results[rank - 1]);
+      if (!dim0 || !dim1 || !mnkDims.contains(dim0.getPosition()) ||
+          !mnkDims.contains(dim1.getPosition()))
+        continue;
+
+      // Fuse by updating the indexing map to absorb the transpose.
       auto invPerm = invertPermutationVector(transpose.getPermutation());
       SmallVector<AffineExpr> newExprs =
           applyPermutation(inputMap.getResults(), invPerm);
