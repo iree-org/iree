@@ -1275,8 +1275,9 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
           }
           for (AffineExpr expr :
                consumerOp.getMatchingIndexingMap(&operand).getResults()) {
-            if (auto dimExpr = dyn_cast<AffineDimExpr>(expr))
+            if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
               usedDims.insert(dimExpr.getPosition());
+            }
           }
         }
 
@@ -1284,12 +1285,14 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
         SmallVector<int64_t> broadcastShape;
         for (auto [i, bound] :
              llvm::enumerate(consumerOp.getStaticLoopRanges())) {
-          if (!usedDims.contains(i))
+          if (!usedDims.contains(i)) {
             broadcastShape.push_back(bound);
+          }
         }
 
-        if (!canDistributeShape(broadcastShape, groupSize))
+        if (!canDistributeShape(broadcastShape, groupSize)) {
           return true;
+        }
       }
     }
     return false;
