@@ -4,7 +4,6 @@
         "--iree-hal-target-device=hip",
         "--iree-hip-target=gfx942",
         "--iree-opt-level=O3",
-        "--iree-opt-generalize-matmul=false",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
         "--iree-llvmgpu-enable-prefetch",
         "--iree-execution-model=async-external",
