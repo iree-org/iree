@@ -51,7 +51,8 @@ def LayoutAttr :
         "isSerialized",
         "isIdentityLayout",
         "calculateStorageSizeInBytes",
-      ]>
+      ]>,
+      DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
     ]> {
   let mnemonic = "layout";
   let assemblyFormat = "`<` $layouts `>`";
@@ -112,6 +113,7 @@ def EncodingAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
+        "convertForBitcast",
       ]>,
       DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
         "getReductionDims",
@@ -148,7 +150,8 @@ def EncodingAttr :
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
     OptionalParameter<"ArrayAttr", "The original operation's iteration sizes. "
-    "This is useful for handling skinny dimension sizes">:$iteration_sizes
+    "This is useful for handling skinny dimension sizes">:$iteration_sizes,
+    OptionalParameter<"Type", "The underlying data type">:$underlying_type
   );
 
   let builders = [
@@ -325,6 +328,7 @@ def TestingAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
+        "convertForBitcast",
       ]>
     ]> {
   let mnemonic = "testing";
@@ -337,7 +341,8 @@ def TestingAttr :
 
   let parameters = (ins
     OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
-    "layouts.">:$layouts
+    "layouts.">:$layouts,
+    OptionalParameter<"Type", "The underlying data type">:$underlying_type
   );
 
   let hasCustomAssemblyFormat = 1;

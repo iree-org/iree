@@ -93,6 +93,19 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
   return res;
 }
 
+LogicalResult LayoutAttr::verifyEncoding(
+  llvm::ArrayRef<int64_t> shape, mlir::Type elementType,
+  llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
+  ArrayAttr layoutsAttr = getLayouts();
+  for (Attribute attr : layoutsAttr) {
+    auto verifiableAttr = dyn_cast<VerifiableTensorEncoding>(attr);
+    if (verifiableAttr && failed(verifiableAttr.verifyEncoding(shape, elementType, emitError))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
@@ -236,7 +249,8 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
   auto iterationSizesAttr =
       iterationSizes.empty() ? ArrayAttr() : b.getI64ArrayAttr(iterationSizes);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
+             b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr,
+             nullptr);
 }
 
 /// Parse a list of integer values and/or dynamic values ('?')
@@ -298,7 +312,7 @@ EncodingAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
                      IntegerAttr operandIndexAttr,
                      EncodingOpTypeAttr opTypeAttr, ArrayAttr elementTypesAttr,
                      ArrayAttr userIndexingMapsAttr,
-                     ArrayAttr iterationSizesAttr) {
+                     ArrayAttr iterationSizesAttr, Type underlyingType) {
   AffineMap indexingMap;
   if (userIndexingMapsAttr) {
     unsigned operandIndex = operandIndexAttr.getValue().getZExtValue();
@@ -421,7 +435,8 @@ EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
   maps.push_back(AffineMapAttr::get(newIndexingMap));
   newMaps[operandIndex] = ArrayAttr::get(getContext(), maps);
   return get(getContext(), getOperandIndex(), getOpType(), getElementTypes(),
-             ArrayAttr::get(getContext(), newMaps), getIterationSizes());
+             ArrayAttr::get(getContext(), newMaps), getIterationSizes(),
+             getUnderlyingType());
 }
 
 bool EncodingAttr::isSerialized() const { return false; }
@@ -429,6 +444,24 @@ bool EncodingAttr::isSerialized() const { return false; }
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
   return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+}
+
+Attribute EncodingAttr::convertForBitcast(Type type) const {
+  auto tensorType = dyn_cast<RankedTensorType>(type);
+  if (!tensorType) {
+    return {};
+  }
+  auto encoding = dyn_cast_or_null<EncodingAttr>(tensorType.getEncoding());
+  if (!encoding) {
+    return {};
+  }
+  if (encoding.getUnderlyingType()) {
+    return {};
+  }
+  return EncodingAttr::get(
+      tensorType.getContext(), encoding.getOperandIndex(), encoding.getOpType(),
+      encoding.getElementTypes(), encoding.getUserIndexingMaps(),
+      encoding.getIterationSizes(), tensorType.getElementType());
 }
 
 std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
@@ -652,17 +685,30 @@ Attribute TestingAttr::parse(AsmParser &p, Type type) {
     p.emitError(p.getNameLoc()) << "expected array attribute";
     return {};
   }
+  Type underlyingType;
+  OptionalParseResult typeResult = p.parseOptionalType(underlyingType);
+  if (typeResult.has_value() && typeResult.value().failed()) {
+    p.emitError(p.getNameLoc()) << "expected type";
+    return {};
+  }
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(p.getContext(), layouts);
+  return get(p.getContext(), layouts, underlyingType);
 }
 
 void TestingAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
-  if (auto layouts = getLayouts()) {
+  ArrayAttr layouts = getLayouts();
+  if (layouts) {
     p.printAttribute(layouts);
+  }
+  if (auto underlyingType = getUnderlyingType()) {
+    if (layouts) {
+      os << ", ";
+    }
+    os << underlyingType;
   }
   os << ">";
 }
@@ -671,7 +717,17 @@ bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
 Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
-  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts),
+                          getUnderlyingType());
+}
+
+Attribute TestingAttr::convertForBitcast(Type type) const {
+  auto tensorType = dyn_cast<RankedTensorType>(type);
+  if (!tensorType) {
+    return {};
+  }
+  return TestingAttr::get(tensorType.getContext(), getLayouts(),
+                          tensorType.getElementType());
 }
 
 Attribute
