@@ -642,31 +642,6 @@ Attribute UnsupportedResolverAttr::getLayout(RankedTensorType) const {
 // Encoding attributes that are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 
-Attribute TestingAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess())) {
-    return {};
-  }
-  ArrayAttr layouts;
-  OptionalParseResult parseResult = p.parseOptionalAttribute(layouts);
-  if (parseResult.has_value() && parseResult.value().failed()) {
-    p.emitError(p.getNameLoc()) << "expected array attribute";
-    return {};
-  }
-  if (failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), layouts);
-}
-
-void TestingAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  if (auto layouts = getLayouts()) {
-    p.printAttribute(layouts);
-  }
-  os << ">";
-}
-
 bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
 Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
