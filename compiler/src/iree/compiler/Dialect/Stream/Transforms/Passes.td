@@ -202,16 +202,15 @@ def ElideAsyncCopiesPass :
     of a value. This eliminates copies both from input programs and those
     materialized by the `iree-stream-materialize-copy-on-write` pass.
   }];
-  let statistics = [
-    Statistic<"numClonesElided", "num-clones-elided",
-              "Number of async clone operations elided">,
-    Statistic<"numTransfersElided", "num-transfers-elided",
-              "Number of async transfer operations elided">,
-    Statistic<"numSlicesElided", "num-slices-elided",
-              "Number of async slice operations elided">,
-    Statistic<"numIterations", "num-iterations",
-              "Number of fixed-point iterations required for convergence">
-  ];
+  let statistics =
+      [Statistic<"numClonesElided", "num-clones-elided",
+                 "Number of async clone operations elided">,
+       Statistic<"numTransfersElided", "num-transfers-elided",
+                 "Number of async transfer operations elided">,
+       Statistic<"numSlicesElided", "num-slices-elided",
+                 "Number of async slice operations elided">,
+       Statistic<"numIterations", "num-iterations",
+                 "Number of fixed-point iterations required for convergence">];
 }
 
 def EmplaceAllocationsPass :

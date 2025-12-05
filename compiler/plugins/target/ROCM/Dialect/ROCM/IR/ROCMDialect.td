@@ -61,7 +61,8 @@ def ROCM_Dialect : Dialect {
     // List of MLIR ukernel functions. These belong in the ModuleOp's cached in
     // `builtinModules`.
     ::llvm::SmallVector<Util::FuncOp> mlirUkernels;
-    std::mutex mlirUkernelsMutex;
+    std::recursive_mutex mlirUkernelsMutex;
+    bool mlirUkernelsParsingStarted = false;
   }];
 }
 

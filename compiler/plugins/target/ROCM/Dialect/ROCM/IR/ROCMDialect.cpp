@@ -67,8 +67,21 @@ SmallVector<StringRef> ROCMDialect::getBuiltinNames() {
 }
 
 const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
-  std::lock_guard<std::mutex> guard(mlirUkernelsMutex);
-  if (mlirUkernels.empty()) {
+  // Issue #22842: This needs to be a recursive mutex because parsing MLIR
+  // ukernels triggers the verifier, which schedules work as futures and then
+  // yields to the thread pool, allowing other tasks to be scheduled on the
+  // current thread, potentially recursing back here on the same thread, so this
+  // used to deadlock with std::mutex.
+  //
+  // A downside of using std::recursive_mutex to allow such recursion, though
+  // is that we are now potentially entering this critical section multiple
+  // times (albeit on the same thread). We do not want to be parsing MLIR
+  // ukernels twice and inserting them into `mlirUkernels` twice. To prevent
+  // that, we condition this on a boolean `mlirUkernelsParsingStarted` that is
+  // set *before* the call to getOrLoadBuiltinModule potentially recursing.
+  std::lock_guard<std::recursive_mutex> guard(mlirUkernelsMutex);
+  if (mlirUkernelsParsingStarted) {
+    mlirUkernelsParsingStarted = true;
     const iree_file_toc_t *toc = iree_mlir_ukernels_amdgpu_create();
     llvm::SmallVector<ModuleOp> result;
     for (size_t i = 0, e = iree_mlir_ukernels_amdgpu_size(); i != e; ++i) {
