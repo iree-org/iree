@@ -19,6 +19,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -1063,6 +1064,91 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
 // Reduction Default Configuration
 //===----------------------------------------------------------------------===//
 
+static bool canDistributeShape(ArrayRef<int64_t> shape, int64_t groupSize) {
+  for (int64_t dim : shape) {
+    if (dim % groupSize == 0) {
+      return true;
+    }
+    if (groupSize % dim == 0) {
+      groupSize /= dim;
+      continue;
+    }
+    return false;
+  }
+  return groupSize == 1;
+};
+
+// Check if a reduction has consumers incompatible with warp distribution
+// based on the reductions' attached lowering config. The reduction itself may
+// be distributable, but since distribution patterns work bottom-up from the
+// yield, if a consumer shape fails distribution, it stays inside the region,
+// which keeps its operands (including the reduction) inside too. This forces
+// fallback to single thread execution. In such cases, we conservatively limit
+// the workgroup size to subgroup size.
+//
+// Example of an incompatible consumer with groupSize=512:
+//
+//   %red = linalg.reduce ins(%in) outs(%init) -> tensor<f32>
+//   %consumer = linalg.generic {
+//     indexing_maps = [affine_map<(d0, d1, d2) -> ()>,
+//                      affine_map<(d0, d1, d2) -> (d0, d1, d2)>]
+//   } ins(%red) outs(%out : tensor<64x3x32xf32>) {
+//     ^bb0(%in: f32, %out: f32):
+//       %add = arith.addf %in, %out : f32
+//       linalg.yield %add : f32
+//   }
+//
+// The scalar reduction result broadcasts across consumer dims [64, 3, 32]. When
+// we try to distribute across this shape for elementwise addition using warp
+// distribution expectations:
+//   - d0=64: 512 % 64 = 0; so remaining is 512/64 = 8
+//   - d1=3: 8 % 3 != 0 and 3 % 8 != 0 -> failure
+// Since the consumer fails distribution, the reduction is also blocked and
+// the entire chain of operations stays inside the region.
+static bool hasIncompatibleConsumer(linalg::LinalgOp reductionOp,
+                                    int64_t groupSize) {
+  for (Value result : reductionOp->getResults()) {
+    for (Operation *user : result.getUsers()) {
+      auto consumerOp = dyn_cast<linalg::LinalgOp>(user);
+      if (!consumerOp) {
+        continue;
+      }
+
+      // Collect dims used by operands referencing the reduction result.
+      llvm::SmallDenseSet<unsigned> usedDims;
+      for (OpOperand &operand : consumerOp->getOpOperands()) {
+        if (operand.get() != result) {
+          continue;
+        }
+        for (AffineExpr expr :
+             consumerOp.getMatchingIndexingMap(&operand).getResults()) {
+          if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+            usedDims.insert(dimExpr.getPosition());
+          }
+        }
+      }
+
+      // Broadcast dims are those not indexed by any use of the result.
+      SmallVector<int64_t> broadcastShape;
+      for (auto [i, bound] :
+           llvm::enumerate(consumerOp.getStaticLoopRanges())) {
+        if (!usedDims.contains(i)) {
+          broadcastShape.push_back(bound);
+        }
+      }
+
+      if (broadcastShape.empty()) {
+        continue;
+      }
+
+      if (!canDistributeShape(broadcastShape, groupSize)) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
                                         linalg::LinalgOp op) {
@@ -1232,6 +1318,12 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   // The final warp reduce requires subgroup count <= subgroup size to work.
   if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
+
+  if (hasIncompatibleConsumer(op, groupSize)) {
+    LDBG() << "Reduction has incompatible consumer, limiting workgroup size "
+           << "from " << groupSize << " to " << subgroupSize;
+    groupSize = subgroupSize;
+  }
 
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
 
