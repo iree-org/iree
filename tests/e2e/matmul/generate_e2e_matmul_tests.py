@@ -17,8 +17,9 @@ from tests.e2e.matmul.generate_code import *
 
 
 # Returns the list of TestShape's to use for the collection of shapes
-# identified by shapes_id.
-def get_test_shapes(shapes_id: ShapesId, no_accumulator_arg=False):
+# identified by shapes_id. Also for custom tests, optionally removes tests with
+# an existing accumulator when remove_accumulator is set.
+def get_test_shapes(shapes_id: ShapesId, remove_accumulator=False):
     # Notes:
     # 1. Be conservative in adding more shapes, as that can increase both the
     #    build and execution latency of tests. The build latency is nearly the
@@ -92,12 +93,14 @@ def get_test_shapes(shapes_id: ShapesId, no_accumulator_arg=False):
         if ShapesId.custom_mnk_values is None:
             raise ValueError("Custom MNK values not set. Use --mnk=m,n,k")
         m, n, k = ShapesId.custom_mnk_values
-        if no_accumulator_arg:
-            return [TestShape(m=m, k=k, n=n, accumulate=False)]
-        return [
-            TestShape(m=m, k=k, n=n, accumulate=True),
-            TestShape(m=m, k=k, n=n, accumulate=False),
-        ]
+        test_shapes = [TestShape(m=m, k=k, n=n, accumulate=False)]
+        if not remove_accumulator:
+            test_shapes.extend(
+                [
+                    TestShape(m=m, k=k, n=n, accumulate=True),
+                ]
+            )
+        return test_shapes
 
     raise ValueError(shapes_id)
 
@@ -111,7 +114,7 @@ def generate(
     shapes_id: ShapesId,
     transpose_rhs: bool,
     compilation_info_id: CompilationInfoId,
-    no_accumulator_arg: bool,
+    remove_accumulator: bool,
 ):
     functions = {}
     calls = []
@@ -119,7 +122,7 @@ def generate(
     for compilation_info in get_test_compilation_infos(
         compilation_info_id, lhs_rhs_type
     ):
-        for shape in get_test_shapes(shapes_id, no_accumulator_arg):
+        for shape in get_test_shapes(shapes_id, remove_accumulator):
             for dynamicities in get_dynamicities(shapes_id):
                 function = generate_function(
                     lhs_rhs_type=lhs_rhs_type,
@@ -255,9 +258,9 @@ def parse_arguments():
         required=False,
     )
     parser.add_argument(
-        "--no_accumulator_arg",
+        "--remove_accumulator",
         action="store_true",
-        help="Do not add an accumulator argument to the function, useful for extremely large shapes that may cause memory issues",
+        help="Remove custom shape tests with existing accumulators, useful to set for extremely large shapes that may cause memory issues",
         default=False,
         required=False,
     )
@@ -321,7 +324,7 @@ def main(args):
         shapes_id=shapes_id,
         transpose_rhs=args.transpose_rhs,
         compilation_info_id=CompilationInfoId(args.compilation_info),
-        no_accumulator_arg=args.no_accumulator_arg,
+        accumulate=args.remove_accumulator,
     )
 
     write_code_file(functions, args.output_matmul_mlir)
