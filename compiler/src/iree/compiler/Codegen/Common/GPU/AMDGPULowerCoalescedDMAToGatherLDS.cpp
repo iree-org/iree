@@ -184,14 +184,11 @@ struct LowerCoalescedGatherDMAPattern final
       Value iVal = arith::ConstantIndexOp::create(rewriter, loc, offsets[0]);
 
       // Source indices: [..., row, lane_id * elementsPerTransfer]
-      // Each lane reads from its offset in the innermost dimension.
       SmallVector<Value> srcIndices(sourceType.getRank(), zero);
       srcIndices[sourceType.getRank() - 2] = iVal;
       srcIndices[sourceType.getRank() - 1] = laneOffset;
 
       // Destination indices: [..., row, 0]
-      // The innermost dimension offset is implicit in GatherToLDS - it writes
-      // to consecutive locations in LDS based on the lane ID internally.
       SmallVector<Value> dstIndices(destType.getRank(), zero);
       dstIndices[destType.getRank() - 2] = iVal;
 
@@ -233,6 +230,15 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
     patterns.add<LowerCoalescedGatherDMAPattern>(context, dmaSizes);
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
+
+    // Verify all CoalescedGatherDMAOps were lowered.
+    WalkResult result = funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp op) {
+      op.emitOpError("failed to lower coalesced_gather_dma op");
+      return WalkResult::interrupt();
+    });
+    if (result.wasInterrupted()) {
+      return signalPassFailure();
+    }
   }
 };
 } // namespace
