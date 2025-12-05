@@ -330,12 +330,8 @@ const char ValueAlignment::ID = 0;
 class ArgumentAnalysis {
 public:
   explicit ArgumentAnalysis(Operation *rootOp)
-      : explorer(rootOp, TraversalAction::SHALLOW),
+      : explorer(rootOp, TraversalAction::RECURSE),
         solver(explorer, allocator) {
-    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
-        TraversalAction::RECURSE);
-    explorer.setDialectAction<IREE::Stream::StreamDialect>(
-        TraversalAction::RECURSE);
     // Ignore the contents of executables (linalg goo, etc).
     explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
     explorer.initialize();
