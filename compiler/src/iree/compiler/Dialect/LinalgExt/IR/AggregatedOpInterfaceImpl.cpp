@@ -192,18 +192,49 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
   SmallVector<AffineMap> indexingMaps{identityMap};
   SmallVector<utils::IteratorType> iteratorTypes(rank,
                                                  utils::IteratorType::parallel);
-  auto genericOp =
-      linalg::GenericOp::create(builder, loc, value.getType(), ValueRange{},
-                                value, indexingMaps, iteratorTypes);
-  auto &dstRegion = genericOp.getRegion();
-  builder.cloneRegionBefore(region, dstRegion, dstRegion.end());
-  {
-    OpBuilder::InsertionGuard withinRegion(builder);
-    builder.setInsertionPoint(dstRegion.back().getTerminator());
-    linalg::YieldOp::create(builder, loc,
-                            dstRegion.back().getTerminator()->getOperands());
-    dstRegion.back().getTerminator()->erase();
-  }
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, value.getType(), ValueRange{}, value, indexingMaps,
+      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value score = args[0];
+
+        // If the region is empty (no score modification), just yield the score
+        if (region.empty() || region.front().empty()) {
+          linalg::YieldOp::create(b, loc, score);
+          return;
+        }
+
+        // Build index arguments if region expects them
+        SmallVector<Value> regionArgs;
+        regionArgs.push_back(score);
+
+        if (region.front().getNumArguments() > 1) {
+          unsigned numExpectedIndices = region.front().getNumArguments() - 1;
+          for (unsigned i = 0; i < numExpectedIndices && i < rank; ++i) {
+            Value idx = b.create<linalg::IndexOp>(loc, i);
+            regionArgs.push_back(idx);
+          }
+          // For missing dimensions, pass zero constants as dummy indices
+          for (unsigned i = rank; i < numExpectedIndices; ++i) {
+            Value zeroIdx = b.create<arith::ConstantIndexOp>(loc, 0);
+            regionArgs.push_back(zeroIdx);
+          }
+        }
+
+        // Clone the region body inline
+        IRMapping mapping;
+        for (auto [arg, regionArg] :
+             llvm::zip_equal(regionArgs, region.front().getArguments())) {
+          mapping.map(regionArg, arg);
+        }
+        for (Operation &op : region.front().without_terminator()) {
+          b.clone(op, mapping);
+        }
+        auto yieldOp =
+            cast<IREE::LinalgExt::YieldOp>(region.front().getTerminator());
+        Value result = mapping.lookup(yieldOp.getOperand(0));
+        linalg::YieldOp::create(b, loc, result);
+      });
+
   return genericOp.getResult(0);
 }
 
@@ -259,15 +290,14 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
   return genericOp.getResult(0);
 }
 
-// Compute output = exp2(output - input)
-static Value computeSubAndExp2(OpBuilder &builder, Location loc,
-                               AffineMap inputMap, AffineMap outputMap,
-                               Value input, Value output) {
+// Compute output = exp2/exp(output - input) depending on useExp2 flag.
+static Value computeSubAndExp(OpBuilder &builder, Location loc,
+                              AffineMap inputMap, AffineMap outputMap,
+                              Value input, Value output, bool useExp2) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
   inputMap = compressedMaps[0];
   outputMap = compressedMaps[1];
-
   SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
                                                  utils::IteratorType::parallel);
   auto genericOp = linalg::GenericOp::create(
@@ -278,8 +308,9 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
         Value diff = arith::SubFOp::create(b, loc, args[1], in);
-        Value weight = math::Exp2Op::create(b, loc, diff);
-        linalg::YieldOp::create(b, loc, weight);
+        Operation *weight = useExp2 ? math::Exp2Op::create(b, loc, diff)
+                                    : math::ExpOp::create(b, loc, diff);
+        linalg::YieldOp::create(b, loc, weight->getResult(0));
       });
   return genericOp.getResult(0);
 }
@@ -315,15 +346,18 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
                               std::optional<AffineMap> maskMap,
                               SmallVector<OpFoldResult> iterationDomain,
                               Type sElementType, Region &elementwiseRegion,
-                              DictionaryAttr qkAttrs, bool lowPrecision) {
+                              DictionaryAttr qkAttrs, bool lowPrecision,
+                              bool useExp2) {
   MLIRContext *ctx = b.getContext();
-  // Since we use exp2 for attention instead of the original exp, we have to
+  // If using exp2 for attention instead of the original exp, we have to
   // multiply the scale by log2(e). We use exp2 instead of exp as most platforms
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
-  Value log2e = arith::ConstantOp::create(
-      b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  scale = arith::MulFOp::create(b, loc, scale, log2e);
+  if (useExp2) {
+    Value log2e = arith::ConstantOp::create(
+        b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+    scale = arith::MulFOp::create(b, loc, scale, log2e);
+  }
 
   auto qETy = getElementTypeOrSelf(query.getType());
 
@@ -435,9 +469,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Type f32Type = b.getF32Type();
 
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(loc, b, query, key, getScale(), mask, qMap,
-                                    kMap, sMap, getMaskMap(), sizes, f32Type,
-                                    getRegion(), qkAttrs, lowPrecision);
+  Value s = computeQKAndElementwise(
+      loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
+      sizes, f32Type, getRegion(), qkAttrs, lowPrecision, /*useExp2=*/true);
 
   // ---- Softmax ----
 
@@ -477,9 +511,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   // max = rowMax(S)
   Value max = reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, maxFill);
 
-  // P = exp2(S - max)
+  // P = exp2(S - max).
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, max, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, max, s, /*useExp2=*/true);
 
   // sum = rowSum(P)
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
@@ -529,9 +563,12 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   DictionaryAttr config = getDecompositionConfigAttr();
 
   DictionaryAttr qkAttrs, pvAttrs;
+  bool useExp2 = true;
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+    if (auto useExp2Attr = config.getAs<BoolAttr>(getUseExp2AttrStr()))
+      useExp2 = useExp2Attr.getValue();
   }
 
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
@@ -552,7 +589,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // ---- QK Matmul + elementwise math ----
   Value s = computeQKAndElementwise(
       loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
-      sizes, elementType, getRegion(), qkAttrs, lowPrecision);
+      sizes, elementType, getRegion(), qkAttrs, lowPrecision, useExp2);
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
@@ -562,20 +599,21 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   AffineMap maxMap = getMaxMap();
   Value newMax = reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, oldMax);
 
-  // norm = exp2(oldMax - newMax)
+  // norm = exp2(oldMax - newMax) or exp(oldMax - newMax) depending on useExp2
   // normMap = maxMap
   AffineMap normMap = getMaxMap();
-  Value norm = computeSubAndExp2(b, loc, maxMap, normMap, newMax, oldMax);
+  Value norm =
+      computeSubAndExp(b, loc, maxMap, normMap, newMax, oldMax, useExp2);
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
   Value normSum = elementwiseValueInPlace<arith::MulFOp>(b, loc, sumMap,
                                                          normMap, oldSum, norm);
 
-  // P = exp2(S - newMax)
+  // P = exp2(S - newMax) or exp(S - newMax) depending on useExp2
   // PMap = SMap
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, newMax, s, useExp2);
 
   // newSum = normSum + rowSum(P)
   Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);

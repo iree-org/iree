@@ -2067,8 +2067,23 @@ LogicalResult AttentionOp::verify() {
 
   auto &block = getRegion().front();
   auto blockTys = block.getArgumentTypes();
+  if (blockTys.size() != 1 && blockTys.size() != 5) {
+    return attnOp->emitOpError(
+        "expects either 1 block argument (score) or 5 block arguments "
+        "(score, b, h, m, n)");
+  }
+
   if (!isa<FloatType>(blockTys[0]))
     return attnOp->emitOpError("block argument 0 should be float");
+
+  // If 5 arguments, verify the indices are of index type
+  if (blockTys.size() == 5) {
+    for (unsigned i = 1; i < 5; ++i) {
+      if (!blockTys[i].isIndex()) {
+        return attnOp->emitOpError("block arguments 1-4 should be index type");
+      }
+    }
+  }
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
   if (!yieldOp) {
@@ -2246,12 +2261,23 @@ LogicalResult OnlineAttentionOp::verify() {
 
   Block &block = attnOp.getRegion().front();
   auto blockTys = block.getArgumentTypes();
-  if (blockTys.size() != 1) {
-    return attnOp->emitOpError("expects single block argument for score");
+  if (blockTys.size() != 1 && blockTys.size() != 5) {
+    return attnOp->emitOpError(
+        "expects either 1 block argument (score) or 5 block arguments "
+        "(score, b, h, m, n)");
   }
 
   if (!isa<FloatType>(blockTys[0])) {
     return attnOp->emitOpError("block argument 0 should be float");
+  }
+
+  // If 5 arguments, verify the indices are of index type
+  if (blockTys.size() == 5) {
+    for (unsigned i = 1; i < 5; ++i) {
+      if (!blockTys[i].isIndex()) {
+        return attnOp->emitOpError("block arguments 1-4 should be index type");
+      }
+    }
   }
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
