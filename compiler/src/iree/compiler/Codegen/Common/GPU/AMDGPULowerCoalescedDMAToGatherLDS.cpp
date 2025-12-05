@@ -174,15 +174,24 @@ struct LowerCoalescedGatherDMAPattern final
         rewriter, loc, laneId,
         arith::ConstantIndexOp::create(rewriter, loc, elementsPerTransfer));
 
+    // Iterate over each row (second innermost dimension) and create a
+    // GatherToLDS op for each. Each op transfers one row from global memory
+    // to LDS, where each lane reads `elementsPerTransfer` contiguous elements.
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (SmallVector<int64_t> offsets :
          StaticTileOffsetRange({secondInnermostDimSize}, {1})) {
+      // Current row index in the second innermost dimension.
       Value iVal = arith::ConstantIndexOp::create(rewriter, loc, offsets[0]);
 
+      // Source indices: [..., row, lane_id * elementsPerTransfer]
+      // Each lane reads from its offset in the innermost dimension.
       SmallVector<Value> srcIndices(sourceType.getRank(), zero);
       srcIndices[sourceType.getRank() - 2] = iVal;
       srcIndices[sourceType.getRank() - 1] = laneOffset;
 
+      // Destination indices: [..., row, 0]
+      // The innermost dimension offset is implicit in GatherToLDS - it writes
+      // to consecutive locations in LDS based on the lane ID internally.
       SmallVector<Value> dstIndices(destType.getRank(), zero);
       dstIndices[destType.getRank() - 2] = iVal;
 
@@ -213,12 +222,12 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
       return;
     }
 
+    // dma_sizes is optional - if not specified, skip the size validation.
     ArrayRef<int64_t> dmaSizes;
     if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
       dmaSizes = dmaSizesAttr.asArrayRef();
     }
 
-    // dma_sizes is optional - if not specified, skip the size validation.
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<LowerCoalescedGatherDMAPattern>(context, dmaSizes);
