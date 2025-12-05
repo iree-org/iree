@@ -1261,14 +1261,16 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     for (Value result : reductionOp->getResults()) {
       for (Operation *user : result.getUsers()) {
         auto consumerOp = dyn_cast<linalg::LinalgOp>(user);
-        if (!consumerOp)
+        if (!consumerOp) {
           continue;
+        }
 
         // Collect dims used by operands referencing the reduction result.
         llvm::SmallDenseSet<unsigned> usedDims;
         for (OpOperand &operand : consumerOp->getOpOperands()) {
-          if (operand.get() != result)
+          if (operand.get() != result) {
             continue;
+          }
           for (AffineExpr expr :
                consumerOp.getMatchingIndexingMap(&operand).getResults()) {
             if (auto dimExpr = dyn_cast<AffineDimExpr>(expr))

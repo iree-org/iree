@@ -100,7 +100,7 @@ func.func @subgroup_reduce_dynamic(%10: tensor<8x?xf32>) -> tensor<8xf32> attrib
 // -----
 
 // Verify workgroup_size is limited to subgroup_size when the consumer's
-// broadcast dimensions can't be distributed.
+// broadcast dimensions can't be distributed. 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = shuffle,
@@ -200,7 +200,7 @@ func.func @reduction_with_parallel_and_elementwise_consumer(
 // -----
 
 // Verify workgroup_size is not limited to subgroup_size when the consumer's broadcast
-// dimensions can be distributed.
+// dimensions can be distributed. 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = shuffle,
