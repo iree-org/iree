@@ -105,7 +105,7 @@ function(iree_local_py_test)
   add_test(
     NAME ${_NAME_PATH}
     COMMAND
-      "${Python3_EXECUTABLE}"
+      "${Python3_EXECUTABLE}" -m pytest
       "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}"
       ${_RULE_ARGS}
   )
