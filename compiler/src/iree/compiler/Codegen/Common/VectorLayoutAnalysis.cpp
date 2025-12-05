@@ -139,7 +139,7 @@ void LayoutInfo::propagateLayoutForward(Value val) {
         continue;
       }
       if (contract.getLhs() == val || contract.getRhs() == val) {
-        if (contract->hasAttr("iree.amdgpu.mma")) {
+        if (contract->hasAttr("iree.gpu.mma")) {
           // Intrinsic ops have fixed layouts, do not try to infer them through
           // maps.
           // TODO: Move to iree_gpu.multi_mma ops.
