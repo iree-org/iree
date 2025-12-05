@@ -114,7 +114,7 @@ util.func public @exportBufferView(%tensor: tensor<?x?x4xf32>, %dim0: index, %di
 // CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[DIM0:.+]]: index, %[[STORAGE:.+]]: !hal.buffer)
 util.func public @aliasStorage(%tensor: tensor<?x4xf32>, %dim0: index, %storage: !hal.buffer) -> tensor<?x4xf32> {
   // CHECK: %[[MIN_STORAGE_SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]}
-  // CHECK: %[[STORAGE_RESOURCE:.+]] = stream.tensor.import %[[STORAGE]] : !hal.buffer -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[MIN_STORAGE_SIZE]]}
+  // CHECK: %[[STORAGE_RESOURCE:.+]] = stream.tensor.import consume %[[STORAGE]] : !hal.buffer -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[MIN_STORAGE_SIZE]]}
   // CHECK: %[[UPDATE:.+]] = stream.async.update %[[TENSOR]], %[[STORAGE_RESOURCE]][%c0 to %[[SIZE]]] : !stream.resource<*>{%[[SIZE]]} -> %[[STORAGE_RESOURCE]] as !stream.resource<external>{%[[MIN_STORAGE_SIZE]]}
   // CHECK: %[[SLICE:.+]] = stream.async.slice %[[UPDATE]][%c0 to %[[SIZE]]] : !stream.resource<external>{%[[MIN_STORAGE_SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
   // CHECK: %[[RESULT:.+]] = stream.async.clone %[[SLICE]] : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
@@ -129,7 +129,7 @@ util.func public @aliasStorage(%tensor: tensor<?x4xf32>, %dim0: index, %storage:
 // CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[DIM0:.+]]: index, %[[STORAGE:.+]]: !hal.buffer, %[[FENCE:.+]]: !hal.fence)
 util.func public @aliasStorageAsync(%tensor: tensor<?x4xf32>, %dim0: index, %storage: !hal.buffer, %fence: !hal.fence) -> tensor<?x4xf32> {
   // CHECK-DAG: %[[MIN_STORAGE_SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]}
-  // CHECK-DAG: %[[UNREADY_STORAGE:.+]] = stream.tensor.import %[[STORAGE]] : !hal.buffer -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[MIN_STORAGE_SIZE]]}
+  // CHECK-DAG: %[[UNREADY_STORAGE:.+]] = stream.tensor.import consume %[[STORAGE]] : !hal.buffer -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[MIN_STORAGE_SIZE]]}
   // CHECK-DAG: %[[TIMEPOINT:.+]] = stream.timepoint.import %[[FENCE]]
   // CHECK-DAG: %[[READY_STORAGE:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[UNREADY_STORAGE]] : !stream.resource<external>{%[[MIN_STORAGE_SIZE]]}
   // CHECK: %[[UPDATE:.+]] = stream.async.update %[[TENSOR]], %[[READY_STORAGE]][%c0 to %[[SIZE]]] : !stream.resource<*>{%[[SIZE]]} -> %[[READY_STORAGE]] as !stream.resource<external>{%[[MIN_STORAGE_SIZE]]}
@@ -209,7 +209,7 @@ util.func public @aliasStorageCrossDevice(%tensor: tensor<4xf32>, %storage: !hal
   //      CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[TENSOR]] : !stream.resource<*>{%[[SIZE]]}
   // CHECK-SAME:     -> to(#hal.device.promise<@dev_b>) !stream.resource<*>{%[[SIZE]]}
   //  CHECK-DAG: %[[STORAGE_SIZE:.+]] = stream.tensor.sizeof on(#hal.device.promise<@dev_b>) tensor<4xf32>
-  //      CHECK: %[[STORAGE_RESOURCE:.+]] = stream.tensor.import on(#hal.device.promise<@dev_b>) %[[STORAGE]] :
+  //      CHECK: %[[STORAGE_RESOURCE:.+]] = stream.tensor.import on(#hal.device.promise<@dev_b>) consume %[[STORAGE]] :
   // CHECK-SAME:     !hal.buffer -> tensor<4xf32> in !stream.resource<external>{%[[STORAGE_SIZE]]}
   //      CHECK: %[[UPDATE:.+]] = stream.async.update on(#hal.device.promise<@dev_b>) %[[TRANSFER]], %[[STORAGE_RESOURCE]][%c0 to %[[SIZE]]] :
   // CHECK-SAME:     !stream.resource<*>{%[[SIZE]]} -> %[[STORAGE_RESOURCE]] as !stream.resource<external>{%[[STORAGE_SIZE]]}

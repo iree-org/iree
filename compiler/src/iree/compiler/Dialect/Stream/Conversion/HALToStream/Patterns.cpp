@@ -246,7 +246,8 @@ struct ConvertTensorAliasOp
     auto importOp = IREE::Stream::TensorImportOp::create(
         rewriter, op.getLoc(), externalType, adaptor.getStorage().front(),
         TypeAttr::get(sourceType), convertedSourceDims, storageSize,
-        /*consume=*/UnitAttr{}, executionAffinityAttr);
+        /*consume=*/UnitAttr::get(rewriter.getContext()),
+        executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the storage is assumed to
     // be immediately available.
