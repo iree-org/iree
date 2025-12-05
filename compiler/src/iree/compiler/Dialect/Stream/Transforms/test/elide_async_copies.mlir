@@ -224,7 +224,9 @@ util.func private @slice_overlap_exclusive(%producer: !stream.resource<*>) -> (!
   // CHECK-NOT: stream.async.slice
   %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
   %consumer_storage = stream.async.alloca : !stream.resource<*>{%c100}
-  // CHECK: stream.async.copy %[[PRODUCER]][%c100 to %c200]
+  // CHECK-DAG: %[[SLICE_START:.+]] = arith.constant 100 : index
+  // CHECK-DAG: %[[SLICE_END:.+]] = arith.constant 200 : index
+  // CHECK: stream.async.copy %[[PRODUCER]][%[[SLICE_START]] to %[[SLICE_END]]]
   %consumer = stream.async.copy %slice[%c0 to %c100], %consumer_storage[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
   // CHECK: stream.async.fill
   %fill = stream.async.fill %c123_i32, %producer[%c200 to %c300 for %c100] : i32 -> !stream.resource<*>{%c300}
@@ -246,11 +248,17 @@ util.func private @slice_overlap_readonly(%producer: !stream.resource<*>) -> (!s
   %c300 = arith.constant 300 : index
   %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
   %consumer_storage_0 = stream.async.alloca : !stream.resource<*>{%c100}
-  // CHECK: stream.async.copy %[[PRODUCER]][%c100 to %c200]
+  // First copy reads slice[0:100] which maps to producer[100:200].
+  // CHECK-DAG: %[[COPY0_START:.+]] = arith.constant 100 : index
+  // CHECK-DAG: %[[COPY0_END:.+]] = arith.constant 200 : index
+  // CHECK: stream.async.copy %[[PRODUCER]][%[[COPY0_START]] to %[[COPY0_END]]]
   // CHECK-NOT: stream.async.slice
   %consumer_0 = stream.async.copy %slice[%c0 to %c100], %consumer_storage_0[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
   %consumer_storage_1 = stream.async.alloca : !stream.resource<*>{%c100}
-  // CHECK: stream.async.copy %[[PRODUCER]][%c101 to %c201]
+  // Second copy reads slice[1:101] which maps to producer[101:201].
+  // CHECK-DAG: %[[COPY1_START:.+]] = arith.constant 101 : index
+  // CHECK-DAG: %[[COPY1_END:.+]] = arith.constant 201 : index
+  // CHECK: stream.async.copy %[[PRODUCER]][%[[COPY1_START]] to %[[COPY1_END]]]
   %consumer_1 = stream.async.copy %slice[%c1 to %c101], %consumer_storage_1[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
   util.return %consumer_0, %consumer_1 : !stream.resource<*>, !stream.resource<*>
 }
@@ -661,7 +669,7 @@ util.func public @chained_inplace_dispatches_caller(%size: index) -> !stream.res
 // Tests that a callee called with mixed semantics (both by-val and by-ref)
 // must preserve defensive copies since it can't assume semantics.
 
-stream.executable private @ex {
+stream.executable private @ex_mixed {
   stream.executable.export public @dispatch workgroups() -> (index, index, index) {
     %c1 = arith.constant 1 : index
     stream.return %c1, %c1, %c1 : index, index, index
@@ -701,7 +709,7 @@ util.func public @mixedSemanticsByrefCaller() {
   // Not last use - by-ref semantics.
   util.call @mixedSemanticsSameCallee(%resource) : (!stream.resource<external>) -> ()
   // Additional use after call.
-  %dispatch = stream.async.dispatch @ex::@dispatch(%resource[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  %dispatch = stream.async.dispatch @ex_mixed::@dispatch(%resource[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
   util.return
 }
 
@@ -764,7 +772,7 @@ util.func public @transferChainFromArg(%arg: !stream.resource<constant>) -> !str
 // Tests that same-type transfers with multiple uses of the source are elided.
 // Since same-type transfer is a no-op, both dispatches use the original arg.
 
-stream.executable private @ex {
+stream.executable private @ex_transfer {
   stream.executable.export public @dispatch1 workgroups() -> (index, index, index) {
     %c1 = arith.constant 1 : index
     stream.return %c1, %c1, %c1 : index, index, index
@@ -783,10 +791,10 @@ util.func public @transferSameTypeMultiUse(%arg: !stream.resource<external>) -> 
   // CHECK-NOT: stream.async.transfer
   %transfer = stream.async.transfer %arg : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
   // Both original and transfer result used - transfer still elided.
-  // CHECK: %[[D1:.+]] = stream.async.dispatch @ex::@dispatch1(%[[ARG]][%c0 to %c100 for %c100])
-  %dispatch1 = stream.async.dispatch @ex::@dispatch1(%arg[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
-  // CHECK: %[[D2:.+]] = stream.async.dispatch @ex::@dispatch2(%[[ARG]][%c0 to %c100 for %c100])
-  %dispatch2 = stream.async.dispatch @ex::@dispatch2(%transfer[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  // CHECK: %[[D1:.+]] = stream.async.dispatch @ex_transfer::@dispatch1(%[[ARG]][%c0 to %c100 for %c100])
+  %dispatch1 = stream.async.dispatch @ex_transfer::@dispatch1(%arg[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  // CHECK: %[[D2:.+]] = stream.async.dispatch @ex_transfer::@dispatch2(%[[ARG]][%c0 to %c100 for %c100])
+  %dispatch2 = stream.async.dispatch @ex_transfer::@dispatch2(%transfer[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
   // CHECK: util.return %[[D1]], %[[D2]]
   util.return %dispatch1, %dispatch2 : !stream.resource<external>, !stream.resource<external>
 }
@@ -800,7 +808,7 @@ util.func public @transferSameTypeMultiUse(%arg: !stream.resource<external>) -> 
 // Tests that a clone from a by-ref argument feeding a tied operation must be
 // preserved to prevent mutation of the caller's value.
 
-stream.executable private @ex {
+stream.executable private @ex_byref {
   stream.executable.export public @dispatch workgroups() -> (index, index, index) {
     %c1 = arith.constant 1 : index
     stream.return %c1, %c1, %c1 : index, index, index
@@ -832,6 +840,219 @@ util.func public @cloneByrefToTiedCaller() {
   // Not last use - by-ref.
   %result = util.call @cloneByrefToTied(%resource) : (!stream.resource<external>) -> !stream.resource<external>
   // Original resource used again.
-  %dispatch = stream.async.dispatch @ex::@dispatch(%resource[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  %dispatch = stream.async.dispatch @ex_byref::@dispatch(%resource[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
   util.return
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// AsyncUpdateOp elision tests
+//===----------------------------------------------------------------------===//
+
+// Tests that an update followed by a write-only operation to the same region
+// can be elided because the mutation is overwritten.
+
+stream.executable private @ex_update {
+  stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @updateElisionOverwrite
+util.func private @updateElisionOverwrite(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c123_i32 = arith.constant 123 : i32
+  %c456_i32 = arith.constant 456 : i32
+  // CHECK: %[[TARGET:.+]] = stream.async.splat %c123
+  %target = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK: %[[UPDATE:.+]] = stream.async.splat %c456
+  %update = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update writes to [0, 4).
+  // CHECK: stream.async.update %[[UPDATE]], %[[TARGET]]
+  %updated = stream.async.update %update, %target[%c0 to %c4] : !stream.resource<*>{%c4} -> %target as !stream.resource<*>{%size}
+  // The update result is used so we cannot elide it.
+  // CHECK: util.return
+  util.return %updated : !stream.resource<*>
+}
+
+// -----
+
+// Tests that an update where the result is only used for another write
+// to the same region can have the update elided.
+
+// CHECK-LABEL: @updateElisionNoRead
+util.func private @updateElisionNoRead(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c123_i32 = arith.constant 123 : i32
+  %c456_i32 = arith.constant 456 : i32
+  %c789_i32 = arith.constant 789 : i32
+  // CHECK: %[[TARGET:.+]] = stream.async.splat %c123
+  %target = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK: %[[UPDATE:.+]] = stream.async.splat %c456
+  %update = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update writes to [0, 4).
+  // Next user writes to [0, 4), completely overwriting this update.
+  // CHECK-NOT: stream.async.update %[[UPDATE]]
+  %updated = stream.async.update %update, %target[%c0 to %c4] : !stream.resource<*>{%c4} -> %target as !stream.resource<*>{%size}
+  // CHECK: %[[FILL:.+]] = stream.async.fill %c789_i32, %[[TARGET]]
+  %filled = stream.async.fill %c789_i32, %updated[%c0 to %c4 for %c4] : i32 -> !stream.resource<*>{%size}
+  util.return %filled : !stream.resource<*>
+}
+
+// -----
+
+// Tests that update cannot be elided when the updated region is read.
+
+stream.executable private @ex_read {
+  stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @updateNotElided_regionRead
+util.func private @updateNotElided_regionRead(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c123_i32 = arith.constant 123 : i32
+  %c456_i32 = arith.constant 456 : i32
+  // CHECK: %[[TARGET:.+]] = stream.async.splat %c123
+  %target = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK: %[[UPDATE:.+]] = stream.async.splat %c456
+  %update = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update writes to [0, 4).
+  // CHECK: %[[UPDATED:.+]] = stream.async.update %[[UPDATE]], %[[TARGET]]
+  %updated = stream.async.update %update, %target[%c0 to %c4] : !stream.resource<*>{%c4} -> %target as !stream.resource<*>{%size}
+  // Dispatch reads from [0, 4) - overlaps with the update, so cannot elide.
+  // CHECK: stream.async.dispatch @ex_read::@dispatch[%c1, %c1, %c1](%[[UPDATED]]
+  %dispatch = stream.async.dispatch @ex_read::@dispatch[%c1, %c1, %c1](%updated[%c0 to %c4 for %c4]) : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  util.return %dispatch : !stream.resource<*>
+}
+
+// -----
+
+// Tests that update cannot be elided when target is a by-ref function argument.
+
+// CHECK-LABEL: util.func private @updateNotElided_byRefArg
+util.func private @updateNotElided_byRefArg(%target: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c123_i32 = arith.constant 123 : i32
+  %update = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update on a by-ref arg cannot be elided as mutation might be observable.
+  // CHECK: stream.async.update
+  %updated = stream.async.update %update, %target[%c0 to %c4] : !stream.resource<*>{%c4} -> %target as !stream.resource<*>{%size}
+  util.return %updated : !stream.resource<*>
+}
+
+// CHECK-LABEL: @updateNotElided_byRefArg_caller
+util.func public @updateNotElided_byRefArg_caller(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c123_i32 = arith.constant 123 : i32
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  %result = util.call @updateNotElided_byRefArg(%splat, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  // Splat is used after call, so arg is by-ref.
+  util.return %splat, %result : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that a full-buffer update (where update size == target size) with
+// a last-use target can be optimized to replace with source.
+
+// CHECK-LABEL: @updateFullBuffer
+util.func private @updateFullBuffer() -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c123_i32 = arith.constant 123 : i32
+  %c456_i32 = arith.constant 456 : i32
+  // CHECK: %[[TARGET:.+]] = stream.async.splat %c123
+  %target = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c4}
+  // CHECK: %[[UPDATE:.+]] = stream.async.splat %c456
+  %update = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%c4}
+  // Full buffer update with same sizes - can replace result with source.
+  // The update itself will remain since it's the only use, but the result
+  // usage pattern is what we're testing.
+  %updated = stream.async.update %update, %target[%c0 to %c4] : !stream.resource<*>{%c4} -> %target as !stream.resource<*>{%c4}
+  // CHECK: util.return
+  util.return %updated : !stream.resource<*>
+}
+
+// -----
+
+// Tests that an update cannot be elided when its result is used by a tied
+// dispatch operation. The tied dispatch passes the buffer through, and
+// downstream operations reading from the dispatch result may access the
+// update region through the tied result alias.
+
+stream.executable private @ex_tied_passthrough {
+  stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @updateNotElided_tiedDispatch
+util.func private @updateNotElided_tiedDispatch(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c8 = arith.constant 8 : index
+  %c123_i32 = arith.constant 123 : i32
+  %c456_i32 = arith.constant 456 : i32
+  // CHECK: %[[TARGET:.+]] = stream.async.splat %c123
+  %target = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK: %[[UPDATE_SRC:.+]] = stream.async.splat %c456
+  %update_src = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update writes to [0, 4).
+  // CHECK: %[[UPDATED:.+]] = stream.async.update %[[UPDATE_SRC]], %[[TARGET]][%c0 to %c4]
+  %updated = stream.async.update %update_src, %target[%c0 to %c4] : !stream.resource<*>{%c4} -> %target as !stream.resource<*>{%size}
+  // Tied dispatch reads from [4, 8) - disjoint from update region.
+  // But output is tied to input, so dispatch result aliases entire buffer.
+  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @ex_tied_passthrough::@dispatch(%[[UPDATED]][%c4 to %c8 for %c4]) : (!stream.resource<*>{%[[SIZE:.+]]}) -> %[[UPDATED]]{%[[SIZE]]}
+  %dispatch = stream.async.dispatch @ex_tied_passthrough::@dispatch(%updated[%c4 to %c8 for %c4]) : (!stream.resource<*>{%size}) -> %updated{%size}
+  // Downstream copy reads entire buffer [0, 8) from dispatch result.
+  // This read covers the update region [0, 4), so update cannot be elided.
+  %output = stream.async.alloca : !stream.resource<*>{%c8}
+  // CHECK: stream.async.copy %[[DISPATCH]]
+  %copy = stream.async.copy %dispatch[%c0 to %c8], %output[%c0 to %c8], %c8 : !stream.resource<*>{%size} -> %output as !stream.resource<*>{%c8}
+  util.return %copy : !stream.resource<*>
+}
+
+// -----
+
+// Tests that chained updates (where one update's result is used as target of
+// another update) are not incorrectly elided. The first update writes to a
+// subset of the buffer, and even though only the second update's result is
+// directly used by the export, the first update's write is still visible
+// through the exported buffer.
+//
+// This is the concat pattern: alloca -> update[0:1] -> update[1:2] -> export
+// where both updates contribute to the final buffer.
+
+// CHECK-LABEL: @updateChained
+util.func private @updateChained() -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c1_i8 = arith.constant 1 : i8
+  %c2_i8 = arith.constant 2 : i8
+  // CHECK: %[[ALLOCA:.+]] = stream.async.alloca
+  %alloca = stream.async.alloca : !stream.resource<*>{%c2}
+  // CHECK: %[[SPLAT0:.+]] = stream.async.splat %c1_i8
+  %splat0 = stream.async.splat %c1_i8 : i8 -> !stream.resource<*>{%c1}
+  // CHECK: %[[SPLAT1:.+]] = stream.async.splat %c2_i8
+  %splat1 = stream.async.splat %c2_i8 : i8 -> !stream.resource<*>{%c1}
+  // First update writes [1] at position 0. This must NOT be elided because
+  // the result is used as target of the second update.
+  // CHECK: %[[UPDATE0:.+]] = stream.async.update %[[SPLAT0]], %[[ALLOCA]][%c0 to %c1]
+  %update0 = stream.async.update %splat0, %alloca[%c0 to %c1] : !stream.resource<*>{%c1} -> %alloca as !stream.resource<*>{%c2}
+  // Second update writes [2] at position 1.
+  // CHECK: %[[UPDATE1:.+]] = stream.async.update %[[SPLAT1]], %[[UPDATE0]][%c1 to %c2]
+  %update1 = stream.async.update %splat1, %update0[%c1 to %c2] : !stream.resource<*>{%c1} -> %update0 as !stream.resource<*>{%c2}
+  // CHECK: util.return %[[UPDATE1]]
+  util.return %update1 : !stream.resource<*>
 }

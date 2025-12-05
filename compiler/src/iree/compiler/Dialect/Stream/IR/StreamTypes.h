@@ -60,6 +60,8 @@ struct AsyncAccessRange {
 
   // Returns true if the access is read-only.
   bool isReadOnly() const { return access == ResourceAccessBitfield::Read; }
+  // Returns true if the access is write-only.
+  bool isWriteOnly() const { return access == ResourceAccessBitfield::Write; }
 
   // Prints a textual representation of the range.
   void print(llvm::raw_ostream &os, AsmState &asmState);
