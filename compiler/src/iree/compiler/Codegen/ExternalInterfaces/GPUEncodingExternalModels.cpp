@@ -11,6 +11,7 @@
 // - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
 // - IREE::Codegen::PackedLayoutMaterializerAttr
+// - VerifiableTensorEncoding
 //
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
@@ -42,6 +43,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/TensorEncoding.h"
 
 #include <cassert>
 #include <cfloat>
@@ -629,6 +631,53 @@ struct GPULayoutResolverAttr final
   }
 };
 
+struct GPUEncodingResolverVerifier
+    : mlir::VerifiableTensorEncoding::ExternalModel<GPUEncodingResolverVerifier,
+                                                    GPUEncodingResolverAttr> {
+  LogicalResult
+  verifyEncoding(Attribute attr, ArrayRef<int64_t> shape, Type elementType,
+                 function_ref<InFlightDiagnostic()> emitError) const {
+    auto resolver = cast<GPUEncodingResolverAttr>(attr);
+    DictionaryAttr config = resolver.getConfiguration();
+    if (!config) {
+      return success();
+    }
+
+    auto encodingInfoAttr = config.getNamed(kEncodingInfoAttrName);
+    if (!encodingInfoAttr) {
+      return success();
+    }
+
+    std::optional<IREE::Codegen::MaterializeEncodingInfo> info =
+        IREE::Codegen::deserializeEncodingInfo(
+            cast<DictionaryAttr>(encodingInfoAttr->getValue()));
+    if (!info) {
+      return emitError() << "invalid encoding_info in configuration";
+    }
+
+    // Identity layouts are always valid.
+    if (IREE::Codegen::isIdentityLayout(info.value())) {
+      return success();
+    }
+
+    if (info->innerDimsPos.size() != info->innerTileSizes.size()) {
+      return emitError() << "innerDimsPos size (" << info->innerDimsPos.size()
+                         << ") does not match innerTileSizes size ("
+                         << info->innerTileSizes.size() << ")";
+    }
+
+    // Check that the innerDimsPos indices are valid for the tensor rank.
+    int64_t rank = shape.size();
+    for (int64_t pos : info->innerDimsPos) {
+      if (pos < 0 || pos >= rank) {
+        return emitError() << "innerDimsPos index " << pos
+                           << " is out of bounds for tensor rank " << rank;
+      }
+    }
+    return success();
+  }
+};
+
 // Returns the pad encoding layout, or nullptr if this is not the only layout or
 // if there's no encoding at all.
 static IREE::Encoding::PaddingAttr
@@ -840,7 +889,7 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
     IREE::GPU::GPUEncodingResolverAttr::attachInterface<
         GPUEncodingPackedLayoutMaterializerAttr,
         GPUEncodingResolverMaterializerAttr, GPULayoutResolverAttr,
-        GPUSerializableAttr>(*ctx);
+        GPUSerializableAttr, GPUEncodingResolverVerifier>(*ctx);
     IREE::GPU::GPUPaddingResolverAttr::attachInterface<
         GPUPadEncodingLayoutMaterializerAttr, GPUPadLayoutResolverAttr>(*ctx);
   });
