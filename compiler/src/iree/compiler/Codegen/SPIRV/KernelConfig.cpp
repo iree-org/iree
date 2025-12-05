@@ -1065,7 +1065,7 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
 
 static bool canDistributeShape(ArrayRef<int64_t> shape, int64_t groupSize) {
   for (int64_t dim : shape) {
-    if (dim >= groupSize && dim % groupSize == 0) {
+    if (dim % groupSize == 0) {
       return true;
     }
     if (groupSize % dim == 0) {
