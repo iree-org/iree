@@ -39,6 +39,7 @@ ALL_SRCS = enforce_glob(
         "exponential_fp16.mlir",
         "exponential_minus_one.mlir",
         "fft.mlir",
+        "fft_complex.mlir",
         "finite.mlir",
         "floor.mlir",
         "gather.mlir",
@@ -185,6 +186,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "dot_bf16.mlir",
             "exponential_fp16.mlir",
+            "fft_complex.mlir"
         ],
     ),
     compiler_flags = [
@@ -263,6 +265,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "exponential_fp16.mlir",
             "fft.mlir",  # TODO(#9583)
+            "fft_complex",
             "reverse.mlir",  # TODO(#12415): disabled due to miscompilation on Pixel 6.
         ],
     ),
@@ -353,6 +356,7 @@ iree_check_single_backend_test_suite(
             "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
             "fft.mlir",
+            "fft_complex.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",

@@ -118,9 +118,49 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
 /// %out = torch.aten.fft_rfft  %arg0, %none, %int-1, %none :
 ///           !torch.vtensor<[3,8,16],f32>, !torch.none, !torch.int, !torch.none
 ///           -> !torch.vtensor<[3,8,9],complex<f32>>
-FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
-                                              int64_t fftLength,
-                                              PatternRewriter &rewriter);
+FailureOr<std::pair<Value, Value>> rewriteRfft(Operation *op, Value operand,
+                                               int64_t fftLength,
+                                               PatternRewriter &rewriter);
+
+/// Rewrite an input fft op (from an upstream dialect) into linalg_ext.fft.
+/// Only applies to power of 2 FFT sizes. Operand must be a floating point
+/// complex tensor. Return real and imaginary tensor values or failure.
+///
+/// op: merely used for getting the Location and for reporting match failures.
+/// operand: input operand to FFT,must be of type RankedTensorType and with
+///   static shapes for the pattern to apply.
+/// fftLength: size of input dimension
+///   along which FFT is computed, must be power of 2 for the pattern to apply
+enum class FFTDirection
+{
+    Forward,
+    Backward
+};
+enum class FFTNormalization
+{
+    NoNormalize,
+    Normalize    // multiply by `1 / fftLength` at the end
+};
+FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op,
+                                             Value operand,
+                                             int64_t fftLength,
+                                             FFTDirection direction,
+                                             FFTNormalization normalization,
+                                             PatternRewriter &rewriter);
+
+/// Rewrite IRFFT (inverse real FFT).
+/// Takes half-sized complex input (due to conjugate symmetry) and produces
+/// real output. The input size must be (fftLength / 2 + 1) on the last dim.
+///
+/// op: merely used for getting the Location and for reporting match failures.
+/// operand: input operand to IRFFT, must be of type RankedTensorType with
+///   complex<float> element type and static shapes for the pattern to apply.
+/// fftLength: desired output size (must be power of 2), input should be
+///   fftLength/2 + 1 elements on the last dimension.
+FailureOr<std::pair<Value, Value>> rewriteIrfft(Operation *op,
+                                                Value operand,
+                                                int64_t fftLength,
+                                                PatternRewriter &rewriter);
 
 /// Apply transformation to split a linalg.generic argmax reduction
 /// into a two-stage reduction using an additional parallel dimension.
