@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "annotate_dispatch_arguments.mlir"
     "annotate_dispatch_assumptions.mlir"
     "automatic_reference_counting.mlir"
+    "automatic_reference_counting_scf.mlir"
     "clone_to_consumers.mlir"
     "convert_to_stream.mlir"
     "dump_statistics.mlir"
