@@ -37,6 +37,7 @@ iree_lit_test_suite(
             "emplace_transients.mlir",
             "emplace_transients_scf.mlir",
             "encode_device_tensors.mlir",
+            "encode_device_tensors_encoding.mlir",
             "encode_device_tensors_packing.mlir",
             "encode_host_tensors.mlir",
             "encode_host_tensors_encoding.mlir",
