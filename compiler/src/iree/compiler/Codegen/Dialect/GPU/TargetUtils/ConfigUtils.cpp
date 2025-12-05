@@ -1671,8 +1671,8 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // This strategy turns non-strided/dilated convolution problems into matmul
-  // problems by tiling certain dimensions to 1:
+  // This strategy turns non-strided convolution problems into matmul problems
+  // by tiling certain dimensions to 1:
   //  - Filter dimensions (reduction on the filter, and convolved on the image).
   //  - All parallel dimensions except the innermost output channel dimension
   //    and output image/batch dimension.
@@ -1695,17 +1695,8 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return llvm::all_of(list, [](int64_t i) { return i == 1; });
   };
 
-  // TODO: Support non-unit strides/dilations.
-  if (!isAllOnesList(convolutionDims->strides) ||
-      !isAllOnesList(convolutionDims->dilations)) {
-    return failure();
-  }
-
-  // TODO: Support NCHW convolutions. This is just a matmul_transpose_a, however
-  // the distribution patterns currently do not support that variant.
-  bool isOutputChannelFirst = convolutionDims->outputChannel.back() <
-                              convolutionDims->outputImage.front();
-  if (isOutputChannelFirst) {
+  // TODO: Support non-unit strides.
+  if (!isAllOnesList(convolutionDims->strides)) {
     return failure();
   }
 
