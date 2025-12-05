@@ -80,7 +80,7 @@ const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
   // that, we condition this on a boolean `mlirUkernelsParsingStarted` that is
   // set *before* the call to getOrLoadBuiltinModule potentially recursing.
   std::lock_guard<std::recursive_mutex> guard(mlirUkernelsMutex);
-  if (mlirUkernelsParsingStarted) {
+  if (!mlirUkernelsParsingStarted) {
     mlirUkernelsParsingStarted = true;
     const iree_file_toc_t *toc = iree_mlir_ukernels_amdgpu_create();
     llvm::SmallVector<ModuleOp> result;
