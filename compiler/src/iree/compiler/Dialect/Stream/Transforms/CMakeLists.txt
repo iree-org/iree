@@ -25,7 +25,6 @@ iree_cc_library(
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"
     "ElideAsyncCopies.cpp"
-    "ElideAsyncTransfers.cpp"
     "ElideTimepoints.cpp"
     "EmplaceAllocations.cpp"
     "EmplaceTransients.cpp"
