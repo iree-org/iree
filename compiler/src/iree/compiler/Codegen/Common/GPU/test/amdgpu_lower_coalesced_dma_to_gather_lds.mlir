@@ -38,16 +38,26 @@ func.func @lower_coalesced_gather_dma_multiple(
     // Each lane reads 4 elements, so lane offset = lane_id * 4.
     // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
     // CHECK-DAG: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C4]]
-    // CHECK-DAG: %[[DST_COL:.+]] = arith.constant 0 : index
     //
-    // CHECK: %[[ROW0:.+]] = arith.constant 0 : index
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW0]], %[[LANE_OFFSET]]], %[[DST]][%[[ROW0]], %[[DST_COL]]] : vector<4xf32>
+    // Row 0: source[0, offset + lane_offset], dest[0, 0]
+    // CHECK-DAG: %[[ROW0:.+]] = arith.constant 0 : index
+    // CHECK: %[[SRC_COL0:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW0]], %[[SRC_COL0]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<4xf32>
+    //
+    // Row 1: source[1, offset + lane_offset], dest[1, 0]
     // CHECK: %[[ROW1:.+]] = arith.constant 1 : index
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW1]], %[[LANE_OFFSET]]], %[[DST]][%[[ROW1]], %[[DST_COL]]] : vector<4xf32>
+    // CHECK: %[[SRC_COL1:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW1]], %[[SRC_COL1]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<4xf32>
+    //
+    // Row 2: source[2, offset + lane_offset], dest[2, 0]
     // CHECK: %[[ROW2:.+]] = arith.constant 2 : index
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW2]], %[[LANE_OFFSET]]], %[[DST]][%[[ROW2]], %[[DST_COL]]] : vector<4xf32>
+    // CHECK: %[[SRC_COL2:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW2]], %[[SRC_COL2]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<4xf32>
+    //
+    // Row 3: source[3, offset + lane_offset], dest[3, 0]
     // CHECK: %[[ROW3:.+]] = arith.constant 3 : index
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW3]], %[[LANE_OFFSET]]], %[[DST]][%[[ROW3]], %[[DST_COL]]] : vector<4xf32>
+    // CHECK: %[[SRC_COL3:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW3]], %[[SRC_COL3]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<4xf32>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
       memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
@@ -92,12 +102,16 @@ func.func @lower_coalesced_copy_dma_basic(
     // Each lane reads 2 elements, so lane offset = lane_id * 2.
     // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
     // CHECK-DAG: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C2]]
-    // CHECK-DAG: %[[DST_COL:.+]] = arith.constant 0 : index
     //
-    // CHECK: %[[ROW0:.+]] = arith.constant 0 : index
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW0]], %[[LANE_OFFSET]]], %[[DST]][%[[ROW0]], %[[DST_COL]]] : vector<2xf16>
+    // Row 0: source[0, offset + lane_offset], dest[0, 0]
+    // CHECK-DAG: %[[ROW0:.+]] = arith.constant 0 : index
+    // CHECK: %[[SRC_COL0:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW0]], %[[SRC_COL0]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<2xf16>
+    //
+    // Row 1: source[1, offset + lane_offset], dest[1, 0]
     // CHECK: %[[ROW1:.+]] = arith.constant 1 : index
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW1]], %[[LANE_OFFSET]]], %[[DST]][%[[ROW1]], %[[DST_COL]]] : vector<2xf16>
+    // CHECK: %[[SRC_COL1:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW1]], %[[SRC_COL1]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<2xf16>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x64xf16, #amdgpu.address_space<fat_raw_buffer>>, memref<2x64xf16, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_0>]}

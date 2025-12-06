@@ -29,9 +29,9 @@ func.func @lower_coalesced_gather_dma_multiple(
   // CHECK: scf.forall (%[[THREAD_IDX:.+]]) in (32)
   scf.forall (%arg6) in (32) {
     // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
-    // CHECK-DAG: %[[OFFSET:.+]] = arith.muli %[[THREAD_IDX]], %[[C4]]
-    // CHECK-DAG: arith.constant 0 : index
-    // CHECK-COUNT-4: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %[[OFFSET]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<4xf32>
+    // CHECK-DAG: %[[LANE_OFFSET:.+]] = arith.muli %[[THREAD_IDX]], %[[C4]]
+    // The innermost source index is (tile_offset + lane_offset).
+    // CHECK-COUNT-4: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %{{.+}}], %[[DST]][%{{.+}}, %{{.+}}] : vector<4xf32>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
       memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
@@ -70,9 +70,9 @@ func.func @lower_coalesced_copy_dma_basic(
   // CHECK: scf.forall (%[[THREAD_IDX:.+]]) in (32)
   scf.forall (%arg6) in (32) {
     // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-    // CHECK-DAG: %[[OFFSET:.+]] = arith.muli %[[THREAD_IDX]], %[[C2]]
-    // CHECK-DAG: arith.constant 0 : index
-    // CHECK-COUNT-2: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %[[OFFSET]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<2xf16>
+    // CHECK-DAG: %[[LANE_OFFSET:.+]] = arith.muli %[[THREAD_IDX]], %[[C2]]
+    // The innermost source index is (tile_offset + lane_offset).
+    // CHECK-COUNT-2: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %{{.+}}], %[[DST]][%{{.+}}, %{{.+}}] : vector<2xf16>
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x64xf16, #amdgpu.address_space<fat_raw_buffer>>, memref<2x64xf16, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return

@@ -97,23 +97,8 @@ struct LowerCoalescedGatherDMAPattern final
 
     Value source = dmaOp.getSource();
     Value dest = dmaOp.getInit();
-    OperandRange indicesRange = dmaOp.getIndices();
 
     auto sourceType = cast<MemRefType>(source.getType());
-    auto destType = cast<MemRefType>(dest.getType());
-
-    if (!indicesRange.empty()) {
-      Value indices = indicesRange.front();
-      auto indicesType = cast<MemRefType>(indices.getType());
-      ArrayRef<int64_t> indicesShape = indicesType.getShape();
-      ArrayRef<int64_t> destShape = destType.getShape();
-
-      // Verify that indices dimensions match dest dimensions.
-      if (indicesShape != destShape) {
-        return rewriter.notifyMatchFailure(
-            dmaOp, "indices shape does not match dest shape");
-      }
-    }
 
     Type elementType = sourceType.getElementType();
     int64_t elementBits = sourceType.getElementTypeBitWidth();
@@ -144,53 +129,61 @@ struct LowerCoalescedGatherDMAPattern final
     }
     LDBG() << "Transfer size matches target DMA sizes";
 
-    // TODO: Handle indices properly - for now we skip the explicit indices
-    // check The lane parameter is always present but we handle it differently.
-
     ArrayRef<int64_t> sourceShape = sourceType.getShape();
     LDBG() << "Source rank: " << sourceShape.size();
 
-    // TODO: Support more general cases such as 1-d.
-    if (sourceShape.size() < 2) {
-      return rewriter.notifyMatchFailure(
-          dmaOp, "source must have at least 2 dimensions");
-    }
-
-    int64_t secondInnermostDimSize = sourceShape[sourceShape.size() - 2];
-    LDBG() << "  Source second innermost dimension size: "
-           << secondInnermostDimSize;
+    OperandRange indices = dmaOp.getIndices();
+    size_t numIndexDims = indices.size();
+    LDBG() << "Number of index dimensions: " << numIndexDims;
 
     int64_t elementsPerTransfer = innermostDimSize / *subgroupSize;
-
     auto transferType = VectorType::get({elementsPerTransfer}, elementType);
 
     // Actually create the GatherToLDS ops to perform the transfer.
     rewriter.setInsertionPoint(dmaOp);
 
     TypedValue<IndexType> laneId = dmaOp.getLane();
-
     Location loc = dmaOp.getLoc();
     Value laneOffset = arith::MulIOp::create(
         rewriter, loc, laneId,
         arith::ConstantIndexOp::create(rewriter, loc, elementsPerTransfer));
 
-    // Iterate over each row (second innermost dimension) and create a
-    // GatherToLDS op for each. Each op transfers one row from global memory
-    // to LDS, where each lane reads `elementsPerTransfer` contiguous elements.
-    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    // Build tile sizes: [1, 1, ..., 1, subgroupSize * elementsPerTransfer].
+    // This iterates over all dimensions, with each lane handling
+    // `elementsPerTransfer` contiguous elements in the innermost dimension.
+    // This approach uniformly handles 1D, 2D, and higher-dimensional cases,
+    // as well as both copy mode (no indices) and gather mode (with indices).
+    SmallVector<int64_t> tileSizes(sourceShape.size(), 1);
+    tileSizes.back() = *subgroupSize * elementsPerTransfer;
+
     for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange({secondInnermostDimSize}, {1})) {
-      // Current row index in the second innermost dimension.
-      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, offsets[0]);
+         StaticTileOffsetRange(sourceShape, tileSizes)) {
+      SmallVector<Value> srcIndices;
+      SmallVector<Value> dstIndices;
 
-      // Source indices: [..., row, lane_id * elementsPerTransfer]
-      SmallVector<Value> srcIndices(sourceType.getRank(), zero);
-      srcIndices[sourceType.getRank() - 2] = iVal;
-      srcIndices[sourceType.getRank() - 1] = laneOffset;
+      for (auto [dim, offset] : llvm::enumerate(offsets)) {
+        Value offsetVal = arith::ConstantIndexOp::create(rewriter, loc, offset);
 
-      // Destination indices: [..., row, 0]
-      SmallVector<Value> dstIndices(destType.getRank(), zero);
-      dstIndices[destType.getRank() - 2] = iVal;
+        // Build source index for this dimension.
+        Value srcIdx;
+        if (dim < numIndexDims) {
+          // This dimension has an index memref - load from it.
+          srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
+                                          ValueRange{offsetVal});
+        } else {
+          // No index memref for this dimension - use the offset directly.
+          srcIdx = offsetVal;
+        }
+
+        // For the innermost dimension, add lane offset to source index.
+        if (dim == sourceShape.size() - 1) {
+          srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, laneOffset);
+        }
+        srcIndices.push_back(srcIdx);
+
+        // Build destination index (always use the offset directly).
+        dstIndices.push_back(offsetVal);
+      }
 
       amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
                                     dstIndices, TypeAttr::get(transferType));
@@ -231,7 +224,8 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
 
-    // Verify all CoalescedGatherDMAOps were lowered.
+    // Verify all CoalescedGatherDMAOps were lowered. This is the current
+    // behavior until we have a fallback lowering path.
     WalkResult result = funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp op) {
       op.emitOpError("failed to lower coalesced_gather_dma op");
       return WalkResult::interrupt();
