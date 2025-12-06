@@ -142,3 +142,47 @@ module @extract_strided_metadata {
     return
   }
 }
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_bf16
+// CHECK-SAME:    %[[ARG0:.+]]: i16, %[[ARG1:.+]]: i16
+func.func @from_elements_bf16(%arg0 : bf16, %arg1 : bf16) -> vector<2xbf16> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi16>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xbf16>
+  // CHECK: return %[[VEC]] : vector<2xi16>
+  return %0 : vector<2xbf16>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_bf16_2d
+// CHECK-SAME:    %[[ARG0:.+]]: i16, %[[ARG1:.+]]: i16, %[[ARG2:.+]]: i16, %[[ARG3:.+]]: i16
+func.func @from_elements_bf16_2d(%arg0 : bf16, %arg1 : bf16, %arg2 : bf16, %arg3 : bf16) -> vector<2x2xbf16> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]] : vector<2x2xi16>
+  %0 = vector.from_elements %arg0, %arg1, %arg2, %arg3 : vector<2x2xbf16>
+  // CHECK: return %[[VEC]] : vector<2x2xi16>
+  return %0 : vector<2x2xbf16>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @to_elements_bf16
+// CHECK-SAME:    %[[ARG:.+]]: vector<2xi16>
+func.func @to_elements_bf16(%arg0 : vector<2xbf16>) -> (bf16, bf16) {
+  // CHECK: %[[E:.+]]:2 = vector.to_elements %[[ARG]] : vector<2xi16>
+  %0, %1 = vector.to_elements %arg0 : vector<2xbf16>
+  // CHECK: return %[[E]]#0, %[[E]]#1 : i16, i16
+  return %0, %1 : bf16, bf16
+}
+
+// -----
+
+// CHECK-LABEL: func.func @to_elements_bf16_2d
+// CHECK-SAME:    %[[ARG:.+]]: vector<2x2xi16>
+func.func @to_elements_bf16_2d(%arg0 : vector<2x2xbf16>) -> (bf16, bf16, bf16, bf16) {
+  // CHECK: %[[E:.+]]:4 = vector.to_elements %[[ARG]] : vector<2x2xi16>
+  %0, %1, %2, %3 = vector.to_elements %arg0 : vector<2x2xbf16>
+  // CHECK: return %[[E]]#0, %[[E]]#1, %[[E]]#2, %[[E]]#3 : i16, i16, i16, i16
+  return %0, %1, %2, %3 : bf16, bf16, bf16, bf16
+}
