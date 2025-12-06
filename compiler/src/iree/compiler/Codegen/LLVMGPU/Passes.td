@@ -121,6 +121,7 @@ def LLVMGPUTileAndDistributePass :
 def LLVMGPUVectorDistributePass :
     InterfacePass<"iree-llvmgpu-vector-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute vectorized functions.";
+  let dependentDialects = ["::mlir::nvgpu::NVGPUDialect"];
 }
 
 def LLVMGPUVectorLoweringPass :

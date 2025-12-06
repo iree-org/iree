@@ -67,8 +67,8 @@ func.func @matmul_i4_quant_weight() {
 }
 
 //     CHECK-LABEL: func.func @matmul_i4_quant_weight()
-//           CHECK:   %[[A_ALLOC:.+]] = memref.alloc() : memref<32x1x36xf32, #gpu.address_space<workgroup>>
-//           CHECK:   %[[B_ALLOC:.+]] = memref.alloc() : memref<1x32x132xf32, #gpu.address_space<workgroup>>
+//           CHECK:   %[[A_ALLOC:.+]] = memref.alloc() {{.*}}: memref<32x1x48xf32, #gpu.address_space<workgroup>>
+//           CHECK:   %[[B_ALLOC:.+]] = memref.alloc() {{.*}}: memref<1x32x144xf32, #gpu.address_space<workgroup>>
 //           CHECK:   %[[WEIGHT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //           CHECK:   %[[WEIGHT_ALIGNED:.+]] = memref.assume_alignment %[[WEIGHT_BINDING]]
 //           CHECK:   %[[SCALE_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)

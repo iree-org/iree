@@ -42,9 +42,9 @@ hal.executable @matmul_f32_128x256x64 {
 }
 
 // Default promotion requires 1024 x vector<4xf32>, however padding to avoid bank conflicts
-// produces an array of size 1056. Similarly 256 gets padded to 288 x vector<4xf32>.
-// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1056 x vector<4xf32>>)>, Workgroup>
-// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<288 x vector<4xf32>>)>, Workgroup>
+// produces an array of size 1152. Similarly 256 gets padded to 384 x vector<4xf32>.
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1152 x vector<4xf32>>)>, Workgroup>
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<384 x vector<4xf32>>)>, Workgroup>
 
 // CHECK-LABEL: spirv.func @matmul_f32_128x256x64
 
@@ -114,10 +114,10 @@ hal.executable @matmul_f16_128x256x64 {
 }
 
 // Ditto on the above.
-//    1024 x vector<4xf32> -> 1056 x vector<4xf32>
-//    256 x vector<4xf32> -> 320 x vector<4xf32>
-// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1056 x vector<4xf32>>)>, Workgroup>
-// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<320 x vector<4xf32>>)>, Workgroup>
+//    1024 x vector<4xf32> -> 1152 x vector<4xf32>
+//    256 x vector<4xf32> -> 512 x vector<4xf32>
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1152 x vector<4xf32>>)>, Workgroup>
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<512 x vector<4xf32>>)>, Workgroup>
 
 // CHECK-LABEL: spirv.func @matmul_f16_128x256x64
 
@@ -183,8 +183,8 @@ hal.executable @matmul_f16_32x1280x1280 {
   }
 }
 
-//   CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<2176 x f16>)>, Workgroup>
-//   CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<384 x f16>)>, Workgroup>
+//   CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<2560 x f16>)>, Workgroup>
+//   CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<512 x f16>)>, Workgroup>
 
 // CHECK-LABEL: spirv.func @matmul_f16_32x1280x1280
 

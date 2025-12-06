@@ -35,6 +35,23 @@ static bool hasCollapseShapeUser(memref::AllocOp allocOp) {
   return false;
 }
 
+/// Compute the padded inner dimension size for a shared memory allocation.
+static int64_t computePaddedInnerDimSize(int64_t innerDim, unsigned paddingBits,
+                                         unsigned bitWidth,
+                                         std::optional<uint64_t> alignment) {
+  int64_t paddingElements = paddingBits / bitWidth;
+  int64_t newSize = innerDim + paddingElements;
+
+  if (alignment) {
+    unsigned elemSize = bitWidth / 8;
+    int64_t alignmentElements = *alignment / elemSize;
+    if (alignmentElements > 0) {
+      newSize = llvm::alignTo(newSize, alignmentElements);
+    }
+  }
+  return newSize;
+}
+
 /// Pad out the inner dimension of the `memref.alloc` op in order reduce the
 /// chances to have bank conflicts when reading 2D shapes within shared memory.
 static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
@@ -54,18 +71,24 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   Type elType = allocOp.getType().getElementType();
   unsigned bitwidth =
       mlir::DataLayout::closest(allocOp).getTypeSizeInBits(elType);
-  // Pad with the specified amount. This should be >= bank size and <= widest
-  // load size.
-  int64_t paddingSize = paddingSizeBits / bitwidth;
   SmallVector<int64_t> shape = llvm::to_vector(allocOp.getType().getShape());
-  shape.back() = shape.back() + paddingSize;
+  int64_t newSize = computePaddedInnerDimSize(shape.back(), paddingSizeBits,
+                                              bitwidth, allocOp.getAlignment());
+  shape.back() = newSize;
   MemRefType allocType =
       MemRefType::get(shape, elType, MemRefLayoutAttrInterface{},
                       allocOp.getType().getMemorySpace());
   IRRewriter rewriter(context);
   rewriter.setInsertionPoint(allocOp);
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = memref::AllocOp::create(rewriter, loc, allocType);
+  // Preserve the alignment attribute on the new allocation.
+  IntegerAttr alignmentAttr;
+  if (std::optional<uint64_t> alignment = allocOp.getAlignment()) {
+    alignmentAttr = rewriter.getI64IntegerAttr(*alignment);
+  }
+  Value paddedAlloc =
+      memref::AllocOp::create(rewriter, loc, allocType,
+                              /*dynamicSizes=*/{}, alignmentAttr);
   SmallVector<int64_t> offsets(shape.size(), 0);
   SmallVector<int64_t> strides(shape.size(), 1);
   Value subview =
@@ -139,8 +162,11 @@ static unsigned computeEffectiveExtraBytes(mlir::FunctionOpInterface funcOp,
         bitWidth = IREE::Util::getTypeBitWidth(elemType);
       }
       unsigned elemSize = bitWidth / 8;
-      unsigned extraElements = paddingBits / bitWidth;
 
+      int64_t innerDim = shape.back();
+      int64_t newSize = computePaddedInnerDimSize(
+          innerDim, paddingBits, bitWidth, allocOp.getAlignment());
+      unsigned extraElements = newSize - innerDim;
       totalExtra += outerProduct * extraElements * elemSize;
     }
   });
