@@ -677,15 +677,8 @@ static VectorType getThreadVectorType(MLIRContext *context,
   if constexpr (std::is_same_v<MMAIntrinsicType, MMAIntrinsic>) {
     if (intrinsic == MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16 ||
         intrinsic == MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16) {
-      if (operandIndex == kMMAOperandLhs) {
-        return VectorType::get({4, 2}, elemType);
-      }
-      if (operandIndex == kMMAOperandRhs) {
-        return VectorType::get({2, 2}, elemType);
-      }
-      if (operandIndex == kMMAOperandAcc) {
-        return VectorType::get({2, 2}, elemType);
-      }
+      return VectorType::get(
+          {s.outer[0] * s.outer[1], s.element[0] * s.element[1]}, elemType);
     }
   }
   return VectorType::get(
