@@ -420,3 +420,65 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 ]]
 
 # TODO(#19465): add large matmul tests for rdna3 and rdna4.
+
+###########################################################################
+##
+## ROCM backend - Coalesced DMA tests
+##
+###########################################################################
+
+# Test matmul with coalesced DMA (direct load) enabled.
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cdna3_coalesced_dma_f32",
+    compiler_flags = [
+        "--iree-hip-target=gfx942",
+        "--iree-llvmgpu-use-direct-load",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--acc_type=f32",
+        "--shapes=custom_mnk",
+        "--mnk=32,32,64",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-cdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "hip"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
+# Second coalesced DMA test with larger N dimension (32x64 @ 64x64).
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cdna3_coalesced_dma_f32_larger",
+    compiler_flags = [
+        "--iree-hip-target=gfx942",
+        "--iree-llvmgpu-use-direct-load",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--acc_type=f32",
+        "--shapes=custom_mnk",
+        "--mnk=32,64,64",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-cdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "hip"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)

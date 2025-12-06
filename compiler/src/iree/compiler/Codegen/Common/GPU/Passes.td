@@ -84,11 +84,21 @@ def GPUConvertToCoalescedDMAPass :
   let summary = "Convert operations to coalesced DMA operations.";
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-    "::mlir::arith::ArithDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
-    "::mlir::tensor::TensorDialect",
-    "::mlir::vector::VectorDialect"
+    "::mlir::tensor::TensorDialect"
+  ];
+}
+
+def AMDGPULowerCoalescedDMAToGatherLDSPass :
+    InterfacePass<"iree-codegen-amdgpu-lower-coalesced-dma-to-gather-lds", "mlir::FunctionOpInterface"> {
+  let summary = "Lower coalesced DMA operations to amdgpu.gather_to_lds.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::amdgpu::AMDGPUDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 

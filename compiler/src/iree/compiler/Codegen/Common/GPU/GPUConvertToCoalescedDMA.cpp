@@ -518,6 +518,13 @@ private:
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
+    // Skip coalesced DMA if the innermost dimension is smaller than subgroup
+    // size. Coalesced DMA requires at least one element per lane.
+    int64_t innermostDim = shape[rank - 1];
+    if (ShapedType::isStatic(innermostDim) && innermostDim < *subgroupSize) {
+      return failure();
+    }
+
     // Compute tile sizes: divide the shape by number of warps.
     // This distributes the work across warps in each dimension.
     SmallVector<OpFoldResult> tileSizes;
@@ -527,10 +534,25 @@ private:
       // For 2D: dim 0 (rows) -> wgSize[1], dim 1 (cols) -> wgSize[0].
       int64_t warpDim =
           (rank - 1 - i) < numWarps.size() ? numWarps[rank - 1 - i] : 1;
-      if (warpDim > 1 && shape[i] != ShapedType::kDynamic) {
-        int64_t tileSize = (shape[i] + warpDim - 1) / warpDim;
+
+      bool isInnermostDim = (i == rank - 1);
+
+      // For innermost dimension: always tile if we need thread-level
+      // distribution, ensuring tile size is at least subgroup_size (but not
+      // exceeding the dimension size).
+      if (isInnermostDim && ShapedType::isStatic(shape[i])) {
+        int64_t tileSize =
+            (warpDim > 1) ? llvm::divideCeil(shape[i], warpDim) : shape[i];
+        // Ensure tile size is at least subgroup_size, but cap at dimension
+        // size.
+        tileSize = std::clamp(tileSize, *subgroupSize, shape[i]);
         tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-        numTiledDims++;
+        ++numTiledDims;
+      } else if (warpDim > 1 && ShapedType::isStatic(shape[i])) {
+        // For other dimensions: only tile if warpDim > 1.
+        int64_t tileSize = llvm::divideCeil(shape[i], warpDim);
+        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+        ++numTiledDims;
       } else {
         tileSizes.push_back(rewriter.getIndexAttr(0));
       }

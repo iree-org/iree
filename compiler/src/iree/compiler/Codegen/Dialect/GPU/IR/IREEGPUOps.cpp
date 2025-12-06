@@ -253,7 +253,9 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   // For gather operations with indices, all index vectors should have the same
-  // length equal to the batch size (first dimension of destination).
+  // length equal to the batch size (first dimension of destination). This is
+  // validated here so that lowering passes can rely on these constraints
+  // without duplicating the checks.
   if (!indices.empty()) {
     // Verify all index vectors are 1D and have the same length.
     auto firstIndexShape = cast<ShapedType>(indices[0].getType()).getShape();
