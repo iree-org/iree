@@ -651,32 +651,32 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled(%lhs: tensor<1x1x2x4x16x4x
  affine_map<(i, j, k) -> (k, j)>,
  affine_map<(i, j, k) -> (i, j)>
 ]
-func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_and_k(%lhs: tensor<1x1x4x2x16x4xf32>, %rhs: tensor<1x1x2x4x16x4xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
+func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_and_k(%lhs: tensor<1x1x4x16x2x4xf32>, %rhs: tensor<1x1x2x4x16x4xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
       attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_m = [0, 1], operands_interleaving_intrinsics_k = [0, 1]>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-  } : tensor<1x1x4x2x16x4xf32>, tensor<1x1x2x4x16x4xf32> into tensor<1x1x2x2x4x16x4xf32>
+  } : tensor<1x1x4x16x2x4xf32>, tensor<1x1x2x4x16x4xf32> into tensor<1x1x2x2x4x16x4xf32>
   return %0 : tensor<1x1x2x2x4x16x4xf32>
 }
 
-// CHECK-LABEL: func @data_tiled_2x2x4_tensor_multi_mma_interleave_m
+// CHECK-LABEL: func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_and_k
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
 //       CHECK:   scf.forall (%[[THREAD_ID:.+]]) in (64) shared_outs(%[[ACC_ARG:.+]] = %[[ACC]]) -> (tensor<1x1x2x2x4x16x4xf32>)
 //   CHECK-DAG:     %[[IN_IDS:.+]]:3 = affine.delinearize_index %[[THREAD_ID]] into (4, 16)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
-//  CHECK-SAME:       [0, 0, %[[IN_IDS]]#1, 0, %[[IN_IDS]]#2, 0] [1, 1, 1, 2, 1, 4] [1, 1, 1, 1, 1, 1]
+//  CHECK-SAME:       [0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0, 0] [1, 1, 1, 1, 2, 4] [1, 1, 1, 1, 1, 1]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
 //  CHECK-SAME:       [0, 0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0] [1, 1, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1]
 //   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, 0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0] [1, 1, 2, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
 //  CHECK-SAME:       kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_F32_16x16x4_F32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_m = [0, 1], operands_interleaving_intrinsics_k = [0, 1]>
-//  CHECK-SAME:       : tensor<1x1x1x2x1x4xf32>, tensor<1x1x2x1x1x4xf32> into tensor<1x1x2x2x1x1x4xf32>
+//  CHECK-SAME:       : tensor<1x1x1x1x2x4xf32>, tensor<1x1x2x1x1x4xf32> into tensor<1x1x2x2x1x1x4xf32>
 //       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, 0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0] [1, 1, 2, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
@@ -688,32 +688,32 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_and_k(%lhs: tensor<1x1
  affine_map<(i, j, k) -> (k, j)>,
  affine_map<(i, j, k) -> (i, j)>
 ]
-func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_only(%lhs: tensor<1x1x4x2x4x16xf32>, %rhs: tensor<1x1x2x4x4x16xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
+func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_only(%lhs: tensor<1x1x4x4x16x2xf32>, %rhs: tensor<1x1x2x4x4x16xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
       attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_m = [0, 1]>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-  } : tensor<1x1x4x2x4x16xf32>, tensor<1x1x2x4x4x16xf32> into tensor<1x1x2x2x4x16x4xf32>
+  } : tensor<1x1x4x4x16x2xf32>, tensor<1x1x2x4x4x16xf32> into tensor<1x1x2x2x4x16x4xf32>
   return %0 : tensor<1x1x2x2x4x16x4xf32>
 }
 
-// CHECK-LABEL: func @data_tiled_2x2x4_tensor_multi_mma_interleave_m
+// CHECK-LABEL: func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_only
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
 //       CHECK:   scf.forall (%[[THREAD_ID:.+]]) in (64) shared_outs(%[[ACC_ARG:.+]] = %[[ACC]]) -> (tensor<1x1x2x2x4x16x4xf32>)
 //   CHECK-DAG:     %[[IN_IDS:.+]]:3 = affine.delinearize_index %[[THREAD_ID]] into (4, 16)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
-//  CHECK-SAME:       [0, 0, 0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2] [1, 1, 4, 2, 1, 1] [1, 1, 1, 1, 1, 1]
+//  CHECK-SAME:       [0, 0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0] [1, 1, 4, 1, 1, 2] [1, 1, 1, 1, 1, 1]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
 //  CHECK-SAME:       [0, 0, 0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2] [1, 1, 2, 4, 1, 1] [1, 1, 1, 1, 1, 1]
 //   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, 0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0] [1, 1, 2, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
 //  CHECK-SAME:       kind = #iree_gpu.data_tiled_mma_layout<intrinsic =  MFMA_F32_16x16x4_F32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_m = [0, 1]>
-//  CHECK-SAME:       : tensor<1x1x4x2x1x1xf32>, tensor<1x1x2x4x1x1xf32> into tensor<1x1x2x2x1x1x4xf32>
+//  CHECK-SAME:       : tensor<1x1x4x1x1x2xf32>, tensor<1x1x2x4x1x1xf32> into tensor<1x1x2x2x1x1x4xf32>
 //       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, 0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, 0] [1, 1, 2, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
@@ -855,6 +855,54 @@ func.func @data_tiled_scaled_2x2x4_tensor_multi_mma_unrolled(
 //       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]], %[[LHS_SCALE_SLICE]], %[[RHS_SCALE_SLICE]]) outs(%[[ACC_SLICE]])
 //  CHECK-SAME:       kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
 //  CHECK-SAME:       : tensor<1x1x1x2x4x1x1x32xf4E2M1FN>, tensor<1x1x1x2x4x1x1x32xf4E2M1FN>, tensor<1x1x2x1x1x4xf8E8M0FNU>, tensor<1x1x2x1x1x4xf8E8M0FNU> into tensor<1x1x2x2x1x1x4xf32>
+//       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC_ARG]]
+//  CHECK-SAME:       [0, 0, 0, 0, %[[IDS]]#1, %[[IDS]]#2, 0] [1, 1, 2, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
+//       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
+
+// -----
+
+#scaled_contraction_accesses = [
+  affine_map<(m, n, k, kb) -> (m, k, kb)>,
+  affine_map<(m, n, k, kb) -> (n, k, kb)>,
+  affine_map<(m, n, k, kb) -> (m, k)>,
+  affine_map<(m, n, k, kb) -> (n, k)>,
+  affine_map<(m, n, k, kb) -> (m, n)>
+]
+func.func @data_tiled_scaled_2x2x4_tensor_interleave_m_n_and_k(
+    %lhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>,
+    %lhs_scales: tensor<1x1x4x16x2x4xf8E8M0FNU>, %rhs_scales: tensor<1x1x4x16x2x4xf8E8M0FNU>,
+    %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
+    attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
+    indexing_maps = #scaled_contraction_accesses,
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
+    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3]>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
+  } : tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x4x16x2x4xf8E8M0FNU>, tensor<1x1x4x16x2x4xf8E8M0FNU> into tensor<1x1x2x2x4x16x4xf32>
+  return %0 : tensor<1x1x2x2x4x16x4xf32>
+}
+
+// CHECK-LABEL: func @data_tiled_scaled_2x2x4_tensor_interleave_m_n_and_k
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9_]+]]
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9_]+]]
+//  CHECK-SAME:   %[[LHS_SCALES:[A-Za-z0-9_]+]]
+//  CHECK-SAME:   %[[RHS_SCALES:[A-Za-z0-9_]+]]
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9_]+]]
+//       CHECK:   scf.forall (%[[THREAD_ID:[A-Za-z0-9_]+]]) in (256) shared_outs(%[[ACC_ARG:[A-Za-z0-9_]+]] = %[[ACC]]) -> (tensor<1x1x2x2x4x16x4xf32>)
+//   CHECK-DAG:     %[[IDS:.+]]:3 = affine.delinearize_index %[[THREAD_ID]] into (4, 16)
+//   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
+//  CHECK-SAME:       [0, 0, 0, 0, 0, %[[IDS]]#1, %[[IDS]]#2, 0] [1, 1, 1, 2, 4, 1, 1, 32] [1, 1, 1, 1, 1, 1, 1, 1]
+//   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
+//  CHECK-SAME:       [0, 0, 0, 0, 0, %[[IDS]]#1, %[[IDS]]#2, 0] [1, 1, 1, 2, 4, 1, 1, 32] [1, 1, 1, 1, 1, 1, 1, 1]
+//   CHECK-DAG:     %[[LHS_SCALE_SLICE:.+]] = tensor.extract_slice %[[LHS_SCALES]]
+//  CHECK-SAME:       [0, 0, %[[IDS]]#1, %[[IDS]]#2, 0, 0] [1, 1, 1, 1, 2, 4] [1, 1, 1, 1, 1, 1]
+//   CHECK-DAG:     %[[RHS_SCALE_SLICE:.+]] = tensor.extract_slice %[[RHS_SCALES]]
+//  CHECK-SAME:       [0, 0, %[[IDS]]#1, %[[IDS]]#2, 0, 0] [1, 1, 1, 1, 2, 4] [1, 1, 1, 1, 1, 1]
+//   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC_ARG]]
+//  CHECK-SAME:       [0, 0, 0, 0, %[[IDS]]#1, %[[IDS]]#2, 0] [1, 1, 2, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
+//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]], %[[LHS_SCALE_SLICE]], %[[RHS_SCALE_SLICE]]) outs(%[[ACC_SLICE]])
+//  CHECK-SAME:       kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4,  operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3]>
+//  CHECK-SAME:       : tensor<1x1x1x2x4x1x1x32xf4E2M1FN>, tensor<1x1x1x2x4x1x1x32xf4E2M1FN>, tensor<1x1x1x1x2x4xf8E8M0FNU>, tensor<1x1x1x1x2x4xf8E8M0FNU> into tensor<1x1x2x2x1x1x4xf32>
 //       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC_ARG]]
 //  CHECK-SAME:       [0, 0, 0, 0, %[[IDS]]#1, %[[IDS]]#2, 0] [1, 1, 2, 2, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:   mapping = [#gpu.thread<linear_dim_0>]
