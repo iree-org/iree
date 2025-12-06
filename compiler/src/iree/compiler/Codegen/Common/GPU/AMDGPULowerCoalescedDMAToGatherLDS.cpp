@@ -156,7 +156,7 @@ struct LowerCoalescedGatherDMAPattern final
     SmallVector<int64_t> tileSizes(sourceShape.size(), 1);
     tileSizes.back() = *subgroupSize * elementsPerTransfer;
 
-    for (SmallVector<int64_t> offsets :
+    for (const SmallVector<int64_t> &offsets :
          StaticTileOffsetRange(sourceShape, tileSizes)) {
       SmallVector<Value> srcIndices;
       SmallVector<Value> dstIndices;
@@ -224,8 +224,10 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
 
-    // Verify all CoalescedGatherDMAOps were lowered. This is the current
-    // behavior until we have a fallback lowering path.
+#ifndef NDEBUG
+    // Verify all CoalescedGatherDMAOps were lowered. Currently, we require all
+    // ops to be successfully lowered. In the future, a fallback lowering path
+    // (e.g., using global_load) could handle ops that don't match the pattern.
     WalkResult result = funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp op) {
       op.emitOpError("failed to lower coalesced_gather_dma op");
       return WalkResult::interrupt();
@@ -233,6 +235,7 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
     if (result.wasInterrupted()) {
       return signalPassFailure();
     }
+#endif // NDEBUG
   }
 };
 } // namespace

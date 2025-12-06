@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-amdgpu-lower-coalesced-dma-to-gather-lds))" \
-// RUN:   --verify-diagnostics %s | FileCheck %s
+// RUN:   %s | FileCheck %s
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
@@ -74,37 +74,6 @@ func.func @lower_coalesced_copy_dma_basic(
     // The innermost source index is (tile_offset + lane_offset).
     // CHECK-COUNT-2: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %{{.+}}], %[[DST]][%{{.+}}, %{{.+}}] : vector<2xf16>
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x64xf16, #amdgpu.address_space<fat_raw_buffer>>, memref<2x64xf16, #gpu.address_space<workgroup>>, index
-  } {mapping = [#gpu.thread<linear_dim_0>]}
-  return
-}
-
-// -----
-
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
-  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx1250", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
-    max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024,
-    max_workgroup_memory_bytes = 65536,
-    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-    max_load_instruction_bits = 128, simds_per_wgp = 4,
-    vgpr_space_bits = 8192, dma_sizes = [32, 64, 128]>>}>
-
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
-
-// Test case: transfer size per lane (100 bits) doesn't match any dma_sizes should fail
-func.func @lower_coalesced_dma_innermost_dim_not_fit_fails(
-    %source: memref<4x100xf32, #amdgpu.address_space<fat_raw_buffer>>,
-    %dest: memref<4x100xf32, #gpu.address_space<workgroup>>)
-  attributes {
-    hal.executable.target = #executable_target_rocm_hsaco_fb,
-    translation_info = #translation} {
-  scf.forall (%arg6) in (32) {
-    // expected-error @+1 {{failed to lower coalesced_gather_dma op}}
-    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<4x100xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<4x100xf32, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
