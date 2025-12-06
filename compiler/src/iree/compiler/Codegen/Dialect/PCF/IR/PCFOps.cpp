@@ -25,7 +25,6 @@ LogicalResult AllocOp::verify() {
         "dimension operand count does not equal sref dynamic dimension count");
   }
 
-  // TODO: Restrict legal parents for this op.
   return success();
 }
 
@@ -128,32 +127,39 @@ static ParseResult parseParallelExecutionBody(
   SmallVector<OpAsmParser::Argument> regionLeadingArgs;
   if (parseOptionalLeadingArgs) {
     if (succeeded(parser.parseOptionalArrow())) {
+      SMLoc leadingArgsLoc = parser.getCurrentLocation();
       if (failed(parser.parseArgumentList(regionLeadingArgs,
                                           OpAsmParser::Delimiter::Paren,
                                           /*allowType=*/true))) {
-        return failure();
+        return parser.emitError(leadingArgsLoc,
+                                "failed to parse leading arguments");
       }
     }
     numLeadingArgs = regionLeadingArgs.size();
   }
-  if (failed(parser.parseKeyword("execute")))
+
+  if (failed(parser.parseKeyword("execute"))) {
     return failure();
+  }
+
   SmallVector<OpAsmParser::Argument> regionRefArgs;
   if (succeeded(parser.parseOptionalLParen())) {
     do {
       // Reserve entries in the lists.
       regionRefArgs.emplace_back();
+      SMLoc argLoc = parser.getCurrentLocation();
       if (failed(parser.parseArgument(regionRefArgs.back(),
                                       /*allowType=*/false,
                                       /*allowAttrs=*/true))) {
-        return failure();
+        return parser.emitError(argLoc, "failed to parse region ref argument");
       }
 
       // Parse the tied init if present.
       if (succeeded(parser.parseOptionalEqual())) {
         inits.emplace_back();
+        SMLoc initLoc = parser.getCurrentLocation();
         if (failed(parser.parseOperand(inits.back()))) {
-          return failure();
+          return parser.emitError(initLoc, "failed to parse tied init operand");
         }
         isTied.push_back(true);
       } else {
@@ -165,11 +171,13 @@ static ParseResult parseParallelExecutionBody(
     }
   }
 
+  SMLoc indexArgsLoc = parser.getCurrentLocation();
   SmallVector<OpAsmParser::Argument> indexArgs;
   if (failed(parser.parseArgumentList(
           indexArgs, /*delimiter=*/OpAsmParser::Delimiter::Square,
           /*allowType=*/true, /*allowAttrs=*/true))) {
-    return failure();
+    return parser.emitError(indexArgsLoc,
+                            "failed to parse index arguments list");
   }
 
   // If there is at least one region arg the arg types and op result types need
@@ -181,6 +189,7 @@ static ParseResult parseParallelExecutionBody(
 
     // Parse "(<type list>)" directly into the type fields of `regionRefArgs`.
     auto it = regionRefArgs.begin();
+    SMLoc refTypesLoc = parser.getCurrentLocation();
     if (failed(parser.parseCommaSeparatedList(
             OpAsmParser::Delimiter::Paren, [&]() -> ParseResult {
               if (it == regionRefArgs.end()) {
@@ -190,7 +199,8 @@ static ParseResult parseParallelExecutionBody(
               ++it;
               return p;
             }))) {
-      return failure();
+      return parser.emitError(refTypesLoc,
+                              "failed to parse region ref argument types");
     }
 
     if (failed(parser.parseArrow()) || failed(parser.parseLParen())) {
@@ -200,18 +210,23 @@ static ParseResult parseParallelExecutionBody(
     int64_t numResults = isTied.size();
     resultTypes.resize(numResults);
     for (auto [i, isTied] : llvm::enumerate(isTied)) {
+      SMLoc resultTypeLoc = parser.getCurrentLocation();
       if (failed(parser.parseType(resultTypes[i]))) {
-        return failure();
+        return parser.emitError(resultTypeLoc, "failed to parse result type");
       }
 
-      auto shapedType = dyn_cast<ShapedType>(resultTypes[i]);
+      ShapedType shapedType = dyn_cast<ShapedType>(resultTypes[i]);
       if (!shapedType) {
-        return failure();
+        return parser.emitError(resultTypeLoc,
+                                "result type must be a shaped type");
       }
 
       if (isTied) {
         initTypes.push_back(resultTypes[i]);
-      } else if (succeeded(parser.parseOptionalLBrace())) {
+      } else if (!shapedType.hasStaticShape()) {
+        if (failed(parser.parseLBrace())) {
+          return failure();
+        }
         // Only parse dynamic dims for non-tied operands.
         SmallVector<OpAsmParser::UnresolvedOperand> dims;
         if (failed(parser.parseOperandList(dims))) {
@@ -219,7 +234,9 @@ static ParseResult parseParallelExecutionBody(
         }
         size_t numDynamicDims = shapedType.getNumDynamicDims();
         if (dims.size() != numDynamicDims) {
-          return failure();
+          return parser.emitError(resultTypeLoc, "expected ")
+                 << numDynamicDims << " dynamic dimension operands for type "
+                 << shapedType << ", but got " << dims.size();
         }
         if (failed(parser.parseRBrace())) {
           return failure();
@@ -869,35 +886,16 @@ void GetMemrefOp::build(OpBuilder &b, OperationState &result, Type resultType,
 
 LogicalResult WriteSliceOp::fold(FoldAdaptor adaptor,
                                  SmallVectorImpl<OpFoldResult> &results) {
-  bool changed = false;
-  OpBuilder builder(getContext());
-
   SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
   SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
 
-  // Try to fold dynamic offsets to static.
-  for (OpFoldResult &offset : mixedOffsets) {
-    if (Value value = dyn_cast<Value>(offset)) {
-      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
-        offset = builder.getI64IntegerAttr(*constantValue);
-        changed = true;
-      }
-    }
-  }
-
-  // Try to fold dynamic strides to static.
-  for (OpFoldResult &stride : mixedStrides) {
-    if (Value value = dyn_cast<Value>(stride)) {
-      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
-        stride = builder.getI64IntegerAttr(*constantValue);
-        changed = true;
-      }
-    }
-  }
-
-  if (!changed) {
+  // Try to fold dynamic offsets/strides to static.
+  if (failed(foldDynamicIndexList(mixedOffsets, /*onlyNonNegative=*/true)) &&
+      failed(foldDynamicIndexList(mixedStrides))) {
     return failure();
   }
+
+  OpBuilder builder(getContext());
 
   // Dispatch back to static/dynamic.
   SmallVector<int64_t> staticOffsets, staticStrides;
@@ -915,35 +913,16 @@ LogicalResult WriteSliceOp::fold(FoldAdaptor adaptor,
 }
 
 OpFoldResult ReadSliceOp::fold(FoldAdaptor adaptor) {
-  bool changed = false;
-  OpBuilder builder(getContext());
-
   SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
   SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
 
-  // Try to fold dynamic offsets to static.
-  for (OpFoldResult &offset : mixedOffsets) {
-    if (Value value = dyn_cast<Value>(offset)) {
-      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
-        offset = builder.getI64IntegerAttr(*constantValue);
-        changed = true;
-      }
-    }
-  }
-
-  // Try to fold dynamic strides to static.
-  for (OpFoldResult &stride : mixedStrides) {
-    if (Value value = dyn_cast<Value>(stride)) {
-      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
-        stride = builder.getI64IntegerAttr(*constantValue);
-        changed = true;
-      }
-    }
-  }
-
-  if (!changed) {
+  // Try to fold dynamic offsets/strides to static.
+  if (failed(foldDynamicIndexList(mixedOffsets, /*onlyNonNegative=*/true)) &&
+      failed(foldDynamicIndexList(mixedStrides))) {
     return {};
   }
+
+  OpBuilder builder(getContext());
 
   // Dispatch back to static/dynamic.
   SmallVector<int64_t> staticOffsets, staticStrides;
@@ -961,35 +940,16 @@ OpFoldResult ReadSliceOp::fold(FoldAdaptor adaptor) {
 }
 
 OpFoldResult GetMemrefOp::fold(FoldAdaptor adaptor) {
-  bool changed = false;
-  OpBuilder builder(getContext());
-
   SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
   SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
 
-  // Try to fold dynamic offsets to static.
-  for (OpFoldResult &offset : mixedOffsets) {
-    if (Value value = dyn_cast<Value>(offset)) {
-      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
-        offset = builder.getI64IntegerAttr(*constantValue);
-        changed = true;
-      }
-    }
-  }
-
-  // Try to fold dynamic strides to static.
-  for (OpFoldResult &stride : mixedStrides) {
-    if (Value value = dyn_cast<Value>(stride)) {
-      if (std::optional<int64_t> constantValue = getConstantIntValue(value)) {
-        stride = builder.getI64IntegerAttr(*constantValue);
-        changed = true;
-      }
-    }
-  }
-
-  if (!changed) {
+  // Try to fold dynamic offsets/strides to static.
+  if (failed(foldDynamicIndexList(mixedOffsets, /*onlyNonNegative=*/true)) &&
+      failed(foldDynamicIndexList(mixedStrides))) {
     return {};
   }
+
+  OpBuilder builder(getContext());
 
   // Dispatch back to static/dynamic.
   SmallVector<int64_t> staticOffsets, staticStrides;
