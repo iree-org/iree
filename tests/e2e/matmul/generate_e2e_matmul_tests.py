@@ -17,8 +17,9 @@ from tests.e2e.matmul.generate_code import *
 
 
 # Returns the list of TestShape's to use for the collection of shapes
-# identified by shapes_id.
-def get_test_shapes(shapes_id: ShapesId):
+# identified by shapes_id. Also for custom tests, optionally removes tests with
+# an existing accumulator when accumulate is false.
+def get_test_shapes(shapes_id: ShapesId, accumulate=True):
     # Notes:
     # 1. Be conservative in adding more shapes, as that can increase both the
     #    build and execution latency of tests. The build latency is nearly the
@@ -92,10 +93,12 @@ def get_test_shapes(shapes_id: ShapesId):
         if ShapesId.custom_mnk_values is None:
             raise ValueError("Custom MNK values not set. Use --mnk=m,n,k")
         m, n, k = ShapesId.custom_mnk_values
-        return [
-            TestShape(m=m, k=k, n=n, accumulate=True),
-            TestShape(m=m, k=k, n=n, accumulate=False),
-        ]
+        test_shapes = [TestShape(m=m, k=k, n=n, accumulate=False)]
+        if accumulate:
+            test_shapes += [
+                TestShape(m=m, k=k, n=n, accumulate=True),
+            ]
+        return test_shapes
 
     raise ValueError(shapes_id)
 
@@ -109,6 +112,7 @@ def generate(
     shapes_id: ShapesId,
     transpose_rhs: bool,
     compilation_info_id: CompilationInfoId,
+    accumulate: bool,
 ):
     functions = {}
     calls = []
@@ -116,7 +120,7 @@ def generate(
     for compilation_info in get_test_compilation_infos(
         compilation_info_id, lhs_rhs_type
     ):
-        for shape in get_test_shapes(shapes_id):
+        for shape in get_test_shapes(shapes_id, accumulate):
             for dynamicities in get_dynamicities(shapes_id):
                 function = generate_function(
                     lhs_rhs_type=lhs_rhs_type,
@@ -251,6 +255,12 @@ def parse_arguments():
         help="Custom dynamicity mask for m,n,k. Format: dynamic|static,dynamic|static,dynamic|static (e.g., --mnk_dynamicities=dynamic,static,static)",
         required=False,
     )
+    parser.add_argument(
+        "--accumulate",
+        action=argparse.BooleanOptionalAction,
+        help="Remove/add custom shape tests with existing accumulators, useful to set for extremely large shapes that may cause memory issues",
+        required=False,
+    )
     return parser.parse_args()
 
 
@@ -311,6 +321,7 @@ def main(args):
         shapes_id=shapes_id,
         transpose_rhs=args.transpose_rhs,
         compilation_info_id=CompilationInfoId(args.compilation_info),
+        accumulate=args.accumulate,
     )
 
     write_code_file(functions, args.output_matmul_mlir)
