@@ -95,11 +95,9 @@ def get_test_shapes(shapes_id: ShapesId, accumulate=True):
         m, n, k = ShapesId.custom_mnk_values
         test_shapes = [TestShape(m=m, k=k, n=n, accumulate=False)]
         if accumulate:
-            test_shapes.extend(
-                [
-                    TestShape(m=m, k=k, n=n, accumulate=True),
-                ]
-            )
+            test_shapes += [
+                TestShape(m=m, k=k, n=n, accumulate=True),
+            ]
         return test_shapes
 
     raise ValueError(shapes_id)
