@@ -79,9 +79,25 @@ IREE_API_EXPORT iree_status_t iree_vm_instance_create(
   return status;
 }
 
+// Forward declaration for cleanup.
+static inline bool iree_vm_type_is_placeholder(
+    const iree_vm_ref_type_descriptor_t* descriptor);
+
 static void iree_vm_instance_destroy(iree_vm_instance_t* instance) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(instance);
+
+  // Free any placeholder type descriptors we allocated.
+  // Placeholder types have NULL destroy functions.
+  for (iree_host_size_t i = 0; i < instance->type_count; ++i) {
+    const iree_vm_ref_type_descriptor_t* descriptor =
+        instance->types[i].descriptor;
+    if (iree_vm_type_is_placeholder(descriptor)) {
+      // Cast away const - we own these descriptors.
+      iree_allocator_free_aligned(instance->allocator, (void*)descriptor);
+    }
+  }
+
   iree_slim_mutex_deinitialize(&instance->type_mutex);
   iree_allocator_free(instance->allocator, instance);
   IREE_TRACE_ZONE_END(z0);
@@ -191,6 +207,13 @@ IREE_API_EXPORT void iree_vm_instance_unregister_type(
   iree_slim_mutex_unlock(&instance->type_mutex);
 }
 
+// Returns true if the given type is a placeholder type (for tooling only).
+// Placeholder types have NULL destroy functions - never legal on real types.
+static inline bool iree_vm_type_is_placeholder(
+    const iree_vm_ref_type_descriptor_t* descriptor) {
+  return descriptor && descriptor->destroy == NULL;
+}
+
 // NOTE: this does a linear scan over the type descriptors even though they are
 // likely in a random order. Type lookup should be done once and reused so this
 // shouldn't really matter.
@@ -200,9 +223,67 @@ IREE_API_EXPORT iree_vm_ref_type_t iree_vm_instance_lookup_type(
   iree_slim_mutex_lock(&instance->type_mutex);
   for (iree_host_size_t i = 0; i < instance->type_count; ++i) {
     const iree_vm_registered_type_t* type = &instance->types[i];
+    // Skip placeholder types - they are not visible to normal lookup.
+    if (iree_vm_type_is_placeholder(type->descriptor)) continue;
     if (iree_string_view_equal(type->descriptor->type_name, full_name)) {
       descriptor = type->descriptor;
       break;
+    }
+  }
+  iree_slim_mutex_unlock(&instance->type_mutex);
+  if (!descriptor) return 0;
+  return (iree_vm_ref_type_t)descriptor |
+         (iree_vm_ref_type_t)descriptor->offsetof_counter;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_instance_register_type_placeholder(
+    iree_vm_instance_t* instance, iree_string_view_t type_name) {
+  IREE_ASSERT_ARGUMENT(instance);
+
+  // Allocate descriptor aligned to required boundary.
+  // Type descriptors must be aligned so low bits can be used for tagging.
+  iree_vm_ref_type_descriptor_t* descriptor = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc_aligned(
+      instance->allocator, sizeof(*descriptor),
+      (1 << IREE_VM_REF_TYPE_TAG_BITS), /*offset=*/0, (void**)&descriptor));
+
+  // Initialize as placeholder: NULL destroy marks it as a placeholder.
+  descriptor->destroy = NULL;
+  descriptor->type_name = type_name;
+  descriptor->offsetof_counter = 0;
+
+  // Register using the normal mechanism.
+  iree_vm_ref_type_t registration = 0;
+  iree_status_t status =
+      iree_vm_instance_register_type(instance, descriptor, &registration);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free_aligned(instance->allocator, descriptor);
+  }
+  return status;
+}
+
+IREE_API_EXPORT iree_vm_ref_type_t iree_vm_instance_lookup_type_placeholder(
+    iree_vm_instance_t* instance, iree_string_view_t full_name) {
+  const iree_vm_ref_type_descriptor_t* descriptor = NULL;
+  iree_slim_mutex_lock(&instance->type_mutex);
+  // First pass: look for real types (prefer real over placeholder).
+  for (iree_host_size_t i = 0; i < instance->type_count; ++i) {
+    const iree_vm_registered_type_t* type = &instance->types[i];
+    if (!iree_vm_type_is_placeholder(type->descriptor) &&
+        iree_string_view_equal(type->descriptor->type_name, full_name)) {
+      descriptor = type->descriptor;
+      break;
+    }
+  }
+  // Second pass: look for placeholder types if no real type found.
+  if (!descriptor) {
+    for (iree_host_size_t i = 0; i < instance->type_count; ++i) {
+      const iree_vm_registered_type_t* type = &instance->types[i];
+      if (iree_vm_type_is_placeholder(type->descriptor) &&
+          iree_string_view_equal(type->descriptor->type_name, full_name)) {
+        descriptor = type->descriptor;
+        break;
+      }
     }
   }
   iree_slim_mutex_unlock(&instance->type_mutex);

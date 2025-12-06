@@ -135,6 +135,7 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/base/internal/flatcc:parsing",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
+        "//runtime/src/iree/vm",
         "//runtime/src/iree/vm/bytecode:module",
     ],
 )

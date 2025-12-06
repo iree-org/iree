@@ -42,4 +42,15 @@ iree_status_t iree_vm_bytecode_trace_disassembly(
     iree_vm_stack_frame_t* frame, iree_vm_source_offset_t pc,
     const iree_vm_registers_t* regs, FILE* file);
 
+// Disassembles an entire function's bytecode.
+// |module_state| may be NULL for static disassembly (no inline values).
+// Output mostly matches --trace_execution format:
+//   [00000000]    <block>
+//   [00000001]    %i0 = vm.const.i32 9  // 0x00000009
+iree_status_t iree_vm_bytecode_disassemble_function(
+    iree_vm_bytecode_module_t* module,
+    iree_vm_bytecode_module_state_t* module_state, uint16_t function_ordinal,
+    iree_vm_bytecode_disassembly_format_t format,
+    iree_string_builder_t* string_builder);
+
 #endif  // IREE_VM_BYTECODE_DISASSEMBLER_H_

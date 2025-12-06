@@ -93,6 +93,7 @@ static void iree_vm_list_retain_range(iree_vm_list_t* list,
 static void iree_vm_list_reset_range(iree_vm_list_t* list,
                                      iree_host_size_t offset,
                                      iree_host_size_t length) {
+  if (!length) return;
   switch (list->storage_mode) {
     case IREE_VM_LIST_STORAGE_MODE_VALUE: {
       void* base_ptr =

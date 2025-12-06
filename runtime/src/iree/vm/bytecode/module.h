@@ -32,6 +32,14 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
     iree_const_byte_span_t archive_contents, iree_allocator_t archive_allocator,
     iree_allocator_t allocator, iree_vm_module_t** out_module);
 
+// Disassembles an entire function's bytecode.
+// Output mostly matches --trace_execution format:
+//   [00000000]    <block>
+//   [00000001]    %i0 = vm.const.i32 9  // 0x00000009
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_disassemble_function(
+    iree_vm_module_t* module, uint16_t function_ordinal,
+    iree_string_builder_t* string_builder);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
