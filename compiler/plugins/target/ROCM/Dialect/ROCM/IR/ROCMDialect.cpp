@@ -67,22 +67,46 @@ SmallVector<StringRef> ROCMDialect::getBuiltinNames() {
 }
 
 const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
-  std::lock_guard<std::mutex> guard(mlirUkernelsMutex);
-  if (mlirUkernels.empty()) {
-    const iree_file_toc_t *toc = iree_mlir_ukernels_amdgpu_create();
-    llvm::SmallVector<ModuleOp> result;
-    for (size_t i = 0, e = iree_mlir_ukernels_amdgpu_size(); i != e; ++i) {
-      auto moduleOp = this->getOrLoadBuiltinModule(toc[i].name);
-      if (failed(moduleOp)) {
-        // parseSourceString should have reported an error already.
-        continue;
-      }
-      moduleOp->walk(
-          [&](Util::FuncOp funcOp) { mlirUkernels.push_back(funcOp); });
+  // Issue #22842: This code used to be straightforward with a single critical
+  // section, and it was deadlocking. The problem was that
+  // getOrLoadBuiltinModule was doing threaded work (specifically the verifier,
+  // but it could have been anything else: the verifier itself didn't matter
+  // other than being threaded work). The problem with doing threaded work is
+  // that the asynchronous tasks in llvm::ThreadPool yield, allowing other tasks
+  // to be executed. This leads to scenarios, even with a single worker thread,
+  // where we enter getOrLoadBuiltinModule, then yield, then another task is
+  // scheduled and needs mlir ukernels too, so it enters this function again,
+  // on the same thread.
+  //
+  // In order to reliably solve this issue, this design uses two separate,
+  // nearly trivial critical sections. The nontrivial work (which is where
+  // the risk of yielding exists) is not in a critical section. This means
+  // potentially doing some redundant parsing, but that's OK: localMlirUkernels
+  // is local, no race, just a minor performance issue.
+  {
+    std::lock_guard<std::mutex> guard(mlirUkernelsMutex);
+    if (!mlirUkernels.empty()) {
+      return mlirUkernels;
     }
   }
-  assert(!mlirUkernels.empty() &&
-         "Zero MLIR ukernels found after parsing builtins?!");
+
+  ::llvm::SmallVector<Util::FuncOp> localMlirUkernels;
+  const iree_file_toc_t *toc = iree_mlir_ukernels_amdgpu_create();
+  llvm::SmallVector<ModuleOp> result;
+  for (size_t i = 0, e = iree_mlir_ukernels_amdgpu_size(); i != e; ++i) {
+    auto moduleOp = this->getOrLoadBuiltinModule(toc[i].name);
+    if (failed(moduleOp)) {
+      // parseSourceString should have reported an error already.
+      continue;
+    }
+    moduleOp->walk(
+        [&](Util::FuncOp funcOp) { localMlirUkernels.push_back(funcOp); });
+  }
+
+  std::lock_guard<std::mutex> guard(mlirUkernelsMutex);
+  if (mlirUkernels.empty()) {
+    mlirUkernels = localMlirUkernels;
+  }
   return mlirUkernels;
 }
 
