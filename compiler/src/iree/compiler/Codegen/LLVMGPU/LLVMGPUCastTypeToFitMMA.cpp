@@ -46,11 +46,11 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
     auto srcAType = contractOp.getLhsType();
     auto srcBType = contractOp.getRhsType();
 
-    auto mmaIntrinsic = contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>(
-        "iree.amdgpu.mma");
+    auto mmaIntrinsic =
+        contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>("iree.gpu.mma");
     if (!mmaIntrinsic) {
       return rewriter.notifyMatchFailure(
-          contractOp, "could not find iree.amdgpu.mma attribute on contract");
+          contractOp, "could not find iree.gpu.mma attribute on contract");
     }
     auto [dstAElemType, dstBElemType, dstCElemType] =
         mmaIntrinsic.getABCElementTypes();
@@ -109,7 +109,7 @@ static void inferMmaKind(vector::ContractionOp contract) {
     return;
   }
 
-  contract->setAttr("iree.amdgpu.mma", intrinsic);
+  contract->setAttr("iree.gpu.mma", intrinsic);
 }
 
 struct LLVMGPUCastTypeToFitMMAPass final
