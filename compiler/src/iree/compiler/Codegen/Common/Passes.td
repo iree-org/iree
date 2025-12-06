@@ -307,6 +307,92 @@ def ReconcileTranslationInfoPass
   ];
 }
 
+def ResolveWorkgroupCountHintsPass
+    : Pass<"iree-codegen-resolve-workgroup-count-hints", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Materialize workgroup count hints in the workgroup count region per export.";
+  let description = [{
+    Resolves `iree_codegen.workgroup_count_hint` ops by materializing a globally
+    agreeable workgroup count per export. This pass performs a depth-first walk
+    of the target variant's call graph constructing the necessary information to
+    materialize workgroup count hints for that function.
+
+    #### Supported IR Structure
+
+    The pass expects executable variants containing exports with associated
+    entry point functions. Each entry point function (or functions it calls)
+    may contain `iree_codegen.workgroup_count_hint` ops:
+
+    ```mlir
+    hal.executable.export @entry_point
+        count(%device: !hal.device, %workload: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %workload
+      hal.return %x, %y, %z : index, index, index
+    }
+    module {
+      func.func @entry_point(%device: !hal.device) {
+        %workload = iree_tensor_ext.dispatch.workload.ordinal %val, 0 : index
+        iree_codegen.workgroup_count_hint sizes(%workload)
+      }
+    }
+    ```
+
+    #### Supported Control Flow
+
+    The pass handles the following control flow patterns:
+
+    1. **Direct hints**: Workgroup count hints directly in entry point functions.
+
+    2. **Transitive function calls**: Hints in functions called (directly or
+       transitively) from the entry point. The backward slice of operands
+       required to compute the hint is tracked across call boundaries.
+
+    3. **Conditional hints (`scf.if`)**: When hints are wrapped in `scf.if`
+       operations, the conditions are preserved in the workgroup count region
+       if possible.
+       ```mlir
+       %o0 = iree_tensor_ext.dispatch.workload.ordinal ...
+       %o1 = iree_tensor_ext.dispatch.workload.ordinal ...
+       %cond = arith.cmpi ..., %o0, %o1
+       scf.if %cond {
+         iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+       } else {
+         iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+       }
+       ```
+       This generates an `scf.if` in the workgroup count region rather than
+       pessimistically taking the maximum.
+
+    #### Resolution of Multiple Hints
+
+    When multiple `workgroup_count_hint` ops contribute to the same export
+    (either directly or through function calls), the final workgroup count
+    is computed as the **elementwise maximum** across all hints:
+
+    ```mlir
+    // Given:
+    iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+    iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+
+    // Resolves to:
+    %wx = arith.maxsi %x, %a
+    %wy = arith.maxsi %y, %b
+    %wz = arith.maxsi %z, %c
+    hal.return %wx, %wy, %wz
+    ```
+
+    #### Backward Slice Requirements
+
+    The backward slice of hint operands must consist only of:
+    - `iree_tensor_ext.dispatch.workload.ordinal` ops (leaf values)
+    - Pure/side-effect-free operations
+    - Function arguments (for transitive call support)
+
+    Operations with memory effects or that depend on device-local values
+    (e.g., `hal.interface.*` ops, workgroup/thread IDs) result in a compiler
+    error for hint operands and omit conditionals for `scf.if` operands.
+  }];
+}
+
 def ReplaceSlowMinMaxOpsPass
     : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
   let summary =

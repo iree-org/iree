@@ -125,6 +125,15 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups);
 
+/// Materialize the provided slice at the current insertion point. The leaves of
+/// the slice are expected to be `iree_tensor_ext.workload.ordinal` ops that
+/// are mapped to the corresponding `workloadVals`. The `map` is updated with
+/// the mapping from the original ops to the cloned ops.
+LogicalResult materializeSliceFromOrdinals(
+    RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
+    ArrayRef<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinals,
+    ArrayRef<Operation *> slice);
+
 /// Materialize the backward slice starting at the values in `workgroupCount`
 /// at the current insertion point of the `rewriter`. The leaves of the slice
 /// are expected to be `iree_tensor_ext.workload.ordinal` ops that
