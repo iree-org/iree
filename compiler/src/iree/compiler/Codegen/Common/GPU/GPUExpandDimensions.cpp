@@ -96,7 +96,6 @@ createDimensionExpansionOps(RewriterBase &rewriter,
   SmallVector<OpFoldResult> origShape = tensor::getMixedSizes(rewriter, loc, v);
 
   // Map each tensor dimension to its expanded shape components.
-  // Dimensions not involved in expansion retain empty entries.
   SmallVector<SmallVector<OpFoldResult>> expandedShapes(tensorRank);
   for (auto [iterDim, reassocIndices] :
        llvm::enumerate(config.getReassociationIndices())) {
@@ -112,8 +111,9 @@ createDimensionExpansionOps(RewriterBase &rewriter,
     FailureOr<SmallVector<OpFoldResult>> groupShape =
         computeExpandedGroupShape(rewriter, loc, origShape[tensorDim.value()],
                                   groupOutputShape, iterDim, op);
-    if (failed(groupShape))
+    if (failed(groupShape)) {
       return std::nullopt;
+    }
 
     expandedShapes[tensorDim.value()] = std::move(groupShape.value());
   }
@@ -136,8 +136,9 @@ createDimensionExpansionOps(RewriterBase &rewriter,
   }
 
   // If no expansion is needed, return early.
-  if (llvm::equal(origShape, expandedShape))
+  if (llvm::equal(origShape, expandedShape)) {
     return std::nullopt;
+  }
 
   auto staticShape = llvm::map_to_vector(expandedShape, [](OpFoldResult ofr) {
     return getConstantIntValue(ofr).value();
