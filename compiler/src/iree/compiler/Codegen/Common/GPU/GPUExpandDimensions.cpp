@@ -227,9 +227,6 @@ void GPUExpandDimensionsPass::runOnOperation() {
                                                       controlFn);
     IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
         bubbleExpandShapePatterns, controlFn);
-    populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
-    populateCombineRelayoutOpPatterns(bubbleExpandShapePatterns);
-    populateFoldTensorReshapeIntoBufferPatterns(bubbleExpandShapePatterns);
     tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
     tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
     linalg::FillOp::getCanonicalizationPatterns(
@@ -253,9 +250,6 @@ void GPUExpandDimensionsPass::runOnOperation() {
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
         removeBarrierOpsPatterns, context);
-    populateReshapeToInterfaceTensorPatterns(removeBarrierOpsPatterns);
-    populateCombineRelayoutOpPatterns(removeBarrierOpsPatterns);
-    populateFoldTensorReshapeIntoBufferPatterns(removeBarrierOpsPatterns);
     tensor::populateFoldTensorEmptyPatterns(removeBarrierOpsPatterns);
     linalg::FillOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
                                                 context);
@@ -266,7 +260,6 @@ void GPUExpandDimensionsPass::runOnOperation() {
       operation->emitOpError("failed in cleanup patterns");
       return signalPassFailure();
     }
-    moveUpMemrefReshapeOps(rewriter, operation);
   }
 
   return;
