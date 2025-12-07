@@ -258,7 +258,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 
 // CHECK-LABEL: hal.executable public @reduction_dispatch
 //       CHECK:   hal.executable.variant public @cuda
-//       CHECK:     "llvm.intr.vector.reduce.fadd"({{.*}}) <{{.*}}> : (f32, vector<4xf32>) -> f32
+//       CHECK:     "llvm.intr.vector.reduce.fadd"({{.*}}) {{.*}} : (f32, vector<4xf32>) -> f32
 
 // -----
 
