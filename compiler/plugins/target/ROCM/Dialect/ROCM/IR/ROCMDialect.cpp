@@ -26,7 +26,7 @@ void ROCMDialect::initialize() {
     const iree_file_toc_t *toc = iree_default_tuning_specs_amdgpu_create();
     for (size_t i = 0, e = iree_default_tuning_specs_amdgpu_size(); i != e;
          ++i) {
-      builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+      builtins.addFile(toc[i].name, StringRef{toc[i].data, toc[i].size});
     }
   }
 
@@ -34,7 +34,7 @@ void ROCMDialect::initialize() {
     const iree_file_toc_t *toc = iree_specialization_patterns_amdgpu_create();
     for (size_t i = 0, e = iree_specialization_patterns_amdgpu_size(); i != e;
          ++i) {
-      builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+      builtins.addFile(toc[i].name, StringRef{toc[i].data, toc[i].size});
     }
   }
 
@@ -42,28 +42,28 @@ void ROCMDialect::initialize() {
     const iree_file_toc_t *toc = iree_mlir_ukernel_patterns_amdgpu_create();
     for (size_t i = 0, e = iree_mlir_ukernel_patterns_amdgpu_size(); i != e;
          ++i) {
-      builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+      builtins.addFile(toc[i].name, StringRef{toc[i].data, toc[i].size});
     }
   }
 
   {
     const iree_file_toc_t *toc = iree_mlir_ukernels_amdgpu_create();
     for (size_t i = 0, e = iree_mlir_ukernels_amdgpu_size(); i != e; ++i) {
-      builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+      builtins.addFile(toc[i].name, StringRef{toc[i].data, toc[i].size});
     }
   }
 }
 
-bool ROCMDialect::hasBuiltin(llvm::StringRef name) {
+bool ROCMDialect::hasBuiltin(StringRef name) {
   return builtins.getFile(name).has_value();
 }
 
-std::optional<StringRef> ROCMDialect::getBuiltin(llvm::StringRef name) {
+std::optional<StringRef> ROCMDialect::getBuiltin(StringRef name) {
   return builtins.getFile(name);
 }
 
 SmallVector<StringRef> ROCMDialect::getBuiltinNames() {
-  return llvm::to_vector(builtins.getMap().keys());
+  return to_vector(builtins.getMap().keys());
 }
 
 const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
@@ -74,8 +74,9 @@ const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
   // deadlocks. That is why the code below is structured with two separate
   // critical sections leaving the MLIR parsing itself outside. It was
   // specifically the verifier that was being threaded here, and we could have
-  // set verifyAfterParse=false, but that would be unsafely assuming that the
-  // verifier would be the only threaded work here.
+  // set verifyAfterParse=false, but we actually care about the verifier running
+  // here, and it is unsafe to assume that it will always be the only threaded
+  // thing here.
 
   {
     // Critical section: check if already have mlirUkernels.
@@ -87,9 +88,9 @@ const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
 
   // Do the parsing outside of critical sections, so that reentry will not
   // deadlock.
-  ::llvm::SmallVector<Util::FuncOp> localMlirUkernels;
+  SmallVector<Util::FuncOp> localMlirUkernels;
   const iree_file_toc_t *toc = iree_mlir_ukernels_amdgpu_create();
-  llvm::SmallVector<ModuleOp> result;
+  SmallVector<ModuleOp> result;
   for (size_t i = 0, e = iree_mlir_ukernels_amdgpu_size(); i != e; ++i) {
     auto moduleOp = this->getOrLoadBuiltinModule(toc[i].name);
     if (failed(moduleOp)) {

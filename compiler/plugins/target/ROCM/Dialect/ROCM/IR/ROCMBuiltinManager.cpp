@@ -15,6 +15,15 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
     return failure();
   }
 
+  // Internally (parseSourceString, builtinModules) we use OwningOpRef<ModuleOp>
+  // but we need to return a FailureOr<ModuleOp>. This performs the conversion.
+  auto failure_or = [](const OwningOpRef<ModuleOp> &m) -> FailureOr<ModuleOp> {
+    if (m) {
+      return m.get();
+    }
+    return failure();
+  };
+
   // Issue #22842: Avoid doing nontrivial MLIR work (such as parsing) in a
   // critical section. Due to how MLIR threading works, any threaded workload
   // may result in yielding and scheduling another task on the same thread,
@@ -22,19 +31,17 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
   // deadlocks. That is why the code below is structured with two separate
   // critical sections leaving the MLIR parsing itself outside. It was
   // specifically the verifier that was being threaded here, and we could have
-  // set verifyAfterParse=false, but that would be unsafely assuming that the
-  // verifier would be the only threaded work here.
+  // set verifyAfterParse=false, but we actually care about the verifier running
+  // here, and it is unsafe to assume that it will always be the only threaded
+  // thing here.
 
   {
     // Critical section: check if already found in builtinModules.
     std::lock_guard<std::mutex> guard(builtinMutex);
-    auto libraryIt = builtinModules.find(path);
-    if (libraryIt != builtinModules.end()) {
+    auto iter = builtinModules.find(path);
+    if (iter != builtinModules.end()) {
       // Check whether the library already failed to load.
-      if (ModuleOp module = libraryIt->second.get()) {
-        return module;
-      }
-      return failure();
+      return failure_or(iter->second);
     }
   }
 
@@ -44,16 +51,20 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
       parseSourceString<mlir::ModuleOp>(maybeBuiltin.value(), getContext(),
                                         /*sourceName=*/path);
 
-  // Critical section: insert into builtinModules.
+  // Critical section: insert into builtinModules if not already found.
   std::lock_guard<std::mutex> guard(builtinMutex);
-  OwningOpRef<ModuleOp> &destinationModule = builtinModules[path];
-  // Insert unconditionally, even if failed to parse: avoid reparsing.
-  destinationModule = std::move(localModule);
-  // Check if this failed to parse.
-  if (!destinationModule) {
-    return failure();
+  // Check again if already found: it could have been inserted by another thread
+  // while we were parsing.
+  auto iter = builtinModules.find(path);
+  if (iter != builtinModules.end()) {
+    // Check whether the library already failed to load.
+    return failure_or(iter->second);
   }
-  return destinationModule.get();
+  OwningOpRef<ModuleOp> &insertedModule = builtinModules[path];
+  // Insert unconditionally, even if failed to parse: avoid reparsing.
+  insertedModule = std::move(localModule);
+  // Check if this failed to parse.
+  return failure_or(insertedModule);
 }
 
 } // namespace mlir::iree_compiler::IREE::ROCM
