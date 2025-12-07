@@ -17,7 +17,7 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
 
   // Internally (parseSourceString, builtinModules) we use OwningOpRef<ModuleOp>
   // but we need to return a FailureOr<ModuleOp>. This performs the conversion.
-  auto failure_or = [](const OwningOpRef<ModuleOp> &m) -> FailureOr<ModuleOp> {
+  auto failureOr = [](const OwningOpRef<ModuleOp> &m) -> FailureOr<ModuleOp> {
     if (m) {
       return m.get();
     }
@@ -41,7 +41,7 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
     auto iter = builtinModules.find(path);
     if (iter != builtinModules.end()) {
       // Check whether the library already failed to load.
-      return failure_or(iter->second);
+      return failureOr(iter->second);
     }
   }
 
@@ -58,13 +58,13 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
   auto iter = builtinModules.find(path);
   if (iter != builtinModules.end()) {
     // Check whether the library already failed to load.
-    return failure_or(iter->second);
+    return failureOr(iter->second);
   }
   OwningOpRef<ModuleOp> &insertedModule = builtinModules[path];
   // Insert unconditionally, even if failed to parse: avoid reparsing.
   insertedModule = std::move(localModule);
   // Check if this failed to parse.
-  return failure_or(insertedModule);
+  return failureOr(insertedModule);
 }
 
 } // namespace mlir::iree_compiler::IREE::ROCM

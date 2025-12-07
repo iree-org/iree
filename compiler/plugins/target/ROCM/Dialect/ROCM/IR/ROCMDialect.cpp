@@ -92,7 +92,7 @@ const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
   const iree_file_toc_t *toc = iree_mlir_ukernels_amdgpu_create();
   SmallVector<ModuleOp> result;
   for (size_t i = 0, e = iree_mlir_ukernels_amdgpu_size(); i != e; ++i) {
-    auto moduleOp = this->getOrLoadBuiltinModule(toc[i].name);
+    FailureOr<ModuleOp> moduleOp = this->getOrLoadBuiltinModule(toc[i].name);
     if (failed(moduleOp)) {
       // parseSourceString should have reported an error already.
       continue;
