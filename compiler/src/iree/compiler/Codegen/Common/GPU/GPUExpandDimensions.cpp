@@ -11,6 +11,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -54,8 +55,8 @@ computeExpandedGroupShape(RewriterBase &rewriter, Location loc,
            << " is dynamic, but expand_dims requires static dimensions";
   }
 
-  int64_t staticFactor = llvm::product_of(llvm::make_filter_range(
-      groupTargetShape, [](int64_t s) { return !ShapedType::isDynamic(s); }));
+  int64_t staticFactor = llvm::product_of(
+      llvm::make_filter_range(groupTargetShape, ShapedType::isStatic));
 
   if (staticFactor < 1) {
     return op.emitOpError("invalid expansion factor ")
@@ -70,7 +71,7 @@ computeExpandedGroupShape(RewriterBase &rewriter, Location loc,
 
   return llvm::map_to_vector(
       groupTargetShape, [&](int64_t size) -> OpFoldResult {
-        if (!ShapedType::isDynamic(size)) {
+        if (ShapedType::isStatic(size)) {
           return rewriter.getIndexAttr(size);
         }
         AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
@@ -79,74 +80,81 @@ computeExpandedGroupShape(RewriterBase &rewriter, Location loc,
       });
 }
 
-static FailureOr<ReshapeOps>
+static std::optional<ReshapeOps>
 createDimensionExpansionOps(RewriterBase &rewriter,
                             IREE::GPU::DimensionExpansionAttr config, Value v,
                             AffineMap indexingMap, linalg::LinalgOp op) {
   auto tensorType = dyn_cast<RankedTensorType>(v.getType());
   if (!tensorType) {
-    return failure();
+    return std::nullopt;
   }
 
   Location loc = v.getLoc();
   MLIRContext *ctx = op.getContext();
-  ArrayRef<int64_t> preprocessedOutputShape =
-      config.getOutputShape().asArrayRef();
+  int64_t tensorRank = tensorType.getRank();
+  ArrayRef<int64_t> outputShape = config.getOutputShape().asArrayRef();
   SmallVector<OpFoldResult> origShape = tensor::getMixedSizes(rewriter, loc, v);
 
-  SmallVector<OpFoldResult> expandedTensorShape;
-  SmallVector<ReassociationIndices> tensorReassociation;
-  int64_t expandedDimIdx = 0;
-
-  for (auto [origDimIdx, expandedReassocIdx] :
+  // Map each tensor dimension to its expanded shape components.
+  // Dimensions not involved in expansion retain empty entries.
+  SmallVector<SmallVector<OpFoldResult>> expandedShapes(tensorRank);
+  for (auto [iterDim, reassocIndices] :
        llvm::enumerate(config.getReassociationIndices())) {
-    AffineExpr dimExpr = getAffineDimExpr(origDimIdx, ctx);
-    std::optional<unsigned> tensorDim = indexingMap.getResultPosition(dimExpr);
-    if (!tensorDim) {
+    std::optional<unsigned> tensorDim =
+        indexingMap.getResultPosition(getAffineDimExpr(iterDim, ctx));
+    if (!tensorDim.has_value()) {
       continue;
     }
 
-    int64_t start = expandedDimIdx;
-    int64_t count = static_cast<int64_t>(expandedReassocIdx.size());
-    auto tensorGroup =
-        llvm::to_vector(llvm::seq<int64_t>(start, start + count));
-    tensorReassociation.push_back(std::move(tensorGroup));
-    expandedDimIdx += count;
-
-    auto preprocessedGroupOutputShape =
-        llvm::map_to_vector(expandedReassocIdx, [&](int64_t i) {
-          return preprocessedOutputShape[i];
-        });
+    auto groupOutputShape = llvm::map_to_vector(
+        reassocIndices, [&](int64_t i) { return outputShape[i]; });
 
     FailureOr<SmallVector<OpFoldResult>> groupShape =
         computeExpandedGroupShape(rewriter, loc, origShape[tensorDim.value()],
-                                  preprocessedGroupOutputShape, origDimIdx, op);
-    if (failed(groupShape)) {
-      return failure();
-    }
-    llvm::append_range(expandedTensorShape, groupShape.value());
+                                  groupOutputShape, iterDim, op);
+    if (failed(groupShape))
+      return std::nullopt;
+
+    expandedShapes[tensorDim.value()] = std::move(groupShape.value());
   }
 
-  auto staticExpandedShape =
-      llvm::map_to_vector(expandedTensorShape, [](OpFoldResult ofr) {
-        return getConstantIntValue(ofr).value_or(ShapedType::kDynamic);
-      });
+  // Build reassociation indices and expanded shape in tensor dimension order.
+  SmallVector<ReassociationIndices> reassociation;
+  SmallVector<OpFoldResult> expandedShape;
 
-  auto expandedType =
-      RankedTensorType::get(staticExpandedShape, tensorType.getElementType(),
-                            tensorType.getEncoding());
+  for (auto [tensorDim, expanded] : llvm::enumerate(expandedShapes)) {
+    ReassociationIndices &indices = reassociation.emplace_back();
+    auto addDim = [&](OpFoldResult dim) {
+      indices.push_back(expandedShape.size());
+      expandedShape.push_back(dim);
+    };
+    if (expanded.empty()) {
+      addDim(origShape[tensorDim]);
+    } else {
+      llvm::for_each(expanded, addDim);
+    }
+  }
 
-  auto expandShapeOp = tensor::ExpandShapeOp::create(
-      rewriter, loc, expandedType, v, tensorReassociation, expandedTensorShape);
+  // If no expansion is needed, return early.
+  if (llvm::equal(origShape, expandedShape))
+    return std::nullopt;
 
+  auto staticShape = llvm::map_to_vector(expandedShape, [](OpFoldResult ofr) {
+    return getConstantIntValue(ofr).value();
+  });
+
+  auto expandedType = RankedTensorType::get(
+      staticShape, tensorType.getElementType(), tensorType.getEncoding());
+
+  auto expandOp = tensor::ExpandShapeOp::create(rewriter, loc, expandedType, v,
+                                                reassociation, expandedShape);
   Value barrier = IREE::Util::OptimizationBarrierOp::create(
-                      rewriter, loc, expandShapeOp.getResult())
+                      rewriter, loc, expandOp.getResult())
                       .getResult(0);
+  auto collapseOp = tensor::CollapseShapeOp::create(rewriter, loc, tensorType,
+                                                    barrier, reassociation);
 
-  auto collapseShapeOp = tensor::CollapseShapeOp::create(
-      rewriter, loc, tensorType, barrier, tensorReassociation);
-
-  return ReshapeOps{expandShapeOp, collapseShapeOp};
+  return ReshapeOps{expandOp, collapseOp};
 }
 
 static LogicalResult expandIterationSpace(RewriterBase &rewriter,
@@ -163,14 +171,11 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
 
   for (OpOperand &operand : op->getOpOperands()) {
     AffineMap indexingMap = indexingMaps[operand.getOperandNumber()];
-    FailureOr<std::optional<ReshapeOps>> reshapes = createDimensionExpansionOps(
+    std::optional<ReshapeOps> reshapes = createDimensionExpansionOps(
         rewriter, config, operand.get(), indexingMap, op);
-    if (failed(reshapes)) {
-      return failure();
-    }
-    if (reshapes->has_value()) {
+    if (reshapes.has_value()) {
       rewriter.modifyOpInPlace(
-          op, [&]() { operand.set(reshapes->value().collapseShapeOp); });
+          op, [&]() { operand.set(reshapes.value().collapseShapeOp); });
     }
   }
 
