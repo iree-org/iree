@@ -3,8 +3,8 @@
 // Test: immutable source global (with initial value) with two encodings -
 // should unify to identity encoding.
 
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
-#encoding2 = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
 
 // CHECK-LABEL: module @immutable_source_with_initial_value
 module @immutable_source_with_initial_value {
@@ -41,8 +41,8 @@ module @immutable_source_with_initial_value {
 // Test: immutable source global (initialized from parameter in initializer) with
 // two encodings - should unify to identity encoding.
 
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
-#encoding2 = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
 
 // CHECK-LABEL: module @immutable_source_initialized_from_parameter
 module @immutable_source_initialized_from_parameter {
@@ -83,9 +83,9 @@ module @immutable_source_initialized_from_parameter {
 
 // Test: mutable source global - should be skipped, encoding unchanged.
 
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 
-// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 // CHECK-LABEL: module @mutable_source_skipped
 module @mutable_source_skipped {
   util.global private mutable @mutable_source : !stream.resource<constant>
@@ -114,11 +114,11 @@ module @mutable_source_skipped {
 
 // Test: mutable encoded global - should be skipped, encoding unchanged.
 
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
-#encoding2 = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
 
-// CHECK: #[[$ENC1:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
-// CHECK: #[[$ENC2:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
+// CHECK: #[[$ENC1:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+// CHECK: #[[$ENC2:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
 // CHECK-LABEL: module @mutable_encoded_global_skipped
 module @mutable_encoded_global_skipped {
   util.global private @source = #stream.parameter.named<"model"::"weight"> : !stream.resource<constant>
@@ -150,9 +150,9 @@ module @mutable_encoded_global_skipped {
 
 // Test: single encoding - not a candidate for unification, encoding unchanged.
 
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 
-// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 // CHECK-LABEL: module @single_encoding_no_unification
 module @single_encoding_no_unification {
   util.global private @source = #stream.parameter.named<"model"::"weight"> : !stream.resource<constant>
@@ -177,9 +177,9 @@ module @single_encoding_no_unification {
 
 // Test: same encoding used twice - not a candidate (only one unique encoding).
 
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 
-// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 // CHECK-LABEL: module @same_encoding_twice_no_unification
 module @same_encoding_twice_no_unification {
   util.global private @source = #stream.parameter.named<"model"::"weight"> : !stream.resource<constant>
