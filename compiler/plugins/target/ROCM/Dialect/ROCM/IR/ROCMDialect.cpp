@@ -84,12 +84,15 @@ const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
   // potentially doing some redundant parsing, but that's OK: localMlirUkernels
   // is local, no race, just a minor performance issue.
   {
+    // Critical section: check if already have mlirUkernels.
     std::lock_guard<std::mutex> guard(mlirUkernelsMutex);
     if (!mlirUkernels.empty()) {
       return mlirUkernels;
     }
   }
 
+  // Do the parsing outside of critical sections, so that reentry will not
+  // deadlock.
   ::llvm::SmallVector<Util::FuncOp> localMlirUkernels;
   const iree_file_toc_t *toc = iree_mlir_ukernels_amdgpu_create();
   llvm::SmallVector<ModuleOp> result;
@@ -103,6 +106,7 @@ const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
         [&](Util::FuncOp funcOp) { localMlirUkernels.push_back(funcOp); });
   }
 
+  // Critical section: set mlirUkernels.
   std::lock_guard<std::mutex> guard(mlirUkernelsMutex);
   if (mlirUkernels.empty()) {
     mlirUkernels = localMlirUkernels;
