@@ -67,22 +67,16 @@ SmallVector<StringRef> ROCMDialect::getBuiltinNames() {
 }
 
 const ArrayRef<Util::FuncOp> ROCMDialect::getMlirUKernels() {
-  // Issue #22842: This code used to be straightforward with a single critical
-  // section, and it was deadlocking. The problem was that
-  // getOrLoadBuiltinModule was doing threaded work (specifically the verifier,
-  // but it could have been anything else: the verifier itself didn't matter
-  // other than being threaded work). The problem with doing threaded work is
-  // that the asynchronous tasks in llvm::ThreadPool yield, allowing other tasks
-  // to be executed. This leads to scenarios, even with a single worker thread,
-  // where we enter getOrLoadBuiltinModule, then yield, then another task is
-  // scheduled and needs mlir ukernels too, so it enters this function again,
-  // on the same thread.
-  //
-  // In order to reliably solve this issue, this design uses two separate,
-  // nearly trivial critical sections. The nontrivial work (which is where
-  // the risk of yielding exists) is not in a critical section. This means
-  // potentially doing some redundant parsing, but that's OK: localMlirUkernels
-  // is local, no race, just a minor performance issue.
+  // Issue #22842: Avoid doing nontrivial MLIR work (such as parsing) in a
+  // critical section. Due to how MLIR threading works, any threaded workload
+  // may result in yielding and scheduling another task on the same thread,
+  // potentially reentering this code on the same thread, resulting in
+  // deadlocks. That is why the code below is structured with two separate
+  // critical sections leaving the MLIR parsing itself outside. It was
+  // specifically the verifier that was being threaded here, and we could have
+  // set verifyAfterParse=false, but that would be unsafely assuming that the
+  // verifier would be the only threaded work here.
+
   {
     // Critical section: check if already have mlirUkernels.
     std::lock_guard<std::mutex> guard(mlirUkernelsMutex);

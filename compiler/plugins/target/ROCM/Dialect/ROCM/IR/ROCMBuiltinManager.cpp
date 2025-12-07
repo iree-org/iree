@@ -18,11 +18,12 @@ FailureOr<ModuleOp> ROCMDialect::getOrLoadBuiltinModule(StringRef path) {
   // Issue #22842: Avoid doing nontrivial MLIR work (such as parsing) in a
   // critical section. Due to how MLIR threading works, any threaded workload
   // may result in yielding and scheduling another task on the same thread,
-  // resulting in deadlocks. That is why the code below is structured with two
-  // separate critical sections leaving the MLIR parsing itself outside.
-  // It was specifically the verifier that was being threaded here, and we could
-  // have set verifyAfterParse=false, but that would be unsafely assuming that
-  // the verifier would be the only threaded work here.
+  // potentially reentering this code on the same thread, resulting in
+  // deadlocks. That is why the code below is structured with two separate
+  // critical sections leaving the MLIR parsing itself outside. It was
+  // specifically the verifier that was being threaded here, and we could have
+  // set verifyAfterParse=false, but that would be unsafely assuming that the
+  // verifier would be the only threaded work here.
 
   {
     // Critical section: check if already found in builtinModules.
