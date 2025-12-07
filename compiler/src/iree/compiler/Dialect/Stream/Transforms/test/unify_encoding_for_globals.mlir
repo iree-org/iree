@@ -1,13 +1,13 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-unify-encoding-for-globals)' %s | FileCheck %s
 
-// Test: immutable source global (with inline initial value) with two encodings -
+// Test: immutable source global (with initial value) with two encodings -
 // should unify to identity encoding.
 
 #encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
 #encoding2 = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
 
-// CHECK-LABEL: module @immutable_source_inline_initial_value
-module @immutable_source_inline_initial_value {
+// CHECK-LABEL: module @immutable_source_with_initial_value
+module @immutable_source_with_initial_value {
   util.global private @source = #stream.parameter.named<"model"::"weight"> : !stream.resource<constant>
   util.global private @encoded_v1 : !stream.resource<constant>
   util.global private @encoded_v2 : !stream.resource<constant>
@@ -115,24 +115,33 @@ module @mutable_source_skipped {
 // Test: mutable encoded global - should be skipped, encoding unchanged.
 
 #encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+#encoding2 = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
 
-// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+// CHECK: #[[$ENC1:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
+// CHECK: #[[$ENC2:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
 // CHECK-LABEL: module @mutable_encoded_global_skipped
 module @mutable_encoded_global_skipped {
   util.global private @source = #stream.parameter.named<"model"::"weight"> : !stream.resource<constant>
-  util.global private mutable @encoded_mutable : !stream.resource<constant>
+  util.global private mutable @encoded_mutable_v1 : !stream.resource<constant>
+  util.global private mutable @encoded_mutable_v2 : !stream.resource<constant>
 
   util.initializer {
     %source = util.global.load @source : !stream.resource<constant>
     %source_size = stream.resource.size %source : !stream.resource<constant>
 
-    // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #[[$ENC]]>
-    // CHECK: stream.tensor.encode {{.*}} -> tensor<4096x4096xf32, #[[$ENC]]>
+    // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #[[$ENC1]]>
+    // CHECK: stream.tensor.encode {{.*}} -> tensor<4096x4096xf32, #[[$ENC1]]>
     %size1 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding1> : index
     %enc1 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
     %const1 = stream.async.clone %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
-    util.global.store %const1, @encoded_mutable : !stream.resource<constant>
+    util.global.store %const1, @encoded_mutable_v1 : !stream.resource<constant>
 
+    // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #[[$ENC2]]>
+    // CHECK: stream.tensor.encode {{.*}} -> tensor<4096x4096xf32, #[[$ENC2]]>
+    %size2 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding2> : index
+    %enc2 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
+    %const2 = stream.async.clone %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
+    util.global.store %const2, @encoded_mutable_v2 : !stream.resource<constant>
     util.return
   }
 }

@@ -33,10 +33,11 @@ namespace {
 
 // Information about an encoded global and its relationship to its source.
 struct EncodedGlobalInfo {
+  // The destination global for the final encoded data.
   IREE::Util::GlobalOpInterface encodedGlobal;
   Attribute encodingAttr;
+  IREE::Stream::TensorSizeOfOp sizeofOp;
   IREE::Stream::TensorEncodeOp encodeOp;
-  IREE::Stream::AffinityAttr affinityAttr;
 };
 
 // Information about a source global and all its encoded versions.
@@ -45,19 +46,18 @@ struct SourceGlobalInfo {
   SmallVector<EncodedGlobalInfo> encodedVersions;
 };
 
-// Finds the global store op that uses the given value, traversing through
-// passthrough ops like clone.
-// TODO(#22485): Handle other passthrough ops (e.g., transfer).
+// Returns the global store op that uses the given value, traversing through
+// passthrough ops like clone. Returns nullptr if not found or multiple users.
 static IREE::Util::GlobalStoreOpInterface findStoreOp(Value value) {
-  for (auto user : value.getUsers()) {
-    if (auto store = dyn_cast<IREE::Util::GlobalStoreOpInterface>(user)) {
-      return store;
-    }
-    if (auto cloneOp = dyn_cast<IREE::Stream::AsyncCloneOp>(user)) {
-      if (auto store = findStoreOp(cloneOp.getResult())) {
-        return store;
-      }
-    }
+  if (!llvm::hasSingleElement(value.getUsers())) {
+    return nullptr;
+  }
+  Operation *user = *value.getUsers().begin();
+  if (auto store = dyn_cast<IREE::Util::GlobalStoreOpInterface>(user)) {
+    return store;
+  }
+  if (auto cloneOp = dyn_cast<IREE::Stream::AsyncCloneOp>(user)) {
+    return findStoreOp(cloneOp.getResult());
   }
   return nullptr;
 }
@@ -68,7 +68,7 @@ static IREE::Util::GlobalStoreOpInterface findStoreOp(Value value) {
 class GlobalEncodingAnalyzer {
 public:
   explicit GlobalEncodingAnalyzer(ModuleOp moduleOp)
-      : moduleOp(moduleOp), symbolTable(moduleOp) {}
+      : moduleOp(moduleOp), symbolTable(moduleOp), globalTable(moduleOp) {}
 
   LogicalResult run();
 
@@ -87,8 +87,13 @@ public:
     return result;
   }
 
-  const llvm::MapVector<StringRef, SourceGlobalInfo> &getSourceGlobals() const {
-    return sourceGlobals;
+  // Returns the SourceGlobalInfo for the given source global name, or
+  // std::nullopt if not found.
+  std::optional<SourceGlobalInfo> getSourceGlobals(StringRef name) const {
+    if (sourceGlobals.contains(name)) {
+      return sourceGlobals.find(name)->second;
+    }
+    return std::nullopt;
   }
 
 private:
@@ -109,13 +114,17 @@ private:
 
   ModuleOp moduleOp;
   SymbolTable symbolTable;
+  IREE::Util::GlobalTable globalTable;
 
-  // Maps source global name to its info. Populated by run().
+  // Maps source global name to its info. Populated by run(). The global name
+  // must match the name of `sourceGlobal` inside SourceGlobalInfo. StringRef is
+  // used for easier lookup, which works better with SymbolTable, etc.
   llvm::MapVector<StringRef, SourceGlobalInfo> sourceGlobals;
 };
 
 LogicalResult GlobalEncodingAnalyzer::run() {
   LDBG() << "=== GlobalEncodingAnalyzer::run() ===";
+  globalTable.rebuild();
   if (failed(collectGlobalEncodings())) {
     return failure();
   }
@@ -185,11 +194,15 @@ LogicalResult GlobalEncodingAnalyzer::collectGlobalEncodings() {
       encodedInfo.encodeOp = encodeOp;
       encodedInfo.encodingAttr =
           cast<RankedTensorType>(resultType).getEncoding();
-      if (auto affinityOp =
-              dyn_cast<IREE::Stream::AffinityOpInterface>(*encodeOp)) {
-        encodedInfo.affinityAttr = affinityOp.getAffinityAttr();
+      encodedInfo.sizeofOp = encodeOp.getResultSize()
+                                 .getDefiningOp<IREE::Stream::TensorSizeOfOp>();
+      if (!encodedInfo.sizeofOp) {
+        LDBG() << "    Skipping: no sizeof op found for result size, can't "
+                  "update corresponding size computations later";
+        return;
       }
-      auto &sourceInfo = sourceGlobals[sourceGlobal.getGlobalName()];
+      SourceGlobalInfo &sourceInfo =
+          sourceGlobals[sourceGlobal.getGlobalName()];
       if (!sourceInfo.sourceGlobal) {
         sourceInfo.sourceGlobal = sourceGlobal;
       }
@@ -201,8 +214,8 @@ LogicalResult GlobalEncodingAnalyzer::collectGlobalEncodings() {
 
 IREE::Util::GlobalOpInterface
 GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
-  // TODO(#22485): Extend to general subgraph canonicalization.
-  // Currently only handles direct global loads + passthrough ops.
+  // TODO(#22485): Extend to general subgraph canonicalization Currently only
+  // handles direct global loads.
   SmallVector<Value> worklist;
   DenseSet<Value> visited;
   IREE::Util::GlobalOpInterface foundSourceGlobal;
@@ -231,23 +244,20 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
                 LDBG() << "      Bail: mutable source global";
                 return false;
               }
-              if (foundSourceGlobal && foundSourceGlobal != globalOp) {
-                LDBG() << "      Bail: multiple source globals";
-                return false;
-              }
+              assert(!foundSourceGlobal &&
+                     "should only find one source global");
               foundSourceGlobal = globalOp;
-              auto initAttr = globalOp.getGlobalInitialValue();
-              if (initAttr) {
-                // Has inline initial value, done tracing.
+              // Has inline initial value, done tracing.
+              if (globalOp.getGlobalInitialValue()) {
                 return true;
               }
-              // No inline initial value; trace through stores in initializers.
-              IREE::Util::GlobalTable globalTable(moduleOp);
-              globalTable.rebuild();
               auto &global = globalTable.lookup(globalName);
-              for (auto storeOp : global.storeOps) {
-                worklist.push_back(storeOp.getStoredGlobalValue());
+              if (global.storeOps.size() != 1) {
+                LDBG() << "      Bail: expected immutable global is only "
+                          "initialized once";
+                return false;
               }
+              worklist.push_back(global.storeOps[0].getStoredGlobalValue());
               return true;
             })
             .Case([&](IREE::Stream::TensorConstantOp) {
@@ -292,32 +302,30 @@ struct UnifyEncodingForGlobalsPass
 
     // Unify encodings for each source global with multiple encodings.
     for (auto sourceName : candidates) {
-      const auto &sourceInfo =
-          analyzer.getSourceGlobals().find(sourceName)->second;
+      std::optional<SourceGlobalInfo> sourceInfo =
+          analyzer.getSourceGlobals(sourceName);
+      if (!sourceInfo) {
+        LDBG() << "  ERROR: source global info not found for " << sourceName;
+        continue;
+      }
 
       // TODO(#22485): Select unified encoding via resolver. For now, use
-      // identity.
+      // identity encoding.
       auto unifiedEncoding =
           IREE::Encoding::IdentityAttr::get(moduleOp.getContext());
 
       // Update each encode op to use the unified encoding.
-      for (const auto &encodedInfo : sourceInfo.encodedVersions) {
+      for (EncodedGlobalInfo &encodedInfo : sourceInfo->encodedVersions) {
         auto encodeOp = encodedInfo.encodeOp;
         auto oldResultType =
             cast<RankedTensorType>(encodeOp.getResultEncoding());
-        auto newResultType = RankedTensorType::get(
-            oldResultType.getShape(), oldResultType.getElementType(),
-            unifiedEncoding);
+        RankedTensorType newResultType =
+            oldResultType.cloneWithEncoding(unifiedEncoding);
         encodeOp.setResultEncodingAttr(TypeAttr::get(newResultType));
         LDBG() << "  Updated encode op: " << encodeOp;
 
-        // Update stream.tensor.sizeof if it defines the result_size.
-        if (auto sizeofOp =
-                encodeOp.getResultSize()
-                    .getDefiningOp<IREE::Stream::TensorSizeOfOp>()) {
-          sizeofOp.setEncodingAttr(TypeAttr::get(newResultType));
-          LDBG() << "  Updated sizeof op: " << sizeofOp;
-        }
+        encodedInfo.sizeofOp.setEncodingAttr(TypeAttr::get(newResultType));
+        LDBG() << "  Updated sizeof op: " << encodedInfo.sizeofOp;
 
         // TODO(#22485): Update dispatch sites and executables.
       }
