@@ -1901,7 +1901,8 @@ getMmt4dInnerTileSizes(linalg::LinalgOp op) {
   // TODO: implement ShapeAwareOpInterface for tensor.empty and track the IR
   // until it reaches an operation that implements that interface instead of
   // hard-coding these ops.
-  if (!isa<linalg::FillOp, IREE::TensorExt::DispatchTensorLoadOp>(destOp)) {
+  if (!isa_and_present<linalg::FillOp, IREE::TensorExt::DispatchTensorLoadOp>(
+          destOp)) {
     LDBG() << "Mmt4d with non-fill or tensor load init buffer, cannot infer "
               "inner tile sizes!";
     return std::nullopt;
@@ -1924,10 +1925,10 @@ getMmt4dInnerTileSizes(linalg::LinalgOp op) {
 }
 
 // Adjusts the tile sizes and scalable flags for SVE in-place.
-// Returns failure if it cannot adjust tile sizes.
+// Returns false if it does not need to adjust tile sizes.
 static bool adjustVectorSizesForScalableVectorization(
     linalg::LinalgOp op, DictionaryAttr targetConfig, int64_t m0, int64_t n0,
-    SmallVector<int64_t> &vecTileSizes,
+    SmallVectorImpl<int64_t> &vecTileSizes,
     IREE::Codegen::ScalableTileFlags &vecScalableTileFlags) {
   int64_t mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
   std::optional<SizesAndScalableFlags> scalableInnerTilesAndFlags =
@@ -1942,6 +1943,10 @@ static bool adjustVectorSizesForScalableVectorization(
     return false;
   }
   if (hasAnySVEFeature(targetConfig) && ShapedType::isDynamic(n0)) {
+    // Set the corresponding scalable tile size and flag for the inner N
+    // dimension, i.e. n1 from the iteration domain ([b, ], m0, n0, k0, m1, n1,
+    // k1). The inner M dimension is not considered here, because SVE currently
+    // only makes the N dimension scalable.
     vecTileSizes[mmt4dDimBase + 4] =
         scalableInnerTilesAndFlags.value().first[1];
     vecScalableTileFlags[mmt4dDimBase + 4] =
@@ -2023,8 +2028,9 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   // In the existence of scalable tiles, we do not yet support limiting vector
   // sizes as this assumes static tile sizes.
   // TODO: extend this mechanism to handle _scalable_ tile sizes as well.
-  if (!scalableTilesFound)
+  if (!scalableTilesFound) {
     limitVectorTileSizes(op, vecTileSizes);
+  }
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
   generator.setVectorTileSizes(vecTileSizes, vecScalableTileFlags);

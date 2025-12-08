@@ -97,6 +97,8 @@ func.func @matmul_with_fill(%15: tensor<1024x256xi8>, %16: tensor<256x256xi8>, %
 
 // -----
 
+// This case tests if the inner tile size of the mmt4d is inferred properly from the shape-aware HAL binding and set accordingly.
+
 #pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
