@@ -779,6 +779,26 @@ struct MergeExtractSliceThroughBlockArg
           innerExtractOp, "shared_out is not defined by an extract_slice op");
     }
 
+    // Check if the outer extract's source is a block arg from a different
+    // forall. This is the nested forall case we need to handle carefully.
+    if (auto outerBA = dyn_cast<BlockArgument>(outerExtractOp.getSource())) {
+      Operation *outerOwnerOp = outerBA.getOwner()->getParentOp();
+      if (auto outerFO = dyn_cast<scf::ForallOp>(outerOwnerOp)) {
+        if (outerFO != forallOp) {
+          // Nested forall case detected - bail out immediately.
+          // Merging in nested forall case is complex because we would need to
+          // update both the inner and outer forall's types and all their
+          // parallel_insert_slice operations.
+          return rewriter.notifyMatchFailure(
+              innerExtractOp,
+              "nested forall case detected - outer extract's source is a "
+              "block arg from a different forall. Merging would require "
+              "updating both foralls' types and inserts, which is too complex "
+              "and error-prone.");
+        }
+      }
+    }
+
     // Disable merging if the extract_slice is used by a fill operation.
     // This ensures the fill op writes to the correct buffer - the inner loop's
     // shared_outs accumulator, not the outer source tensor. Merging would
@@ -847,9 +867,108 @@ struct MergeExtractSliceThroughBlockArg
     llvm::append_range(mergedStrides,
                        llvm::drop_begin(outerStrides, innerStrides.size()));
 
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        innerExtractOp, innerExtractOp.getType(), outerExtractOp.getSource(),
-        mergedOffsets, mergedSizes, mergedStrides);
+    // Create the merged extract_slice from blockArg with merged offsets.
+    auto mergedExtractOp = tensor::ExtractSliceOp::create(
+        rewriter, loc, innerExtractOp.getType(), blockArg, mergedOffsets,
+        mergedSizes, mergedStrides);
+
+    rewriter.replaceOp(innerExtractOp, mergedExtractOp.getResult());
+
+    // Option 2: Update the forall's shared_outs and parallel_insert_slice ops
+    // to maintain consistency. We need to:
+    // 1. Update shared_outs to point to outer source.
+    // 2. Update blockArg type.
+    // 3. Update all parallel_insert_slice ops that target this blockArg.
+
+    // First, collect all parallel_insert_slice ops that need updating.
+    SmallVector<tensor::ParallelInsertSliceOp> insertsToUpdate;
+    for (Operation &op : *blockArg.getOwner()) {
+      if (auto parallelOp = dyn_cast<scf::InParallelOp>(&op)) {
+        for (Operation &innerOp : parallelOp.getRegion().front()) {
+          if (auto insertOp =
+                  dyn_cast<tensor::ParallelInsertSliceOp>(&innerOp)) {
+            if (insertOp.getDest() == blockArg) {
+              insertsToUpdate.push_back(insertOp);
+            }
+          }
+        }
+      }
+    }
+
+    // Update forall's shared_outs.
+    SmallVector<Value> newOutputs(forallOp.getOutputs().begin(),
+                                  forallOp.getOutputs().end());
+    newOutputs[sharedOutIndex] = outerExtractOp.getSource();
+
+    // Update the block argument's type to match the new shared_outs type.
+    Type outerSourceType = outerExtractOp.getSource().getType();
+    blockArg.setType(outerSourceType);
+
+    // Update the forall's result type to match the new shared_outs type.
+    SmallVector<Type> newResultTypes(forallOp.getResultTypes().begin(),
+                                     forallOp.getResultTypes().end());
+    newResultTypes[sharedOutIndex] = outerSourceType;
+
+    rewriter.modifyOpInPlace(forallOp, [&]() {
+      forallOp.getOutputsMutable().assign(newOutputs);
+      forallOp->getResult(sharedOutIndex).setType(outerSourceType);
+    });
+
+    // Update all parallel_insert_slice ops with merged offsets.
+    for (auto insertOp : insertsToUpdate) {
+      SmallVector<OpFoldResult> insertOffsets = insertOp.getMixedOffsets();
+      SmallVector<OpFoldResult> insertSizes = insertOp.getMixedSizes();
+      SmallVector<OpFoldResult> insertStrides = insertOp.getMixedStrides();
+
+      // Merge insert offsets with outer offsets (same logic as extract merge).
+      SmallVector<OpFoldResult> mergedInsertOffsets = llvm::map_to_vector(
+          llvm::zip(outerOffsets, insertOffsets),
+          [&](auto pair) -> OpFoldResult {
+            auto [outer, insert] = pair;
+            std::optional<int64_t> outerConst = getConstantIntValue(outer);
+            std::optional<int64_t> insertConst = getConstantIntValue(insert);
+            if (outerConst && insertConst) {
+              return rewriter.getIndexAttr(*outerConst + *insertConst);
+            }
+            Value outerVal =
+                getValueOrCreateConstantIndexOp(rewriter, loc, outer);
+            Value insertVal =
+                getValueOrCreateConstantIndexOp(rewriter, loc, insert);
+            return arith::AddIOp::create(rewriter, loc, outerVal, insertVal)
+                .getResult();
+          });
+      llvm::append_range(mergedInsertOffsets,
+                         llvm::drop_begin(outerOffsets, insertOffsets.size()));
+
+      SmallVector<OpFoldResult> mergedInsertSizes = insertSizes;
+      llvm::append_range(mergedInsertSizes,
+                         llvm::drop_begin(outerSizes, insertSizes.size()));
+
+      SmallVector<OpFoldResult> mergedInsertStrides = llvm::map_to_vector(
+          llvm::zip(outerStrides, insertStrides),
+          [&](auto pair) -> OpFoldResult {
+            auto [outer, insert] = pair;
+            std::optional<int64_t> outerConst = getConstantIntValue(outer);
+            std::optional<int64_t> insertConst = getConstantIntValue(insert);
+            if (outerConst && insertConst) {
+              return rewriter.getIndexAttr(*outerConst * *insertConst);
+            }
+            Value outerVal =
+                getValueOrCreateConstantIndexOp(rewriter, loc, outer);
+            Value insertVal =
+                getValueOrCreateConstantIndexOp(rewriter, loc, insert);
+            return arith::MulIOp::create(rewriter, loc, outerVal, insertVal)
+                .getResult();
+          });
+      llvm::append_range(mergedInsertStrides,
+                         llvm::drop_begin(outerStrides, insertStrides.size()));
+
+      // Replace with new insert using merged offsets/sizes/strides.
+      rewriter.setInsertionPoint(insertOp);
+      rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
+          insertOp, insertOp.getSource(), blockArg, mergedInsertOffsets,
+          mergedInsertSizes, mergedInsertStrides);
+    }
 
     return success();
   }
