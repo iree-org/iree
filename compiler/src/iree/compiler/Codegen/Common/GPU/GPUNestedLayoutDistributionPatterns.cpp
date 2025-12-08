@@ -7,6 +7,7 @@
 #include <cstdint>
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -15,11 +16,13 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/Utils/GPUUtils.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
@@ -29,6 +32,10 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
+
+#define DEBUG_TYPE "iree-codegen-gpu-distribution"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -87,6 +94,46 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
         affine::AffineLinearizeIndexOp::create(b, loc, ids, sizes, disjoint);
   }
   return slicedIndices;
+}
+
+/// Computes memory indices for ldmatrix based on nested layout.
+/// For ldmatrix, lane offsets replace outer+thread distribution since
+/// ldmatrix loads a full MMA tile.
+/// Order matches scalar: warp → batch → lane → base
+static SmallVector<Value> getLdMatrixIndicesFromNestedLayout(
+    OpBuilder &b, ValueRange baseIndices, ArrayRef<int64_t> batchOffsets,
+    NestedLayoutAttr vectorLayout, ArrayRef<Value> warpIndices,
+    ArrayRef<Value> laneOffsets) {
+
+  int64_t rank = vectorLayout.getRank();
+  ArrayRef<int64_t> batchTile = vectorLayout.getBatchTile();
+  ArrayRef<int64_t> outerTile = vectorLayout.getOuterTile();
+  ArrayRef<int64_t> threadTile = vectorLayout.getThreadTile();
+  ArrayRef<int64_t> elementTile = vectorLayout.getElementTile();
+
+  SmallVector<Value> memIndices;
+  for (int64_t i = 0; i < rank; ++i) {
+    Location loc = baseIndices[i].getLoc();
+
+    // Lane stride covers outer+thread+element since ldmatrix loads full tile
+    int64_t laneStride = outerTile[i] * threadTile[i] * elementTile[i];
+    SmallVector<Value> ids = {
+        warpIndices[i], arith::ConstantIndexOp::create(b, loc, batchOffsets[i]),
+        laneOffsets[i], baseIndices[i]};
+    SmallVector<int64_t> sizes = {vectorLayout.getSubgroupTile()[i],
+                                  batchTile[i], laneStride, 1};
+
+    // The base index is often not zero, so we can't mark this `disjoint` in
+    // general. However, if `baseIndices[i]` is known to be zero, we can do
+    // this, unlocking potential optimizations.
+    bool disjoint = false;
+    if (std::optional<int64_t> baseConst = getConstantIntValue(baseIndices[i]))
+      disjoint = *baseConst == 0;
+    Value memIdx =
+        affine::AffineLinearizeIndexOp::create(b, loc, ids, sizes, disjoint);
+    memIndices.push_back(memIdx);
+  }
+  return memIndices;
 }
 
 static SmallVector<int64_t>
@@ -230,6 +277,33 @@ static LogicalResult populateWarpAndThreadIndices(
   return success();
 }
 
+static LogicalResult calculateWarpIndicesAndLinearLaneID(
+    RewriterBase &rewriter, Value threadId, int64_t subgroupSize,
+    NestedLayoutAttr vectorLayout, SmallVector<Value> &warpIndices,
+    Value &laneID) {
+
+  Location loc = threadId.getLoc();
+
+  SmallVector<int64_t> subgroupBasis;
+  SmallVector<size_t> subgroupDimToResult;
+
+  if (failed(basisFromSizesStrides(vectorLayout.getSubgroupTile(),
+                                   vectorLayout.getSubgroupStrides(),
+                                   subgroupBasis, subgroupDimToResult)))
+    return failure();
+
+  // Add the subgroup_size to the end of the subgroup delinearization basis.
+  subgroupBasis.push_back(subgroupSize);
+
+  auto subgroupSplit = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, threadId, subgroupBasis, /*hasOuterBound=*/false);
+
+  llvm::transform(subgroupDimToResult, std::back_inserter(warpIndices),
+                  [&](size_t idx) { return subgroupSplit.getResult(idx); });
+  laneID = subgroupSplit.getResults().back();
+  return success();
+}
+
 static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
                                          Location loc,
                                          ArrayRef<int64_t> offsets,
@@ -297,7 +371,276 @@ static VectorValue extractSliceAsVector(RewriterBase &rewriter, Location loc,
   return cast<VectorValue>(slice);
 }
 
+//===----------------------------------------------------------------------===//
+// ldmatrix support utilities
+//===----------------------------------------------------------------------===//
+
+/// Parameters for emitting nvgpu.ldmatrix ops.
+struct LdMatrixParams {
+  int numTiles;   // Number of 8x8 tiles: 1, 2, or 4
+  bool transpose; // Use .trans variant for transposed loads
+};
+
+/// Check if a transfer_read is consumed by a to_layout with mma_kind.
+/// Returns the MMA kind attribute if found, failure otherwise.
+static FailureOr<IREE::GPU::MMAAttr>
+getMmaKindFromUser(vector::TransferReadOp readOp) {
+  // Look through users to find a to_layout op with mma_kind
+  for (Operation *user : readOp->getUsers()) {
+    auto toLayoutOp = dyn_cast<IREE::VectorExt::ToLayoutOp>(user);
+    if (!toLayoutOp)
+      continue;
+
+    Attribute mmaKindAttr = toLayoutOp.getMmaKindAttr();
+    if (!mmaKindAttr)
+      continue;
+
+    if (auto mmaAttr = dyn_cast<IREE::GPU::MMAAttr>(mmaKindAttr)) {
+      return mmaAttr;
+    }
+  }
+  return failure();
+}
+
+/// Infer ldmatrix parameters directly from nested layout structure.
+/// Returns failure if ldmatrix is not applicable.
+static FailureOr<LdMatrixParams>
+inferLdMatrixParamsFromLayout(IREE::VectorExt::NestedLayoutAttr layout,
+                              IREE::GPU::MMAAttr mmaKind) {
+  // For now, only support NV_MMA_SYNC F16 intrinsics
+  IREE::GPU::MMAIntrinsic intrinsic = mmaKind.getIntrinsic();
+  if (intrinsic != IREE::GPU::MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16 &&
+      intrinsic != IREE::GPU::MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16) {
+    LDBG("ldmatrix: unsupported MMA intrinsic, only "
+         "NV_MMA_SYNC_F32_16x8x16_F16 and NV_MMA_SYNC_F16_16x8x16_F16 "
+         "supported");
+    return failure();
+  }
+
+  ArrayRef<int64_t> outerTile = layout.getOuterTile();
+  ArrayRef<int64_t> threadStrides = layout.getThreadStrides();
+
+  if (outerTile.size() != 2) {
+    LDBG("ldmatrix: layout rank != 2");
+    return failure();
+  }
+
+  // numTiles = product of outer tile dimensions
+  int numTiles = outerTile[0] * outerTile[1];
+  if (numTiles != 2 && numTiles != 4) {
+    LDBG("ldmatrix: invalid numTiles=" << numTiles << ", must be 2, or 4");
+    return failure();
+  }
+
+  // Transpose based on thread stride pattern.
+  // Column-major (stride[0] < stride[1]) needs transpose.
+  bool transpose = (threadStrides[0] < threadStrides[1]);
+
+  LDBG("ldmatrix: inferred numTiles=" << numTiles
+                                      << ", transpose=" << transpose);
+
+  return LdMatrixParams{numTiles, transpose};
+}
+
 namespace {
+
+/// Pattern to distribute `vector.transfer_read` ops from shared memory to
+/// `nvgpu.ldmatrix` when the layout permits.
+struct DistributeTransferReadToLdMatrix final
+    : OpDistributionPattern<vector::TransferReadOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeTransferReadToLdMatrix(MLIRContext *context, PatternBenefit benefit,
+                                   Value threadId, int64_t subgroupSize)
+      : OpDistributionPattern(context, benefit), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  /// Compute lane-to-row/col mapping based on ldmatrix parameters.
+  /// Returns failure for unsupported configurations.
+  FailureOr<std::pair<Value, Value>>
+  computeLdMatrixLaneIndices(OpBuilder &b, Location loc, Value laneId,
+                             const LdMatrixParams &params) const {
+    MLIRContext *ctx = b.getContext();
+    AffineExpr d0 = b.getAffineDimExpr(0);
+
+    AffineMap rowMap, colMap;
+    if (params.numTiles == 4 && !params.transpose) {
+      // x4 non-transpose: 16x16 tile
+      // row = (lane % 8) + (lane / 16) * 8
+      rowMap = AffineMap::get(1, 0, d0 % 8 + (d0.floorDiv(16)) * 8, ctx);
+      // col = ((lane / 8) % 2) * 8
+      colMap = AffineMap::get(1, 0, (d0.floorDiv(8) % 2) * 8, ctx);
+    } else if (params.numTiles == 2 && params.transpose) {
+      // x2 transpose: 16x8 tile
+      // row = lane % 16
+      rowMap = AffineMap::get(1, 0, d0 % 16, ctx);
+      // col = 0
+      colMap = AffineMap::get(1, 0, b.getAffineConstantExpr(0), ctx);
+    } else if (params.numTiles == 2 && !params.transpose) {
+      // x2 non-transpose: 8x16 tile
+      // Loads 2 horizontally-adjacent 8x8 tiles
+      // row = lane % 8
+      rowMap = AffineMap::get(1, 0, d0 % 8, ctx);
+      // col = ((lane / 8) % 2) * 8
+      colMap = AffineMap::get(1, 0, (d0.floorDiv(8) % 2) * 8, ctx);
+    } else {
+      // Unsupported configuration
+      return failure();
+    }
+
+    Value row = affine::makeComposedAffineApply(b, loc, rowMap, {laneId});
+    Value col = affine::makeComposedAffineApply(b, loc, colMap, {laneId});
+    return std::pair<Value, Value>{row, col};
+  }
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    // Check if source is shared memory
+    auto memrefType = dyn_cast<MemRefType>(readOp.getBase().getType());
+    if (!memrefType) {
+      return rewriter.notifyMatchFailure(readOp, "source is not a memref");
+    }
+    if (!hasSharedMemoryAddressSpace(memrefType)) {
+      return rewriter.notifyMatchFailure(readOp, "source is not shared memory");
+    }
+
+    // Check element type is f16
+    Type elementType = memrefType.getElementType();
+    if (!elementType.isF16()) {
+      return rewriter.notifyMatchFailure(readOp, "element type is not f16");
+    }
+
+    // Find consuming to_layout with mma_kind
+    FailureOr<IREE::GPU::MMAAttr> mmaKind = getMmaKindFromUser(readOp);
+    if (failed(mmaKind)) {
+      return rewriter.notifyMatchFailure(readOp, "no mma_kind from user");
+    }
+
+    // Get layout and infer ldmatrix parameters
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[readOp.getResult()]);
+    if (!vectorLayout) {
+      return rewriter.notifyMatchFailure(readOp, "non-nested layout");
+    }
+
+    FailureOr<LdMatrixParams> params =
+        inferLdMatrixParamsFromLayout(vectorLayout, *mmaKind);
+    if (failed(params)) {
+      return rewriter.notifyMatchFailure(
+          readOp, "ldmatrix not applicable for this layout/MMA kind");
+    }
+
+    // Check for unsupported features
+    if (readOp.getMask()) {
+      return rewriter.notifyMatchFailure(readOp, "masked reads not supported");
+    }
+
+    // Only support identity permutation map for now
+    if (!readOp.getPermutationMap().isIdentity()) {
+      return rewriter.notifyMatchFailure(
+          readOp, "non-identity permutation map not supported");
+    }
+
+    Location loc = readOp.getLoc();
+
+    // Compute warp indices and get access to the lane ID via the subgroup
+    // delinearize operation.
+    SmallVector<Value> warpIndices;
+    Value laneId;
+    auto subgroupDelinearize = calculateWarpIndicesAndLinearLaneID(
+        rewriter, threadId, subgroupSize, vectorLayout, warpIndices, laneId);
+    if (failed(subgroupDelinearize)) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "failed to compute subgroup indices");
+    }
+
+    auto laneIndicesResult =
+        computeLdMatrixLaneIndices(rewriter, loc, laneId, *params);
+    if (failed(laneIndicesResult)) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "unsupported ldmatrix configuration");
+    }
+    auto [laneRow, laneCol] = *laneIndicesResult;
+
+    // Compute the distributed result shape
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    int64_t rank = vectorLayout.getRank();
+
+    // The ldmatrix result type: for x4 we get vector<4x2xf16>, for x2 we get
+    // vector<2x2xf16>
+    auto ldmatrixResultType =
+        VectorType::get({params->numTiles, 2}, elementType);
+
+    auto fullDistType = VectorType::get(distShape, elementType);
+    Value distResult = arith::ConstantOp::create(
+        rewriter, loc, fullDistType, rewriter.getZeroAttr(fullDistType));
+
+    ValueRange baseIndices = readOp.getIndices();
+
+    // For ldmatrix, we iterate over batch dimensions only.
+    // Each ldmatrix call loads all outer+element values for one MMA tile.
+    SmallVector<int64_t> tileShape(distShape);
+    for (int64_t i = 0; i < rank; ++i) {
+      tileShape[i] = 1;
+    }
+
+    // Iterate over batch tiles (one ldmatrix per MMA tile)
+    SmallVector<Value> laneOffsets = {laneRow, laneCol};
+
+    for (SmallVector<int64_t> offsets :
+         StaticTileOffsetRange(distShape, tileShape)) {
+      // offsets: [batch0, batch1, 0, 0, 0, 0]
+      ArrayRef<int64_t> batchOffsets(offsets.data(), rank);
+
+      SmallVector<Value> memIndices = getLdMatrixIndicesFromNestedLayout(
+          rewriter, baseIndices, batchOffsets, vectorLayout, warpIndices,
+          laneOffsets);
+
+      Value ldmatrixResult = nvgpu::LdMatrixOp::create(
+          rewriter, loc, ldmatrixResultType, readOp.getBase(), memIndices,
+          params->transpose, params->numTiles);
+
+      // Shape cast ldmatrix result to match the outer+element dimensions.
+      // ldmatrix returns vector<numTiles x 2> (e.g., vector<4x2xf16> for x4).
+      // The per-batch shape is [outer0, outer1, elem0, elem1] (e.g.,
+      // [2,2,1,2]). Both have the same number of elements in the same row-major
+      // order, so shape_cast works directly.
+      ArrayRef<int64_t> outerTile = vectorLayout.getOuterTile();
+      ArrayRef<int64_t> elementTile = vectorLayout.getElementTile();
+      SmallVector<int64_t> perBatchShape;
+      for (int64_t i = 0; i < rank; ++i) {
+        perBatchShape.push_back(outerTile[i]);
+      }
+      for (int64_t i = 0; i < rank; ++i) {
+        perBatchShape.push_back(elementTile[i]);
+      }
+      auto perBatchType = VectorType::get(perBatchShape, elementType);
+      Value shapeCast = vector::ShapeCastOp::create(rewriter, loc, perBatchType,
+                                                    ldmatrixResult);
+
+      SmallVector<int64_t> batchPos(offsets.begin(), offsets.begin() + rank);
+      distResult = vector::InsertOp::create(rewriter, loc, shapeCast,
+                                            distResult, batchPos);
+    }
+
+    // Set 16-byte alignment requirement for ldmatrix on the source allocation.
+    if (auto allocOp = readOp.getBase().getDefiningOp<memref::AllocOp>()) {
+      uint64_t requiredAlignment = 16; // 128 bits
+      uint64_t currentAlignment = allocOp.getAlignment().value_or(0);
+      if (currentAlignment < requiredAlignment) {
+        allocOp.setAlignment(requiredAlignment);
+      }
+    }
+
+    replaceOpWithDistributedValues(rewriter, readOp,
+                                   cast<VectorValue>(distResult));
+    return success();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
 
 /// Pattern to distribute `vector.transfer_read` ops with nested layouts.
 struct DistributeTransferRead final
@@ -2205,6 +2548,10 @@ struct DistributeConstantMask final
 void populateGPUDistributeNestedLayoutAttrPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
+  // Add ldmatrix pattern with higher benefit than regular transfer_read.
+  // This ensures ldmatrix is tried first for shared memory reads with MMA.
+  patterns.add<DistributeTransferReadToLdMatrix>(
+      patterns.getContext(), /*benefit=*/2, threadId, subgroupSize);
   patterns.add<DistributeTransferRead, DistributeTransferGather,
                DistributeMapScatter>(patterns.getContext(), threadId,
                                      subgroupSize);

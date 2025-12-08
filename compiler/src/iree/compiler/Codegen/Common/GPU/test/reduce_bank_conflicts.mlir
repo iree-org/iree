@@ -152,3 +152,15 @@ func.func @pad_if_below_limit() {
   %0 = memref.alloc() : memref<4x32x126xf32, #gpu.address_space<workgroup>>
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @pad_alloc_with_alignment
+// CHECK:         %[[A:.*]] = memref.alloc() {alignment = 16 : i64} : memref<32x40xf16, #gpu.address_space<workgroup>>
+// CHECK:         memref.subview %[[A]][0, 0] [32, 32] [1, 1] :
+// CHECK-SAME:      memref<32x40xf16, #gpu.address_space<workgroup>> to
+// CHECK-SAME:      memref<32x32xf16, strided<[40, 1]>, #gpu.address_space<workgroup>>
+func.func @pad_alloc_with_alignment() {
+  %0 = memref.alloc() {alignment = 16 : i64} : memref<32x32xf16, #gpu.address_space<workgroup>>
+  return
+}
