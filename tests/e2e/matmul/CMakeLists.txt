@@ -1142,6 +1142,64 @@ iree_generated_e2e_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna3_coalesced_dma_f32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=custom_mnk"
+    "--mnk=32,32,64"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    "--iree-hip-target=gfx942"
+    "--iree-llvmgpu-use-direct-load"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna3_coalesced_dma_f32_larger
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=custom_mnk"
+    "--mnk=32,64,64"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    "--iree-hip-target=gfx942"
+    "--iree-llvmgpu-use-direct-load"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # To distinguish between CDNA(gfx9), RDNA3(gfx11), and RDNA4(gfx12)
@@ -1236,7 +1294,6 @@ iree_generated_e2e_runner_test(
     "noubsan"
     "requires-gpu-cdna3"
 )
-
 
 if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94")
   set(_CDNA_ARCH "cdna3")
