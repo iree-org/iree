@@ -214,23 +214,16 @@ LogicalResult GlobalEncodingAnalyzer::collectGlobalEncodings() {
 
 IREE::Util::GlobalOpInterface
 GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
-  // TODO(#22485): Extend to general subgraph canonicalization Currently only
-  // handles direct global loads.
-  SmallVector<Value> worklist;
-  DenseSet<Value> visited;
   IREE::Util::GlobalOpInterface foundSourceGlobal;
-  worklist.push_back(value);
-  while (!worklist.empty()) {
-    Value current = worklist.pop_back_val();
-    if (!visited.insert(current).second) {
-      continue;
-    }
-    Operation *defOp = current.getDefiningOp();
+  bool shouldContinue = true;
+  while (shouldContinue) {
+    Operation *defOp = value.getDefiningOp();
     if (!defOp) {
       LDBG() << "      Bail: block argument";
       return nullptr;
     }
-    bool shouldContinue =
+    shouldContinue = false;
+    bool isValid =
         llvm::TypeSwitch<Operation *, bool>(defOp)
             .Case([&](IREE::Util::GlobalLoadOpInterface loadOp) {
               StringRef globalName = loadOp.getGlobalName();
@@ -257,7 +250,9 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
                           "initialized once";
                 return false;
               }
-              worklist.push_back(global.storeOps[0].getStoredGlobalValue());
+              // Continue tracing the source of the store op.
+              value = global.storeOps[0].getStoredGlobalValue();
+              shouldContinue = true;
               return true;
             })
             .Case([&](IREE::Stream::TensorConstantOp) {
@@ -268,7 +263,7 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
               LDBG() << "      Bail: unknown op " << op->getName();
               return false;
             });
-    if (!shouldContinue) {
+    if (!isValid) {
       return nullptr;
     }
   }
