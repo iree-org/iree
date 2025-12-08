@@ -42,6 +42,7 @@ iree_lit_test_suite(
             "gpu_combine_value_barriers.mlir",
             "gpu_lower_to_global_loads.mlir",
             "gpu_nested_layout_contract_amdgpu.mlir",
+            "gpu_nested_layout_contract_nvgpu.mlir",
             "gpu_nested_layout_vector_distribution.mlir",
             "gpu_nested_layout_vector_distribution_mask.mlir",
             "gpu_nested_layout_vector_distribution_multi_reduce.mlir",
