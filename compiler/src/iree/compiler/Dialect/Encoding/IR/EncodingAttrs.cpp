@@ -93,6 +93,19 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
   return res;
 }
 
+LogicalResult LayoutAttr::verifyEncoding(
+    llvm::ArrayRef<int64_t> shape, mlir::Type elementType,
+    llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
+  for (Attribute attr : getLayouts()) {
+    auto verifiableAttr = dyn_cast<VerifiableTensorEncoding>(attr);
+    if (verifiableAttr &&
+        failed(verifiableAttr.verifyEncoding(shape, elementType, emitError))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
