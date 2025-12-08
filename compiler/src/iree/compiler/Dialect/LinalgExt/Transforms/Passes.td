@@ -55,8 +55,10 @@ def DecomposeAggregatedOpPass :
   let summary = "Decomposes ops that implement the AggregatedOpImpl interface";
   let options = [
     Option<"filterOps", "filter-ops", "std::string", /*default=*/"",
-           "A comma-delimited list of op names. For every op in the list, decompose the op.
-            Op names must be fully-qualified (eg. `linalg.generic`).">
+            [{
+              A comma-delimited list of op names. This pass decomposes every op listed.
+              Op names must be fully-qualified (eg. `linalg.generic`).
+            }]>
   ];
 }
 

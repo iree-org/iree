@@ -1,42 +1,35 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-aggregated-ops{filter-ops='iree_linalg_ext.winograd.filter_transform'}), canonicalize, cse)" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-aggregated-ops), canonicalize, cse)"  --verify-diagnostics %s
 
-func.func @attention(
-  %s_in: tensor<20x4096x4096xf32>,
-  %v_in: tensor<20x4096x64xf32>,
-  %max_init: tensor<20x4096xf32>,
-  %sum_init: tensor<20x4096xf32>,
-  %acc_init: tensor<20x4096x64xf32>
-) -> (tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>)
-  {
-  %max, %sumt, %pv = iree_linalg_ext.exp_reduction {
-    indexing_maps = [
-      affine_map<(B, M, N, K2) -> (B, M, K2)>,
-      affine_map<(B, M, N, K2) -> (B, K2, N)>,
-      affine_map<(B, M, N, K2) -> (B, M)>,
-      affine_map<(B, M, N, K2) -> (B, M)>,
-      affine_map<(B, M, N, K2) -> (B, M, N)>
-    ],
-    iterator_types = [
-      #iree_linalg_ext.iterator_type<parallel>,
-      #iree_linalg_ext.iterator_type<parallel>,
-      #iree_linalg_ext.iterator_type<parallel>,
-      #iree_linalg_ext.iterator_type<reduction>
-    ],
-    exp_reduced_operands = [1, 2]
-  }
-    ins(%s_in, %v_in : tensor<20x4096x4096xf32>, tensor<20x4096x64xf32>)
-    outs(%max_init, %sum_init, %acc_init : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>)
-  {
-  ^bb0(%ex : f32, %v : f32, %m : f32, %sum : f32, %acc : f32):
-    %nsum = arith.addf %ex, %sum : f32
-    %mul  = arith.mulf %ex, %v : f32
-    %nacc = arith.addf %mul, %acc : f32
-    iree_linalg_ext.yield %m, %nsum, %nacc : f32, f32, f32
-  } -> tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
+#mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
+#mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
+#mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
+#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
+#mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
+#mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
-  return %max, %sumt, %pv : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
+// expected-warning@+1 {{decompose-aggregated-op op list is empty!}}
+func.func @attention_f16(%query: tensor<192x1024x64xf16>,
+                         %key: tensor<192x1024x64xf16>,
+                         %value: tensor<192x1024x64xf16>,
+                         %output: tensor<192x1024x64xf32>)
+                         -> (tensor<192x1024x64xf32>) {
+  %scale = arith.constant 1.0 : f16
+
+  %out = iree_linalg_ext.attention
+        { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO] }
+        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
+        outs(%output : tensor<192x1024x64xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     }
+        -> tensor<192x1024x64xf32>
+
+  return %out : tensor<192x1024x64xf32>
 }
+
 // CHECK-LABEL: @attention
-// CHECK-SAME: %[[S:[0-9A-Za-z]*]]: tensor<20x4096x4096xf32>
-// CHECK-SAME: %[[V:[0-9A-Za-z]*]]: tensor<20x4096x64xf32>
-// CHECK: %[[OUT:.*]]:3 = iree_linalg_ext.exp_reduction
+// CHECK-SAME: %[[query:[0-9A-Za-z]*]]: tensor<192x1024x64xf16>
+// CHECK-SAME: %[[key:[0-9A-Za-z]*]]: tensor<192x1024x64xf16>
+// CHECK-SAME: %[[value:[0-9A-Za-z]*]]: tensor<192x1024x64xf16>
+// CHECK-SAME: %[[output:[0-9A-Za-z]*]]: tensor<192x1024x64xf16>
+// CHECK: %[[OUT:.*]]:3 = iree_linalg_ext.attention
