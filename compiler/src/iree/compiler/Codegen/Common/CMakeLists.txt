@@ -140,6 +140,7 @@ iree_cc_library(
     "ReplaceSlowMinMaxOps.cpp"
     "ReshapePatterns.cpp"
     "ResolveSwizzleHints.cpp"
+    "ResolveWorkgroupCountHints.cpp"
     "SpecializeExports.cpp"
     "SplitFullPartialTransferPass.cpp"
     "StripCompilationInfoPass.cpp"
