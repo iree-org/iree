@@ -129,8 +129,9 @@ struct LowerCoalescedGatherDMAPattern final
     }
     LDBG() << "Transfer size matches target DMA sizes";
 
-    ArrayRef<int64_t> sourceShape = sourceType.getShape();
-    LDBG() << "Source rank: " << sourceShape.size();
+    auto destType = cast<MemRefType>(dest.getType());
+    ArrayRef<int64_t> destShape = destType.getShape();
+    LDBG() << "Destination rank: " << destShape.size();
 
     OperandRange indices = dmaOp.getIndices();
     size_t numIndexDims = indices.size();
@@ -149,15 +150,15 @@ struct LowerCoalescedGatherDMAPattern final
         arith::ConstantIndexOp::create(rewriter, loc, elementsPerTransfer));
 
     // Build tile sizes: [1, 1, ..., 1, subgroupSize * elementsPerTransfer].
-    // This iterates over all dimensions, with each lane handling
+    // This iterates over destination dimensions, with each lane handling
     // `elementsPerTransfer` contiguous elements in the innermost dimension.
     // This approach uniformly handles 1D, 2D, and higher-dimensional cases,
     // as well as both copy mode (no indices) and gather mode (with indices).
-    SmallVector<int64_t> tileSizes(sourceShape.size(), 1);
+    SmallVector<int64_t> tileSizes(destShape.size(), 1);
     tileSizes.back() = *subgroupSize * elementsPerTransfer;
 
     for (const SmallVector<int64_t> &offsets :
-         StaticTileOffsetRange(sourceShape, tileSizes)) {
+         StaticTileOffsetRange(destShape, tileSizes)) {
       SmallVector<Value> srcIndices;
       SmallVector<Value> dstIndices;
 
@@ -176,7 +177,7 @@ struct LowerCoalescedGatherDMAPattern final
         }
 
         // For the innermost dimension, add lane offset to source index.
-        if (dim == sourceShape.size() - 1) {
+        if (dim == destShape.size() - 1) {
           srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, laneOffset);
         }
         srcIndices.push_back(srcIdx);
