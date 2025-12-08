@@ -4919,17 +4919,12 @@ emulator.</p>
 <li><a href="https://gitlab.com/qemu-project/qemu">QEMU</a></li>
 <li><a href="https://risc-v-getting-started-guide.readthedocs.io/en/latest/linux-qemu.html">RISC-V Linux QEMU</a></li>
 </ul>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The <code>RISCV_TOOLCHAIN_ROOT</code> environment variable needs
-to be set to the root directory of the installed GNU toolchain when building
-the RISC-V compiler target and the runtime library.</p>
-</div>
 <h4 id="install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain">Install prebuilt RISC-V tools (RISC-V 64-bit Linux toolchain)<a class="headerlink" href="#install-prebuilt-risc-v-tools-risc-v-64-bit-linux-toolchain" title="Permanent link">link</a></h4>
 <p>Execute the following script to download the prebuilt RISC-V toolchain and QEMU
 from the IREE root directory:</p>
 <div class="highlight"><pre><span></span><code>./build_tools/riscv/riscv_bootstrap.sh
 </code></pre></div>
+<p>By default, the install path is <code>~/riscv/toolchain/clang/linux/RISCV</code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The prebuilt toolchain is built with AlmaLinux release 8.8
@@ -4961,7 +4956,7 @@ as a reference of how to set up the cmake configuration.</p>
 <span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="k">$(</span>realpath<span class="w"> </span>../iree-build/install/bin<span class="k">)</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DRISCV_CPU<span class="o">=</span>linux-riscv_64<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DRISCV_TOOLCHAIN_ROOT<span class="o">=</span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DRISCV_TOOLCHAIN_ROOT<span class="o">=</span>/path/to/riscv/toolchain/clang/linux/RISCV<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>.
 cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build-riscv/
 </code></pre></div>
