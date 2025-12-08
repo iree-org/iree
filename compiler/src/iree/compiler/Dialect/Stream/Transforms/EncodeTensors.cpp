@@ -59,7 +59,7 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
 // Aligns the element type of a tensor<> to a byte-aligned power of 2 bit width.
 static RankedTensorType alignTensorType(RankedTensorType originalType) {
   Type elementType = originalType.getElementType();
-  Type alignedType = legalizeStorageElementType(elementType);
+  Type alignedType = legalizeStorageElementType(originalType);
   if (alignedType == elementType)
     return originalType;
   return RankedTensorType::get(originalType.getShape(), alignedType,
@@ -133,7 +133,8 @@ static Value calculateElementByteOffset(Location loc,
 //
 // Returns the pattern converted to one of [i8, i16, i32, i64] (with i64 needing
 // to be handled via emulation) or nullptr if the type is unsupported.
-static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
+static Value canonicalizeFillPattern(Value pattern, RankedTensorType resultType,
+                                     OpBuilder &builder) {
   auto loc = pattern.getLoc();
 
   // Decompose complex numbers into the real/imag components and pack into an
@@ -153,14 +154,7 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
         pattern);
   }
 
-  // HACK: extend i1 to i8. This is really not something we should be doing here
-  // in optimized programs as this is a super shady operation.
   unsigned elementBitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
-  if (elementBitWidth == 1) {
-    return builder.createOrFold<arith::ExtUIOp>(loc, builder.getI8Type(),
-                                                pattern);
-  }
-
   // For packed sub-byte patterns, duplicate the sub-byte parts into a full
   // byte. We first extend the sub-byte parts into full bytes, and then keep
   // shifting left and bitwise or the sub-byte parts. For example, to create an
@@ -169,7 +163,7 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
   //   %i8_val = (%i8_val << 2) | %i2_val
   //   %i8_val = (%i8_val << 2) | %i2_val
   //   %i8_val = (%i8_val << 2) | %i2_val
-  if (needToPackSubByteElementBitWidth(elementBitWidth)) {
+  if (needToPackSubByteElements(resultType)) {
     Type i8Type = builder.getI8Type();
     Value bitwidth = builder.createOrFold<arith::ConstantOp>(
         loc, i8Type, builder.getIntegerAttr(i8Type, elementBitWidth));
@@ -182,6 +176,15 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
     }
     return i8Val;
   }
+
+  // HACK: For unpacked i1, extend i1 to i8. This is really not something we
+  // should be doing here in optimized programs as this is a super shady
+  // operation.
+  if (elementBitWidth == 1) {
+    return builder.createOrFold<arith::ExtUIOp>(loc, builder.getI8Type(),
+                                                pattern);
+  }
+
   if ((elementBitWidth % 8) != 0) {
     // We'd need some policy to determine how to handle non-byte-aligned widths.
     return {};
@@ -365,7 +368,7 @@ struct EncodeTensorSplatOp
     }
 
     // Canonicalize the fill pattern into an integer type [i8, i16, i32, i64].
-    auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
+    auto pattern = canonicalizeFillPattern(op.getValue(), resultType, rewriter);
     if (!pattern) {
       return op.emitOpError()
              << "has unsupported pattern type " << op.getValue().getType()
@@ -460,7 +463,7 @@ struct EncodeTensorFillOp
     }
 
     // Canonicalize the fill pattern into an integer type [i8, i16, i32, i64].
-    auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
+    auto pattern = canonicalizeFillPattern(op.getValue(), targetType, rewriter);
     if (!pattern) {
       return op.emitOpError()
              << "has unsupported pattern type " << op.getValue().getType()
@@ -656,7 +659,8 @@ struct EncodeHostTensorsPass
 static IREE::TensorExt::DispatchTensorType
 alignDispatchTensorType(IREE::TensorExt::DispatchTensorType originalType) {
   Type elementType = originalType.getBoundElementType();
-  Type alignedType = legalizeStorageElementType(elementType);
+  Type alignedType =
+      legalizeStorageElementType(originalType.asRankedTensorType());
   if (alignedType == elementType)
     return originalType;
   return IREE::TensorExt::DispatchTensorType::get(

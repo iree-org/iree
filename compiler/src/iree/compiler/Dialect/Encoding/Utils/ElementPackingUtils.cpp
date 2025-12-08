@@ -86,6 +86,13 @@ Type legalizeStorageElementType(Type elementType) {
                                         /*isPackedStorage=*/clEnableI1Support);
 }
 
+Type legalizeStorageElementType(RankedTensorType shapedType) {
+  bool isPackedStorage =
+      clEnableI1Support || IREE::Encoding::hasPackedStorageAttr(shapedType);
+  return legalizeStorageElementTypeImpl(shapedType.getElementType(),
+                                        isPackedStorage);
+}
+
 Value calculateStorageElementCountInBytes(Location loc,
                                           RankedTensorType shapedType,
                                           ValueRange dynamicDims,
