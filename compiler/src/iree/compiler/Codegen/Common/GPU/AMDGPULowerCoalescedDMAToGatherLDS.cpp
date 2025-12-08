@@ -118,30 +118,8 @@ struct LowerCoalescedGatherDMAPattern final
     }
     LDBG() << "Subgroup size: " << *subgroupSize;
 
-    // Get forall bounds to determine if this is a "wide" forall where the
-    // iteration count exceeds subgroup_size.
-    ArrayRef<int64_t> forallBounds = forallOp.getStaticUpperBound();
-    int64_t forallBound =
-        forallBounds.empty() ? *subgroupSize : forallBounds[0];
-    bool isWideForall = forallBound != *subgroupSize;
-
-    if (isWideForall) {
-      // The forall upper bound must be divisible by subgroup_size for correct
-      // execution across multiple waves.
-      if (forallBound % *subgroupSize != 0) {
-        return rewriter.notifyMatchFailure(
-            dmaOp, "forall upper bound must be divisible by subgroup size");
-      }
-    }
-
-    // For wide foralls, compute elementsPerTransfer based on the forall bound
-    // (total threads) rather than subgroup_size. This distributes the work
-    // across all threads, with each thread handling fewer elements.
-    int64_t divisor = isWideForall ? forallBound : *subgroupSize;
-    int64_t elementsPerTransfer = innermostDimSize / divisor;
-
     // Check that transfer size matches one of the target DMA sizes.
-    int64_t transferSizePerLane = elementsPerTransfer * elementBits;
+    int64_t transferSizePerLane = transferSizeBits / *subgroupSize;
     LDBG() << "Transfer size per lane: " << transferSizePerLane << " bits";
 
     if (!targetDmaSizes.empty() &&
@@ -159,6 +137,7 @@ struct LowerCoalescedGatherDMAPattern final
     size_t numIndexDims = indices.size();
     LDBG() << "Number of index dimensions: " << numIndexDims;
 
+    int64_t elementsPerTransfer = innermostDimSize / *subgroupSize;
     auto transferType = VectorType::get({elementsPerTransfer}, elementType);
 
     // Actually create the GatherToLDS ops to perform the transfer.
@@ -166,20 +145,8 @@ struct LowerCoalescedGatherDMAPattern final
 
     TypedValue<IndexType> laneId = dmaOp.getLane();
     Location loc = dmaOp.getLoc();
-
-    // For wide foralls where the iteration count exceeds subgroup_size, we need
-    // lane_id % subgroup_size to ensure each wave of threads accesses valid
-    // data within bounds. If the forall bound equals subgroup_size, we can use
-    // lane_id directly.
-    Value effectiveLaneId = laneId;
-    if (isWideForall) {
-      Value subgroupSizeVal =
-          arith::ConstantIndexOp::create(rewriter, loc, *subgroupSize);
-      effectiveLaneId =
-          arith::RemUIOp::create(rewriter, loc, laneId, subgroupSizeVal);
-    }
     Value laneOffset = arith::MulIOp::create(
-        rewriter, loc, effectiveLaneId,
+        rewriter, loc, laneId,
         arith::ConstantIndexOp::create(rewriter, loc, elementsPerTransfer));
 
     // Build tile sizes: [1, 1, ..., 1, subgroupSize * elementsPerTransfer].
