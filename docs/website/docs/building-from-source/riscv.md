@@ -37,11 +37,6 @@ See instructions in the following links
 * [QEMU](https://gitlab.com/qemu-project/qemu)
 * [RISC-V Linux QEMU](https://risc-v-getting-started-guide.readthedocs.io/en/latest/linux-qemu.html)
 
-!!! note
-    The `RISCV_TOOLCHAIN_ROOT` environment variable needs
-    to be set to the root directory of the installed GNU toolchain when building
-    the RISC-V compiler target and the runtime library.
-
 #### Install prebuilt RISC-V tools (RISC-V 64-bit Linux toolchain)
 
 Execute the following script to download the prebuilt RISC-V toolchain and QEMU
@@ -50,6 +45,8 @@ from the IREE root directory:
 ```shell
 ./build_tools/riscv/riscv_bootstrap.sh
 ```
+
+By default, the install path is `~/riscv/toolchain/clang/linux/RISCV`.
 
 !!! note
     The prebuilt toolchain is built with AlmaLinux release 8.8
@@ -92,7 +89,7 @@ cmake -GNinja -B ../iree-build-riscv/ \
   -DIREE_HOST_BIN_DIR=$(realpath ../iree-build/install/bin) \
   -DRISCV_CPU=linux-riscv_64 \
   -DIREE_BUILD_COMPILER=OFF \
-  -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
+  -DRISCV_TOOLCHAIN_ROOT=/path/to/riscv/toolchain/clang/linux/RISCV \
   .
 cmake --build ../iree-build-riscv/
 ```
