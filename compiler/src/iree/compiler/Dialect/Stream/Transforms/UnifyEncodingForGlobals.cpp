@@ -321,10 +321,10 @@ struct UnifyEncodingForGlobalsPass
 
         encodedInfo.sizeofOp.setEncodingAttr(TypeAttr::get(newResultType));
         LDBG() << "  Updated sizeof op: " << encodedInfo.sizeofOp;
-
-        // TODO(#22485): Update dispatch sites and executables.
       }
     }
+
+    // TODO(#22485): Update tensor ops, dispatch sites and executables.
   }
 };
 
