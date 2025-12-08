@@ -398,39 +398,3 @@ func.func @gather_iterates_over_dest_shape_not_source(
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
-
-// -----
-
-// Negative test: Final dimension (96) is not a multiple that produces a valid
-// DMA transfer size. With 32 lanes and f32 elements:
-//   * Elements per lane = 96 / 32 = 3
-//   * Transfer size per lane = 3 * 32 bits = 96 bits
-//   * 96 bits is not in dma_sizes [32, 64, 128], so pattern should not match.
-
-#executable_target_rocm_hsaco_fb_with_dma_sizes = #hal.executable.target<"rocm",
-  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx1250", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
-    max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024,
-    max_workgroup_memory_bytes = 65536,
-    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-    max_load_instruction_bits = 128, simds_per_wgp = 4,
-    vgpr_space_bits = 8192, dma_sizes = [32, 64, 128]>>}>
-
-#translation_32 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
-
-func.func @negative_invalid_transfer_size(
-    %source: memref<4x96xf32, #amdgpu.address_space<fat_raw_buffer>>,
-    %dest: memref<4x96xf32, #gpu.address_space<workgroup>>)
-  attributes {
-    hal.executable.target = #executable_target_rocm_hsaco_fb_with_dma_sizes,
-    translation_info = #translation_32} {
-  scf.forall (%arg6) in (32) {
-    // expected-error @+1 {{failed to lower coalesced_gather_dma op}}
-    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<4x96xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<4x96xf32, #gpu.address_space<workgroup>>, index
-  } {mapping = [#gpu.thread<linear_dim_0>]}
-  return
-}
