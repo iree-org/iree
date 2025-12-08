@@ -5,6 +5,6 @@
     "gfx942"
   ],
   "module": "sdxl/modules/clip_gfx942",
-  "golden_dispatch_count": 790,
+  "golden_dispatch_count": 792,
   "golden_binary_size": 460000
 }
