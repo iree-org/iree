@@ -41,7 +41,6 @@ iree_cc_library(
     "StripDebugOps.cpp"
     "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
-    "TestIntegerDivisibilityAnalysis.cpp"
     "VerifyInitializationOrder.cpp"
     "VerifyStructuredControlFlow.cpp"
   DEPS
