@@ -238,7 +238,7 @@ func.func @lower_coalesced_copy_dma_3d(
   arch = "gfx1250", features = "", wgp = <
     compute = fp64|fp32|fp16|int64|int32|int16|int8,
     storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [256, 256],
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -246,40 +246,35 @@ func.func @lower_coalesced_copy_dma_3d(
     max_load_instruction_bits = 128, simds_per_wgp = 4,
     vgpr_space_bits = 8192>>}>
 
-#translation_256_wide = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 256>
+#translation_256_wide = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 32>
 
-// Test: Wide forall with 256 lanes, 2D memref 2x1024.
-//   * subgroup_size = 256
+// Test: Wide forall (256 threads) with subgroup_size=32 and 1D memref.
+// This represents 256/32 = 8 waves of execution at runtime.
+//   * memref<1024xf32>
 //   * elementsPerTransfer = 1024 / 256 = 4 (128 bits per lane)
-//   * tileSizes = [1, 1024]
-//   * 2 rows * 1 tile per row = 2 gather_to_lds ops
+//   * tileSizes = [32 * 4] = [128]
+//   * 1024 / 128 = 8 gather_to_lds ops
 //
-// CHECK-LABEL: func.func @lower_coalesced_copy_dma_wide_forall_2d
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<2x1024xf32, #amdgpu.address_space<fat_raw_buffer>>
-// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<2x1024xf32, #gpu.address_space<workgroup>>
-func.func @lower_coalesced_copy_dma_wide_forall_2d(
-    %source: memref<2x1024xf32, #amdgpu.address_space<fat_raw_buffer>>,
-    %dest: memref<2x1024xf32, #gpu.address_space<workgroup>>)
+// CHECK-LABEL: func.func @lower_coalesced_copy_dma_wide_forall
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<1024xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<1024xf32, #gpu.address_space<workgroup>>
+func.func @lower_coalesced_copy_dma_wide_forall(
+    %source: memref<1024xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<1024xf32, #gpu.address_space<workgroup>>)
   attributes {
     hal.executable.target = #executable_target_rocm_hsaco_fb_wide,
     translation_info = #translation_256_wide} {
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (256)
   scf.forall (%arg6) in (256) {
-    // elementsPerTransfer = 1024 / 256 = 4
+    // Effective lane ID = lane_id % subgroup_size (for wide foralls)
+    // CHECK-DAG: %[[C32:[a-zA-Z0-9_]+]] = arith.constant 32
+    // CHECK-DAG: %[[EFF_LANE:[a-zA-Z0-9_]+]] = arith.remui %[[LANE_ID]], %[[C32]]
     // CHECK-DAG: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
-    // CHECK-DAG: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
-    //
-    // Row 0: source[0, offset + lane_offset], dest[0, 0]
-    // CHECK-DAG: %[[ROW0:.+]] = arith.constant 0 : index
-    // CHECK: %[[SRC_COL0:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW0]], %[[SRC_COL0]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<4xf32>
-    //
-    // Row 1: source[1, offset + lane_offset], dest[1, 0]
-    // CHECK: %[[ROW1:.+]] = arith.constant 1 : index
-    // CHECK: %[[SRC_COL1:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW1]], %[[SRC_COL1]]], %[[DST]][%{{.+}}, %{{.+}}] : vector<4xf32>
+    // CHECK-DAG: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[EFF_LANE]], %[[C4]]
+    // CHECK-COUNT-8: amdgpu.gather_to_lds {{.*}} : vector<4xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
-    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x1024xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<2x1024xf32, #gpu.address_space<workgroup>>, index
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<1024xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<1024xf32, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
@@ -431,6 +426,39 @@ func.func @negative_invalid_transfer_size(
   scf.forall (%arg6) in (32) {
     // expected-error @+1 {{failed to lower coalesced_gather_dma op}}
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<4x96xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<4x96xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// -----
+
+// Negative test: Forall upper bound (100) is not divisible by subgroup_size (32).
+// 100 % 32 = 4, so the pattern should not match.
+
+#executable_target_rocm_hsaco_fb_indivisible = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx1250", features = "", wgp = <
+    compute = fp64|fp32|fp16|int64|int32|int16|int8,
+    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192>>}>
+
+#translation_100 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [100, 1, 1] subgroup_size = 32>
+
+func.func @negative_forall_not_divisible_by_subgroup(
+    %source: memref<128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<128xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_indivisible,
+    translation_info = #translation_100} {
+  scf.forall (%arg6) in (100) {
+    // expected-error @+1 {{failed to lower coalesced_gather_dma op}}
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<128xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<128xf32, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
