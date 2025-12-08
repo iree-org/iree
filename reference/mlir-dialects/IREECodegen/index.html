@@ -2029,13 +2029,37 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-usage-linearized-workgroup-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Usage: Linearized Workgroup Counts
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_3" class="md-nav__link">
+  <a href="#attributes_4" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5309,13 +5333,37 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-usage-linearized-workgroup-counts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common Usage: Linearized Workgroup Counts
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_3" class="md-nav__link">
+  <a href="#attributes_4" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5859,9 +5907,13 @@ within a backend.</p>
 <li><a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop">iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)</a></li>
 <li><a href="#iree_codegenstore_to_buffer-codegenstoretobufferop">iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)</a></li>
 <li><a href="#iree_codegenswizzle_hint-codegenswizzlehintop">iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)</a></li>
+<li><a href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop">iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)</a><ul>
+<li><a href="#common-usage-linearized-workgroup-counts">Common Usage: Linearized Workgroup Counts</a></li>
 </ul>
 </li>
-<li><a href="#attributes_3">Attributes</a><ul>
+</ul>
+</li>
+<li><a href="#attributes_4">Attributes</a><ul>
 <li><a href="#denormalfpmathattr">DenormalFpMathAttr</a></li>
 <li><a href="#dispatchloweringpasspipelineattr">DispatchLoweringPassPipelineAttr</a></li>
 <li><a href="#compilationinfoattr">CompilationInfoAttr</a></li>
@@ -6445,7 +6497,61 @@ is otherwise perfectly legal.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_3">Attributes<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h2>
+<h3 id="iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop"><code>iree_codegen.workgroup_count_hint</code> (Codegen::WorkgroupCountHintOp)<a class="headerlink" href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop" title="Permanent link">link</a></h3>
+<p><em>Hints at the workgroup count to set</em></p>
+<p>Captures a set of values to use as the workgroup count. The backward slice
+starting from this op's operands is cloned into the workgroup count region
+of all transitive callers.</p>
+<p>The sizes are specified in logical order (innermost to outermost), matching
+the workgroup count region's (x, y, z) convention. If fewer than 3 sizes
+are provided, the remaining dimensions default to 1.</p>
+<p>If multiple hints inform the same entry point, the <strong>elementwise maximum</strong>
+across all hints is used as the count along each dimension. For example:</p>
+<div class="highlight"><pre><span></span><code>hal.executable.export @entry_point
+module {
+  func.func @entry_point() {
+    iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+    iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+  }
+}
+</code></pre></div>
+<p>resolves to:</p>
+<div class="highlight"><pre><span></span><code>hal.executable.export @entry_point {
+  %wx = arith.maxsi %a, %x
+  %wy = arith.maxsi %b, %y
+  %wz = arith.maxsi %c, %z
+  hal.return %wx, %wy, %wz
+}
+</code></pre></div>
+<h4 id="common-usage-linearized-workgroup-counts">Common Usage: Linearized Workgroup Counts<a class="headerlink" href="#common-usage-linearized-workgroup-counts" title="Permanent link">link</a></h4>
+<p>The most common use case for this operation involves computing a linearized
+(1-D) workgroup count and specifying it as a single size.</p>
+<div class="highlight"><pre><span></span><code>%num_workgroups = arith.ceildivui %total_iterations, %tile_size : index
+iree_codegen.workgroup_count_hint sizes(%num_workgroups)
+</code></pre></div>
+<p>This results in <code>(%num_workgroups, 1, 1)</code> as the final workgroup count.</p>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>static_sizes</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
+</table>
+
+<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>sizes</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h2 id="attributes_4">Attributes<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h2>
 <h3 id="denormalfpmathattr">DenormalFpMathAttr<a class="headerlink" href="#denormalfpmathattr" title="Permanent link">link</a></h3>
 <p><em>Denormal mode for fp math</em></p>
 <p>Syntax:</p>

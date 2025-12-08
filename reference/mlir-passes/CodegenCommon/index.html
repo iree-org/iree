@@ -3631,6 +3631,57 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-resolve-workgroup-count-hints" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-resolve-workgroup-count-hints
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-codegen-resolve-workgroup-count-hints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-ir-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported IR Structure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported Control Flow
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolution-of-multiple-hints" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resolution of Multiple Hints
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backward-slice-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Backward Slice Requirements
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-specialize-exports" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-specialize-exports
@@ -6662,6 +6713,57 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-resolve-workgroup-count-hints" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-resolve-workgroup-count-hints
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-codegen-resolve-workgroup-count-hints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-ir-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported IR Structure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported Control Flow
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolution-of-multiple-hints" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resolution of Multiple Hints
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backward-slice-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Backward Slice Requirements
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-specialize-exports" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-specialize-exports
@@ -7280,6 +7382,78 @@ lowering configurations.</p>
 <p><em>Replace slow min/max operations that propagate NaNs and distinguish between +/-0.0 with faster min/max operations that ignore them.</em></p>
 <h3 id="-iree-codegen-resolve-swizzle-hints"><code>-iree-codegen-resolve-swizzle-hints</code><a class="headerlink" href="#-iree-codegen-resolve-swizzle-hints" title="Permanent link">link</a></h3>
 <p><em>Resolves iree_codegen.swizzle_hint ops</em></p>
+<h3 id="-iree-codegen-resolve-workgroup-count-hints"><code>-iree-codegen-resolve-workgroup-count-hints</code><a class="headerlink" href="#-iree-codegen-resolve-workgroup-count-hints" title="Permanent link">link</a></h3>
+<p><em>Materialize workgroup count hints in the workgroup count region per export.</em></p>
+<p>Resolves <code>iree_codegen.workgroup_count_hint</code> ops by materializing a globally
+agreeable workgroup count per export. This pass performs a depth-first walk
+of the target variant's call graph constructing the necessary information to
+materialize workgroup count hints for that function.</p>
+<h4 id="supported-ir-structure">Supported IR Structure<a class="headerlink" href="#supported-ir-structure" title="Permanent link">link</a></h4>
+<p>The pass expects executable variants containing exports with associated
+entry point functions. Each entry point function (or functions it calls)
+may contain <code>iree_codegen.workgroup_count_hint</code> ops:</p>
+<div class="highlight"><pre><span></span><code>hal.executable.export @entry_point
+    count(%device: !hal.device, %workload: index) -&gt; (index, index, index) {
+  %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %workload
+  hal.return %x, %y, %z : index, index, index
+}
+module {
+  func.func @entry_point(%device: !hal.device) {
+    %workload = iree_tensor_ext.dispatch.workload.ordinal %val, 0 : index
+    iree_codegen.workgroup_count_hint sizes(%workload)
+  }
+}
+</code></pre></div>
+<h4 id="supported-control-flow">Supported Control Flow<a class="headerlink" href="#supported-control-flow" title="Permanent link">link</a></h4>
+<p>The pass handles the following control flow patterns:</p>
+<ol>
+<li>
+<p><strong>Direct hints</strong>: Workgroup count hints directly in entry point functions.</p>
+</li>
+<li>
+<p><strong>Transitive function calls</strong>: Hints in functions called (directly or
+   transitively) from the entry point. The backward slice of operands
+   required to compute the hint is tracked across call boundaries.</p>
+</li>
+<li>
+<p><strong>Conditional hints (<code>scf.if</code>)</strong>: When hints are wrapped in <code>scf.if</code>
+   operations, the conditions are preserved in the workgroup count region
+   if possible.
+   <div class="highlight"><pre><span></span><code>%o0 = iree_tensor_ext.dispatch.workload.ordinal ...
+%o1 = iree_tensor_ext.dispatch.workload.ordinal ...
+%cond = arith.cmpi ..., %o0, %o1
+scf.if %cond {
+  iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+} else {
+  iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+}
+</code></pre></div>
+   This generates an <code>scf.if</code> in the workgroup count region rather than
+   pessimistically taking the maximum.</p>
+</li>
+</ol>
+<h4 id="resolution-of-multiple-hints">Resolution of Multiple Hints<a class="headerlink" href="#resolution-of-multiple-hints" title="Permanent link">link</a></h4>
+<p>When multiple <code>workgroup_count_hint</code> ops contribute to the same export
+(either directly or through function calls), the final workgroup count
+is computed as the <strong>elementwise maximum</strong> across all hints:</p>
+<div class="highlight"><pre><span></span><code>// Given:
+iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+
+// Resolves to:
+%wx = arith.maxsi %x, %a
+%wy = arith.maxsi %y, %b
+%wz = arith.maxsi %z, %c
+hal.return %wx, %wy, %wz
+</code></pre></div>
+<h4 id="backward-slice-requirements">Backward Slice Requirements<a class="headerlink" href="#backward-slice-requirements" title="Permanent link">link</a></h4>
+<p>The backward slice of hint operands must consist only of:
+- <code>iree_tensor_ext.dispatch.workload.ordinal</code> ops (leaf values)
+- Pure/side-effect-free operations
+- Function arguments (for transitive call support)</p>
+<p>Operations with memory effects or that depend on device-local values
+(e.g., <code>hal.interface.*</code> ops, workgroup/thread IDs) result in a compiler
+error for hint operands and omit conditionals for <code>scf.if</code> operands.</p>
 <h3 id="-iree-codegen-specialize-exports"><code>-iree-codegen-specialize-exports</code><a class="headerlink" href="#-iree-codegen-specialize-exports" title="Permanent link">link</a></h3>
 <p><em>Specializes exported functions based on annotated ranges</em></p>
 <h3 id="-iree-codegen-split-full-partial-transfer"><code>-iree-codegen-split-full-partial-transfer</code><a class="headerlink" href="#-iree-codegen-split-full-partial-transfer" title="Permanent link">link</a></h3>

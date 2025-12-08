@@ -13096,7 +13096,7 @@ the result type (tensor, memref, etc).</p>
 <p>An optional alignment indicates the byte alignment of the base binding
 resource. Note that the byte offset is added to the base and the alignment
 will be the minimum of the two.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>HAL_ExecutableInterfaceOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_50">Attributes:<a class="headerlink" href="#attributes_50" title="Permanent link">link</a></h5>
@@ -13163,7 +13163,7 @@ index into binding resources.</p>
 to the constant from all dispatch sites in the program. If omitted the value
 may be from an unanalyzable source (outside of the program, indirect, etc)
 and must be assumed to have any value.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HAL_ExecutableInterfaceOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_51">Attributes:<a class="headerlink" href="#attributes_51" title="Permanent link">link</a></h5>
@@ -13204,7 +13204,7 @@ built-in variable.</p>
 %y = hal.interface.workgroup.count[1] : index
 %z = hal.interface.workgroup.count[2] : index
 </code></pre></div>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HAL_ExecutableInterfaceOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntRangeInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_52">Attributes:<a class="headerlink" href="#attributes_52" title="Permanent link">link</a></h5>
@@ -13242,7 +13242,7 @@ built-in variable.</p>
 %y = hal.interface.workgroup.id[1] : index
 %z = hal.interface.workgroup.id[2] : index
 </code></pre></div>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HAL_ExecutableInterfaceOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntRangeInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_53">Attributes:<a class="headerlink" href="#attributes_53" title="Permanent link">link</a></h5>
@@ -13281,7 +13281,7 @@ built-in variable.</p>
 %y = hal.interface.workgroup.size[1] : index
 %z = hal.interface.workgroup.size[2] : index
 </code></pre></div>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HAL_ExecutableInterfaceOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferIntRangeInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_54">Attributes:<a class="headerlink" href="#attributes_54" title="Permanent link">link</a></h5>
