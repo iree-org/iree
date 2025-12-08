@@ -78,14 +78,14 @@ cmake --build ../iree-build/ --target install
 
 The following instruction shows how to build for a RISC-V 64-bit Linux machine.
 For other RISC-V targets, please refer to
-[riscv.toolchain.cmake](https://github.com/iree-org/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
+[riscv_toolchain_linux.cmake](https://github.com/iree-org/iree/blob/main/build_tools/cmake/riscv_toolchain_linux.cmake)
 as a reference of how to set up the cmake configuration.
 
 #### RISC-V 64-bit Linux target
 
 ```shell
 cmake -GNinja -B ../iree-build-riscv/ \
-  -DCMAKE_TOOLCHAIN_FILE="./build_tools/cmake/riscv.toolchain.cmake" \
+  -DCMAKE_TOOLCHAIN_FILE="./build_tools/cmake/riscv_toolchain_linux.cmake" \
   -DIREE_HOST_BIN_DIR=$(realpath ../iree-build/install/bin) \
   -DRISCV_CPU=linux-riscv_64 \
   -DIREE_BUILD_COMPILER=OFF \
