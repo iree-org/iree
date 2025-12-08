@@ -49,6 +49,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AMDGPUDistributeContract.cpp"
+    "AMDGPULowerCoalescedDMAToGatherLDS.cpp"
     "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
     "GPUAllocPrivateMemoryForDPSOps.cpp"
