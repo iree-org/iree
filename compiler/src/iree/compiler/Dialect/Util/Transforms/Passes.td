@@ -346,14 +346,4 @@ def TestFloatRangeAnalysisPass : Pass<"iree-util-test-float-range-analysis", "">
   }];
 }
 
-def TestIntegerDivisibilityAnalysisPass :
-    Pass<"iree-util-test-integer-divisibility-analysis", ""> {
-  let summary = "Tests integer divisibility analysis.";
-  let description = [{
-    Tests integer divisibility analysis by evaluating any
-    'iree_unregistered.test_int_divisibility' op and setting the results on an
-    attribute.
-  }];
-}
-
 #endif  // IREE_DIALECT_UTIL_PASSES
