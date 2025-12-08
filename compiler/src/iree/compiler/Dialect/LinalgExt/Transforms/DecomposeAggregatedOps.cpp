@@ -35,14 +35,18 @@ private:
 
 void DecomposeAggregatedOpPass::runOnOperation() {
   FailureOr<StringSet<>> filterResult = parseFilterOps();
-  if (failed(filterResult))
+  if (failed(filterResult)) {
     return;
+  }
   StringSet<> filter = filterResult.value();
+  if (filter.empty()) {
+    return;
+  }
+
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
   getOperation().walk([&](linalg::AggregatedOpInterface aggregatedOp) {
-    if (!filter.empty() &&
-        !filter.contains(aggregatedOp->getName().getStringRef())) {
+    if (!filter.contains(aggregatedOp->getName().getStringRef())) {
       return;
     }
     rewriter.setInsertionPoint(aggregatedOp);
@@ -61,6 +65,7 @@ void DecomposeAggregatedOpPass::runOnOperation() {
 
 FailureOr<StringSet<>> DecomposeAggregatedOpPass::parseFilterOps() {
   if (filterOps.empty()) {
+    getOperation()->emitWarning("decompose-aggregated-op op list is empty!");
     return llvm::StringSet{};
   }
 
