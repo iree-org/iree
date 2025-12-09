@@ -363,11 +363,14 @@ def IREEGPU_DataTiledMMAAttr :
     By default, intrinsic-level sub-tiles are contiguous and arranged
     side-by-side in the overall tile layout. When
     `operands_interleaving_intrinsics_{m,n,k}` is non-empty, each entry
-    indicates an operand (given by its operand index) for which the tile layout
-    has the corresponding intrinsics tiles interleaved. For example, when
-    `intrinsics_k = 2` and `operands_interleaving_intrinsics_k = [0, 1]`, there
-    are two intrinsics along the k-dimension and their layouts are interleaved
-    in operands 0 and 1, meaning LHS and RHS.
+    indicates an operand (given by its operand index) for which the
+    `intrinsics_{m,n,k}` tiles are interleaved to the innermost positions of
+    the entire swizzled layout. For example, when `intrinsics_k = 2` and
+    `operands_interleaving_intrinsics_k = [0, 1]`, there are two intrinsics
+    along the k-dimension and their layouts are interleaved in operands 0
+    and 1, meaning LHS and RHS. When multiple interleavings are applied,
+    `intrinsics_k` is placed innermost, then going outward `intrinsics_n`,
+    then `intrinsics_m`.
 
     The `subgroups_{m,n,k}` parameters control the number of subgroups and the
     layout of the tile accesses made by different subgroups. The product of the
