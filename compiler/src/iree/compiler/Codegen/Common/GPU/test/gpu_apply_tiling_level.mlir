@@ -672,7 +672,7 @@ func.func @no_swap_collapse_shape_with_extract_slice_3(%arg0: tensor<8x1x4x16x16
   return %1 : tensor<512x48x48xf32>
 }
 
-// No swap would happen when the user of extract_slice is a tensor.parallel_insert_slice.
+// No swap would happen when extract_slice and collapse_shape ops are within the same block.
 // NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice_3
 //       NORM-REDUCTION:   scf.forall
 //       NORM-REDUCTION:     linalg.copy
