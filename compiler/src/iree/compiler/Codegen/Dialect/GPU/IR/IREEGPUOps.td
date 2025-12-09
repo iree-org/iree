@@ -400,7 +400,14 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    $source (`[` $indices^ `]`)?
+    `into` $init
+    custom<OptionalSlice>($offsets, $sizes, $strides,
+                          $static_offsets, $static_sizes, $static_strides)
+    `lane` `(` $lane `)`
+    attr-dict `:` functional-type(operands, results)
+  }];
 
   let hasVerifier = 1;
 

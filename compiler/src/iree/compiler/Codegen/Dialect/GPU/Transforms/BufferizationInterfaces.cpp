@@ -378,10 +378,18 @@ struct CoalescedGatherDMAOpBufferizationInterface
 
     rewriter.setInsertionPoint(gatherOp);
 
+    // Handle slice semantics: create a subview of the init buffer.
+    Value destBuffer = *initBuffer;
+    if (gatherOp.hasSliceSemantics()) {
+      destBuffer = memref::SubViewOp::create(
+          rewriter, gatherOp.getLoc(), destBuffer, gatherOp.getMixedOffsets(),
+          gatherOp.getMixedSizes(), gatherOp.getMixedStrides());
+    }
+
     // Create the bufferized DMA operation with no results (memref form).
     IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, gatherOp.getLoc(), /*resultType=*/Type{}, *sourceBuffer,
-        bufferizedIndices, *initBuffer, gatherOp.getLane());
+        bufferizedIndices, destBuffer, gatherOp.getLane());
 
     // Replace the tensor op. If it has a result, replace with the init buffer.
     // If it has no result (inside scf.forall.in_parallel), just erase it.

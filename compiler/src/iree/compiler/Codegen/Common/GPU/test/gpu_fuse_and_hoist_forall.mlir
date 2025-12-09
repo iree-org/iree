@@ -852,7 +852,7 @@ func.func @fuse_warp_and_lane_foralls_with_coalesced_dma(%src: tensor<2x2x64xf32
     %src_slice = tensor.extract_slice %src[%warp0, %warp1, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
     %lane_result = scf.forall (%lane) in (64) shared_outs(%lane_out = %warp_slice) -> (tensor<1x1x64xf32>) {
       scf.forall.in_parallel {
-        iree_gpu.coalesced_gather_dma %src_slice into %lane_out lane(%lane) : tensor<1x1x64xf32>, tensor<1x1x64xf32>, index
+        iree_gpu.coalesced_gather_dma %src_slice into %lane_out lane(%lane) : (tensor<1x1x64xf32>, tensor<1x1x64xf32>, index) -> ()
       }
     } {mapping = [#iree_gpu.lane_id<0>]}
     scf.forall.in_parallel {
@@ -867,11 +867,9 @@ func.func @fuse_warp_and_lane_foralls_with_coalesced_dma(%src: tensor<2x2x64xf32
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x2x64xf32>
 //       CHECK:   %[[THREAD_FORALL:.+]] = scf.forall (%[[TID0:.+]], %[[TID1:.+]], %[[TID2:.+]]) in (2, 2, 64)
 //  CHECK-SAME:       shared_outs(%[[INIT_ARG:.+]] = %[[EMPTY]])
-//   CHECK-DAG:     %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]][%[[TID0]], %[[TID1]], 0] [1, 1, 64]
-//   CHECK-DAG:     %[[DEST_SLICE:.+]] = tensor.extract_slice %[[INIT_ARG]][%[[TID0]], %[[TID1]], 0] [1, 1, 64]
-//       CHECK:     %[[DMA_RESULT:.+]] = iree_gpu.coalesced_gather_dma %[[SRC_SLICE]] into %[[DEST_SLICE]] lane(%[[TID2]])
+//       CHECK:     %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]][%[[TID0]], %[[TID1]], 0] [1, 1, 64]
 //       CHECK:     scf.forall.in_parallel {
-//       CHECK:       tensor.parallel_insert_slice %[[DMA_RESULT]] into %[[INIT_ARG]][%[[TID0]], %[[TID1]], 0]
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[SRC_SLICE]] into %[[INIT_ARG]] [%[[TID0]], %[[TID1]], 0] [1, 1, 64] [1, 1, 1] lane(%[[TID2]])
 //       CHECK:     }
 //       CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 //       CHECK:   return %[[THREAD_FORALL]]

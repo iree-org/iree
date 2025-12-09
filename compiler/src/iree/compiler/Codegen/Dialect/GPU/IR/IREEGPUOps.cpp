@@ -15,7 +15,66 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Support/LLVM.h"
+
+using namespace mlir;
+using namespace mlir::iree_compiler::IREE::GPU;
+
+//===----------------------------------------------------------------------===//
+// Custom directive for optional slice (offsets/sizes/strides)
+// Prints nothing when empty, or [offsets] [sizes] [strides] when present
+//===----------------------------------------------------------------------===//
+
+static ParseResult
+parseOptionalSlice(OpAsmParser &parser,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &offsets,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &strides,
+                   DenseI64ArrayAttr &staticOffsets,
+                   DenseI64ArrayAttr &staticSizes,
+                   DenseI64ArrayAttr &staticStrides) {
+  // Try to parse [offsets] [sizes] [strides] - if first '[' fails, it's empty
+  if (failed(parser.parseOptionalLSquare())) {
+    // Empty - no slice semantics
+    staticOffsets = parser.getBuilder().getDenseI64ArrayAttr({});
+    staticSizes = parser.getBuilder().getDenseI64ArrayAttr({});
+    staticStrides = parser.getBuilder().getDenseI64ArrayAttr({});
+    return success();
+  }
+
+  // Parse offsets (without brackets - we already parsed '[')
+  if (parseDynamicIndexList(parser, offsets, staticOffsets, nullptr,
+                            AsmParser::Delimiter::None) ||
+      parser.parseRSquare())
+    return failure();
+
+  // Parse sizes
+  if (parseDynamicIndexList(parser, sizes, staticSizes))
+    return failure();
+
+  // Parse strides
+  if (parseDynamicIndexList(parser, strides, staticStrides))
+    return failure();
+
+  return success();
+}
+
+static void printOptionalSlice(OpAsmPrinter &p, Operation *op,
+                               OperandRange offsets, OperandRange sizes,
+                               OperandRange strides,
+                               DenseI64ArrayAttr staticOffsets,
+                               DenseI64ArrayAttr staticSizes,
+                               DenseI64ArrayAttr staticStrides) {
+  if (staticOffsets.empty())
+    return; // No slice - print nothing
+
+  printDynamicIndexList(p, op, offsets, staticOffsets.asArrayRef());
+  p << " ";
+  printDynamicIndexList(p, op, sizes, staticSizes.asArrayRef());
+  p << " ";
+  printDynamicIndexList(p, op, strides, staticStrides.asArrayRef());
+}
 
 // clang-format off
 #define GET_OP_CLASSES
@@ -352,221 +411,6 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   return success();
-}
-
-/// Helper to print a mixed list of operands and integers (static values).
-static void printDynamicIndexList(OpAsmPrinter &p, OperandRange values,
-                                  ArrayRef<int64_t> staticVals) {
-  unsigned dynamicIdx = 0;
-  llvm::interleaveComma(staticVals, p, [&](int64_t val) {
-    if (val == ShapedType::kDynamic) {
-      p << values[dynamicIdx++];
-    } else {
-      p << val;
-    }
-  });
-}
-
-/// Helper to parse a mixed list of operands and integers.
-static ParseResult
-parseDynamicIndexList(OpAsmParser &parser,
-                      SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
-                      SmallVectorImpl<int64_t> &staticVals) {
-  auto parseOne = [&]() -> ParseResult {
-    OpAsmParser::UnresolvedOperand operand;
-    auto res = parser.parseOptionalOperand(operand);
-    if (res.has_value() && succeeded(*res)) {
-      values.push_back(operand);
-      staticVals.push_back(ShapedType::kDynamic);
-    } else {
-      int64_t val;
-      if (parser.parseInteger(val))
-        return failure();
-      staticVals.push_back(val);
-    }
-    return success();
-  };
-  return parser.parseCommaSeparatedList(parseOne);
-}
-
-// Custom parser for CoalescedGatherDMAOp
-// Format: $source (`[` $indices^ `]`)? `into` $init
-//         (`[` offset-list `]` `[` size-list `]` `[` stride-list `]`)?
-//         `lane` `(` $lane `)` attr-dict `:` type(operands) (`->`
-//         type($result))?
-ParseResult CoalescedGatherDMAOp::parse(OpAsmParser &parser,
-                                        OperationState &result) {
-  OpAsmParser::UnresolvedOperand source;
-  SmallVector<OpAsmParser::UnresolvedOperand> indices;
-  OpAsmParser::UnresolvedOperand init;
-  OpAsmParser::UnresolvedOperand lane;
-
-  // Parse source
-  if (parser.parseOperand(source))
-    return failure();
-
-  // Parse optional indices
-  if (succeeded(parser.parseOptionalLSquare())) {
-    if (parser.parseOperandList(indices) || parser.parseRSquare())
-      return failure();
-  }
-
-  // Parse 'into' and init
-  if (parser.parseKeyword("into") || parser.parseOperand(init))
-    return failure();
-
-  // Parse optional offset/size/stride lists
-  SmallVector<OpAsmParser::UnresolvedOperand> offsets, sizes, strides;
-  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
-
-  if (succeeded(parser.parseOptionalLSquare())) {
-    // We have slice semantics - parse offsets, sizes, strides
-    if (parseDynamicIndexList(parser, offsets, staticOffsets) ||
-        parser.parseRSquare() || parser.parseLSquare() ||
-        parseDynamicIndexList(parser, sizes, staticSizes) ||
-        parser.parseRSquare() || parser.parseLSquare() ||
-        parseDynamicIndexList(parser, strides, staticStrides) ||
-        parser.parseRSquare())
-      return failure();
-  }
-
-  // Parse 'lane' '(' lane ')'
-  if (parser.parseKeyword("lane") || parser.parseLParen() ||
-      parser.parseOperand(lane) || parser.parseRParen())
-    return failure();
-
-  // Parse attributes
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  // Parse ':' and types
-  if (parser.parseColon())
-    return failure();
-
-  // Parse source type
-  Type sourceType;
-  if (parser.parseType(sourceType))
-    return failure();
-
-  // Parse indices types
-  SmallVector<Type> indicesTypes;
-  for (size_t i = 0; i < indices.size(); ++i) {
-    if (parser.parseComma())
-      return failure();
-    Type indexType;
-    if (parser.parseType(indexType))
-      return failure();
-    indicesTypes.push_back(indexType);
-  }
-
-  // Parse init type
-  if (parser.parseComma())
-    return failure();
-  Type initType;
-  if (parser.parseType(initType))
-    return failure();
-
-  // Parse lane type (index)
-  if (parser.parseComma())
-    return failure();
-  Type laneType;
-  if (parser.parseType(laneType))
-    return failure();
-
-  // Parse optional result type
-  Type resultType;
-  if (succeeded(parser.parseOptionalArrow())) {
-    if (parser.parseType(resultType))
-      return failure();
-    result.addTypes(resultType);
-  }
-
-  // Resolve operands
-  if (parser.resolveOperand(source, sourceType, result.operands))
-    return failure();
-  if (parser.resolveOperands(indices, indicesTypes, parser.getNameLoc(),
-                             result.operands))
-    return failure();
-  if (parser.resolveOperand(init, initType, result.operands))
-    return failure();
-  if (parser.resolveOperand(lane, laneType, result.operands))
-    return failure();
-  if (parser.resolveOperands(offsets, parser.getBuilder().getIndexType(),
-                             result.operands))
-    return failure();
-  if (parser.resolveOperands(sizes, parser.getBuilder().getIndexType(),
-                             result.operands))
-    return failure();
-  if (parser.resolveOperands(strides, parser.getBuilder().getIndexType(),
-                             result.operands))
-    return failure();
-
-  // Add segment sizes
-  result.addAttribute(
-      CoalescedGatherDMAOp::getOperandSegmentSizesAttrName(result.name),
-      parser.getBuilder().getDenseI32ArrayAttr(
-          {1, static_cast<int32_t>(indices.size()), 1, 1,
-           static_cast<int32_t>(offsets.size()),
-           static_cast<int32_t>(sizes.size()),
-           static_cast<int32_t>(strides.size())}));
-
-  // Add static offset/size/stride attributes
-  result.addAttribute(
-      CoalescedGatherDMAOp::getStaticOffsetsAttrName(result.name),
-      parser.getBuilder().getDenseI64ArrayAttr(staticOffsets));
-  result.addAttribute(CoalescedGatherDMAOp::getStaticSizesAttrName(result.name),
-                      parser.getBuilder().getDenseI64ArrayAttr(staticSizes));
-  result.addAttribute(
-      CoalescedGatherDMAOp::getStaticStridesAttrName(result.name),
-      parser.getBuilder().getDenseI64ArrayAttr(staticStrides));
-
-  return success();
-}
-
-// Custom printer for CoalescedGatherDMAOp
-void CoalescedGatherDMAOp::print(OpAsmPrinter &p) {
-  p << ' ' << getSource();
-
-  // Print optional indices
-  if (!getIndices().empty()) {
-    p << '[';
-    llvm::interleaveComma(getIndices(), p);
-    p << ']';
-  }
-
-  p << " into " << getInit();
-
-  // Print optional slice offsets/sizes/strides
-  if (hasSliceSemantics()) {
-    p << " [";
-    printDynamicIndexList(p, getOffsets(), getStaticOffsets());
-    p << "] [";
-    printDynamicIndexList(p, getSizes(), getStaticSizes());
-    p << "] [";
-    printDynamicIndexList(p, getStrides(), getStaticStrides());
-    p << ']';
-  }
-
-  p << " lane(" << getLane() << ')';
-
-  // Print attributes (excluding operand_segment_sizes and static_* attrs)
-  SmallVector<StringRef> elidedAttrs = {
-      getOperandSegmentSizesAttrName(), getStaticOffsetsAttrName(),
-      getStaticSizesAttrName(), getStaticStridesAttrName()};
-  p.printOptionalAttrDict(getOperation()->getAttrs(), elidedAttrs);
-
-  // Print types
-  p << " : " << getSource().getType();
-  for (Value index : getIndices()) {
-    p << ", " << index.getType();
-  }
-  p << ", " << getInit().getType();
-  p << ", " << getLane().getType();
-
-  // Print optional result type
-  if (getResult()) {
-    p << " -> " << getResult().getType();
-  }
 }
 
 // Builder with OpFoldResult for offsets/sizes/strides
