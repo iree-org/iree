@@ -15,6 +15,7 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/ParallelCombiningOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
@@ -259,6 +260,8 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
+    AttrSizedOperandSegments,
+    OffsetSizeAndStrideOpInterface,
     DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
        ["getUpdatedDestinations", "getIteratingParent"]>]> {
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
@@ -283,6 +286,21 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     ParallelCombiningOpInterface and must live inside an op implementing
     `InParallelOpInterface`, such as `scf.forall.in_parallel`.
 
+    ## Slice Semantics
+
+    The operation supports optional slice semantics via `offsets`, `sizes`,
+    and `strides` operands. When these are provided, the DMA writes to a
+    slice of `init` rather than the entire tensor:
+
+    - **Without slice**: The source shape must match the init shape (for
+      non-indexed dimensions). The DMA writes to the entire init tensor.
+    - **With slice**: The source shape must match the `sizes` (for non-indexed
+      dimensions). The DMA writes to a slice of init at the given offsets.
+
+    This is similar to how `tensor.parallel_insert_slice` works, allowing
+    different parallel iterations to write to different slices of the
+    destination tensor.
+
     ## Lowering Paths
 
     Two lowering strategies are supported:
@@ -291,6 +309,8 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     2. Default lowering using `vector.gather` operations.
 
     ## Operands and Results
+
+    * `$source`: Source tensor/memref containing the data to be gathered.
 
     * `$indices`: The variadic `indices` operand is an optional tensor
       or vector of indices to gather from `source`. If the indices are
@@ -324,25 +344,44 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
       is that one lowering path (from linalg_ext.gather) already have
       indices in i32 type.
 
-    * `$source`: Source tensor/memref containing the data to be gathered.
     * `$init`: Destination tensor/memref receiving the gathered data
-      (destination-passing style).
-    * `lane`: The lane that specifies the coalescing store's offset within the
-      workgroup/shared memory.
+      (destination-passing style). When slice semantics are used, this is
+      the full tensor that contains the slice being written to.
 
+    * `$lane`: The lane that specifies the coalescing store's offset within
+      the workgroup/shared memory.
 
-    ## Example of a single subgroup using coalesced_gather_dma in copy mode
-       for transferring tensor<4x128xf32>, with an intended DMA width of 128 bits
-       (4 x f32), with subgroup size 32:
+    * `$offsets`, `$sizes`, `$strides`: Optional slice specification for
+      writing to a subset of `init`. When provided, the source shape must
+      match `sizes` (for non-indexed dimensions), and the data is written
+      to `init[offsets]` with the given sizes and strides. These follow the
+      same conventions as `tensor.extract_slice`/`tensor.parallel_insert_slice`.
+
+    ## Examples
+
+    Example of a single subgroup using coalesced_gather_dma in copy mode
+    for transferring tensor<4x128xf32>, with an intended DMA width of 128 bits
+    (4 x f32), with subgroup size 32:
     ```mlir
-    scf.forall (%arg6) in (32) ... {
-        %2 = %arg6 * 4
-        %thread_slice = ... : tensor<4x128xf32>
-        %dest_slice = ... : tensor<4x128xf32>
-        scf.forall.in_parallel {
-          iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice lane(%arg6) :  ...
-        }
-      } {mapping = [#gpu.lane_id<linear_dim_0>]}
+    scf.forall (%lane) in (32) shared_outs(%out = %init) -> tensor<4x128xf32> {
+      scf.forall.in_parallel {
+        iree_gpu.coalesced_gather_dma %src into %out lane(%lane)
+          : tensor<4x128xf32>, tensor<4x128xf32>, index
+      }
+    } {mapping = [#iree_gpu.lane_id<0>]}
+    ```
+
+    Example with slice semantics, where each warp writes to a different
+    slice of the output:
+    ```mlir
+    scf.forall (%warp, %lane) in (4, 32) shared_outs(%out = %init) -> tensor<16x128xf32> {
+      %src_slice = tensor.extract_slice %src[%warp, 0] [4, 128] [1, 1]
+        : tensor<16x128xf32> to tensor<4x128xf32>
+      scf.forall.in_parallel {
+        iree_gpu.coalesced_gather_dma %src_slice into %out [%warp, 0] [4, 128] [1, 1] lane(%lane)
+          : tensor<4x128xf32>, tensor<16x128xf32>, index
+      }
+    } {mapping = [#gpu.warp<linear_dim_0>, #iree_gpu.lane_id<0>]}
     ```
   }];
 
@@ -350,15 +389,18 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     AnyRankedTensorOrMemRef:$source,
     Variadic<RankedTensorOrVectorOrMemRefOf<[I32, Index]>>:$indices,
     AnyRankedTensorOrMemRef:$init,
-    Index:$lane
+    Index:$lane,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides,
+    DenseI64ArrayAttr:$static_offsets,
+    DenseI64ArrayAttr:$static_sizes,
+    DenseI64ArrayAttr:$static_strides
   );
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
-  let assemblyFormat = [{
-    $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
-    attr-dict `:` type(operands) ( `->` type($result)^ )?
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let hasVerifier = 1;
 
@@ -371,7 +413,44 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     bool hasTensorSemantics() {
       return ::llvm::isa<RankedTensorType>(getInit().getType());
     }
+
+    // Check if this op has slice semantics (non-empty offsets).
+    bool hasSliceSemantics() {
+      return !getStaticOffsets().empty();
+    }
+
+    // OffsetSizeAndStrideOpInterface required methods.
+    std::array<unsigned, 3> getArrayAttrMaxRanks() {
+      // When no slice semantics (empty offsets), return 0.
+      // When slice semantics are used, the rank matches the static arrays.
+      unsigned rank = static_cast<unsigned>(getStaticOffsets().size());
+      return {rank, rank, rank};
+    }
+    static unsigned getOffsetSizeAndStrideStartOperandIndex() {
+      // After source, indices, init, lane - but since we use AttrSizedOperandSegments,
+      // the interface will use getOffsets/getSizes/getStrides directly.
+      return 4;
+    }
   }];
+
+  let builders = [
+    // Builder without slice (original behavior)
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+                   "ValueRange":$indices, "Value":$init, "Value":$lane), [{
+      build($_builder, $_state, resultType, source, indices, init, lane,
+            /*offsets=*/ValueRange{}, /*sizes=*/ValueRange{}, /*strides=*/ValueRange{},
+            $_builder.getDenseI64ArrayAttr({}),
+            $_builder.getDenseI64ArrayAttr({}),
+            $_builder.getDenseI64ArrayAttr({}));
+    }]>,
+    // Builder with slice offsets/sizes/strides
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+                   "ValueRange":$indices, "Value":$init, "Value":$lane,
+                   "ArrayRef<OpFoldResult>":$offsets,
+                   "ArrayRef<OpFoldResult>":$sizes,
+                   "ArrayRef<OpFoldResult>":$strides,
+                   CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+  ];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
