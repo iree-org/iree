@@ -224,37 +224,6 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
 }
 
 //===----------------------------------------------------------------------===//
-// GlobalLoadDMAOp
-//===----------------------------------------------------------------------===//
-
-def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
-    SameVariadicOperandSize]> {
-  let summary = "Does a global load DMA operation";
-  let description = [{
-    This operation represents a subgroup-level global load DMA operation.
-    It is used to represent a direct gathering operation from global memory to workgroup.
-    To be specific, the thread gathers data from the global memoryspace at the designated
-    indices, and stores it to the thread's lane-offset of the workgroup memref at the
-    designated indices.
-
-    Specifically, if the thread's subgroup lane id is `lane_id`, the thread will load the data
-    from `$source[sourceIndices]` and store it to `$target[targetIndices] + lane_id`.
-    Collectively, all threads in the subgroup orchestrate the load DMA operation.
-
-    Note: each gather has a load width is 32bit.
-  }];
-
-  let arguments = (ins AnyMemRef:$source, Variadic<Index>:$sourceIndices,
-                       AnyMemRef:$target, Variadic<Index>:$targetIndices);
-  let results   = (outs);
-
-  let assemblyFormat = [{
-    $source`[` $sourceIndices `]` `->` $target `[` $targetIndices `]` attr-dict
-      `:` type($source) `->` type($target)
-  }];
-}
-
-//===----------------------------------------------------------------------===//
 // CoalescedGatherDMAOp
 //===----------------------------------------------------------------------===//
 
