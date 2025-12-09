@@ -445,6 +445,15 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
     }
   });
 
+  // TODO(vivian): remove this check once we have a better solution on fusion of
+  // extract_slice with scf.forall loop.
+  for (Operation *user : sliceOp->getUsers()) {
+    if (isa<tensor::ParallelInsertSliceOp>(user)) {
+      return rewriter.notifyMatchFailure(
+          sliceOp, "unsupported: user is tensor.parallel_insert_slice");
+    }
+  }
+
   // The tensor.extract_slice before applying the pattern works on the result
   // of the tensor.collapse_shape, so variables (i.e. inputs for
   // ExtractSliceOp) referring to the state before applying the pattern are
