@@ -213,7 +213,7 @@ func.func @unpack_fully_dynamic(%arg0 : tensor<?x?x?x?xi32>, %m0 : index, %n0 : 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
-func.func @unpack_generic(%arg0 : tensor<128x10x?x8x?xf32>, %arg1 : tensor<128x320xf32>) -> tensor<128x320x80xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+func.func @unpack_with_generic(%arg0 : tensor<128x10x?x8x?xf32>, %arg1 : tensor<128x320xf32>) -> tensor<128x320x80xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
   %c8 = arith.constant 8 : index
   %vscale = vector.vscale
   %c8_vscale = arith.muli %vscale, %c8 : index
@@ -227,15 +227,15 @@ func.func @unpack_generic(%arg0 : tensor<128x10x?x8x?xf32>, %arg1 : tensor<128x3
   } -> tensor<128x320x80xf32>
   return %generic : tensor<128x320x80xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 8, [8]]>
-//   CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 40], vector_common_parallel = [1, [8], 8]>
+//   CHECK-DAG: #[[CONFIG_UNPACK:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 8, [8]]>
+//   CHECK-DAG: #[[CONFIG_GENERIC:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 40], vector_common_parallel = [1, [8], 8]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert
-//       CHECK: func.func @unpack_generic
+//       CHECK: func.func @unpack_with_generic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
-//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+//  CHECK-SAME:       lowering_config = #[[CONFIG_UNPACK]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[CONFIG1]]
+//  CHECK-SAME:       lowering_config = #[[CONFIG_GENERIC]]
 
 // -----
 
