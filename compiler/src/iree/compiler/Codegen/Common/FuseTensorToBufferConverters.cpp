@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFOps.h"
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFTypes.h"
 #include "iree/compiler/Codegen/Dialect/PCF/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
@@ -516,6 +517,85 @@ struct FoldTransferReadOfTensorEmpty
   }
 };
 
+/// Pattern to fuse iree_linalg_ext.map_scatter into
+/// iree_codegen.store_to_buffer by replacing the map_scatter's tensor
+/// destination with the store's memref. This avoids allocating an intermediate
+/// tensor buffer during bufferization.
+///
+/// Converts:
+///   %dest = tensor.empty() or iree_codegen.load_from_buffer %buf
+///   %result = iree_linalg_ext.map_scatter %input into %dest {...}
+///   iree_codegen.store_to_buffer %result, %buf
+/// To:
+///   %input_buf = memref.alloca (if input is tensor)
+///   iree_codegen.store_to_buffer %input, %input_buf (if input is tensor)
+///   iree_linalg_ext.map_scatter %input_buf into %buf {...}
+///
+/// The destination must come from tensor.empty() or load_from_buffer (with the
+/// same buffer as the store) to ensure correctness.
+struct FuseMapScatterIntoBufferStore
+    : public OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
+  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    // Check if the tensor is produced by a map_scatter.
+    auto mapScatterOp =
+        storeOp.getTensor().getDefiningOp<IREE::LinalgExt::MapScatterOp>();
+    if (!mapScatterOp) {
+      return failure();
+    }
+
+    // Only fuse if the map_scatter has a single use (the store).
+    if (!mapScatterOp->hasOneUse()) {
+      return failure();
+    }
+
+    Value buffer = storeOp.getBuffer();
+
+    // Verify that the output (destination) comes from tensor.empty() or
+    // load_from_buffer with the same underlying buffer we're storing to.
+    Value dest = mapScatterOp.getOutput();
+    if (auto loadOp = dest.getDefiningOp<IREE::Codegen::LoadFromBufferOp>()) {
+      // If destination comes from load_from_buffer, verify it's loading from
+      // the same buffer we're storing to (otherwise semantics would differ).
+      if (loadOp.getBuffer() != buffer) {
+        return failure();
+      }
+    } else if (!dest.getDefiningOp<tensor::EmptyOp>()) {
+      // Destination must be from either load_from_buffer or tensor.empty().
+      return failure();
+    }
+
+    // Check if the input comes from load_from_buffer. If so, use the underlying
+    // memref directly for pure buffer semantics. Otherwise, keep it as a tensor
+    // (MapScatterOp supports mixed semantics: tensor input with memref output).
+    Value input = mapScatterOp.getInput();
+    if (auto inputLoadOp =
+            input.getDefiningOp<IREE::Codegen::LoadFromBufferOp>()) {
+      input = inputLoadOp.getBuffer();
+    }
+    Location loc = mapScatterOp.getLoc();
+
+    // Create a new map_scatter that writes directly to the memref.
+    // When the output is a memref, the op has no tensor result.
+    rewriter.setInsertionPoint(storeOp);
+    auto newMapScatterOp = IREE::LinalgExt::MapScatterOp::create(
+        rewriter, loc, /*resultTypes=*/TypeRange{}, input, buffer);
+
+    // Move the transformation region from the old op to the new one.
+    rewriter.inlineRegionBefore(
+        mapScatterOp.getTransformationRegion(),
+        newMapScatterOp.getTransformationRegion(),
+        newMapScatterOp.getTransformationRegion().end());
+
+    // Erase both the store and the old map_scatter.
+    rewriter.eraseOp(storeOp);
+    rewriter.eraseOp(mapScatterOp);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass Definition
 //===----------------------------------------------------------------------===//
@@ -535,7 +615,8 @@ struct FuseTensorToBufferConvertersPass final
                  ComposeExtractSliceInsidePCFLoop,
                  ComposeExtractSliceOfDispatchLoadInsidePCFLoop,
                  ComposeExtractSliceOfLoadFromBufferInsidePCF,
-                 FoldTransferReadOfTensorEmpty>(context);
+                 FoldTransferReadOfTensorEmpty, FuseMapScatterIntoBufferStore>(
+        context);
     IREE::PCF::populatePCFDropUnusedResultPatterns(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     // Add reshape fusion patterns that become applicable after fusing stores

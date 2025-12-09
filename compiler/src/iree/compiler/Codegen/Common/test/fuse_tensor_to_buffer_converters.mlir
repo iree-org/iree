@@ -340,3 +340,71 @@ func.func @no_compose_extract_slice_of_dispatch_load_outside_pcf_loop(
 // CHECK-LABEL: @no_compose_extract_slice_of_dispatch_load_outside_pcf_loop
 //       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //       CHECK:   tensor.extract_slice
+
+// -----
+
+// Test fusing iree_linalg_ext.map_scatter into iree_codegen.store_to_buffer.
+// The input comes from load_from_buffer so we can use pure buffer semantics.
+func.func @fuse_map_scatter_into_buffer_store(%dest_buf: memref<64xf32>, %input_buf: memref<16xf32>) {
+  %true = arith.constant true
+  %dest = iree_codegen.load_from_buffer %dest_buf : memref<64xf32> -> tensor<64xf32>
+  %input = iree_codegen.load_from_buffer %input_buf : memref<16xf32> -> tensor<16xf32>
+  %result = iree_linalg_ext.map_scatter %input into %dest {
+  ^bb0(%idx0: index):
+    iree_linalg_ext.yield %idx0, %true : index, i1
+  } : tensor<16xf32> into tensor<64xf32> -> tensor<64xf32>
+  iree_codegen.store_to_buffer %result, %dest_buf : tensor<64xf32> into memref<64xf32>
+  return
+}
+
+// CHECK-LABEL: @fuse_map_scatter_into_buffer_store
+//  CHECK-SAME:   %[[DEST_BUF:[A-Za-z0-9_]+]]: memref<64xf32>
+//  CHECK-SAME:   %[[INPUT_BUF:[A-Za-z0-9_]+]]: memref<16xf32>
+//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT_BUF]] into %[[DEST_BUF]]
+//       CHECK:     : memref<16xf32> into memref<64xf32>
+//   CHECK-NOT:   iree_codegen.store_to_buffer
+//   CHECK-NOT:   iree_codegen.load_from_buffer
+
+// -----
+
+// Test that map_scatter is NOT fused when it has multiple uses.
+func.func @no_fuse_map_scatter_multiple_uses(%dest_buf: memref<64xf32>, %input_buf: memref<16xf32>) -> tensor<64xf32> {
+  %true = arith.constant true
+  %dest = iree_codegen.load_from_buffer %dest_buf : memref<64xf32> -> tensor<64xf32>
+  %input = iree_codegen.load_from_buffer %input_buf : memref<16xf32> -> tensor<16xf32>
+  %result = iree_linalg_ext.map_scatter %input into %dest {
+  ^bb0(%idx0: index):
+    iree_linalg_ext.yield %idx0, %true : index, i1
+  } : tensor<16xf32> into tensor<64xf32> -> tensor<64xf32>
+  iree_codegen.store_to_buffer %result, %dest_buf : tensor<64xf32> into memref<64xf32>
+  // Return creates a second use of %result
+  return %result : tensor<64xf32>
+}
+
+// CHECK-LABEL: @no_fuse_map_scatter_multiple_uses
+//       CHECK:   iree_linalg_ext.map_scatter
+//       CHECK:     into tensor<64xf32> -> tensor<64xf32>
+//       CHECK:   iree_codegen.store_to_buffer
+
+// -----
+
+// Test fusing map_scatter with tensor.empty() destination.
+// This is the key pattern for avoiding large stack allocations.
+func.func @fuse_map_scatter_tensor_empty_dest(%dest_buf: memref<64xf32>, %input: tensor<16xf32>) {
+  %true = arith.constant true
+  %dest = tensor.empty() : tensor<64xf32>
+  %result = iree_linalg_ext.map_scatter %input into %dest {
+  ^bb0(%idx0: index):
+    iree_linalg_ext.yield %idx0, %true : index, i1
+  } : tensor<16xf32> into tensor<64xf32> -> tensor<64xf32>
+  iree_codegen.store_to_buffer %result, %dest_buf : tensor<64xf32> into memref<64xf32>
+  return
+}
+
+// CHECK-LABEL: @fuse_map_scatter_tensor_empty_dest
+//  CHECK-SAME:   %[[DEST_BUF:[A-Za-z0-9_]+]]: memref<64xf32>
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9_]+]]: tensor<16xf32>
+//   CHECK-NOT:   tensor.empty
+//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[DEST_BUF]]
+//       CHECK:     : tensor<16xf32> into memref<64xf32>
+//   CHECK-NOT:   iree_codegen.store_to_buffer
