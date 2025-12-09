@@ -434,6 +434,16 @@ static LogicalResult
 swapCollapseShapeWithSlice(RewriterBase &rewriter,
                            tensor::CollapseShapeOp collapseShapeOp,
                            tensor::ExtractSliceOp sliceOp) {
+  // Limit the pattern to work with extract_slice and collapse_shape ops in
+  // different blocks.
+  // TODO(vivian): remove this check once we have a better handle on fusion of
+  // extract_slice with scf.forall loop.
+  if (sliceOp->getBlock() == collapseShapeOp->getBlock()) {
+    return rewriter.notifyMatchFailure(
+        sliceOp, "unsupported: extract_slice and collapse_shape ops are within "
+                 "the same block");
+  }
+
   // FIXME: this is a workaround for the fact that this inf loops due to the
   // creation of `affine::AffineDelinearizeIndexOp` but still returns failure.
   SmallVector<Operation *> createdOps;
@@ -444,16 +454,6 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
       }
     }
   });
-
-  // Limit the pattern to work with extract_slice and collapse_shape ops in
-  // different blocks.
-  // TODO(vivian): remove this check once we have a better handle on fusion of
-  // extract_slice with scf.forall loop.
-  if (sliceOp->getBlock() == collapseShapeOp->getBlock()) {
-    return rewriter.notifyMatchFailure(
-        sliceOp, "unsupported: extract_slice and collapse_shape ops are within "
-                 "the same block");
-  }
 
   // The tensor.extract_slice before applying the pattern works on the result
   // of the tensor.collapse_shape, so variables (i.e. inputs for
