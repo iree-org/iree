@@ -66,7 +66,7 @@ void DecomposeAggregatedOpPass::runOnOperation() {
 FailureOr<StringSet<>> DecomposeAggregatedOpPass::parseFilterOps() {
   if (filterOps.empty()) {
     getOperation()->emitWarning("decompose-aggregated-op op list is empty!");
-    return llvm::StringSet{};
+    return llvm::StringSet<>{};
   }
 
   MLIRContext *ctx{&getContext()};
