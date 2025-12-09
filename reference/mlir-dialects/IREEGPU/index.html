@@ -6454,11 +6454,14 @@ generated.</p>
 By default, intrinsic-level sub-tiles are contiguous and arranged
 side-by-side in the overall tile layout. When
 <code>operands_interleaving_intrinsics_{m,n,k}</code> is non-empty, each entry
-indicates an operand (given by its operand index) for which the tile layout
-has the corresponding intrinsics tiles interleaved. For example, when
-<code>intrinsics_k = 2</code> and <code>operands_interleaving_intrinsics_k = [0, 1]</code>, there
-are two intrinsics along the k-dimension and their layouts are interleaved
-in operands 0 and 1, meaning LHS and RHS.</p>
+indicates an operand (given by its operand index) for which the
+<code>intrinsics_{m,n,k}</code> tiles are interleaved to the innermost positions of
+the entire swizzled layout. For example, when <code>intrinsics_k = 2</code> and
+<code>operands_interleaving_intrinsics_k = [0, 1]</code>, there are two intrinsics
+along the k-dimension and their layouts are interleaved in operands 0
+and 1, meaning LHS and RHS. When multiple interleavings are applied,
+<code>intrinsics_k</code> is placed innermost, then going outward <code>intrinsics_n</code>,
+then <code>intrinsics_m</code>.</p>
 <p>The <code>subgroups_{m,n,k}</code> parameters control the number of subgroups and the
 layout of the tile accesses made by different subgroups. The product of the
 <code>subgroups_{m,n,k}</code> equals the number of subgroups, and for instance
