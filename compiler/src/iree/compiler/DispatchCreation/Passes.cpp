@@ -247,6 +247,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass([] {
         FuseMultiUseElementwiseProducerPassOptions options;
         options.intraDispatch = true;
+        options.numIterations = 32;
         return DispatchCreation::createFuseMultiUseElementwiseProducerPass(
             options);
       })

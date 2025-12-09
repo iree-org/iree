@@ -51,7 +51,8 @@ def LayoutAttr :
         "isSerialized",
         "isIdentityLayout",
         "calculateStorageSizeInBytes",
-      ]>
+      ]>,
+      DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
     ]> {
   let mnemonic = "layout";
   let assemblyFormat = "`<` $layouts `>`";
@@ -340,7 +341,7 @@ def TestingAttr :
     "layouts.">:$layouts
   );
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = "`<` struct(params) `>`";
   let genVerifyDecl = 0;
 }
 

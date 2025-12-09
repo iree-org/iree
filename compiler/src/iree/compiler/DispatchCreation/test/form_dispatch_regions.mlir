@@ -1875,3 +1875,89 @@ util.func public @no_fusion_use_from_above(%arg0 : tensor<?x?xf32>,
 //       CHECK:       tensor.extract %[[DISPATCH0]]
 //       CHECK:     flow.return %[[CONSUMER]]
 //       CHECK:   util.return %[[DISPATCH1]]
+
+// -----
+
+util.func public @dont_fuse_no_shared_parallel_loops(%arg0: tensor<16x16x24xf32>, %arg1: tensor<64x3x32xf32>) -> (tensor<64x3x32xf32>, tensor<32x64x3xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<f32>
+  %1 = tensor.empty() : tensor<64x3x32xf32>
+  %2 = tensor.empty() : tensor<32x64x3xf32>
+  %3 = linalg.fill ins(%cst : f32) outs(%0 : tensor<f32>) -> tensor<f32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> ()>], iterator_types = ["reduction", "reduction", "reduction"]} ins(%arg0 : tensor<16x16x24xf32>) outs(%3 : tensor<f32>) {
+  ^bb0(%in: f32, %out: f32):
+    %6 = arith.mulf %in, %in : f32
+    %7 = arith.addf %out, %6 : f32
+    linalg.yield %7 : f32
+  } -> tensor<f32>
+  %5:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> ()>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d2, d0, d1)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1, %4 : tensor<64x3x32xf32>, tensor<f32>) outs(%1, %2 : tensor<64x3x32xf32>, tensor<32x64x3xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32, %out_1: f32):
+    %6 = arith.addf %in, %in_0 : f32
+    linalg.yield %6, %6 : f32, f32
+  } -> (tensor<64x3x32xf32>, tensor<32x64x3xf32>)
+  util.return %5#0, %5#1 : tensor<64x3x32xf32>, tensor<32x64x3xf32>
+}
+// CHECK-LABEL: util.func public @dont_fuse_no_shared_parallel_loops(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<16x16x24xf32>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<64x3x32xf32>)
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:   %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]]
+//       CHECK:     flow.return %[[REDUCTION]]
+//       CHECK:   %[[DISPATCH1:.+]]:2 = flow.dispatch.region
+//       CHECK:     %[[GENERIC:.+]]:2 = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG1]], %[[DISPATCH0]]
+//       CHECK:     flow.return %[[GENERIC]]#0, %[[GENERIC]]#1
+//       CHECK:   util.return %[[DISPATCH1]]#0, %[[DISPATCH1]]#1
+
+// -----
+
+util.func public @fuse_reduction_with_two_consumers(%arg0 : tensor<?x?xf32>) -> (tensor<?xf32>, tensor<?xf32>) {
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %empty = tensor.empty(%d0) : tensor<?xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?xf32>) -> tensor<?xf32>
+  %reduction = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%arg0 : tensor<?x?xf32>) outs(%fill : tensor<?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %0 = arith.addf %b0, %b1 : f32
+      linalg.yield %0 : f32
+  } -> tensor<?xf32>
+  %consumer1 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%reduction : tensor<?xf32>) outs(%empty : tensor<?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %0 = arith.mulf %b0, %b0 : f32
+      linalg.yield %0 : f32
+  } -> tensor<?xf32>
+  %consumer2 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%reduction : tensor<?xf32>) outs(%empty : tensor<?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %0 = arith.addf %b0, %b0 : f32
+      linalg.yield %0 : f32
+  } -> tensor<?xf32>
+  util.return %consumer1, %consumer2 : tensor<?xf32>, tensor<?xf32>
+}
+// CHECK-LABEL: util.func public @fuse_reduction_with_two_consumers
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
+//       CHECK:     %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "reduction"]
+//  CHECK-SAME:         ins(%[[ARG0]] :
+//       CHECK:     %[[CONSUMER1:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel"]
+//  CHECK-SAME:         ins(%[[REDUCTION]] :
+//       CHECK:     %[[CONSUMER2:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel"]
+//  CHECK-SAME:         ins(%[[REDUCTION]] :
+//       CHECK:     flow.return %[[CONSUMER1]], %[[CONSUMER2]]
+//       CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1

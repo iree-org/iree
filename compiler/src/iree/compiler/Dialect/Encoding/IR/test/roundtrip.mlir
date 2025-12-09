@@ -223,11 +223,11 @@ func.func @testing_without_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<
 
 // -----
 
-#encoding = #iree_encoding.testing<[#iree_encoding.specialization_resolver<123>]>
+#encoding = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 func.func @testing_with_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.specialization_resolver<123>]>
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 //      CHECK: func.func @testing_with_layouts(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
 // CHECK         return %[[ARG0]]

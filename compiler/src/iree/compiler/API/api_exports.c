@@ -109,7 +109,7 @@ extern void ireeGPUVirtualMMAIntrinsicAttrGetValue();
 extern void ireeGPUMMAAttrGetVirtualMMAIntrinsic();
 extern void ireeGPUPipelineOptionsAttrGet();
 extern void ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts();
-extern void ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory();
+extern void ireeGPUPipelineOptionsAttrGetPrefetchNumStages();
 extern void ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy();
 extern void ireeGPUPipelineOptionsAttrGetTypeID();
 extern void ireeGPUPipelineOptionsAttrGetUseIgemmConvolution();
@@ -1030,7 +1030,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeGPUMMAAttrGetVirtualMMAIntrinsic;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGet;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts;
-  x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory;
+  x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetPrefetchNumStages;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetTypeID;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetUseIgemmConvolution;

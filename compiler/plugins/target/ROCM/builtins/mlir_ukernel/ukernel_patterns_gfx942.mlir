@@ -74,7 +74,6 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_medium_expanded : benefit(1) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -166,7 +165,6 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_large_expanded : benefit(2) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -251,7 +249,6 @@ pdl.pattern @annotate_matmul_like_f16_large : benefit(1) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -340,7 +337,6 @@ pdl.pattern @annotate_matmul_like_f16_medium_expanded : benefit(1) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -429,7 +425,6 @@ pdl.pattern @annotate_matmul_like_f16_large_expanded : benefit(2) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -514,7 +509,6 @@ pdl.pattern @annotate_matmul_like_bf16_large : benefit(1) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -607,7 +601,6 @@ pdl.pattern @annotate_matmul_like_bf16_medium_expanded : benefit(1) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -690,7 +683,6 @@ pdl.pattern @annotate_matmul_like_bf16_large_expanded : benefit(2) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -747,7 +739,6 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_medium : benefit(1) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -804,7 +795,6 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_large : benefit(2) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
@@ -861,7 +851,6 @@ pdl.pattern @annotate_inner_tiled_f16_large : benefit(1) {
         // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
-            prefetch_shared_memory = false,
             no_reduce_shared_memory_bank_conflicts = true>,
         // This strategy requires 2 waves per SIMD.
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>

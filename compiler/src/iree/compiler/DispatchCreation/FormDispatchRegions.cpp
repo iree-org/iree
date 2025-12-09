@@ -204,6 +204,9 @@ public:
                         });
   }
 
+  // Check if adding `op` would exceed the operand limit.
+  bool wouldExceedOperandLimit(Operation *op) const;
+
 private:
   Operation *rootOp;
   // All operations to be fused with the root op. This does not include
@@ -230,6 +233,42 @@ void FusionGroup::insert(Operation *op) {
     map = inverseAndBroadcastProjectedPermutation(map);
     loopMaps.insert({op, map});
   }
+}
+
+bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
+  llvm::SmallSetVector<Operation *, kIreeMaxOperandCount> dispatchOperands;
+  int64_t numResults = 0;
+
+  auto visitOp = [&](Operation *op) {
+    auto visitOperand = [&](OpOperand *operand) {
+      if (!isa<RankedTensorType>(operand->get().getType())) {
+        return;
+      }
+      Operation *definingOp = operand->get().getDefiningOp();
+      if (llvm::isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(definingOp)) {
+        return;
+      }
+      if (definingOp && definingOp != newOp && !loopMaps.contains(definingOp)) {
+        dispatchOperands.insert(definingOp);
+      }
+    };
+    visitUsedValuesDefinedAbove(op->getRegions(), visitOperand);
+    llvm::for_each(llvm::make_pointer_range(op->getOpOperands()), visitOperand);
+
+    for (OpResult result : op->getResults()) {
+      if (llvm::any_of(result.getUsers(), [&](Operation *user) {
+            return user != newOp && !loopMaps.contains(user);
+          })) {
+        ++numResults;
+      }
+    }
+  };
+
+  visitOp(newOp);
+  for (auto [op, map] : this->loopMaps) {
+    visitOp(op);
+  }
+  return (dispatchOperands.size() + numResults) > kIreeMaxOperandCount;
 }
 
 FailureOr<AffineMap>
@@ -303,6 +342,10 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
       if (failed(composedMap) || (newMap && composedMap != newMap)) {
         return failure();
       }
+      if (composedMap.value().getNumResults() ==
+          composedMap.value().getNumOfZeroResults()) {
+        return failure();
+      }
       newMap = composedMap.value();
     }
   } else {
@@ -336,6 +379,8 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
       }
     }
   }
+
+  // Fail if there is no mapping or if there are no parallel loops in common.
   if (!newMap) {
     return failure();
   }
@@ -561,7 +606,9 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
 
   // If consumer is a dequant operation, dont fuse it. These get cloned
   // into their consumers.
-  if (IREE::LinalgExt::isBitExtendOp(consumer)) {
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
+  if (IREE::Flow::isClonableIntoDispatchOp(consumer, clonableOptions)) {
     return false;
   }
 
@@ -642,6 +689,11 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     return false;
   }
 
+  // Check operand limit before allowing fusion
+  if (tracker.getFusionGroup(producer).wouldExceedOperandLimit(consumer)) {
+    return false;
+  }
+
   // Check if the iteration spaces of the producer and consumer are same.
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
@@ -709,17 +761,6 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
                          /*aggressiveFusion=*/options.aggressiveFusion);
       if (fusableUses.empty()) {
         continue;
-      }
-
-      // For now prune the fusable uses due to codegen failures. Ideally we
-      // should just be taking the whole set of fusable uses.
-      if (IREE::LinalgExt::isBitTruncateOp(fusableUses.front()->getOwner())) {
-        fusableUses =
-            llvm::filter_to_vector(fusableUses, [](OpOperand *operand) {
-              return IREE::LinalgExt::isBitTruncateOp(operand->getOwner());
-            });
-      } else {
-        fusableUses.resize(1);
       }
 
       // Analyse the use to see if it is fusable.
@@ -812,6 +853,12 @@ static bool isFusableWithProducer(OpOperand &operand,
   if (!tracker.getFusionGroup(consumer).isFusable(producer)) {
     return false;
   }
+
+  // Check operand limit before allowing fusion
+  if (tracker.getFusionGroup(consumer).wouldExceedOperandLimit(producer)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -1044,7 +1091,8 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       auto newRegionOp = IREE::Flow::moveFollowingOpIntoDispatchRegion(
           rewriter, consumer, regionOp);
       if (failed(newRegionOp)) {
-        return consumer->emitOpError("failed to move consumer into region");
+        consumer->emitWarning("failed to move consumer into region");
+        continue;
       }
       regionOp = *newRegionOp;
     }

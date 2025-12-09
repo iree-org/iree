@@ -114,7 +114,7 @@ transform.named_sequence
                                                  workgroup = [64, 128, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
       workgroup_size = [256, 1, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
   > -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }

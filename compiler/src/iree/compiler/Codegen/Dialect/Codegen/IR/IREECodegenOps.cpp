@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LLVM.h"
@@ -393,4 +394,55 @@ std::optional<SmallVector<int64_t, 4>> InnerTiledOp::getShapeForUnroll() {
   SmallVector<int64_t, 4> shape;
   getIterationBounds(shape);
   return shape;
+}
+
+//===----------------------------------------------------------------------===//
+// WorkgroupCountHintOp
+//===----------------------------------------------------------------------===//
+
+ParseResult WorkgroupCountHintOp::parse(OpAsmParser &parser,
+                                        OperationState &result) {
+  SmallVector<OpAsmParser::UnresolvedOperand, 3> dynamicSizes;
+  DenseI64ArrayAttr staticSizesAttr;
+
+  if (parseDynamicIndexList(parser, dynamicSizes, staticSizesAttr,
+                            /*valueTypes=*/{},
+                            /*delimiter=*/AsmParser::Delimiter::Paren)) {
+    return failure();
+  }
+
+  // All sizes are of index type. `parseDynamicIndexList` does not set the sizes
+  // correctly when used as a custom directive so manually infer it from the
+  // number of parsed sizes.
+  IndexType indexType = parser.getBuilder().getIndexType();
+  SmallVector<Type> dynamicSizeTypes(dynamicSizes.size(), indexType);
+
+  if (parser.resolveOperands(dynamicSizes, dynamicSizeTypes,
+                             parser.getCurrentLocation(), result.operands)) {
+    return failure();
+  }
+
+  result.addAttribute("static_sizes", staticSizesAttr);
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  return success();
+}
+
+void WorkgroupCountHintOp::print(OpAsmPrinter &printer) {
+  printDynamicIndexList(printer, getOperation(), getSizes(), getStaticSizes(),
+                        /*valueTypes=*/{},
+                        /*delimiter=*/AsmParser::Delimiter::Paren);
+  printer.printOptionalAttrDict((*this)->getAttrs(),
+                                /*elidedAttrs=*/{"static_sizes"});
+}
+
+void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
+                                 ArrayRef<OpFoldResult> sizes) {
+  SmallVector<int64_t> staticSizes;
+  SmallVector<Value> dynamicSizes;
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  build(builder, state, dynamicSizes,
+        builder.getDenseI64ArrayAttr(staticSizes));
 }

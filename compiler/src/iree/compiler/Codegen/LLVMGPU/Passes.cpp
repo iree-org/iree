@@ -389,6 +389,8 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+
+  funcPassManager.addPass(createAMDGPULowerCoalescedDMAToGatherLDSPass());
 }
 
 /// Control function for decomposing pack and unpack ops. Returns true if the
@@ -591,10 +593,12 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
-  if (forROCDL && pipelineOptions.prefetchSharedMemory) {
+  if (forROCDL && pipelineOptions.prefetchNumStages >= 2) {
     funcPassManager.addPass(createFissionTransferOpsInControlFlowPass());
     funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass());
+    ROCDLPrefetchSharedMemoryPassOptions prefetchOpts;
+    prefetchOpts.numStages = pipelineOptions.prefetchNumStages;
+    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass(prefetchOpts));
   }
 
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
@@ -850,8 +854,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
-  if (forROCDL && options.prefetchSharedMemory) {
-    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass());
+  if (forROCDL && options.prefetchNumStages >= 2) {
+    ROCDLPrefetchSharedMemoryPassOptions prefetchOpts;
+    prefetchOpts.numStages = options.prefetchNumStages;
+    funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass(prefetchOpts));
   }
   if (clLLVMGPUEnableSharedMemoryReuse) {
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
@@ -1147,6 +1153,7 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     ReconcileTranslationInfoPassOptions options;
     options.distributeAlong = clSetWorkgroupDistributionAlong;
     variantPassManager.addPass(createReconcileTranslationInfoPass(options));
+    variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
   }
 
   //===--------------------------------------------------------------------===//
@@ -1199,6 +1206,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager,
         .addPass(createVerifyWorkgroupDistributionPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
   variantPassManager.addPass(createLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
       IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
