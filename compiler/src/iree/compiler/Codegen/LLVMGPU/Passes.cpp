@@ -1151,6 +1151,7 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     ReconcileTranslationInfoPassOptions options;
     options.distributeAlong = clSetWorkgroupDistributionAlong;
     variantPassManager.addPass(createReconcileTranslationInfoPass(options));
+    variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
   }
 
   //===--------------------------------------------------------------------===//
@@ -1203,6 +1204,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager,
         .addPass(createVerifyWorkgroupDistributionPass);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
   variantPassManager.addPass(createLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
       IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
