@@ -58,6 +58,7 @@ from iree.compiler.dialects import (
     util,
     iree_codegen,
     iree_gpu,
+    iree_tensor_ext,
     preprocessing_transform,
 )
 
@@ -688,6 +689,17 @@ def gpu_target_info_constructor_error_cases():
         assert False, "Expected TypeError for wrong MMA intrinsic object type"
     except TypeError:
         pass
+
+
+# ======================================================================
+# IREE TensorExt Dialect
+# ======================================================================
+
+
+@run
+def iree_tensor_ext_smoke_test():
+    # Make sure that generated op bindings are accessible.
+    assert issubclass(iree_tensor_ext.ComputeBarrierStartOp, ir.OpView)
 
 
 # ======================================================================
