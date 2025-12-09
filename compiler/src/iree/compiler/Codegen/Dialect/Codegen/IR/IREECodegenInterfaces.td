@@ -548,7 +548,26 @@ def IREECodegen_PackedLayoutMaterializerAttr :
         assert(false && "unimplemented interface method");
         return MaterializeEncodingInfo{};
       }]
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Verifies that the packed layout encoding is valid for a tensor with the
+        given shape and element type. This is called by the VerifiableTensorEncoding
+        interface to validate that the encoding configuration (e.g., innerDimsPos,
+        innerTileSizes) is consistent with the tensor rank and properties.
+      }],
+      /*retTy=*/"::llvm::LogicalResult",
+      /*methodName=*/"verifyPackedLayoutWithType",
+      /*args=*/(ins
+        "::mlir::ArrayRef<int64_t>":$shape,
+        "::mlir::Type":$elementType,
+        "::llvm::function_ref<::mlir::InFlightDiagnostic()>":$emitError),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
+      }]
+    >,
   ];
 }
 
