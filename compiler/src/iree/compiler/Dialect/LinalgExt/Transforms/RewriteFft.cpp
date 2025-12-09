@@ -15,8 +15,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 
 // Create `arith.constant dense<...> : tensor<fftLength x i64>` of indices
 // needed to shuffle FFT inputs into the expected bit-reversed order.
-static Value getBitReversalBuffer(ImplicitLocOpBuilder &b,
-                                  int64_t fftLength) {
+static Value getBitReversalBuffer(ImplicitLocOpBuilder &b, int64_t fftLength) {
   SmallVector<Attribute> values;
   int64_t logn = std::log(fftLength) / std::log<int64_t>(2);
   for (int64_t i = 0; i < fftLength; ++i) {
@@ -27,8 +26,8 @@ static Value getBitReversalBuffer(ImplicitLocOpBuilder &b,
     values.push_back(b.getI64IntegerAttr(r));
   }
   auto type = RankedTensorType::get({fftLength}, b.getI64Type());
-  return arith::ConstantOp::create(
-      b, type, DenseIntElementsAttr::get(type, values));
+  return arith::ConstantOp::create(b, type,
+                                   DenseIntElementsAttr::get(type, values));
 }
 
 // Create the bit-reversed shuffled inputs for RFFT.
@@ -37,8 +36,7 @@ static Value getBitReversalBuffer(ImplicitLocOpBuilder &b,
 // [1]: tensor of zeroes for the imaginary part:
 //      `arith.constant dense<0.000000e+00> : tensor<fftLength x f32>`
 static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
-                                              Value real,
-                                              int64_t fftLength) {
+                                              Value real, int64_t fftLength) {
   ShapedType realType = cast<ShapedType>(real.getType());
   int64_t rank = realType.getRank();
   auto realElementType = realType.getElementType();
@@ -51,16 +49,15 @@ static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
   outs.push_back(tensor::EmptyOp::create(b, mixedSizes, realElementType));
 
   SmallVector<AffineMap> maps;
-  maps.push_back(AffineMap::get(rank, 0,
-                                b.getAffineDimExpr(rank - 1),
+  maps.push_back(AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1),
                                 b.getContext())); // input i64 tensor
   maps.push_back(b.getMultiDimIdentityMap(rank)); // output float
   maps.push_back(b.getMultiDimIdentityMap(rank)); // output float
   SmallVector<utils::IteratorType> iterTypes(rank,
                                              utils::IteratorType::parallel);
 
-  Value zero = arith::ConstantOp::create(
-    b, b.getLoc(), b.getZeroAttr(realElementType));
+  Value zero =
+      arith::ConstantOp::create(b, b.getLoc(), b.getZeroAttr(realElementType));
 
   Value indices = getBitReversalBuffer(b, fftLength);
   auto genericOp = linalg::GenericOp::create(
@@ -72,9 +69,11 @@ static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
         }
         ivs.push_back(
             arith::IndexCastOp::create(b, loc, b.getIndexType(), args[0]));
-        linalg::YieldOp::create(b, loc, SmallVector<Value> {
-            tensor::ExtractOp::create(b, loc, real, ivs).getResult(),
-          zero } );
+        linalg::YieldOp::create(
+            b, loc,
+            SmallVector<Value>{
+                tensor::ExtractOp::create(b, loc, real, ivs).getResult(),
+                zero});
       });
   return genericOp.getResults();
 }
@@ -88,18 +87,16 @@ static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
 // to avoid an additional scaling step at the end, since FFTs are linear,
 // we can scale the input and just combine it with our existing `genericOp`
 // used to shuffle the tensor and split into real and imag parts.
-static SmallVector<Value> getBitReversalOrderComplex(ImplicitLocOpBuilder &b,
-                                                     Value complexTensor,
-                                                     int64_t fftLength,
-                                                     bool hasScale,
-                                                     double scale) {
+static SmallVector<Value>
+getBitReversalOrderComplex(ImplicitLocOpBuilder &b, Value complexTensor,
+                           int64_t fftLength, bool hasScale, double scale) {
   auto shapeType = cast<ShapedType>(complexTensor.getType());
   int64_t rank = shapeType.getRank();
 
   auto complexType = cast<ComplexType>(shapeType.getElementType());
   auto complexElemType = complexType.getElementType();
 
-    SmallVector<OpFoldResult> mixedSizes =
+  SmallVector<OpFoldResult> mixedSizes =
       tensor::getMixedSizes(b, b.getLoc(), complexTensor);
 
   SmallVector<Value> outs;
@@ -107,8 +104,7 @@ static SmallVector<Value> getBitReversalOrderComplex(ImplicitLocOpBuilder &b,
   outs.push_back(tensor::EmptyOp::create(b, mixedSizes, complexElemType));
 
   SmallVector<AffineMap> maps;
-  maps.push_back(AffineMap::get(rank, 0,
-                                b.getAffineDimExpr(rank - 1),
+  maps.push_back(AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1),
                                 b.getContext())); // input i64 tensor
   maps.push_back(b.getMultiDimIdentityMap(rank)); // output float
   maps.push_back(b.getMultiDimIdentityMap(rank)); // output float
@@ -136,13 +132,17 @@ static SmallVector<Value> getBitReversalOrderComplex(ImplicitLocOpBuilder &b,
         auto realPart = complex::ReOp::create(b, loc, complexElemType, elem);
         auto imagPart = complex::ImOp::create(b, loc, complexElemType, elem);
         if (hasScale) {
-          linalg::YieldOp::create(b, loc, SmallVector<Value> {
-            arith::MulFOp::create(b, loc, realPart, scaleValue).getResult(),
-            arith::MulFOp::create(b, loc, imagPart, scaleValue).getResult()});
+          linalg::YieldOp::create(
+              b, loc,
+              SmallVector<Value>{
+                  arith::MulFOp::create(b, loc, realPart, scaleValue)
+                      .getResult(),
+                  arith::MulFOp::create(b, loc, imagPart, scaleValue)
+                      .getResult()});
         } else {
           linalg::YieldOp::create(
-              b, loc, SmallVector<Value>{realPart.getResult(),
-                                         imagPart.getResult()});
+              b, loc,
+              SmallVector<Value>{realPart.getResult(), imagPart.getResult()});
         }
       });
   return genericOp.getResults();
@@ -150,8 +150,7 @@ static SmallVector<Value> getBitReversalOrderComplex(ImplicitLocOpBuilder &b,
 
 // Get FFT coefficients for `stage` and FFT `direction`.
 static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b,
-                                            FFTDirection direction,
-                                            int stage) {
+                                            FFTDirection direction, int stage) {
   constexpr std::complex<double> kI(0, 1);
   const double sign = FFTDirection::Forward == direction ? -1.0 : 1.0;
   int m = 1 << stage;
@@ -171,18 +170,18 @@ static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b,
 // Given appropriately shuffled and scaled real and imaginary tensors,
 // run an FFT of size `fftLength`.
 static SmallVector<Value> generateFFT(ImplicitLocOpBuilder &b,
-                                      int64_t fftLength,
-                                      FFTDirection direction,
-                                      const SmallVector<Value>& inputs) {
+                                      int64_t fftLength, FFTDirection direction,
+                                      const SmallVector<Value> &inputs) {
   SmallVector<Value> results = inputs;
   int64_t lognPlus1 = std::log(fftLength) / std::log<int64_t>(2) + 1;
   for (auto s : llvm::seq<uint64_t>(1, lognPlus1)) {
     SmallVector<Value> inputs;
     inputs.push_back(arith::ConstantIndexOp::create(b, s));
     inputs.append(getCoeffConstants(b, direction, s));
-    results = FftOp::create(
-                  b, TypeRange{results[0].getType(), results[1].getType()},
-                  inputs, results).getResults();
+    results =
+        FftOp::create(b, TypeRange{results[0].getType(), results[1].getType()},
+                      inputs, results)
+            .getResults();
   }
 
   return results;
@@ -245,15 +244,13 @@ static Value expandConjugateSymmetry(ImplicitLocOpBuilder &b,
 
   // Concatenate first half and mirrored second half along the last dimension
   Value result = tensor::ConcatOp::create(
-      b, rank - 1,
-      SmallVector<Value>{halfSizedComplex, mirrorOp.getResult(0)});
+      b, rank - 1, SmallVector<Value>{halfSizedComplex, mirrorOp.getResult(0)});
 
   return result;
 }
 
 // Rewrite complex FFT, including direction and normalization.
-FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op,
-                                              Value operand,
+FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
                                               int64_t fftLength,
                                               FFTDirection direction,
                                               FFTNormalization normalization,
@@ -275,10 +272,9 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op,
 
   ImplicitLocOpBuilder b(loc, rewriter);
 
-  SmallVector<Value> inputs =
-    getBitReversalOrderComplex(b, operand, fftLength,
-                               normalization == FFTNormalization::Normalize,
-                               1.0 / (double) fftLength);
+  SmallVector<Value> inputs = getBitReversalOrderComplex(
+      b, operand, fftLength, normalization == FFTNormalization::Normalize,
+      1.0 / (double)fftLength);
 
   SmallVector<Value> results = generateFFT(b, fftLength, direction, inputs);
   return std::make_pair(results[0], results[1]);
@@ -286,8 +282,7 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op,
 
 // Rewrite real to half-sized complex forward FFT by doing a full FFT with an
 // imaginary part of `<0.0, 0.0,...>`, then truncating the result.
-FailureOr<std::pair<Value, Value>> rewriteRfft(Operation *op,
-                                               Value operand,
+FailureOr<std::pair<Value, Value>> rewriteRfft(Operation *op, Value operand,
                                                int64_t fftLength,
                                                PatternRewriter &rewriter) {
   assert(llvm::isPowerOf2_64(fftLength) &&
@@ -317,12 +312,12 @@ FailureOr<std::pair<Value, Value>> rewriteRfft(Operation *op,
   SmallVector<OpFoldResult> offsets(ty.getRank(), b.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(ty.getRank(), b.getIndexAttr(1));
   SmallVector<OpFoldResult> sizes =
-    tensor::getMixedSizes(b, b.getLoc(), operand);
+      tensor::getMixedSizes(b, b.getLoc(), operand);
   sizes.back() = b.getIndexAttr(shape.back());
-  Value real =
-    tensor::ExtractSliceOp::create(b, ty, results[0], offsets, sizes, strides);
-  Value imag =
-    tensor::ExtractSliceOp::create(b, ty, results[1], offsets, sizes, strides);
+  Value real = tensor::ExtractSliceOp::create(b, ty, results[0], offsets, sizes,
+                                              strides);
+  Value imag = tensor::ExtractSliceOp::create(b, ty, results[1], offsets, sizes,
+                                              strides);
 
   return std::make_pair(real, imag);
 }
@@ -331,8 +326,7 @@ FailureOr<std::pair<Value, Value>> rewriteRfft(Operation *op,
 // Takes half-sized complex input (due to conjugate symmetry) and produces
 // real output. This expands the input to full size using conjugate symmetry,
 // then performs a normalized backward FFT.
-FailureOr<std::pair<Value, Value>> rewriteIrfft(Operation *op,
-                                                Value operand,
+FailureOr<std::pair<Value, Value>> rewriteIrfft(Operation *op, Value operand,
                                                 int64_t fftLength,
                                                 PatternRewriter &rewriter) {
   assert(llvm::isPowerOf2_64(fftLength) &&
@@ -364,10 +358,8 @@ FailureOr<std::pair<Value, Value>> rewriteIrfft(Operation *op,
   Value expandedInput = expandConjugateSymmetry(b, operand, fftLength);
 
   // Now perform a normalized backward FFT on the expanded input
-  return rewriteFft(op, expandedInput, fftLength,
-                   FFTDirection::Backward,
-                   FFTNormalization::Normalize,
-                   rewriter);
+  return rewriteFft(op, expandedInput, fftLength, FFTDirection::Backward,
+                    FFTNormalization::Normalize, rewriter);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

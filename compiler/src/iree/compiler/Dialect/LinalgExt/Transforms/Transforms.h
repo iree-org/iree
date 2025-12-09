@@ -131,22 +131,16 @@ FailureOr<std::pair<Value, Value>> rewriteRfft(Operation *op, Value operand,
 ///   static shapes for the pattern to apply.
 /// fftLength: size of input dimension
 ///   along which FFT is computed, must be power of 2 for the pattern to apply
-enum class FFTDirection
-{
-    Forward,
-    Backward
+enum class FFTDirection { Forward, Backward };
+enum class FFTNormalization {
+  NoNormalize,
+  Normalize // multiply by `1 / fftLength` at the end
 };
-enum class FFTNormalization
-{
-    NoNormalize,
-    Normalize    // multiply by `1 / fftLength` at the end
-};
-FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op,
-                                             Value operand,
-                                             int64_t fftLength,
-                                             FFTDirection direction,
-                                             FFTNormalization normalization,
-                                             PatternRewriter &rewriter);
+FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
+                                              int64_t fftLength,
+                                              FFTDirection direction,
+                                              FFTNormalization normalization,
+                                              PatternRewriter &rewriter);
 
 /// Rewrite IRFFT (inverse real FFT).
 /// Takes half-sized complex input (due to conjugate symmetry) and produces
@@ -157,8 +151,7 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op,
 ///   complex<float> element type and static shapes for the pattern to apply.
 /// fftLength: desired output size (must be power of 2), input should be
 ///   fftLength/2 + 1 elements on the last dimension.
-FailureOr<std::pair<Value, Value>> rewriteIrfft(Operation *op,
-                                                Value operand,
+FailureOr<std::pair<Value, Value>> rewriteIrfft(Operation *op, Value operand,
                                                 int64_t fftLength,
                                                 PatternRewriter &rewriter);
 

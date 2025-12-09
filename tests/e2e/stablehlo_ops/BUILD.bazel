@@ -186,7 +186,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "dot_bf16.mlir",
             "exponential_fp16.mlir",
-            "fft_complex.mlir"
+            "fft_complex.mlir",
         ],
     ),
     compiler_flags = [

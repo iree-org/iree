@@ -314,26 +314,20 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
     FailureOr<std::pair<Value, Value>> rewriteRes;
     if (fftType == mlir::stablehlo::FftType::RFFT) {
       rewriteRes = IREE::LinalgExt::rewriteRfft(op, adaptor.getOperand(),
-                                                    fftLength, rewriter);
+                                                fftLength, rewriter);
     } else if (fftType == mlir::stablehlo::FftType::FFT) {
-      rewriteRes =
-        IREE::LinalgExt::rewriteFft(op,
-                                    adaptor.getOperand(),
-                                    fftLength,
-                                    IREE::LinalgExt::FFTDirection::Forward,
-                                    IREE::LinalgExt::FFTNormalization::NoNormalize,
-                                    rewriter);
+      rewriteRes = IREE::LinalgExt::rewriteFft(
+          op, adaptor.getOperand(), fftLength,
+          IREE::LinalgExt::FFTDirection::Forward,
+          IREE::LinalgExt::FFTNormalization::NoNormalize, rewriter);
     } else if (fftType == mlir::stablehlo::FftType::IFFT) {
-      rewriteRes =
-        IREE::LinalgExt::rewriteFft(op,
-                                    adaptor.getOperand(),
-                                    fftLength,
-                                    IREE::LinalgExt::FFTDirection::Backward,
-                                    IREE::LinalgExt::FFTNormalization::Normalize,
-                                    rewriter);
+      rewriteRes = IREE::LinalgExt::rewriteFft(
+          op, adaptor.getOperand(), fftLength,
+          IREE::LinalgExt::FFTDirection::Backward,
+          IREE::LinalgExt::FFTNormalization::Normalize, rewriter);
     } else if (fftType == mlir::stablehlo::FftType::IRFFT) {
       rewriteRes = IREE::LinalgExt::rewriteIrfft(op, adaptor.getOperand(),
-                                                  fftLength, rewriter);
+                                                 fftLength, rewriter);
     } else {
       // Not implemented.
       return failure();
