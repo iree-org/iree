@@ -1,14 +1,14 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
 
 // Test that the GPU encoding resolver with valid encoding_info roundtrips correctly.
-// The verifier checks that innerDimsPos indices are valid for the tensor rank.
+// The verifier checks that innerDimsPos, outerDimsPerm and swizzle are valid.
 
-#encoding = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1]}}>
+#encoding = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = [[["Internal", 16]], [["Internal", 16]]], permutation = [0, 1]}}}>
 func.func @valid_2d_encoding(%arg0: tensor<32x64xf32, #encoding>) -> tensor<32x64xf32, #encoding> {
   return %arg0 : tensor<32x64xf32, #encoding>
 }
 // CHECK-LABEL: func.func @valid_2d_encoding
-// CHECK-SAME:    tensor<32x64xf32, #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1]}}>>
+// CHECK-SAME:    tensor<32x64xf32, #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = {{\[}}{{\[}}{{\[}}"Internal", 16{{\]}}{{\]}}, {{\[}}{{\[}}"Internal", 16{{\]}}{{\]}}{{\]}}, permutation = [0, 1]}}}>
 
 // -----
 
@@ -57,6 +57,16 @@ func.func @encoding_without_config(%arg0: tensor<32x64xf32, #encoding>) -> tenso
 }
 // CHECK-LABEL: func.func @encoding_without_config
 // CHECK-SAME:    tensor<32x64xf32, #iree_gpu.gpu_encoding_resolver<>>
+
+// -----
+
+// Test encoding with valid swizzle - multi-dimensional expand shape with CrossThread and CrossIntrinsic kinds.
+#encoding_swizzle_multi = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = [[["CrossThread", 2], ["CrossIntrinsic", 4], ["CrossThread", 16]], [["CrossIntrinsic", 4], ["CrossThread", 4]]], permutation = [0, 1, 4, 2, 3]}}}>
+func.func @valid_swizzle_multi_expand(%arg0: tensor<256x128xf32, #encoding_swizzle_multi>) -> tensor<256x128xf32, #encoding_swizzle_multi> {
+  return %arg0 : tensor<256x128xf32, #encoding_swizzle_multi>
+}
+// CHECK-LABEL: func.func @valid_swizzle_multi_expand
+// CHECK-SAME:    swizzle = {expandShape = {{\[}}{{\[}}{{\[}}"CrossThread", 2], ["CrossIntrinsic", 4], ["CrossThread", 16{{\]}}{{\]}}, {{\[}}{{\[}}"CrossIntrinsic", 4], ["CrossThread", 4{{\]}}{{\]}}{{\]}}, permutation = [0, 1, 4, 2, 3]}
 
 // -----
 
