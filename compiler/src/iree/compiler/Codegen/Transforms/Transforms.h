@@ -174,6 +174,15 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
+/// Creates an `iree_codegen.workgroup_count_hint` op at the current insertion
+/// point with the provided operands. If there are more operands provided than
+/// |maxWorkgroupParallelDims| the outermost sizes are linearized into the
+/// one at the maximum dim. If |reverse| is true, the workgroupCount is added in
+/// reverse order to the hint.
+LogicalResult createWorkgroupCountHint(
+    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> workgroupCount,
+    int maxWorkgroupParallelDims = kNumMaxParallelDims, bool reverse = true);
+
 /// Helper to perform LICM on loops nested within |target| that are guaranteed
 /// to have at least one trip. Additionally LICM on `scf.forall` ops with
 /// mapping attributes are excluded as their trip count is unclear until
