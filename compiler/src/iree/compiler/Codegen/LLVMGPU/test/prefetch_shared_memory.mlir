@@ -17,11 +17,10 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
   // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
-  // For non-nested loops, prologue barriers are skipped for performance.
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
   // CHECK-1STAGE: scf.for %{{.*}} = %c0 to %c128 step %c1
-  // 3-stage prologue: 2 reads (no barrier for non-nested loops)
+  // 3-stage prologue: 2 reads
   // CHECK-3STAGE: vector.transfer_read %arg0
   // CHECK-3STAGE: vector.transfer_write
   // CHECK-3STAGE: vector.transfer_read %arg0
@@ -92,7 +91,6 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
   // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
-  // For non-nested loops, prologue barriers are skipped for performance.
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]]:2 = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]], %[[ARG1:.*]] = %[[CST]])
   %0:2 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst, %arg3 = %cst) -> (vector<1xf32>, vector<1xf32>) {
@@ -139,7 +137,6 @@ func.func @prefetch_add_with_if(%arg0: memref<128xf32>) {
   // CHECK-DAG: %[[SHARED:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   // CHECK-DAG: %[[PRO_READ:.*]] = vector.transfer_read %[[GLOBAL]]
-  // For non-nested loops, prologue barriers are skipped for performance.
   // CHECK: vector.transfer_write %[[PRO_READ]], %[[SHARED]]
   // CHECK: %[[OUT:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C127]] step %[[C1]] iter_args(%[[ARG:.*]] = %[[CST]])
   %0 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst) -> (vector<1xf32>) {
@@ -233,7 +230,6 @@ func.func @prefetch_scf_if(%arg0: memref<128xf32>, %cond : i1) {
 // CHECK-DAG: %[[WG_ALLOC:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
 // CHECK-DAG: %[[PRIV_ALLOC:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 
-// For non-nested loops, prologue barriers are skipped, so the scf.if blocks are merged.
 // CHECK: scf.if %[[COND]] {
 // CHECK:   %[[IF_READ:.*]] = vector.transfer_read %[[GLOBAL]][%[[C0]]]
 // CHECK:   vector.transfer_write %[[IF_READ]], %[[PRIV_ALLOC]][%[[C0]]]
@@ -353,7 +349,6 @@ func.func @prefetch_scf_if_transientreadwrite(%arg0: memref<128xf32>, %cond : i1
 // CHECK: %[[PRIV_ALLOC1:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
 // CHECK: scf.if
 // CHECK: %[[INIT:.*]] = vector.transfer_read %[[PRIV_ALLOC1]]
-// For non-nested loops, prologue barriers are skipped for performance.
 // CHECK: vector.transfer_write %[[INIT]], %[[WG_ALLOC]]
 // CHECK: %[[OUT:.*]] = scf.for
 // CHECK:   %[[PRIV_ALLOC2:.*]] = memref.alloca() : memref<1xf32, #gpu.address_space<private>>
@@ -368,3 +363,40 @@ func.func @prefetch_scf_if_transientreadwrite(%arg0: memref<128xf32>, %cond : i1
 // CHECK:   amdgpu.sched_barrier allow = <none>
 // CHECK:   vector.transfer_write %[[READ4]], %[[WG_ALLOC]]
 // CHECK:   scf.yield %[[COMP]]
+
+// -----
+
+// Test that nested loops DO get prologue barriers for correctness.
+// When a pipelined loop is inside another loop, we need barriers in the
+// prologue to prevent data races between iterations of the outer loop.
+
+// CHECK-ALL-LABEL: @prefetch_nested_loop
+// CHECK-SAME: (%[[GLOBAL:.*]]: memref<128xf32>)
+func.func @prefetch_nested_loop(%arg0: memref<128xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %alloc = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // Outer loop - the inner pipelined loop is nested inside this
+  // CHECK: scf.for
+  scf.for %outer = %c0 to %c4 step %c1 {
+    // Inner loop that will be pipelined
+    // For nested loops, prologue barriers ARE inserted for correctness.
+    // CHECK: vector.transfer_read %[[GLOBAL]]
+    // CHECK: gpu.barrier
+    // CHECK: vector.transfer_write
+    // CHECK: scf.for
+    %0 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst) -> (vector<1xf32>) {
+      %1 = vector.transfer_read %arg0[%arg1], %cst_0 : memref<128xf32>, vector<1xf32>
+      vector.transfer_write %1, %alloc[%c0] {in_bounds = [true]} : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+      %2 = vector.transfer_read %alloc[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+      %3 = arith.addf %2, %arg2 : vector<1xf32>
+      scf.yield %3 : vector<1xf32>
+    }
+    vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  }
+  return
+}
