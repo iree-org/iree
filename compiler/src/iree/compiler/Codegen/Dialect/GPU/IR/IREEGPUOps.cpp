@@ -9,6 +9,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -278,21 +279,51 @@ LogicalResult CoalescedGatherDMAOp::verify() {
       }
     }
 
-    // The batch size should match the first dimension of the destination.
-    if (!initShape.empty() && batchSize != initShape[0]) {
+    // The batch size should match the first dimension of the destination
+    // (or slice size if sliced).
+    ArrayRef<int64_t> staticSizesForBatch = getStaticSizes();
+    int64_t destBatchDim = staticSizesForBatch.empty()
+                               ? (initShape.empty() ? 0 : initShape[0])
+                               : staticSizesForBatch[0];
+    if (destBatchDim != 0 && batchSize != destBatchDim) {
       return emitOpError("expected batch size (length of index vectors: ")
              << batchSize << ") to match first destination dimension ("
-             << initShape[0] << ")";
+             << destBatchDim << ")";
     }
   }
 
+  // Verify offsets/sizes/strides if present.
+  ArrayRef<int64_t> staticOffsets = getStaticOffsets();
+  ArrayRef<int64_t> staticSizes = getStaticSizes();
+  ArrayRef<int64_t> staticStrides = getStaticStrides();
+  bool hasSliceParams = !staticOffsets.empty();
+  if (hasSliceParams) {
+    unsigned initRank = initShapedType.getRank();
+    if (staticOffsets.size() != initRank || staticSizes.size() != initRank ||
+        staticStrides.size() != initRank) {
+      return emitOpError("expected offsets, sizes, and strides to have ")
+             << initRank << " elements to match init rank, but got "
+             << staticOffsets.size() << ", " << staticSizes.size() << ", "
+             << staticStrides.size();
+    }
+  }
+
+  // For dimension matching, use slice sizes if present, otherwise use init
+  // shape.
+  SmallVector<int64_t> destShape;
+  if (hasSliceParams) {
+    destShape = llvm::to_vector(staticSizes);
+  } else {
+    destShape = llvm::to_vector(initShape);
+  }
+
   // Verify the contiguous (non-indexed) dimensions match between source and
-  // dest.
-  for (auto [dim, size] : llvm::enumerate(initShape)) {
+  // dest (or slice sizes if sliced).
+  for (auto [dim, size] : llvm::enumerate(destShape)) {
     if (dim >= sourceShape.size()) {
       return emitOpError("expected source to have at least ")
              << (dim + 1) << " dimensions when destination has rank "
-             << initShape.size();
+             << destShape.size();
     }
 
     // Skip indexed dimensions - they're validated above.
@@ -300,8 +331,13 @@ LogicalResult CoalescedGatherDMAOp::verify() {
       continue;
     }
 
+    // Skip dynamic sizes in slice parameters.
+    if (ShapedType::isDynamic(size)) {
+      continue;
+    }
+
     // Check the suffix (hidden) gathering dimensions are the same in `source`
-    // and `init`.
+    // and dest (or slice sizes).
     int64_t sourceDim = sourceShape[dim];
     if (sourceDim != size) {
       return emitOpError("expected unindexed dimension ")
@@ -311,6 +347,212 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   return success();
+}
+
+// Builder without slice parameters (backward compatible).
+void CoalescedGatherDMAOp::build(OpBuilder &b, OperationState &result,
+                                 Type resultType, Value source,
+                                 ValueRange indices, Value init, Value lane) {
+  build(b, result, resultType, source, indices, init, lane,
+        /*offsets=*/ArrayRef<OpFoldResult>{},
+        /*sizes=*/ArrayRef<OpFoldResult>{},
+        /*strides=*/ArrayRef<OpFoldResult>{});
+}
+
+// Builder with mixed static and dynamic slice entries.
+void CoalescedGatherDMAOp::build(OpBuilder &b, OperationState &result,
+                                 Type resultType, Value source,
+                                 ValueRange indices, Value init, Value lane,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes,
+                                 ArrayRef<OpFoldResult> strides) {
+  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+  SmallVector<Value> dynamicOffsets, dynamicSizes, dynamicStrides;
+  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
+  build(b, result, resultType, source, indices, init, lane, dynamicOffsets,
+        dynamicSizes, dynamicStrides, b.getDenseI64ArrayAttr(staticOffsets),
+        b.getDenseI64ArrayAttr(staticSizes),
+        b.getDenseI64ArrayAttr(staticStrides));
+}
+
+SmallVector<OpFoldResult> CoalescedGatherDMAOp::getMixedOffsets() {
+  Builder b(getContext());
+  return getMixedValues(getStaticOffsets(), getOffsets(), b);
+}
+
+SmallVector<OpFoldResult> CoalescedGatherDMAOp::getMixedSizes() {
+  Builder b(getContext());
+  return getMixedValues(getStaticSizes(), getSizes(), b);
+}
+
+SmallVector<OpFoldResult> CoalescedGatherDMAOp::getMixedStrides() {
+  Builder b(getContext());
+  return getMixedValues(getStaticStrides(), getStrides(), b);
+}
+
+// Custom parser for CoalescedGatherDMAOp.
+// Format: source ('[' indices ']')? 'into' init
+//         ('[' offsets ']' '[' sizes ']' '[' strides ']')?
+//         'lane' '(' lane ')' ':' type (',' type)? 'into' type ('->' type)?
+ParseResult CoalescedGatherDMAOp::parse(OpAsmParser &parser,
+                                        OperationState &result) {
+  OpAsmParser::UnresolvedOperand source;
+  SmallVector<OpAsmParser::UnresolvedOperand> indices;
+  OpAsmParser::UnresolvedOperand init;
+  OpAsmParser::UnresolvedOperand lane;
+  SmallVector<OpAsmParser::UnresolvedOperand> offsets, sizes, strides;
+  DenseI64ArrayAttr staticOffsets, staticSizes, staticStrides;
+  Type sourceType, initType, resultType;
+  SmallVector<Type> indicesTypes;
+
+  // Parse: source
+  if (parser.parseOperand(source))
+    return failure();
+
+  // Parse optional: '[' indices ']'
+  if (succeeded(parser.parseOptionalLSquare())) {
+    if (parser.parseOperandList(indices) || parser.parseRSquare())
+      return failure();
+  }
+
+  // Parse: 'into' init
+  if (parser.parseKeyword("into") || parser.parseOperand(init))
+    return failure();
+
+  // Parse optional: '[' offsets ']' '[' sizes ']' '[' strides ']'
+  if (succeeded(parser.parseOptionalLSquare())) {
+    if (parseDynamicIndexList(parser, offsets, staticOffsets) ||
+        parser.parseRSquare())
+      return failure();
+    if (parser.parseLSquare() ||
+        parseDynamicIndexList(parser, sizes, staticSizes) ||
+        parser.parseRSquare())
+      return failure();
+    if (parser.parseLSquare() ||
+        parseDynamicIndexList(parser, strides, staticStrides) ||
+        parser.parseRSquare())
+      return failure();
+  } else {
+    // No slice parameters - use empty arrays.
+    staticOffsets = parser.getBuilder().getDenseI64ArrayAttr({});
+    staticSizes = parser.getBuilder().getDenseI64ArrayAttr({});
+    staticStrides = parser.getBuilder().getDenseI64ArrayAttr({});
+  }
+
+  // Parse: 'lane' '(' lane ')'
+  if (parser.parseKeyword("lane") || parser.parseLParen() ||
+      parser.parseOperand(lane) || parser.parseRParen())
+    return failure();
+
+  // Parse attributes.
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+
+  // Parse: ':' sourceType
+  if (parser.parseColon() || parser.parseType(sourceType))
+    return failure();
+
+  // Parse optional: ',' indicesTypes
+  if (succeeded(parser.parseOptionalComma())) {
+    if (parser.parseTypeList(indicesTypes))
+      return failure();
+  }
+
+  // Parse: 'into' initType
+  if (parser.parseKeyword("into") || parser.parseType(initType))
+    return failure();
+
+  // Parse optional: '->' resultType
+  bool hasResult = succeeded(parser.parseOptionalArrow());
+  if (hasResult) {
+    if (parser.parseType(resultType))
+      return failure();
+  }
+
+  // Resolve operands.
+  if (parser.resolveOperand(source, sourceType, result.operands))
+    return failure();
+  for (auto [idx, indicesType] : llvm::zip(indices, indicesTypes)) {
+    if (parser.resolveOperand(idx, indicesType, result.operands))
+      return failure();
+  }
+  if (parser.resolveOperand(init, initType, result.operands))
+    return failure();
+  if (parser.resolveOperand(lane, parser.getBuilder().getIndexType(),
+                            result.operands))
+    return failure();
+  for (auto &offset : offsets) {
+    if (parser.resolveOperand(offset, parser.getBuilder().getIndexType(),
+                              result.operands))
+      return failure();
+  }
+  for (auto &size : sizes) {
+    if (parser.resolveOperand(size, parser.getBuilder().getIndexType(),
+                              result.operands))
+      return failure();
+  }
+  for (auto &stride : strides) {
+    if (parser.resolveOperand(stride, parser.getBuilder().getIndexType(),
+                              result.operands))
+      return failure();
+  }
+
+  // Add attributes.
+  result.addAttribute(getStaticOffsetsAttrName(result.name), staticOffsets);
+  result.addAttribute(getStaticSizesAttrName(result.name), staticSizes);
+  result.addAttribute(getStaticStridesAttrName(result.name), staticStrides);
+
+  // Add operand segment sizes.
+  result.addAttribute(getOperandSegmentSizeAttr(),
+                      parser.getBuilder().getDenseI32ArrayAttr(
+                          {1, static_cast<int32_t>(indices.size()), 1, 1,
+                           static_cast<int32_t>(offsets.size()),
+                           static_cast<int32_t>(sizes.size()),
+                           static_cast<int32_t>(strides.size())}));
+
+  // Add result type if present.
+  if (hasResult) {
+    result.addTypes(resultType);
+  }
+
+  return success();
+}
+
+// Custom printer for CoalescedGatherDMAOp.
+void CoalescedGatherDMAOp::print(OpAsmPrinter &p) {
+  p << " " << getSource();
+  if (!getIndices().empty()) {
+    p << "[" << getIndices() << "]";
+  }
+  p << " into " << getInit();
+
+  // Print slice parameters if present.
+  if (hasSlice()) {
+    p << "[";
+    printDynamicIndexList(p, *this, getOffsets(), getStaticOffsets());
+    p << "] [";
+    printDynamicIndexList(p, *this, getSizes(), getStaticSizes());
+    p << "] [";
+    printDynamicIndexList(p, *this, getStrides(), getStaticStrides());
+    p << "]";
+  }
+
+  p << " lane(" << getLane() << ")";
+  p.printOptionalAttrDict((*this)->getAttrs(),
+                          {getOperandSegmentSizeAttr(),
+                           getStaticOffsetsAttrName(), getStaticSizesAttrName(),
+                           getStaticStridesAttrName()});
+  p << " : " << getSource().getType();
+  if (!getIndices().empty()) {
+    p << ", ";
+    llvm::interleaveComma(getIndices().getTypes(), p);
+  }
+  p << " into " << getInit().getType();
+  if (getResult()) {
+    p << " -> " << getResult().getType();
+  }
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

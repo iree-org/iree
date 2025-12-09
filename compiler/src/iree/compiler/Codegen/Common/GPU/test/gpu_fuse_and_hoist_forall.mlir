@@ -852,7 +852,7 @@ func.func @fuse_warp_and_lane_foralls_with_coalesced_dma(%src: tensor<2x2x64xf32
     %src_slice = tensor.extract_slice %src[%warp0, %warp1, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
     %lane_result = scf.forall (%lane) in (64) shared_outs(%lane_out = %warp_slice) -> (tensor<1x1x64xf32>) {
       scf.forall.in_parallel {
-        iree_gpu.coalesced_gather_dma %src_slice into %lane_out lane(%lane) : tensor<1x1x64xf32>, tensor<1x1x64xf32>, index
+        iree_gpu.coalesced_gather_dma %src_slice into %lane_out lane(%lane) : tensor<1x1x64xf32> into tensor<1x1x64xf32>
       }
     } {mapping = [#iree_gpu.lane_id<0>]}
     scf.forall.in_parallel {
@@ -868,10 +868,42 @@ func.func @fuse_warp_and_lane_foralls_with_coalesced_dma(%src: tensor<2x2x64xf32
 //       CHECK:   %[[THREAD_FORALL:.+]] = scf.forall (%[[TID0:.+]], %[[TID1:.+]], %[[TID2:.+]]) in (2, 2, 64)
 //  CHECK-SAME:       shared_outs(%[[INIT_ARG:.+]] = %[[EMPTY]])
 //   CHECK-DAG:     %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]][%[[TID0]], %[[TID1]], 0] [1, 1, 64]
-//   CHECK-DAG:     %[[DEST_SLICE:.+]] = tensor.extract_slice %[[INIT_ARG]][%[[TID0]], %[[TID1]], 0] [1, 1, 64]
-//       CHECK:     %[[DMA_RESULT:.+]] = iree_gpu.coalesced_gather_dma %[[SRC_SLICE]] into %[[DEST_SLICE]] lane(%[[TID2]])
 //       CHECK:     scf.forall.in_parallel {
-//       CHECK:       tensor.parallel_insert_slice %[[DMA_RESULT]] into %[[INIT_ARG]][%[[TID0]], %[[TID1]], 0]
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[SRC_SLICE]] into %[[INIT_ARG]]{{\[}}[%[[TID0]], %[[TID1]], 0]{{\]}} {{\[}}[1, 1, 64]{{\]}} {{\[}}[1, 1, 1]{{\]}} lane(%[[TID2]])
+//  CHECK-SAME:         : tensor<1x1x64xf32> into tensor<2x2x64xf32>
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+//       CHECK:   return %[[THREAD_FORALL]]
+
+// -----
+
+// Test that coalesced_gather_dma with indices is correctly fused and the indices are preserved.
+// Source: [128, 1, 64] with 1 indexed dimension → gather produces [1, 1, 64] shape
+func.func @fuse_warp_and_lane_foralls_with_coalesced_dma_indices(%src: tensor<128x1x64xf32>, %indices: tensor<1xindex>) -> tensor<2x2x64xf32> {
+  %empty = tensor.empty() : tensor<2x2x64xf32>
+  %result = scf.forall (%warp0, %warp1) in (2, 2) shared_outs(%warp_out = %empty) -> (tensor<2x2x64xf32>) {
+    %warp_slice = tensor.extract_slice %warp_out[%warp0, %warp1, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
+    %lane_result = scf.forall (%lane) in (64) shared_outs(%lane_out = %warp_slice) -> (tensor<1x1x64xf32>) {
+      scf.forall.in_parallel {
+        iree_gpu.coalesced_gather_dma %src[%indices] into %lane_out lane(%lane) : tensor<128x1x64xf32>, tensor<1xindex> into tensor<1x1x64xf32>
+      }
+    } {mapping = [#iree_gpu.lane_id<0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %lane_result into %warp_out[%warp0, %warp1, 0] [1, 1, 64] [1, 1, 1] : tensor<1x1x64xf32> into tensor<2x2x64xf32>
+    }
+  } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  return %result : tensor<2x2x64xf32>
+}
+
+// CHECK-LABEL: func @fuse_warp_and_lane_foralls_with_coalesced_dma_indices
+//  CHECK-SAME:   %[[SRC:.+]]: tensor<128x1x64xf32>
+//  CHECK-SAME:   %[[INDICES:.+]]: tensor<1xindex>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x2x64xf32>
+//       CHECK:   %[[THREAD_FORALL:.+]] = scf.forall (%[[TID0:.+]], %[[TID1:.+]], %[[TID2:.+]]) in (2, 2, 64)
+//  CHECK-SAME:       shared_outs(%[[INIT_ARG:.+]] = %[[EMPTY]])
+//       CHECK:     scf.forall.in_parallel {
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[SRC]][%[[INDICES]]] into %[[INIT_ARG]]{{\[}}[%[[TID0]], %[[TID1]], 0]{{\]}} {{\[}}[1, 1, 64]{{\]}} {{\[}}[1, 1, 1]{{\]}} lane(%[[TID2]])
+//  CHECK-SAME:         : tensor<128x1x64xf32>, tensor<1xindex> into tensor<2x2x64xf32>
 //       CHECK:     }
 //       CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 //       CHECK:   return %[[THREAD_FORALL]]

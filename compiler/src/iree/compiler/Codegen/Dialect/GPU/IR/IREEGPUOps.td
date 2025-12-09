@@ -15,6 +15,7 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/ParallelCombiningOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
@@ -259,6 +260,7 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
+    AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
        ["getUpdatedDestinations", "getIteratingParent"]>]> {
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
@@ -326,9 +328,16 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
     * `$source`: Source tensor/memref containing the data to be gathered.
     * `$init`: Destination tensor/memref receiving the gathered data
-      (destination-passing style).
+      (destination-passing style). When offsets/sizes/strides are provided,
+      this specifies the full destination and the DMA writes to the slice
+      specified by those parameters.
     * `lane`: The lane that specifies the coalescing store's offset within the
       workgroup/shared memory.
+    * `offsets`, `sizes`, `strides`: Optional slice parameters specifying where
+      in `init` to write the gathered data. When provided, the operation writes
+      to a slice of `init` at the given offsets with the given sizes and strides.
+      This allows the DMA to be used directly inside `scf.forall.in_parallel`
+      without needing a separate `tensor.parallel_insert_slice`.
 
 
     ## Example of a single subgroup using coalesced_gather_dma in copy mode
@@ -344,21 +353,35 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
         }
       } {mapping = [#gpu.lane_id<linear_dim_0>]}
     ```
+
+    ## Example with offsets/sizes/strides (sliced write):
+    ```mlir
+    scf.forall (%tid) in (32) shared_outs(%out = %init) -> tensor<4x128xf32> {
+        %src_slice = ... : tensor<1x4xf32>
+        scf.forall.in_parallel {
+          iree_gpu.coalesced_gather_dma %src_slice into %out[%tid, 0] [1, 4] [1, 1]
+              lane(%tid) : tensor<1x4xf32> into tensor<4x128xf32>
+        }
+      } {mapping = [#gpu.thread<x>]}
+    ```
   }];
 
   let arguments = (ins
     AnyRankedTensorOrMemRef:$source,
     Variadic<RankedTensorOrVectorOrMemRefOf<[I32, Index]>>:$indices,
     AnyRankedTensorOrMemRef:$init,
-    Index:$lane
+    Index:$lane,
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides,
+    DenseI64ArrayAttr:$static_offsets,
+    DenseI64ArrayAttr:$static_sizes,
+    DenseI64ArrayAttr:$static_strides
   );
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
-  let assemblyFormat = [{
-    $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
-    attr-dict `:` type(operands) ( `->` type($result)^ )?
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let hasVerifier = 1;
 
@@ -371,7 +394,42 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     bool hasTensorSemantics() {
       return ::llvm::isa<RankedTensorType>(getInit().getType());
     }
+
+    /// Return whether the op has non-empty offsets/sizes/strides.
+    bool hasSlice() {
+      return !getStaticOffsets().empty();
+    }
+
+    /// Return the type of the init operand (destination).
+    ShapedType getInitType() {
+      return llvm::cast<ShapedType>(getInit().getType());
+    }
+
+    /// Return the type of the source operand.
+    ShapedType getSourceType() {
+      return llvm::cast<ShapedType>(getSource().getType());
+    }
+
+    /// Return mixed offsets.
+    SmallVector<OpFoldResult> getMixedOffsets();
+
+    /// Return mixed sizes.
+    SmallVector<OpFoldResult> getMixedSizes();
+
+    /// Return mixed strides.
+    SmallVector<OpFoldResult> getMixedStrides();
   }];
+
+  let builders = [
+    // Build without slice parameters (backward compatible).
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+      "ValueRange":$indices, "Value":$init, "Value":$lane)>,
+    // Build with mixed static and dynamic slice entries.
+    OpBuilder<(ins "Type":$resultType, "Value":$source,
+      "ValueRange":$indices, "Value":$init, "Value":$lane,
+      "ArrayRef<OpFoldResult>":$offsets, "ArrayRef<OpFoldResult>":$sizes,
+      "ArrayRef<OpFoldResult>":$strides)>,
+  ];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS

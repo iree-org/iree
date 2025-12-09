@@ -380,7 +380,7 @@ struct CoalescedGatherDMAOpBufferizationInterface
 
     // Create the bufferized DMA operation with no results (memref form).
     IREE::GPU::CoalescedGatherDMAOp::create(
-        rewriter, gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
+        rewriter, gatherOp.getLoc(), /*resultType=*/Type{}, *sourceBuffer,
         bufferizedIndices, *initBuffer, gatherOp.getLane());
 
     // Replace the tensor op. If it has a result, replace with the init buffer.

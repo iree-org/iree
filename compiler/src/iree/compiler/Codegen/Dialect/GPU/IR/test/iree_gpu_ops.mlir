@@ -102,7 +102,7 @@ func.func @coalesced_gather_dma_static(%idx0: vector<64xi32>, %source: tensor<40
   %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64xf32>) {
     scf.forall.in_parallel {
       iree_gpu.coalesced_gather_dma %source[%idx0] into %out lane(%lane)
-        : tensor<4096xf32>, vector<64xi32>, tensor<64xf32>, index -> tensor<64xf32>
+        : tensor<4096xf32>, vector<64xi32> into tensor<64xf32> -> tensor<64xf32>
     }
   }
   return %result : tensor<64xf32>
@@ -111,7 +111,7 @@ func.func @coalesced_gather_dma_static(%idx0: vector<64xi32>, %source: tensor<40
 // CHECK-LABEL: func @coalesced_gather_dma_static
 //       CHECK:   scf.forall
 //       CHECK:     scf.forall.in_parallel
-//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<4096xf32>, vector<64xi32>, tensor<64xf32>, index -> tensor<64xf32>
+//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<4096xf32>, vector<64xi32> into tensor<64xf32> -> tensor<64xf32>
 
 // -----
 
@@ -121,7 +121,7 @@ func.func @coalesced_gather_dma_f16(%idx0: vector<128xi32>, %source: tensor<8192
   %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<128xf16>) {
     scf.forall.in_parallel {
       iree_gpu.coalesced_gather_dma %source[%idx0] into %out lane(%lane)
-        : tensor<8192xf16>, vector<128xi32>, tensor<128xf16>, index -> tensor<128xf16>
+        : tensor<8192xf16>, vector<128xi32> into tensor<128xf16> -> tensor<128xf16>
     }
   }
   return %result : tensor<128xf16>
@@ -130,7 +130,7 @@ func.func @coalesced_gather_dma_f16(%idx0: vector<128xi32>, %source: tensor<8192
 // CHECK-LABEL: func @coalesced_gather_dma_f16
 //       CHECK:   scf.forall
 //       CHECK:     scf.forall.in_parallel
-//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<8192xf16>, vector<128xi32>, tensor<128xf16>, index -> tensor<128xf16>
+//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<8192xf16>, vector<128xi32> into tensor<128xf16> -> tensor<128xf16>
 
 // -----
 
@@ -139,7 +139,7 @@ func.func @coalesced_gather_dma_1d(%indices: vector<1024xi32>, %source: tensor<2
   %result = scf.forall (%i) in (%c32) shared_outs(%out = %dest) -> (tensor<1024xf32>) {
     scf.forall.in_parallel {
       iree_gpu.coalesced_gather_dma %source[%indices] into %out lane(%lane)
-        : tensor<2048xf32>, vector<1024xi32>, tensor<1024xf32>, index -> tensor<1024xf32>
+        : tensor<2048xf32>, vector<1024xi32> into tensor<1024xf32> -> tensor<1024xf32>
     }
   }
   return %result : tensor<1024xf32>
@@ -149,7 +149,7 @@ func.func @coalesced_gather_dma_1d(%indices: vector<1024xi32>, %source: tensor<2
 //       CHECK:   %[[C32:.+]] = arith.constant 32 : index
 //       CHECK:   scf.forall (%{{.+}}) in (%[[C32]])
 //       CHECK:     scf.forall.in_parallel
-//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<2048xf32>, vector<1024xi32>, tensor<1024xf32>, index -> tensor<1024xf32>
+//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<2048xf32>, vector<1024xi32> into tensor<1024xf32> -> tensor<1024xf32>
 
 // -----
 
@@ -158,7 +158,7 @@ func.func @coalesced_gather_dma_copy(%source: tensor<32x128xf32>, %dest: tensor<
   %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<32x128xf32>) {
     scf.forall.in_parallel {
       iree_gpu.coalesced_gather_dma %source into %out lane(%lane)
-        : tensor<32x128xf32>, tensor<32x128xf32>, index -> tensor<32x128xf32>
+        : tensor<32x128xf32> into tensor<32x128xf32> -> tensor<32x128xf32>
     }
   }
   return %result : tensor<32x128xf32>
@@ -167,18 +167,18 @@ func.func @coalesced_gather_dma_copy(%source: tensor<32x128xf32>, %dest: tensor<
 // CHECK-LABEL: func @coalesced_gather_dma_copy
 //       CHECK:   scf.forall
 //       CHECK:     scf.forall.in_parallel
-//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}} into %{{.+}} lane(%{{.+}}) : tensor<32x128xf32>, tensor<32x128xf32>, index -> tensor<32x128xf32>
+//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}} into %{{.+}} lane(%{{.+}}) : tensor<32x128xf32> into tensor<32x128xf32> -> tensor<32x128xf32>
 
 // -----
 
 func.func @coalesced_gather_dma_copy_memref(%source: memref<1x32xf32, strided<[128, 1], offset: ?>>, %dest: memref<1x32xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>, %lane: index) {
   iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
-    : memref<1x32xf32, strided<[128, 1], offset: ?>>, memref<1x32xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>, index
+    : memref<1x32xf32, strided<[128, 1], offset: ?>> into memref<1x32xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
   return
 }
 
 // CHECK-LABEL: func @coalesced_gather_dma_copy_memref
-//       CHECK:   iree_gpu.coalesced_gather_dma %{{.+}} into %{{.+}} lane(%{{.+}}) : memref<1x32xf32, strided<[128, 1], offset: ?>>, memref<1x32xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>, index
+//       CHECK:   iree_gpu.coalesced_gather_dma %{{.+}} into %{{.+}} lane(%{{.+}}) : memref<1x32xf32, strided<[128, 1], offset: ?>> into memref<1x32xf32, strided<[128, 1], offset: ?>, #gpu.address_space<workgroup>>
 
 // -----
 
@@ -187,7 +187,7 @@ func.func @coalesced_gather_dma_tensor_indices(%idx0: tensor<64xi32>, %source: t
   %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64xf32>) {
     scf.forall.in_parallel {
       iree_gpu.coalesced_gather_dma %source[%idx0] into %out lane(%lane)
-        : tensor<4096xf32>, tensor<64xi32>, tensor<64xf32>, index -> tensor<64xf32>
+        : tensor<4096xf32>, tensor<64xi32> into tensor<64xf32> -> tensor<64xf32>
     }
   }
   return %result : tensor<64xf32>
@@ -196,4 +196,4 @@ func.func @coalesced_gather_dma_tensor_indices(%idx0: tensor<64xi32>, %source: t
 // CHECK-LABEL: func @coalesced_gather_dma_tensor_indices
 //       CHECK:   scf.forall
 //       CHECK:     scf.forall.in_parallel
-//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<4096xf32>, tensor<64xi32>, tensor<64xf32>, index -> tensor<64xf32>
+//       CHECK:       iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}] into %{{.+}} lane(%{{.+}}) : tensor<4096xf32>, tensor<64xi32> into tensor<64xf32> -> tensor<64xf32>
