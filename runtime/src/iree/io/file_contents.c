@@ -303,11 +303,12 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_map(
       host_allocator, sizeof(*contents), (void**)&contents);
 
   if (iree_status_is_ok(status)) {
-    status =
-        iree_io_file_map_view(handle, access, 0, IREE_HOST_SIZE_MAX,
-                              IREE_IO_FILE_MAPPING_FLAG_PRIVATE |
-                                  IREE_IO_FILE_MAPPING_FLAG_EXCLUDE_FROM_DUMPS,
-                              host_allocator, &contents->mapping);
+    status = iree_io_file_map_view(
+        handle, access, 0, IREE_HOST_SIZE_MAX,
+        IREE_IO_FILE_MAPPING_FLAG_PRIVATE |
+            IREE_IO_FILE_MAPPING_FLAG_TRANSPARENT_LARGE_PAGES |
+            IREE_IO_FILE_MAPPING_FLAG_EXCLUDE_FROM_DUMPS,
+        host_allocator, &contents->mapping);
   }
 
   iree_io_file_handle_release(handle);
