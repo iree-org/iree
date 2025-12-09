@@ -2764,6 +2764,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-unify-encoding-for-globals" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-unify-encoding-for-globals
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-verify-affinities" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-verify-affinities
@@ -5312,6 +5321,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-unify-encoding-for-globals" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-unify-encoding-for-globals
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-verify-affinities" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-verify-affinities
@@ -5734,6 +5752,29 @@ initializers and non-initializer roots. At the point in the pipeline where
 this pass runs most internal function calls return timepoints and the
 initializer is the place where they are stored into globals so it happens to
 work out.</p>
+<h3 id="-iree-stream-unify-encoding-for-globals"><code>-iree-stream-unify-encoding-for-globals</code><a class="headerlink" href="#-iree-stream-unify-encoding-for-globals" title="Permanent link">link</a></h3>
+<p><em>Unifies multiple encodings of the same immutable global to reduce memory.</em></p>
+<p>When a single source global (e.g., a model weight) is encoded multiple
+times with different encodings for different uses, this pass selects a
+unified encoding and updates all references to reduce memory footprint.</p>
+<p>The pass analyzes initializers to identify:
+1. Source globals (e.g., stream.tensor.constant with parameters)
+2. Encoded globals derived from the same source
+3. Dispatch sites using these encoded globals</p>
+<p>When multiple encoded globals share the same source, the pass queries
+layout resolvers to determine a unified encoding. If a common encoding
+is found, the pass updates:
+1. The encoding operations in initializers
+2. The corresponding stream.tensor.sizeof operations
+3. The dispatch operand encodings
+4. The executable binding types</p>
+<p>Constraints:
+- Only handles immutable globals with !stream.resource<constant> type
+- Bails out if an encoded global can have multiple sources due to CFG
+- Requires exactly one AffinityAnalysisDialectInterface implementation
+- Skips hand-authored executables to avoid incorrect modifications</p>
+<p>This pass should run after CombineInitializersPass and before
+SpecializeEncodingsPass in the Stream pipeline.</p>
 <h3 id="-iree-stream-verify-affinities"><code>-iree-stream-verify-affinities</code><a class="headerlink" href="#-iree-stream-verify-affinities" title="Permanent link">link</a></h3>
 <p><em>Verifies that all operations have affinities assigned (directly or indirectly).</em></p>
 <h3 id="-iree-stream-verify-async-access-ranges"><code>-iree-stream-verify-async-access-ranges</code><a class="headerlink" href="#-iree-stream-verify-async-access-ranges" title="Permanent link">link</a></h3>
