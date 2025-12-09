@@ -875,3 +875,40 @@ func.func @fuse_warp_and_lane_foralls_with_coalesced_dma(%src: tensor<2x2x64xf32
 //       CHECK:     }
 //       CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 //       CHECK:   return %[[THREAD_FORALL]]
+
+// -----
+
+// This test checks that the extract_slice is fused into the forall op without folding the tensor.empty inside the loop.
+
+func.func @fuse_extract_slice_into_forall(%arg0: tensor<2x2xf32>, %arg1: index) -> tensor<?xf32> {
+  %0 = tensor.empty() : tensor<4x8xf32>
+  %1 = scf.forall (%arg2, %arg3) = (0, 0) to (4, 8) step (2, 2) shared_outs(%arg4 = %0) -> (tensor<4x8xf32>) {
+    %empty = tensor.empty() : tensor<2x2xf32>
+    %transposed = linalg.transpose ins(%arg0 : tensor<2x2xf32>) outs(%empty : tensor<2x2xf32>) permutation = [1, 0]
+    %extracted_slice_0 = tensor.extract_slice %arg4[%arg2, %arg3] [2, 2] [1, 1] : tensor<4x8xf32> to tensor<2x2xf32>
+    %2 = linalg.copy ins(%transposed : tensor<2x2xf32>) outs(%extracted_slice_0 : tensor<2x2xf32>) -> tensor<2x2xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %2 into %arg4[%arg2, %arg3] [2, 2] [1, 1] : tensor<2x2xf32> into tensor<4x8xf32>
+    }
+  } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+  %extracted_slice = tensor.extract_slice %1[0, 0] [1, %arg1] [1, 1] : tensor<4x8xf32> to tensor<?xf32>
+  return %extracted_slice : tensor<?xf32>
+}
+
+// CHECK-LABEL: func @fuse_extract_slice_into_forall
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<2x2xf32>
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: index
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<4x8xf32>
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[EMPTY]][0, 0] [1, %[[ARG1]]] [1, 1] : tensor<4x8xf32> to tensor<1x?xf32>
+//       CHECK:   %[[FORALL:.+]] = scf.forall {{.*}} shared_outs({{.*}} = %[[SLICE]]) -> (tensor<1x?xf32>) {
+//       CHECK:     %[[TRANSPOSE:.+]] = linalg.transpose
+//   CHECK-NOT:     tensor.empty()
+//       CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY:.+]]
+//       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[TRANSPOSE:.+]] : tensor<2x2xf32>) outs(%[[OUT_SLICE:.+]] : tensor<2x2xf32>) -> tensor<2x2xf32>
+//       CHECK:     %[[SLICE_COPY:.+]] = tensor.extract_slice %[[COPY]]
+//       CHECK:     scf.forall.in_parallel {
+//       CHECK:       tensor.parallel_insert_slice %[[SLICE_COPY]]
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[FORALL]] {{\[}}[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+//       CHECK:   return %[[COLLAPSE]]

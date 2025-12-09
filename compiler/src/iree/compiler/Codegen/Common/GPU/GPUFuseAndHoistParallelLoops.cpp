@@ -377,7 +377,8 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseCollapseShapeConsumers>(context);
     patterns.add<FuseExtractSliceConsumers>(context);
     populateSwapExtractWithExpandPattern(patterns);
-    tensor::populateFoldTensorEmptyPatterns(patterns);
+    tensor::populateFoldTensorEmptyPatterns(patterns,
+                                            /*foldSingleUseOnly=*/true);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp->emitOpError("failed to apply fusion + hoisting patterns (set 2)");
@@ -392,7 +393,8 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     RewritePatternSet patterns(context);
     patterns.add<FuseTilableDestinationProducers>(context);
     patterns.add<FuseTilableSliceProducers>(context);
-    tensor::populateFoldTensorEmptyPatterns(patterns);
+    tensor::populateFoldTensorEmptyPatterns(patterns,
+                                            /*foldSingleUseOnly=*/true);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       funcOp->emitOpError("failed to apply fusion + hoisting patterns (set 3)");

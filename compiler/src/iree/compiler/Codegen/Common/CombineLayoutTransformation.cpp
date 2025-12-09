@@ -511,7 +511,8 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
                             CombineRelayoutOpsControlFnRef controlFn) {
   // Sink relayout operations to the end of the funcOp.
   RewritePatternSet propagationPatterns(ctx);
-  tensor::populateFoldTensorEmptyPatterns(propagationPatterns);
+  tensor::populateFoldTensorEmptyPatterns(propagationPatterns,
+                                          /*foldSingleUseOnly=*/true);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(propagationPatterns, ctx);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(propagationPatterns,
                                                        ctx);
@@ -697,7 +698,8 @@ struct CombineLayoutTransformationPass final
       RewritePatternSet patterns(context);
       populateFuseTilableForallConsumersPattern(patterns);
       scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-      tensor::populateFoldTensorEmptyPatterns(patterns);
+      tensor::populateFoldTensorEmptyPatterns(patterns,
+                                              /*foldSingleUseOnly=*/true);
       if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
