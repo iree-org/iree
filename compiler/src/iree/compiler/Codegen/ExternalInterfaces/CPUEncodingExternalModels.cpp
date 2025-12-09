@@ -12,6 +12,7 @@
 // - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
 // - IREE::Codegen::PackedLayoutMaterializerAttr
+// - VerifiableTensorEncoding
 //
 // In these backends, we transpose narrow-N into narrow-M
 // for a combination of reasons:
@@ -799,6 +800,20 @@ struct CPUSerializableAttr final
   }
 };
 
+struct CPUEncodingResolverVerifier
+    : mlir::VerifiableTensorEncoding::ExternalModel<CPUEncodingResolverVerifier,
+                                                    CPUEncodingResolverAttr> {
+
+  LogicalResult
+  verifyEncoding(Attribute attr, ArrayRef<int64_t> shape, Type elementType,
+                 function_ref<InFlightDiagnostic()> emitError) const {
+    auto packedLayoutMaterializerAttr =
+        cast<Codegen::PackedLayoutMaterializerAttr>(attr);
+    return packedLayoutMaterializerAttr.verifyPackedLayoutWithType(
+        shape, elementType, emitError);
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Interface methods implementaion for iree_cpu.vmvx_encoding_resolver.
 //===----------------------------------------------------------------------===//
@@ -949,6 +964,19 @@ struct VMVXSerializableAttr final
   }
 };
 
+struct VMVXEncodingResolverVerifier
+    : mlir::VerifiableTensorEncoding::ExternalModel<
+          VMVXEncodingResolverVerifier, VMVXEncodingResolverAttr> {
+  LogicalResult
+  verifyEncoding(Attribute attr, ArrayRef<int64_t> shape, Type elementType,
+                 function_ref<InFlightDiagnostic()> emitError) const {
+    auto packedLayoutMaterializerAttr =
+        cast<Codegen::PackedLayoutMaterializerAttr>(attr);
+    return packedLayoutMaterializerAttr.verifyPackedLayoutWithType(
+        shape, elementType, emitError);
+  }
+};
+
 } // namespace
 
 void registerCPUEncodingExternalModels(DialectRegistry &registry) {
@@ -957,11 +985,11 @@ void registerCPUEncodingExternalModels(DialectRegistry &registry) {
         IREE::CPU::CPUEncodingResolverAttr::attachInterface<
             CPUEncodingPackedLayoutMaterializerAttr,
             CPUEncodingResolverMaterializerAttr, CPULayoutResolverAttr,
-            CPUSerializableAttr>(*ctx);
+            CPUSerializableAttr, CPUEncodingResolverVerifier>(*ctx);
         IREE::CPU::VMVXEncodingResolverAttr::attachInterface<
             VMVXEncodingPackedLayoutMaterializerAttr,
             VMVXEncodingResolverMaterializerAttr, VMVXLayoutResolverAttr,
-            VMVXSerializableAttr>(*ctx);
+            VMVXSerializableAttr, VMVXEncodingResolverVerifier>(*ctx);
       });
 }
 
