@@ -13,11 +13,15 @@ IREE_BASE_SRCS = $(addprefix $(srcdir)/, \
 	src/math/floorf.c \
 	src/math/fmaf.c \
 	src/math/fmodf.c \
+	src/math/frexpf.c \
+	src/math/ldexpf.c \
 	src/math/powf.c \
 	src/math/expf.c \
 	src/math/powf_data.c \
-	src/math/roundf.c \
 	src/math/exp2f_data.c \
+	src/math/rintf.c \
+	src/math/roundf.c \
+	src/math/scalbnf.c \
 	src/math/__math_invalidf.c \
 	src/math/__math_oflowf.c \
 	src/math/__math_uflowf.c \
