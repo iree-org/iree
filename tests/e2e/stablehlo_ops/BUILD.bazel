@@ -265,7 +265,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "exponential_fp16.mlir",
             "fft.mlir",  # TODO(#9583)
-            "fft_complex",
+            "fft_complex.mlir",
             "reverse.mlir",  # TODO(#12415): disabled due to miscompilation on Pixel 6.
         ],
     ),
