@@ -596,6 +596,18 @@ static SharedBarrierState insertBarriersInRange(RewriterBase &rewriter,
   return state;
 }
 
+// Check if the operation is inside a loop (scf.for, scf.while, etc.)
+static bool isInsideLoop(Operation *op) {
+  Operation *parent = op->getParentOp();
+  while (parent) {
+    if (isa<scf::ForOp, scf::WhileOp, scf::ParallelOp>(parent)) {
+      return true;
+    }
+    parent = parent->getParentOp();
+  }
+  return false;
+}
+
 // Inserts synchronization barriers in the pipelined loop.
 static void insertPipelineBarriers(RewriterBase &rewriter,
                                    scf::ForOp newForOp) {
@@ -603,10 +615,29 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
   Location loc = newForOp.getLoc();
   SharedBarrierState state;
 
-  // Prologue (operations before the loop).
-  state.needBarrierBeforeWrite = true;
-  state = insertBarriersInRange(rewriter, loc, parentBlock->begin(),
-                                newForOp->getIterator(), state);
+  // Check if the pipelined loop is nested inside another loop.
+  // If nested, we need prologue barriers because:
+  //   - The epilogue of outer iteration N writes to shared memory
+  //   - The prologue of outer iteration N+1 reads from shared memory
+  //   - Without a barrier, there's a data race between iterations
+  bool isNested = isInsideLoop(newForOp);
+
+  if (isNested) {
+    // Nested loop: insert barriers in prologue for correctness.
+    // Start with needBarrierBeforeWrite=true because the epilogue of the
+    // previous outer iteration may have read from shared memory.
+    state.needBarrierBeforeWrite = true;
+    state = insertBarriersInRange(rewriter, loc, parentBlock->begin(),
+                                  newForOp->getIterator(), state);
+  } else {
+    // Non-nested loop: skip prologue barriers for performance.
+    // The prologue contains global->shared memory copies that don't require
+    // barriers between them since there are no shared memory reads in prologue.
+    // We only need to set up the state for the loop body: since the prologue
+    // writes to shared memory, subsequent shared reads in the loop body will
+    // need a barrier.
+    state.needBarrierBeforeRead = true;
+  }
 
   // Loop body (exclude terminator).
   Block *body = newForOp.getBody();
