@@ -1961,3 +1961,48 @@ util.func public @fuse_reduction_with_two_consumers(%arg0 : tensor<?x?xf32>) -> 
 //  CHECK-SAME:         ins(%[[REDUCTION]] :
 //       CHECK:     flow.return %[[CONSUMER1]], %[[CONSUMER2]]
 //       CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1
+
+// -----
+
+// Test that when a producer has both a non-fusable consumer (tensor.expand_shape)
+// and a fusable consumer (linalg.generic), the fusable consumer still gets fused.
+util.func public @fuse_consumer_despite_nonfusable_sibling(%arg0: tensor<10x32x42x32xf32>) -> (tensor<10x32x42x1xf32>, tensor<10x32x42x32xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %6 = tensor.empty() : tensor<10x32x42x32xf32>
+  %7 = tensor.empty() : tensor<10x32x42xf32>
+  %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<10x32x42xf32>) -> tensor<10x32x42xf32>
+  %9 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%arg0 : tensor<10x32x42x32xf32>) outs(%8 : tensor<10x32x42xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %22 = arith.addf %in, %out : f32
+      linalg.yield %22 : f32
+    } -> tensor<10x32x42xf32>
+  %expanded = tensor.expand_shape %9 [[0], [1], [2, 3]] output_shape [10, 32, 42, 1]
+      : tensor<10x32x42xf32> into tensor<10x32x42x1xf32>
+  %10 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0, %9 : tensor<10x32x42x32xf32>, tensor<10x32x42xf32>) outs(%6 : tensor<10x32x42x32xf32>) {
+    ^bb0(%in: f32, %in_3: f32, %out: f32):
+      %22 = arith.subf %in, %in_3 : f32
+      linalg.yield %22 : f32
+    } -> tensor<10x32x42x32xf32>
+  util.return %expanded, %10 : tensor<10x32x42x1xf32>, tensor<10x32x42x32xf32>
+}
+// CHECK-LABEL: util.func public @fuse_consumer_despite_nonfusable_sibling
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<10x32x42x32xf32>
+//       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
+//       CHECK:     %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+//  CHECK-SAME:         ins(%[[ARG0]] :
+//       CHECK:     %[[SUB:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:         ins(%[[ARG0]], %[[REDUCTION]] :
+//       CHECK:     flow.return %[[REDUCTION]], %[[SUB]]
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[DISPATCH]]#0
+//       CHECK:   util.return %[[EXPAND]], %[[DISPATCH]]#1
