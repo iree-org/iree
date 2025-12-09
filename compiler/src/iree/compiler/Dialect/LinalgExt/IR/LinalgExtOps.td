@@ -798,6 +798,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     If an additional mask argument M is included, the result of the first matmul is modified according to:
 
     Q @ K.T += M
+
+    Region:
+      The region body can receive either 1 or 5 block arguments:
+        - 1 argument (legacy): score (element type of output)
+        - 5 arguments: score, b (batch index), h (head index), m (query seq index), n (key/value seq index)
+      The region should yield a single value (the modified score).
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -923,6 +929,15 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     it over the entire softmax reduction dimension by:
       x, _, sum : results
       x = (1 / sum) * x
+
+    Region:
+      The region body receives the following block arguments:
+        - score: the computed score value from Q @ K.T (element type of output)
+        - b: batch index (index type)
+        - h: head index (index type)
+        - m: query sequence index (index type)
+        - n: key/value sequence index (index type)
+      The region should yield a single value (the modified score).
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -1007,6 +1022,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     // Attributes to set on QK and PV matmul after decomposition.
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
+    // Flag to control whether to use exp2 (with log2(e) scaling) or exp.
+    static StringRef getUseExp2AttrStr() { return "use_exp2"; }
   }];
 
   let hasCanonicalizer = 1;

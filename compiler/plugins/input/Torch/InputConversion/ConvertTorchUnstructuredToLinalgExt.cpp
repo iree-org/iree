@@ -6,7 +6,16 @@
 
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "llvm/ADT/APFloat.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchDialect.h"
@@ -163,6 +172,353 @@ struct FftRfftOpConversion
   }
 };
 
+struct FlexAttentionOpConversion
+    : public OpRewritePattern<torch::Torch::AtenFlexAttentionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  // Attention tensors are 4D: [batch, head, query_seq, key_seq].
+  static constexpr int kAttentionRank = 4;
+  // Modification functions receive 4 index arguments: (b, h, m, n).
+  static constexpr int kNumModificationIndices = 4;
+
+  // Makes it convenient to pass around commonly used types.
+  struct TypeInfo {
+    Type i32Type;
+    Type si32Type;
+    RankedTensorType scalarTensorType;
+    RankedTensorType i32ScalarTensorType;
+    RankedTensorType boolScalarTensorType;
+    torch::Torch::ValueTensorType torchScalarType;
+    torch::Torch::ValueTensorType torchI32ScalarType;
+    torch::Torch::ValueTensorType torchBoolScalarType;
+  } mutable typeInfo;
+
+  LogicalResult matchAndRewrite(torch::Torch::AtenFlexAttentionOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    MLIRContext *ctx = getContext();
+    Value query = op.getQuery();
+    Value key = op.getKey();
+    Value value = op.getValue();
+    Value scaleValue = op.getScale();
+    auto scoreModSymbol = op.getScoreModFn();
+    auto maskModSymbol = op.getMaskModFn();
+
+    bool returnLseValue;
+    if (!matchPattern(op.getReturnLse(),
+                      torch::Torch::m_TorchConstantBool(&returnLseValue))) {
+      return rewriter.notifyMatchFailure(
+          op, "expected return_lse to be a constant bool");
+    }
+
+    auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
+    auto keyType = cast<torch::Torch::ValueTensorType>(key.getType());
+    auto valueType = cast<torch::Torch::ValueTensorType>(value.getType());
+
+    if (!queryType.hasSizes() || !keyType.hasSizes() || !valueType.hasSizes()) {
+      return rewriter.notifyMatchFailure(
+          op, "expected input(s) types having sizes");
+    }
+
+    ArrayRef<int64_t> queryShape = queryType.getSizes();
+    ArrayRef<int64_t> valueShape = valueType.getSizes();
+
+    // Query shape: [B, H, M, E].
+    if (queryShape.size() != kAttentionRank) {
+      return rewriter.notifyMatchFailure(op, "expected 4D query tensor");
+    }
+
+    int64_t batch = queryShape[0];
+    int64_t numHeads = queryShape[1];
+    int64_t seqLenQ = queryShape[2];
+    int64_t headDim = queryShape[3];
+    int64_t seqLenKV = keyType.getSizes()[2];
+    int64_t valueDim = valueShape[3];
+
+    if (headDim == torch::Torch::kUnknownSize) {
+      return rewriter.notifyMatchFailure(op, "NYI: dynamic head dimension");
+    }
+
+    // Check if the element type is a float.
+    Type elementType = queryType.getOptionalDtype();
+    auto floatType = dyn_cast<FloatType>(elementType);
+    if (!floatType) {
+      return rewriter.notifyMatchFailure(op, "expected float element type");
+    }
+
+    // Default scale: 1.0 / sqrt(head_dim).
+    double scaleVal;
+    if (!matchPattern(scaleValue,
+                      torch::Torch::m_TorchConstantFloat(&scaleVal))) {
+      scaleVal = 1.0 / std::sqrt(static_cast<double>(headDim));
+    }
+
+    Value scale = arith::ConstantOp::create(
+        rewriter, loc, floatType, rewriter.getFloatAttr(floatType, scaleVal));
+
+    Value builtinQuery = convertToBuiltinTensor(rewriter, loc, query);
+    Value builtinKey = convertToBuiltinTensor(rewriter, loc, key);
+    Value builtinValue = convertToBuiltinTensor(rewriter, loc, value);
+
+    // Declare common types for mask and score modification regions.
+    setTypeInfo(rewriter, floatType);
+    Value zero = arith::ConstantFloatOp::create(
+        rewriter, loc, floatType,
+        llvm::APFloat::getZero(floatType.getFloatSemantics()));
+    Value mask;
+    if (maskModSymbol) {
+      FlatSymbolRefAttr maskModRef =
+          FlatSymbolRefAttr::get(ctx, *maskModSymbol);
+      mask = createModifiedMask(rewriter, loc, ctx, maskModRef, batch, numHeads,
+                                seqLenQ, seqLenKV, floatType, builtinQuery,
+                                builtinKey, zero);
+    }
+
+    // Create output tensor for attention.
+    SmallVector<Value> outputDynSizes;
+    SmallVector<int64_t> outputShape = {batch, numHeads, seqLenQ, valueDim};
+    computeDynamicSizes(rewriter, loc, outputShape, outputDynSizes,
+                        builtinQuery, builtinValue);
+
+    // Initialize output tensor with identity value (0.0 for addition).
+    Value outputInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
+                                               floatType, rewriter, loc,
+                                               /*useOnlyFiniteValue=*/true);
+    Value outputTensor = tensor::SplatOp::create(rewriter, loc, outputInit,
+                                                 outputShape, outputDynSizes);
+
+    // Build indexing maps for attention.
+    // Standard maps: Q, K, V, scale, [mask], output.
+    AffineExpr b, h, m, n, k1, k2;
+    bindDims(ctx, b, h, m, n, k1, k2);
+
+    auto qMap = AffineMap::get(6, 0, {b, h, m, k1}, ctx);
+    auto kMap = AffineMap::get(6, 0, {b, h, n, k1}, ctx);
+    auto vMap = AffineMap::get(6, 0, {b, h, n, k2}, ctx);
+    auto sMap = AffineMap::get(6, 0, {}, ctx);
+    auto oMap = AffineMap::get(6, 0, {b, h, m, k2}, ctx);
+
+    SmallVector<AffineMap> indexingMaps = {qMap, kMap, vMap, sMap};
+    if (mask) {
+      indexingMaps.push_back(AffineMap::get(6, 0, {b, h, m, n}, ctx));
+    }
+
+    indexingMaps.push_back(oMap);
+
+    // Create attention op.
+    auto attentionOp = IREE::LinalgExt::AttentionOp::create(
+        rewriter, loc, outputTensor.getType(), builtinQuery, builtinKey,
+        builtinValue, scale, outputTensor,
+        rewriter.getAffineMapArrayAttr(indexingMaps), mask);
+
+    createScoreModificationRegion(rewriter, loc, attentionOp, scoreModSymbol,
+                                  floatType);
+
+    rewriter.setInsertionPointAfter(attentionOp);
+
+    Value normalizedOutput = attentionOp.getResult(0);
+
+    auto outputTorchType =
+        queryType.getWithSizesAndDtype(outputShape, elementType);
+    Value torchOutput = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, outputTorchType, normalizedOutput);
+
+    // Handle logsumexp.
+    // Note: AttentionOp doesn't expose intermediate max/sum
+    // values needed for LSE calculation. Return a dummy tensor - logsumexp
+    // shape is output_shape[:-1] (remove last dim).
+    if (returnLseValue) {
+      op.emitWarning("FlexAttention: logsumexp output is a dummy (zeros), "
+                     "actual values are not available from AttentionOp");
+    }
+    SmallVector<int64_t> lseShape = outputShape;
+    lseShape.pop_back();
+
+    SmallVector<Value> lseDynSizes = outputDynSizes;
+    if (!outputDynSizes.empty()) {
+      lseDynSizes.pop_back();
+    }
+
+    Value lseTensor =
+        tensor::SplatOp::create(rewriter, loc, zero, lseShape, lseDynSizes);
+
+    auto lseTorchType = queryType.getWithSizesAndDtype(lseShape, elementType);
+    Value torchLogsumexp = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, lseTorchType, lseTensor);
+
+    rewriter.replaceOp(op, {torchOutput, torchLogsumexp});
+    return success();
+  }
+
+  Value convertToBuiltinTensor(PatternRewriter &rewriter, Location loc,
+                               Value torchTensor) const {
+    auto torchType = cast<torch::Torch::ValueTensorType>(torchTensor.getType());
+    return torch::TorchConversion::ToBuiltinTensorOp::create(
+        rewriter, loc, torchType.toBuiltinTensor(), torchTensor);
+  }
+
+  void setTypeInfo(PatternRewriter &rewriter, FloatType floatType) const {
+    typeInfo.i32Type = rewriter.getI32Type();
+    typeInfo.si32Type =
+        IntegerType::get(rewriter.getContext(), 32, IntegerType::Signed);
+    typeInfo.scalarTensorType = RankedTensorType::get({}, floatType);
+    typeInfo.i32ScalarTensorType = RankedTensorType::get({}, typeInfo.i32Type);
+    typeInfo.boolScalarTensorType =
+        RankedTensorType::get({}, rewriter.getI1Type());
+    typeInfo.torchScalarType = rewriter.getType<torch::Torch::ValueTensorType>(
+        ArrayRef<int64_t>{}, floatType);
+    typeInfo.torchI32ScalarType =
+        rewriter.getType<torch::Torch::ValueTensorType>(ArrayRef<int64_t>{},
+                                                        typeInfo.si32Type);
+    typeInfo.torchBoolScalarType =
+        rewriter.getType<torch::Torch::ValueTensorType>(ArrayRef<int64_t>{},
+                                                        rewriter.getI1Type());
+  }
+
+  void computeDynamicSizes(PatternRewriter &rewriter, Location loc,
+                           const SmallVector<int64_t> &shape,
+                           SmallVector<Value> &dynSizes, Value first,
+                           Value second) const {
+    for (int i = 0; i < kAttentionRank; ++i) {
+      if (shape[i] == torch::Torch::kUnknownSize) {
+        Value idx =
+            arith::ConstantIndexOp::create(rewriter, loc, std::min(i, 2));
+        Value dim =
+            tensor::DimOp::create(rewriter, loc, i < 3 ? first : second, idx);
+        dynSizes.push_back(dim);
+      }
+    }
+  }
+
+  // Creates a modified mask tensor.
+  Value createModifiedMask(PatternRewriter &rewriter, Location loc,
+                           MLIRContext *ctx, FlatSymbolRefAttr maskModRef,
+                           int64_t batch, int64_t numHeads, int64_t seqLenQ,
+                           int64_t seqLenKV, FloatType floatType,
+                           Value builtinQuery, Value builtinKey,
+                           Value zero) const {
+    // Create mask tensor [B, H, M, N] with values 0.0 (attend) or -inf
+    // (mask).
+    SmallVector<int64_t> maskShape = {batch, numHeads, seqLenQ, seqLenKV};
+    SmallVector<Value> maskDynSizes;
+
+    computeDynamicSizes(rewriter, loc, maskShape, maskDynSizes, builtinQuery,
+                        builtinKey);
+
+    Value maskTensor = tensor::EmptyOp::create(rewriter, loc, maskShape,
+                                               floatType, maskDynSizes);
+    // Create linalg.generic to materialize mask.
+    SmallVector<AffineMap> maskMaps;
+    maskMaps.push_back(AffineMap::getMultiDimIdentityMap(kAttentionRank, ctx));
+
+    SmallVector<utils::IteratorType> iteratorTypes(
+        kAttentionRank, utils::IteratorType::parallel);
+
+    Value negInf = arith::ConstantFloatOp::create(
+        rewriter, loc, floatType,
+        llvm::APFloat::getInf(floatType.getFloatSemantics(),
+                              /*Negative=*/true));
+
+    auto maskGeneric = linalg::GenericOp::create(
+        rewriter, loc, TypeRange{maskTensor.getType()}, ValueRange{},
+        ValueRange{maskTensor}, maskMaps, iteratorTypes,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          // Get indices and convert to torch tensors.
+          SmallVector<Value> torchIndices;
+          for (unsigned i = 0; i < kNumModificationIndices; ++i) {
+            Value idx = linalg::IndexOp::create(b, loc, i);
+            Value idxI32 =
+                arith::IndexCastOp::create(b, loc, typeInfo.i32Type, idx);
+            Value idxTensor = tensor::FromElementsOp::create(
+                b, loc, typeInfo.i32ScalarTensorType, ValueRange{idxI32});
+            Value torchIdx =
+                torch::TorchConversion::FromBuiltinTensorOp::create(
+                    b, loc, typeInfo.torchI32ScalarType, idxTensor);
+            torchIndices.push_back(torchIdx);
+          }
+
+          // Call mask_mod_fn(b, h, q_idx, kv_idx).
+          auto callOp = func::CallOp::create(
+              b, loc, TypeRange{typeInfo.torchBoolScalarType}, maskModRef,
+              ValueRange(torchIndices));
+          Value torchMaskResult = callOp.getResult(0);
+
+          Value maskResult = torch::TorchConversion::ToBuiltinTensorOp::create(
+              b, loc, typeInfo.boolScalarTensorType, torchMaskResult);
+
+          Value maskBool =
+              tensor::ExtractOp::create(b, loc, maskResult, ValueRange{});
+
+          Value maskValue =
+              arith::SelectOp::create(b, loc, maskBool, zero, negInf);
+
+          linalg::YieldOp::create(b, loc, maskValue);
+        });
+
+    return maskGeneric.getResult(0);
+  }
+
+  // Adds a score modification region to the attention op.
+  void
+  createScoreModificationRegion(PatternRewriter &rewriter, Location loc,
+                                IREE::LinalgExt::AttentionOp attentionOp,
+                                std::optional<llvm::StringRef> scoreModSymbol,
+                                FloatType floatType) const {
+    OpBuilder::InsertionGuard g(rewriter);
+    Block *block = rewriter.createBlock(&attentionOp.getRegion());
+
+    // Add block arguments: score (floatType), b, h, m, n (all index type).
+    Type indexType = rewriter.getIndexType();
+    block->addArgument(floatType, loc);
+    for (int i = 0; i < kNumModificationIndices; ++i) {
+      block->addArgument(indexType, loc);
+    }
+    rewriter.setInsertionPointToStart(block);
+
+    Value score = block->getArgument(0);
+    SmallVector<Value> indices;
+    for (int i = 0; i < kNumModificationIndices; ++i) {
+      indices.push_back(block->getArgument(i + 1));
+    }
+    Value modifiedScore = score;
+
+    if (scoreModSymbol) {
+      // The score_mod_fn takes (score, b, h, m, n) where m=q_idx, n=kv_idx.
+
+      Value scoreTensor = tensor::FromElementsOp::create(
+          rewriter, loc, typeInfo.scalarTensorType, ValueRange{score});
+      Value torchScore = torch::TorchConversion::FromBuiltinTensorOp::create(
+          rewriter, loc, typeInfo.torchScalarType, scoreTensor);
+
+      SmallVector<Value> callArgs;
+      callArgs.push_back(torchScore);
+
+      for (Value idx : indices) {
+        Value idxI32 =
+            arith::IndexCastOp::create(rewriter, loc, typeInfo.i32Type, idx);
+        Value idxTensor = tensor::FromElementsOp::create(
+            rewriter, loc, typeInfo.i32ScalarTensorType, ValueRange{idxI32});
+        Value torchIdx = torch::TorchConversion::FromBuiltinTensorOp::create(
+            rewriter, loc, typeInfo.torchI32ScalarType, idxTensor);
+        callArgs.push_back(torchIdx);
+      }
+
+      auto callOp = func::CallOp::create(
+          rewriter, loc, TypeRange{typeInfo.torchScalarType},
+          scoreModSymbol.value(), ValueRange(callArgs));
+      Value torchResult = callOp.getResult(0);
+
+      Value resultTensor = torch::TorchConversion::ToBuiltinTensorOp::create(
+          rewriter, loc, typeInfo.scalarTensorType, torchResult);
+
+      modifiedScore =
+          tensor::ExtractOp::create(rewriter, loc, resultTensor, ValueRange{});
+    }
+
+    IREE::LinalgExt::YieldOp::create(rewriter, loc, modifiedScore);
+  }
+};
+
 class ConvertTorchUnstructuredToLinalgExtPass final
     : public impl::ConvertTorchUnstructuredToLinalgExtPassBase<
           ConvertTorchUnstructuredToLinalgExtPass> {
@@ -171,13 +527,14 @@ public:
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
                     torch::Torch::TorchDialect, tensor::TensorDialect,
                     linalg::LinalgDialect, arith::ArithDialect,
+                    math::MathDialect, func::FuncDialect,
                     torch::TorchConversion::TorchConversionDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
 
-    patterns.add<FftRfftOpConversion>(context);
+    patterns.add<FftRfftOpConversion, FlexAttentionOpConversion>(context);
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();
