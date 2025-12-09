@@ -1967,6 +1967,112 @@ func.func @cross_attention_transposev_dyn(%query: tensor<?x?x?xf32>, %key: tenso
 
 // -----
 
+module {
+  func.func private @sdpa_score0(%arg0: !torch.vtensor<[],f32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>, %arg4: !torch.vtensor<[],si32>) -> !torch.vtensor<[],f32> {
+    %0 = torch.aten.tanh %arg0 : !torch.vtensor<[],f32> -> !torch.vtensor<[],f32>
+    return %0 : !torch.vtensor<[],f32>
+  }
+  func.func @flex_attn_with_indexing(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> !torch.vtensor<[4,8,1024,64],f32> attributes {torch.assume_strict_symbolic_shapes} {
+    %cst = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
+    %cst_0 = arith.constant 1.000000e+00 : f32
+    %0 = torch_c.to_builtin_tensor %arg0 : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
+    %1 = torch_c.to_builtin_tensor %arg1 : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
+    %2 = torch_c.to_builtin_tensor %arg2 : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
+    %3 = iree_linalg_ext.attention {indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+      ]
+    } ins(%0, %1, %2, %cst_0 : tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, f32) outs(%cst : tensor<4x8x1024x64xf32>) {
+    ^bb0(%arg3: f32):
+      %from_elements = tensor.from_elements %arg3 : tensor<f32>
+      %5 = torch_c.from_builtin_tensor %from_elements : tensor<f32> -> !torch.vtensor<[],f32>
+      %6 = iree_linalg_ext.index 0 : index
+      %7 = arith.index_cast %6 : index to i32
+      %from_elements_1 = tensor.from_elements %7 : tensor<i32>
+      %8 = torch_c.from_builtin_tensor %from_elements_1 : tensor<i32> -> !torch.vtensor<[],si32>
+      %9 = iree_linalg_ext.index 1 : index
+      %10 = arith.index_cast %9 : index to i32
+      %from_elements_2 = tensor.from_elements %10 : tensor<i32>
+      %11 = torch_c.from_builtin_tensor %from_elements_2 : tensor<i32> -> !torch.vtensor<[],si32>
+      %12 = iree_linalg_ext.index 2 : index
+      %13 = arith.index_cast %12 : index to i32
+      %from_elements_3 = tensor.from_elements %13 : tensor<i32>
+      %14 = torch_c.from_builtin_tensor %from_elements_3 : tensor<i32> -> !torch.vtensor<[],si32>
+      %15 = iree_linalg_ext.index 3 : index
+      %16 = arith.index_cast %15 : index to i32
+      %from_elements_4 = tensor.from_elements %16 : tensor<i32>
+      %17 = torch_c.from_builtin_tensor %from_elements_4 : tensor<i32> -> !torch.vtensor<[],si32>
+      %18 = func.call @sdpa_score0(%5, %8, %11, %14, %17) : (!torch.vtensor<[],f32>, !torch.vtensor<[],si32>, !torch.vtensor<[],si32>, !torch.vtensor<[],si32>, !torch.vtensor<[],si32>) -> !torch.vtensor<[],f32>
+      %19 = torch_c.to_builtin_tensor %18 : !torch.vtensor<[],f32> -> tensor<f32>
+      %extracted = tensor.extract %19[] : tensor<f32>
+      iree_linalg_ext.yield %extracted : f32
+    } -> tensor<4x8x1024x64xf32>
+    %4 = torch_c.from_builtin_tensor %3 : tensor<4x8x1024x64xf32> -> !torch.vtensor<[4,8,1024,64],f32>
+    return %4 : !torch.vtensor<[4,8,1024,64],f32>
+  }
+}
+
+// CHECK-DAG: #[[$MAP_Q:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+// CHECK-DAG: #[[$MAP_K:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>
+// CHECK-DAG: #[[$MAP_V:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
+// CHECK-DAG: #[[$MAP_S:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+// CHECK-DAG: #[[$MAP_O:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+
+// CHECK-LABEL: func.func private @sdpa_score0(
+// CHECK-SAME:    %[[SCORE_ARG0:[a-zA-Z0-9_]+]]: !torch.vtensor<[],f32>
+// CHECK-SAME:    %[[SCORE_ARG1:[a-zA-Z0-9_]+]]: !torch.vtensor<[],si32>
+// CHECK-SAME:    %[[SCORE_ARG2:[a-zA-Z0-9_]+]]: !torch.vtensor<[],si32>
+// CHECK-SAME:    %[[SCORE_ARG3:[a-zA-Z0-9_]+]]: !torch.vtensor<[],si32>
+// CHECK-SAME:    %[[SCORE_ARG4:[a-zA-Z0-9_]+]]: !torch.vtensor<[],si32>
+// CHECK:         %[[TANH:.+]] = torch.aten.tanh %[[SCORE_ARG0]]
+// CHECK:         return %[[TANH]]
+
+// CHECK-LABEL: func.func @flex_attn_with_indexing(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: !torch.vtensor<[4,8,1024,64],f32>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: !torch.vtensor<[4,8,1024,64],f32>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: !torch.vtensor<[4,8,1024,64],f32>
+// CHECK-DAG:     %[[INIT:.+]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
+// CHECK-DAG:     %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
+// CHECK-DAG:     %[[T0:.+]] = torch_c.to_builtin_tensor %[[ARG0]]
+// CHECK-DAG:     %[[T1:.+]] = torch_c.to_builtin_tensor %[[ARG1]]
+// CHECK-DAG:     %[[T2:.+]] = torch_c.to_builtin_tensor %[[ARG2]]
+// CHECK:         %[[ATTN:.+]] = iree_linalg_ext.attention
+// CHECK-SAME:                   {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]}
+// CHECK-SAME:                   ins(%[[T0]], %[[T1]], %[[T2]], %[[SCALE]] :
+// CHECK-SAME:        tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, f32) outs(%[[INIT]] :
+// CHECK-SAME:        tensor<4x8x1024x64xf32>) {
+// CHECK:         ^bb0(%[[SCORE:.+]]: f32):
+// CHECK:           %[[FROM_ELEM:.+]] = tensor.from_elements %[[SCORE]] : tensor<f32>
+// CHECK:           %[[TORCH_SCORE:.+]] = torch_c.from_builtin_tensor %[[FROM_ELEM]] : tensor<f32> -> !torch.vtensor<[],f32>
+// CHECK:           %[[IDX0:.+]] = iree_linalg_ext.index 0 : index
+// CHECK:           %[[CAST0:.+]] = arith.index_cast %[[IDX0]] : index to i32
+// CHECK:           %[[FROM_ELEM0:.+]] = tensor.from_elements %[[CAST0]] : tensor<i32>
+// CHECK:           %[[TORCH_IDX0:.+]] = torch_c.from_builtin_tensor %[[FROM_ELEM0]] : tensor<i32> -> !torch.vtensor<[],si32>
+// CHECK:           %[[IDX1:.+]] = iree_linalg_ext.index 1 : index
+// CHECK:           %[[CAST1:.+]] = arith.index_cast %[[IDX1]] : index to i32
+// CHECK:           %[[FROM_ELEM1:.+]] = tensor.from_elements %[[CAST1]] : tensor<i32>
+// CHECK:           %[[TORCH_IDX1:.+]] = torch_c.from_builtin_tensor %[[FROM_ELEM1]] : tensor<i32> -> !torch.vtensor<[],si32>
+// CHECK:           %[[IDX2:.+]] = iree_linalg_ext.index 2 : index
+// CHECK:           %[[CAST2:.+]] = arith.index_cast %[[IDX2]] : index to i32
+// CHECK:           %[[FROM_ELEM2:.+]] = tensor.from_elements %[[CAST2]] : tensor<i32>
+// CHECK:           %[[TORCH_IDX2:.+]] = torch_c.from_builtin_tensor %[[FROM_ELEM2]] : tensor<i32> -> !torch.vtensor<[],si32>
+// CHECK:           %[[IDX3:.+]] = iree_linalg_ext.index 3 : index
+// CHECK:           %[[CAST3:.+]] = arith.index_cast %[[IDX3]] : index to i32
+// CHECK:           %[[FROM_ELEM3:.+]] = tensor.from_elements %[[CAST3]] : tensor<i32>
+// CHECK:           %[[TORCH_IDX3:.+]] = torch_c.from_builtin_tensor %[[FROM_ELEM3]] : tensor<i32> -> !torch.vtensor<[],si32>
+// CHECK:           %[[CALL:.+]] = func.call @sdpa_score0(%[[TORCH_SCORE]], %[[TORCH_IDX0]], %[[TORCH_IDX1]], %[[TORCH_IDX2]], %[[TORCH_IDX3]])
+// CHECK:           %[[RESULT_TENSOR:.+]] = torch_c.to_builtin_tensor %[[CALL]] : !torch.vtensor<[],f32> -> tensor<f32>
+// CHECK:           %[[EXTRACTED:.+]] = tensor.extract %[[RESULT_TENSOR]][] : tensor<f32>
+// CHECK:           iree_linalg_ext.yield %[[EXTRACTED]] : f32
+// CHECK:         } -> tensor<4x8x1024x64xf32>
+// CHECK:         %[[RESULT:.+]] = torch_c.from_builtin_tensor %[[ATTN]]
+// CHECK:         return %[[RESULT]] : !torch.vtensor<[4,8,1024,64],f32>
+
+// -----
+
 func.func @custom_op_default(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
   %0 = iree_linalg_ext.custom_op {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
