@@ -639,7 +639,7 @@ func.func @no_swap_collapse_shape_with_extract_slice_2(%arg0: tensor<32x2x2x16xf
 // -----
 
 #config = #iree_gpu.lowering_config<{reduction = [0, 30]}>
-func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf32>) -> tensor<2592x32xf32> {
+func.func @no_swap_collapse_shape_with_extract_slice_dynamic(%arg0: tensor<288x3x3x32xf32>) -> tensor<2592x32xf32> {
   %collapsed = tensor.collapse_shape %arg0 [[0, 1, 2], [3]] : tensor<288x3x3x32xf32> into tensor<2592x32xf32>
   %empty = tensor.empty() : tensor<2592x32xf32>
   %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<2592x32xf32>) outs(%empty : tensor<2592x32xf32>) -> tensor<2592x32xf32>
@@ -647,12 +647,37 @@ func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf3
 }
 
 // No swap would happen when both the collapsed size and offset are dynamic after tiling.
-// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice_dynamic
 //       NORM-REDUCTION:   tensor.collapse_shape
 //       NORM-REDUCTION:   scf.for
 //       NORM-REDUCTION:     tensor.extract_slice {{.*}} tensor<2592x32xf32> to tensor<2592x?xf32>
 //   NORM-REDUCTION-NOT:     tensor.collapse_shape
 //       NORM-REDUCTION:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 0, 1]}>
+func.func @no_swap_collapse_shape_with_extract_slice_3(%arg0: tensor<8x1x4x16x16xf32>) -> tensor<512x48x48xf32> {
+  %0 = tensor.empty() : tensor<512x48x48xf32>
+  %1 = scf.forall (%arg1, %arg2, %arg3) in (4, 48, 1) shared_outs(%arg4 = %0) -> (tensor<512x48x48xf32>) {
+    %2 = tensor.empty() : tensor<8x16x1x4x16xf32>
+    %transposed = linalg.transpose ins(%arg0 : tensor<8x1x4x16x16xf32>) outs(%2 : tensor<8x16x1x4x16xf32>) permutation = [0, 3, 1, 2, 4]
+    %3 = linalg.copy {lowering_config = #config} ins(%transposed : tensor<8x16x1x4x16xf32>) outs(%2 : tensor<8x16x1x4x16xf32>) -> tensor<8x16x1x4x16xf32>
+    %collapsed = tensor.collapse_shape %3 [[0, 1], [2], [3, 4]] : tensor<8x16x1x4x16xf32> into tensor<128x1x64xf32>
+    %extracted_slice = tensor.extract_slice %collapsed[0, 0, 0] [128, 1, 48] [1, 1, 1] : tensor<128x1x64xf32> to tensor<128x1x48xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %extracted_slice into %arg4[0, 0, 0] [128, 1, 48] [1, 1, 1] : tensor<128x1x48xf32> into tensor<512x48x48xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  return %1 : tensor<512x48x48xf32>
+}
+
+// No swap would happen when extract_slice and collapse_shape ops are within the same block.
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice_3
+//       NORM-REDUCTION:   scf.forall
+//       NORM-REDUCTION:     linalg.copy
+//       NORM-REDUCTION:     tensor.collapse_shape
+//       NORM-REDUCTION:     tensor.extract_slice
 
 // -----
 
