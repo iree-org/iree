@@ -514,10 +514,12 @@ IREE_API_EXPORT iree_status_t iree_io_parse_safetensors_index(
   // implementations.
   iree_io_file_mapping_t* file_mapping = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_io_file_map_view(file_handle, IREE_IO_FILE_ACCESS_READ, 0,
-                                IREE_HOST_SIZE_MAX,
-                                IREE_IO_FILE_MAPPING_FLAG_EXCLUDE_FROM_DUMPS,
-                                host_allocator, &file_mapping));
+      z0, iree_io_file_map_view(
+              file_handle, IREE_IO_FILE_ACCESS_READ, 0, IREE_HOST_SIZE_MAX,
+              IREE_IO_FILE_MAPPING_FLAG_PRIVATE |
+                  IREE_IO_FILE_MAPPING_FLAG_TRANSPARENT_LARGE_PAGES |
+                  IREE_IO_FILE_MAPPING_FLAG_EXCLUDE_FROM_DUMPS,
+              host_allocator, &file_mapping));
 
   iree_status_t status = iree_io_parse_safetensors_index_from_memory(
       file_handle, iree_io_file_mapping_contents_ro(file_mapping), index);

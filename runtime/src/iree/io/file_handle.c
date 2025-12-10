@@ -724,6 +724,13 @@ static iree_status_t iree_io_platform_map_file_view(
     advice |= MADV_DONTDUMP;
   }
 #endif  // MADV_DONTDUMP
+#if defined(MADV_HUGEPAGE)
+  if (iree_all_bits_set(flags,
+                        IREE_IO_FILE_MAPPING_FLAG_TRANSPARENT_LARGE_PAGES)) {
+    advice |= MADV_HUGEPAGE;
+  }
+#endif  // MADV_HUGEPAGE
+
   if (advice) {
     madvise(ptr, adjusted_length, advice);
   }
