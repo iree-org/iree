@@ -1200,6 +1200,35 @@ iree_generated_e2e_runner_test(
     "requires-gpu-cdna3"
 )
 
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna3_coalesced_dma_f32_multi_transfer
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=custom_mnk"
+    "--mnk=32,128,128"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    "--iree-hip-target=gfx942"
+    "--iree-llvmgpu-use-direct-load"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # To distinguish between CDNA(gfx9), RDNA3(gfx11), and RDNA4(gfx12)

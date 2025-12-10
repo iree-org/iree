@@ -13,7 +13,7 @@
     max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [2147483647, 2147483647, 2147483647],
     max_load_instruction_bits = 128, simds_per_wgp = 4,
-    vgpr_space_bits = 8192>>}>
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
 
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
 
@@ -53,7 +53,7 @@ func.func @lower_coalesced_gather_dma_multiple(
     max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [2147483647, 2147483647, 2147483647],
     max_load_instruction_bits = 128, simds_per_wgp = 4,
-    vgpr_space_bits = 8192>>}>
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
 
 #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 

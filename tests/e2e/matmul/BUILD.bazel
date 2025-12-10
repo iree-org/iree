@@ -482,3 +482,35 @@ iree_generated_e2e_runner_test(
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
 )
+
+# Third coalesced DMA test with wide K/N to trigger multiple DMA transfers per lane.
+# With K=N=128, subgroup_size=64, dma_sizes=[32,128]:
+#   - innermost=128, 128 % 256 != 0 (can't use 128-bit), 128 % 64 = 0 (use 32-bit)
+#   - Each lane transfers 1 element per DMA, needs 2 transfers to cover 128 elements
+# This tests the N-transfer mode where innermostDimSize > subgroupSize * elementsPerLane.
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cdna3_coalesced_dma_f32_multi_transfer",
+    compiler_flags = [
+        "--iree-hip-target=gfx942",
+        "--iree-llvmgpu-use-direct-load",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--acc_type=f32",
+        "--shapes=custom_mnk",
+        "--mnk=32,128,128",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-cdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "hip"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
