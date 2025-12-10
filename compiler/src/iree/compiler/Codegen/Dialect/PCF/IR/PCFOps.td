@@ -99,7 +99,7 @@ def GenericOp : PCF_Op<"generic", [
     Executes a region across a set of workers at a specified scope. When
     control flow reaches this op, `nproc` workers of the specified scope are
     spawned and begin executing the region. The scope is given by an attribute
-    implementing the `ScopeAttr` interface and is responsible for the semantics
+    implementing the `ScopeAttrInterface` interface and is responsible for the semantics
     of all pcf primitives at the same scope. Further details about scopes are
     included in the docs for the interface.
 
@@ -151,7 +151,7 @@ def GenericOp : PCF_Op<"generic", [
       }
     ```
   }];
-  let arguments = (ins PCF_ScopeAttr:$scope,
+  let arguments = (ins PCF_ScopeAttrInterface:$scope,
       Variadic<AnyRankedTensorOrMemRef>:$inits, Variadic<Index>:$dynamic_sizes,
       ArrayProp<BoolProp>:$is_tied,
       DefaultValuedProp<BoolProp, "false">:$sync_on_return,
@@ -183,22 +183,21 @@ def GenericOp : PCF_Op<"generic", [
   // The default builder does not add the proper body BBargs, roll our own.
   let skipDefaultBuilders = 1;
   let builders = [
-    // Builder with no return values.
-    OpBuilder<(ins "ScopeAttr":$scope, "int64_t":$num_iterators,
-                   CArg<"bool", "false">:$sync_on_return)>,
-    // Builder with return types inferred from inits.
-    OpBuilder<(ins "ScopeAttr":$scope, "ValueRange":$inits,
-                   "int64_t":$num_iterators,
-                   CArg<"bool", "false">:$sync_on_return)>,
-    // Builder with no inits.
-    OpBuilder<(ins "TypeRange":$result_types, "ScopeAttr":$scope,
-                   "ValueRange":$dynamic_sizes, "int64_t":$num_iterators,
-                   CArg<"bool", "false">:$sync_on_return)>,
-    // Builder with everything.
-    OpBuilder<(ins "TypeRange":$result_types, "ScopeAttr":$scope,
-                   "ValueRange":$inits, "ValueRange":$dynamic_sizes,
-                   "ArrayRef<bool>":$is_tied, "int64_t":$num_iterators,
-                   CArg<"bool", "false">:$sync_on_return)>,
+      // Builder with no return values.
+      OpBuilder<(ins "ScopeAttrInterface":$scope, "int64_t":$num_iterators,
+          CArg<"bool", "false">:$sync_on_return)>,
+      // Builder with return types inferred from inits.
+      OpBuilder<(ins "ScopeAttrInterface":$scope, "ValueRange":$inits,
+          "int64_t":$num_iterators, CArg<"bool", "false">:$sync_on_return)>,
+      // Builder with no inits.
+      OpBuilder<(ins "TypeRange":$result_types, "ScopeAttrInterface":$scope,
+          "ValueRange":$dynamic_sizes, "int64_t":$num_iterators,
+          CArg<"bool", "false">:$sync_on_return)>,
+      // Builder with everything.
+      OpBuilder<(ins "TypeRange":$result_types, "ScopeAttrInterface":$scope,
+          "ValueRange":$inits, "ValueRange":$dynamic_sizes,
+          "ArrayRef<bool>":$is_tied, "int64_t":$num_iterators,
+          CArg<"bool", "false">:$sync_on_return)>,
   ];
 
   let extraClassDeclaration = [{
@@ -275,7 +274,7 @@ def LoopOp : PCF_Op<"loop", [
 
     When control flow reaches this op, the scope determines how to distribute
     the iterations across available workers. The scope is given by an attribute
-    implementing the `ScopeAttr` interface. Further details about scopes are
+    implementing the `ScopeAttrInterface` interface. Further details about scopes are
     included in the docs for the interface.
 
     The execute region receives one index block argument per count operand,
@@ -311,7 +310,7 @@ def LoopOp : PCF_Op<"loop", [
       }
     ```
   }];
-  let arguments = (ins PCF_ScopeAttr:$scope, Variadic<Index>:$count,
+  let arguments = (ins PCF_ScopeAttrInterface:$scope, Variadic<Index>:$count,
       Variadic<AnyRankedTensorOrMemRef>:$inits, Variadic<Index>:$dynamic_sizes,
       ArrayProp<BoolProp>:$is_tied,
       DefaultValuedProp<BoolProp, "false">:$sync_on_return);
@@ -336,23 +335,20 @@ def LoopOp : PCF_Op<"loop", [
   // The default builder does not add the proper body BBargs, roll our own.
   let skipDefaultBuilders = 1;
   let builders = [
-    // Builder with no return values.
-    OpBuilder<(ins "ScopeAttr":$scope, "ValueRange":$count,
-                   CArg<"bool", "false">:$sync_on_return)>,
-    // Builder with return types inferred from inits.
-    OpBuilder<(ins "ScopeAttr":$scope, "ValueRange":$count,
-                   "ValueRange":$inits,
-                   CArg<"bool", "false">:$sync_on_return)>,
-    // Builder with no inits.
-    OpBuilder<(ins "TypeRange":$result_types, "ScopeAttr":$scope,
-                   "ValueRange":$count,
-                   "ValueRange":$dynamic_sizes,
-                   CArg<"bool", "false">:$sync_on_return)>,
-    // Builder with everything.
-    OpBuilder<(ins "TypeRange":$result_types, "ScopeAttr":$scope,
-                   "ValueRange":$count, "ValueRange":$inits,
-                   "ValueRange":$dynamic_sizes, "ArrayRef<bool>":$is_tied,
-                   CArg<"bool", "false">:$sync_on_return)>,
+      // Builder with no return values.
+      OpBuilder<(ins "ScopeAttrInterface":$scope, "ValueRange":$count,
+          CArg<"bool", "false">:$sync_on_return)>,
+      // Builder with return types inferred from inits.
+      OpBuilder<(ins "ScopeAttrInterface":$scope, "ValueRange":$count,
+          "ValueRange":$inits, CArg<"bool", "false">:$sync_on_return)>,
+      // Builder with no inits.
+      OpBuilder<(ins "TypeRange":$result_types, "ScopeAttrInterface":$scope,
+          "ValueRange":$count, "ValueRange":$dynamic_sizes,
+          CArg<"bool", "false">:$sync_on_return)>,
+      // Builder with everything.
+      OpBuilder<(ins "TypeRange":$result_types, "ScopeAttrInterface":$scope,
+          "ValueRange":$count, "ValueRange":$inits, "ValueRange":$dynamic_sizes,
+          "ArrayRef<bool>":$is_tied, CArg<"bool", "false">:$sync_on_return)>,
   ];
 
   let extraClassDeclaration = [{

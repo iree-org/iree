@@ -128,8 +128,9 @@ def PCF_ShapedRef : TypeDef<PCF_Dialect, "ShapedRef", [
     A reference to a buffer with unspecified layout and physical storage.
     Carries the shape and element type of the referenced region. Elements can
     be accessed by index, though no assumptions about the physical relation
-    between two coordinates can be made. Elements referenced by an `sref` may
-    not internally alias.
+    between two coordinates can be made. Elements at different coordinates must
+    not internally alias. For example, if `foo` is a `pcf.sref<2xi32>`, `foo[0]`
+    and `foo[1]` must be distinct values.
 
     ```
     template<size_t rank, typename eltype, typename alloc_scope_ty, sync_scope>
@@ -154,16 +155,14 @@ def PCF_ShapedRef : TypeDef<PCF_Dialect, "ShapedRef", [
     ```
   }];
 
-  let parameters = (ins
-    ArrayRefParameter<"int64_t">:$shape,
-    "Type":$elementType,
-    "PCF::ScopeAttr":$scope,
-    "Attribute":$sync_scope
-  );
+  let parameters = (ins ArrayRefParameter<"int64_t">:$shape,
+      "Type":$elementType, "PCF::ScopeAttrInterface":$scope,
+      "Attribute":$sync_scope);
   let hasCustomAssemblyFormat = 1;
   let builders = [
-    // Builder with no sync scope.
-    AttrOrTypeBuilder<(ins "ArrayRef<int64_t>":$shape, "Type":$element_type, "PCF::ScopeAttr":$scope)>,
+      // Builder with no sync scope.
+      AttrOrTypeBuilder<(ins "ArrayRef<int64_t>":$shape, "Type":$element_type,
+          "PCF::ScopeAttrInterface":$scope)>,
   ];
 
   let extraClassDeclaration = [{
@@ -187,8 +186,9 @@ def PCF_ShapedRef : TypeDef<PCF_Dialect, "ShapedRef", [
 //===----------------------------------------------------------------------===//
 
 def PCF_TestScopeAttr
-    : AttrDef<PCF_Dialect,
-              "TestScope", [DeclareAttrInterfaceMethods<PCF_ScopeAttr>]> {
+    : AttrDef<
+          PCF_Dialect,
+          "TestScope", [DeclareAttrInterfaceMethods<PCF_ScopeAttrInterface>]> {
   let mnemonic = "test_scope";
   let summary = [{Test scope attribute used for testing.}];
   let description = [{
@@ -210,10 +210,10 @@ def PCF_TestScopeAttr
   }];
 }
 
-def PCF_SequentialAttr :
-    AttrDef<PCF_Dialect, "Sequential", [
-      DeclareAttrInterfaceMethods<PCF_ScopeAttr>
-    ]> {
+def PCF_SequentialAttr
+    : AttrDef<
+          PCF_Dialect,
+          "Sequential", [DeclareAttrInterfaceMethods<PCF_ScopeAttrInterface>]> {
   let mnemonic = "sequential";
   let summary = [{Attribute representing sequential execution}];
   let description = [{
@@ -237,10 +237,9 @@ def PCF_SequentialAttr :
   }];
 }
 
-def PCF_SyncOnParentAttr :
-    AttrDef<PCF_Dialect, "SyncOnParent", [
-      DeclareAttrInterfaceMethods<PCF_SyncScopeAttr>
-    ]> {
+def PCF_SyncOnParentAttr
+    : AttrDef<PCF_Dialect, "SyncOnParent",
+              [DeclareAttrInterfaceMethods<PCF_SyncScopeAttrInterface>]> {
   let mnemonic = "sync_on_parent";
   let summary = [{
     Attribute indicating syncronization for the tied shape ref is dictated

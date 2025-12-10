@@ -10,10 +10,10 @@
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
-// IREE::PCF::ScopeAttr
+// IREE::PCF::ScopeAttrInterface
 //===----------------------------------------------------------------------===//
 
-def PCF_ScopeAttr : AttrInterface<"ScopeAttr"> {
+def PCF_ScopeAttrInterface : AttrInterface<"ScopeAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::PCF";
 
   let summary = [{Defines parallel execution scope.}];
@@ -119,10 +119,10 @@ def PCF_ScopeAttr : AttrInterface<"ScopeAttr"> {
 }
 
 //===----------------------------------------------------------------------===//
-// IREE::PCF::SyncScopeAttr
+// IREE::PCF::SyncScopeAttrInterface
 //===----------------------------------------------------------------------===//
 
-def PCF_SyncScopeAttr : AttrInterface<"SyncScopeAttr"> {
+def PCF_SyncScopeAttrInterface : AttrInterface<"SyncScopeAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::PCF";
 
   let summary = [{Determines synchronization semantics.}];

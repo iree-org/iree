@@ -72,7 +72,7 @@ static LogicalResult verifyParallelBodyOp(OpTy op, int64_t numLeadingArgs,
     }
   }
 
-  PCF::ScopeAttr scope = op.getScope();
+  PCF::ScopeAttrInterface scope = op.getScope();
   int64_t currIsTiedIndex = 0;
   int64_t currResultIndex = 0;
   for (auto [resultType, refArg, isTied] : llvm::zip_equal(
@@ -423,7 +423,7 @@ LogicalResult GenericOp::verify() {
 }
 
 void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
-                      ScopeAttr scope, int64_t numIterators,
+                      ScopeAttrInterface scope, int64_t numIterators,
                       bool syncOnReturn) {
   GenericOp::build(b, result, TypeRange(), scope, ArrayRef<Value>{},
                    ArrayRef<Value>{}, ArrayRef<bool>{}, numIterators,
@@ -431,8 +431,8 @@ void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
 }
 
 void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
-                      ScopeAttr scope, ValueRange inits, int64_t numIterators,
-                      bool syncOnReturn) {
+                      ScopeAttrInterface scope, ValueRange inits,
+                      int64_t numIterators, bool syncOnReturn) {
   SmallVector<bool> isTied(inits.size(), true);
   SmallVector<Type> resultTypes =
       llvm::map_to_vector(inits, [](Value v) -> Type { return v.getType(); });
@@ -441,7 +441,7 @@ void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
 }
 
 void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
-                      TypeRange resultTypes, ScopeAttr scope,
+                      TypeRange resultTypes, ScopeAttrInterface scope,
                       ValueRange dynamicSizes, int64_t numIterators,
                       bool syncOnReturn) {
   SmallVector<bool> isTied(resultTypes.size(), false);
@@ -450,9 +450,10 @@ void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
 }
 
 void GenericOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
-                      TypeRange resultTypes, ScopeAttr scope, ValueRange inits,
-                      ValueRange dynamicSizes, ArrayRef<bool> isTied,
-                      int64_t numIterators, bool syncOnReturn) {
+                      TypeRange resultTypes, ScopeAttrInterface scope,
+                      ValueRange inits, ValueRange dynamicSizes,
+                      ArrayRef<bool> isTied, int64_t numIterators,
+                      bool syncOnReturn) {
 
   result.addAttribute(GenericOp::getScopeAttrName(result.name), scope);
   result.addOperands(inits);
@@ -587,13 +588,14 @@ LogicalResult LoopOp::verify() {
 }
 
 void LoopOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
-                   ScopeAttr scope, ValueRange count, bool syncOnReturn) {
+                   ScopeAttrInterface scope, ValueRange count,
+                   bool syncOnReturn) {
   LoopOp::build(b, result, TypeRange(), scope, count, ArrayRef<Value>{},
                 ArrayRef<Value>{}, ArrayRef<bool>{}, syncOnReturn);
 }
 
 void LoopOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
-                   ScopeAttr scope, ValueRange count, ValueRange inits,
+                   ScopeAttrInterface scope, ValueRange count, ValueRange inits,
                    bool syncOnReturn) {
   SmallVector<bool> isTied(inits.size(), true);
   SmallVector<Type> resultTypes =
@@ -603,16 +605,17 @@ void LoopOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
 }
 
 void LoopOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
-                   TypeRange resultTypes, ScopeAttr scope, ValueRange count,
-                   ValueRange dynamicSizes, bool syncOnReturn) {
+                   TypeRange resultTypes, ScopeAttrInterface scope,
+                   ValueRange count, ValueRange dynamicSizes,
+                   bool syncOnReturn) {
   SmallVector<bool> isTied(resultTypes.size(), false);
   LoopOp::build(b, result, resultTypes, scope, count, ArrayRef<Value>{},
                 dynamicSizes, isTied, syncOnReturn);
 }
 
 void LoopOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
-                   TypeRange resultTypes, ScopeAttr scope, ValueRange count,
-                   ValueRange inits, ValueRange dynamicSizes,
+                   TypeRange resultTypes, ScopeAttrInterface scope,
+                   ValueRange count, ValueRange inits, ValueRange dynamicSizes,
                    ArrayRef<bool> isTied, bool syncOnReturn) {
 
   result.addAttribute(LoopOp::getScopeAttrName(result.name), scope);

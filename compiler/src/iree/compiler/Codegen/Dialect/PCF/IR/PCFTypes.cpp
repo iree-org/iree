@@ -69,9 +69,9 @@ Type ShapedRefType::parse(AsmParser &parser) {
       return {};
     }
 
-    if (!isa<ScopeAttr>(scope)) {
+    if (!isa<ScopeAttrInterface>(scope)) {
       parser.emitError(scopeLoc, "expected 'scope' parameter ")
-          << scope << " to implement 'ScopeAttrInterface'";
+          << scope << " to implement 'ScopeAttrInterfaceInterface'";
       return {};
     }
 
@@ -89,8 +89,8 @@ Type ShapedRefType::parse(AsmParser &parser) {
   }
 
   MLIRContext *context = parser.getContext();
-  return ShapedRefType::get(context, shape, elementType, cast<ScopeAttr>(scope),
-                            syncScope);
+  return ShapedRefType::get(context, shape, elementType,
+                            cast<ScopeAttrInterface>(scope), syncScope);
 }
 
 void ShapedRefType::print(AsmPrinter &printer) const {
@@ -122,7 +122,7 @@ void ShapedRefType::print(AsmPrinter &printer) const {
 }
 
 ShapedRefType ShapedRefType::get(MLIRContext *context, ArrayRef<int64_t> shape,
-                                 Type elementType, ScopeAttr scope) {
+                                 Type elementType, ScopeAttrInterface scope) {
   return ShapedRefType::get(context, shape, elementType, scope, Attribute());
 }
 
