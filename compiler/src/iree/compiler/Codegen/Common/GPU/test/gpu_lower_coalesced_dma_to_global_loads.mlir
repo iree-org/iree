@@ -4,7 +4,7 @@
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx1250", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp64|fp32|fp16|int64|int32|int16|int8,
     storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
     dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
@@ -44,7 +44,7 @@ func.func @lower_coalesced_gather_dma_multiple(
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx1250", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp64|fp32|fp16|int64|int32|int16|int8,
     storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
     dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],

@@ -121,8 +121,8 @@ struct LowerCoalescedGatherDMAPattern final
     // Find a suitable DMA size that allows the innermost dimension to be
     // evenly divided into N transfers. We prefer larger DMA sizes for
     // efficiency. Sort DMA sizes in descending order to prefer larger sizes.
-    auto sortedDmaSizes = llvm::to_vector(targetDmaSizes);
-    llvm::sort(sortedDmaSizes, std::greater<int64_t>());
+    auto sortedDmaSizes = llvm::to_vector_of<int64_t>(targetDmaSizes);
+    llvm::sort(sortedDmaSizes, std::greater<>());
 
     int64_t elementsPerLane = 0;
     for (int64_t dmaSize : sortedDmaSizes) {
