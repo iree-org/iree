@@ -109,6 +109,41 @@ public:
       return failure();
     }
 
+    // Verify swizzle if present.
+    if (info->swizzle) {
+      const IREE::Codegen::TileSwizzle &swizzle = *info->swizzle;
+
+      // Verify internal consistency of the swizzle (permutation size and
+      // validity).
+      if (failed(swizzle.verify(emitError))) {
+        return failure();
+      }
+
+      // The expand shape should have the same number of entries as inner tile
+      // dimensions.
+      if (swizzle.expandShape.size() != info->innerTileSizes.size()) {
+        return emitError() << "swizzle expandShape size ("
+                           << swizzle.expandShape.size()
+                           << ") does not match innerTileSizes size ("
+                           << info->innerTileSizes.size() << ")";
+      }
+
+      // For each inner dimension, the product of expanded sizes should match
+      // the inner tile size.
+      for (auto [idx, expandDims] : llvm::enumerate(swizzle.expandShape)) {
+        int64_t product = 1;
+        for (const Codegen::TileSwizzle::Dim &dim : expandDims) {
+          product *= dim.size;
+        }
+        if (product != info->innerTileSizes[idx]) {
+          return emitError()
+                 << "swizzle expandShape[" << idx << "] product (" << product
+                 << ") does not match innerTileSizes[" << idx << "] ("
+                 << info->innerTileSizes[idx] << ")";
+        }
+      }
+    }
+
     return success();
   }
 };
