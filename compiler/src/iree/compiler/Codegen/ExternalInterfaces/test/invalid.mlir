@@ -61,6 +61,70 @@ func.func @invalid_outer_dims_perm_duplicate(%arg0: tensor<32x64xf32, #encoding>
 
 // -----
 
+// Test that swizzle with permutation size mismatch is rejected.
+// The expandShape produces 2 total dimensions, but permutation has 3 elements.
+
+// expected-error @+2 {{swizzle permutation size (3) does not match total expanded dimensions (2)}}
+#encoding_swizzle = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = [[["Internal", 16]], [["Internal", 16]]], permutation = [0, 1, 2]}}}>
+func.func @invalid_swizzle_permutation_size_mismatch(%arg0: tensor<32x64xf32, #encoding_swizzle>) -> tensor<32x64xf32, #encoding_swizzle> {
+  return %arg0 : tensor<32x64xf32, #encoding_swizzle>
+}
+
+// -----
+
+// Test that swizzle with permutation index out of bounds is rejected.
+// The expandShape produces 2 dimensions (indices 0-1), but permutation contains index 2.
+
+// expected-error @+2 {{swizzle permutation is not a valid permutation}}
+#encoding_swizzle = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = [[["Internal", 16]], [["Internal", 16]]], permutation = [2, 0]}}}>
+func.func @invalid_swizzle_permutation_out_of_bounds(%arg0: tensor<32x64xf32, #encoding_swizzle>) -> tensor<32x64xf32, #encoding_swizzle> {
+  return %arg0 : tensor<32x64xf32, #encoding_swizzle>
+}
+
+// -----
+
+// Test that swizzle with duplicate permutation indices is rejected.
+
+// expected-error @+2 {{swizzle permutation is not a valid permutation}}
+#encoding_swizzle = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = [[["Internal", 16]], [["Internal", 16]]], permutation = [0, 0]}}}>
+func.func @invalid_swizzle_permutation_duplicate(%arg0: tensor<32x64xf32, #encoding_swizzle>) -> tensor<32x64xf32, #encoding_swizzle> {
+  return %arg0 : tensor<32x64xf32, #encoding_swizzle>
+}
+
+// -----
+
+// Test that swizzle expandShape size mismatch with innerTileSizes is rejected.
+// innerTileSizes has 2 entries but expandShape has 3.
+
+// expected-error @+2 {{swizzle expandShape size (3) does not match innerTileSizes size (2)}}
+#encoding_swizzle = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = [[["Internal", 16]], [["Internal", 16]], [["Internal", 8]]], permutation = [0, 1, 2]}}}>
+func.func @invalid_swizzle_expand_shape_size_mismatch(%arg0: tensor<32x64xf32, #encoding_swizzle>) -> tensor<32x64xf32, #encoding_swizzle> {
+  return %arg0 : tensor<32x64xf32, #encoding_swizzle>
+}
+
+// -----
+
+// Test that swizzle expandShape product mismatch with innerTileSizes is rejected.
+// innerTileSizes[0] is 16, but expandShape[0] product is 4*8 = 32.
+
+// expected-error @+2 {{swizzle expandShape[0] product (32) does not match innerTileSizes[0] (16)}}
+#encoding_swizzle = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = [[["Internal", 4], ["Internal", 8]], [["Internal", 16]]], permutation = [0, 1, 2]}}}>
+func.func @invalid_swizzle_expand_shape_product_mismatch(%arg0: tensor<32x64xf32, #encoding_swizzle>) -> tensor<32x64xf32, #encoding_swizzle> {
+  return %arg0 : tensor<32x64xf32, #encoding_swizzle>
+}
+
+// -----
+
+// Test that swizzle with negative permutation index is rejected.
+
+// expected-error @+2 {{swizzle permutation is not a valid permutation}}
+#encoding_swizzle = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1], swizzle = {expandShape = [[["Internal", 16]], [["Internal", 16]]], permutation = [-1, 0]}}}>
+func.func @invalid_swizzle_permutation_negative(%arg0: tensor<32x64xf32, #encoding_swizzle>) -> tensor<32x64xf32, #encoding_swizzle> {
+  return %arg0 : tensor<32x64xf32, #encoding_swizzle>
+}
+
+// -----
+
 // CPU encoding resolver invalid test.
 // Note: Most encoding verifier tests are done on gpu_encoding_resolver above.
 // This test verifies that cpu_encoding_resolver also rejects invalid encodings.
