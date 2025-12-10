@@ -50,8 +50,9 @@ ConvertWorkgroupForall::matchAndRewrite(scf::ForallOp op,
   // when it's ok not to linearize.
   //
   // Interface is implemented via external models hence the cast.
-  auto scope = cast<IREE::PCF::ScopeAttr>(IREE::Codegen::WorkgroupAttr::get(
-      rewriter.getContext(), /*linearize=*/true));
+  auto scope =
+      cast<IREE::PCF::ScopeAttrInterface>(IREE::Codegen::WorkgroupAttr::get(
+          rewriter.getContext(), /*linearize=*/true));
   FailureOr<IREE::PCF::LoopOp> res = convertForallToPCF(rewriter, op, scope, 1);
   if (failed(res)) {
     return failure();

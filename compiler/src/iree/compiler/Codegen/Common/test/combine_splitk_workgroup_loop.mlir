@@ -24,7 +24,7 @@ func.func @combine_splitk_reduction() attributes {translation_info = #iree_codeg
     iree_codegen.workgroup_count_hint(%c8)
     %11 = pcf.loop scope(#iree_codegen.workgroup<linearize>) count(%c8)
       execute(%ref = %extracted_slice)[%id: index]
-           : (!pcf.sref<128xf32, #iree_codegen.workgroup<linearize>, #pcf.sync_on_parent>)
+           : (!pcf.sref<128xf32, #iree_codegen.workgroup<linearize>, #pcf.sync_on_return>)
           -> (tensor<128xf32>) {
       %12 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%id]
       %extracted_slice_0 = tensor.extract_slice %4[%12, 0] [16, 128] [1, 1] : tensor<128x128xf32> to tensor<16x128xf32>
@@ -35,7 +35,7 @@ func.func @combine_splitk_reduction() attributes {translation_info = #iree_codeg
         %15 = arith.addf %in, %out : f32
         linalg.yield %15 : f32
       } -> tensor<16xf32>
-      pcf.write_slice %14 into %ref[%12] [16] [1] : tensor<16xf32> into !pcf.sref<128xf32, #iree_codegen.workgroup<linearize>, #pcf.sync_on_parent>
+      pcf.write_slice %14 into %ref[%12] [16] [1] : tensor<16xf32> into !pcf.sref<128xf32, #iree_codegen.workgroup<linearize>, #pcf.sync_on_return>
       pcf.return
     }
     scf.forall.in_parallel {

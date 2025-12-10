@@ -52,7 +52,7 @@ void IREECodegenDialect::initialize() {
 
   addTypes<IREE::Codegen::NullPointerType>();
 
-  declarePromisedInterface<PCF::ScopeAttr, WorkgroupAttr>();
+  declarePromisedInterface<PCF::ScopeAttrInterface, WorkgroupAttr>();
 }
 
 static LogicalResult

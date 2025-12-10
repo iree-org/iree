@@ -166,12 +166,12 @@ LogicalResult CombineSplitKWorkgroupLoopPattern::collectWriteSlices(
     DenseMap<unsigned, SmallVector<IREE::PCF::WriteSliceOp>> &writesByResult)
     const {
   for (auto [idx, refArg] : llvm::enumerate(loopOp.getRegionRefArgs())) {
-    // Check sync scope is sync_on_parent.
+    // Check sync scope is sync_on_return.
     auto srefType = cast<IREE::PCF::ShapedRefType>(refArg.getType());
     auto syncScope = srefType.getSyncScope();
-    auto syncOnParent =
-        dyn_cast_or_null<IREE::PCF::SyncOnParentAttr>(syncScope);
-    if (!syncOnParent) {
+    auto syncOnReturn =
+        dyn_cast_or_null<IREE::PCF::SyncOnReturnAttr>(syncScope);
+    if (!syncOnReturn) {
       return failure();
     }
 
@@ -278,8 +278,8 @@ LogicalResult CombineSplitKWorkgroupLoopPattern::matchAndRewrite(
       /*is_tied=*/SmallVector<bool>(forallOp.getNumResults(), true),
       /*num_iterators=*/1);
 
-  // Step 9.5: Set sync scope to parent only for the pcf.generic sref arguments.
-  Attribute syncScope = IREE::PCF::SyncOnParentAttr::get(rewriter.getContext());
+  // Step 9.5: Set sync scope to return only for the pcf.generic sref arguments.
+  Attribute syncScope = IREE::PCF::SyncOnReturnAttr::get(rewriter.getContext());
   for (auto regionRefArg : genericOp.getRegionRefArgs()) {
     auto srefType = cast<IREE::PCF::ShapedRefType>(regionRefArg.getType());
     auto newSrefType = IREE::PCF::ShapedRefType::get(

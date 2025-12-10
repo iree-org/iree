@@ -22,8 +22,8 @@ namespace mlir::iree_compiler::IREE::Codegen {
 //===----------------------------------------------------------------------===//
 
 struct WorkgroupScopeAttr final
-    : IREE::PCF::ScopeAttr::ExternalModel<WorkgroupScopeAttr,
-                                          Codegen::WorkgroupAttr> {
+    : IREE::PCF::ScopeAttrInterface::ExternalModel<WorkgroupScopeAttr,
+                                                   Codegen::WorkgroupAttr> {
   SmallVector<Value> getWorkerCounts(Attribute attr, OpBuilder &builder,
                                      Location loc, int64_t numIds) const {
     auto workgroupAttr = cast<Codegen::WorkgroupAttr>(attr);

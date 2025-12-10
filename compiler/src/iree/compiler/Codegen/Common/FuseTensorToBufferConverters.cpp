@@ -43,7 +43,7 @@ getProducerSlices(PCFOpTy pcfOp, OpResult result) {
 
   // The fusion is only valid if the sref type is parent only sync scope.
   auto srefType = dyn_cast<IREE::PCF::ShapedRefType>(tiedArg.getType());
-  if (!srefType || !srefType.isParentScopeOnlySync()) {
+  if (!srefType || !srefType.isReturnOnlySync()) {
     return failure();
   }
 
