@@ -24,6 +24,9 @@
 //   3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
 //      so it is nice that they have fewer narrow cases to consider.
 //
+// The only current exception to this is Arm SVE. It currently adheres to the
+// canonical form of scalable vectorisation and keeps the N dimension to be
+// scalable.
 // This transposition is made easier by (and was all along part of the idea in)
 // the RHS-transposition in mmt4d (the t in mmt4d), as generally with matrix
 // multiplication
@@ -108,12 +111,13 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
   // Not a vector case, so all three arrays in `info` have size at least 2,
   // outerDimsPerm may have size 3 if there is a batch dimension, but in all
   // cases, the last 2 entries of each array are M and N, not batch.
-  auto transpose = [](SmallVector<int64_t> &a) {
-    std::swap(a[a.size() - 2], a[a.size() - 1]);
-  };
+  auto transpose = [](auto &a) { std::swap(a[a.size() - 2], a[a.size() - 1]); };
   transpose(info.innerDimsPos);
   transpose(info.innerTileSizes);
   transpose(info.outerDimsPerm);
+  if (info.scalableTiles) {
+    transpose(info.scalableTiles.value());
+  }
 }
 
 static RankedTensorType
@@ -325,6 +329,10 @@ Operation *lowerContractionOpWithEncoding(
   }
 
   bool transpose = isNarrowNResult(resultEncoding);
+  // Do not transpose in case we have scalable tiles.
+  transpose &= llvm::none_of(
+      encodingInfo.scalableTiles.value_or(IREE::Codegen::ScalableTileFlags{}),
+      [](bool flag) { return flag; });
   SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
   SmallVector<ReassociationIndices> ri;
   Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder, ri,
@@ -464,6 +472,7 @@ static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
                                                        DictionaryAttr config) {
   // For SVE and scalable vectors, this methods selects base sizes that match
   // the NEON fixed-width sizes.
+  // TODO: Add SME inner tile sizes and corresponding tests.
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
@@ -718,13 +727,15 @@ struct CPUEncodingPackedLayoutMaterializerAttr
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    if (IREE::Encoding::isNarrowNResult(encoding)) {
-      transposeInPlace(info);
-    }
     FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
         getScalableTileFlags(*cDims, encoding, layoutAttr.getConfiguration());
     if (succeeded(scalableFlags)) {
       info.scalableTiles = std::move(scalableFlags);
+    }
+    if (IREE::Encoding::isNarrowNResult(encoding) &&
+        llvm::none_of(info.scalableTiles.value_or(Codegen::ScalableTileFlags{}),
+                      [](bool flag) { return flag; })) {
+      transposeInPlace(info);
     }
     return info;
   }

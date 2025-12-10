@@ -97,6 +97,58 @@ func.func @matmul_with_fill(%15: tensor<1024x256xi8>, %16: tensor<256x256xi8>, %
 
 // -----
 
+// This case tests if the inner tile size of the mmt4d is inferred properly from the shape-aware HAL binding and set accordingly.
+
+#pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+#map = affine_map<()[s0] -> (256 ceildiv s0)>
+func.func @mmt4d_tensors(%arg0: tensor<32x128x8x1xf32>, %arg1 : tensor<?x128x?x1xf32>) -> tensor<32x?x8x?xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %c8 = arith.constant 8 : index
+  %c0 = arith.constant 0 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %n0 = affine.apply #map()[%c8_vscale]
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<32x?x8x?xf32>>{%n0, %c8_vscale}
+  %init = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [32, %n0, 8, %c8_vscale], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<32x?x8x?xf32>>{%n0, %c8_vscale} -> tensor<32x?x8x?xf32>
+  %mmt4d = linalg.mmt4d ins(%arg0, %arg1 : tensor<32x128x8x1xf32>, tensor<?x128x?x1xf32>) outs(%init : tensor<32x?x8x?xf32>) -> tensor<32x?x8x?xf32>
+  return %mmt4d : tensor<32x?x8x?xf32>
+}
+// CHECK-DAG:  #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [4, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
+// CHECK:      func.func @mmt4d_tensors
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: linalg.mmt4d
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+#map = affine_map<()[s0] -> (256 ceildiv s0)>
+func.func @mmtd4_with_fill(%arg0 : tensor<32x128x8x1xf32>, %arg1 : tensor<?x128x?x1xf32>) -> tensor<32x?x8x?xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %0 = affine.apply #map()[%c8_vscale]
+  %init = tensor.empty(%0, %c8_vscale) : tensor<32x?x8x?xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<32x?x8x?xf32>) -> tensor<32x?x8x?xf32>
+  %mmt4d = linalg.mmt4d ins(%arg0, %arg1 : tensor<32x128x8x1xf32>, tensor<?x128x?x1xf32>) outs(%fill : tensor<32x?x8x?xf32>) -> tensor<32x?x8x?xf32>
+  return %mmt4d : tensor<32x?x8x?xf32>
+}
+// CHECK-DAG:  #[[CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 8, [8]]>
+// CHECK-DAG:  #[[CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [4, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
+// CHECK:      func.func @mmtd4_with_fill
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: linalg.fill
+// CHECK-SAME:     lowering_config = #[[CONFIG1]]
+//      CHECK: linalg.mmt4d
+// CHECK-SAME:     lowering_config = #[[CONFIG2]]
+
+// -----
+
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
 func.func @depthwise_conv(%3: tensor<1x57x57x72xf32>, %4: tensor<3x3x72xf32>) -> tensor<1x28x28x72xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
   %cst = arith.constant 0.000000e+00 : f32
