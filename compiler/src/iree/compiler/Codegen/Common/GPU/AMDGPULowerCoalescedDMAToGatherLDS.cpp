@@ -120,13 +120,7 @@ struct LowerCoalescedGatherDMAPattern final
 
     // Find a suitable DMA size that allows the innermost dimension to be
     // evenly divided into N transfers. We prefer larger DMA sizes for
-    // efficiency.
-    if (targetDmaSizes.empty()) {
-      return rewriter.notifyMatchFailure(
-          dmaOp, "target DMA sizes not specified in GPU target attributes");
-    }
-
-    // Sort DMA sizes in descending order to prefer larger sizes.
+    // efficiency. Sort DMA sizes in descending order to prefer larger sizes.
     auto sortedDmaSizes = llvm::to_vector(targetDmaSizes);
     llvm::sort(sortedDmaSizes, std::greater<int64_t>());
 
