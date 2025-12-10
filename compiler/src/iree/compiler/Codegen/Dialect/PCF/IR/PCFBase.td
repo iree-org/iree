@@ -147,10 +147,10 @@ def PCF_ShapedRef : TypeDef<PCF_Dialect, "ShapedRef", [
     }
     ```
 
-    When the `sync_scope` is of type `#pcf.sync_on_parent`, then a special
+    When the `sync_scope` is of type `#pcf.sync_on_return`, then a special
     printer kicks in, i.e. the following two types are equivalent:
     ```
-    !pcf.ref<?xi32, #pcf.test_scope, #pcf.sync_on_parent>
+    !pcf.ref<?xi32, #pcf.test_scope, #pcf.sync_on_return>
     !pcf.ref<?xi32, sync(#pcf.test_scope)>
     ```
   }];
@@ -176,8 +176,8 @@ def PCF_ShapedRef : TypeDef<PCF_Dialect, "ShapedRef", [
     }
 
     // Helper to check whether the only way accesses to this sref are
-    // synchronized is by returning from the parent of the same scope.
-    bool isParentScopeOnlySync() const;
+    // synchronized is on return from the worker of the same scope.
+    bool isReturnOnlySync() const;
   }];
 }
 
@@ -237,17 +237,18 @@ def PCF_SequentialAttr
   }];
 }
 
-def PCF_SyncOnParentAttr
-    : AttrDef<PCF_Dialect, "SyncOnParent",
+def PCF_SyncOnReturnAttr
+    : AttrDef<PCF_Dialect, "SyncOnReturn",
               [DeclareAttrInterfaceMethods<PCF_SyncScopeAttrInterface>]> {
-  let mnemonic = "sync_on_parent";
+  let mnemonic = "sync_on_return";
   let summary = [{
-    Attribute indicating syncronization for the tied shape ref is dictated
-    solely by the parent.
+    Synchronize when returning from the worker of the same scope
   }];
   let description = [{
     Attribute indicating that the shaped ref this attribute is tied to is only
-    fenced when the parent of the same scope returns.
+    fenced when the parent of the same scope returns. This is akin to memory
+    order acquire on scope entry and __syncthreads followed by a memory order
+    release fence on scope exit.
   }];
   let parameters = (ins);
   let assemblyFormat = [{}];

@@ -57,8 +57,8 @@ Type ShapedRefType::parse(AsmParser &parser) {
       return {};
     }
 
-    // Special parsing for SyncOnParentAttr sync scope.
-    syncScope = SyncOnParentAttr::get(parser.getContext());
+    // Special parsing for SyncOnReturnAttr sync scope.
+    syncScope = SyncOnReturnAttr::get(parser.getContext());
     if (failed(parser.parseRParen())) {
       return {};
     }
@@ -107,7 +107,7 @@ void ShapedRefType::print(AsmPrinter &printer) const {
 
   printer << getElementType();
   printer << ", ";
-  if (isParentScopeOnlySync()) {
+  if (isReturnOnlySync()) {
     // Special case printer for parent only sync for convenience.
     printer << "sync";
     printer << "(" << getScope() << ")";
@@ -126,8 +126,8 @@ ShapedRefType ShapedRefType::get(MLIRContext *context, ArrayRef<int64_t> shape,
   return ShapedRefType::get(context, shape, elementType, scope, Attribute());
 }
 
-bool ShapedRefType::isParentScopeOnlySync() const {
-  return isa_and_present<SyncOnParentAttr>(getSyncScope());
+bool ShapedRefType::isReturnOnlySync() const {
+  return isa_and_present<SyncOnReturnAttr>(getSyncScope());
 }
 
 //===----------------------------------------------------------------------===//

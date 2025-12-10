@@ -84,9 +84,9 @@ static LogicalResult verifyParallelBodyOp(OpTy op, int64_t numLeadingArgs,
                  "with scope ")
              << scope;
     }
-    if (!srefType.isParentScopeOnlySync() && srefType.getSyncScope()) {
+    if (!srefType.isReturnOnlySync() && srefType.getSyncScope()) {
       return op.emitOpError(
-          "expected region ref argument to have none or parent sync scope");
+          "expected region ref argument to sync on return or is unspecified");
     }
 
     // Traits guarantee this cast to be valid.
