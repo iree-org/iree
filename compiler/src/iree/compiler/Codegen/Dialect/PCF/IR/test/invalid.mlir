@@ -28,7 +28,7 @@ util.func private @init_type_mismatch(%0: tensor<3xi32>) {
 // -----
 
 util.func private @sync_scope_mismatch(%dim: index) {
-// expected-error@+1 {{expected region ref argument to have none or parent sync scope}}
+// expected-error@+1 {{expected region ref argument to sync on return or is unspecified}}
   pcf.generic scope(#pcf.test_scope)
     execute(%ref)[%id: index, %n: index]
          : (!pcf.sref<?xi32, #pcf.test_scope, i32>)
