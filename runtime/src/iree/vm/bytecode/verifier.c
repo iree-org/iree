@@ -654,7 +654,27 @@ iree_status_t iree_vm_bytecode_function_verify(
   IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
   IREE_VM_VERIFY_REG_F32(name##_ordinal);     \
   pc += IREE_REGISTER_ORDINAL_SIZE;
+// Operand ref - rejects MOVE bit (default, for ops that don't support MOVE).
+#if 0
+#define VM_VerifyOperandRegRef(name)                                     \
+  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal);                            \
+  IREE_VM_VERIFY_REG_REF(name##_ordinal);                                \
+  if (IREE_UNLIKELY((name##_ordinal) & IREE_REF_REGISTER_MOVE_BIT)) {    \
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                \
+                            "ref register has MOVE bit but op does not " \
+                            "support MOVE");                             \
+  }                                                                      \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#else
+// TODO(benvanik): when we have the compiler upgraded to emit moves correctly we
+// can re-enable this.
 #define VM_VerifyOperandRegRef(name)          \
+  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
+  IREE_VM_VERIFY_REG_REF(name##_ordinal);     \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#endif  // 0
+// Operand ref - allows MOVE bit (for ops that support ownership transfer).
+#define VM_VerifyOperandRegRefMove(name)      \
   IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
   IREE_VM_VERIFY_REG_REF(name##_ordinal);     \
   pc += IREE_REGISTER_ORDINAL_SIZE;
@@ -713,7 +733,18 @@ iree_status_t iree_vm_bytecode_function_verify(
   IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
   IREE_VM_VERIFY_REG_F64(name##_ordinal);     \
   pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyResultRegRef(name)           \
+// Result ref - rejects MOVE bit (default, for ops that don't support MOVE).
+#define VM_VerifyResultRegRef(name)                                      \
+  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal);                            \
+  IREE_VM_VERIFY_REG_REF(name##_ordinal);                                \
+  if (IREE_UNLIKELY((name##_ordinal) & IREE_REF_REGISTER_MOVE_BIT)) {    \
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                \
+                            "ref register has MOVE bit but op does not " \
+                            "support MOVE");                             \
+  }                                                                      \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+// Result ref - allows MOVE bit (for ops that support ownership transfer).
+#define VM_VerifyResultRegRefMove(name)       \
   IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
   IREE_VM_VERIFY_REG_REF(name##_ordinal);     \
   pc += IREE_REGISTER_ORDINAL_SIZE;
@@ -1114,28 +1145,28 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       VM_VerifyGlobalAttr(global);
       VM_VerifyGlobalRefOrdinal(global);
       VM_VerifyTypeOf(type_def);
-      VM_VerifyResultRegRef(value);
+      VM_VerifyResultRegRefMove(value);
     });
 
     VERIFY_OP(CORE, GlobalStoreRef, {
       VM_VerifyGlobalAttr(global);
       VM_VerifyGlobalRefOrdinal(global);
       VM_VerifyTypeOf(type_def);
-      VM_VerifyOperandRegRef(value);
+      VM_VerifyOperandRegRefMove(value);
     });
 
     VERIFY_OP(CORE, GlobalLoadIndirectRef, {
       VM_VerifyOperandRegI32(global);
       // NOTE: we have to verify the ordinal at runtime.
       VM_VerifyTypeOf(type_def);
-      VM_VerifyResultRegRef(value);
+      VM_VerifyResultRegRefMove(value);
     });
 
     VERIFY_OP(CORE, GlobalStoreIndirectRef, {
       VM_VerifyOperandRegI32(global);
       // NOTE: we have to verify the ordinal at runtime.
       VM_VerifyTypeOf(type_def);
-      VM_VerifyOperandRegRef(value);
+      VM_VerifyOperandRegRefMove(value);
     });
 
     //===------------------------------------------------------------------===//
@@ -1156,12 +1187,12 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(CORE, ConstI64Zero, { VM_VerifyResultRegI64(result); });
 
-    VERIFY_OP(CORE, ConstRefZero, { VM_VerifyResultRegRef(result); });
+    VERIFY_OP(CORE, ConstRefZero, { VM_VerifyResultRegRefMove(result); });
 
     VERIFY_OP(CORE, ConstRefRodata, {
       VM_VerifyRodataAttr(rodata);
       VM_VerifyRodataOrdinal(rodata);
-      VM_VerifyResultRegRef(value);
+      VM_VerifyResultRegRefMove(value);
     });
 
     //===------------------------------------------------------------------===//
@@ -1171,15 +1202,15 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP(CORE, BufferAlloc, {
       VM_VerifyOperandRegI64HostSize(length);
       VM_VerifyOperandRegI32(alignment);
-      VM_VerifyResultRegRef(result);
+      VM_VerifyResultRegRefMove(result);
     });
 
     VERIFY_OP(CORE, BufferClone, {
-      VM_VerifyOperandRegRef(source);
+      VM_VerifyOperandRegRef(source);  // Source buffer - no MOVE.
       VM_VerifyOperandRegI64HostSize(offset);
       VM_VerifyOperandRegI64HostSize(length);
       VM_VerifyOperandRegI32(alignment);
-      VM_VerifyResultRegRef(result);
+      VM_VerifyResultRegRefMove(result);
     });
 
     VERIFY_OP(CORE, BufferLength, {
@@ -1294,7 +1325,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP(CORE, ListAlloc, {
       VM_VerifyTypeOf(element_type);
       VM_VerifyOperandRegI32(initial_capacity);
-      VM_VerifyResultRegRef(result);
+      VM_VerifyResultRegRefMove(result);
     });
 
     VERIFY_OP(CORE, ListReserve, {
@@ -1337,16 +1368,16 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     });
 
     VERIFY_OP(CORE, ListGetRef, {
-      VM_VerifyOperandRegRef(list);
+      VM_VerifyOperandRegRef(list);  // List operand - no MOVE.
       VM_VerifyOperandRegI32(index);
       VM_VerifyTypeOf(type_def);
-      VM_VerifyResultRegRef(result);
+      VM_VerifyResultRegRefMove(result);
     });
 
     VERIFY_OP(CORE, ListSetRef, {
-      VM_VerifyOperandRegRef(list);
+      VM_VerifyOperandRegRef(list);  // List operand - no MOVE.
       VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegRef(value);
+      VM_VerifyOperandRegRefMove(value);
     });
 
     //===------------------------------------------------------------------===//
@@ -1372,9 +1403,9 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       // TODO(benvanik): remove the type_id and use either LHS/RHS (if both are
       // null then output is always null so no need to know the type).
       VM_VerifyTypeOf(true_value_type_def);
-      VM_VerifyOperandRegRef(true_value);
-      VM_VerifyOperandRegRef(false_value);
-      VM_VerifyResultRegRef(result);
+      VM_VerifyOperandRegRefMove(true_value);
+      VM_VerifyOperandRegRefMove(false_value);
+      VM_VerifyResultRegRefMove(result);
     });
 
     VERIFY_OP(CORE, SwitchI32, {
@@ -1394,9 +1425,10 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP(CORE, SwitchRef, {
       VM_VerifyOperandRegI32(index);
       VM_VerifyTypeOf(type_def);
-      VM_VerifyOperandRegRef(default_value);
-      VM_VerifyVariadicOperandsRef(values, type_def);
-      VM_VerifyResultRegRef(result);
+      VM_VerifyOperandRegRefMove(default_value);
+      VM_VerifyVariadicOperandsRef(values,
+                                   type_def);  // TODO: add Move variant.
+      VM_VerifyResultRegRefMove(result);
     });
 
     //===------------------------------------------------------------------===//
@@ -1468,9 +1500,9 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     });
 
     VERIFY_OP(CORE, CastAnyRef, {
-      VM_VerifyOperandRegRef(operand);
+      VM_VerifyOperandRegRefMove(operand);
       VM_VerifyTypeOf(result);
-      VM_VerifyResultRegRef(result);
+      VM_VerifyResultRegRefMove(result);
     });
 
     //===------------------------------------------------------------------===//

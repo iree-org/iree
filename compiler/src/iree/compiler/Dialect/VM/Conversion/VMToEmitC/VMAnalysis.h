@@ -29,9 +29,15 @@ struct FuncAnalysis {
   FuncAnalysis() = default;
   FuncAnalysis(bool emitAtEnd) : emitAtEnd(emitAtEnd) {}
   FuncAnalysis(IREE::VM::FuncOp funcOp) {
-    Operation *op = funcOp.getOperation();
-    registerAllocation = RegisterAllocation(op);
-    valueLiveness = ValueLiveness(op);
+    // Use default constructor and explicit recalculate to properly check for
+    // failure. The RegisterAllocation(Operation*) constructor ignores the
+    // return value of recalculate().
+    RegisterAllocation regAlloc;
+    if (failed(regAlloc.recalculate(funcOp))) {
+      llvm::report_fatal_error("register allocation failed for emitc");
+    }
+    registerAllocation = std::move(regAlloc);
+    valueLiveness = ValueLiveness(funcOp.getOperation());
     originalFunctionType = funcOp.getFunctionType();
     callingConvention = makeCallingConventionString(funcOp).value();
     refs = DenseMap<int64_t, Value>{};

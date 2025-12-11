@@ -121,11 +121,11 @@ class CustomModuleState final {
   // Creates a new string with a copy of the given string data.
   // No NUL terminator is required.
   StatusOr<vm::ref<iree_sample_string_t>> StringFromTensor(
-      vm::ref<iree_hal_buffer_view_t> buffer_view) {
+      iree_hal_buffer_view_t* buffer_view) {
     char string_buffer[512];
     iree_host_size_t string_length = 0;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_format(
-        buffer_view.get(), 128, IREE_ARRAYSIZE(string_buffer), string_buffer,
+        buffer_view, 128, IREE_ARRAYSIZE(string_buffer), string_buffer,
         &string_length));
 
     vm::ref<iree_sample_string_t> string;
@@ -139,7 +139,7 @@ class CustomModuleState final {
   }
 
   // Prints the contents of the string to stdout.
-  Status StringPrint(const vm::ref<iree_sample_string_t> string) {
+  Status StringPrint(iree_sample_string_t* string) {
     if (!string) return OkStatus();  // no-op
     fprintf(stdout, "PRINT %.*s\n", static_cast<int>(string->value.size),
             string->value.data);

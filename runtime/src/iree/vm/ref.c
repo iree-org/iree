@@ -10,8 +10,19 @@
 
 #include "iree/base/internal/atomics.h"
 
-// Useful debugging tool:
-#if 0
+#ifdef IREE_VM_REF_LOG
+
+#ifdef IREE_VM_REF_LOG_INCLUDE_BACKTRACES
+#define IREE_DEBUG_PRINT_BACKTRACE_HERE(msg)                              \
+  {                                                                       \
+    iree_status_t __status = iree_make_status(IREE_STATUS_INTERNAL, msg); \
+    iree_status_fprint(stderr, __status);                                 \
+    iree_status_ignore(__status);                                         \
+  }
+#else
+#define IREE_DEBUG_PRINT_BACKTRACE_HERE(msg)
+#endif  // IREE_VM_REF_LOG_INCLUDE_BACKTRACES
+
 static inline iree_atomic_ref_count_t* iree_vm_get_raw_counter_ptr(
     void* ptr, iree_vm_ref_type_t type);
 
@@ -24,20 +35,22 @@ static void iree_vm_ref_trace(const char* msg, iree_vm_ref_t* ref) {
   iree_string_view_t name = iree_vm_ref_type_name(ref->type);
   fprintf(stderr, "%s %.*s 0x%p %d\n", msg, (int)name.size, name.data, ref->ptr,
           iree_atomic_ref_count_load(counter));
+  IREE_DEBUG_PRINT_BACKTRACE_HERE(msg);
 }
 static void iree_vm_ref_ptr_trace(const char* msg, void* ptr,
                                   iree_vm_ref_type_t type) {
   if (!ptr) return;
-  iree_atomic_ref_count_t* counter =
-      iree_vm_get_raw_counter_ptr(ptr, type);
+  iree_atomic_ref_count_t* counter = iree_vm_get_raw_counter_ptr(ptr, type);
   iree_string_view_t name = iree_vm_ref_type_name(type);
   fprintf(stderr, "%s %.*s 0x%p %d\n", msg, (int)name.size, name.data, ptr,
           iree_atomic_ref_count_load(counter));
+  IREE_DEBUG_PRINT_BACKTRACE_HERE(msg);
 }
+
 #else
 #define iree_vm_ref_trace(...)
 #define iree_vm_ref_ptr_trace(...)
-#endif  // 0
+#endif  // IREE_VM_REF_LOG
 
 IREE_API_EXPORT iree_string_view_t
 iree_vm_ref_type_name(iree_vm_ref_type_t type) {
@@ -48,7 +61,7 @@ iree_vm_ref_type_name(iree_vm_ref_type_t type) {
 static inline iree_atomic_ref_count_t* iree_vm_get_raw_counter_ptr(
     void* ptr, iree_vm_ref_type_t type) {
   IREE_VM_REF_ASSERT(ptr);
-  IREE_VM_REF_ASSERT(type_descriptor);
+  IREE_VM_REF_ASSERT(type);
   return (iree_atomic_ref_count_t*)ptr + (type & IREE_VM_REF_TYPE_TAG_BIT_MASK);
 }
 
@@ -213,6 +226,14 @@ IREE_API_EXPORT void iree_vm_ref_release(iree_vm_ref_t* ref) {
   IREE_VM_REF_ASSERT(ref);
   iree_vm_ref_t temp_ref = *ref;
   if (temp_ref.type == IREE_VM_REF_TYPE_NULL || temp_ref.ptr == NULL) return;
+#if defined(IREE_VM_REF_DEBUG_MOVE)
+  // In debug move mode, poisoned refs from moved-from registers are cleaned up
+  // during frame cleanup. Just clear them without trying to release.
+  if (temp_ref.type == IREE_VM_REF_TYPE_POISONED) {
+    memset(ref, 0, sizeof(*ref));
+    return;
+  }
+#endif  // IREE_VM_REF_DEBUG_MOVE
 
   iree_vm_ref_trace("RELEASE", ref);
   iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(&temp_ref);
@@ -265,7 +286,15 @@ IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
 
   // Reset input ref so it points at nothing.
   iree_vm_ref_t src_ref = *ref;
+#if defined(IREE_VM_REF_DEBUG_MOVE)
+  // Poison the source ref with a sentinel value to detect use-after-move.
+  // If the compiler incorrectly marked this as a last-use when it's actually
+  // used again, the next access will see this poison value and assert.
+  ref->ptr = (void*)(uintptr_t)IREE_VM_REF_TYPE_POISONED;
+  ref->type = IREE_VM_REF_TYPE_POISONED;
+#else
   memset(ref, 0, sizeof(*ref));
+#endif  // IREE_VM_REF_DEBUG_MOVE
 
   iree_vm_ref_t dst_ref = *out_ref;
   if (dst_ref.ptr != NULL) {
