@@ -205,10 +205,11 @@ struct ModuleAnalysis {
   }
 
   void move(mlir::emitc::FuncOp newFunc, IREE::VM::FuncOp oldFunc) {
-    auto &analysis = lookupFunction(oldFunc.getOperation());
-
+    auto ptr = functions.find(oldFunc.getOperation());
+    assert(ptr != functions.end() && "analysis lookup failed");
+    FuncAnalysis analysis = std::move(ptr->second);
+    functions.erase(ptr);
     functions[newFunc.getOperation()] = std::move(analysis);
-    functions.erase(oldFunc.getOperation());
     functionMapping[oldFunc] = newFunc;
   }
 

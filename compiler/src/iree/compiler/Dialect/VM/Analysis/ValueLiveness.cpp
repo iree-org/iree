@@ -300,6 +300,11 @@ ArrayRef<Value> ValueLiveness::getBlockLiveIns(Block *block) {
   return blockSets.liveIn.getArrayRef();
 }
 
+ArrayRef<Value> ValueLiveness::getBlockLiveOuts(Block *block) {
+  auto &blockSets = blockLiveness_[block];
+  return blockSets.liveOut.getArrayRef();
+}
+
 bool ValueLiveness::isLastValueUse(Value value, Operation *useOp) {
   auto &blockSets = blockLiveness_[useOp->getBlock()];
   if (blockSets.liveOut.count(value)) {
@@ -329,6 +334,75 @@ bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
     }
   }
   assert(false && "value not used by operand");
+  return false;
+}
+
+// Determines if an operand is the last "real" use of a ref value.
+//
+// "Real" uses exclude vm.discard_refs operations, which are cleanup markers
+// rather than actual uses. This distinction is critical for MOVE bit logic:
+// - If the only uses after a branch are discard ops, the branch IS the last
+//   real use and should get MOVE semantics.
+// - Without this, we'd incorrectly retain refs that are about to be discarded.
+//
+// Returns true when all conditions are met:
+// 1. useOp is not a discard op (discards are never "real" uses)
+// 2. value is not in the block's live-out set (doesn't escape)
+// 3. No non-discard uses exist after useOp in the same block
+// 4. operandIndex is >= the last operand using this value (handles multi-use)
+//
+// The multi-use check (condition 4) ensures that for ops like:
+//   vm.call @foo(%ref, %ref)  // same ref used twice
+// Only the LAST operand (index 1) is considered the "last use", so MOVE
+// is only applied once.
+bool ValueLiveness::isLastRealValueUse(Value value, Operation *useOp,
+                                       int operandIndex) {
+  // Discards are never "real" uses - they just clean up.
+  if (isa<IREE::VM::DiscardRefsOp>(useOp)) {
+    return false;
+  }
+
+  // Check if value escapes block.
+  auto &blockSets = blockLiveness_[useOp->getBlock()];
+  if (blockSets.liveOut.count(value)) {
+    // Value is in liveOut, but if useOp is a branch terminator and the value
+    // is passed as a successor operand, we need to check if ALL escaping uses
+    // are through this branch. If so, the branch IS the last use.
+    if (!useOp->hasTrait<OpTrait::IsTerminator>()) {
+      return false;
+    }
+    // For terminators, check if the value escapes to any successor blocks
+    // OTHER than through this terminator's successor operands.
+    // Discard ops don't count as "escaping" - they're cleanup markers.
+    for (auto &use : value.getUses()) {
+      Operation *userOp = use.getOwner();
+      if (userOp->getBlock() != useOp->getBlock() &&
+          !isa<IREE::VM::DiscardRefsOp>(userOp)) {
+        // This use is in another block - the value truly escapes.
+        return false;
+      }
+    }
+    // All uses are in the current block, so even though it's "liveOut" (because
+    // it's passed as a successor operand), the branch terminator IS the last
+    // use. Fall through to check if this is the last use within the block.
+  }
+
+  // Walk forward to see if any non-discard uses exist after this op.
+  for (auto it = ++Block::iterator(useOp); it != useOp->getBlock()->end();
+       ++it) {
+    for (OpOperand &operand : it->getOpOperands()) {
+      if (operand.get() == value && !isa<IREE::VM::DiscardRefsOp>(&*it)) {
+        return false; // Real use found after this op
+      }
+    }
+  }
+
+  // Handle same-value multiple operands (only last operand is "last use").
+  for (auto &operand : llvm::reverse(useOp->getOpOperands())) {
+    if (operand.get() == value) {
+      return operandIndex >= operand.getOperandNumber();
+    }
+  }
   return false;
 }
 
