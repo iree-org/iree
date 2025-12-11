@@ -142,6 +142,12 @@ static iree_status_t iree_vm_bytecode_function_enter(
   stack_storage->i32_register_offset = header_size;
   stack_storage->ref_register_count = ref_register_count;
   stack_storage->ref_register_offset = header_size + i32_register_size;
+
+  // Initialize result_code to UNKNOWN - indicating the frame hasn't completed.
+  // On successful return, this gets set to OK. On error or unwind, it stays
+  // non-OK, causing cleanup to release any remaining refs.
+  stack_storage->result_code = IREE_STATUS_UNKNOWN;
+
   *out_callee_registers =
       iree_vm_bytecode_get_register_storage(*out_callee_frame);
 
@@ -211,7 +217,7 @@ static iree_status_t iree_vm_bytecode_external_leave(
     const iree_vm_registers_t* IREE_RESTRICT callee_registers,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     iree_byte_span_t results) {
-  const iree_vm_bytecode_frame_storage_t* stack_storage =
+  iree_vm_bytecode_frame_storage_t* stack_storage =
       (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
           callee_frame);
 
@@ -242,6 +248,9 @@ static iree_status_t iree_vm_bytecode_external_leave(
       } break;
     }
   }
+
+  // Mark successful completion - compiler guarantees all refs are released.
+  stack_storage->result_code = IREE_STATUS_OK;
 
   // Leave and deallocate bytecode stack frame.
   return iree_vm_stack_function_leave(stack);
@@ -351,6 +360,12 @@ static iree_status_t iree_vm_bytecode_internal_leave(
       caller_registers.i32[dst_reg] = callee_registers.i32[src_reg];
     }
   }
+
+  // Mark successful completion - compiler guarantees all refs are released.
+  iree_vm_bytecode_frame_storage_t* callee_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          callee_frame);
+  callee_storage->result_code = IREE_STATUS_OK;
 
   // Leave and deallocate bytecode stack frame.
   *out_caller_frame = caller_frame;
@@ -643,6 +658,11 @@ iree_status_t iree_vm_bytecode_dispatch_begin(
   iree_status_t status = iree_vm_bytecode_dispatch(stack, module, current_frame,
                                                    regs, call.results);
   if (!iree_status_is_ok(status) && !iree_status_is_deferred(status)) {
+    // Mark as error path so frame cleanup releases refs.
+    iree_vm_bytecode_frame_storage_t* stack_storage =
+        (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+            current_frame);
+    stack_storage->result_code = iree_status_code(status);
     // Balance the external_enter on failure.
     IREE_IGNORE_ERROR(iree_vm_stack_function_leave(stack));
   }
