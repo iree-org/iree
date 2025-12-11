@@ -851,7 +851,7 @@ util.func public @dont_sink_through_edge_expand_shape(%arg0 : tensor<2x3x4xf32>)
 #map_rhs = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map_out = affine_map<(d0, d1, d2) -> (d0, d1)>
 util.func public @fuse_transpose_through_generic_matmul(
-    %lhs: tensor<16x32xf32>, %transposed_rhs: tensor<16x32xf32>) -> tensor<16x16xf32> {
+  %lhs: tensor<16x32xf32>, %transposed_rhs: tensor<16x32xf32>) -> tensor<16x16xf32> {
   %empty = tensor.empty(): tensor<32x16xf32>
   %rhs = linalg.transpose ins(%transposed_rhs : tensor<16x32xf32>)
       outs(%empty : tensor<32x16xf32>) permutation = [1, 0]
@@ -889,7 +889,7 @@ util.func public @fuse_transpose_through_generic_matmul(
 #map_bmm_rhs = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map_bmm_out = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 util.func public @fuse_transpose_through_generic_batch_matmul(
-    %lhs: tensor<2x16x32xf32>, %transposed_rhs: tensor<2x16x32xf32>) -> tensor<2x16x16xf32> {
+  %lhs: tensor<2x16x32xf32>, %transposed_rhs: tensor<2x16x32xf32>) -> tensor<2x16x16xf32> {
   %empty = tensor.empty(): tensor<2x32x16xf32>
   %rhs = linalg.transpose ins(%transposed_rhs : tensor<2x16x32xf32>)
       outs(%empty : tensor<2x32x16xf32>) permutation = [0, 2, 1]
@@ -919,3 +919,35 @@ util.func public @fuse_transpose_through_generic_batch_matmul(
 //  CHECK-SAME:     indexing_maps = [#[[$MAP_BMM_LHS]], #[[$MAP_BMM_RHS_TRANSPOSED]], #[[$MAP_BMM_OUT]]]
 //  CHECK-SAME:     ins(%[[LHS]], %[[TRANSPOSED_RHS]] : tensor<2x16x32xf32>, tensor<2x16x32xf32>)
 //       CHECK:   util.return %[[BMM]]
+// -----
+
+// Generic reduction transpose fusion
+#map_red_in = affine_map<(d0, d1) -> (d0)>
+#map_red_rhs = affine_map<(d0, d1) -> (d1, d0)>
+#map_red_out = affine_map<(d0, d1) -> (d0)>
+util.func public @fuse_transpose_through_generic_reduction(
+  %lhs: tensor<4xf32>, %transposed_rhs: tensor<4x8xf32>) -> tensor<4xf32> {
+  %empty = tensor.empty(): tensor<8x4xf32>
+  %rhs = linalg.transpose ins(%transposed_rhs : tensor<4x8xf32>)
+      outs(%empty : tensor<8x4xf32>) permutation = [1, 0]
+  %init = tensor.empty(): tensor<4xf32>
+  %reduce = linalg.generic {
+      indexing_maps = [#map_red_in, #map_red_rhs, #map_red_out],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%lhs, %rhs : tensor<4xf32>, tensor<8x4xf32>)
+      outs(%init : tensor<4xf32>) {
+    ^bb0(%a: f32, %b: f32, %acc: f32):
+      %mul = arith.mulf %a, %b : f32
+      %add = arith.addf %acc, %mul : f32
+      linalg.yield %add : f32
+  } -> tensor<4xf32>
+  util.return %reduce : tensor<4xf32>
+}
+//   CHECK-DAG: #[[$MAP_RED_IN:.+]] = affine_map<(d0, d1) -> (d0)>
+//   CHECK-DAG: #[[$MAP_RED_RHS:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL: util.func public @fuse_transpose_through_generic_reduction
+//   CHECK-NOT:   linalg.transpose
+//       CHECK:   %[[GEN:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps = [#[[$MAP_RED_IN]], #[[$MAP_RED_RHS]], #[[$MAP_RED_IN]]]
+//  CHECK-SAME:     ins(%{{.*}}, %{{.*}} : tensor<4xf32>, tensor<4x8xf32>)
+//       CHECK:   util.return %[[GEN]]
