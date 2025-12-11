@@ -7,9 +7,16 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-common-transforms"
@@ -713,6 +720,25 @@ struct SwapCollapseShapeWithSlicePattern
 
 void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns) {
   patterns.add<SwapCollapseShapeWithSlicePattern>(patterns.getContext());
+}
+
+namespace {
+
+struct RemoveOptimizationBarrier final
+    : public OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp barrierOp,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOp(barrierOp, barrierOp.getOperands());
+    return success();
+  }
+};
+
+} // namespace
+
+void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns) {
+  patterns.insert<RemoveOptimizationBarrier>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler
