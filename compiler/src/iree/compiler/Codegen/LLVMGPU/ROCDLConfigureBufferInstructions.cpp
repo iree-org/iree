@@ -14,6 +14,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-rocdl-configure-buffer-instructions"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -67,26 +68,8 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
   });
 }
 
-/// Return the maximum value that has been `util.assume.int`'d about this value
-/// if there is one.
-/// TODO: it'd be nice to be able to run the IntRangeAnalysis just up to the
-/// value in question, but we don't have that, so we approximate it.
-static std::optional<int64_t> getDynamicSizeMax(Value size) {
-  size = stripIntegerCasts(size);
-  // Special case for constants that're still dynamic.
-  APInt constVal;
-  if (matchPattern(size, m_ConstantInt(&constVal))) {
-    return constVal.getZExtValue();
-  }
-  auto assumeOp = size.getDefiningOp<IREE::Util::AssumeIntOp>();
-  if (!assumeOp)
-    return std::nullopt;
-  std::optional<int64_t> maybeMax =
-      assumeOp.getUnionedUnsignedRange(cast<OpResult>(size).getResultNumber())
-          .second;
-  return maybeMax;
-}
-
+/// Return the maximum number of bytes spanned by the binding, or nullopt if
+/// unable to determine.
 static std::optional<int64_t>
 getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
   int64_t maxNumElems = 1;
@@ -98,8 +81,10 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
   if (!resultTy || !resultTy.hasRank())
     return std::nullopt;
   for (Value dynArg : binding.getResultDynamicDims(0)) {
-    std::optional<int64_t> dimMax = getDynamicSizeMax(dynArg);
-    if (!dimMax)
+    FailureOr<int64_t> dimMax = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::UB, dynArg,
+        /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(dimMax))
       return std::nullopt;
     maxNumElems *= (*dimMax);
   }
