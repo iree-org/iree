@@ -118,16 +118,39 @@ struct LowerCoalescedGatherDMAPattern final
     }
     LDBG() << "Subgroup size: " << *subgroupSize;
 
-    // Check that transfer size matches one of the target DMA sizes.
-    int64_t transferSizePerLane = transferSizeBits / *subgroupSize;
-    LDBG() << "Transfer size per lane: " << transferSizePerLane << " bits";
+    // Find a suitable DMA size that allows the innermost dimension to be
+    // evenly divided into N transfers. We prefer larger DMA sizes for
+    // efficiency. Sort DMA sizes in descending order to prefer larger sizes.
+    auto sortedDmaSizes = llvm::to_vector_of<int64_t>(targetDmaSizes);
+    llvm::sort(sortedDmaSizes, std::greater<>());
 
-    if (!targetDmaSizes.empty() &&
-        !llvm::is_contained(targetDmaSizes, transferSizePerLane)) {
-      return rewriter.notifyMatchFailure(
-          dmaOp, "transfer size does not match any target DMA size");
+    int64_t elementsPerLane = 0;
+    for (int64_t dmaSize : sortedDmaSizes) {
+      // Calculate elements per lane for this DMA size.
+      if (dmaSize % elementBits != 0)
+        continue;
+      int64_t candidateElementsPerLane = dmaSize / elementBits;
+
+      // Calculate total elements per transfer (all lanes combined).
+      int64_t totalElementsPerTransfer =
+          *subgroupSize * candidateElementsPerLane;
+
+      // Make sure it can evenly divide the innermost dimension.
+      if (innermostDimSize % totalElementsPerTransfer == 0) {
+        elementsPerLane = candidateElementsPerLane;
+        LDBG() << "Selected DMA size: " << dmaSize
+               << " bits, elementsPerLane: " << elementsPerLane
+               << ", numTransfers: "
+               << (innermostDimSize / totalElementsPerTransfer);
+        break;
+      }
     }
-    LDBG() << "Transfer size matches target DMA sizes";
+
+    if (elementsPerLane == 0) {
+      return rewriter.notifyMatchFailure(
+          dmaOp, "innermost dimension is not evenly divisible by any "
+                 "supported DMA transfer size (subgroupSize * dmaSize)");
+    }
 
     auto destType = cast<MemRefType>(dest.getType());
     ArrayRef<int64_t> destShape = destType.getShape();
@@ -137,8 +160,7 @@ struct LowerCoalescedGatherDMAPattern final
     size_t numIndexDims = indices.size();
     LDBG() << "Number of index dimensions: " << numIndexDims;
 
-    int64_t elementsPerTransfer = innermostDimSize / *subgroupSize;
-    auto transferType = VectorType::get({elementsPerTransfer}, elementType);
+    auto transferType = VectorType::get({elementsPerLane}, elementType);
 
     // Actually create the GatherToLDS ops to perform the transfer.
     rewriter.setInsertionPoint(dmaOp);
@@ -147,15 +169,17 @@ struct LowerCoalescedGatherDMAPattern final
     Location loc = dmaOp.getLoc();
     Value laneOffset = arith::MulIOp::create(
         rewriter, loc, laneId,
-        arith::ConstantIndexOp::create(rewriter, loc, elementsPerTransfer));
+        arith::ConstantIndexOp::create(rewriter, loc, elementsPerLane));
 
-    // Build tile sizes: [1, 1, ..., 1, subgroupSize * elementsPerTransfer].
+    // Build tile sizes: [1, 1, ..., 1, subgroupSize * elementsPerLane].
     // This iterates over destination dimensions, with each lane handling
-    // `elementsPerTransfer` contiguous elements in the innermost dimension.
+    // `elementsPerLane` contiguous elements in the innermost dimension.
     // This approach uniformly handles 1D, 2D, and higher-dimensional cases,
     // as well as both copy mode (no indices) and gather mode (with indices).
+    // When innermostDimSize > subgroupSize * elementsPerLane, multiple
+    // GatherToLDS ops are generated to cover the entire inner dimension.
     SmallVector<int64_t> tileSizes(destShape.size(), 1);
-    tileSizes.back() = *subgroupSize * elementsPerTransfer;
+    tileSizes.back() = *subgroupSize * elementsPerLane;
 
     for (const SmallVector<int64_t> &offsets :
          StaticTileOffsetRange(destShape, tileSizes)) {
