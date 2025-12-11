@@ -450,7 +450,7 @@ func.func @lower_coalesced_dma_multiple_transfers_1d(
     // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX1]]], %[[DST]][%[[TILE1]]] : vector<4xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
-    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<256xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<256xf32, #gpu.address_space<workgroup>>, index
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : (memref<256xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<256xf32, #gpu.address_space<workgroup>>, index) -> ()
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
@@ -506,7 +506,7 @@ func.func @lower_coalesced_dma_multiple_transfers_2d(
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
-    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x256xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<2x256xf32, #gpu.address_space<workgroup>>, index
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : (memref<2x256xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<2x256xf32, #gpu.address_space<workgroup>>, index) -> ()
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }

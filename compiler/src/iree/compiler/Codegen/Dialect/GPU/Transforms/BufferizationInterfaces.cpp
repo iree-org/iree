@@ -381,9 +381,15 @@ struct CoalescedGatherDMAOpBufferizationInterface
     // Handle slice semantics: create a subview of the init buffer.
     Value destBuffer = *initBuffer;
     if (gatherOp.hasSliceSemantics()) {
+      // Convert Values to OpFoldResults, using static attributes for constants.
+      SmallVector<OpFoldResult> offsets = llvm::map_to_vector(
+          gatherOp.getOffsets(), [](Value v) { return getAsOpFoldResult(v); });
+      SmallVector<OpFoldResult> sizes = llvm::map_to_vector(
+          gatherOp.getSizes(), [](Value v) { return getAsOpFoldResult(v); });
+      SmallVector<OpFoldResult> strides = llvm::map_to_vector(
+          gatherOp.getStrides(), [](Value v) { return getAsOpFoldResult(v); });
       destBuffer = memref::SubViewOp::create(
-          rewriter, gatherOp.getLoc(), destBuffer, gatherOp.getMixedOffsets(),
-          gatherOp.getMixedSizes(), gatherOp.getMixedStrides());
+          rewriter, gatherOp.getLoc(), destBuffer, offsets, sizes, strides);
     }
 
     // Create the bufferized DMA operation with no results (memref form).

@@ -416,6 +416,22 @@ static void composeParallelInsertSlices(
   }
 }
 
+/// Convert OpFoldResults to Values, creating arith.constant for static values.
+static SmallVector<Value> getAsValues(RewriterBase &rewriter, Location loc,
+                                      ArrayRef<OpFoldResult> ofrs) {
+  SmallVector<Value> values;
+  for (OpFoldResult ofr : ofrs) {
+    if (auto v = dyn_cast<Value>(ofr)) {
+      values.push_back(v);
+    } else {
+      int64_t staticVal = cast<IntegerAttr>(cast<Attribute>(ofr)).getInt();
+      values.push_back(
+          arith::ConstantIndexOp::create(rewriter, loc, staticVal));
+    }
+  }
+  return values;
+}
+
 /// Compose and fuse coalesced gather DMA operations with parallel insert
 /// slices. Replaces the parallel_insert_slice with a CoalescedGatherDMAOp
 /// that has slice semantics, writing directly to the shared_out at the
@@ -432,13 +448,22 @@ static void composeCoalescedGatherDMA(
     // that has slice semantics. The DMA will write directly to the
     // shared_out (warpInsert.getDest()) at the given offsets.
     rewriter.setInsertionPoint(warpInsert);
+    Location loc = warpInsert.getLoc();
+
+    // Convert OpFoldResults to Values (creating constants for static values).
+    SmallVector<Value> offsets =
+        getAsValues(rewriter, loc, warpInsert.getMixedOffsets());
+    SmallVector<Value> sizes =
+        getAsValues(rewriter, loc, warpInsert.getMixedSizes());
+    SmallVector<Value> strides =
+        getAsValues(rewriter, loc, warpInsert.getMixedStrides());
+
     rewriter.replaceOpWithNewOp<IREE::GPU::CoalescedGatherDMAOp>(
         warpInsert,
         /*resultType=*/Type{}, // No result when inside in_parallel
         laneInsert.getSource(), laneInsert.getIndices(),
         warpInsert.getDest(), // Write directly to shared_out
-        laneInsert.getLane(), warpInsert.getMixedOffsets(),
-        warpInsert.getMixedSizes(), warpInsert.getMixedStrides());
+        laneInsert.getLane(), offsets, sizes, strides);
     rewriter.eraseOp(laneInsert);
   }
 }

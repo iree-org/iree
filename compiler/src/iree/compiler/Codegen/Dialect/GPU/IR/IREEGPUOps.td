@@ -261,7 +261,6 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     AttrSizedOperandSegments,
-    OffsetSizeAndStrideOpInterface,
     DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
        ["getUpdatedDestinations", "getIteratingParent"]>]> {
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
@@ -372,14 +371,18 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     ```
 
     Example with slice semantics, where each warp writes to a different
-    slice of the output:
+    slice of the output (note: all offsets/sizes/strides must be SSA values):
     ```mlir
     scf.forall (%warp, %lane) in (4, 32) shared_outs(%out = %init) -> tensor<16x128xf32> {
+      %c0 = arith.constant 0 : index
+      %c4 = arith.constant 4 : index
+      %c128 = arith.constant 128 : index
+      %c1 = arith.constant 1 : index
       %src_slice = tensor.extract_slice %src[%warp, 0] [4, 128] [1, 1]
         : tensor<16x128xf32> to tensor<4x128xf32>
       scf.forall.in_parallel {
-        iree_gpu.coalesced_gather_dma %src_slice into %out [%warp, 0] [4, 128] [1, 1] lane(%lane)
-          : tensor<4x128xf32>, tensor<16x128xf32>, index
+        iree_gpu.coalesced_gather_dma %src_slice into %out [%warp, %c0] [%c4, %c128] [%c1, %c1] lane(%lane)
+          : (tensor<4x128xf32>, tensor<16x128xf32>, index, index, index, index, index, index, index) -> ()
       }
     } {mapping = [#gpu.warp<linear_dim_0>, #iree_gpu.lane_id<0>]}
     ```
@@ -392,10 +395,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     Index:$lane,
     Variadic<Index>:$offsets,
     Variadic<Index>:$sizes,
-    Variadic<Index>:$strides,
-    DenseI64ArrayAttr:$static_offsets,
-    DenseI64ArrayAttr:$static_sizes,
-    DenseI64ArrayAttr:$static_strides
+    Variadic<Index>:$strides
   );
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
@@ -403,8 +403,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let assemblyFormat = [{
     $source (`[` $indices^ `]`)?
     `into` $init
-    custom<OptionalSlice>($offsets, $sizes, $strides,
-                          $static_offsets, $static_sizes, $static_strides)
+    custom<OptionalSlice>($offsets, $sizes, $strides)
     `lane` `(` $lane `)`
     attr-dict `:` functional-type(operands, results)
   }];
@@ -423,20 +422,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
     // Check if this op has slice semantics (non-empty offsets).
     bool hasSliceSemantics() {
-      return !getStaticOffsets().empty();
-    }
-
-    // OffsetSizeAndStrideOpInterface required methods.
-    std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      // When no slice semantics (empty offsets), return 0.
-      // When slice semantics are used, the rank matches the static arrays.
-      unsigned rank = static_cast<unsigned>(getStaticOffsets().size());
-      return {rank, rank, rank};
-    }
-    static unsigned getOffsetSizeAndStrideStartOperandIndex() {
-      // After source, indices, init, lane - but since we use AttrSizedOperandSegments,
-      // the interface will use getOffsets/getSizes/getStrides directly.
-      return 4;
+      return !getOffsets().empty();
     }
   }];
 
@@ -445,18 +431,9 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     OpBuilder<(ins "Type":$resultType, "Value":$source,
                    "ValueRange":$indices, "Value":$init, "Value":$lane), [{
       build($_builder, $_state, resultType, source, indices, init, lane,
-            /*offsets=*/ValueRange{}, /*sizes=*/ValueRange{}, /*strides=*/ValueRange{},
-            $_builder.getDenseI64ArrayAttr({}),
-            $_builder.getDenseI64ArrayAttr({}),
-            $_builder.getDenseI64ArrayAttr({}));
-    }]>,
-    // Builder with slice offsets/sizes/strides
-    OpBuilder<(ins "Type":$resultType, "Value":$source,
-                   "ValueRange":$indices, "Value":$init, "Value":$lane,
-                   "ArrayRef<OpFoldResult>":$offsets,
-                   "ArrayRef<OpFoldResult>":$sizes,
-                   "ArrayRef<OpFoldResult>":$strides,
-                   CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+            /*offsets=*/ValueRange{}, /*sizes=*/ValueRange{}, /*strides=*/ValueRange{});
+    }]>
+    // The default builder with all operands (including slice) is auto-generated.
   ];
 }
 

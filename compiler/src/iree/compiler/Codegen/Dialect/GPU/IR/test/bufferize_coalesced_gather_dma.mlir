@@ -82,12 +82,14 @@ func.func @bufferize_coalesced_gather_dma_with_slice(%source: tensor<1x1x64xf32>
                                                       %dest: tensor<2x2x64xf32>,
                                                       %off0: index, %off1: index,
                                                       %lane: index) -> tensor<2x2x64xf32> {
-  %result = iree_gpu.coalesced_gather_dma %source into %dest [%off0, %off1, 0] [1, 1, 64] [1, 1, 1] lane(%lane)
-    : (tensor<1x1x64xf32>, tensor<2x2x64xf32>, index, index, index) -> tensor<2x2x64xf32>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c64 = arith.constant 64 : index
+  %result = iree_gpu.coalesced_gather_dma %source into %dest [%off0, %off1, %c0] [%c1, %c1, %c64] [%c1, %c1, %c1] lane(%lane)
+    : (tensor<1x1x64xf32>, tensor<2x2x64xf32>, index, index, index, index, index, index, index, index, index, index) -> tensor<2x2x64xf32>
   return %result : tensor<2x2x64xf32>
 }
 
 // CHECK-LABEL: func @bufferize_coalesced_gather_dma_with_slice
-//  CHECK-SAME:   %[[SOURCE:.+]]: memref<1x1x64xf32{{.+}}>, %[[DEST:.+]]: memref<2x2x64xf32{{.+}}>, %[[OFF0:.+]]: index, %[[OFF1:.+]]: index, %[[LANE:.+]]: index
-//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[DEST]][%[[OFF0]], %[[OFF1]], 0] [1, 1, 64] [1, 1, 1]
-//       CHECK:   iree_gpu.coalesced_gather_dma %[[SOURCE]] into %[[SUBVIEW]] lane(%[[LANE]]) : (memref<1x1x64xf32{{.+}}>, memref<1x1x64xf32{{.+}}>, index) -> ()
+//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %{{.+}}[%{{.+}}, %{{.+}}, 0] [1, 1, 64] [1, 1, 1]
+//       CHECK:   iree_gpu.coalesced_gather_dma %{{.+}} into %[[SUBVIEW]] lane(%{{.+}}) : (memref<1x1x64xf32{{.+}}>, memref<1x1x64xf32{{.+}}>, index) -> ()
