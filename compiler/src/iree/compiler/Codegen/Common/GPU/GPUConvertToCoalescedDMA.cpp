@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -417,7 +418,7 @@ struct ConvertGatherToCoalescedDMA
     }
 
     ArrayRef<int64_t> dmaSizes;
-    if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
       dmaSizes = dmaSizesAttr.asArrayRef();
     }
 
@@ -617,7 +618,7 @@ private:
     }
 
     ArrayRef<int64_t> dmaSizes;
-    if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
       dmaSizes = dmaSizesAttr.asArrayRef();
     }
 
