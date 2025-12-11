@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
@@ -785,6 +786,21 @@ void ConstRefZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultName(setNameFn, getResult(), "null");
 }
 
+FailureOr<bool> DiscardRefsOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  // TODO(benvanik): implement when new register allocator is ready.
+  return false;
+}
+
+FailureOr<bool> AssignRefOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  if (failed(
+          e.encodeOpcode("AssignRef", static_cast<int>(Opcode::AssignRef))) ||
+      failed(e.encodeOperand(getSource(), 0)) ||
+      failed(e.encodeResult(getResult()))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
+}
+
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      Attribute value, ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("sym_name", builder.getStringAttr(name));
@@ -995,6 +1011,17 @@ ParseResult SwitchRefOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void SwitchRefOp::print(OpAsmPrinter &p) { printSwitchOp(p, *this); }
+
+FailureOr<bool> CastRefAnyOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  // Uses same encoding as AssignRef since widening casts are no-ops at runtime.
+  if (failed(
+          e.encodeOpcode("AssignRef", static_cast<int>(Opcode::AssignRef))) ||
+      failed(e.encodeOperand(getOperand(), 0)) ||
+      failed(e.encodeResult(getResult()))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 // Comparison ops

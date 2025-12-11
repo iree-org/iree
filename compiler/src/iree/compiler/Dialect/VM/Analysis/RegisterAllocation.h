@@ -158,7 +158,7 @@ private:
 // Analysis that performs VM register allocation on the given function op and
 // its children. Once calculated value usages can be mapped to VM register
 // reference bytes.
-class RegisterAllocation {
+class RegisterAllocation : public VMRegisterAllocation {
 public:
   // Annotates the IR with the register mappings. This is only required if the
   // register mappings are interesting to persist beyond just encoding, such as

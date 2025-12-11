@@ -453,6 +453,59 @@ vm.module @ref_ops {
   }
 
   //===--------------------------------------------------------------------===//
+  // Discard refs operations
+  //===--------------------------------------------------------------------===//
+
+  // Discard zero refs (no-op but should not crash).
+  vm.export @test_discard_empty attributes {emitc.exclude}
+  vm.func private @test_discard_empty() {
+    vm.discard.refs
+    vm.return
+  }
+
+  // Discard a single ref.
+  vm.export @test_discard_single_ref attributes {emitc.exclude}
+  vm.func private @test_discard_single_ref() {
+    %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
+    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    vm.check.nz %ref_dno, "ref valid before discard" : !vm.buffer
+    vm.discard.refs %ref_dno : !vm.buffer
+    // Note: After discard, the ref is released. We shouldn't use it.
+    vm.return
+  }
+
+  // Discard multiple refs at once.
+  vm.export @test_discard_multiple_refs attributes {emitc.exclude}
+  vm.func private @test_discard_multiple_refs() {
+    %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
+    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
+    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    vm.check.nz %ref_a_dno, "ref_a valid before discard" : !vm.buffer
+    vm.check.nz %ref_b_dno, "ref_b valid before discard" : !vm.buffer
+    vm.discard.refs %ref_a_dno, %ref_b_dno : !vm.buffer, !vm.buffer
+    vm.return
+  }
+
+  // Discard in a branch - verify control flow works.
+  vm.export @test_discard_in_branch attributes {emitc.exclude}
+  vm.func private @test_discard_in_branch() {
+    %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
+    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %c1 = vm.const.i32 1
+    %c1_dno = util.optimization_barrier %c1 : i32
+    vm.cond_br %c1_dno, ^bb1, ^bb2
+  ^bb1:
+    vm.discard.refs %ref_dno : !vm.buffer
+    vm.br ^exit
+  ^bb2:
+    // Don't discard on this path.
+    vm.br ^exit
+  ^exit:
+    vm.return
+  }
+
+  //===--------------------------------------------------------------------===//
   // Edge case: Nested loops with refs
   //===--------------------------------------------------------------------===//
 
