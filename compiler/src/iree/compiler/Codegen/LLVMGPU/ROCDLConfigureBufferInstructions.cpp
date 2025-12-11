@@ -7,14 +7,16 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-rocdl-configure-buffer-instructions"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -71,7 +73,8 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
 /// Return the maximum number of bytes spanned by the binding, or nullopt if
 /// unable to determine.
 static std::optional<int64_t>
-getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
+getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding,
+                const DataFlowSolver &solver) {
   int64_t maxNumElems = 1;
   ShapedType resultTy = dyn_cast<ShapedType>(binding.getType());
   if (auto tensorType =
@@ -81,9 +84,7 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
   if (!resultTy || !resultTy.hasRank())
     return std::nullopt;
   for (Value dynArg : binding.getResultDynamicDims(0)) {
-    FailureOr<int64_t> dimMax = ValueBoundsConstraintSet::computeConstantBound(
-        presburger::BoundType::UB, dynArg,
-        /*stopCondition=*/nullptr, /*closedUB=*/true);
+    FailureOr<int64_t> dimMax = getDynamicUpperBound(dynArg, solver);
     if (failed(dimMax))
       return std::nullopt;
     maxNumElems *= (*dimMax);
@@ -106,10 +107,20 @@ struct ROCDLConfigureBufferInstructionsPass final
     if (!clROCDLlEnableBufferInstructions)
       return;
     mlir::FunctionOpInterface funcOp = getOperation();
-    // Is this really he best way to skip this pass on non-rocdl targets?
+    // Is this really the best way to skip this pass on non-rocdl targets?
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     if (!target || !target.isAMD())
       return;
+
+    // Initialize the DataFlowSolver with IntegerRangeAnalysis.
+    DataFlowSolver solver;
+    solver.load<dataflow::DeadCodeAnalysis>();
+    solver.load<dataflow::IntegerRangeAnalysis>();
+    if (failed(solver.initializeAndRun(funcOp))) {
+      funcOp.emitOpError("failed to run integer range analysis");
+      return signalPassFailure();
+    }
+
     auto *gpuDialect =
         getContext().getLoadedDialect<IREE::GPU::IREEGPUDialect>();
     auto annotationHelper =
@@ -122,7 +133,7 @@ struct ROCDLConfigureBufferInstructionsPass final
                << " not known workgroup-uniform\n";
         return;
       }
-      std::optional<int64_t> maxBytes = getSpannedBytes(binding);
+      std::optional<int64_t> maxBytes = getSpannedBytes(binding, solver);
       if (!maxBytes) {
         LDBG() << "Couldn't bound binding size for " << binding;
         return;
