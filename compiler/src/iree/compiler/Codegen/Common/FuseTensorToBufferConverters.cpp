@@ -517,6 +517,123 @@ struct FoldTransferReadOfTensorEmpty
   }
 };
 
+/// Pattern to fold rank-increasing tensor.insert_slice ops into
+/// vector.transfer_write if the insert_slice only introduces unit dimensions.
+/// This handles IR like:
+///   %0 = vector.transfer_write %v, %t[%c0, %c0] : vector<64x64xi8>,
+///   tensor<...> %1 = tensor.insert_slice %0 into %dest[0, 0, 0, 0] [1, 64, 1,
+///   64] [1, 1, 1]
+///       : tensor<64x64xi8> into tensor<1x64x1x64xi8>
+/// by writing directly to %dest with an updated permutation map.
+struct FoldRankIncreasingInsertSliceIntoTransferWrite
+    : public OpRewritePattern<tensor::InsertSliceOp> {
+  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
+                                PatternRewriter &rewriter) const override {
+    // Check for unit stride.
+    if (!insertOp.hasUnitStride()) {
+      return failure();
+    }
+
+    // Check if the source is a transfer_write.
+    auto writeOp =
+        insertOp.getSource().getDefiningOp<vector::TransferWriteOp>();
+    if (!writeOp) {
+      return failure();
+    }
+
+    // Check for 0-d corner case.
+    if (writeOp.getTransferRank() == 0) {
+      return failure();
+    }
+
+    // Check that the transfer_write has no mask.
+    if (writeOp.getMask()) {
+      return failure();
+    }
+
+    // Check that the insert_slice is rank-increasing (source has fewer dims
+    // than result).
+    RankedTensorType sourceType = insertOp.getSourceType();
+    RankedTensorType resultType = insertOp.getType();
+    if (sourceType.getRank() >= resultType.getRank()) {
+      return failure();
+    }
+
+    // Check that it only introduces unit dimensions (rank-increased type check)
+    // by verifying the result is a rank-extended version of the source.
+    if (isRankReducedType(resultType, sourceType) !=
+        SliceVerificationResult::Success) {
+      return failure();
+    }
+
+    // Check that the transfer_write fully overwrites its destination.
+    // The vector shape must match the source tensor shape.
+    VectorType vecType = writeOp.getVectorType();
+    if (vecType.getRank() != sourceType.getRank()) {
+      return failure();
+    }
+    for (auto [vecDim, tensorDim] :
+         llvm::zip_equal(vecType.getShape(), sourceType.getShape())) {
+      if (vecDim != tensorDim) {
+        return failure();
+      }
+    }
+
+    // Check all indices of transfer_write are zero. Otherwise, the vector
+    // wouldn't fully overwrite the tensor.
+    for (Value idx : writeOp.getIndices()) {
+      if (!isZeroInteger(idx)) {
+        return failure();
+      }
+    }
+
+    // Check that the permutation map is identity. We could support more
+    // permutations, but identity covers the common case.
+    if (!writeOp.getPermutationMap().isIdentity()) {
+      return failure();
+    }
+
+    // Get the dropped dims (unit dims in result that don't exist in source).
+    llvm::SmallBitVector droppedDims = insertOp.getDroppedDims();
+
+    // Build the new permutation map. The permutation map for transfer_write
+    // maps from tensor dimensions (numDims = resultRank) to vector dimensions
+    // (numResults = vectorRank). For non-unit dims, we map to the corresponding
+    // vector dimension. For unit (dropped) dims, we don't include them in the
+    // result since we're only writing to those dimensions at specific offsets.
+    int64_t resultRank = resultType.getRank();
+    int64_t vectorRank = vecType.getRank();
+    SmallVector<AffineExpr> exprs;
+    [[maybe_unused]] int64_t vectorIdx = 0;
+    for (int64_t i = 0; i < resultRank; ++i) {
+      if (!droppedDims.test(i)) {
+        // This non-unit dimension maps to a vector dimension.
+        exprs.push_back(getAffineDimExpr(i, rewriter.getContext()));
+        ++vectorIdx;
+      }
+    }
+    assert(vectorIdx == vectorRank && "dimension count mismatch");
+
+    AffineMap newPermutationMap =
+        AffineMap::get(resultRank, 0, exprs, rewriter.getContext());
+
+    // Compute new indices: use the insert_slice offsets.
+    SmallVector<Value> newIndices = getValueOrCreateConstantIndexOp(
+        rewriter, insertOp.getLoc(), insertOp.getMixedOffsets());
+
+    // Compute in_bounds: we're writing the full vector at the given offsets.
+    // The vector fully covers the non-unit dimensions.
+    SmallVector<bool> inBounds(vectorRank, true);
+
+    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+        insertOp, writeOp.getVector(), insertOp.getDest(), newIndices,
+        newPermutationMap, inBounds);
+    return success();
+  }
+};
+
 /// Pattern to fuse iree_linalg_ext.map_scatter into
 /// iree_codegen.store_to_buffer by replacing the map_scatter's tensor
 /// destination with the store's memref. This avoids allocating an intermediate
@@ -612,6 +729,7 @@ struct FuseTensorToBufferConvertersPass final
                  FuseRankIncreasingExpandIntoBufferStore,
                  FuseRankIncreasingExpandIntoDispatchTensorStore,
                  FuseRankReducingInsertSliceIntoDispatchTensorStore,
+                 FoldRankIncreasingInsertSliceIntoTransferWrite,
                  ComposeExtractSliceInsidePCFLoop,
                  ComposeExtractSliceOfDispatchLoadInsidePCFLoop,
                  ComposeExtractSliceOfLoadFromBufferInsidePCF,

@@ -367,6 +367,73 @@ func.func @fuse_map_scatter_into_buffer_store(%dest_buf: memref<64xf32>, %input_
 
 // -----
 
+// Test folding rank-increasing tensor.insert_slice into vector.transfer_write.
+// The insert_slice only introduces unit dimensions.
+func.func @fold_rank_increasing_insert_slice_into_transfer_write(
+    %vec: vector<64x64xi8>, %dest: tensor<1x64x1x64xi8>) -> tensor<1x64x1x64xi8> {
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<64x64xi8>
+  %write = vector.transfer_write %vec, %empty[%c0, %c0] {in_bounds = [true, true]}
+      : vector<64x64xi8>, tensor<64x64xi8>
+  %inserted = tensor.insert_slice %write into %dest[0, 0, 0, 0] [1, 64, 1, 64] [1, 1, 1, 1]
+      : tensor<64x64xi8> into tensor<1x64x1x64xi8>
+  return %inserted : tensor<1x64x1x64xi8>
+}
+
+// CHECK-LABEL: @fold_rank_increasing_insert_slice_into_transfer_write
+//  CHECK-SAME:   %[[VEC:[A-Za-z0-9_]+]]: vector<64x64xi8>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9_]+]]: tensor<1x64x1x64xi8>
+//       CHECK:   %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[DEST]]
+//  CHECK-SAME:       {in_bounds = [true, true], permutation_map = #{{.*}}}
+//  CHECK-SAME:       : vector<64x64xi8>, tensor<1x64x1x64xi8>
+//       CHECK:   return %[[WRITE]]
+//   CHECK-NOT:   tensor.insert_slice
+
+// -----
+
+// Test that rank-increasing insert_slice fold does NOT happen when the source
+// insert_slice has non-unit strides.
+func.func @no_fold_insert_slice_non_unit_stride(
+    %vec: vector<64x64xi8>, %dest: tensor<1x128x1x128xi8>) -> tensor<1x128x1x128xi8> {
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<64x64xi8>
+  %write = vector.transfer_write %vec, %empty[%c0, %c0] {in_bounds = [true, true]}
+      : vector<64x64xi8>, tensor<64x64xi8>
+  %inserted = tensor.insert_slice %write into %dest[0, 0, 0, 0] [1, 64, 1, 64] [1, 2, 1, 2]
+      : tensor<64x64xi8> into tensor<1x128x1x128xi8>
+  return %inserted : tensor<1x128x1x128xi8>
+}
+
+// CHECK-LABEL: @no_fold_insert_slice_non_unit_stride
+//       CHECK:   vector.transfer_write
+//       CHECK:   tensor.insert_slice
+
+// -----
+
+// Test folding with non-zero offsets in insert_slice.
+// Note: The dest tensor must have shape matching the insert sizes for this to be
+// a valid rank-increasing insert_slice fold (not just inserting a small slice).
+func.func @fold_rank_increasing_insert_slice_with_offsets(
+    %vec: vector<32x32xi8>, %dest: tensor<1x32x1x32xi8>) -> tensor<1x32x1x32xi8> {
+  %c0 = arith.constant 0 : index
+  %empty = tensor.empty() : tensor<32x32xi8>
+  %write = vector.transfer_write %vec, %empty[%c0, %c0] {in_bounds = [true, true]}
+      : vector<32x32xi8>, tensor<32x32xi8>
+  %inserted = tensor.insert_slice %write into %dest[0, 0, 0, 0] [1, 32, 1, 32] [1, 1, 1, 1]
+      : tensor<32x32xi8> into tensor<1x32x1x32xi8>
+  return %inserted : tensor<1x32x1x32xi8>
+}
+
+// CHECK-LABEL: @fold_rank_increasing_insert_slice_with_offsets
+//  CHECK-SAME:   %[[VEC:[A-Za-z0-9_]+]]: vector<32x32xi8>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9_]+]]: tensor<1x32x1x32xi8>
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[DEST]][%[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+//       CHECK:   return %[[WRITE]]
+//   CHECK-NOT:   tensor.insert_slice
+
+// -----
+
 // Test that map_scatter is NOT fused when it has multiple uses.
 func.func @no_fuse_map_scatter_multiple_uses(%dest_buf: memref<64xf32>, %input_buf: memref<16xf32>) -> tensor<64xf32> {
   %true = arith.constant true
