@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
       iree_vm_bytecode_module_size_benchmark_module_create();
   iree_vm_module_t* module = nullptr;
   iree_vm_bytecode_module_create(
-      instance,
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           static_cast<iree_host_size_t>(module_file_toc->size)},
