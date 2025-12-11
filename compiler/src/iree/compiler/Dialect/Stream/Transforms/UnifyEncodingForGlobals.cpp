@@ -284,30 +284,28 @@ static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
       continue;
     }
 
+    // The operand_encodings attribute has the same length as getMixedOperands().
+    // For non-affinity types (e.g., index), the encoding is just the type.
+    // For affinity types, the encoding is a RankedTensorType with encoding attr.
     SmallVector<Attribute> newOperandEncodings;
-    ArrayRef<Attribute> oldOperandEncodings =
-        dispatchOp.getOperandEncodings().getValue();
-
-    // The operand_encodings attribute only contains entries for resource
-    // operands (not index/scalar operands). We iterate through all mixed
-    // operands to map from mixed operand index (used in operandUpdates) to
-    // encoding index.
-    for (auto [idx, operand] : llvm::enumerate(dispatchOp.getMixedOperands())) {
-      if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
+    for (auto [idx, operand, typeAttr] :
+         llvm::enumerate(dispatchOp.getMixedOperands(),
+                         dispatchOp.getOperandEncodings().getValue())) {
+      Type type = cast<TypeAttr>(typeAttr).getValue();
+      if (!isa<IREE::Stream::AffinityTypeInterface>(type)) {
+        newOperandEncodings.push_back(typeAttr);
         continue;
       }
-      Attribute oldEncoding = oldOperandEncodings[newOperandEncodings.size()];
       if (!operandUpdates.contains(idx)) {
-        newOperandEncodings.push_back(oldEncoding);
+        newOperandEncodings.push_back(typeAttr);
         continue;
       }
       Attribute newEncoding = operandUpdates.lookup(idx);
-      auto tensorType =
-          cast<RankedTensorType>(cast<TypeAttr>(oldEncoding).getValue());
+      auto tensorType = cast<RankedTensorType>(type);
       newOperandEncodings.push_back(
           TypeAttr::get(tensorType.cloneWithEncoding(newEncoding)));
-      LDBG() << "  Updated dispatch operand encoding at index "
-             << newOperandEncodings.size() - 1 << " to " << newEncoding;
+      LDBG() << "  Updated dispatch operand encoding at index " << idx
+             << " to " << newEncoding;
     }
     dispatchOp.setOperandEncodingsAttr(
         ArrayAttr::get(dispatchOp.getContext(), newOperandEncodings));
@@ -348,13 +346,17 @@ static void collectUpdatesForStreamTensorOps(Explorer &explorer,
       }
 
       // TODO: Handle other tensor phase ops (TensorFillOp, etc.)
-      if (!isa<IREE::Stream::TensorDispatchOp>(user)) {
+      auto dispatchOp = dyn_cast<IREE::Stream::TensorDispatchOp>(user);
+      if (!dispatchOp) {
         return WalkResult::advance();
       }
 
-      LDBG() << "      Found TensorPhaseOp: " << user->getName() << " operand "
-             << operand.getOperandNumber();
-      updates[user][operand.getOperandNumber()] = newEncoding;
+      // The operand number is the index in the full operand list (including
+      // workload). We need the index in getMixedOperands() for encoding lookup.
+      unsigned mixedOperandIdx =
+          operand.getOperandNumber() - dispatchOp.getWorkload().size();
+      LDBG() << "      Found TensorDispatchOp operand " << mixedOperandIdx;
+      updates[user][mixedOperandIdx] = newEncoding;
       return WalkResult::advance();
     });
   }

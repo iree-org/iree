@@ -107,15 +107,15 @@ module @immutable_source_initialized_from_parameter {
     }
   }
 
-  // Executable that uses both encodings.
+  // Executable that uses both encodings with index operands in between.
   stream.executable private @executable_both {
     stream.executable.export public @dispatch
     builtin.module {
-      func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: !stream.binding) {
+      func.func @dispatch(%arg0: !stream.binding, %arg1: index, %arg2: !stream.binding, %arg3: index, %arg4: !stream.binding) {
         %c0 = arith.constant 0 : index
         %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x4096xf32, #encoding1>>
-        %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x4096xf32, #encoding2>>
-        %2 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
+        %1 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x4096xf32, #encoding2>>
+        %2 = stream.binding.subspan %arg4[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
         return
       }
     }
@@ -145,9 +145,15 @@ module @immutable_source_initialized_from_parameter {
     util.return %result : !stream.resource<*>
   }
 
-  // Function that uses both encoded globals in the same dispatch.
+  // Function that uses both encoded globals in the same dispatch with index
+  // operands in between. This tests that the operand index to encoding index
+  // mapping is correct.
   // CHECK-LABEL: util.func public @use_both_encodings
   util.func public @use_both_encodings(%arg0: index) -> !stream.resource<*> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c16 = arith.constant 16 : index
+    %c32 = arith.constant 32 : index
     %encoded_v1 = util.global.load @encoded_v1 : !stream.resource<constant>
     %encoded_v1_size = util.global.load @encoded_v1_size : index
     %encoded_v2 = util.global.load @encoded_v2 : !stream.resource<constant>
@@ -159,7 +165,7 @@ module @immutable_source_initialized_from_parameter {
     // CHECK:      stream.tensor.dispatch @executable_both::@dispatch
     // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
     // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
-    %result = stream.tensor.dispatch @executable_both::@dispatch(%cloned_v1, %cloned_v2) : (tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%encoded_v1_size}, tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%encoded_v2_size}) -> tensor<16xf32> in !stream.resource<*>{%arg0}
+    %result = stream.tensor.dispatch @executable_both::@dispatch[%c16, %c32](%cloned_v1, %c0, %cloned_v2, %c1) : (tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%encoded_v1_size}, index, tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%encoded_v2_size}, index) -> tensor<16xf32> in !stream.resource<*>{%arg0}
 
     util.return %result : !stream.resource<*>
   }
