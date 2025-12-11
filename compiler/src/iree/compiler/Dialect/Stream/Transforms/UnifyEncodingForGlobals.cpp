@@ -284,9 +284,10 @@ static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
       continue;
     }
 
-    // The operand_encodings attribute has the same length as getMixedOperands().
-    // For non-affinity types (e.g., index), the encoding is just the type.
-    // For affinity types, the encoding is a RankedTensorType with encoding attr.
+    // The operand_encodings attribute has the same length as
+    // getMixedOperands(). For non-affinity types (e.g., index), the encoding is
+    // just the type. For affinity types, the encoding is a RankedTensorType
+    // with encoding attr.
     SmallVector<Attribute> newOperandEncodings;
     for (auto [idx, operand, typeAttr] :
          llvm::enumerate(dispatchOp.getMixedOperands(),
@@ -304,8 +305,8 @@ static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
       auto tensorType = cast<RankedTensorType>(type);
       newOperandEncodings.push_back(
           TypeAttr::get(tensorType.cloneWithEncoding(newEncoding)));
-      LDBG() << "  Updated dispatch operand encoding at index " << idx
-             << " to " << newEncoding;
+      LDBG() << "  Updated dispatch operand encoding at index " << idx << " to "
+             << newEncoding;
     }
     dispatchOp.setOperandEncodingsAttr(
         ArrayAttr::get(dispatchOp.getContext(), newOperandEncodings));
