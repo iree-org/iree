@@ -1022,10 +1022,10 @@ static bool isTransposeOfLastTwoDims(ArrayRef<int64_t> perm) {
          perm[rank - 1] == static_cast<int64_t>(rank - 2);
 }
 
-// Fuses a transpose into a contraction (matmul-like) linalg.generic by
-// absorbing it into the indexing map. Only handles transposes that swap
-// the last two dimensions of an operand for now.
-class FuseTransposeThroughGenericContraction
+// Fuses a transpose into a reduction linalg.generic by absorbing it into the
+// indexing map. Only handles transposes that swap the last two dimensions of an
+// operand for now.
+class FuseTransposeThroughGenericReduction
     : public OpRewritePattern<linalg::GenericOp> {
 public:
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
@@ -1035,23 +1035,10 @@ public:
     if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp))
       return failure();
 
-    FailureOr<linalg::ContractionDimensions> maybeContractionDims =
-        linalg::inferContractionDims(genericOp);
-    if (failed(maybeContractionDims))
-      return rewriter.notifyMatchFailure(genericOp, "not a contraction");
-
-    linalg::ContractionDimensions contractionDims =
-        std::move(*maybeContractionDims);
-    if (contractionDims.m.size() != 1 || contractionDims.n.size() != 1 ||
-        contractionDims.k.size() != 1 || contractionDims.batch.size() > 1) {
-      return rewriter.notifyMatchFailure(genericOp,
-                                         "not a simple matmul contraction");
-    }
-
-    DenseSet<int64_t> mnkDims;
-    mnkDims.insert(contractionDims.m.begin(), contractionDims.m.end());
-    mnkDims.insert(contractionDims.n.begin(), contractionDims.n.end());
-    mnkDims.insert(contractionDims.k.begin(), contractionDims.k.end());
+    // Only try to fuse when the generic has at least one reduction dimension.
+    // This avoids elementwise cases that are already handled elsewhere.
+    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops())
+      return rewriter.notifyMatchFailure(genericOp, "not a reduction");
 
     // Look for a transpose on any input that swaps the last two dimensions.
     for (int64_t inputIdx = 0; inputIdx < genericOp.getNumDpsInputs();
@@ -1071,11 +1058,6 @@ public:
       ArrayRef<AffineExpr> results = inputMap.getResults();
       size_t rank = results.size();
       if (rank < 2)
-        continue;
-      AffineDimExpr dim0 = dyn_cast<AffineDimExpr>(results[rank - 2]);
-      AffineDimExpr dim1 = dyn_cast<AffineDimExpr>(results[rank - 1]);
-      if (!dim0 || !dim1 || !mnkDims.contains(dim0.getPosition()) ||
-          !mnkDims.contains(dim1.getPosition()))
         continue;
 
       // Fuse by updating the indexing map to absorb the transpose.
@@ -1124,8 +1106,8 @@ struct PropagateLinalgTransposePass
 };
 } // namespace
 
-static void populateNamedOpSinkingPatterns(MLIRContext *context,
-                                           RewritePatternSet &sinkingPatterns) {
+static void populateMatmulSinkingPatterns(MLIRContext *context,
+                                          RewritePatternSet &sinkingPatterns) {
   sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
                                            /*inputIdx=*/1>>(
       context, SmallVector<int64_t>{1, 0});
@@ -1138,7 +1120,7 @@ static void populateNamedOpSinkingPatterns(MLIRContext *context,
   sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
                                            /*inputIdx=*/0>>(
       context, SmallVector<int64_t>{0, 2, 1});
-  sinkingPatterns.insert<FuseTransposeThroughGenericContraction>(context);
+  sinkingPatterns.insert<FuseTransposeThroughGenericReduction>(context);
 }
 
 static void
@@ -1187,7 +1169,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(
         context, enableEdgeReshapePropagation);
-    populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    populateMatmulSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
@@ -1331,7 +1313,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
         context, enableAggressivePropagation, enableConvolutionPropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);
-    populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    populateMatmulSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
