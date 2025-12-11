@@ -1007,24 +1007,8 @@ private:
   SmallVector<int64_t> permutation;
 };
 
-// Returns true if the permutation swaps only the last two dimensions.
-static bool isTransposeOfLastTwoDims(ArrayRef<int64_t> perm) {
-  size_t rank = perm.size();
-  if (rank < 2)
-    return false;
-  // Check that all dims except the last two are identity.
-  for (size_t i = 0; i < rank - 2; ++i) {
-    if (perm[i] != static_cast<int64_t>(i))
-      return false;
-  }
-  // Check that the last two dims are swapped.
-  return perm[rank - 2] == static_cast<int64_t>(rank - 1) &&
-         perm[rank - 1] == static_cast<int64_t>(rank - 2);
-}
-
 // Fuses a transpose into a reduction linalg.generic by absorbing it into the
-// indexing map. Only handles transposes that swap the last two dimensions of an
-// operand for now.
+// indexing map.
 class FuseTransposeThroughGenericReduction
     : public OpRewritePattern<linalg::GenericOp> {
 public:
@@ -1032,33 +1016,27 @@ public:
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp))
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
       return failure();
+    }
 
     // Only try to fuse when the generic has at least one reduction dimension.
-    // This avoids elementwise cases that are already handled elsewhere.
-    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops())
+    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops()) {
       return rewriter.notifyMatchFailure(genericOp, "not a reduction");
+    }
 
-    // Look for a transpose on any input that swaps the last two dimensions.
+    // Look for a transpose on any input.
     for (int64_t inputIdx = 0; inputIdx < genericOp.getNumDpsInputs();
          ++inputIdx) {
       auto transpose = genericOp.getDpsInputs()[inputIdx]
                            .getDefiningOp<linalg::TransposeOp>();
-      if (!transpose || !isTransposeOfLastTwoDims(transpose.getPermutation()))
+      if (!transpose) {
         continue;
+      }
 
       // Update the indexing map according to the transpose.
       AffineMap inputMap = genericOp.getMatchingIndexingMap(
           genericOp.getDpsInputOperand(inputIdx));
-
-      // In the case that the there is a batch dimension in the last two
-      // dimensions, we need to check that the last 2 dims in the indexing map
-      // are m, n, or k.
-      ArrayRef<AffineExpr> results = inputMap.getResults();
-      size_t rank = results.size();
-      if (rank < 2)
-        continue;
 
       // Fuse by updating the indexing map to absorb the transpose.
       auto invPerm = invertPermutationVector(transpose.getPermutation());
