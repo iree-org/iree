@@ -192,18 +192,26 @@ struct LowerCoalescedGatherDMAPattern final
     SmallVector<int64_t> outerTileSizes(destShape.size(), 1);
     outerTileSizes.back() = innermostDimSize;
 
-    // Iterate over each row, then over segments within each row.
+    // Precompute laneOffset for each unique segment type. This allows the
+    // values to be reused across all rows while maintaining row-major order.
+    SmallVector<Value> segmentLaneOffsets;
+    for (const TransferSegment &segment : segments) {
+      Value laneOffset =
+          arith::MulIOp::create(rewriter, loc, laneId,
+                                arith::ConstantIndexOp::create(
+                                    rewriter, loc, segment.elementsPerLane));
+      segmentLaneOffsets.push_back(laneOffset);
+    }
+
+    // Iterate over each row, then segments within each row.
     for (const SmallVector<int64_t> &outerOffsets :
          StaticTileOffsetRange(destShape, outerTileSizes)) {
       // For each segment, generate the transfers.
-      for (const TransferSegment &segment : segments) {
+      for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
         int64_t elementsPerLane = segment.elementsPerLane;
         int64_t totalElementsPerTransfer = *subgroupSize * elementsPerLane;
         auto transferType = VectorType::get({elementsPerLane}, elementType);
-
-        Value laneOffset = arith::MulIOp::create(
-            rewriter, loc, laneId,
-            arith::ConstantIndexOp::create(rewriter, loc, elementsPerLane));
+        Value laneOffset = segmentLaneOffsets[segmentIdx];
 
         // Generate transfers for this segment.
         for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
@@ -217,12 +225,12 @@ struct LowerCoalescedGatherDMAPattern final
           for (auto [dim, outerOffset] : llvm::enumerate(outerOffsets)) {
             // Build source index for this dimension.
             Value srcIdx;
+            Value outerOffsetVal =
+                arith::ConstantIndexOp::create(rewriter, loc, outerOffset);
             if (dim < numIndexDims) {
               // This dimension has an index memref - load from it.
-              Value offsetVal =
-                  arith::ConstantIndexOp::create(rewriter, loc, outerOffset);
               srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
-                                              ValueRange{offsetVal});
+                                              ValueRange{outerOffsetVal});
             }
 
             // For the innermost dimension, compute the full offset.
@@ -238,21 +246,17 @@ struct LowerCoalescedGatherDMAPattern final
                 srcIdx = innerOffsetVal;
               }
               srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, laneOffset);
+              // Reuse innerOffsetVal for destination index.
+              dstIndices.push_back(innerOffsetVal);
             } else if (!srcIdx) {
               // Non-innermost dimension without index memref.
-              srcIdx =
-                  arith::ConstantIndexOp::create(rewriter, loc, outerOffset);
+              srcIdx = outerOffsetVal;
+              dstIndices.push_back(outerOffsetVal);
+            } else {
+              // Dimension with index memref (non-innermost).
+              dstIndices.push_back(outerOffsetVal);
             }
             srcIndices.push_back(srcIdx);
-
-            // Build destination index.
-            if (dim == destShape.size() - 1) {
-              dstIndices.push_back(
-                  arith::ConstantIndexOp::create(rewriter, loc, innerOffset));
-            } else {
-              dstIndices.push_back(
-                  arith::ConstantIndexOp::create(rewriter, loc, outerOffset));
-            }
           }
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,

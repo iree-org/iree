@@ -36,6 +36,7 @@ func.func @lower_coalesced_gather_dma_multiple(
   // CHECK: scf.forall (%[[LANE_ID:.+]]) in (32)
   scf.forall (%arg6) in (32) {
     // Each lane reads 4 elements, so lane offset = lane_id * 4.
+    // laneOffset is precomputed once and reused across all rows.
     // CHECK: %[[C4:.+]] = arith.constant 4 : index
     // CHECK: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C4]]
     //
@@ -44,18 +45,15 @@ func.func @lower_coalesced_gather_dma_multiple(
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Row 1: source[1, offset + lane_offset], dest[1, 0]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Row 2: source[2, offset + lane_offset], dest[2, 0]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Row 3: source[3, offset + lane_offset], dest[3, 0]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
@@ -99,6 +97,7 @@ func.func @lower_coalesced_copy_dma_basic(
   // CHECK: scf.forall (%[[LANE_ID:.+]]) in (32)
   scf.forall (%arg6) in (32) {
     // Each lane reads 2 elements, so lane offset = lane_id * 2.
+    // laneOffset is precomputed once and reused across all rows.
     // CHECK: %[[C2:.+]] = arith.constant 2 : index
     // CHECK: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C2]]
     //
@@ -107,8 +106,7 @@ func.func @lower_coalesced_copy_dma_basic(
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<2xf16>
     //
     // Row 1: source[1, offset + lane_offset], dest[1, 0]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<2xf16>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x64xf16, #amdgpu.address_space<fat_raw_buffer>>, memref<2x64xf16, #gpu.address_space<workgroup>>, index
@@ -150,8 +148,7 @@ func.func @lower_coalesced_copy_dma_1d(
   scf.forall (%arg6) in (32) {
     // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
     // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
-    // CHECK: %[[C0:[a-zA-Z0-9_]+]] = arith.constant 0
-    // CHECK: %[[SRC_IDX:[a-zA-Z0-9_]+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_IDX:[a-zA-Z0-9_]+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX]]], %[[DST]][%{{.+}}] : vector<4xf32>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<128xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<128xf32, #gpu.address_space<workgroup>>, index
@@ -192,6 +189,7 @@ func.func @lower_coalesced_copy_dma_3d(
     translation_info = #translation_32} {
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
   scf.forall (%arg6) in (32) {
+    // laneOffset is precomputed once and reused across all tiles.
     // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
     // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
     //
@@ -200,18 +198,15 @@ func.func @lower_coalesced_copy_dma_3d(
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Tile [0, 1, 0]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Tile [1, 0, 0]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Tile [1, 1, 0]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
@@ -255,6 +250,7 @@ func.func @lower_coalesced_copy_dma_wide_forall_2d(
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (256)
   scf.forall (%arg6) in (256) {
     // elementsPerTransfer = 1024 / 256 = 4
+    // laneOffset is precomputed once and reused across all rows.
     // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
     // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
     //
@@ -263,8 +259,7 @@ func.func @lower_coalesced_copy_dma_wide_forall_2d(
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Row 1: source[1, offset + lane_offset], dest[1, 0]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x1024xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<2x1024xf32, #gpu.address_space<workgroup>>, index
@@ -303,6 +298,7 @@ func.func @lower_coalesced_gather_dma_with_indices(
     translation_info = #translation_32} {
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
   scf.forall (%arg6) in (32) {
+    // laneOffset is precomputed once and reused across all rows.
     // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
     // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
     //
@@ -312,9 +308,8 @@ func.func @lower_coalesced_gather_dma_with_indices(
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Row 1: load row_indices[1], then gather source[loaded_idx, col+lane_offset]
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
     // CHECK: memref.load %[[IDX]]
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source[%row_indices] into %dest lane(%arg6) : memref<1024x128xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<2xindex>, memref<2x128xf32, #gpu.address_space<workgroup>>, index
@@ -356,6 +351,7 @@ func.func @gather_iterates_over_dest_shape_not_source(
     translation_info = #translation_32} {
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
   scf.forall (%arg6) in (32) {
+    // laneOffset is precomputed once and reused across all rows.
     // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
     // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
     //
@@ -365,15 +361,13 @@ func.func @gather_iterates_over_dest_shape_not_source(
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Row 1
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
     // CHECK: memref.load %[[IDX]]
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     //
     // Row 2
-    // CHECK: arith.muli %[[LANE_ID]], %{{.+}}
     // CHECK: memref.load %[[IDX]]
-    // CHECK: arith.addi %{{.+}}, %{{.+}}
+    // CHECK: arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
@@ -423,13 +417,11 @@ func.func @lower_coalesced_dma_multiple_transfers_1d(
     // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
     //
     // Transfer 1: elements [0, 128), tile offset = 0
-    // CHECK: %[[C0:[a-zA-Z0-9_]+]] = arith.constant 0
-    // CHECK: %[[SRC_IDX0:[a-zA-Z0-9_]+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_IDX0:[a-zA-Z0-9_]+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX0]]], %[[DST]][%{{.+}}] : vector<4xf32>
     //
     // Transfer 2: elements [128, 256), tile offset = 128
-    // CHECK: %[[C128:[a-zA-Z0-9_]+]] = arith.constant 128
-    // CHECK: %[[SRC_IDX1:[a-zA-Z0-9_]+]] = arith.addi %[[C128]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_IDX1:[a-zA-Z0-9_]+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX1]]], %[[DST]][%{{.+}}] : vector<4xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
@@ -535,15 +527,16 @@ func.func @lower_coalesced_dma_mixed_sizes_1d(
     // Transfer 1: 128-bit DMA, elements [0, 128)
     // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
     // CHECK: %[[LANE_OFFSET_4:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
-    // CHECK: %[[C0:[a-zA-Z0-9_]+]] = arith.constant 0
-    // CHECK: %[[SRC_IDX0:[a-zA-Z0-9_]+]] = arith.addi %[[C0]], %[[LANE_OFFSET_4]]
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX0]]], %[[DST]][%{{.+}}] : vector<4xf32>
-    //
     // Transfer 2: 32-bit DMA, elements [128, 160)
     // CHECK: %[[C1:[a-zA-Z0-9_]+]] = arith.constant 1
     // CHECK: %[[LANE_OFFSET_1:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C1]]
-    // CHECK: %[[C128:[a-zA-Z0-9_]+]] = arith.constant 128
-    // CHECK: %[[SRC_IDX1:[a-zA-Z0-9_]+]] = arith.addi %[[C128]], %[[LANE_OFFSET_1]]
+    //
+    // Transfer 1: 128-bit DMA using LANE_OFFSET_4
+    // CHECK: %[[SRC_IDX0:[a-zA-Z0-9_]+]] = arith.addi %{{.+}}, %[[LANE_OFFSET_4]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX0]]], %[[DST]][%{{.+}}] : vector<4xf32>
+    //
+    // Transfer 2: 32-bit DMA using LANE_OFFSET_1
+    // CHECK: %[[SRC_IDX1:[a-zA-Z0-9_]+]] = arith.addi %{{.+}}, %[[LANE_OFFSET_1]]
     // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_IDX1]]], %[[DST]][%{{.+}}] : vector<1xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
