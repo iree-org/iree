@@ -3,9 +3,10 @@
   "compiler_flags": [
       "--iree-hal-target-device=hip",
       "--iree-hip-target=gfx942",
-      "--iree-opt-level=O1",
+      "--iree-opt-level=O2",
       "--iree-stream-resource-memory-model=discrete",
       "--iree-hal-indirect-command-buffers=true",
-      "--iree-hal-memoization=true"
+      "--iree-hal-memoization=true",
+      "--iree-dispatch-creation-enable-split-reduction"
   ]
 }
