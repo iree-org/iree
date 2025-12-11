@@ -33,7 +33,7 @@ func.func @copy(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tenso
   // CHECK-SAME:   shared_outs(%[[THREAD_INIT:.+]] = %[[SLICE_DST]]) -> (tensor<8x256xf32>) {
   // CHECK:     scf.forall.in_parallel {
   // CHECK:       iree_gpu.coalesced_gather_dma %[[SLICE_SRC]] into %[[THREAD_INIT]] lane(%[[LANE]])
-  // CHECK-SAME:       : tensor<8x256xf32>, tensor<8x256xf32>, index
+  // CHECK-SAME:       : (tensor<8x256xf32>, tensor<8x256xf32>, index) -> ()
   // CHECK:     }
 
   // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
@@ -89,7 +89,7 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
   // CHECK-SAME:   shared_outs(%[[THREAD_INIT:.+]] = %[[SLICE_DST]]) -> (tensor<4x128xf32>) {
   // CHECK:     scf.forall.in_parallel {
   // CHECK:       iree_gpu.coalesced_gather_dma %[[SLICE_SRC]][%[[SLICE_INDICES]]] into %[[THREAD_INIT]] lane(%[[LANE]])
-  // CHECK-SAME:       : tensor<64x128xf32>, tensor<4xi32>, tensor<4x128xf32>, index
+  // CHECK-SAME:       : (tensor<64x128xf32>, tensor<4xi32>, tensor<4x128xf32>, index) -> ()
   // CHECK:     }
   // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
 

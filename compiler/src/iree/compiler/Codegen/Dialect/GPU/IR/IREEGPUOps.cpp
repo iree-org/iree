@@ -17,6 +17,56 @@
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 
+using namespace mlir;
+using namespace mlir::iree_compiler::IREE::GPU;
+
+//===----------------------------------------------------------------------===//
+// Custom directive for optional slice (offsets/sizes/strides)
+// Prints nothing when empty, or [offsets] [sizes] [strides] when present
+// All values are dynamic (SSA values).
+//===----------------------------------------------------------------------===//
+
+static ParseResult
+parseOptionalSlice(OpAsmParser &parser,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &offsets,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &strides) {
+  // Try to parse [offsets] [sizes] [strides] - if first '[' fails, it's empty
+  if (failed(parser.parseOptionalLSquare()))
+    return success(); // Empty - no slice semantics
+
+  // Parse offsets
+  if (parser.parseOperandList(offsets) || parser.parseRSquare())
+    return failure();
+
+  // Parse sizes [...]
+  if (parser.parseLSquare() || parser.parseOperandList(sizes) ||
+      parser.parseRSquare())
+    return failure();
+
+  // Parse strides [...]
+  if (parser.parseLSquare() || parser.parseOperandList(strides) ||
+      parser.parseRSquare())
+    return failure();
+
+  return success();
+}
+
+static void printOptionalSlice(OpAsmPrinter &p, Operation *op,
+                               OperandRange offsets, OperandRange sizes,
+                               OperandRange strides) {
+  if (offsets.empty())
+    return; // No slice - print nothing
+
+  p << "[";
+  llvm::interleaveComma(offsets, p);
+  p << "] [";
+  llvm::interleaveComma(sizes, p);
+  p << "] [";
+  llvm::interleaveComma(strides, p);
+  p << "]";
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.cpp.inc" // IWYU pragma: keep
@@ -286,27 +336,49 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     }
   }
 
-  // Verify the contiguous (non-indexed) dimensions match between source and
-  // dest.
-  for (auto [dim, size] : llvm::enumerate(initShape)) {
-    if (dim >= sourceShape.size()) {
-      return emitOpError("expected source to have at least ")
-             << (dim + 1) << " dimensions when destination has rank "
-             << initShape.size();
-    }
+  // Validate slice semantics if present.
+  if (hasSliceSemantics()) {
+    size_t numOffsets = getOffsets().size();
+    size_t numSizes = getSizes().size();
+    size_t numStrides = getStrides().size();
 
-    // Skip indexed dimensions - they're validated above.
-    if (dim < indices.size()) {
-      continue;
+    if (numOffsets != initShape.size()) {
+      return emitOpError("expected ")
+             << initShape.size() << " offset values, got " << numOffsets;
     }
+    if (numSizes != initShape.size()) {
+      return emitOpError("expected ")
+             << initShape.size() << " size values, got " << numSizes;
+    }
+    if (numStrides != initShape.size()) {
+      return emitOpError("expected ")
+             << initShape.size() << " stride values, got " << numStrides;
+    }
+    // With all-dynamic slice values, we can't verify shapes at compile time.
+    // The shape verification will happen at runtime.
+  } else {
+    // Without slice semantics, verify source and init shapes match
+    // for non-indexed dimensions.
+    for (size_t dim = indices.size(); dim < initShape.size(); ++dim) {
+      if (dim >= sourceShape.size()) {
+        return emitOpError("expected source to have at least ")
+               << (dim + 1) << " dimensions when destination has rank "
+               << initShape.size();
+      }
 
-    // Check the suffix (hidden) gathering dimensions are the same in `source`
-    // and `init`.
-    int64_t sourceDim = sourceShape[dim];
-    if (sourceDim != size) {
-      return emitOpError("expected unindexed dimension ")
-             << dim << " to have same length in source (" << sourceDim
-             << ") and destination (" << size << ')';
+      int64_t sourceDim = sourceShape[dim];
+      int64_t destDim = initShape[dim];
+
+      // Skip dynamic dimensions.
+      if (ShapedType::isDynamic(sourceDim) || ShapedType::isDynamic(destDim)) {
+        continue;
+      }
+
+      if (sourceDim != destDim) {
+        return emitOpError("expected unindexed dimension ")
+               << dim << " to have same length in source (" << sourceDim
+               << ") and destination (" << destDim << ')';
+      }
     }
   }
 

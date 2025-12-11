@@ -416,9 +416,27 @@ static void composeParallelInsertSlices(
   }
 }
 
+/// Convert OpFoldResults to Values, creating arith.constant for static values.
+static SmallVector<Value> getAsValues(RewriterBase &rewriter, Location loc,
+                                      ArrayRef<OpFoldResult> ofrs) {
+  SmallVector<Value> values;
+  for (OpFoldResult ofr : ofrs) {
+    if (auto v = dyn_cast<Value>(ofr)) {
+      values.push_back(v);
+    } else {
+      int64_t staticVal = cast<IntegerAttr>(cast<Attribute>(ofr)).getInt();
+      values.push_back(
+          arith::ConstantIndexOp::create(rewriter, loc, staticVal));
+    }
+  }
+  return values;
+}
+
 /// Compose and fuse coalesced gather DMA operations with parallel insert
-/// slices. Creates a DMA op with a result, then uses parallel_insert_slice
-/// to insert the result into the forall's shared_out at the composed offsets.
+/// slices. Replaces the parallel_insert_slice with a CoalescedGatherDMAOp
+/// that has slice semantics, writing directly to the shared_out at the
+/// given offsets. This avoids the intermediate extract_slice + DMA +
+/// parallel_insert_slice pattern.
 static void composeCoalescedGatherDMA(
     RewriterBase &rewriter,
     SmallVector<std::pair<tensor::ParallelInsertSliceOp,
@@ -426,27 +444,26 @@ static void composeCoalescedGatherDMA(
   for (auto [warpInsert, laneInsert] : insertPairs) {
     OpBuilder::InsertionGuard g(rewriter);
 
-    // Create an extract_slice for the DMA's init to match the source shape.
-    // This is done outside the in_parallel region.
-    rewriter.setInsertionPoint(warpInsert->getParentOp());
-    auto destSlice = tensor::ExtractSliceOp::create(
-        rewriter, warpInsert.getLoc(), warpInsert.getDest(),
-        warpInsert.getMixedOffsets(), warpInsert.getMixedSizes(),
-        warpInsert.getMixedStrides());
-
-    // Create new CoalescedGatherDMAOp with a result (outside in_parallel).
-    auto dmaOp = IREE::GPU::CoalescedGatherDMAOp::create(
-        rewriter, warpInsert.getLoc(), destSlice.getType(),
-        laneInsert.getSource(), laneInsert.getIndices(), destSlice,
-        laneInsert.getLane());
-
-    // Replace the warp parallel_insert_slice with one that inserts the DMA
-    // result.
+    // Replace the warp parallel_insert_slice with a CoalescedGatherDMAOp
+    // that has slice semantics. The DMA will write directly to the
+    // shared_out (warpInsert.getDest()) at the given offsets.
     rewriter.setInsertionPoint(warpInsert);
-    rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
-        warpInsert, dmaOp.getResult(), warpInsert.getDest(),
-        warpInsert.getMixedOffsets(), warpInsert.getMixedSizes(),
-        warpInsert.getMixedStrides());
+    Location loc = warpInsert.getLoc();
+
+    // Convert OpFoldResults to Values (creating constants for static values).
+    SmallVector<Value> offsets =
+        getAsValues(rewriter, loc, warpInsert.getMixedOffsets());
+    SmallVector<Value> sizes =
+        getAsValues(rewriter, loc, warpInsert.getMixedSizes());
+    SmallVector<Value> strides =
+        getAsValues(rewriter, loc, warpInsert.getMixedStrides());
+
+    rewriter.replaceOpWithNewOp<IREE::GPU::CoalescedGatherDMAOp>(
+        warpInsert,
+        /*resultType=*/Type{}, // No result when inside in_parallel
+        laneInsert.getSource(), laneInsert.getIndices(),
+        warpInsert.getDest(), // Write directly to shared_out
+        laneInsert.getLane(), offsets, sizes, strides);
     rewriter.eraseOp(laneInsert);
   }
 }
