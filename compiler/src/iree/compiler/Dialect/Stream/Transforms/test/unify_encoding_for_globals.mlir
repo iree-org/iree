@@ -44,6 +44,7 @@ module @immutable_source_with_initial_value {
 #encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 #encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
 
+// CHECK-LABEL: module @immutable_source_initialized_from_parameter
 module @immutable_source_initialized_from_parameter {
   util.global private @weight : !stream.resource<constant>
   util.global private @weight_size : index

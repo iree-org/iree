@@ -272,44 +272,48 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
 }
 
 // Maps a tensor op to a set of (operand index -> new encoding).
+using OperandEncodingUpdates = llvm::DenseMap<unsigned, Attribute>;
 using TensorEncodingUpdates =
-    llvm::DenseMap<Operation *, llvm::DenseMap<unsigned, Attribute>>;
+    llvm::DenseMap<Operation *, OperandEncodingUpdates>;
+
+// Updates encoding attributes for a TensorDispatchOp.
+static void updateTensorDispatchOp(TensorDispatchOp dispatchOp,
+                                   const OperandEncodingUpdates &operandUpdates) {
+  // Update operand encodings.
+  // The operand_encodings attribute has the same length as getMixedOperands().
+  // For non-affinity types (e.g., index), the encoding is just the type.
+  // For affinity types, the encoding is a RankedTensorType with encoding attr.
+  SmallVector<Attribute> newOperandEncodings;
+  for (auto [idx, operand, typeAttr] :
+       llvm::enumerate(dispatchOp.getMixedOperands(),
+                       dispatchOp.getOperandEncodings().getValue())) {
+    Type type = cast<TypeAttr>(typeAttr).getValue();
+    if (!isa<IREE::Stream::AffinityTypeInterface>(type)) {
+      newOperandEncodings.push_back(typeAttr);
+      continue;
+    }
+    if (!operandUpdates.contains(idx)) {
+      newOperandEncodings.push_back(typeAttr);
+      continue;
+    }
+    Attribute newEncoding = operandUpdates.lookup(idx);
+    auto tensorType = cast<RankedTensorType>(type);
+    newOperandEncodings.push_back(
+        TypeAttr::get(tensorType.cloneWithEncoding(newEncoding)));
+    LDBG() << "  Updated dispatch operand encoding at index " << idx
+           << " to " << newEncoding;
+  }
+  dispatchOp.setOperandEncodingsAttr(
+      ArrayAttr::get(dispatchOp.getContext(), newOperandEncodings));
+}
 
 // Applies all cached encoding updates to tensor ops.
 static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
   for (auto &[op, operandUpdates] : updates) {
-    // TODO: Handle other TensorPhaseOp ops (TensorFillOp, etc.)
-    auto dispatchOp = dyn_cast<TensorDispatchOp>(op);
-    if (!dispatchOp) {
-      continue;
+    // TODO: Handle other TensorPhaseOp ops (TensorFillOp, etc.) via TypeSwitch.
+    if (auto dispatchOp = dyn_cast<TensorDispatchOp>(op)) {
+      updateTensorDispatchOp(dispatchOp, operandUpdates);
     }
-
-    // The operand_encodings attribute has the same length as
-    // getMixedOperands(). For non-affinity types (e.g., index), the encoding is
-    // just the type. For affinity types, the encoding is a RankedTensorType
-    // with encoding attr.
-    SmallVector<Attribute> newOperandEncodings;
-    for (auto [idx, operand, typeAttr] :
-         llvm::enumerate(dispatchOp.getMixedOperands(),
-                         dispatchOp.getOperandEncodings().getValue())) {
-      Type type = cast<TypeAttr>(typeAttr).getValue();
-      if (!isa<IREE::Stream::AffinityTypeInterface>(type)) {
-        newOperandEncodings.push_back(typeAttr);
-        continue;
-      }
-      if (!operandUpdates.contains(idx)) {
-        newOperandEncodings.push_back(typeAttr);
-        continue;
-      }
-      Attribute newEncoding = operandUpdates.lookup(idx);
-      auto tensorType = cast<RankedTensorType>(type);
-      newOperandEncodings.push_back(
-          TypeAttr::get(tensorType.cloneWithEncoding(newEncoding)));
-      LDBG() << "  Updated dispatch operand encoding at index " << idx << " to "
-             << newEncoding;
-    }
-    dispatchOp.setOperandEncodingsAttr(
-        ArrayAttr::get(dispatchOp.getContext(), newOperandEncodings));
   }
 }
 
