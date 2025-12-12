@@ -383,27 +383,11 @@ void DispatchWorkloadOrdinalOp::inferResultRanges(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_tensor_ext.compute_barrier.start
+// iree_tensor_ext.compute_barrier
 //===----------------------------------------------------------------------===//
 
-LogicalResult ComputeBarrierStartOp::verify() {
-  ComputeBarrierStartOp op = *this;
-  if (failed(verifyOpDynamicDims(op, {op.getValue()}, op.getValueDims()))) {
-    return failure();
-  }
-
-  if (op.getValue().getType() != op.getResult().getType()) {
-    return op.emitOpError("value and result types must match");
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// iree_tensor_ext.compute_barrier.end
-//===----------------------------------------------------------------------===//
-
-LogicalResult ComputeBarrierEndOp::verify() {
-  ComputeBarrierEndOp op = *this;
+LogicalResult ComputeBarrierOp::verify() {
+  ComputeBarrierOp op = *this;
   if (failed(verifyOpDynamicDims(op, {op.getValue()}, op.getValueDims()))) {
     return failure();
   }
