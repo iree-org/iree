@@ -1095,25 +1095,33 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     } -> tensor<f32>, tensor<f32>
   ```
 
-  Encodes the following computation
+  This encodes the following computation, sans handling of the norms
 
   ```
   %M, %O = linalg.generic {
-    ...
+      indexing_maps = [
+        affine_map<(i) -> (i)>,
+        affine_map<(i) -> ()>,
+        affine_map<(i) -> ()>
+      ],
   } ins(%V: tensor<256xf32>)
     outs(%M_init, %S: tensor<f32>, tensor<f32>) {
     ^bb0(%v: f32, %m: f32, %s: f32):
       %exp_v = math.exp2 %v       : f32
       %add = arith.addf %exp_v, %s : f32
       linalg.yield %m, %add       : f32, f32
-  } -> tensor<256xf32>, tensor<f32>
+  } -> tensor<f32>, tensor<f32>
   ```
 
   And decomposes into operations equivalent to the following:
 
   ```
   %M, %O = linalg.generic {
-    ...
+      indexing_maps = [
+        affine_map<(i) -> (i)>,
+        affine_map<(i) -> ()>,
+        affine_map<(i) -> ()>
+      ],
   } ins(%V: tensor<256xf32>)
     outs(%M_init, %S: tensor<f32>, tensor<f32>) {
     ^bb0(%v: f32, %prev_m: f32, %prev_s: f32):
@@ -1125,7 +1133,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
       %s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
       %add    = arith.addf %exp_v, %s      : f32
       linalg.yield %m, %add                : f32, f32
-  } -> tensor<256xf32>, tensor<f32>
+  } -> tensor<f32>, tensor<f32>
   ```
   }];
 

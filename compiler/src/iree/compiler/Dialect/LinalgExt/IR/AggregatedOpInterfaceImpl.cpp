@@ -1048,15 +1048,20 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
 // ExpReductionOp
 //===----------------------------------------------------------------------===//
 
+/// The return value of captureUsedOperationsAndBlockArguments
 struct UsedOperationsAndBlockArguments {
   SetVector<int64_t> usedInputIndices;
   SetVector<Operation *> usedOperations;
 };
 
 /// For a given resultNumber in a linalg::GenericOp, this op scans the
-/// GenericOp's body for:
-/// 1. The index of the inputs used to compute the result
-/// 2. The operations used to compute the result
+/// GenericOp's body for the block arguments and operations that are involved
+/// in its computation.
+///
+/// Block arguments are returned as indices over the block, to be used as:
+///   for (auto idx : usedInputIndices)
+///     getDpsInitOperand(idx)
+/// Operations are returned as generic operations
 static FailureOr<UsedOperationsAndBlockArguments>
 captureUsedOperationsAndBlockArguments(linalg::GenericOp linalgOp,
                                        int64_t resultNumber) {
@@ -1067,14 +1072,15 @@ captureUsedOperationsAndBlockArguments(linalg::GenericOp linalgOp,
   };
   auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
   Value result = yieldOp.getOperand(resultNumber);
-  UsedOperationsAndBlockArguments retval;
-  if (failed(getBackwardSlice(result, &retval.usedOperations, options))) {
+  SetVector<Operation *> usedOperations;
+  if (failed(getBackwardSlice(result, &usedOperations, options))) {
     return failure();
   }
 
+  SetVector<int64_t> usedInputIndices;
   // Get all block arguments used by the operations. If any of the arguments
   // used is a dpsInit argument other than resultNumber, return failure.
-  for (Operation *op : retval.usedOperations) {
+  for (Operation *op : usedOperations) {
     for (Value operand : op->getOperands()) {
       auto blockArg = dyn_cast<BlockArgument>(operand);
       if (!blockArg) {
@@ -1085,7 +1091,7 @@ captureUsedOperationsAndBlockArguments(linalg::GenericOp linalgOp,
       }
       int64_t argNumber = blockArg.getArgNumber();
       if (argNumber < linalgOp.getNumDpsInputs()) {
-        retval.usedInputIndices.insert(argNumber);
+        usedInputIndices.insert(argNumber);
         continue;
       }
       if (argNumber - linalgOp.getNumDpsInputs() != resultNumber) {
@@ -1094,12 +1100,14 @@ captureUsedOperationsAndBlockArguments(linalg::GenericOp linalgOp,
     }
   }
 
-  return retval;
+  return UsedOperationsAndBlockArguments{usedInputIndices, usedOperations};
 }
 
-/// this function decomposes a linalg::GenericOp with multiple results into
-/// multiple ops with a single result
-/// if the linalgOp only has one result, return failure
+/// Returns a vector of GenericOps with only one output.
+/// Each generic op in the vector corresponds to an output in the input
+/// generic op. However, these resultant ops will only contain the:
+///   1. Block Arguments that are involved in the result's computation and
+///   2. The Operations involved in the result's computation
 static FailureOr<SmallVector<linalg::GenericOp>>
 decomposeMultipleResults(linalg::GenericOp genericOp, RewriterBase &rewriter) {
   if (genericOp.getNumResults() < 2) {
@@ -1175,6 +1183,7 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
   IRRewriter rewriter(b);
 
+  // Let the first dpsInputOperand be s
   // Split the op into:
   // curr_max = max(s, old_max)
   // ex = e^{x - curr_max}
