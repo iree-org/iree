@@ -40,6 +40,8 @@ module @immutable_source_with_initial_value {
 
 // Test: immutable source global (initialized from parameter in initializer) with
 // two encodings - should unify to identity encoding.
+// This test also verifies that stream.async.clone between load and encode is
+// properly traced through (matching real-world patterns from input pipelines).
 
 #encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 #encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
@@ -61,17 +63,24 @@ module @immutable_source_initialized_from_parameter {
     %source = util.global.load @weight : !stream.resource<constant>
     %source_size = util.global.load @weight_size : index
 
+    // Clone before encode (common pattern in real pipelines).
+    // CHECK: %[[CLONE1:.+]] = stream.async.clone %[[SOURCE]]
+    %cloned1 = stream.async.clone %source : !stream.resource<constant>{%source_size} -> !stream.resource<*>{%source_size}
+
     // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #iree_encoding.identity>
-    // CHECK: stream.tensor.encode %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK: stream.tensor.encode %[[CLONE1]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
     %size1 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding1> : index
-    %enc1 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
+    %enc1 = stream.tensor.encode %cloned1 : tensor<4096x4096xf32> in !stream.resource<*>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
     %const1 = stream.async.clone %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
     util.global.store %const1, @encoded_v1 : !stream.resource<constant>
 
+    // CHECK: %[[CLONE2:.+]] = stream.async.clone %[[SOURCE]]
+    %cloned2 = stream.async.clone %source : !stream.resource<constant>{%source_size} -> !stream.resource<*>{%source_size}
+
     // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #iree_encoding.identity>
-    // CHECK: stream.tensor.encode %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK: stream.tensor.encode %[[CLONE2]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
     %size2 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding2> : index
-    %enc2 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
+    %enc2 = stream.tensor.encode %cloned2 : tensor<4096x4096xf32> in !stream.resource<*>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
     %const2 = stream.async.clone %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
     util.global.store %const2, @encoded_v2 : !stream.resource<constant>
 
