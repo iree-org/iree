@@ -1,0 +1,421 @@
+# IREE CI Error Pattern Definitions
+#
+# This file defines error patterns for automated triage of CI failures.
+# Each pattern includes:
+#   - pattern: Regular expression to match in log files
+#   - severity: critical, high, medium, or low
+#   - actionable: Whether this represents a fixable issue (vs infrastructure flake)
+#   - context_lines: Number of lines to capture before/after match
+#   - extract: Optional list of fields to extract from the match
+#   - description: Human-readable description of the error type
+#
+# Pattern definitions are based on comprehensive analysis of 563 CI failure logs
+# from the IREE project (2025-11-15).
+
+patterns:
+  # ============================================================================
+  # Build and Compilation Errors
+  # ============================================================================
+
+  compile_error:
+    pattern: '\S+\.(?:cpp|hpp|cc|cxx|h|c):\d+:\d+: error:|compilation terminated|clang.*: error:|g\+\+.*: error:|gcc.*: error:'
+    severity: critical
+    actionable: true
+    context_lines: 5
+    description: "C/C++ compilation error"
+    extract:
+      - name: file_path
+        regex: '(\S+\.\w+):(\d+):(\d+):'
+      - name: error_message
+        regex: 'error: (.+)'
+
+  undefined_reference:
+    pattern: 'undefined reference to|unresolved external symbol'
+    severity: critical
+    actionable: true
+    context_lines: 3
+    description: "Linker error: undefined symbol"
+
+  linker_error:
+    pattern: 'ld returned.*exit status|collect2: error:'
+    severity: critical
+    actionable: true
+    context_lines: 5
+    description: "Linker error"
+
+  # ============================================================================
+  # Test Failures
+  # ============================================================================
+
+  filecheck_failed:
+    pattern: 'FileCheck.*failed'
+    severity: high
+    actionable: true
+    context_lines: 10
+    description: "LLVM FileCheck test failure"
+    extract:
+      - name: check_file
+        regex: 'FileCheck.*--check-prefix[es]*=(\S+)'
+      - name: failed_line
+        regex: '(\S+):(\d+):\d+: error:'
+
+  test_failed:
+    pattern: 'FAILED.*tests?|Test.*failed'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "Test suite failure"
+
+  assertion_failed:
+    pattern: 'Assertion.*failed|assert.*failed'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "Assertion failure in test"
+
+  segfault:
+    pattern: 'Segmentation fault|segmentation fault|SIGSEGV'
+    severity: critical
+    actionable: true
+    context_lines: 10
+    description: "Segmentation fault"
+
+  # ============================================================================
+  # Timeouts
+  # ============================================================================
+
+  timeout:
+    pattern: '(?:timeout|TIMEOUT).*(?:exceeded|error|failed)|timed out|Test timed out after|Timeout of \d+.*exceeded'
+    severity: high
+    actionable: false
+    context_lines: 3
+    description: "Job or test timeout"
+
+  deadline_exceeded:
+    pattern: 'deadline exceeded|context deadline exceeded'
+    severity: medium
+    actionable: false
+    context_lines: 3
+    description: "Deadline exceeded"
+
+  # ============================================================================
+  # Python Errors
+  # ============================================================================
+
+  python_exception:
+    pattern: 'Traceback \(most recent call last\)|^\s*\w+(?:Error|Exception):\s'
+    severity: high
+    actionable: true
+    context_lines: 10
+    description: "Python runtime exception"
+    extract:
+      - name: exception_type
+        regex: '(\w+Error|\w+Exception):'
+      - name: exception_file
+        regex: 'File "([^"]+)", line (\d+)'
+
+  python_import_error:
+    pattern: 'ImportError:|ModuleNotFoundError:'
+    severity: high
+    actionable: true
+    context_lines: 3
+    description: "Python import error"
+
+  # ============================================================================
+  # CUDA Errors (NVIDIA GPU)
+  # ============================================================================
+
+  cuda_error:
+    pattern: 'CUDA error|cudaError|CUDA_ERROR'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "CUDA runtime error"
+
+  cuda_oom:
+    pattern: 'CUDA out of memory|cudaMalloc failed'
+    severity: medium
+    actionable: false
+    context_lines: 3
+    description: "CUDA out of memory"
+
+  cuda_device_lost:
+    pattern: 'CUDA.*device.*lost'
+    severity: critical
+    actionable: false
+    context_lines: 5
+    description: "CUDA device lost (driver issue)"
+
+  # ============================================================================
+  # HIP/ROCm Errors (AMD GPU)
+  # ============================================================================
+
+  hip_error:
+    pattern: 'hipError\w+|HIP error'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "HIP runtime error"
+    extract:
+      - name: hip_error_code
+        regex: '(hipError\w+)'
+
+  rocm_error:
+    pattern: 'ROCm error|HSA_STATUS_ERROR|hsa.*(?:error|failed)|amd.*smi.*error'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "ROCm runtime error"
+
+  rocclr_error:
+    pattern: 'rocclr/.*:\d+.*error|rocclr.*failed'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "ROCm CLR internal error"
+
+  # CRITICAL: ROCm cleanup crash - creates false CI failures
+  # Tests often PASS but crash during cleanup with exit code 134
+  rocclr_memobj:
+    pattern: 'Memobj map does not have ptr'
+    severity: critical
+    actionable: false  # Infrastructure/driver issue, not code bug
+    context_lines: 10
+    description: "ROCm memory object cleanup crash (false CI failure)"
+    extract:
+      - name: rocclr_file
+        regex: '(rocclr/\S+):(\d+)'
+
+  hip_device_lost:
+    pattern: 'HIP.*device.*lost|device.*lost.*HIP'
+    severity: critical
+    actionable: false
+    context_lines: 5
+    description: "HIP device lost (driver issue)"
+
+  hip_file_not_found:
+    pattern: 'hipErrorFileNotFound'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "HIP file not found (missing device libraries)"
+
+  # ============================================================================
+  # Vulkan Errors
+  # ============================================================================
+
+  vk_error:
+    pattern: 'VK_ERROR_\w+'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "Vulkan API error"
+    extract:
+      - name: vk_error_code
+        regex: '(VK_ERROR_\w+)'
+
+  vk_device_lost:
+    pattern: 'VK_ERROR_DEVICE_LOST'
+    severity: critical
+    actionable: false
+    context_lines: 5
+    description: "Vulkan device lost (driver issue)"
+
+  vk_oom:
+    pattern: 'VK_ERROR_OUT_OF_\w+_MEMORY'
+    severity: medium
+    actionable: false
+    context_lines: 3
+    description: "Vulkan out of memory"
+
+  vk_initialization_failed:
+    pattern: 'VK_ERROR_INITIALIZATION_FAILED'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "Vulkan initialization failed"
+
+  vulkan_error:
+    pattern: 'vulkan.*error|vkCreate.*failed'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "Vulkan generic error"
+
+  # ============================================================================
+  # Metal Errors (Apple GPU)
+  # ============================================================================
+
+  metal_error:
+    pattern: 'MTL.*Error|Metal.*error'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "Metal API error"
+
+  # ============================================================================
+  # Build System Errors
+  # ============================================================================
+
+  bazel_failed:
+    pattern: 'FAILED: Build did NOT complete|bazel.*failed'
+    severity: critical
+    actionable: true
+    context_lines: 5
+    description: "Bazel build failure"
+
+  bazel_timeout:
+    pattern: 'Bazel.*timeout|bazel.*timed out'
+    severity: medium
+    actionable: false
+    context_lines: 3
+    description: "Bazel timeout"
+
+  ctest_failed:
+    pattern: 'tests? failed out of|CTest.*failed'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "CTest failure"
+
+  cmake_error:
+    pattern: 'CMake Error|cmake.*error'
+    severity: critical
+    actionable: true
+    context_lines: 5
+    description: "CMake configuration error"
+
+  # ============================================================================
+  # Memory Errors
+  # ============================================================================
+
+  oom:
+    pattern: 'out of memory|OOM|cannot allocate memory'
+    severity: medium
+    actionable: false
+    context_lines: 3
+    description: "Out of memory"
+
+  bad_alloc:
+    pattern: 'std::bad_alloc|bad_alloc'
+    severity: medium
+    actionable: false
+    context_lines: 3
+    description: "Memory allocation failed"
+
+  stack_overflow:
+    pattern: 'stack overflow|STACKOVERFLOW'
+    severity: high
+    actionable: true
+    context_lines: 5
+    description: "Stack overflow"
+
+  # ============================================================================
+  # Process Termination
+  # ============================================================================
+
+  aborted:
+    pattern: 'Aborted|SIGABRT|aborted'
+    severity: high
+    actionable: true
+    context_lines: 10
+    description: "Process aborted (SIGABRT)"
+
+  core_dumped:
+    pattern: 'core dumped|dumped core'
+    severity: high
+    actionable: true
+    context_lines: 10
+    description: "Process core dump"
+
+  # ============================================================================
+  # Infrastructure Errors
+  # ============================================================================
+
+  network_error:
+    pattern: 'network.*error|connection.*refused|connection.*timed out'
+    severity: low
+    actionable: false
+    context_lines: 2
+    description: "Network error"
+
+  download_failed:
+    pattern: 'download.*failed|failed to download'
+    severity: low
+    actionable: false
+    context_lines: 3
+    description: "Download failure"
+
+  permission_denied:
+    pattern: 'permission denied|access denied'
+    severity: medium
+    actionable: true
+    context_lines: 3
+    description: "Permission denied"
+
+  file_not_found:
+    pattern: 'no such file or directory|file not found'
+    severity: high
+    actionable: true
+    context_lines: 3
+    description: "File not found"
+
+  docker_error:
+    pattern: 'docker.*error|container.*failed'
+    severity: medium
+    actionable: false
+    context_lines: 5
+    description: "Docker/container error"
+
+  git_error:
+    pattern: 'git.*error|fatal: .*git'
+    severity: medium
+    actionable: true
+    context_lines: 3
+    description: "Git operation error"
+
+  # ============================================================================
+  # Performance Errors
+  # ============================================================================
+
+  benchmark_regression:
+    pattern: 'Benchmark failed|exceeds golden_time'
+    severity: medium
+    actionable: true
+    context_lines: 5
+    description: "Performance regression"
+
+  # ============================================================================
+  # General Errors
+  # ============================================================================
+
+  process_exit_error:
+    pattern: 'Process completed with exit code [1-9]'
+    severity: medium
+    actionable: true
+    context_lines: 5
+    description: "Non-zero exit code"
+    extract:
+      - name: exit_code
+        regex: 'exit code (\d+)'
+
+  fatal_error:
+    pattern: 'fatal error|FATAL ERROR'
+    severity: critical
+    actionable: true
+    context_lines: 10
+    description: "Fatal error"
+
+  internal_error:
+    pattern: 'internal error|INTERNAL ERROR'
+    severity: critical
+    actionable: true
+    context_lines: 10
+    description: "Internal error"
+
+  panic:
+    pattern: 'panic:|PANIC:'
+    severity: critical
+    actionable: true
+    context_lines: 10
+    description: "Panic"
