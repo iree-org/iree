@@ -203,14 +203,6 @@ LogicalResult PackedStorageAttr::verifyEncoding(
   return success();
 }
 
-RankedTensorType
-PackedStorageAttr::dropWithoutMaterialization(RankedTensorType type) const {
-  if (!isa_and_present<PackedStorageAttr>(type.getEncoding())) {
-    return type;
-  }
-  return type.dropEncoding();
-}
-
 //===---------------------------------------------------------------------===//
 // iree_encoding.encoding
 //===---------------------------------------------------------------------===//
