@@ -370,19 +370,17 @@ util.func public @test_slice_negate_cat_peephole(%arg0: tensor<1x32x1x128xf16>) 
 // CHECK-LABEL: util.func public @test_slice_negate_cat_peephole
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<1x32x1x128xf16>
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[EXPIN:.+]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2], [3, 4]] output_shape [1, 32, 1, 2, 64] : tensor<1x32x1x128xf16> into tensor<1x32x1x2x64xf16>
+//       CHECK:   %[[EXPOUT:.+]] = tensor.expand_shape %{{.+}} {{\[\[}}0], [1], [2], [3, 4]] output_shape [1, 32, 1, 2, 64] : tensor<1x32x1x128xf16> into tensor<1x32x1x2x64xf16>
 //       CHECK:   %[[NREV:.+]] = linalg.generic
+//  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>]
 //  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<32x64xf16>, tensor<32x64xf16>)
+//  CHECK-SAME:       outs(%[[EXPOUT]] : tensor<1x32x1x2x64xf16>)
 
-//       CHECK:      %[[I1:.+]] = linalg.index 1 : index
 //       CHECK:      %[[I3:.+]] = linalg.index 3 : index
-//       CHECK:      %[[I4:.+]] = linalg.index 4 : index
-//       CHECK:      %[[R3:.+]] = arith.subi %[[C1]], %[[I3]] : index
-//       CHECK:      %[[EXTR:.+]] = tensor.extract %expanded[%[[C0]], %[[I1]], %[[C0]], %[[R3]], %[[I4]]] : tensor<1x32x1x2x64xf16>
-//       CHECK:      %[[NEGF:.+]] = arith.negf %[[EXTR]] : f16
-//       CHECK:      %[[CMP:.+]] = arith.cmpi eq, %[[R3]], %[[C1]] : index
-//       CHECK:      %[[SEL:.+]] = arith.select %[[CMP]], %[[NEGF]], %[[EXTR]] : f16
+//       CHECK:      %[[CMP:.+]] = arith.cmpi eq, %[[I3]], %[[C0]] : index
+//       CHECK:      %[[NEGF:.+]] = arith.negf %{{.+}} : f16
+//       CHECK:      %[[SEL:.+]] = arith.select %[[CMP]], %[[NEGF]], %{{.+}} : f16
 //       CHECK:      linalg.yield %[[SEL]] : f16
 
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[NREV]] {{\[\[}}0], [1], [2], [3, 4]] : tensor<1x32x1x2x64xf16> into tensor<1x32x1x128xf16>
@@ -412,7 +410,7 @@ util.func public @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<1x32x?x12
 // CHECK-LABEL: util.func public @test_slice_negate_cat_peephole_dynamic
 //       CHECK:    tensor.expand_shape
 //       CHECK:    linalg.generic
-//       CHECK:      tensor.extract
+//  CHECK-NOT:    tensor.extract
 //       CHECK:    %[[COL:.+]] = tensor.collapse_shape
 //       CHECK:    util.return %[[COL]]
 
@@ -439,9 +437,10 @@ util.func public @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<32x?x128x
 // CHECK-LABEL: util.func public @test_slice_negate_cat_peephole_dynamic
 //       CHECK:    tensor.expand_shape
 //       CHECK:    linalg.generic
-//       CHECK:      tensor.extract
+//  CHECK-NOT:    tensor.extract
 //       CHECK:    %[[COL:.+]] = tensor.collapse_shape
-//       CHECK:    util.return %[[COL]]
+//       CHECK:    %{{.+}} = tensor.cast %[[COL]]
+//       CHECK:    util.return %{{.+}}
 
 // -----
 
@@ -773,3 +772,40 @@ util.func public @constant_pad_f32(%arg0: tensor<?x?xf32>, %x: index, %y: index)
 //       CHECK:   %[[PAD:.+]] = tensor.pad %[[ARG0]] low[1, 2] high[%[[H0]], %[[H1]]]
 //       CHECK:     tensor.yield %[[C1]]
 //       CHECK:   util.return %[[PAD]]
+
+// -----
+
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+util.func public @test_non_rank_reduced_slices(%arg0: tensor<4x32x1x128xf16>) -> tensor<4x32x1x128xf16> {
+  %0 = tensor.empty() : tensor<4x32x1x128xf16>
+  %1 = tensor.empty() : tensor<4x32x1x64xf16>
+  %extracted_slice = tensor.extract_slice %arg0[0, 0, 0, 0] [4, 32, 1, 64] [1, 1, 1, 1] : tensor<4x32x1x128xf16> to tensor<4x32x1x64xf16>
+  %extracted_slice_0 = tensor.extract_slice %arg0[0, 0, 0, 64] [4, 32, 1, 64] [1, 1, 1, 1] : tensor<4x32x1x128xf16> to tensor<4x32x1x64xf16>
+  %2 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%extracted_slice_0 : tensor<4x32x1x64xf16>) outs(%1 : tensor<4x32x1x64xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %3 = arith.negf %in : f16
+    linalg.yield %3 : f16
+  } -> tensor<4x32x1x64xf16>
+  %inserted_slice = tensor.insert_slice %2 into %0[0, 0, 0, 0] [4, 32, 1, 64] [1, 1, 1, 1] : tensor<4x32x1x64xf16> into tensor<4x32x1x128xf16>
+  %inserted_slice_1 = tensor.insert_slice %extracted_slice into %inserted_slice[0, 0, 0, 64] [4, 32, 1, 64] [1, 1, 1, 1] : tensor<4x32x1x64xf16> into tensor<4x32x1x128xf16>
+  util.return %inserted_slice_1 : tensor<4x32x1x128xf16>
+}
+
+// CHECK-LABEL: util.func public @test_non_rank_reduced_slices
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<4x32x1x128xf16>
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[EXPOUT:.+]] = tensor.expand_shape %{{.+}} {{\[\[}}0], [1], [2], [3, 4]] output_shape [4, 32, 1, 2, 64] : tensor<4x32x1x128xf16> into tensor<4x32x1x2x64xf16>
+//       CHECK:   %[[NREV:.+]] = linalg.generic
+//  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>]
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<4x32x1x64xf16>, tensor<4x32x1x64xf16>)
+//  CHECK-SAME:       outs(%[[EXPOUT]] : tensor<4x32x1x2x64xf16>)
+
+//       CHECK:      %[[I3:.+]] = linalg.index 3 : index
+//       CHECK:      %[[CMP:.+]] = arith.cmpi eq, %[[I3]], %[[C0]] : index
+//       CHECK:      %[[NEGF:.+]] = arith.negf %{{.+}} : f16
+//       CHECK:      %[[SEL:.+]] = arith.select %[[CMP]], %[[NEGF]], %{{.+}} : f16
+//       CHECK:      linalg.yield %[[SEL]] : f16
+
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[NREV]] {{\[\[}}0], [1], [2], [3, 4]] : tensor<4x32x1x2x64xf16> into tensor<4x32x1x128xf16>
+//       CHECK:   util.return %[[COLLAPSE]]

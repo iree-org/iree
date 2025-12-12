@@ -870,70 +870,104 @@ static std::optional<Value> matchCatNegateAndSlice(tensor::ConcatOp concatOp) {
 }
 
 static Value createCatNegateAndSlice(RewriterBase &rewriter, Value outTensor,
-                                     Value source) {
-  Location loc = source.getLoc();
-  /// The matcher checks that this cast is valid.
-  auto sourceType = cast<RankedTensorType>(source.getType());
+                                     Value topHalfSlice,
+                                     Value bottomHalfSlice) {
+  Location loc = topHalfSlice.getLoc();
+  /// The matcher checks that these casts are valid.
+  auto topHalfType = cast<RankedTensorType>(topHalfSlice.getType());
+  auto bottomHalfType = cast<RankedTensorType>(bottomHalfSlice.getType());
 
-  SmallVector<int64_t> targetShape(sourceType.getShape());
+  // Both slices should have the same type
+  (void)bottomHalfType;
+  assert(topHalfType == bottomHalfType && "slices must have the same type");
+
+  // Output shape: [..., 2, dim] where we concatenate along the second-to-last
+  // dim First, expand the output tensor to add the dimension of size 2
+  auto outType = cast<RankedTensorType>(outTensor.getType());
+  int64_t outRank = outType.getRank();
+
+  // Create reassociation to expand the innermost dimension: [..., 128] -> [...,
+  // 2, 64]
   SmallVector<ReassociationIndices> reassoc;
-  for (int i = 0, e = targetShape.size(); i < e; i++) {
+  for (int i = 0; i < outRank - 1; i++) {
     reassoc.push_back(ReassociationIndices{i});
   }
-  reassoc.back().push_back(targetShape.size());
+  reassoc.push_back(ReassociationIndices{outRank - 1, outRank});
 
-  /// Note that because we've verified the pair of slices is exactly half
-  /// of the whole inner most extent, the sliceSize is necessarily
-  /// divisible by 2.
-  int64_t sliceSize = targetShape.back();
-  targetShape[targetShape.size() - 1] = 2;
-  targetShape.push_back(ShapedType::isDynamic(sliceSize) ? sliceSize
-                                                         : sliceSize / 2);
-  Type expandedType =
-      RankedTensorType::get(targetShape, sourceType.getElementType());
-  Value expanded = tensor::ExpandShapeOp::create(rewriter, loc, expandedType,
-                                                 source, reassoc);
-
+  SmallVector<int64_t> outputShape(outType.getShape());
+  int64_t innerDim = outputShape.back();
+  outputShape[outRank - 1] = 2;
+  outputShape.push_back(ShapedType::isDynamic(innerDim) ? innerDim
+                                                        : innerDim / 2);
+  Type expandedOutputType =
+      RankedTensorType::get(outputShape, outType.getElementType());
   Value expandedOutTensor = tensor::ExpandShapeOp::create(
-      rewriter, loc, expandedType, outTensor, reassoc);
+      rewriter, loc, expandedOutputType, outTensor, reassoc);
 
-  SmallVector<AffineMap> indexingMaps = {
-      rewriter.getMultiDimIdentityMap(targetShape.size())};
-  SmallVector<utils::IteratorType> iteratorTypes(targetShape.size(),
+  // Create indexing maps for broadcasting:
+  // Map the slice dimensions to the expanded output dimensions, broadcasting
+  // over the concatenation dimension.
+  int64_t rank = outputShape.size();
+  int64_t concatDimIdx = rank - 2; // Second-to-last dimension
+  int64_t sliceRank = topHalfType.getRank();
+
+  // Determine if slices are rank-reduced by comparing to the original output
+  // rank (which is rank - 1 since we expanded)
+  bool isRankReduced = sliceRank < (rank - 1);
+
+  // Build broadcast map: map slice dimensions to expanded output dimensions
+  SmallVector<AffineExpr> broadcastExprs;
+  for (int64_t i = 0; i < rank; i++) {
+    if (i == concatDimIdx) {
+      // Skip concatenation dimension (broadcast over it)
+      continue;
+    }
+    // For rank-reduced slices, skip unit dimensions in the expanded output
+    // For non-rank-reduced slices, include all dimensions
+    if (isRankReduced && outputShape[i] == 1) {
+      continue;
+    }
+    broadcastExprs.push_back(getAffineDimExpr(i, rewriter.getContext()));
+  }
+  AffineMap broadcastMap =
+      AffineMap::get(rank, 0, broadcastExprs, rewriter.getContext());
+  AffineMap identityMap = rewriter.getMultiDimIdentityMap(rank);
+
+  SmallVector<AffineMap> indexingMaps = {broadcastMap, broadcastMap,
+                                         identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(rank,
                                                  utils::IteratorType::parallel);
 
   auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange args) {
-    SmallVector<Value> extractionIndices;
-    for (size_t i = 0, e = targetShape.size(); i < e; ++i) {
-      extractionIndices.push_back(linalg::IndexOp::create(b, loc, i));
-    }
+    Value topVal = args[0];
+    Value bottomVal = args[1];
 
-    Value c1 =
-        arith::ConstantOp::create(rewriter, loc, rewriter.getIndexAttr(1));
+    Value c0 = arith::ConstantOp::create(b, loc, b.getIndexAttr(0));
 
-    // Take the reverse of the second to last iterator. Because we statically
-    // guaranteed it to be 2 it just becomes `1 - iters[-2]`.
-    Value reverseSplitIdx = arith::SubIOp::create(
-        rewriter, loc, c1, extractionIndices[targetShape.size() - 2]);
-    extractionIndices[targetShape.size() - 2] = reverseSplitIdx;
+    // Get the index for the concatenation dimension (second-to-last, index
+    // rank-2)
+    Value concatDimIdx = linalg::IndexOp::create(b, loc, rank - 2);
 
-    // Extract the value from input tensor and negate the top half of the result
-    // slice (lower half of the input slice).
-    Value inputVal =
-        tensor::ExtractOp::create(b, loc, expanded, extractionIndices);
-    Value maybeNegate = arith::NegFOp::create(b, loc, inputVal);
+    // Select which slice to use: if concatDimIdx == 0, use bottomHalf
+    // (negated), if concatDimIdx == 1, use topHalf
+    Value isBottomHalf = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq,
+                                               concatDimIdx, c0);
 
-    Value isEqual = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq,
-                                          reverseSplitIdx, c1);
-    Value select =
-        arith::SelectOp::create(rewriter, loc, isEqual, maybeNegate, inputVal);
-    linalg::YieldOp::create(b, loc, select);
+    // Negate bottomHalf
+    Value negatedBottom = arith::NegFOp::create(b, loc, bottomVal);
+
+    // Select: if isBottomHalf, use negatedBottom, else use topVal
+    Value selected =
+        arith::SelectOp::create(b, loc, isBottomHalf, negatedBottom, topVal);
+
+    linalg::YieldOp::create(b, loc, selected);
   };
 
   Value result =
       linalg::GenericOp::create(rewriter, loc, expandedOutTensor.getType(),
-                                ValueRange(), expandedOutTensor, indexingMaps,
-                                iteratorTypes, bodyBuilder)
+                                ValueRange{topHalfSlice, bottomHalfSlice},
+                                expandedOutTensor, indexingMaps, iteratorTypes,
+                                bodyBuilder)
           .getResult(0);
 
   return tensor::CollapseShapeOp::create(rewriter, loc, outTensor.getType(),
@@ -946,7 +980,18 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
   rewriter.setInsertionPoint(sliceOp);
   Value outTensor =
       sliceOp.getDest().getDefiningOp<tensor::InsertSliceOp>().getDest();
-  return createCatNegateAndSlice(rewriter, outTensor, source);
+
+  // Extract the slices from the matched pattern
+  // topHalf is the source of the outer insert_slice
+  Value topHalf = sliceOp.getSource();
+
+  // bottomHalf is the input to the negate op
+  auto destInsertSlice =
+      sliceOp.getDest().getDefiningOp<tensor::InsertSliceOp>();
+  auto negate = destInsertSlice.getSource().getDefiningOp<linalg::GenericOp>();
+  Value bottomHalf = negate.getDpsInputs()[0];
+
+  return createCatNegateAndSlice(rewriter, outTensor, topHalf, bottomHalf);
 }
 
 static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
@@ -956,7 +1001,16 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
   Value outTensor = tensor::EmptyOp::create(
       rewriter, source.getLoc(),
       tensor::getMixedSizes(rewriter, source.getLoc(), source), elemType);
-  return createCatNegateAndSlice(rewriter, outTensor, source);
+
+  // Extract the slices from the matched pattern
+  // topHalf is the second input to concat (right side)
+  Value topHalf = concatOp.getInputs()[1];
+
+  // bottomHalf is the input to the negate op (first input to concat is negated)
+  auto negate = concatOp.getInputs()[0].getDefiningOp<linalg::GenericOp>();
+  Value bottomHalf = negate.getDpsInputs()[0];
+
+  return createCatNegateAndSlice(rewriter, outTensor, topHalf, bottomHalf);
 }
 
 class InsertSliceNegateAndSlicePattern
