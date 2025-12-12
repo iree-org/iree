@@ -175,11 +175,9 @@ private:
 
 LogicalResult GlobalEncodingAnalyzer::run() {
   LDBG() << "=== GlobalEncodingAnalyzer::run() ===";
-
   if (failed(setupLayoutResolver())) {
     return failure();
   }
-
   globalTable.rebuild();
   if (failed(collectGlobalEncodings())) {
     return failure();
@@ -219,12 +217,6 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
     return success();
   }
 
-  LDBG() << "Found " << candidates.size()
-         << " source globals with multiple encodings:";
-  for (auto name : candidates) {
-    LDBG() << "  - " << name;
-  }
-
   // Build queries for layout resolution.
   SmallVector<IREE::Stream::AffinityAndOpPair> queries;
   for (StringRef sourceName : candidates) {
@@ -239,7 +231,7 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
   llvm::DenseMap<IREE::Stream::AffinityAndOpPair, SetVector<Attribute>>
       cachedLayoutAttrs;
   if (failed(resolveLayoutAttr(queries, cachedLayoutAttrs))) {
-    LDBG() << "failed to resolve layouts for a query";
+    LDBG() << "Failed to resolve layouts for a query";
     return failure();
   }
 
@@ -259,7 +251,9 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
     }
 
     // TODO: It is not clear which encoding to pick when there are multiple
-    // layout resolvers. For now, just use identity encoding for safety.
+    // layout resolvers. For now, just fallback to identity encoding for safety.
+    // A minor improvement can be checking if all the resolvers return the
+    // identical unified encoding and use that.
     if (layoutResolvers.size() != 1) {
       unifiedEncodings[sourceName] = IREE::Encoding::IdentityAttr::get(ctx);
       continue;
@@ -600,16 +594,15 @@ struct UnifyEncodingForGlobalsPass
           UnifyEncodingForGlobalsPass> {
   void runOnOperation() override {
     ModuleOp moduleOp = getOperation();
-
     GlobalEncodingAnalyzer analyzer(moduleOp);
     if (failed(analyzer.run())) {
       LDBG() << "Analysis failed, skipping.";
       return;
     }
-
     SmallVector<StringRef> candidates =
         analyzer.getSourcesWithMultipleEncodings();
     if (candidates.empty()) {
+      LDBG() << "No source globals with multiple encodings found.";
       return;
     }
 
