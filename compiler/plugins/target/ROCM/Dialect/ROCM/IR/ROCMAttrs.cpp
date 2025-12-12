@@ -172,7 +172,7 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
       }
     }
     // Match architecture if specified. Expects an ArrayAttr of StringAttr,
-    // e.g., archs = ["gfx942", "gfx950"]
+    // e.g., archs = ["gfx942", "gfx950"].
     if (auto archs = dyn_cast_if_present<ArrayAttr>(
             info.getMatch().get(kUKernelInfoArchsName))) {
       StringRef targetArch = targetAttr.getArch();
