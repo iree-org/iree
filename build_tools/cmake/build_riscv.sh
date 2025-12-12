@@ -50,15 +50,13 @@ args=(
   "-DIREE_BUILD_ALL_CHECK_TEST_MODULES=OFF"
 )
 
-if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
-  :
-elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
+if [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
     -DRISCV_TOOLCHAIN_TRIPLE="riscv32-unknown-elf"
   )
-else
+elif [[ "${RISCV_PLATFORM}" != "linux" ]]; then
   echo "riscv config for ${RISCV_PLATFORM_ARCH} not supported yet"
   return -1
 fi
