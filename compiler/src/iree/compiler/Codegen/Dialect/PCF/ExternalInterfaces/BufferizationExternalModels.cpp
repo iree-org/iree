@@ -26,8 +26,8 @@ using namespace mlir::bufferization;
 namespace {
 
 struct GenericOpInterface
-    : public BufferizableOpInterface::ExternalModel<GenericOpInterface,
-                                                    PCF::GenericOp> {
+    : BufferizableOpInterface::ExternalModel<GenericOpInterface,
+                                             PCF::GenericOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     // Parallel ops can be treated as though they never read.
@@ -60,11 +60,11 @@ struct GenericOpInterface
 
     SmallVector<Value> newInits;
     newInits.reserve(genericOp.getInits().size());
-    for (auto init : genericOp.getInits()) {
+    for (Value init : genericOp.getInits()) {
       if (isa<RankedTensorType>(init.getType())) {
         FailureOr<Value> newInit = getBuffer(rewriter, init, options, state);
         if (failed(newInit)) {
-          return op->emitError() << "failed to get init buffer";
+          return op->emitOpError("failed to get init buffer");
         }
         newInits.push_back(*newInit);
       } else {
@@ -73,7 +73,7 @@ struct GenericOpInterface
     }
 
     SmallVector<Type> newResultTypes;
-    for (auto result : genericOp.getResults()) {
+    for (Value result : genericOp.getResults()) {
       if (isa<TensorType>(result.getType())) {
         FailureOr<BufferLikeType> resultType =
             bufferization::getBufferType(result, options, state);
@@ -127,8 +127,7 @@ struct GenericOpInterface
 };
 
 struct LoopOpInterface
-    : public BufferizableOpInterface::ExternalModel<LoopOpInterface,
-                                                    PCF::LoopOp> {
+    : BufferizableOpInterface::ExternalModel<LoopOpInterface, PCF::LoopOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     // Parallel ops can be treated as though they never read.
@@ -161,11 +160,11 @@ struct LoopOpInterface
 
     SmallVector<Value> newInits;
     newInits.reserve(loopOp.getInits().size());
-    for (auto init : loopOp.getInits()) {
+    for (Value init : loopOp.getInits()) {
       if (isa<RankedTensorType>(init.getType())) {
         FailureOr<Value> newInit = getBuffer(rewriter, init, options, state);
         if (failed(newInit)) {
-          return op->emitError() << "failed to get init buffer";
+          return op->emitOpError("failed to get init buffer");
         }
         newInits.push_back(*newInit);
       } else {
@@ -174,7 +173,7 @@ struct LoopOpInterface
     }
 
     SmallVector<Type> newResultTypes;
-    for (auto result : loopOp.getResults()) {
+    for (Value result : loopOp.getResults()) {
       if (isa<TensorType>(result.getType())) {
         FailureOr<BufferLikeType> resultType =
             bufferization::getBufferType(result, options, state);
@@ -227,8 +226,8 @@ struct LoopOpInterface
 };
 
 struct WriteSliceOpInterface
-    : public BufferizableOpInterface::ExternalModel<WriteSliceOpInterface,
-                                                    PCF::WriteSliceOp> {
+    : BufferizableOpInterface::ExternalModel<WriteSliceOpInterface,
+                                             PCF::WriteSliceOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     // The only valid tensor operand is the source which is always read.
@@ -264,8 +263,8 @@ struct WriteSliceOpInterface
 };
 
 struct ReadSliceOpInterface
-    : public BufferizableOpInterface::ExternalModel<ReadSliceOpInterface,
-                                                    PCF::ReadSliceOp> {
+    : BufferizableOpInterface::ExternalModel<ReadSliceOpInterface,
+                                             PCF::ReadSliceOp> {
   static MemRefType
   getMaximallyDynamicBufferType(MLIRContext *context,
                                 PCF::ShapedRefType sourceType) {
