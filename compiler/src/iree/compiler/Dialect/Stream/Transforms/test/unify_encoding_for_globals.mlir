@@ -42,6 +42,202 @@ module @immutable_source_with_initial_value {
 
 // -----
 
+// Checks that the identity encoding is generated if no resolver is specified.
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {}>
+#device_target_local = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<789>]>
+
+// CHECK: util.global private @[[$DEVICE_A:.+]] =
+util.global private @device_a = #device_target_local
+util.global private @weight : !stream.resource<constant>
+util.global private @weight_size : index
+util.global private @encoded_v1 : !stream.resource<constant>
+util.global private @encoded_v1_size : index
+util.global private @encoded_v2 : !stream.resource<constant>
+util.global private @encoded_v2_size : index
+
+// CHECK: util.initializer
+util.initializer {
+  %cst = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf32> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight"> : tensor<4096x4096xf32>
+  %0 = stream.resource.size %cst : !stream.resource<constant>
+  util.global.store %cst, @weight : !stream.resource<constant>
+  util.global.store %0, @weight_size : index
+  // CHECK: %[[SOURCE:.+]] = util.global.load @weight
+  %source = util.global.load @weight : !stream.resource<constant>
+  %source_size = util.global.load @weight_size : index
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding1> : index
+  %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
+  %const1 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
+  util.global.store %const1, @encoded_v1 : !stream.resource<constant>
+  util.global.store %size1, @encoded_v1_size : index
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding2> : index
+  %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
+  %const2 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
+  util.global.store %const2, @encoded_v2 : !stream.resource<constant>
+  util.global.store %size2, @encoded_v2_size : index
+
+  util.return
+}
+
+// -----
+
+// Test: multiple devices with different resolvers encoding the same source global.
+// Since different resolvers produce different encodings and they share the same source,
+// there's no common encoding - should fall back to identity encoding.
+
+#executable_target_0 = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
+#executable_target_1 = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<456>}>
+#device_target_local_0 = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_0]> : !hal.device
+#device_target_local_1 = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_1]> : !hal.device
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<111>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<222>]>
+
+// CHECK: util.global private @[[$DEVICE_A:.+]] =
+// CHECK: util.global private @[[$DEVICE_B:.+]] =
+util.global private @device_a = #device_target_local_0
+util.global private @device_b = #device_target_local_1
+// Single source global shared by both devices.
+util.global private @weight : !stream.resource<constant>
+util.global private @weight_size : index
+util.global private @encoded_a_v1 : !stream.resource<constant>
+util.global private @encoded_a_v2 : !stream.resource<constant>
+util.global private @encoded_b_v1 : !stream.resource<constant>
+util.global private @encoded_b_v2 : !stream.resource<constant>
+
+// CHECK: util.initializer
+util.initializer {
+  %cst = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf32> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight"> : tensor<4096x4096xf32>
+  %0 = stream.resource.size %cst : !stream.resource<constant>
+  util.global.store %cst, @weight : !stream.resource<constant>
+  util.global.store %0, @weight_size : index
+
+  // CHECK: %[[SOURCE:.+]] = util.global.load @weight
+  %source = util.global.load @weight : !stream.resource<constant>
+  %source_size = util.global.load @weight_size : index
+
+  // Device A encodes the shared source - should get identity encoding.
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding1> : index
+  %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
+  %const1 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
+  util.global.store %const1, @encoded_a_v1 : !stream.resource<constant>
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding2> : index
+  %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
+  %const2 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
+  util.global.store %const2, @encoded_a_v2 : !stream.resource<constant>
+
+  // Device B encodes the same shared source - should also get identity encoding.
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_B]]>) tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_B]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  %size3 = stream.tensor.sizeof on(#hal.device.affinity<@device_b>) tensor<4096x4096xf32, #encoding1> : index
+  %enc3 = stream.tensor.encode on(#hal.device.affinity<@device_b>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size3}
+  %const3 = stream.async.clone on(#hal.device.affinity<@device_b>) %enc3 : !stream.resource<*>{%size3} -> !stream.resource<constant>{%size3}
+  util.global.store %const3, @encoded_b_v1 : !stream.resource<constant>
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_B]]>) tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_B]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  %size4 = stream.tensor.sizeof on(#hal.device.affinity<@device_b>) tensor<4096x4096xf32, #encoding2> : index
+  %enc4 = stream.tensor.encode on(#hal.device.affinity<@device_b>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size4}
+  %const4 = stream.async.clone on(#hal.device.affinity<@device_b>) %enc4 : !stream.resource<*>{%size4} -> !stream.resource<constant>{%size4}
+  util.global.store %const4, @encoded_b_v2 : !stream.resource<constant>
+
+  util.return
+}
+
+// -----
+
+// Test: multiple devices with different resolvers - each device should use its own resolver.
+
+#executable_target_0 = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
+#executable_target_1 = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<456>}>
+#device_target_local_0 = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_0]> : !hal.device
+#device_target_local_1 = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_1]> : !hal.device
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<111>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<222>]>
+
+// CHECK: util.global private @[[$DEVICE_A:.+]] =
+// CHECK: util.global private @[[$DEVICE_B:.+]] =
+util.global private @device_a = #device_target_local_0
+util.global private @device_b = #device_target_local_1
+// Two separate source globals - one for each device.
+util.global private @weight_a : !stream.resource<constant>
+util.global private @weight_a_size : index
+util.global private @weight_b : !stream.resource<constant>
+util.global private @weight_b_size : index
+util.global private @encoded_a_v1 : !stream.resource<constant>
+util.global private @encoded_a_v2 : !stream.resource<constant>
+util.global private @encoded_b_v1 : !stream.resource<constant>
+util.global private @encoded_b_v2 : !stream.resource<constant>
+
+// CHECK: util.initializer
+util.initializer {
+  // Initialize weight_a for device_a.
+  %cst_a = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf32> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight_a"> : tensor<4096x4096xf32>
+  %size_a = stream.resource.size %cst_a : !stream.resource<constant>
+  util.global.store %cst_a, @weight_a : !stream.resource<constant>
+  util.global.store %size_a, @weight_a_size : index
+
+  // Initialize weight_b for device_b.
+  %cst_b = stream.tensor.constant on(#hal.device.affinity<@device_b>) : tensor<4096x4096xf32> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight_b"> : tensor<4096x4096xf32>
+  %size_b = stream.resource.size %cst_b : !stream.resource<constant>
+  util.global.store %cst_b, @weight_b : !stream.resource<constant>
+  util.global.store %size_b, @weight_b_size : index
+
+  // CHECK: %[[SOURCE_A:.+]] = util.global.load @weight_a
+  %source_a = util.global.load @weight_a : !stream.resource<constant>
+  %source_a_size = util.global.load @weight_a_size : index
+
+  // CHECK: %[[SOURCE_B:.+]] = util.global.load @weight_b
+  %source_b = util.global.load @weight_b : !stream.resource<constant>
+  %source_b_size = util.global.load @weight_b_size : index
+
+  // Device A encodes weight_a with specialization_resolver<123>.
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE_A]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding1> : index
+  %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source_a : tensor<4096x4096xf32> in !stream.resource<constant>{%source_a_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
+  %const1 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
+  util.global.store %const1, @encoded_a_v1 : !stream.resource<constant>
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE_A]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding2> : index
+  %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source_a : tensor<4096x4096xf32> in !stream.resource<constant>{%source_a_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
+  %const2 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
+  util.global.store %const2, @encoded_a_v2 : !stream.resource<constant>
+
+  // Device B encodes weight_b with specialization_resolver<456>.
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_B]]>) tensor<4096x4096xf32, #iree_encoding.specialized<456>>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_B]]>) %[[SOURCE_B]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<456>>
+  %size3 = stream.tensor.sizeof on(#hal.device.affinity<@device_b>) tensor<4096x4096xf32, #encoding1> : index
+  %enc3 = stream.tensor.encode on(#hal.device.affinity<@device_b>) %source_b : tensor<4096x4096xf32> in !stream.resource<constant>{%source_b_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size3}
+  %const3 = stream.async.clone on(#hal.device.affinity<@device_b>) %enc3 : !stream.resource<*>{%size3} -> !stream.resource<constant>{%size3}
+  util.global.store %const3, @encoded_b_v1 : !stream.resource<constant>
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_B]]>) tensor<4096x4096xf32, #iree_encoding.specialized<456>>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_B]]>) %[[SOURCE_B]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<456>>
+  %size4 = stream.tensor.sizeof on(#hal.device.affinity<@device_b>) tensor<4096x4096xf32, #encoding2> : index
+  %enc4 = stream.tensor.encode on(#hal.device.affinity<@device_b>) %source_b : tensor<4096x4096xf32> in !stream.resource<constant>{%source_b_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size4}
+  %const4 = stream.async.clone on(#hal.device.affinity<@device_b>) %enc4 : !stream.resource<*>{%size4} -> !stream.resource<constant>{%size4}
+  util.global.store %const4, @encoded_b_v2 : !stream.resource<constant>
+
+  util.return
+}
+
+// -----
+
 // Test: immutable source global (initialized from parameter in initializer) with
 // two encodings - should unify to identity encoding.
 // This test also verifies that stream.async.clone between load and encode is
@@ -65,7 +261,7 @@ module @immutable_source_initialized_from_parameter {
 
   // CHECK: util.initializer
   util.initializer {
-    %cst = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight"> : tensor<4096x4096xf32>
+    %cst = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf32> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight"> : tensor<4096x4096xf32>
     %0 = stream.resource.size %cst : !stream.resource<constant>
     util.global.store %cst, @weight : !stream.resource<constant>
     util.global.store %0, @weight_size : index
