@@ -50,7 +50,7 @@ jobs:
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
-            iree_test_files: /amdshark-cache/data/iree-regression-cache
+            iree_test_files: /amd-shark-cache/data/iree-regression-cache
             sku: mi300
             target: target_hip
             runs-on: linux-mi325-1gpu-ossci-iree-org
