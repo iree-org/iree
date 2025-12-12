@@ -6,7 +6,10 @@
 
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCFOps.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCFTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/Support/DebugLog.h"
@@ -616,6 +619,22 @@ defaultPadWorkgroupDistributionConfigFn(ArrayRef<int64_t> iterationBounds,
   return {workgroupDistributionConfig};
 }
 
+/// Helper function to check if the backward slice from a source value contains
+/// any non-reshape relayout ops. If the slice contains only reshape ops,
+/// bufferization can usually handle it, so we don't need map_scatter.
+static bool hasNonReshapeRelayoutOps(Value source) {
+  llvm::SetVector<Operation *> slice;
+  BackwardSliceOptions options;
+  options.filter = isSupportedRelayoutOp;
+  options.inclusive = true;
+  LogicalResult result = getBackwardSlice(source, &slice, options);
+  if (failed(result)) {
+    return false;
+  }
+  return !llvm::all_of(
+      slice, llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp>);
+}
+
 CombineRelayoutOpsControlFn
 getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope) {
   CombineRelayoutOpsControlFn controlFn;
@@ -632,41 +651,47 @@ getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope) {
     break;
   // Control function for Workgroup scope. Filters to only relayout ops with
   // a single tensor.parallel_insert_slice user inside of a workgroup
-  // scf.forall op. Relayout chains of only reshapes are also filtered out,
+  // scf.forall op, or a pcf.write_slice user with a workgroup-scoped
+  // destination. Relayout chains of only reshapes are also filtered out,
   // because these chains can usually be handled by bufferization.
   case IREE::Codegen::RelayoutCombinationScope::Workgroup:
     controlFn = [](OpResult leaf) {
       if (leaf.getNumUses() != 1) {
         return false;
       }
-      auto parallelInsertOp =
-          dyn_cast<tensor::ParallelInsertSliceOp>(*leaf.getUsers().begin());
-      if (!parallelInsertOp) {
-        return false;
+      Operation *userOp = *leaf.getUsers().begin();
+
+      // Case 1: tensor.parallel_insert_slice inside a workgroup scf.forall.
+      if (auto parallelInsertOp =
+              dyn_cast<tensor::ParallelInsertSliceOp>(userOp)) {
+        auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
+        if (!forallOp || !forallOp.getMapping() ||
+            !llvm::all_of(forallOp.getMapping().value(),
+                          llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
+          return false;
+        }
+        auto bbArg = dyn_cast<BlockArgument>(parallelInsertOp.getDest());
+        if (!bbArg || forallOp.getCombiningOps(bbArg).size() != 1) {
+          return false;
+        }
+        return hasNonReshapeRelayoutOps(parallelInsertOp.getSource());
       }
-      auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
-      if (!forallOp || !forallOp.getMapping() ||
-          !llvm::all_of(forallOp.getMapping().value(),
-                        llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
-        return false;
+
+      // Case 2: pcf.write_slice with a workgroup-scoped destination.
+      if (auto writeSliceOp = dyn_cast<IREE::PCF::WriteSliceOp>(userOp)) {
+        auto srefType = dyn_cast<IREE::PCF::ShapedRefType>(
+            writeSliceOp.getDest().getType());
+        if (!srefType) {
+          return false;
+        }
+        // Check if the sref's scope is a WorkgroupAttr.
+        if (!isa<IREE::Codegen::WorkgroupAttr>(srefType.getScope())) {
+          return false;
+        }
+        return hasNonReshapeRelayoutOps(writeSliceOp.getSource());
       }
-      auto bbArg = dyn_cast<BlockArgument>(parallelInsertOp.getDest());
-      if (!bbArg || forallOp.getCombiningOps(bbArg).size() != 1) {
-        return false;
-      }
-      // If there are only reshape ops, then bufferization can usually handle
-      // it, so don't introduce map_scatter.
-      llvm::SetVector<Operation *> slice;
-      BackwardSliceOptions options;
-      options.filter = isSupportedRelayoutOp;
-      options.inclusive = true;
-      LogicalResult result =
-          getBackwardSlice(parallelInsertOp.getSource(), &slice, options);
-      if (failed(result)) {
-        return false;
-      }
-      return !llvm::all_of(
-          slice, llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp>);
+
+      return false;
     };
     break;
   }
