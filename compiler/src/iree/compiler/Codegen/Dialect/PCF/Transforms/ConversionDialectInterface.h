@@ -16,13 +16,10 @@ class PCFConversionDialectInterface
     : public DialectInterface::Base<PCFConversionDialectInterface> {
 public:
   PCFConversionDialectInterface(Dialect *dialect) : Base(dialect) {}
-
-  // Load dialects that pcf.generic/loop lowering may produce.
+  virtual void loadSRefLoweringDependentDialects(MLIRContext *context) const {}
+  virtual void loadTokenLoweringDependentDialects(MLIRContext *context) const {}
   virtual void
   loadStructuralLoweringDependentDialects(MLIRContext *context) const {}
-
-  // Load dialects that sref to memref conversion may produce.
-  virtual void loadSRefLoweringDependentDialects(MLIRContext *context) const {}
 };
 
 } // namespace mlir::iree_compiler
