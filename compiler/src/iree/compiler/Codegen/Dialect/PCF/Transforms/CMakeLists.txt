@@ -29,6 +29,7 @@ iree_cc_library(
     "Transforms.h"
   SRCS
     "ConvertForallToLoops.cpp"
+    "ConvertSRefToMemRef.cpp"
     "FuseConsumers.cpp"
     "FusePCFWrites.cpp"
     "LowerStructuralPCF.cpp"

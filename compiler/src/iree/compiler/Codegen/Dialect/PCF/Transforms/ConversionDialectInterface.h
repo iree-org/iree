@@ -20,6 +20,9 @@ public:
   // Load dialects that pcf.generic/loop lowering may produce.
   virtual void
   loadStructuralLoweringDependentDialects(MLIRContext *context) const {}
+
+  // Load dialects that sref to memref conversion may produce.
+  virtual void loadSRefLoweringDependentDialects(MLIRContext *context) const {}
 };
 
 } // namespace mlir::iree_compiler
