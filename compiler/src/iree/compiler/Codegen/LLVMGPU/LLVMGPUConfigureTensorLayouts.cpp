@@ -314,79 +314,6 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   return success();
 }
 
-static LogicalResult
-setConvolutionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                     SmallVector<bool> promotedOperands, RewriterBase &rewriter,
-                     linalg::LinalgOp conv) {
-  // This function should have only be called on a convolution op.
-  FailureOr<linalg::ConvolutionDimensions> convDims =
-      linalg::inferConvolutionDims(conv);
-  assert(succeeded(convDims) &&
-         "cannot set convolution anchor on non convolution op");
-
-  // Only convs with unit filter dims can be directly converted to matmul.
-  SmallVector<int64_t> shape = conv.getStaticLoopRanges();
-  if (!llvm::all_of(convDims->filterLoop,
-                    [&shape](unsigned dim) { return shape[dim] == 1; })) {
-    return failure();
-  }
-
-  llvm::SmallBitVector filterDims(conv.getNumLoops(), false);
-  for (unsigned idx : convDims->filterLoop) {
-    filterDims.set(idx);
-  }
-
-  SmallVector<AffineMap> maps = conv.getIndexingMapsArray();
-  for (AffineMap &map : maps) {
-    map = projectDims(map, filterDims, /*compressDimsFlag=*/false);
-  }
-
-  SmallVector<int64_t> bounds = getIterationSpaceBounds(conv);
-  FailureOr<ContractionLayout> layouts =
-      getContractionLayout(conv, bounds, maps);
-
-  auto [aLayout, bLayout, cLayout] = *layouts;
-  Location loc = conv.getLoc();
-
-  Value lhs = conv->getOperand(0);
-  Value rhs = conv->getOperand(1);
-  Value acc = conv->getOperand(2);
-
-  // Set layouts for lhs, rhs and acc.
-  rewriter.setInsertionPoint(conv);
-  auto layoutedLhs = ToLayoutOp::create(rewriter, loc, lhs, aLayout, intrinsic);
-  auto layoutedRhs = ToLayoutOp::create(rewriter, loc, rhs, bLayout, intrinsic);
-  auto layoutedAcc = ToLayoutOp::create(rewriter, loc, acc, cLayout, intrinsic);
-
-  // Promote matmul lhs and rhs.
-  // TODO: This is a hack until layout analysis is improved. The layout analysis
-  // should decide where to put these shared memory conversions.
-  if (promotedOperands[0]) {
-    layoutedLhs.setSharedMemoryConversion(true);
-  }
-
-  if (promotedOperands[1]) {
-    layoutedRhs.setSharedMemoryConversion(true);
-  }
-
-  if (promotedOperands[2]) {
-    layoutedAcc.setSharedMemoryConversion(true);
-  }
-
-  conv->setOperand(0, layoutedLhs.getResult());
-  conv->setOperand(1, layoutedRhs.getResult());
-  conv->setOperand(2, layoutedAcc.getResult());
-
-  // Set layout for result.
-  rewriter.setInsertionPointAfter(conv);
-  auto toLayout =
-      ToLayoutOp::create(rewriter, loc, conv->getResult(0), cLayout, intrinsic);
-  rewriter.replaceAllUsesExcept(conv->getResult(0), toLayout.getResult(),
-                                toLayout);
-
-  return success();
-}
-
 /// Let's assume we have an matmul intrinsic (@) doing a matmul
 /// ((M, K) X (K, N)) which produces a particular layout:
 ///
@@ -608,13 +535,6 @@ static LogicalResult setIntrinsicLoweringConfigLayout(
 
   if (linalg::isaContractionOpInterface(candidate)) {
     if (succeeded(setContractionAnchor(intrinsic, promotedOperands, rewriter,
-                                       candidate))) {
-      return success();
-    }
-  }
-
-  if (succeeded(linalg::inferConvolutionDims(candidate))) {
-    if (succeeded(setConvolutionAnchor(intrinsic, promotedOperands, rewriter,
                                        candidate))) {
       return success();
     }
