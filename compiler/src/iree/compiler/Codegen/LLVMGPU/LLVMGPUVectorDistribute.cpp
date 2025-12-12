@@ -14,11 +14,13 @@
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-vector-distribute"
 
@@ -53,6 +55,60 @@ ContractionVectorLayoutOptions::getDefaultLayout(VectorType type) const {
 }
 
 namespace {
+
+struct RemoveUnitDimStrechingBroadcast final
+    : OpRewritePattern<vector::BroadcastOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
+                                PatternRewriter &rewriter) const override {
+    SetVector<int64_t> strechedDims = broadcastOp.computeBroadcastedUnitDims();
+    if (strechedDims.empty()) {
+      return failure();
+    }
+    VectorType srcTy = cast<VectorType>(broadcastOp.getSource().getType());
+    VectorType dstTy = broadcastOp.getResultVectorType();
+    int64_t numLeadingBroadcastDims = dstTy.getRank() - srcTy.getRank();
+    SmallVector<int64_t> broadcastedUnitDims;
+    for (auto i : llvm::seq<int64_t>(numLeadingBroadcastDims)) {
+      if (dstTy.getShape()[i] == 1) {
+        broadcastedUnitDims.push_back(i);
+      }
+    }
+    if (strechedDims.size() > broadcastedUnitDims.size()) {
+      return rewriter.notifyMatchFailure(
+          broadcastOp,
+          "number of streched dims is greater than broadcasted unit dims");
+    }
+    // Build a permutation that swaps the broadcasted unit dims with a leading
+    // unit dim.
+    // Note that the way this permutation is built, makes it involutory, i.e.,
+    // P = P^{-1}.
+    auto perm = llvm::to_vector(llvm::seq<int64_t>(dstTy.getRank()));
+    // We use zip instead of zip_equal because strechedDims.size() <=
+    // broadcastedUnitDims.size().
+    for (auto [strechedDim, broadcastedUnitDim] :
+         llvm::zip(strechedDims.getArrayRef(), broadcastedUnitDims)) {
+      std::swap(perm[strechedDim], perm[broadcastedUnitDim]);
+    }
+    VectorType permutedBroadcastTy = VectorType::get(
+        applyPermutation(dstTy.getShape(), perm), dstTy.getElementType());
+    Value permutedBroadcast = vector::BroadcastOp::create(
+        rewriter, broadcastOp.getLoc(), permutedBroadcastTy,
+        broadcastOp.getSource());
+    rewriter.replaceOpWithNewOp<vector::TransposeOp>(broadcastOp,
+                                                     permutedBroadcast, perm);
+    return success();
+  }
+};
+
+static LogicalResult
+preVectorDistributionNormalizations(mlir::FunctionOpInterface funcOp) {
+  RewritePatternSet patterns(funcOp.getContext());
+  patterns.add<RemoveUnitDimStrechingBroadcast>(funcOp.getContext());
+  return applyPatternsGreedily(funcOp, std::move(patterns));
+}
+
 struct LLVMGPUVectorDistributePass final
     : impl::LLVMGPUVectorDistributePassBase<LLVMGPUVectorDistributePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -66,6 +122,12 @@ struct LLVMGPUVectorDistributePass final
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
 
+    LLVM_DEBUG(llvm::dbgs() << "Pre-distribution normalizations\n");
+    if (failed(preVectorDistributionNormalizations(funcOp))) {
+      funcOp->emitOpError()
+          << "failed to apply pre-distribution normalization patterns";
+      return signalPassFailure();
+    }
     std::array<int64_t, 3> workgroupSize;
     if (funcOp->hasAttr("workgroup_size")) {
       auto tmpSizes =
