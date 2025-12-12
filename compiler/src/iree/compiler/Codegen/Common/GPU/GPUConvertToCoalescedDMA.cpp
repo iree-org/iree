@@ -606,8 +606,11 @@ private:
               })
               .Default([](Operation *) { return failure(); });
 
-      if (failed(tilingResult))
+      if (failed(tilingResult)) {
+        // Erase the lowering config so the normal lowering path can handle it.
+        eraseLoweringConfig(op);
         continue;
+      }
 
       // Replace the original op with the tiled version.
       rewriter.replaceOp(op, tilingResult->replacements);

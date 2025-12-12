@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -30,6 +31,27 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
+
+/// Check if a value originates from a tensor.pad operation by tracing back
+/// through the definition chain.
+static bool isFromPadOp(Value v) {
+  while (Operation *defOp = v.getDefiningOp()) {
+    if (isa<tensor::PadOp>(defOp))
+      return true;
+
+    // Trace back through operations that pass through tensors.
+    v = TypeSwitch<Operation *, Value>(defOp)
+            .Case<tensor::ExtractSliceOp>(
+                [](auto op) { return op.getSource(); })
+            .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+                [](auto op) { return op.getSrc(); })
+            .Default([](Operation *) { return nullptr; });
+    if (!v)
+      break;
+  }
+  return false;
+}
+
 /// Helper to insert copy with derived thread config.
 Value promoteValue(OpBuilder &builder, Location loc, Value v,
                    bool useDirectLoad) {
@@ -40,7 +62,10 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v,
                                         tensorType.getElementType());
   auto copy = linalg::CopyOp::create(builder, loc, v, empty);
 
-  if (useDirectLoad) {
+  // If the value originates from a tensor.pad, we cannot use direct global
+  // load DMA because the padded region doesn't exist in global memory.
+  // Fall back to DerivedThreadConfigAttr in this case.
+  if (useDirectLoad && !isFromPadOp(v)) {
     setLoweringConfig(
         copy, IREE::GPU::UseGlobalLoadDMAAttr::get(builder.getContext()));
   } else {
