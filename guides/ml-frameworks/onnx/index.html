@@ -4893,7 +4893,7 @@ iree-run-module<span class="w"> </span><span class="se">\</span>
 </tr>
 <tr>
 <td>Curated op and model tests</td>
-<td>SHARK-TestSuite <a href="https://github.com/nod-ai/SHARK-TestSuite/tree/main/e2eshark/onnx"><code>e2eshark/onnx</code></a> and <a href="https://github.com/nod-ai/SHARK-TestSuite/tree/main/alt_e2eshark/onnx_tests"><code>alt_e2eshark/onnx_tests</code></a></td>
+<td>AMD-SHARK-TestSuite <a href="https://github.com/nod-ai/AMD-SHARK-TestSuite/tree/main/e2eamdshark/onnx"><code>e2eshark/onnx</code></a> and <a href="https://github.com/nod-ai/AMD-SHARK-TestSuite/tree/main/alt_e2eamdshark/onnx_tests"><code>alt_e2eshark/onnx_tests</code></a></td>
 </tr>
 <tr>
 <td>Importer tests</td>
@@ -4905,7 +4905,7 @@ iree-run-module<span class="w"> </span><span class="se">\</span>
 <p>Support for a broad set of <a href="https://onnx.ai/onnx/operators/">ONNX operators</a>
 and <a href="https://onnx.ai/onnx/intro/concepts.html#supported-types">data types</a>
 is an active investment area. See the
-<a href="https://github.com/nod-ai/SHARK-ModelDev/issues/215">ONNX Op Support tracking issue</a>
+<a href="https://github.com/nod-ai/AMD-SHARK-ModelDev/issues/215">ONNX Op Support tracking issue</a>
 for the latest status.</p>
 <h3 id="failed-to-legalize-operation-that-was-explicitly-marked-illegal">Failed to legalize operation that was explicitly marked illegal<a class="headerlink" href="#failed-to-legalize-operation-that-was-explicitly-marked-illegal" title="Permanent link">link</a></h3>
 <p>If you see an error compiling a converted .mlir file like this:</p>
@@ -4920,7 +4920,7 @@ for the latest status.</p>
 <li>The operator is not implemented, or the implementation is missing a case.
    Search for a matching issue in one of these places:<ul>
 <li><a href="https://github.com/llvm/torch-mlir/issues">https://github.com/llvm/torch-mlir/issues</a></li>
-<li><a href="https://github.com/nod-ai/SHARK-ModelDev/issues">https://github.com/nod-ai/SHARK-ModelDev/issues</a></li>
+<li><a href="https://github.com/nod-ai/AMD-SHARK-ModelDev/issues">https://github.com/nod-ai/AMD-SHARK-ModelDev/issues</a></li>
 </ul>
 </li>
 <li>

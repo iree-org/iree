@@ -4893,17 +4893,17 @@ graph LR;
 <h2 id="shark-tuner"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.75 7.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5a.75.75 0 0 1 .75-.75m5.25.75a.75.75 0 0 0-1.5 0v1.5a.75.75 0 0 0 1.5 0z"/><path d="M6.25 0h2A.75.75 0 0 1 9 .75V3.5h3.25a2.25 2.25 0 0 1 2.25 2.25V8h.75a.75.75 0 0 1 0 1.5h-.75v2.75a2.25 2.25 0 0 1-2.25 2.25h-8.5a2.25 2.25 0 0 1-2.25-2.25V9.5H.75a.75.75 0 0 1 0-1.5h.75V5.75A2.25 2.25 0 0 1 3.75 3.5H7.5v-2H6.25a.75.75 0 0 1 0-1.5M3 5.75v6.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-6.5a.75.75 0 0 0-.75-.75h-8.5a.75.75 0 0 0-.75.75"/></svg></span> SHARK Tuner<a class="headerlink" href="#shark-tuner" title="Permanent link">link</a></h2>
 <h3 id="overview"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.74 3.74 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574M8.755 4.75l-.004 7.322a3.75 3.75 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25"/></svg></span> Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h3>
 <p>While tuning can be done manually, the
-<a href="https://github.com/nod-ai/shark-ai/tree/main/sharktuner">SHARK Tuner</a> tool
-can automatically search through possible knob values for individual
+<a href="https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner">AMDSHARK Tuner</a>
+tool can automatically search through possible knob values for individual
 dispatches to improve overall program performance. Dispatches are blocks of
 code that are created as part of IREE's compilation flow by splitting the
 input program into blocks that can be executed concurrently and atomically.
 For further information on dispatches see the sections below.</p>
 <div class="admonition info">
 <p class="admonition-title">Info</p>
-<p>For more information about SHARK Tuner, see its source in the
-<a href="https://github.com/nod-ai/shark-ai/tree/main/sharktuner">shark-ai GitHub repository</a>
-and the <a href="https://github.com/nod-ai/shark-ai/tree/main/sharktuner/model_tuner">Model Tuner example</a>.</p>
+<p>For more information about AMDSHARK Tuner, see its source in the
+<a href="https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner">amd-shark-ai GitHub repository</a>
+and the <a href="https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner/model_tuner">Model Tuner example</a>.</p>
 </div>
 <p>In our experience, using the SHARK Tuner can provide <strong>meaningful speedup</strong> of
 model execution.</p>
