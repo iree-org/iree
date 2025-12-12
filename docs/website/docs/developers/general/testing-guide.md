@@ -521,9 +521,9 @@ tests nightly in
 
 Tests for small scale versions of Large Language Models (LLMs)
 and other Generative AI (GenAI) programs exported using the
-[sharktank package](https://github.com/nod-ai/shark-ai/tree/main/sharktank)
-built as part of the [shark-ai project](https://github.com/nod-ai/shark-ai) are
-included at
+[sharktank package](https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktank)
+built as part of the
+[amd-shark-ai project](https://github.com/nod-ai/amd-shark-ai) are included at
 [`sharktank_models/`](https://github.com/iree-org/iree-test-suites/tree/main/sharktank_models)
 in the
 [iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
@@ -544,10 +544,10 @@ Detailed steps on how to update the golden output in SDXL may be found [here](..
 
 ### SHARK-TestSuite
 
-The [nod-ai/SHARK-TestSuite](https://github.com/nod-ai/SHARK-TestSuite)
+The [nod-ai/AMD-SHARK-TestSuite](https://github.com/nod-ai/AMD-SHARK-TestSuite)
 repository also contains tests using IREE,
 [llvm/torch-mlir](https://github.com/llvm/torch-mlir), and
-[nod-ai/shark-ai](https://github.com/nod-ai/shark-ai).
+[nod-ai/amd-shark-ai](https://github.com/nod-ai/amd-shark-ai).
 
 Some test coverage may overlap between SHARK-TestSuite and iree-test-suites,
 though some tests are planned to be migrated into
