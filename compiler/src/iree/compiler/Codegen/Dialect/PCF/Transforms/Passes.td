@@ -83,4 +83,31 @@ def FusePCFWritesPass : Pass<"iree-pcf-fuse-pcf-writes", ""> {
   let dependentDialects = ["::mlir::iree_compiler::IREE::PCF::PCFDialect"];
 }
 
+def LowerStructuralPCFPass : Pass<"iree-pcf-lower-structural-pcf", ""> {
+  let summary = "Lowers pcf.generic/loop to scf.execute_region/forall";
+  let description = [{
+    Lowers structured PCF parallel ops to SCF and CF ops. This is the final
+    step of PCF lowering, converting the abstract parallel constructs to
+    concrete control flow that can be further lowered to target-specific code.
+
+    The input is expected to be IR where PCF ops no longer have tied results
+    (after `iree-pcf-convert-sref-to-memref`). The scope attribute on each op
+    determines how worker IDs and counts are materialized.
+
+    Op conversions:
+    - `pcf.generic` -> `scf.execute_region` with worker IDs from scope
+    - `pcf.loop` -> serialized `scf.forall` with iteration bounds from count operands
+    - `pcf.return` -> `scf.yield` (in generic) or `scf.forall.in_parallel` (in loop)
+    - `pcf.branch_cond_return` -> `cf.cond_br` to a return block
+
+    If `sync_on_return` is set on a parallel op, a barrier (determined by the
+    scope) is inserted after the lowered op. This attribute is introduced when
+    converting sref to memref to retain the required synchronization semantics
+    of any tied results.
+  }];
+  let dependentDialects = ["::mlir::iree_compiler::IREE::PCF::PCFDialect",
+                           "::mlir::scf::SCFDialect",
+                           "::mlir::cf::ControlFlowDialect"];
+}
+
 #endif // IREE_CODEGEN_DIALECT_PCF_TRANSFORMS_PASSES
