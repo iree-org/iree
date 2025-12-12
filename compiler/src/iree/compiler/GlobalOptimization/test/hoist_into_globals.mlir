@@ -184,3 +184,63 @@ module @hoist_index {
     util.return %1 : index
   }
 }
+
+// -----
+
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-DAG:   #[[$ENCODING_WITH_TYPE:.+]] = #iree_encoding.testing<original_element_type = i4>
+// CHECK-LABEL: @hoist_subbyte_with_encoding
+#encoding = #iree_encoding.testing<>
+module @hoist_subbyte_with_encoding {
+  // The global stores i8 with encoding that tracks the original i4 type.
+  // CHECK: util.global private @[[HOISTED:.*]] : tensor<32xi8, #[[$ENCODING_WITH_TYPE]]>
+  // CHECK: util.initializer
+  // CHECK:   %[[CST:.*]] = arith.constant dense<3> : tensor<64xi4>
+  // CHECK:   %[[ENCODE:.*]] = flow.tensor.encode %[[CST]] : tensor<64xi4> -> tensor<64xi4, #[[$ENCODING]]>
+  // CHECK:   %[[CEXPR:.*]] = "iree_unregistered.const_expr"(%[[ENCODE]])
+  // CHECK:   %[[CAST:.*]] = iree_tensor_ext.bitcast %[[CEXPR]] : tensor<64xi4, #[[$ENCODING]]> -> tensor<32xi8, #[[$ENCODING_WITH_TYPE]]>
+  // CHECK:   util.global.store %[[CAST]], @[[HOISTED]] : tensor<32xi8, #[[$ENCODING_WITH_TYPE]]>
+  // CHECK:   util.return
+
+  // CHECK: util.func public @main() -> tensor<64xi4, #[[$ENCODING]]>
+  // CHECK:   %[[GLOBAL_LD:.*]] = util.global.load immutable @[[HOISTED]] : tensor<32xi8, #[[$ENCODING_WITH_TYPE]]>
+  // CHECK:   %[[ORIG_VAL:.*]] = iree_tensor_ext.bitcast %[[GLOBAL_LD]] : tensor<32xi8, #[[$ENCODING_WITH_TYPE]]> -> tensor<64xi4, #[[$ENCODING]]>
+  // CHECK:   util.return %[[ORIG_VAL]]
+  util.func public @main() -> tensor<64xi4, #encoding> {
+    %0 = arith.constant dense<3> : tensor<64xi4>
+    %1 = flow.tensor.encode %0 : tensor<64xi4> -> tensor<64xi4, #encoding>
+    %2 = "iree_unregistered.const_expr"(%1) : (tensor<64xi4, #encoding>) -> tensor<64xi4, #encoding>
+    util.return %2 : tensor<64xi4, #encoding>
+  }
+}
+
+// -----
+
+// Negative test: tensor<63xi4> has 63*4=252 bits, not divisible by 8.
+// The bitcast conversion to i8 fails, so the tensor is hoisted without
+// byte-packing (stays as i4, no original_element_type added).
+// CHECK-DAG: #[[$ENCODING_UNALIGNED:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL: @hoist_subbyte_unaligned_with_encoding
+#encoding_unaligned = #iree_encoding.testing<>
+module @hoist_subbyte_unaligned_with_encoding {
+  // Since 63*4=252 bits is not byte-aligned, conversion fails.
+  // The tensor is still hoisted but WITHOUT converting to i8 storage.
+  // Note: no original_element_type field because no bitcast occurred.
+  // CHECK: util.global private @[[HOISTED:.*]] : tensor<63xi4, #[[$ENCODING_UNALIGNED]]>
+  // CHECK: util.initializer
+  // CHECK:   %[[CST:.*]] = arith.constant dense<3> : tensor<63xi4>
+  // CHECK:   %[[ENCODE:.*]] = flow.tensor.encode %[[CST]] : tensor<63xi4> -> tensor<63xi4, #[[$ENCODING_UNALIGNED]]>
+  // CHECK:   %[[CEXPR:.*]] = "iree_unregistered.const_expr"(%[[ENCODE]])
+  // CHECK:   util.global.store %[[CEXPR]], @[[HOISTED]] : tensor<63xi4, #[[$ENCODING_UNALIGNED]]>
+  // CHECK:   util.return
+  //
+  // CHECK: util.func public @main() -> tensor<63xi4, #[[$ENCODING_UNALIGNED]]>
+  // CHECK:   %[[GLOBAL_LD:.*]] = util.global.load immutable @[[HOISTED]] : tensor<63xi4, #[[$ENCODING_UNALIGNED]]>
+  // CHECK:   util.return %[[GLOBAL_LD]]
+  util.func public @main() -> tensor<63xi4, #encoding_unaligned> {
+    %0 = arith.constant dense<3> : tensor<63xi4>
+    %1 = flow.tensor.encode %0 : tensor<63xi4> -> tensor<63xi4, #encoding_unaligned>
+    %2 = "iree_unregistered.const_expr"(%1) : (tensor<63xi4, #encoding_unaligned>) -> tensor<63xi4, #encoding_unaligned>
+    util.return %2 : tensor<63xi4, #encoding_unaligned>
+  }
+}

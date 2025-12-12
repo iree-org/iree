@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Casting.h"
@@ -22,6 +23,73 @@
 
 namespace mlir::iree_compiler::IREE {
 using IREE::Codegen::MaterializeEncodingInfo;
+
+void adjustTileSizesForBitcast(RankedTensorType type,
+                               MaterializeEncodingInfo &info) {
+  auto encoding =
+      dyn_cast_if_present<Encoding::EncodingAttr>(type.getEncoding());
+  if (!encoding) {
+    return;
+  }
+
+  // Only adjust if the encoding has an original_element_type, indicating a
+  // bitcast occurred.
+  auto originalElementTypeAttr = encoding.getOriginalElementType();
+  if (!originalElementTypeAttr) {
+    return;
+  }
+
+  Type originalType = originalElementTypeAttr.getValue();
+  Type storageType = type.getElementType();
+
+  // No adjustment needed if types are the same.
+  if (originalType == storageType) {
+    return;
+  }
+
+  assert(originalType.isIntOrFloat() && storageType.isIntOrFloat() &&
+         "expected int or float element types in encoding");
+  unsigned originalBits = originalType.getIntOrFloatBitWidth();
+  unsigned storageBits = storageType.getIntOrFloatBitWidth();
+
+  // One bit width must be a multiple of the other.
+  assert((storageBits >= originalBits ? storageBits % originalBits
+                                      : originalBits % storageBits) == 0 &&
+         "bit widths must be multiples of each other");
+
+  // Adjust the innermost tile size based on the bit width ratio between
+  // original and storage types. The innermost dimension is where packing
+  // occurs.
+  if (info.innerTileSizes.empty()) {
+    return;
+  }
+  int64_t &innermostTileSize = info.innerTileSizes.back();
+  if (innermostTileSize == ShapedType::kDynamic) {
+    return;
+  }
+
+  // Scale the tile size: multiply by originalBits and divide by storageBits.
+  // This scales down when storage > original (e.g., i4→i8 packing).
+  int64_t scaledSize = innermostTileSize * originalBits;
+  assert(scaledSize % storageBits == 0 &&
+         "scaled tile size must be divisible by storage bits");
+  innermostTileSize = scaledSize / storageBits;
+
+  // Also adjust the swizzle's expandShape innermost dimension if present.
+  // The expandShape describes how each inner tile dimension is further split,
+  // and the innermost dimension's size must be scaled by the same ratio.
+  if (info.swizzle && !info.swizzle->expandShape.empty()) {
+    Codegen::TileSwizzle::ExpandShapeDimVectorType &innermostExpandDims =
+        info.swizzle->expandShape.back();
+    if (!innermostExpandDims.empty()) {
+      Codegen::TileSwizzle::Dim &innermostDim = innermostExpandDims.back();
+      int64_t scaledExpandSize = innermostDim.size * originalBits;
+      assert(scaledExpandSize % storageBits == 0 &&
+             "scaled expand size must be divisible by storage bits");
+      innermostDim.size = scaledExpandSize / storageBits;
+    }
+  }
+}
 
 Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
                                             OpBuilder &builder,

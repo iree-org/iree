@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -241,15 +242,19 @@ static FailureOr<AffineMap> getComposedAffineMap(Attribute attr) {
 
 EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                EncodingOpType opType, ArrayRef<Type> elemTypes,
+                               Type originalElementType,
                                ArrayRef<AffineMap> maps,
                                ArrayRef<int64_t> iterationSizes) {
   Builder b(ctx);
   auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
+  auto originalElementTypeAttr =
+      originalElementType ? TypeAttr::get(originalElementType) : TypeAttr();
   auto mapsAttr = maps.empty() ? ArrayAttr() : b.getAffineMapArrayAttr(maps);
   auto iterationSizesAttr =
       iterationSizes.empty() ? ArrayAttr() : b.getI64ArrayAttr(iterationSizes);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
+             b.getTypeArrayAttr(elemTypes), originalElementTypeAttr, mapsAttr,
+             iterationSizesAttr);
 }
 
 /// Parse a list of integer values and/or dynamic values ('?')
@@ -306,12 +311,11 @@ static void printDynamicI64ArrayAttr(AsmPrinter &p, ArrayAttr attrs) {
   return printDynamicI64IntegerList(p, intVals);
 }
 
-LogicalResult
-EncodingAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
-                     IntegerAttr operandIndexAttr,
-                     EncodingOpTypeAttr opTypeAttr, ArrayAttr elementTypesAttr,
-                     ArrayAttr userIndexingMapsAttr,
-                     ArrayAttr iterationSizesAttr) {
+LogicalResult EncodingAttr::verify(
+    function_ref<mlir::InFlightDiagnostic()> emitError,
+    IntegerAttr operandIndexAttr, EncodingOpTypeAttr opTypeAttr,
+    ArrayAttr elementTypesAttr, TypeAttr originalElementTypeAttr,
+    ArrayAttr userIndexingMapsAttr, ArrayAttr iterationSizesAttr) {
   AffineMap indexingMap;
   if (userIndexingMapsAttr) {
     unsigned operandIndex = operandIndexAttr.getValue().getZExtValue();
@@ -434,7 +438,8 @@ EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
   maps.push_back(AffineMapAttr::get(newIndexingMap));
   newMaps[operandIndex] = ArrayAttr::get(getContext(), maps);
   return get(getContext(), getOperandIndex(), getOpType(), getElementTypes(),
-             ArrayAttr::get(getContext(), newMaps), getIterationSizes());
+             getOriginalElementType(), ArrayAttr::get(getContext(), newMaps),
+             getIterationSizes());
 }
 
 bool EncodingAttr::isSerialized() const { return false; }
@@ -442,6 +447,70 @@ bool EncodingAttr::isSerialized() const { return false; }
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
   return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+}
+
+/// Helper to compute new shape when bitcasting a tensor to a different element
+/// type. Returns failure if the tensor is invalid or bits don't divide evenly.
+/// On success, returns the new shape with the last dimension adjusted.
+static FailureOr<SmallVector<int64_t>>
+computeBitcastShape(RankedTensorType tensorType, Type newElementType) {
+  ArrayRef<int64_t> shape = tensorType.getShape();
+  if (shape.empty()) {
+    return failure();
+  }
+
+  unsigned oldBitWidth =
+      IREE::Util::getTypeBitWidth(tensorType.getElementType());
+  unsigned newBitWidth = IREE::Util::getTypeBitWidth(newElementType);
+
+  // If bit widths are the same, shape doesn't change.
+  if (oldBitWidth == newBitWidth) {
+    return SmallVector<int64_t>(shape);
+  }
+
+  int64_t lastDim = shape.back();
+
+  // Compute the new last dimension based on the ratio of bit widths.
+  // totalBits = lastDim * oldBitWidth must equal newLastDim * newBitWidth.
+  int64_t totalBits = lastDim * oldBitWidth;
+  if (totalBits % newBitWidth != 0) {
+    return failure();
+  }
+  int64_t newLastDim = totalBits / newBitWidth;
+
+  SmallVector<int64_t> newShape(shape.drop_back());
+  newShape.push_back(newLastDim);
+  return newShape;
+}
+
+FailureOr<Type> EncodingAttr::convertForBitcast(Type type,
+                                                Type newElementType) const {
+  auto tensorType = dyn_cast<RankedTensorType>(type);
+  if (!tensorType) {
+    return failure();
+  }
+  auto encoding = dyn_cast_or_null<EncodingAttr>(tensorType.getEncoding());
+  if (!encoding) {
+    return failure();
+  }
+
+  FailureOr<SmallVector<int64_t>> newShape =
+      computeBitcastShape(tensorType, newElementType);
+  if (failed(newShape)) {
+    return failure();
+  }
+
+  // Preserve the original element type if not already set, or keep the
+  // existing one if this is a chain of bitcasts.
+  Type originalElemType = encoding.getOriginalElementType()
+                              ? encoding.getOriginalElementType().getValue()
+                              : tensorType.getElementType();
+  EncodingAttr newEncoding = EncodingAttr::get(
+      getContext(), encoding.getOperandIndex().getValue().getZExtValue(),
+      encoding.getOpType().getValue(), encoding.getElementTypesArray(),
+      originalElemType, encoding.getRootMaps(),
+      encoding.getIterationSizesArray());
+  return RankedTensorType::get(*newShape, newElementType, newEncoding);
 }
 
 std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
@@ -659,7 +728,31 @@ bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
 Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
-  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts),
+                          getOriginalElementType());
+}
+
+FailureOr<Type> TestingAttr::convertForBitcast(Type type,
+                                               Type newElementType) const {
+  auto tensorType = dyn_cast<RankedTensorType>(type);
+  if (!tensorType) {
+    return failure();
+  }
+
+  FailureOr<SmallVector<int64_t>> newShape =
+      computeBitcastShape(tensorType, newElementType);
+  if (failed(newShape)) {
+    return failure();
+  }
+
+  // Preserve the original element type if not already set, or keep the
+  // existing one if this is a chain of bitcasts.
+  Type originalElemType = getOriginalElementType()
+                              ? getOriginalElementType()
+                              : tensorType.getElementType();
+  auto newAttr =
+      TestingAttr::get(tensorType.getContext(), getLayouts(), originalElemType);
+  return RankedTensorType::get(*newShape, newElementType, newAttr);
 }
 
 Attribute

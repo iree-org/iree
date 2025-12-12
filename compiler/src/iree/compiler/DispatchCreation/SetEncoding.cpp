@@ -162,7 +162,8 @@ static LogicalResult setDataTilingEncodings(RewriterBase &rewriter,
     MLIRContext *ctx = linalgOp.getContext();
     Attribute encoding = EncodingAttr::get(
         ctx, operandIndex, encodingInfo->opType, encodingInfo->elemTypes,
-        encodingInfo->maps, encodingInfo->iterationSizes);
+        /*originalElementType=*/{}, encodingInfo->maps,
+        encodingInfo->iterationSizes);
     return setEncoding(rewriter, loc, src, encoding);
   };
 

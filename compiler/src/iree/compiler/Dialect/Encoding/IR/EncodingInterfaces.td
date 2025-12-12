@@ -193,6 +193,26 @@ def IREEEncoding_SerializableAttr :
         assert(false && "unimplemented interface method");
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Converts the type for a bitcast operation. Given a tensor type with this
+        encoding and a new element type, returns the converted type with updated
+        shape and/or encoding to maintain the same total bit count.
+        Returns failure if the conversion is not possible (e.g., bits don't
+        divide evenly).
+      }],
+      /*retTy=*/"::llvm::FailureOr<::mlir::Type>",
+      /*methodName=*/"convertForBitcast",
+      /*args=*/(ins
+        "::mlir::Type":$type,
+        "::mlir::Type":$new_element_type
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
+      }]
     >
   ];
 
