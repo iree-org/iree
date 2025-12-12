@@ -193,27 +193,6 @@ def IREEEncoding_SerializableAttr :
         assert(false && "unimplemented interface method");
         return {};
       }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the tensor type without encoding if it's possible to drop the
-        encoding without further materialization.
-        It is up to the semantics of the concrete encoding implementing the
-        interface to decide if and when it's possible to drop the encoding.
-        If it is possible to drop the encoding, this will return a new ranked
-        tensor type without the encoding attached, otherwise it will return the
-        original type.
-      }],
-      /*retTy=*/"::mlir::RankedTensorType",
-      /*methodName=*/"dropWithoutMaterialization",
-      /*args=*/(ins
-        "::mlir::RankedTensorType":$type
-      ),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        assert(isa<ConcreteAttr>(type.getEncoding()));
-        return type;
-      }]
     >
   ];
 

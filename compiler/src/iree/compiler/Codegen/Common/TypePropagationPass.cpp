@@ -93,17 +93,11 @@ static std::optional<Type> getLegalizedType(Type t) {
 
 static std::optional<Type> dropEncodingWithoutMaterialization(Type t) {
   if (auto shapedType = dyn_cast<RankedTensorType>(t)) {
-    if (IREE::Encoding::SerializableAttr encoding =
-            dyn_cast_if_present<IREE::Encoding::SerializableAttr>(
+    // TODO(#21185): Remove special casing and replace with more generic logic.
+    if (auto packedStorage =
+            dyn_cast_if_present<IREE::Encoding::PackedStorageAttr>(
                 shapedType.getEncoding())) {
-      RankedTensorType newTy = encoding.dropWithoutMaterialization(shapedType);
-      // As we have already propagated bitwidths to all tensors in the first
-      // phase, we don't allow a change in element type/bitwidth in the second
-      // phase.
-      if (newTy.getElementType() != shapedType.getElementType()) {
-        return std::nullopt;
-      }
-      return newTy;
+      return shapedType.dropEncoding();
     }
   }
   return t;
