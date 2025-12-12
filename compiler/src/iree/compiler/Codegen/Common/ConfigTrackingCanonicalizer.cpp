@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -61,6 +63,60 @@ void ConfigTrackingListener::notifyOperationReplaced(Operation *op,
 
 namespace {
 
+/// Fold tensor.insert_slice into tensor.empty when the inserted slice covers
+/// the entire destination tensor. This pattern handles both static and dynamic
+/// dimensions by comparing mixed sizes.
+///
+/// Example:
+///   %0 = tensor.empty(%d) : tensor<?x128xf32>
+///   %1 = tensor.insert_slice %src into %0[0, 0][%d, 128][1, 1]
+///        : tensor<?x128xf32> into tensor<?x128xf32>
+/// Folds to:
+///   %1 = tensor.cast %src : tensor<?x128xf32> to tensor<?x128xf32>
+/// Or just %src if types match.
+class FoldFullInsertSliceIntoEmpty final
+    : public OpRewritePattern<tensor::InsertSliceOp> {
+public:
+  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
+                                PatternRewriter &rewriter) const override {
+    // Check that the destination is a tensor.empty.
+    auto emptyOp = insertOp.getDest().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) {
+      return failure();
+    }
+
+    // Check that all offsets are zero and all strides are one.
+    if (!areAllConstantIntValue(insertOp.getMixedOffsets(), 0) ||
+        !areAllConstantIntValue(insertOp.getMixedStrides(), 1)) {
+      return failure();
+    }
+
+    // Get the mixed sizes of both the insert_slice and the empty tensor.
+    SmallVector<OpFoldResult> insertSizes = insertOp.getMixedSizes();
+    SmallVector<OpFoldResult> emptySizes = emptyOp.getMixedSizes();
+
+    // Check that the sizes are equal (including dynamic dimensions).
+    // Use isEqualConstantIntOrValueArray which handles both static and dynamic
+    // sizes correctly.
+    if (!isEqualConstantIntOrValueArray(insertSizes, emptySizes)) {
+      return failure();
+    }
+
+    // The insert_slice covers the entire tensor, so we can replace it with
+    // the source (possibly with a cast if types differ).
+    Value source = insertOp.getSource();
+    if (source.getType() == insertOp.getType()) {
+      rewriter.replaceOp(insertOp, source);
+    } else {
+      rewriter.replaceOpWithNewOp<tensor::CastOp>(insertOp, insertOp.getType(),
+                                                  source);
+    }
+    return success();
+  }
+};
+
 /// Add the corresponding fast-math flags to operations given a floating-point
 /// optimization mode.
 // TODO: For now we only allow default flags, such as arithmetic reassociation.
@@ -81,6 +137,9 @@ public:
       dialect->getCanonicalizationPatterns(owningPatterns);
     for (RegisteredOperationName op : context->getRegisteredOperations())
       op.getCanonicalizationPatterns(owningPatterns, context);
+
+    // Add custom patterns.
+    owningPatterns.add<FoldFullInsertSliceIntoEmpty>(context);
 
     patterns =
         std::make_shared<FrozenRewritePatternSet>(std::move(owningPatterns));

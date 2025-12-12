@@ -432,3 +432,55 @@ func.func @consumer_unfusable_due_to_init(%arg0: tensor<?xi32>, %arg1: tensor<?x
 //       DISPATCH-SCOPE:     scf.forall.in_parallel
 //       DISPATCH-SCOPE:       tensor.parallel_insert_slice
 //       DISPATCH-SCOPE:   linalg.generic
+
+// -----
+
+// Test that pcf.write_slice with workgroup-scoped destination triggers
+// map_scatter insertion at workgroup scope.
+
+func.func @pcf_write_slice_with_transpose(%source : tensor<32xbf16>,
+                                          %dest : !pcf.sref<32xbf16, #iree_codegen.workgroup>) {
+  %init = tensor.empty() : tensor<4x8xbf16>
+  %expand = tensor.expand_shape %source [[0, 1]] output_shape [8, 4] : tensor<32xbf16> into tensor<8x4xbf16>
+  %transpose = linalg.transpose ins(%expand : tensor<8x4xbf16>) outs(%init : tensor<4x8xbf16>) permutation = [1, 0]
+  %collapse = tensor.collapse_shape %transpose [[0, 1]] : tensor<4x8xbf16> into tensor<32xbf16>
+  pcf.write_slice %collapse into %dest[0] [32] [1] : tensor<32xbf16> into !pcf.sref<32xbf16, #iree_codegen.workgroup>
+  return
+}
+
+// WORKGROUP-SCOPE-LABEL: @pcf_write_slice_with_transpose
+//       WORKGROUP-SCOPE:   iree_linalg_ext.map_scatter
+//       WORKGROUP-SCOPE:   pcf.write_slice
+
+// -----
+
+// Test that pcf.write_slice with non-workgroup scoped destination does NOT
+// trigger map_scatter insertion.
+
+func.func @pcf_write_slice_non_workgroup_scope(%source : tensor<32xbf16>,
+                                               %dest : !pcf.sref<32xbf16, #pcf.test_scope>) {
+  %init = tensor.empty() : tensor<4x8xbf16>
+  %expand = tensor.expand_shape %source [[0, 1]] output_shape [8, 4] : tensor<32xbf16> into tensor<8x4xbf16>
+  %transpose = linalg.transpose ins(%expand : tensor<8x4xbf16>) outs(%init : tensor<4x8xbf16>) permutation = [1, 0]
+  %collapse = tensor.collapse_shape %transpose [[0, 1]] : tensor<4x8xbf16> into tensor<32xbf16>
+  pcf.write_slice %collapse into %dest[0] [32] [1] : tensor<32xbf16> into !pcf.sref<32xbf16, #pcf.test_scope>
+  return
+}
+
+// WORKGROUP-SCOPE-LABEL: @pcf_write_slice_non_workgroup_scope
+//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter
+
+// -----
+
+// Test that pcf.write_slice with only reshape ops does NOT trigger map_scatter
+// insertion (bufferization can handle it).
+
+func.func @pcf_write_slice_reshape_only(%source : tensor<8x4xbf16>,
+                                        %dest : !pcf.sref<32xbf16, #iree_codegen.workgroup>) {
+  %collapse = tensor.collapse_shape %source [[0, 1]] : tensor<8x4xbf16> into tensor<32xbf16>
+  pcf.write_slice %collapse into %dest[0] [32] [1] : tensor<32xbf16> into !pcf.sref<32xbf16, #iree_codegen.workgroup>
+  return
+}
+
+// WORKGROUP-SCOPE-LABEL: @pcf_write_slice_reshape_only
+//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter

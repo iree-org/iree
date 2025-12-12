@@ -123,6 +123,28 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def ConvertWorkgroupForallToPCFPass
+    : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
+  let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
+  let description = [{
+    Converts `scf.forall` ops with `#iree_codegen.workgroup_mapping` attributes
+    to `pcf.loop` ops with workgroup scope.
+
+    The input is IR containing `scf.forall` ops mapped to workgroups via
+    `#iree_codegen.workgroup_mapping<x/y/z>` attributes. The pass linearizes
+    all workgroup IDs down to a single dimension to handle cases where multiple
+    foralls have incompatible delinearization bases.
+
+    The output replaces each matching forall with a `pcf.loop` using
+    `#iree_codegen.workgroup<linearize>` scope. Additionally, an
+    `iree_codegen.workgroup_count_hint` is inserted before each loop to
+    communicate the required workgroup count to the export's count region.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::PCF::PCFDialect"
+  ];
+}
+
 def CombineLayoutTransformationPass :
     InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
@@ -150,6 +172,37 @@ def CombineLayoutTransformationPass :
   ];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
+def CombineSplitKWorkgroupLoopPass
+    : Pass<"iree-codegen-combine-splitk-workgroup-loop"> {
+  let summary = "Combines split-k reduction scf.forall with nested pcf.loop into pcf.generic";
+  let description = [{
+    Transforms split-k reduction patterns by combining an `scf.forall` with
+    `#iree_linalg_ext.split_reduction_mapping` containing a `pcf.loop` into a
+    single `pcf.generic` operation.
+
+    The input is IR with:
+    - An outer `scf.forall` with split_reduction_mapping (the reduction dimension)
+    - A nested `pcf.loop` with workgroup scope (the parallel workgroup dimension)
+    - `tensor.parallel_insert_slice` terminators that write `pcf.loop` results
+
+    The output replaces this structure with a single `pcf.generic`:
+    - The combined iteration space is `forall_iters * loop_count`
+    - An outer `scf.for` iterates over the forall dimensions with proper
+      delinearization for load balancing across workgroups
+    - An inner `scf.for` iterates over the original `pcf.loop` dimension
+    - `pcf.write_slice` ops are composed with the `parallel_insert_slice` offsets
+    - A workgroup count hint is created for the combined iteration count
+  }];
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "iree_compiler::IREE::PCF::PCFDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect"
   ];
@@ -500,6 +553,36 @@ def FoldTensorExtractOpPass :
     folded to use a load of the created memref object that holds the constant
     values.
   }];
+}
+
+def FuseTensorToBufferConvertersPass :
+  Pass<"iree-codegen-fuse-tensor-to-buffer-converters", ""> {
+  let summary = "Fuse tensor to buffer converter ops into PCF ops";
+  let description = [{
+    Fuses tensor-to-buffer converter operations into producer `pcf.loop` and
+    `pcf.generic` ops by moving writes directly into the PCF region.
+
+    The input is IR containing store operations that consume PCF op results:
+    - `iree_codegen.store_to_buffer` ops storing to memref buffers
+    - `iree_tensor_ext.dispatch.tensor.store` ops storing to dispatch tensors
+
+    The pass moves each store inside the PCF region by:
+    - Finding the `pcf.write_slice` ops that produce the stored result
+    - Creating corresponding buffer writes (`memref.subview` + copy/transfer_write
+      for `store_to_buffer`, composed `dispatch.tensor.store` for dispatch stores)
+    - Erasing the original store op
+
+    Additional cleanup patterns are included:
+    - Composing nested `tensor.extract_slice` ops inside PCF contexts
+    - Fusing rank-increasing `tensor.expand_shape` into buffer stores
+    - Fusing rank-reducing `tensor.insert_slice` into dispatch stores
+    - Folding `vector.transfer_read` of `tensor.empty` to `ub.poison`
+  }];
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::memref::MemRefDialect"
+  ];
 }
 
 def ForallToForPass :

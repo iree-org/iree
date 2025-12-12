@@ -45,7 +45,7 @@ module {
 
 //   CHECK-LABEL:  func.func @sort2D_static_shape
 //         CHECK:      amdgpu.fat_raw_buffer_cast
-//         CHECK:      scf.forall
+//         CHECK:      pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //         CHECK:        memref.subview
 //         CHECK:        scf.for
 
@@ -76,6 +76,6 @@ module {
 
 //   CHECK-LABEL:  func.func @sort3D_dynamic_shape
 //         CHECK:      amdgpu.fat_raw_buffer_cast
-//         CHECK:      scf.forall
+//         CHECK:      pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //         CHECK:       scf.for
 //         CHECK:         memref.subview

@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
@@ -111,6 +112,11 @@ static llvm::cl::opt<bool> clPatchFuncOps(
         "Perform the patches on func ops for debugging purpose. It should be "
         "used with `--iree-codegen-debug-patched-func-ops-file-name`."),
     llvm::cl::init(false), llvm::cl::Hidden);
+
+static llvm::cl::opt<bool>
+    clTestPCF("iree-llvmgpu-test-pcf",
+              llvm::cl::desc("tests using pcf for workgroup distributed loops"),
+              llvm::cl::init(true), llvm::cl::Hidden);
 
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
@@ -251,6 +257,12 @@ static void tileAndDistributeToWorkgroup(
   //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+
+  // Convert workgroup forall to PCF for better parallel control flow
+  // representation.
+  if (useForall && clTestPCF) {
+    funcPassManager.addPass(createConvertWorkgroupForallToPCFPass());
+  }
 }
 
 static void tileAndBufferize(OpPassManager &funcPassManager) {
@@ -269,6 +281,10 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+
+  // Fuse PCF writes before vectorization for better optimization opportunities.
+  funcPassManager.addPass(IREE::PCF::createFusePCFWritesPass());
+
   funcPassManager.addPass(
       IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
   // Vectorize.
@@ -363,6 +379,11 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
 }
 
 static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
+  // Last chance to emplace dispatch results.
+  funcPassManager.addPass(createCombineSplitKWorkgroupLoopPass());
+  funcPassManager.addPass(createFuseTensorToBufferConvertersPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createEliminateEmptyTensorsPass());
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(createGPUInferMemorySpacePass());
@@ -538,6 +559,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
+  funcPassManager.addPass(IREE::PCF::createFuseConsumersPass());
   funcPassManager.addPass(createGPUFuseAndHoistParallelLoopsPass());
   CombineLayoutTransformationPassOptions combineLayoutOptions;
   combineLayoutOptions.scope =
@@ -975,7 +997,15 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
+  // PCF Lowerings
+  modulePassManager.addPass(IREE::PCF::createResolveTokensPass());
+  modulePassManager.addPass(IREE::PCF::createConvertSRefToMemRefPass());
+
   FunctionLikeNest(modulePassManager)
+      // PCF -> SCF
+      .addPass(IREE::PCF::createLowerStructuralPCFPass)
+      .addPass(createCanonicalizerPass)
+      .addPass(createCSEPass)
       // LinalgExt -> SCF
       .addPass(IREE::LinalgExt::createLinalgExtToLoopsPass)
 

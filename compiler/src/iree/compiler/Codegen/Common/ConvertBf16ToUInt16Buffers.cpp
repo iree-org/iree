@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCFDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/SmallVector.h"
@@ -293,10 +294,10 @@ struct ConvertBf16ToUInt16BuffersPass final
         return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
       });
       target.addLegalOp<arith::TruncFOp, arith::ExtFOp, ModuleOp>();
-      target.addDynamicallyLegalDialect<arith::ArithDialect, func::FuncDialect,
-                                        IREE::HAL::HALDialect,
-                                        memref::MemRefDialect, scf::SCFDialect,
-                                        IREE::Codegen::IREECodegenDialect>(
+      target.addDynamicallyLegalDialect<
+          arith::ArithDialect, func::FuncDialect, IREE::HAL::HALDialect,
+          memref::MemRefDialect, scf::SCFDialect,
+          IREE::Codegen::IREECodegenDialect, IREE::PCF::PCFDialect>(
           [&typeConverter](Operation *op) {
             bool legal = typeConverter.isLegal(op);
             LLVM_DEBUG(if (!legal) llvm::dbgs()
