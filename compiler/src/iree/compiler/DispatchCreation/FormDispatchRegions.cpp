@@ -780,8 +780,6 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         if (isFusableWithConsumer(*fusableUse, tracker, options)) {
           tracker.appendToFusionGroup(consumerOp, fusionGroup);
           workList.push_back(consumerOp);
-        } else {
-          break;
         }
       }
     }
