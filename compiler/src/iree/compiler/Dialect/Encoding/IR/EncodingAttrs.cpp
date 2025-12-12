@@ -600,6 +600,12 @@ Attribute IdentityResolverAttr::getLayout(RankedTensorType type) const {
   return Encoding::IdentityAttr::get(getContext());
 }
 
+Attribute
+IdentityResolverAttr::getUnifiedEncoding(ArrayRef<Attribute> encodings) const {
+  MLIRContext *ctx = getContext();
+  return Encoding::IdentityAttr::get(ctx);
+}
+
 Type IdentityResolverAttr::convertType(Type type) const {
   using IREE::TensorExt::DispatchTensorType;
   return TypeSwitch<Type, Type>(type)
@@ -671,6 +677,12 @@ Attribute SpecializationResolverAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
   return SpecializedAttr::get(ctx, getSeed(),
                               TypeAttr::get(type.dropEncoding()));
+}
+
+Attribute SpecializationResolverAttr::getUnifiedEncoding(
+    ArrayRef<Attribute> encodings) const {
+  MLIRContext *ctx = getContext();
+  return SpecializedAttr::get(ctx, getSeed(), /*type=*/nullptr);
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding
