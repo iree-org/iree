@@ -497,7 +497,7 @@ func.func @attention(
 // CHECK-SAME: outs(%[[acc_norm]]
 // CHECK:   arith.mulf
 // CHECK:   arith.addf
-// CHECK: return 
+// CHECK: return
 // CHECK-SAME: %[[M]]
 // CHECK-SAME: %[[SUM]]
 // CHECK-SAME: %[[PV]]
