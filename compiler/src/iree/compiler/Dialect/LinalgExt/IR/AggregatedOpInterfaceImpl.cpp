@@ -1048,13 +1048,18 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
 // ExpReductionOp
 //===----------------------------------------------------------------------===//
 
+struct UsedOperationsAndBlockArguments {
+  SetVector<int64_t> usedInputIndices;
+  SetVector<Operation *> usedOperations;
+};
+
 /// For a given resultNumber in a linalg::GenericOp, this op scans the
 /// GenericOp's body for:
 /// 1. The index of the inputs used to compute the result
 /// 2. The operations used to compute the result
-static LogicalResult captureUsedOperationsAndBlockArguments(
-    linalg::GenericOp linalgOp, SetVector<int64_t> &usedInputs,
-    SetVector<Operation *> &usedOperations, int64_t resultNumber) {
+static FailureOr<UsedOperationsAndBlockArguments>
+captureUsedOperationsAndBlockArguments(linalg::GenericOp linalgOp,
+                                       int64_t resultNumber) {
   BackwardSliceOptions options;
   options.inclusive = true;
   options.filter = [&linalgOp](Operation *op) -> bool {
@@ -1062,14 +1067,14 @@ static LogicalResult captureUsedOperationsAndBlockArguments(
   };
   auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
   Value result = yieldOp.getOperand(resultNumber);
-
-  if (failed(getBackwardSlice(result, &usedOperations, options))) {
+  UsedOperationsAndBlockArguments retval;
+  if (failed(getBackwardSlice(result, &retval.usedOperations, options))) {
     return failure();
   }
 
   // Get all block arguments used by the operations. If any of the arguments
   // used is a dpsInit argument other than resultNumber, return failure.
-  for (Operation *op : usedOperations) {
+  for (Operation *op : retval.usedOperations) {
     for (Value operand : op->getOperands()) {
       auto blockArg = dyn_cast<BlockArgument>(operand);
       if (!blockArg) {
@@ -1080,7 +1085,7 @@ static LogicalResult captureUsedOperationsAndBlockArguments(
       }
       int64_t argNumber = blockArg.getArgNumber();
       if (argNumber < linalgOp.getNumDpsInputs()) {
-        usedInputs.insert(argNumber);
+        retval.usedInputIndices.insert(argNumber);
         continue;
       }
       if (argNumber - linalgOp.getNumDpsInputs() != resultNumber) {
@@ -1089,7 +1094,7 @@ static LogicalResult captureUsedOperationsAndBlockArguments(
     }
   }
 
-  return success();
+  return retval;
 }
 
 /// this function decomposes a linalg::GenericOp with multiple results into
@@ -1097,7 +1102,7 @@ static LogicalResult captureUsedOperationsAndBlockArguments(
 /// if the linalgOp only has one result, return failure
 static FailureOr<SmallVector<linalg::GenericOp>>
 decomposeMultipleResults(linalg::GenericOp genericOp, RewriterBase &rewriter) {
-  if (genericOp.getNumResults() <= 2) {
+  if (genericOp.getNumResults() < 2) {
     return SmallVector<linalg::GenericOp>{genericOp};
   }
 
@@ -1109,23 +1114,21 @@ decomposeMultipleResults(linalg::GenericOp genericOp, RewriterBase &rewriter) {
     auto yieldOp = cast<linalg::YieldOp>(genericOp.getBlock()->getTerminator());
     Value result = yieldOp.getOperand(resultNumber);
     // Get all operations required to produce this result.
-    SetVector<Operation *> usedOperations;
-    SetVector<int64_t> usedInputs;
-    if (failed(captureUsedOperationsAndBlockArguments(
-            genericOp, usedInputs, usedOperations, resultNumber))) {
+    auto usedOperationsAndBlockArguments =
+        captureUsedOperationsAndBlockArguments(genericOp, resultNumber);
+    if (failed(usedOperationsAndBlockArguments)) {
       return failure();
     }
     // Create a new linalg.generic operation for this result.
-    SmallVector<Value> inputs = llvm::map_to_vector(usedInputs, [&](int64_t x) {
-      return genericOp.getDpsInputOperand(x)->get();
-    });
+    SmallVector<Value> inputs = llvm::map_to_vector(
+        usedOperationsAndBlockArguments->usedInputIndices,
+        [&](int64_t x) { return genericOp.getDpsInputOperand(x)->get(); });
     SmallVector<Value> inits = {
         genericOp.getDpsInitOperand(resultNumber)->get()};
 
-    SmallVector<AffineMap> indexingMaps =
-        llvm::map_to_vector(usedInputs, [&](int64_t x) {
-          return genericOp.getIndexingMapsArray()[x];
-        });
+    SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
+        usedOperationsAndBlockArguments->usedInputIndices,
+        [&](int64_t x) { return genericOp.getIndexingMapsArray()[x]; });
     indexingMaps.push_back(genericOp.getIndexingMapMatchingResult(
         genericOp->getOpResult(resultNumber)));
     llvm::SmallBitVector unusedDims = getUnusedDimsBitVector(indexingMaps);
@@ -1141,14 +1144,17 @@ decomposeMultipleResults(linalg::GenericOp genericOp, RewriterBase &rewriter) {
         indexingMaps, iteratorTypes,
         [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
           Block *oldBody = genericOp.getBody();
-          usedInputs.insert(resultNumber + genericOp.getNumDpsInputs());
+          usedOperationsAndBlockArguments->usedInputIndices.insert(
+              resultNumber + genericOp.getNumDpsInputs());
           IRMapping regionMapping;
-          for (auto [oldBlockArgNum, newBlockArg] :
-               llvm::zip_equal(usedInputs, blockArgs)) {
+          for (auto [oldBlockArgNum, newBlockArg] : llvm::zip_equal(
+                   usedOperationsAndBlockArguments->usedInputIndices,
+                   blockArgs)) {
             regionMapping.map(oldBody->getArgument(oldBlockArgNum),
                               newBlockArg);
           }
-          for (Operation *usedOperation : usedOperations) {
+          for (Operation *usedOperation :
+               usedOperationsAndBlockArguments->usedOperations) {
             b.clone(*usedOperation, regionMapping);
           }
           linalg::YieldOp::create(b, loc, regionMapping.lookup(result));
@@ -1213,16 +1219,17 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
 
   IRMapping mapper;
   getBodyRegion().cloneInto(&expRedGeneric.getBodyRegion(), mapper);
+  IRRewriter::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(expRedGeneric.getBody()->getTerminator());
   auto yieldOp =
       cast<IREE::LinalgExt::YieldOp>(expRedGeneric.getBody()->getTerminator());
   rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp, yieldOp.getOperands());
-
   FailureOr<SmallVector<linalg::GenericOp>> decomposedResults =
       decomposeMultipleResults(expRedGeneric, rewriter);
   if (failed(decomposedResults)) {
     return failure();
   }
+
   return llvm::map_to_vector(
       decomposedResults.value(),
       [](linalg::GenericOp op) -> Value { return op->getResult(0); });

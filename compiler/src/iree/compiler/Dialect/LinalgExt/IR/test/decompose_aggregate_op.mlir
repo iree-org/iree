@@ -428,7 +428,7 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-func.func @attention(
+func.func @exp_reduction(
   %s_in: tensor<20x4096x4096xf32>,
   %v_in: tensor<20x4096x64xf32>,
   %max_init: tensor<20x4096xf32>,
@@ -464,40 +464,35 @@ func.func @attention(
 
   return %max, %sumt, %pv : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
 }
-// CHECK-LABEL: @attention
-// CHECK-SAME: %[[S:[0-9A-Za-z]*]]: tensor<20x4096x4096xf32>
-// CHECK-SAME: %[[V:[0-9A-Za-z]*]]: tensor<20x4096x64xf32>
-// CHECK: %[[M:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[S]]
-// CHECK-SAME: outs(
-// CHECK:   arith.maximumf
-// CHECK: %[[sub:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[M]]
-// CHECK-SAME: outs(%[[S]]
-// CHECK:   arith.subf
-// CHECK:   math.exp2
-// CHECK: %[[n:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[M]]
-// CHECK:   arith.subf
-// CHECK:   math.exp2
-// norms
-// CHECK: %[[max_norm:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[n]]
-// CHECK:   arith.mulf
-// CHECK: %[[acc_norm:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[n]]
-// CHECK:   arith.mulf
-// reduction body
-// CHECK: %[[SUM:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[sub]]
-// CHECK-SAME: outs(%[[max_norm]]
-// CHECK:   arith.addf
-// CHECK: %[[PV:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[sub]], %[[V]]
-// CHECK-SAME: outs(%[[acc_norm]]
-// CHECK:   arith.mulf
-// CHECK:   arith.addf
-// CHECK: return
-// CHECK-SAME: %[[M]]
-// CHECK-SAME: %[[SUM]]
-// CHECK-SAME: %[[PV]]
+// CHECK-LABEL: @exp_reduction
+// CHECK-SAME:    %[[S:[0-9A-Za-z]*]]: tensor<20x4096x4096xf32>
+// CHECK-SAME:    %[[V:[0-9A-Za-z]*]]: tensor<20x4096x64xf32>
+// CHECK:       %[[M:.*]]       = linalg.generic
+// CHECK-SAME:                      ins(%[[S]]
+// CHECK-SAME:                      outs(
+// CHECK:                             arith.maximumf
+// CHECK:       %[[sub:.*]]     = linalg.generic
+// CHECK-SAME:                      ins(%[[M]]
+// CHECK-SAME:                      outs(%[[S]]
+// CHECK:                             arith.subf
+// CHECK:                             math.exp2
+// CHECK:       %[[n:.*]]       = linalg.generic
+// CHECK-SAME:                      ins(%[[M]]
+// CHECK:                             arith.subf
+// CHECK:                             math.exp2
+// CHECK:      %[[max_norm:.*]] = linalg.generic
+// CHECK-SAME:                      ins(%[[n]]
+// CHECK:                             arith.mulf
+// CHECK:      %[[acc_norm:.*]] = linalg.generic
+// CHECK-SAME:                      ins(%[[n]]
+// CHECK:                             arith.mulf
+// CHECK:      %[[SUM:.*]]      = linalg.generic
+// CHECK-SAME:                      ins(%[[sub]]
+// CHECK-SAME:                      outs(%[[max_norm]]
+// CHECK:                             arith.addf
+// CHECK:      %[[PV:.*]]       = linalg.generic
+// CHECK-SAME:                      ins(%[[sub]], %[[V]]
+// CHECK-SAME:                      outs(%[[acc_norm]]
+// CHECK:                             arith.mulf
+// CHECK:                             arith.addf
+// CHECK:      return %[[M]], %[[SUM]], %[[PV]]
