@@ -171,6 +171,19 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
         continue;
       }
     }
+    // Match architecture if specified. Expects an ArrayAttr of StringAttr,
+    // e.g., archs = ["gfx942", "gfx950"]
+    if (auto archs = dyn_cast_if_present<ArrayAttr>(
+            info.getMatch().get(kUKernelInfoArchsName))) {
+      StringRef targetArch = targetAttr.getArch();
+      bool matched = llvm::any_of(archs, [&](Attribute attr) {
+        auto strAttr = dyn_cast<StringAttr>(attr);
+        return strAttr && strAttr.getValue() == targetArch;
+      });
+      if (!matched) {
+        continue;
+      }
+    }
     // Read the data-tiled-layout attribute.
     Attribute mma = info.getMma();
     if (!mma) {
