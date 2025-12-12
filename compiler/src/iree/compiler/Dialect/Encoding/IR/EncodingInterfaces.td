@@ -69,6 +69,29 @@ def IREEEncoding_LayoutResolverAttr :
         assert(false && "unimplemented interface method");
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a unified encoding attribute given a list of candidate encoding
+        attributes. This is used when multiple encodings are used for the same
+        source data and need to be unified to a single encoding.
+
+        The resolver implementation can create any encoding based on
+        backend-specific heuristics. The returned encoding does not need to be
+        one of the input encodings - for example, a resolver might return an
+        identity encoding for simplicity, or synthesize a new encoding that
+        introduces less overheads in relayout.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getUnifiedEncoding",
+      /*args=*/(ins
+        "llvm::ArrayRef<::mlir::Attribute>":$encodings
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return {};
+      }]
     >
   ];
 }

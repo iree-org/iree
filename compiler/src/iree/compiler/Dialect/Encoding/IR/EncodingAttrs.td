@@ -278,6 +278,7 @@ def IdentityResolverAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
+        "getUnifiedEncoding",
       ]>,
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutMaterializerAttr, [
         "convertType",
@@ -361,6 +362,7 @@ def SpecializationResolverAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
+        "getUnifiedEncoding",
       ]>
     ]> {
   let mnemonic = "specialization_resolver";
