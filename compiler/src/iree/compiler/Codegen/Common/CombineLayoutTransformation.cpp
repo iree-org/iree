@@ -18,6 +18,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-combine-layout-transformation"
 
@@ -357,6 +358,75 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
     scf::IfOp::create(b, loopLoc, mask, thenBuilder);
   };
 
+  auto stopConditionFn = [](Value /*v*/, std::optional<int64_t> /*dim*/,
+                            ValueBoundsConstraintSet & /*cstr*/) -> bool {
+    return false;
+  };
+
+  // Prove that range [lb, ub) is empty (lb >= ub).
+  //
+  // For high padding, we have:
+  //   lb = low + srcSize
+  //   ub = resultSize
+  // and for a well-formed pad, resultSize = srcSize + low + high, so:
+  //   ub - lb = high
+  // Therefore "lb >= ub" => "high == 0". Expressing the check in terms of lb/ub
+  // keeps it robust even when pad amount has been rewritten into a complex
+  // form.
+  auto proveEmptyRange = [&](RewriterBase &rewriter, Location loc, Value lb,
+                             Value ub) -> bool {
+    using presburger::BoundType;
+
+    // Materialize diff = ub - lb and ask for a constant upper bound on diff.
+    // If we can prove UB(diff) <= 0, then diff <= 0 => ub - lb <= 0 => lb >=
+    // ub.
+    Value diff = arith::SubIOp::create(rewriter, loc, ub, lb);
+
+    auto ubConstantBound = ValueBoundsConstraintSet::computeConstantBound(
+        BoundType::UB, ValueBoundsConstraintSet::Variable(diff),
+        /*stopCondition=*/stopConditionFn,
+        /*addConservativeSemiAffineBounds=*/true);
+
+    return succeeded(ubConstantBound) && *ubConstantBound <= 0;
+  };
+
+  // Prove v == 0 by proving both:
+  //   LB(v) == 0  and  UB(v) == 0
+  //
+  // This is intentionally strict (see stopConditionFn): if ValueBounds cannot
+  // prove either bound, it returns failure and we treat v as "not provably
+  // zero".
+  auto proveEqZero = [&](Value v) -> bool {
+    using presburger::BoundType;
+
+    // Query constant upper bound of v.
+    FailureOr<int64_t> ub = ValueBoundsConstraintSet::computeConstantBound(
+        BoundType::UB, ValueBoundsConstraintSet::Variable(v),
+        /*stopCondition=*/stopConditionFn,
+        /*addConservativeSemiAffineBounds=*/true);
+
+    // Query constant lower bound of v.
+    FailureOr<int64_t> lb = ValueBoundsConstraintSet::computeConstantBound(
+        BoundType::LB, ValueBoundsConstraintSet::Variable(v),
+        /*stopCondition=*/stopConditionFn,
+        /*addConservativeSemiAffineBounds=*/true);
+
+    return succeeded(ub) && succeeded(lb) && *ub == 0 && *lb == 0;
+  };
+
+  auto isProvablyZeroOfr = [&](OpFoldResult ofr) -> bool {
+    // static 0?
+    if (isConstantIntValue(ofr, 0)) {
+      return true;
+    }
+
+    // dynamic %v == 0?
+    if (auto v = dyn_cast<Value>(ofr)) {
+      return proveEqZero(v);
+    }
+    return false;
+  };
+
   // Distribute the padding of each dimension separately. This causes some
   // overlap of the iteration spaces across the loops, but simplifies the
   // implementation. The trade-off is expected to be okay because we expect
@@ -392,8 +462,8 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   // computation in order to have a more simplified kernel.
   for (auto [idx, low, high] :
        llvm::enumerate(padOp.getMixedLowPad(), padOp.getMixedHighPad())) {
-    // Create a distributed loop for the low padding
-    if (!isConstantIntValue(low, 0)) {
+    // Create a distributed loop for the low padding if low pad is non-zero
+    if (!isProvablyZeroOfr(low)) {
       SmallVector<OpFoldResult> ubs(padResultSizes);
       SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
       SmallVector<int64_t> shape(padOp.getSourceType().getShape());
@@ -404,15 +474,41 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
       buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs,
                                    ubs, distConfigs, innerLoopBuilder);
     }
-    // Create a distributed loop for the high padding
-    if (isConstantIntValue(high, 0)) {
+
+    // If the pad amount is provably zero, skip generating loops.
+    // This reduces IR bloat and avoids degenerate scf.forall bounds for
+    // padding.
+    if (isProvablyZeroOfr(high)) {
       continue;
     }
+
+    // Create a distributed loop for the high padding
     SmallVector<OpFoldResult> ubs(padResultSizes);
     SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
     SmallVector<int64_t> shape(padOp.getSourceType().getShape());
     shape[idx] = padOp.getStaticHigh()[idx];
     lbs[idx] = IREE::LinalgExt::addOfrs(rewriter, loc, low, padSrcSizes[idx]);
+    // ubs[idx] is padResultSizes[idx] already (since ubs initialized from
+    // padResultSizes)
+
+    // Fallback: Even if we couldn't prove the pad amount is exactly 0, the
+    // derived half-open iteration space [lb, ub) may still be empty. For
+    // well-formed pads this typically means lb == ub (i.e., the high pad is 0),
+    // but we phrase it as the general condition lb >= ub for half-open ranges.
+    // If it's empty, skip generating this loop nest.
+    {
+      Value lbV = getValueOrCreateConstantIndexOp(rewriter, loc, lbs[idx]);
+      Value ubV = getValueOrCreateConstantIndexOp(rewriter, loc, ubs[idx]);
+
+      if (lbV == ubV) {
+        continue;
+      }
+
+      if (proveEmptyRange(rewriter, loc, lbV, ubV)) {
+        continue;
+      }
+    }
+
     SmallVector<DistributionConfig> distConfigs =
         padDistributionConfigFn(shape, rewriter.getContext());
     buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs,
@@ -593,6 +689,24 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   // ops like pack and unpack into simpler supported ops.
   IRRewriter rewriter(ctx);
   simplifyComplexRelayoutOps(rewriter, funcOp);
+
+  // Resolve dims aggressively and canonicalize to simplify and deduplicate the
+  // IR. This improves pattern matching and makes it easier for subsequent
+  // rewrites/proofs to recognize identity/no-op cases.
+  {
+    RewritePatternSet dimResolve(ctx);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(dimResolve);
+    if (failed(applyPatternsGreedily(funcOp, std::move(dimResolve)))) {
+      return failure();
+    }
+
+    PassManager pm(ctx);
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
+    if (failed(pm.run(funcOp))) {
+      return failure();
+    }
+  }
 
   // Combine relayout operations into new the map_scatter ops.
   RewritePatternSet relayoutCombinationPatterns(ctx);
