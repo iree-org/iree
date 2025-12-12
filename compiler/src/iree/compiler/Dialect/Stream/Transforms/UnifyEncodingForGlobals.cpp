@@ -259,6 +259,12 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
               // Constant is a valid leaf source.
               return true;
             })
+            .Case([&](IREE::Stream::AsyncCloneOp cloneOp) {
+              // Clone is a passthrough op, continue tracing through its source.
+              value = cloneOp.getSource();
+              shouldContinue = true;
+              return true;
+            })
             .Default([&](Operation *op) {
               LDBG() << "      Bail: unknown op " << op->getName();
               return false;
