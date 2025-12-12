@@ -1007,20 +1007,6 @@ private:
   SmallVector<int64_t> permutation;
 };
 
-// Returns true if the permutation swaps only the last two dimensions.
-static bool isTransposeOfLastTwoDims(ArrayRef<int64_t> perm) {
-  size_t rank = perm.size();
-  if (rank < 2)
-    return false;
-  // Check that all dims except the last two are identity.
-  for (size_t i = 0; i < rank - 2; ++i) {
-    if (perm[i] != static_cast<int64_t>(i))
-      return false;
-  }
-  // Check that the last two dims are swapped.
-  return perm[rank - 2] == static_cast<int64_t>(rank - 1) &&
-         perm[rank - 1] == static_cast<int64_t>(rank - 2);
-}
 // Fuses a transpose into a reduction linalg.generic by absorbing it into the
 // indexing map.
 class FuseTransposeThroughGenericReduction
@@ -1039,12 +1025,20 @@ public:
       return rewriter.notifyMatchFailure(genericOp, "not a reduction");
     }
 
+    // All maps must be projected permutations.
+    if (!llvm::all_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
+          return map.isProjectedPermutation();
+        })) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "not a projected permutation");
+    }
+
     // Look for a transpose on any input.
     for (int64_t inputIdx = 0; inputIdx < genericOp.getNumDpsInputs();
          ++inputIdx) {
       auto transpose = genericOp.getDpsInputs()[inputIdx]
                            .getDefiningOp<linalg::TransposeOp>();
-      if (!transpose || !isTransposeOfLastTwoDims(transpose.getPermutation())) {
+      if (!transpose) {
         continue;
       }
 
@@ -1056,6 +1050,18 @@ public:
       auto invPerm = invertPermutationVector(transpose.getPermutation());
       SmallVector<AffineExpr> newExprs =
           applyPermutation(inputMap.getResults(), invPerm);
+
+      // Only fuse if newExprs are now contiguous.
+      int64_t prevDim = -1;
+      for (int64_t i = 0; i < newExprs.size(); ++i) {
+        int64_t dim = cast<AffineDimExpr>(newExprs[i]).getPosition();
+        if (dim < prevDim) {
+          return rewriter.notifyMatchFailure(genericOp,
+                                             "newExprs are not contiguous");
+        }
+        prevDim = dim;
+      }
+
       AffineMap transposedMap =
           AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
                          newExprs, rewriter.getContext());
