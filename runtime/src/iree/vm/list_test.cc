@@ -1257,4 +1257,55 @@ TEST_F(VMListTest, PushPopRef) {
 
 // TODO(benvanik): test ref variant get/set.
 
+// Test that F64 values (eg Python floats) can be converted to F32 values
+// when pushed to a VM list expecting F32 values.
+TEST_F(VMListTest, F64ToF32Conversion) {
+  iree_vm_type_def_t element_type =
+      iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F32);
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*capacity=*/10,
+                                     iree_allocator_system(), &list));
+
+  // Python passes floats as F64 (double)
+  double python_value = 0.7;
+  iree_vm_value_t f64_value = iree_vm_value_make_f64(python_value);
+
+  // Push the F64 value to a list expecting F32
+  // This internally calls iree_vm_list_convert_value_type(F64 -> F32)
+  IREE_ASSERT_OK(iree_vm_list_push_value(list, &f64_value));
+
+  // Retrieve the value and verify it was converted correctly
+  iree_vm_value_t retrieved_value;
+  IREE_ASSERT_OK(iree_vm_list_get_value(list, 0, &retrieved_value));
+  EXPECT_EQ(retrieved_value.type, IREE_VM_VALUE_TYPE_F32);
+  float expected_f32 = (float)python_value;
+  EXPECT_NEAR(retrieved_value.f32, expected_f32, 1e-6f);
+  EXPECT_NE(retrieved_value.f32, 0.0f);
+
+  iree_vm_list_release(list);
+}
+
+// Test F32 to F64 conversion
+TEST_F(VMListTest, F32ToF64Conversion) {
+  iree_vm_type_def_t element_type =
+      iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F64);
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*capacity=*/10,
+                                     iree_allocator_system(), &list));
+
+  // Push an F32 value to a list expecting F64
+  float f32_value = 3.14159f;
+  iree_vm_value_t value = iree_vm_value_make_f32(f32_value);
+  IREE_ASSERT_OK(iree_vm_list_push_value(list, &value));
+
+  // Retrieve and verify
+  iree_vm_value_t retrieved_value;
+  IREE_ASSERT_OK(iree_vm_list_get_value(list, 0, &retrieved_value));
+  EXPECT_EQ(retrieved_value.type, IREE_VM_VALUE_TYPE_F64);
+  EXPECT_NEAR(retrieved_value.f64, (double)f32_value, 1e-6);
+  EXPECT_NE(retrieved_value.f64, 0.0);
+
+  iree_vm_list_release(list);
+}
+
 }  // namespace

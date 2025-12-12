@@ -615,6 +615,22 @@ static void iree_vm_list_convert_value_type(
         default:
           return;
       }
+    case IREE_VM_VALUE_TYPE_F32:
+      switch (target_value_type) {
+        case IREE_VM_VALUE_TYPE_F64:
+          out_value->f64 = (double)source_value->f32;
+          return;
+        default:
+          return;
+      }
+    case IREE_VM_VALUE_TYPE_F64:
+      switch (target_value_type) {
+        case IREE_VM_VALUE_TYPE_F32:
+          out_value->f32 = (float)source_value->f64;
+          return;
+        default:
+          return;
+      }
   }
 }
 
