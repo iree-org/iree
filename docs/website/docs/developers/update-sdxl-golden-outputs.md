@@ -18,7 +18,7 @@ re-running CI.
 
 Before updating golden outputs, first confirm your change maintains acceptable
 accuracy. Follow the steps
-[outlined](https://github.com/nod-ai/SHARK-MLPERF/blob/dev/code/stable-diffusion-xl/development.md#test-accuracy-only).
+[outlined](https://github.com/nod-ai/AMD-SHARK-MLPERF/blob/dev/code/stable-diffusion-xl/development.md#test-accuracy-only).
 Use the offline variant of the `precompile_model_shortfin.sh` script for your
 platform. On MI300X use the one for MI325X.
 

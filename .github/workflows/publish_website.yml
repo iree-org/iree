@@ -71,7 +71,7 @@ jobs:
       #   https://github.com/iree-org/iree
       #   https://github.com/iree-org/iree-turbine
       # Ecosystem projects for consideration:
-      #   https://github.com/nod-ai/shark-ai
+      #   https://github.com/nod-ai/amd-shark-ai
       #   https://github.com/openxla/stablehlo
       #   https://github.com/llvm/torch-mlir (see below)
       #   https://github.com/llvm/torch-mlir-release
