@@ -111,7 +111,7 @@ jobs:
           # MI325
           - name: amdgpu_mi325_gfx942
             markers: "gfx942 or mi325"
-            cache-dir: /shark-cache/data/iree-regression-cache
+            cache-dir: /amdshark-cache/data/iree-regression-cache
             summary-file: torch_models_amdgpu_mi325_summary.json
             runs-on: linux-mi325-1gpu-ossci-iree-org
     env:
