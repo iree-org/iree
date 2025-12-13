@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/MapVector.h"
@@ -276,9 +277,102 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
   return foundSourceGlobal;
 }
 
-//===----------------------------------------------------------------------===//
-// Pass Implementation
-//===----------------------------------------------------------------------===//
+// Maps a tensor op to a set of (operand index -> new encoding).
+using OperandEncodingUpdates = llvm::DenseMap<unsigned, Attribute>;
+using TensorEncodingUpdates =
+    llvm::DenseMap<Operation *, OperandEncodingUpdates>;
+
+// Updates encoding attributes for a TensorDispatchOp.
+static void
+updateTensorDispatchOp(TensorDispatchOp dispatchOp,
+                       const OperandEncodingUpdates &operandUpdates) {
+  // Update operand encodings.
+  // The operand_encodings attribute has the same length as getMixedOperands().
+  // For non-affinity types (e.g., index), the encoding is just the type.
+  // For affinity types, the encoding is a RankedTensorType with encoding attr.
+  SmallVector<Attribute> newOperandEncodings;
+  for (auto [idx, operand, typeAttr] :
+       llvm::enumerate(dispatchOp.getMixedOperands(),
+                       dispatchOp.getOperandEncodings().getValue())) {
+    Type type = cast<TypeAttr>(typeAttr).getValue();
+    if (!isa<IREE::Stream::AffinityTypeInterface>(type)) {
+      newOperandEncodings.push_back(typeAttr);
+      continue;
+    }
+    if (!operandUpdates.contains(idx)) {
+      newOperandEncodings.push_back(typeAttr);
+      continue;
+    }
+    Attribute newEncoding = operandUpdates.lookup(idx);
+    auto tensorType = cast<RankedTensorType>(type);
+    newOperandEncodings.push_back(
+        TypeAttr::get(tensorType.cloneWithEncoding(newEncoding)));
+    LDBG() << "  Updated dispatch operand encoding at index " << idx << " to "
+           << newEncoding;
+  }
+  dispatchOp.setOperandEncodingsAttr(
+      ArrayAttr::get(dispatchOp.getContext(), newOperandEncodings));
+}
+
+// Applies all cached encoding updates to tensor ops.
+static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
+  for (auto &[op, operandUpdates] : updates) {
+    // TODO: Handle other TensorPhaseOp ops (TensorFillOp, etc.) via TypeSwitch.
+    if (auto dispatchOp = dyn_cast<TensorDispatchOp>(op)) {
+      updateTensorDispatchOp(dispatchOp, operandUpdates);
+    }
+  }
+}
+
+// Collects updates for stream tensor ops by walking from global loads.
+static void collectUpdatesForStreamTensorOps(Explorer &explorer,
+                                             EncodedGlobalInfo &encodedInfo,
+                                             Attribute newEncoding,
+                                             TensorEncodingUpdates &updates) {
+  StringRef globalName = encodedInfo.encodedGlobal.getGlobalName();
+  LDBG() << "  Collecting updates for global: " << globalName;
+
+  // Get loads from the explorer's global info.
+  const Explorer::GlobalInfo *globalInfo =
+      explorer.queryGlobalInfoFrom(globalName, encodedInfo.encodedGlobal);
+  assert(globalInfo &&
+         "expected global info to be present in explorer for encoded global");
+  SmallVector<Value> worklist;
+  for (auto loadOp : globalInfo->getLoads()) {
+    worklist.push_back(loadOp.getLoadedGlobalValue());
+  }
+
+  while (!worklist.empty()) {
+    Value value = worklist.pop_back_val();
+    explorer.walkTransitiveUses(value, [&](OpOperand &operand) {
+      Operation *user = operand.getOwner();
+      if (auto cloneOp = dyn_cast<AsyncCloneOp>(user)) {
+        LDBG() << "      Following clone: " << cloneOp;
+        worklist.push_back(cloneOp.getResult());
+        return WalkResult::advance();
+      }
+
+      // Only stream tensor ops need to be updated. Skip other operations.
+      if (!user->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
+        return WalkResult::advance();
+      }
+
+      // TODO: Handle other tensor phase ops (TensorFillOp, etc.)
+      auto dispatchOp = dyn_cast<IREE::Stream::TensorDispatchOp>(user);
+      if (!dispatchOp) {
+        return WalkResult::advance();
+      }
+
+      // The operand number is the index in the full operand list (including
+      // workload). We need the index in getMixedOperands() for encoding lookup.
+      unsigned mixedOperandIdx =
+          operand.getOperandNumber() - dispatchOp.getWorkload().size();
+      LDBG() << "      Found TensorDispatchOp operand " << mixedOperandIdx;
+      updates[user][mixedOperandIdx] = newEncoding;
+      return WalkResult::advance();
+    });
+  }
+}
 
 struct UnifyEncodingForGlobalsPass
     : public impl::UnifyEncodingForGlobalsPassBase<
@@ -301,7 +395,12 @@ struct UnifyEncodingForGlobalsPass
       LDBG() << "  - " << name;
     }
 
-    // Unify encodings for each source global with multiple encodings.
+    // Unify encodings for each source global with multiple encodings, and cache
+    // the updates.
+    Explorer explorer(moduleOp, TraversalAction::RECURSE);
+    explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
+    explorer.initialize();
+    TensorEncodingUpdates tensorEncodingUpdates;
     for (auto sourceName : candidates) {
       std::optional<SourceGlobalInfo> sourceInfo =
           analyzer.getSourceGlobals(sourceName);
@@ -324,13 +423,17 @@ struct UnifyEncodingForGlobalsPass
             oldResultType.cloneWithEncoding(unifiedEncoding);
         encodeOp.setResultEncodingAttr(TypeAttr::get(newResultType));
         LDBG() << "  Updated encode op: " << encodeOp;
-
         encodedInfo.sizeofOp.setEncodingAttr(TypeAttr::get(newResultType));
         LDBG() << "  Updated sizeof op: " << encodedInfo.sizeofOp;
+        collectUpdatesForStreamTensorOps(explorer, encodedInfo, unifiedEncoding,
+                                         tensorEncodingUpdates);
       }
     }
 
-    // TODO(#22485): Update tensor ops, dispatch sites and executables.
+    // Apply all tensor encoding updates in one shot.
+    applyTensorEncodingUpdates(tensorEncodingUpdates);
+
+    // TODO(#22485): Update executables.
   }
 };
 
