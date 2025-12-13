@@ -1365,6 +1365,7 @@ def VM_BufferAllocOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc]>,
       AlwaysSpeculatable,
+      VM_MayFail,
     ]> {
   let summary = [{Allocates a new zero-initialized buffer.}];
   let description = [{
@@ -1396,6 +1397,7 @@ def VM_BufferCloneOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc, MemRead]>,
       AlwaysSpeculatable,
+      VM_MayFail,
     ]> {
   let summary = [{Clones a buffer.}];
   let description = [{
@@ -1460,6 +1462,7 @@ def VM_BufferCopyOp :
     VM_Op<"buffer.copy", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Copies a range of a buffer to another.}];
   let description = [{
@@ -1492,6 +1495,7 @@ def VM_BufferCompareOp :
     VM_Op<"buffer.compare", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Compares a range of a buffer to another.}];
   let description = [{
@@ -1529,6 +1533,7 @@ class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Fills an element range of the buffer with the given value, like memset.
@@ -1587,6 +1592,7 @@ class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Loads a value from the buffer at the given element offset.
@@ -1618,6 +1624,7 @@ class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Stores a value to the buffer at the given element offset.
@@ -1709,6 +1716,7 @@ def VM_BufferStoreF64Op :
 def VM_BufferHashOp : VM_Op<"buffer.hash", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let description = [{
     Computes the SipHash-2-4 of the source buffer at the given offset for
@@ -1760,6 +1768,7 @@ def VM_ListAllocOp :
     VM_Op<"list.alloc", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc]>,
+      VM_MayFail,
     ]> {
   let summary = [{Allocates a new empty list.}];
   let description = [{
@@ -1789,6 +1798,7 @@ def VM_ListReserveOp :
     VM_Op<"list.reserve", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc, MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Reserves capacity for list growth.}];
   let description = [{
@@ -1816,6 +1826,7 @@ def VM_ListSizeOp :
     VM_Op<"list.size", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let summary = [{The size of the list in elements.}];
   let description = [{
@@ -1844,6 +1855,7 @@ def VM_ListResizeOp :
     VM_Op<"list.resize", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Resizes the list to a new count in elements.}];
   let description = [{
@@ -1873,6 +1885,7 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ])> {
   let summary = [{Primitive type element accessor.}];
   let description = [{
@@ -1904,6 +1917,7 @@ class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let summary = [{Primitive type element mutator.}];
   let description = [{
@@ -1957,6 +1971,7 @@ def VM_ListGetRefOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let summary = [{ref type element accessor.}];
   let description = [{
@@ -2004,6 +2019,7 @@ def VM_ListSetRefOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{ref type element mutator.}];
   let description = [{
@@ -4421,6 +4437,7 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
       DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       CallOpInterface,
+      VM_MayFail,
     ])> {
   let extraClassDeclaration = [{
     /// Get the argument operands to the called function.
@@ -4621,6 +4638,7 @@ def VM_ReturnOp : VM_Op<"return", [
 def VM_FailOp : VM_Op<"fail", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
+    VM_MayFail,
   ]> {
   let summary = [{Raises a global failure.}];
   let description = [{
@@ -4673,6 +4691,7 @@ def VM_FailOp : VM_Op<"fail", [
 
 def VM_CondFailOp : VM_Op<"cond_fail", [
     VM_PseudoOp,
+    VM_MayFail,
   ]> {
   let summary = [{Raises a global failure if the condition is true.}];
   let description = [{

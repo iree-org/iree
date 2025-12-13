@@ -113,6 +113,21 @@ def OrdinalAllocationPass :
   }];
 }
 
+def AnnotateFunctionsPass :
+    Pass<"iree-vm-annotate-functions", "IREE::VM::ModuleOp"> {
+  let summary = "Annotates VM functions with yield/unwind requirements.";
+  let description = [{
+    Analyzes the call graph to propagate function attributes:
+    - vm.yield: Function may yield, requires resumable execution
+    - vm.unwind: Function requires stack unwinding with ref cleanup
+
+    This pass uses SCC-based propagation for efficiency:
+    1. Single walk per function to collect initial bits and callees
+    2. Process SCCs in reverse topological order
+    3. Propagate bits from callees to callers
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Optimization passes
 //===----------------------------------------------------------------------===//

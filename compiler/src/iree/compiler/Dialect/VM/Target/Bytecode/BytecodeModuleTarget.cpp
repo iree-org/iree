@@ -297,6 +297,13 @@ static iree_vm_FeatureBits_enum_t findRequiredFeatures(Operation *rootOp) {
       result |= iree_vm_FeatureBits_EXT_F64;
     }
   });
+  // Check function-level attributes set by AnnotateFunctionsPass.
+  if (rootOp->hasAttr("vm.yield")) {
+    result |= iree_vm_FeatureBits_YIELD;
+  }
+  if (rootOp->hasAttr("vm.unwind")) {
+    result |= iree_vm_FeatureBits_UNWIND;
+  }
   return result;
 }
 
@@ -550,6 +557,9 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
     allowedFeatures |= iree_vm_FeatureBits_EXT_F32;
   if (vmOptions.f64Extension)
     allowedFeatures |= iree_vm_FeatureBits_EXT_F64;
+  // Yield/unwind are core VM semantics once supported by the runtime.
+  allowedFeatures |= iree_vm_FeatureBits_YIELD;
+  allowedFeatures |= iree_vm_FeatureBits_UNWIND;
   if ((moduleRequirements & allowedFeatures) != moduleRequirements) {
     return moduleOp.emitError()
            << "module uses features not allowed by flags (requires "

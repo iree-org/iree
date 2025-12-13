@@ -315,6 +315,10 @@ def VM_ExtF32 : NativeOpTrait<"IREE::VM::ExtF32">;
 // Operations with this trait require the VM f64 extension.
 def VM_ExtF64 : NativeOpTrait<"IREE::VM::ExtF64">;
 
+// Operations with this trait may fail at runtime (return an error status).
+// This is used to determine which functions require stack unwinding support.
+def VM_MayFail : NativeOpTrait<"IREE::VM::MayFail">;
+
 //===----------------------------------------------------------------------===//
 // ref<T> types
 //===----------------------------------------------------------------------===//
