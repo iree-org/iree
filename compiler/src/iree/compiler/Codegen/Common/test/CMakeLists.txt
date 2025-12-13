@@ -123,7 +123,6 @@ iree_lit_test_suite(
     "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
-    "type_propagation_packing.mlir"
     "unroll_annotated_loops.mlir"
     "vector_layout_analysis.mlir"
     "vectorize_memref_copy.mlir"
