@@ -2059,27 +2059,10 @@ struct LowerValueBarrierPattern
     return success();
   }
 };
-
-struct LowerGlobalLoadDMAPattern
-    : public OpRewritePattern<IREE::GPU::GlobalLoadDMAOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(IREE::GPU::GlobalLoadDMAOp dmaOp,
-                                PatternRewriter &rewriter) const override {
-    Type transferType = rewriter.getI32Type();
-    rewriter.replaceOpWithNewOp<amdgpu::GatherToLDSOp>(
-        dmaOp, dmaOp.getSource(), dmaOp.getSourceIndices(), dmaOp.getTarget(),
-        dmaOp.getTargetIndices(), transferType);
-    return success();
-  }
-};
 } // namespace
 
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
   patterns.add<LowerValueBarrierPattern>(patterns.getContext());
-}
-
-void populateIREEGPULowerGlobalLoadDMAPatterns(RewritePatternSet &patterns) {
-  patterns.add<LowerGlobalLoadDMAPattern>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
