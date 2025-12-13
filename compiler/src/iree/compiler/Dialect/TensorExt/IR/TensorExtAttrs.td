@@ -46,4 +46,23 @@ def RaggedShapeAttr :
   }];
 }
 
+def SparseIterationDimsAttr :
+  AttrDef<IREETensorExt_Dialect, "SparseIterationDims"> {
+  let mnemonic = "sparse_iteration_dims";
+
+  let description = [{
+    Attribute to encode the iteration dimensions of a loop that are sparse.
+
+    This is expected to be used on `scf.forall` operations to indicate which
+    iteration dimensions are sparse. These are expected to added to the loops
+    generated during tiling to map from the sparse data space of operands to
+    the iteration space of the generated loop.
+  }];
+  let parameters = (ins
+    OptionalArrayRefParameter<"int64_t",
+        "The iteration dimensions of the loop that are sparse">
+        :$sparseIterationDims);
+  let assemblyFormat = "`<` `[` $sparseIterationDims `]` `>`";
+}
+
 #endif // IREE_DIALECT_TENSOR_EXT_ATTRS
