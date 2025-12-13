@@ -55,12 +55,19 @@ def IREETensorExt_SparseCastOpInterface :
 
   let methods = [
     InterfaceMethod<
-      /*description =*/[{Generate to a loop structure that iterates over the exact sparse
-      iteration space.
+      /*description =*/[{
+        Generate to a loop structure that iterates over the exact sparse data given a
+        range that represents orthonormal hull of the sparse range.
 
-      Given a range, expected to be "bigger" (or a hull) of the actual sparse iteration,
-      generate a loop structure that iterates over the exact sparse iteration space. The
-      method returns the induction variables of the generated loops.
+        Given a range, expected to be the orthonormal hull of the actual sparse iteration,
+        generate a loop structure that iterates over the exact sparse iteration space. The
+        method returns the induction variables of the generated loops. On return the
+        insertion point is set to start of the innermost loop upon success.
+
+        - `sparseDims` is the list of sparse dimensions of the result that are expected
+          by the caller to lower to loops.
+        - `givenRanges` for the `sparseDims` specifies the range of the orthonormal hull
+          of the sparse range.
       }],
       /*retTy =*/"::llvm::FailureOr<::llvm::SmallVector<::mlir::Value>>",
       /*methodName =*/"lowerLoopRange",
@@ -70,11 +77,18 @@ def IREETensorExt_SparseCastOpInterface :
           "::llvm::ArrayRef<::mlir::Range>":$givenRanges)
     >,
     InterfaceMethod<
-      /*description =*/[{Return an estimate of the range account for the sparsity.
+      /*description =*/[{
+        Return a range that represents an tighter estimate of the number
+        of sparse elements in the source, but still using the same rank as the given range.
 
-      Typically, the actual sparse iteration space is such that the bounds of one dimension
-      depends on the position of the other dimensions. This methods is meant to get an
-      estimate such that the bounds dont depend on position of the other dimensions.
+        Typically, the actual sparse iteration space is such that the bounds of one dimension
+        depends on the position of the other dimensions. This methods is meant to get an
+        estimate such that the bounds dont depend on position of the other dimensions.
+
+        - `sparseDims` is the list of sparse dimensions of the result that are expected
+          by the caller to lower to loops.
+        - `givenRanges` for the `sparseDims` specifies the range of the orthonormal hull
+          of the sparse range.
       }],
       /*retTy =*/"::llvm::FailureOr<::llvm::SmallVector<::mlir::Range>>",
       /*methodName =*/"getEstimatedLoopRange",
