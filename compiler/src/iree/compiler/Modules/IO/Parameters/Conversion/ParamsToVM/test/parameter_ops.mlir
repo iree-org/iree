@@ -99,7 +99,7 @@ util.func public @parameterScatter(%device: !hal.device, %queue_affinity: i64, %
   //  CHECK-DAG: %[[SCOPE:.+]] = vm.rodata.inline {{.+}} = "scope"
   //      CHECK: vm.call @io_parameters.scatter
   // CHECK-SAME: (%[[DEVICE]], %[[QUEUE_AFFINITY]], %[[WAIT]], %[[SIGNAL]],
-  // CHECK-SAME:   %[[SCOPE]], %[[SOURCE_BUFFER]], %[[KEY_TABLE]], %[[KEY_DATA]], %[[SPANS]])
+  // CHECK-SAME:   %[[SOURCE_BUFFER]], %[[SCOPE]], %[[KEY_TABLE]], %[[KEY_DATA]], %[[SPANS]])
   io_parameters.scatter<%device : !hal.device> affinity(%queue_affinity) wait(%wait) signal(%signal) {
     %source_buffer[%c100 for %c200] : !hal.buffer -> "scope"::"key0"[%c50_i64],
     %source_buffer[%c101 for %c201] : !hal.buffer -> "scope"::"key1"[%c51_i64],

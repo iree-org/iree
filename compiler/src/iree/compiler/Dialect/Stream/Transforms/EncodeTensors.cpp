@@ -345,7 +345,7 @@ struct EncodeTensorConstantOp
              << alignedType << " does not have integral number of total bytes";
     }
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncConstantOp>(
-        op, op.getResult().getType(), encodedAttr, resultSize,
+        op, op.getResult().getType(), Value(), encodedAttr, resultSize,
         op.getAffinityAttr());
 
     return success();

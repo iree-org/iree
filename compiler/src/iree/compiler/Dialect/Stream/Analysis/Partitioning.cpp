@@ -99,14 +99,25 @@ void PartitionSet::dump(AsmState &asmState) {}
 #endif // !NDEBUG
 
 LogicalResult Partition::verify(Location loc) {
-  // Ensure all ops are compatible with the partition affinity.
   for (auto *op : ops) {
+    // Ensure all ops are compatible with the partition affinity.
     if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
       if (!IREE::Stream::AffinityAttr::areCompatible(
               affinity, affinityOp.getAffinityAttr())) {
         return op->emitError("op affinity ")
                << affinityOp.getAffinityAttr()
                << " is not compatible with the partition affinity " << affinity;
+      }
+    }
+
+    // Verify that no ops in the partitions produce result timepoints.
+    // When forming the partition we could gather the result timepoints and
+    // replace them all with the new timepoint of the execution region.
+    if (auto timelineOp = dyn_cast<IREE::Stream::TimelineOpInterface>(op)) {
+      if (Value resultTimepoint = timelineOp.getResultTimepoint()) {
+        return op->emitError()
+               << "cannot partition timeline op with result timepoint; "
+               << "result timepoints from partitioned ops not yet supported";
       }
     }
   }
@@ -178,8 +189,9 @@ LogicalResult Partition::verify(Location loc) {
 LogicalResult PartitionSet::verify(Location loc) {
   // Verify each partition is consistent.
   for (auto &partition : partitions) {
-    if (failed(partition.verify(loc)))
+    if (failed(partition.verify(loc))) {
       return failure();
+    }
   }
 
   // Ensure a correct topological order of partitions. This only checks the
