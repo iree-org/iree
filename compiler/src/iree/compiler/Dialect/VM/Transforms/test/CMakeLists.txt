@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_functions.mlir"
     "deduplicate_rodata.mlir"
     "drop_empty_module_initializers.mlir"
     "drop_unused_calls.mlir"

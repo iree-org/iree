@@ -16,6 +16,15 @@ enum FeatureBits:uint32 (bit_flags) {
   EXT_F32 = 0,  // 1u << 0
   // 64-bit floating point extension.
   EXT_F64 = 1,  // 1u << 1
+  // The function may (transitively) yield and requires resumable execution.
+  // When set on function requirements callers must be able to handle
+  // IREE_STATUS_DEFERRED results and resume execution later.
+  YIELD = 2,  // 1u << 2
+  // The function (transitively) requires stack unwinding with ref cleanup.
+  // When set on function requirements callers must ensure that stack frames
+  // are entered with a cleanup callback that can release any live refs on
+  // error/unwind paths.
+  UNWIND = 3,  // 1u << 3
 }
 
 // Arbitrary key/value reflection attribute.

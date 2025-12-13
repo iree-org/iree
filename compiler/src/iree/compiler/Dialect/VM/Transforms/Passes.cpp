@@ -157,6 +157,10 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<IREE::VM::ModuleOp>(
       createDropEmptyModuleInitializersPass());
 
+  // Annotate functions with yield/unwind requirements by analyzing the call
+  // graph. This must happen after all inlining is complete.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(createAnnotateFunctionsPass());
+
   if (targetOptions.optimizeForStackSize) {
     passManager.addNestedPass<IREE::VM::ModuleOp>(createSinkDefiningOpsPass());
   }
