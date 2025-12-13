@@ -659,6 +659,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
     addCommonTargetExecutablePreprocessingPasses(funcPassManager,
                                                  clUseSoftmaxInterFusion);
   }
+  modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   FunctionLikeNest(modulePassManager)
       .addPass(createMaterializeDeviceEncodingPass)
