@@ -1007,6 +1007,81 @@ private:
   SmallVector<int64_t> permutation;
 };
 
+// Fuses a transpose into a reduction linalg.generic by absorbing it into the
+// indexing map.
+class FuseTransposeThroughGenericReduction
+    : public OpRewritePattern<linalg::GenericOp> {
+public:
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
+      return failure();
+    }
+
+    // Only try to fuse when the generic has at least one reduction dimension.
+    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops()) {
+      return rewriter.notifyMatchFailure(genericOp, "not a reduction");
+    }
+
+    // All maps must be projected permutations.
+    if (!llvm::all_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
+          return map.isProjectedPermutation();
+        })) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "not a projected permutation");
+    }
+
+    // Look for a transpose on any input.
+    for (int64_t inputIdx = 0; inputIdx < genericOp.getNumDpsInputs();
+         ++inputIdx) {
+      auto transpose = genericOp.getDpsInputs()[inputIdx]
+                           .getDefiningOp<linalg::TransposeOp>();
+      if (!transpose) {
+        continue;
+      }
+
+      // Update the indexing map according to the transpose.
+      AffineMap inputMap = genericOp.getMatchingIndexingMap(
+          genericOp.getDpsInputOperand(inputIdx));
+
+      // Fuse by updating the indexing map to absorb the transpose.
+      auto invPerm = invertPermutationVector(transpose.getPermutation());
+      SmallVector<AffineExpr> newExprs =
+          applyPermutation(inputMap.getResults(), invPerm);
+
+      // Only fuse if newExprs are now contiguous.
+      int64_t prevDim = -1;
+      for (int64_t i = 0; i < newExprs.size(); ++i) {
+        int64_t dim = cast<AffineDimExpr>(newExprs[i]).getPosition();
+        if (dim < prevDim) {
+          return rewriter.notifyMatchFailure(genericOp,
+                                             "newExprs are not contiguous");
+        }
+        prevDim = dim;
+      }
+
+      AffineMap transposedMap =
+          AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
+                         newExprs, rewriter.getContext());
+
+      SmallVector<AffineMap> newIndexingMaps = genericOp.getIndexingMapsArray();
+      newIndexingMaps[inputIdx] = transposedMap;
+
+      rewriter.startOpModification(genericOp);
+      genericOp.setIndexingMapsAttr(
+          rewriter.getAffineMapArrayAttr(newIndexingMaps));
+      genericOp.setOperand(inputIdx, transpose.getInput());
+      rewriter.finalizeOpModification(genericOp);
+      return success();
+    }
+
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "no matching transpose found");
+  }
+};
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -1029,8 +1104,8 @@ struct PropagateLinalgTransposePass
 };
 } // namespace
 
-static void populateNamedOpSinkingPatterns(MLIRContext *context,
-                                           RewritePatternSet &sinkingPatterns) {
+static void populateMatmulSinkingPatterns(MLIRContext *context,
+                                          RewritePatternSet &sinkingPatterns) {
   sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
                                            /*inputIdx=*/1>>(
       context, SmallVector<int64_t>{1, 0});
@@ -1043,6 +1118,7 @@ static void populateNamedOpSinkingPatterns(MLIRContext *context,
   sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
                                            /*inputIdx=*/0>>(
       context, SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns.insert<FuseTransposeThroughGenericReduction>(context);
 }
 
 static void
@@ -1091,7 +1167,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(
         context, enableEdgeReshapePropagation);
-    populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    populateMatmulSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
@@ -1235,7 +1311,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
         context, enableAggressivePropagation, enableConvolutionPropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);
-    populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    populateMatmulSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
