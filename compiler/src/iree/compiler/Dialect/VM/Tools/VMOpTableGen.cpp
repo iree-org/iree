@@ -63,7 +63,9 @@ void emitOpTable(const llvm::RecordKeeper &recordKeeper, const Record &tableDef,
 // Finds all opcode tables in VMBase.td and emits a enum and template table for
 // their opcode and name.
 bool emitOpTableDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
-  llvm::emitSourceFileHeader("IREE VM Operation Tables", os);
+  llvm::emitSourceFileHeader("iree-tblgen generated file; do not modify; "
+                             "change VM op .td files instead",
+                             os);
 
   auto defs = recordKeeper.getAllDerivedDefinitions("VM_OPC_EnumAttr");
   for (const auto *def : defs) {

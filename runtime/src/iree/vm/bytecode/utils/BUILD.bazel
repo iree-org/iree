@@ -23,6 +23,8 @@ iree_runtime_cc_library(
         "features.h",
         "generated/op_table.h",
         "isa.h",
+        "isa_decoder.h",
+        "isa_decoder.inl",
     ],
     deps = [
         "//runtime/src/iree/base",

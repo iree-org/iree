@@ -33,7 +33,7 @@ static void iree_vm_ref_trace(const char* msg, iree_vm_ref_t* ref) {
   if (!ref->ptr) return;
   iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(ref);
   iree_string_view_t name = iree_vm_ref_type_name(ref->type);
-  fprintf(stderr, "%s %.*s 0x%p %d\n", msg, (int)name.size, name.data, ref->ptr,
+  fprintf(stderr, "%s %.*s %p %d\n", msg, (int)name.size, name.data, ref->ptr,
           iree_atomic_ref_count_load(counter));
   IREE_DEBUG_PRINT_BACKTRACE_HERE(msg);
 }
@@ -42,7 +42,7 @@ static void iree_vm_ref_ptr_trace(const char* msg, void* ptr,
   if (!ptr) return;
   iree_atomic_ref_count_t* counter = iree_vm_get_raw_counter_ptr(ptr, type);
   iree_string_view_t name = iree_vm_ref_type_name(type);
-  fprintf(stderr, "%s %.*s 0x%p %d\n", msg, (int)name.size, name.data, ptr,
+  fprintf(stderr, "%s %.*s %p %d\n", msg, (int)name.size, name.data, ptr,
           iree_atomic_ref_count_load(counter));
   IREE_DEBUG_PRINT_BACKTRACE_HERE(msg);
 }
