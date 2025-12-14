@@ -539,3 +539,31 @@ iree_generated_e2e_runner_test(
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
 )
+
+# Tests coalesced DMA with irregular (non-power-of-2) dimensions.
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cdna3_coalesced_dma_f32_irregular",
+    compiler_flags = [
+        "--iree-hip-target=gfx942",
+        "--iree-llvmgpu-use-direct-load",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--acc_type=f32",
+        "--shapes=custom_mnk",
+        "--mnk=123,234,345",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-cdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "hip"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)

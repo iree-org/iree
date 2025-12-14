@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -20,6 +21,26 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+/// Check if a value originates from a tensor.pad operation by tracing back
+/// through the definition chain.
+static bool isFromPadOp(Value v) {
+  while (Operation *defOp = v.getDefiningOp()) {
+    if (isa<tensor::PadOp>(defOp))
+      return true;
+
+    // Trace back through operations that pass through tensors.
+    v = TypeSwitch<Operation *, Value>(defOp)
+            .Case<tensor::ExtractSliceOp>(
+                [](auto op) { return op.getSource(); })
+            .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+                [](auto op) { return op.getSrc(); })
+            .Default([](Operation *) { return nullptr; });
+    if (!v)
+      break;
+  }
+  return false;
+}
+
 /// Helper to insert copy with the specified attr.
 Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
   auto tensorType = cast<RankedTensorType>(v.getType());
@@ -28,6 +49,13 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
   Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
                                         tensorType.getElementType());
   auto copy = linalg::CopyOp::create(builder, loc, v, empty);
+
+  // If the value originates from a tensor.pad, we cannot use direct global
+  // load DMA because the padded region doesn't exist in global memory.
+  // Fall back to DerivedThreadConfigAttr in this case.
+  if (isa<UseGlobalLoadDMAAttr>(attr) && isFromPadOp(v)) {
+    attr = DerivedThreadConfigAttr::get(builder.getContext());
+  }
   setLoweringConfig(copy, attr);
   return copy.getResult(0);
 }
