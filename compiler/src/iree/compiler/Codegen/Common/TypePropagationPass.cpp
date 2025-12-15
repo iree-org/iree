@@ -91,7 +91,7 @@ static std::optional<Type> getLegalizedType(Type t) {
   return std::nullopt;
 }
 
-static std::optional<Type> dropEncodingWithoutMaterialization(Type t) {
+static Type dropEncodingWithoutMaterialization(Type t) {
   if (auto shapedType = dyn_cast<RankedTensorType>(t)) {
     // TODO(#21185): Remove special casing and replace with more generic logic.
     if (auto packedStorage =
@@ -127,15 +127,12 @@ struct TypePropagationTypeConverter : public TypeConverter {
 /// Type converter used to drop encodings that need no materialization.
 struct DropEncodingTypeConverter : public TypeConverter {
   DropEncodingTypeConverter() {
-    addConversion([](Type t) -> std::optional<Type> {
+    addConversion([](Type t) -> Type {
       if (auto dispatchTensor =
               dyn_cast<IREE::TensorExt::DispatchTensorType>(t)) {
         Type oldBoundTy = dispatchTensor.getBoundType();
         std::optional<Type> newBoundTy =
             dropEncodingWithoutMaterialization(oldBoundTy);
-        if (!newBoundTy) {
-          return std::nullopt;
-        }
         if (*newBoundTy == oldBoundTy) {
           return t;
         }
