@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "convert_forall_to_loops.mlir"
+    "convert_sref_to_memref.mlir"
     "fuse_consumers.mlir"
     "fuse_pcf_writes.mlir"
     "lower_structural_pcf.mlir"
