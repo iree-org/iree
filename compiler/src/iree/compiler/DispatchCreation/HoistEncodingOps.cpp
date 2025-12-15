@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -96,6 +97,21 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
         "output map numDims do not match last encoding map numResults");
   }
 
+  // Get encoding_dims from the original SetEncodingOp and try to rematerialize
+  // them at the new insertion point (before the genericOp).
+  // For identity output map, we can remap tensor.dim from output to inputs.
+  Value genericOutput = encodingOp.getSource();
+  Value firstInput = genericOp.getDpsInputOperand(0)->get();
+  FailureOr<SmallVector<Value>> rematerializedDims =
+      IREE::Encoding::rematerializeEncodingDims(rewriter, genericOp,
+                                                encodingOp.getEncodingDims(),
+                                                genericOutput, firstInput);
+  if (failed(rematerializedDims)) {
+    return rewriter.notifyMatchFailure(encodingOp,
+                                       "cannot rematerialize encoding_dims");
+  }
+  ValueRange encodingDims = *rematerializedDims;
+
   // Set encodings on each input
   Location loc = genericOp->getLoc();
   SmallVector<Value> encodedOperands;
@@ -110,7 +126,7 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
     Value encodedInput = IREE::Encoding::SetEncodingOp::create(
-        rewriter, loc, resType, operand->get(), /*encoding_dims=*/ValueRange{});
+        rewriter, loc, resType, operand->get(), encodingDims);
     encodedOperands.push_back(encodedInput);
   }
 
@@ -152,6 +168,25 @@ static bool isHoistableOp(Operation *op) {
     ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
     return IREE::Flow::isOffsetSizeAndStrideMappableToFlow(offsets, sizes,
                                                            strides, srcShape);
+  }
+  // tensor.dim ops are hoistable if their source tensor is outside the
+  // dispatch (e.g., a block argument or already hoisted value). These ops
+  // are commonly used as encoding_dims and need to be hoisted along with
+  // set_encoding ops.
+  if (auto dimOp = dyn_cast<tensor::DimOp>(op)) {
+    Value source = dimOp.getSource();
+    Operation *sourceOp = source.getDefiningOp();
+    // If source is a block argument (no defining op), it's outside the dispatch
+    // and the dim op can be hoisted.
+    if (!sourceOp) {
+      return true;
+    }
+    // If source is defined outside the dispatch, the dim op can be hoisted.
+    if (!sourceOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+      return true;
+    }
+    // Otherwise, check if the source can also be hoisted.
+    return isHoistableOp(sourceOp);
   }
   // ConstExprHoistingPolicy has an assumption that any root op is not hoistable
   // because they are already hoisted. This is not the case when the parent op
