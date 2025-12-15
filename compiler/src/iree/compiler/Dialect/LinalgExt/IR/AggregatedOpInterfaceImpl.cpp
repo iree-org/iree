@@ -1233,8 +1233,6 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   auto expRedGeneric = linalg::GenericOp::create(
       rewriter, loc, TypeRange(normOuts), inputs, normOuts,
       getIndexingMapsArray(), getLoopIteratorTypes());
-  expRedGeneric->setDiscardableAttrs(
-      getOperation()->getDiscardableAttrDictionary());
 
   IRMapping mapper;
   getBodyRegion().cloneInto(&expRedGeneric.getBodyRegion(), mapper);
