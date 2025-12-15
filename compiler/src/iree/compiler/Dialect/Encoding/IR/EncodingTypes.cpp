@@ -10,7 +10,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -49,6 +51,85 @@ static Type getContractionInputTypeWithSignedness(OpBuilder &builder,
   return elemType;
 }
 
+/// Extract only the dynamic dimension values for a contraction operation.
+/// Returns values only for dimensions that are dynamic in iteration_sizes.
+/// The returned values are ordered to match iteration_sizes: Batch, M, N, K.
+/// This matches the standard loop dimension ordering for matmul-like ops.
+static SmallVector<Value> getContractionDynamicDims(OpBuilder &builder,
+                                                    linalg::LinalgOp linalgOp) {
+  Location loc = linalgOp.getLoc();
+
+  // Infer contraction dimensions (B, M, N, K).
+  auto cDims = linalg::inferContractionDims(linalgOp);
+  if (failed(cDims)) {
+    return {};
+  }
+
+  // Get static loop ranges to determine which dimensions are dynamic.
+  SmallVector<int64_t> iterationSizes = linalgOp.getStaticLoopRanges();
+
+  // Get the output tensor to extract B, M and N from.
+  Value output = linalgOp.getDpsInits()[0];
+  AffineMap outputMap = linalgOp.getIndexingMapsArray().back();
+
+  // Helper to get dimension value from a tensor given a loop dimension.
+  // Note: This is only called for dimensions that are dynamic in
+  // iteration_sizes. For standard matmul/batch_matmul, all dynamic dimensions
+  // should be mappable to tensor dimensions.
+  auto getDimValue = [&](Value tensor, AffineMap map,
+                         unsigned loopDim) -> Value {
+    auto dimPos = map.getResultPosition(
+        getAffineDimExpr(loopDim, linalgOp->getContext()));
+    if (!dimPos) {
+      // This dimension is not present in this operand. This is unexpected for
+      // dynamic dimensions in standard contractions, but we handle it
+      // gracefully by returning constant 1.
+      return arith::ConstantIndexOp::create(builder, loc, 1);
+    }
+    return tensor::DimOp::create(builder, loc, tensor, *dimPos);
+  };
+
+  // Extract dynamic dimension values in order: B, M, N, K.
+  // This matches the iteration_sizes order for standard matmul-like ops.
+  SmallVector<Value> dynamicDims;
+
+  // Process Batch dimensions (come first in iteration order).
+  for (unsigned batchDim : cDims->batch) {
+    if (batchDim < iterationSizes.size() &&
+        ShapedType::isDynamic(iterationSizes[batchDim])) {
+      dynamicDims.push_back(getDimValue(output, outputMap, batchDim));
+    }
+  }
+
+  // Process M dimensions.
+  for (unsigned mDim : cDims->m) {
+    if (mDim < iterationSizes.size() &&
+        ShapedType::isDynamic(iterationSizes[mDim])) {
+      dynamicDims.push_back(getDimValue(output, outputMap, mDim));
+    }
+  }
+
+  // Process N dimensions.
+  for (unsigned nDim : cDims->n) {
+    if (nDim < iterationSizes.size() &&
+        ShapedType::isDynamic(iterationSizes[nDim])) {
+      dynamicDims.push_back(getDimValue(output, outputMap, nDim));
+    }
+  }
+
+  // Process K dimensions (extracted from LHS).
+  Value lhs = linalgOp.getDpsInputs()[0];
+  AffineMap lhsMap = linalgOp.getIndexingMapsArray()[0];
+  for (unsigned kDim : cDims->k) {
+    if (kDim < iterationSizes.size() &&
+        ShapedType::isDynamic(iterationSizes[kDim])) {
+      dynamicDims.push_back(getDimValue(lhs, lhsMap, kDim));
+    }
+  }
+
+  return dynamicDims;
+}
+
 FailureOr<OpEncodingProperties>
 SerializableAttr::getEncodingProperties(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
@@ -57,7 +138,7 @@ SerializableAttr::getEncodingProperties(Operation *op) {
   }
 
   MLIRContext *ctx = op->getContext();
-  OpBuilder builder(ctx);
+  OpBuilder builder(op);
 
   OpEncodingProperties props;
   SmallVector<Type> elemTypes;
@@ -65,11 +146,14 @@ SerializableAttr::getEncodingProperties(Operation *op) {
   SmallVector<int64_t> iterationSizes = linalgOp.getStaticLoopRanges();
   EncodingOpType opType;
 
+  // Extract M, N, K dynamic dimensions (shared by all contraction types).
+  SmallVector<Value> dynamicDims = getContractionDynamicDims(builder, linalgOp);
+
   auto addEncoding = [&](int64_t operandIndex) {
     return EncodingProperties{EncodingAttr::get(ctx, operandIndex, opType,
                                                 elemTypes, maps,
                                                 iterationSizes),
-                              /*dynamicValues=*/{}};
+                              dynamicDims};
   };
 
   // Return encoding properties for contraction operations.

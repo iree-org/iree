@@ -7,10 +7,15 @@
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/Dominance.h"
+
+#define DEBUG_TYPE "iree-encoding-utils"
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
@@ -138,6 +143,131 @@ bool isNarrowNResult(EncodingAttr encoding) {
   }
 
   return IREE::Encoding::getPo2MatmulNarrowDim(encoding).isN();
+}
+
+namespace {
+/// Helper class for recursive rematerialization of encoding dims.
+/// Tracks already-rematerialized values to avoid duplicate work.
+class RematerializationHelper {
+public:
+  RematerializationHelper(RewriterBase &builder, Operation *insertionPoint,
+                          Value propagationSource, Value newSource)
+      : builder(builder), insertionPoint(insertionPoint),
+        propagationSource(propagationSource), newSource(newSource),
+        domInfo(insertionPoint->getParentOp()) {}
+
+  /// Try to rematerialize a single value, recursively rematerializing
+  /// operands if needed.
+  FailureOr<Value> rematerialize(Value value) {
+    // Check if already rematerialized.
+    auto it = rematerialized.find(value);
+    if (it != rematerialized.end()) {
+      return it->second;
+    }
+
+    // If the value already dominates, use it directly.
+    if (domInfo.properlyDominates(value, insertionPoint)) {
+      rematerialized[value] = value;
+      return value;
+    }
+
+    Operation *definingOp = value.getDefiningOp();
+    if (!definingOp) {
+      // Block argument that doesn't dominate - cannot rematerialize.
+      LLVM_DEBUG(llvm::dbgs() << "Cannot rematerialize: block argument does "
+                                 "not dominate\n");
+      return failure();
+    }
+
+    // Special case: tensor.dim on the propagation source can be recreated
+    // from the new source tensor.
+    if (auto dimOp = dyn_cast<tensor::DimOp>(definingOp)) {
+      if (dimOp.getSource() == propagationSource) {
+        Value newDim = tensor::DimOp::create(builder, dimOp.getLoc(), newSource,
+                                             dimOp.getIndex());
+        rematerialized[value] = newDim;
+        return newDim;
+      }
+    }
+
+    // General case: any pure operation can be cloned if we can
+    // rematerialize all its operands.
+    if (!isPure(definingOp)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Cannot rematerialize: operation is not pure\n");
+      return failure();
+    }
+
+    // Recursively rematerialize operands.
+    SmallVector<Value> newOperands;
+    newOperands.reserve(definingOp->getNumOperands());
+    for (Value operand : definingOp->getOperands()) {
+      FailureOr<Value> newOperand = rematerialize(operand);
+      if (failed(newOperand)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Cannot rematerialize operand: " << operand << "\n");
+        return failure();
+      }
+      newOperands.push_back(*newOperand);
+    }
+
+    // Find which result index the value corresponds to.
+    auto resultIt = llvm::find(definingOp->getResults(), value);
+    if (resultIt == definingOp->getResults().end()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Cannot rematerialize: value not found in op results\n");
+      return failure();
+    }
+    unsigned resultIndex =
+        std::distance(definingOp->getResults().begin(), resultIt);
+
+    // Clone the operation with the rematerialized operands.
+    Operation *cloned = builder.clone(*definingOp);
+    for (auto [idx, newOperand] : llvm::enumerate(newOperands)) {
+      cloned->setOperand(idx, newOperand);
+    }
+    Value result = cloned->getResult(resultIndex);
+    rematerialized[value] = result;
+    return result;
+  }
+
+private:
+  RewriterBase &builder;
+  Operation *insertionPoint;
+  Value propagationSource;
+  Value newSource;
+  DominanceInfo domInfo;
+  DenseMap<Value, Value> rematerialized;
+};
+} // namespace
+
+FailureOr<SmallVector<Value>>
+rematerializeEncodingDims(RewriterBase &builder, Operation *insertionPoint,
+                          ValueRange encodingDims, Value propagationSource,
+                          Value newSource) {
+  if (encodingDims.empty()) {
+    return SmallVector<Value>{};
+  }
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPoint(insertionPoint);
+
+  RematerializationHelper helper(builder, insertionPoint, propagationSource,
+                                 newSource);
+  SmallVector<Value> rematerializedDims;
+  rematerializedDims.reserve(encodingDims.size());
+
+  for (Value dim : encodingDims) {
+    FailureOr<Value> result = helper.rematerialize(dim);
+    if (failed(result)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Cannot rematerialize encoding dim: " << dim << "\n");
+      return failure();
+    }
+    rematerializedDims.push_back(*result);
+  }
+
+  return rematerializedDims;
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -33,7 +34,8 @@ namespace {
 /// 1. Are encoded by casting their types to the encoded types.
 /// 2. Are able to directly use the source of any producer unset_encoding ops
 ///    for propagation, and do not need to re-set the encoding.
-static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
+static FailureOr<IREE::Encoding::PropagationResult>
+propagateThroughEncodingCastableOp(
     RewriterBase &builder, Operation *op,
     IREE::Encoding::PropagationEncoding encodings,
     OpOperand *propagationSource) {
@@ -43,6 +45,23 @@ static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
       propagationSource->get().getDefiningOp<IREE::Encoding::UnsetEncodingOp>();
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPoint(op);
+
+  // Try to rematerialize encoding dims at the new insertion point.
+  // For bubble-up propagation through encoding castable ops (tensor.cast,
+  // tensor.collapse_shape, etc.), tensor.dim ops on the result can be
+  // recreated from the source operand. These ops have a single tensor
+  // input as their first operand.
+  Value sourceOperand = op->getOperand(0);
+  FailureOr<SmallVector<Value>> rematerializedDims =
+      IREE::Encoding::rematerializeEncodingDims(
+          builder, op, encodings.encodingDims, propagationSource->get(),
+          sourceOperand);
+  if (failed(rematerializedDims)) {
+    return failure();
+  }
+  // Update encodings with rematerialized dims.
+  encodings.encodingDims = *rematerializedDims;
+
   for (auto [operand, encoding] :
        llvm::zip_equal(op->getOperands(), encodings.operandEncodings)) {
     // Scalar operands do not need encodings.
@@ -72,7 +91,7 @@ static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
     // Otherwise, we need to create a new set_encoding op.
     auto setEncodingOp = IREE::Encoding::SetEncodingOp::create(
         builder, op->getLoc(), encodedOperandType, operand,
-        /*encodingDims=*/ValueRange{});
+        encodings.encodingDims);
     encodedOperands.push_back(setEncodingOp.getResult());
     result.generatedEncodingOps.push_back(setEncodingOp);
   }
@@ -101,7 +120,7 @@ static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
     std::tie(std::ignore, resultDynamicDims) = decomposeMixedValues(mixedSizes);
     auto unsetEncodingOp = IREE::Encoding::UnsetEncodingOp::create(
         builder, op->getLoc(), originalResult.getType(), encodedResult,
-        resultDynamicDims, /*encodingDims=*/ValueRange{});
+        resultDynamicDims, encodings.encodingDims);
     result.generatedEncodingOps.push_back(unsetEncodingOp);
     result.replacements.push_back(unsetEncodingOp.getResult());
   }
