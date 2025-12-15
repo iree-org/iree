@@ -30,6 +30,7 @@ iree_cc_library(
   SRCS
     "ConvertForallToLoops.cpp"
     "FuseConsumers.cpp"
+    "FusePCFWrites.cpp"
     "Passes.cpp"
     "Transforms.cpp"
   DEPS
