@@ -201,6 +201,18 @@ def IREEEncoding_SerializableAttr :
     /// both attributes implement SerializableAttr interface
     /// and they are compatible with each other.
     static bool areCompatible(Attribute lhs, Attribute rhs);
+
+    /// Derives encoding properties for all operands and results of an operation.
+    /// The operation is the source of truth for determining the encodings
+    /// (e.g., a linalg.matmul determines encodings for its LHS, RHS, and result).
+    ///
+    /// Returns OpEncodingProperties containing encoding properties for operands
+    /// and results. Each EncodingProperties bundles the encoding attribute with
+    /// any dynamic values needed (e.g., M, N, K dimensions).
+    ///
+    /// Returns failure if the operation is not supported for encoding derivation.
+    static FailureOr<IREE::Encoding::OpEncodingProperties>
+    getEncodingProperties(Operation *op);
   }];
 }
 
