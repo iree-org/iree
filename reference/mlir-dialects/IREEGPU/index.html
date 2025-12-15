@@ -2024,15 +2024,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.value_barrier (GPU::ValueBarrierOp)
@@ -5304,15 +5295,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.value_barrier (GPU::ValueBarrierOp)
@@ -5891,7 +5873,6 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#lowering-paths">Lowering Paths</a></li>
 <li><a href="#operands-and-results">Operands and Results</a></li>
 <li><a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode">Example of a single subgroup using coalesced_gather_dma in copy mode</a><ul>
-<li><a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop">iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)</a></li>
 <li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
 </ul>
@@ -6235,49 +6216,6 @@ ParallelCombiningOpInterface and must live inside an op implementing
 </tr>
 </tbody>
 </table>
-<h3 id="iree_gpuglobal_load_dma-gpugloballoaddmaop"><code>iree_gpu.global_load_dma</code> (GPU::GlobalLoadDMAOp)<a class="headerlink" href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" title="Permanent link">link</a></h3>
-<p><em>Does a global load DMA operation</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.global_load_dma` $source`[` $sourceIndices `]` `-&gt;` $target `[` $targetIndices `]` attr-dict
-              `:` type($source) `-&gt;` type($target)
-</code></pre></div>
-<p>This operation represents a subgroup-level global load DMA operation.
-It is used to represent a direct gathering operation from global memory to workgroup.
-To be specific, the thread gathers data from the global memoryspace at the designated
-indices, and stores it to the thread's lane-offset of the workgroup memref at the
-designated indices.</p>
-<p>Specifically, if the thread's subgroup lane id is <code>lane_id</code>, the thread will load the data
-from <code>$source[sourceIndices]</code> and store it to <code>$target[targetIndices] + lane_id</code>.
-Collectively, all threads in the subgroup orchestrate the load DMA operation.</p>
-<p>Note: each gather has a load width is 32bit.</p>
-<p>Traits: <code>SameVariadicOperandSize</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>source</code></td>
-<td>memref of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>sourceIndices</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>target</code></td>
-<td>memref of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>targetIndices</code></td>
-<td>variadic of index</td>
-</tr>
-</tbody>
-</table>
 <h3 id="iree_gpuvalue_barrier-gpuvaluebarrierop"><code>iree_gpu.value_barrier</code> (GPU::ValueBarrierOp)<a class="headerlink" href="#iree_gpuvalue_barrier-gpuvaluebarrierop" title="Permanent link">link</a></h3>
 <p><em>Synchronizes workers on a value semantic tensor or vector.</em></p>
 <p>Syntax:</p>
@@ -6295,7 +6233,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6334,7 +6272,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
