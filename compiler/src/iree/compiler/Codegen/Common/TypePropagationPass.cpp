@@ -131,13 +131,12 @@ struct DropEncodingTypeConverter : public TypeConverter {
       if (auto dispatchTensor =
               dyn_cast<IREE::TensorExt::DispatchTensorType>(t)) {
         Type oldBoundTy = dispatchTensor.getBoundType();
-        std::optional<Type> newBoundTy =
-            dropEncodingWithoutMaterialization(oldBoundTy);
-        if (*newBoundTy == oldBoundTy) {
+        Type newBoundTy = dropEncodingWithoutMaterialization(oldBoundTy);
+        if (newBoundTy == oldBoundTy) {
           return t;
         }
         return IREE::TensorExt::DispatchTensorType::get(
-            dispatchTensor.getAccess(), *newBoundTy);
+            dispatchTensor.getAccess(), newBoundTy);
       }
       return dropEncodingWithoutMaterialization(t);
     });
