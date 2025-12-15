@@ -123,26 +123,26 @@ module @immutable_source_initialized_from_parameter {
   }
 
   // CHECK-LABEL: util.func public @use_encoded_v1
-  util.func public @use_encoded_v1(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  util.func public @use_encoded_v1(%arg0: index) -> !stream.resource<*> {
     %encoded = util.global.load @encoded_v1 : !stream.resource<constant>
     %encoded_size = util.global.load @encoded_v1_size : index
-    %cloned = stream.async.clone %encoded : !stream.resource<constant>{%encoded_size} -> !stream.resource<*>{%encoded_size}
-
-    // CHECK: stream.tensor.dispatch {{.*}} tensor<4096x4096xf32, #iree_encoding.identity>
-    %result = stream.tensor.dispatch @executable_v1::@dispatch(%arg0, %cloned) : (tensor<16xf32> in !stream.resource<*>{%arg1}, tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%encoded_size}) -> tensor<16xf32> in !stream.resource<*>{%arg1}
-
+    // CHECK:      stream.tensor.dispatch
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
+    %result = stream.tensor.dispatch @executable_v1::@dispatch(%encoded)
+      : (tensor<4096x4096xf32, #encoding1> in !stream.resource<constant>{%encoded_size})
+      -> tensor<16xf32> in !stream.resource<*>{%arg0}
     util.return %result : !stream.resource<*>
   }
 
   // CHECK-LABEL: util.func public @use_encoded_v2
-  util.func public @use_encoded_v2(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  util.func public @use_encoded_v2(%arg0: index) -> !stream.resource<*> {
     %encoded = util.global.load @encoded_v2 : !stream.resource<constant>
     %encoded_size = util.global.load @encoded_v2_size : index
-    %cloned = stream.async.clone %encoded : !stream.resource<constant>{%encoded_size} -> !stream.resource<*>{%encoded_size}
-
-    // CHECK: stream.tensor.dispatch {{.*}} tensor<4096x4096xf32, #iree_encoding.identity>
-    %result = stream.tensor.dispatch @executable_v2::@dispatch(%arg0, %cloned) : (tensor<16xf32> in !stream.resource<*>{%arg1}, tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%encoded_size}) -> tensor<16xf32> in !stream.resource<*>{%arg1}
-
+    // CHECK:      stream.tensor.dispatch
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
+    %result = stream.tensor.dispatch @executable_v2::@dispatch(%encoded)
+      : (tensor<4096x4096xf32, #encoding2> in !stream.resource<constant>{%encoded_size})
+      -> tensor<16xf32> in !stream.resource<*>{%arg0}
     util.return %result : !stream.resource<*>
   }
 
@@ -170,23 +170,78 @@ module @immutable_source_initialized_from_parameter {
 
     util.return %result : !stream.resource<*>
   }
+}
+
+// -----
+
+// Test: cross-function tracking - load encoded global, pass to callee via
+// util.call, and verify dispatch site encoding is updated in callee.
+
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+
+// CHECK-LABEL: module @cross_function_tracking
+module @cross_function_tracking {
+  util.global private @source = #stream.parameter.named<"model"::"weight"> : !stream.resource<constant>
+  util.global private @encoded_v1 : !stream.resource<constant>
+  util.global private @encoded_v1_size : index
+  util.global private @encoded_v2 : !stream.resource<constant>
+  util.global private @encoded_v2_size : index
+
+  util.initializer {
+    %source = util.global.load @source : !stream.resource<constant>
+    %source_size = stream.resource.size %source : !stream.resource<constant>
+
+    // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK: stream.tensor.encode {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+    %size1 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding1> : index
+    %enc1 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
+    %const1 = stream.async.clone %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
+    util.global.store %const1, @encoded_v1 : !stream.resource<constant>
+    util.global.store %size1, @encoded_v1_size : index
+
+    // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK: stream.tensor.encode {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+    %size2 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding2> : index
+    %enc2 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
+    %const2 = stream.async.clone %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
+    util.global.store %const2, @encoded_v2 : !stream.resource<constant>
+    util.global.store %size2, @encoded_v2_size : index
+
+    util.return
+  }
+
+  stream.executable private @executable_both {
+    stream.executable.export public @dispatch
+    builtin.module {
+      func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: !stream.binding) {
+        %c0 = arith.constant 0 : index
+        %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x4096xf32, #encoding1>>
+        %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x4096xf32, #encoding2>>
+        %2 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
+        return
+      }
+    }
+  }
 
   // Helper function called from cross_function_call test.
   // CHECK-LABEL: util.func private @dispatch_helper
-  util.func private @dispatch_helper(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
-    // CHECK:      stream.tensor.dispatch @executable_v1::@dispatch
+  util.func private @dispatch_helper(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index, %arg4: index) -> !stream.resource<*> {
+    // CHECK:      stream.tensor.dispatch @executable_both::@dispatch
     // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
-    %result = stream.tensor.dispatch @executable_v1::@dispatch(%arg0, %arg0) : (tensor<16xf32> in !stream.resource<*>{%arg1}, tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%arg1}) -> tensor<16xf32> in !stream.resource<*>{%arg1}
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
+    %result = stream.tensor.dispatch @executable_both::@dispatch(%arg0, %arg2) : (tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%arg1}, tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%arg3}) -> tensor<16xf32> in !stream.resource<*>{%arg4}
     util.return %result : !stream.resource<*>
   }
 
-  // Test cross-function tracking: load encoded global, pass to callee via util.call.
-  // CHECK-LABEL: util.func public @cross_function_call
-  util.func public @cross_function_call() -> !stream.resource<*> {
-    %encoded = util.global.load @encoded_v1 : !stream.resource<constant>
-    %encoded_size = util.global.load @encoded_v1_size : index
-    %cloned = stream.async.clone %encoded : !stream.resource<constant>{%encoded_size} -> !stream.resource<*>{%encoded_size}
-    %result = util.call @dispatch_helper(%cloned, %encoded_size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.func public @cross_function_call(%arg0: index) -> !stream.resource<*> {
+    %encoded_v1 = util.global.load @encoded_v1 : !stream.resource<constant>
+    %encoded_v1_size = util.global.load @encoded_v1_size : index
+    %encoded_v2 = util.global.load @encoded_v2 : !stream.resource<constant>
+    %encoded_v2_size = util.global.load @encoded_v2_size : index
+    %cloned_v1 = stream.async.clone %encoded_v1 : !stream.resource<constant>{%encoded_v1_size} -> !stream.resource<*>{%encoded_v1_size}
+    %cloned_v2 = stream.async.clone %encoded_v2 : !stream.resource<constant>{%encoded_v2_size} -> !stream.resource<*>{%encoded_v2_size}
+    %result = util.call @dispatch_helper(%cloned_v1, %encoded_v1_size, %cloned_v2, %encoded_v2_size, %arg0) : (!stream.resource<*>, index, !stream.resource<*>, index, index) -> !stream.resource<*>
     util.return %result : !stream.resource<*>
   }
 }
