@@ -36,15 +36,16 @@ using IREE::Encoding::EncodingAttr;
 //===---------------------------------------------------------------------===//
 
 static Value setEncoding(OpBuilder &builder, Location loc, Value source,
-                         Attribute encodingAttr) {
+                         Attribute encodingAttr, ValueRange encodingDims = {}) {
   auto resultType =
       cast<RankedTensorType>(source.getType()).cloneWithEncoding(encodingAttr);
-  return IREE::Encoding::SetEncodingOp::create(builder, loc, resultType,
-                                               source);
-};
+  return IREE::Encoding::SetEncodingOp::create(builder, loc, resultType, source,
+                                               encodingDims);
+}
 
 static Value unsetEncoding(OpBuilder &builder, Location loc, Value source,
-                           SmallVector<OpFoldResult> sizes) {
+                           SmallVector<OpFoldResult> sizes,
+                           ValueRange encodingDims = {}) {
   SmallVector<Value> dynamicSizesVec;
   SmallVector<int64_t> staticSizesVec;
   dispatchIndexOpFoldResults(sizes, dynamicSizesVec, staticSizesVec);
@@ -53,7 +54,8 @@ static Value unsetEncoding(OpBuilder &builder, Location loc, Value source,
   auto unsetEncodingReturnType =
       RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
   return IREE::Encoding::UnsetEncodingOp::create(
-      builder, loc, unsetEncodingReturnType, source, dynamicSizesVec);
+      builder, loc, unsetEncodingReturnType, source, dynamicSizesVec,
+      encodingDims);
 }
 
 static SmallVector<linalg::LinalgOp>
@@ -91,15 +93,18 @@ static LogicalResult setDataTilingEncodings(RewriterBase &rewriter,
   SmallVector<Value> encodedInputOperands;
   for (auto [idx, props] : llvm::enumerate(encProps.operands)) {
     Value src = linalgOp.getDpsInputs()[idx];
-    Value encoded = setEncoding(rewriter, loc, src, props.encoding);
+    Value encoded =
+        setEncoding(rewriter, loc, src, props.encoding, props.dynamicValues);
     encodedInputOperands.push_back(encoded);
   }
 
   // Set encoding on init operand.
   // For now, we assume single init.
   assert(encProps.inits.size() == 1 && "Expected single init encoding");
-  Value encodedInitOperand = setEncoding(
-      rewriter, loc, linalgOp.getDpsInits()[0], encProps.inits[0].encoding);
+  IREE::Encoding::EncodingProperties &initProps = encProps.inits[0];
+  Value encodedInitOperand =
+      setEncoding(rewriter, loc, linalgOp.getDpsInits()[0], initProps.encoding,
+                  initProps.dynamicValues);
 
   SmallVector<Value> encodedOperands(encodedInputOperands);
   encodedOperands.push_back(encodedInitOperand);
@@ -110,7 +115,8 @@ static LogicalResult setDataTilingEncodings(RewriterBase &rewriter,
   // Sizes are computed by original output size.
   SmallVector<OpFoldResult> outSizes =
       tensor::getMixedSizes(rewriter, loc, linalgOp.getDpsInits()[0]);
-  Value result = unsetEncoding(rewriter, loc, opTiled, outSizes);
+  Value result =
+      unsetEncoding(rewriter, loc, opTiled, outSizes, initProps.dynamicValues);
 
   rewriter.replaceOp(linalgOp, result);
   return success();
@@ -242,7 +248,8 @@ static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
   // Find the new value to yield.
   Value newYieldedVal = map.lookup(operand);
   auto encodingOp = IREE::Encoding::SetEncodingOp::create(
-      rewriter, returnOp->getLoc(), newResultType, newYieldedVal);
+      rewriter, returnOp->getLoc(), newResultType, newYieldedVal,
+      /*encodingDims=*/ValueRange{});
   rewriter.modifyOpInPlace(
       returnOp, [&]() { returnOp.setOperand(resultNumber, encodingOp); });
 
@@ -276,7 +283,7 @@ static SmallVector<unsigned> padOperandsOfOp(RewriterBase &rewriter,
       Type operandType = operand.get().getType();
       auto unsetEncodignOp = IREE::Encoding::UnsetEncodingOp::create(
           rewriter, op->getLoc(), operandType, paddedVal->paddedValue,
-          paddedVal->dynamicDims);
+          paddedVal->dynamicDims, /*encodingDims=*/ValueRange{});
       op->setOperand(operandNum, unsetEncodignOp.getResult());
     });
   }
