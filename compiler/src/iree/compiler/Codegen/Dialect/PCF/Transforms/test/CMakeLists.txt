@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "convert_forall_to_loops.mlir"
   TOOLS
     FileCheck
     iree-opt

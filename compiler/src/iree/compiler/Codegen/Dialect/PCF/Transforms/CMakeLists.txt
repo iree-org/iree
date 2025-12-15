@@ -28,6 +28,7 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
+    "ConvertForallToLoops.cpp"
     "Passes.cpp"
     "Transforms.cpp"
   DEPS
