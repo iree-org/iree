@@ -281,17 +281,15 @@ util.initializer {
   // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #iree_encoding.identity>
   // CHECK: stream.tensor.encode %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
   %size1 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding1> : index
-  %enc1 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
-  %const1 = stream.async.clone %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
-  util.global.store %const1, @encoded_v1 : !stream.resource<constant>
+  %enc1 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<constant>{%size1}
+  util.global.store %enc1, @encoded_v1 : !stream.resource<constant>
   util.global.store %size1, @encoded_v1_size : index
 
   // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #iree_encoding.identity>
   // CHECK: stream.tensor.encode %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
   %size2 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding2> : index
-  %enc2 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
-  %const2 = stream.async.clone %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
-  util.global.store %const2, @encoded_v2 : !stream.resource<constant>
+  %enc2 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<constant>{%size2}
+  util.global.store %enc2, @encoded_v2 : !stream.resource<constant>
   util.global.store %size2, @encoded_v2_size : index
 
   util.return
@@ -329,7 +327,9 @@ util.func public @dispatch_with_tied_operand(%N: index, %M: index) -> !stream.re
   // CHECK:      stream.tensor.encode %[[DISPATCH]] :
   // CHECK-SAME:   tensor<?x?xf32, #iree_encoding.identity>
   // CHECK-SAME:   -> tensor<?x?xf32, #[[$ENC]]>{%[[N]], %[[M]]}
-  %result = stream.tensor.dispatch @executable_tied::@dispatch_inplace(%cloned) : (tensor<?x?xf32, #encoding1>{%N, %M} in !stream.resource<*>{%encoded_size}) -> tensor<?x?xf32, #encoding1>{%N, %M} in %cloned{%encoded_size}
+  %result = stream.tensor.dispatch @executable_tied::@dispatch_inplace(%cloned)
+    : (tensor<?x?xf32, #encoding1>{%N, %M} in !stream.resource<*>{%encoded_size})
+    -> tensor<?x?xf32, #encoding1>{%N, %M} in %cloned{%encoded_size}
 
   util.return %result : !stream.resource<*>
 }

@@ -369,6 +369,7 @@ static void updateTensorDispatchOp(TensorDispatchOp dispatchOp,
     remainingDims = remainingDims.drop_front(dynamicDimCount);
   }
 
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(dispatchOp);
   for (auto [result, oldType] : resultsToReencode) {
     unsigned resultIdx = result.getResultNumber();
