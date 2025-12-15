@@ -1051,7 +1051,9 @@ public:
       SmallVector<AffineExpr> newExprs =
           applyPermutation(inputMap.getResults(), invPerm);
 
-      // Only fuse if newExprs are now contiguous.
+      // Only fuse if dimension indices are in increasing order to maintain
+      // efficient memory access patterns. This should offset the fact that the
+      // transpose may have multiple uses.
       int64_t prevDim = -1;
       for (int64_t i = 0; i < newExprs.size(); ++i) {
         int64_t dim = cast<AffineDimExpr>(newExprs[i]).getPosition();
