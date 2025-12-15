@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "ConvertForallToLoops.cpp",
         "FuseConsumers.cpp",
         "FusePCFWrites.cpp",
+        "LowerStructuralPCF.cpp",
         "Passes.cpp",
         "Transforms.cpp",
     ],
@@ -79,6 +80,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
+        "@llvm-project//mlir:WalkPatternRewriteDriver",
     ],
 )
 
