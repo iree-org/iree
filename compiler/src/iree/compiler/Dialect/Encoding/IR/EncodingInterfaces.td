@@ -76,6 +76,8 @@ def IREEEncoding_LayoutResolverAttr :
         attributes. This is used when multiple encodings are used for the same
         source data and need to be unified to a single encoding.
 
+        Returns nullptr if it fails to get a unified encoding.
+
         The resolver implementation can create any encoding based on
         backend-specific heuristics. The returned encoding does not need to be
         one of the input encodings - for example, a resolver might return an

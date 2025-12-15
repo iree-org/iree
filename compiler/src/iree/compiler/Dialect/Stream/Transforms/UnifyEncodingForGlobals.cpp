@@ -116,13 +116,12 @@ public:
     return result;
   }
 
-  // Returns the SourceGlobalInfo for the given source global name, or
-  // std::nullopt if not found.
-  std::optional<SourceGlobalInfo> getSourceGlobals(StringRef name) const {
-    if (sourceGlobals.contains(name)) {
-      return sourceGlobals.find(name)->second;
-    }
-    return std::nullopt;
+  // Returns the SourceGlobalInfo for the given source global name. There is a
+  // copy in the call, so it is not a cheap call.
+  SourceGlobalInfo getSourceGlobals(StringRef name) {
+    assert(sourceGlobals.contains(name) &&
+           "Expected all the source globals are parsed");
+    return sourceGlobals.find(name)->second;
   }
 
   // Returns the unified encoding for the given source global name, or
@@ -170,7 +169,7 @@ private:
   llvm::MapVector<StringRef, SourceGlobalInfo> sourceGlobals;
 
   // Maps source global name to its unified encoding. Populated by run().
-  llvm::DenseMap<StringRef, Attribute> unifiedEncodings;
+  llvm::StringMap<Attribute> unifiedEncodings;
 };
 
 LogicalResult GlobalEncodingAnalyzer::run() {
@@ -220,10 +219,10 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
   // Build queries for layout resolution.
   SmallVector<IREE::Stream::AffinityAndOpPair> queries;
   for (StringRef sourceName : candidates) {
-    std::optional<SourceGlobalInfo> sourceInfo = getSourceGlobals(sourceName);
-    for (EncodedGlobalInfo &encodedInfo : sourceInfo->encodedVersions) {
-      queries.push_back({encodedInfo.encodeOp.getAffinityAttr(),
-                         encodedInfo.encodedGlobal});
+    SourceGlobalInfo sourceInfo = getSourceGlobals(sourceName);
+    for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
+      queries.push_back(
+          {encodedInfo.encodeOp.getAffinityAttr(), encodedInfo.encodedGlobal});
     }
   }
 
@@ -240,8 +239,8 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
   for (StringRef sourceName : candidates) {
     SetVector<Attribute> layoutResolvers;
     SmallVector<Attribute> encodingAttrVersions;
-    std::optional<SourceGlobalInfo> sourceInfo = getSourceGlobals(sourceName);
-    for (EncodedGlobalInfo &encodedInfo : sourceInfo->encodedVersions) {
+    SourceGlobalInfo sourceInfo = getSourceGlobals(sourceName);
+    for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
       const SetVector<Attribute> &resolvers =
           cachedLayoutAttrs[IREE::Stream::AffinityAndOpPair(
               encodedInfo.encodeOp.getAffinityAttr(),
@@ -271,6 +270,10 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
            << " to unify encodings for source global: " << sourceName;
     unifiedEncodings[sourceName] =
         layoutResolver.getUnifiedEncoding(encodingAttrVersions);
+    // Fallback to identity encoding on failure.
+    if (!unifiedEncodings[sourceName]) {
+      unifiedEncodings[sourceName] = IREE::Encoding::IdentityAttr::get(ctx);
+    }
   }
 
   return success();
@@ -613,13 +616,12 @@ struct UnifyEncodingForGlobalsPass
     explorer.initialize();
     TensorEncodingUpdates tensorEncodingUpdates;
     for (StringRef sourceName : candidates) {
-      std::optional<SourceGlobalInfo> sourceInfo =
-          analyzer.getSourceGlobals(sourceName);
+      SourceGlobalInfo sourceInfo = analyzer.getSourceGlobals(sourceName);
       // Update each encode op to use the unified encoding.
       Attribute unifiedEncoding = *analyzer.getUnifiedEncoding(sourceName);
       LDBG() << "Unifying encodings for source global: " << sourceName
              << " to " << unifiedEncoding;
-      for (EncodedGlobalInfo &encodedInfo : sourceInfo->encodedVersions) {
+      for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
         auto encodeOp = encodedInfo.encodeOp;
         auto oldResultType =
             cast<RankedTensorType>(encodeOp.getResultEncoding());
