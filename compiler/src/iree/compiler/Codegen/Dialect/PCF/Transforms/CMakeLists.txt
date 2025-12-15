@@ -34,6 +34,7 @@ iree_cc_library(
     "FusePCFWrites.cpp"
     "LowerStructuralPCF.cpp"
     "Passes.cpp"
+    "ResolveTokens.cpp"
     "Transforms.cpp"
   DEPS
     ::PassesIncGen
@@ -45,7 +46,6 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRControlFlowInterfaces
     MLIRDestinationStyleOpInterface
-    MLIRDialectUtils
     MLIRFuncDialect
     MLIRFuncTransforms
     MLIRFunctionInterfaces
