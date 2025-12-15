@@ -23,13 +23,19 @@ def IREEEncoding_SetEncodingOp : IREEEncoding_PureOp<"set_encoding",[
     Operation to assign an encoding to a tensor. The operation does not change
     the rank or extent of a tensor. Instead it adds a LayoutResolverAttr
     attribute to the tensor type to represent a change in layout.
+
+    The optional `encoding_dims` operand carries dynamic values needed by the
+    encoding (e.g., M, N, K dimensions for matmul encodings). These values are
+    used for runtime layout selection based on problem size.
   }];
 
-  let arguments = (ins AnyRankedTensor:$source);
+  let arguments = (ins
+    AnyRankedTensor:$source,
+    Variadic<Index>:$encoding_dims);
   let results = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
-    attr-dict $source `:` type($source) `->` type($result)
+    attr-dict $source (`encoding_dims` `{` $encoding_dims^ `}`)? `:` type($source) `->` type($result)
   }];
 
   let hasVerifier = 1;
@@ -49,21 +55,27 @@ def IREEEncoding_SetEncodingOp : IREEEncoding_PureOp<"set_encoding",[
 //===----------------------------------------------------------------------===//
 
 def IREEEncoding_UnsetEncodingOp : IREEEncoding_PureOp<"unset_encoding", [
-    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>, Pure
+    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    AttrSizedOperandSegments, Pure
   ]> {
   let summary = [{Perform unpack and extract operation on source.}];
   let description = [{
     Operation to convert a tensor with LayoutResolverAttr encoding that
     represents its data layout into a tensor with default layout
     (i.e. no encoding). For now in IREE the default layout is row-major.
+
+    The optional `encoding_dims` operand carries dynamic values needed by the
+    encoding (e.g., M, N, K dimensions for matmul encodings). These values are
+    used for runtime layout selection based on problem size.
   }];
   let arguments = (ins
     AnyRankedTensor:$source,
-    Variadic<Index>:$result_dims);
+    Variadic<Index>:$result_dims,
+    Variadic<Index>:$encoding_dims);
   let results = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
-    attr-dict $source `:` type($source) `->` type($result) (`` `{` $result_dims^ `}`)?
+    attr-dict $source (`encoding_dims` `{` $encoding_dims^ `}`)? `:` type($source) `->` type($result) (`` `{` $result_dims^ `}`)?
   }];
 
   let hasVerifier = 1;
