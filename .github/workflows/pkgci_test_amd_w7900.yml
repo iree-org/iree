@@ -19,7 +19,7 @@ on:
 
 jobs:
   test_w7900:
-    runs-on: [Linux, X64, iree-w7900]
+    runs-on: [self-hosted, Linux, X64, iree-w7900]
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests

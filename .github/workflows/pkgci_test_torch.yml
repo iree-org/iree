@@ -36,11 +36,11 @@ jobs:
             runs-on: ubuntu-24.04
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
-            runs-on: [Linux, X64, gfx1100]
+            runs-on: [self-hosted, Linux, X64, gfx1100]
           - name: amdgpu_vulkan_O3
             config-file: torch_ops_gpu_vulkan_O3.json
             # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
-            runs-on: [Linux, X64, rdna3, shark10-ci]
+            runs-on: [self-hosted, Linux, X64, rdna3, shark10-ci]
           - name: amdgpu_rocm_mi300_gfx942_O3
             config-file: torch_ops_gpu_hip_gfx942_O3.json
             runs-on: linux-mi325-1gpu-ossci-iree-org
