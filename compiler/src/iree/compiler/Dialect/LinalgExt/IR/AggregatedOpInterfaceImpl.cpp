@@ -1054,23 +1054,32 @@ struct UsedOperationsAndBlockArguments {
   SetVector<Operation *> usedOperations;
 };
 
-/// For a given resultNumber in a linalg::GenericOp, this op scans the
+/// For a given `resultNumber` in a linalg::GenericOp, this op scans the
 /// GenericOp's body for the block arguments and operations that are involved
 /// in its computation.
 ///
-/// Block arguments are returned as indices over the block, to be used as:
-///   for (auto idx : usedInputIndices)
+/// Block arguments used are returned as indices over the dpsInputs and
+/// dpsInputs, to be used as:
+/// ```
+/// for (auto idx : usedInputIndices)
+///   if (idx < getNumDpsInputs())
+///     getDpsInputOperand(idx)
+///   else
 ///     getDpsInitOperand(idx)
-/// Operations are returned as generic operations
+/// ```
+/// As resultNumber is specified, if a dpsInit is used that is not resultNumber
+/// failure is returned.
+///
+/// Operations are returned as generic operations.
 static FailureOr<UsedOperationsAndBlockArguments>
-captureUsedOperationsAndBlockArguments(linalg::GenericOp linalgOp,
+captureUsedOperationsAndBlockArguments(linalg::GenericOp genericOp,
                                        int64_t resultNumber) {
   BackwardSliceOptions options;
   options.inclusive = true;
-  options.filter = [&linalgOp](Operation *op) -> bool {
-    return op->getBlock() == linalgOp.getBody();
+  options.filter = [&genericOp](Operation *op) -> bool {
+    return op->getBlock() == genericOp.getBody();
   };
-  auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBlock()->getTerminator());
   Value result = yieldOp.getOperand(resultNumber);
   SetVector<Operation *> usedOperations;
   if (failed(getBackwardSlice(result, &usedOperations, options))) {
@@ -1086,15 +1095,15 @@ captureUsedOperationsAndBlockArguments(linalg::GenericOp linalgOp,
       if (!blockArg) {
         continue;
       }
-      if (blockArg.getOwner() != linalgOp.getBlock()) {
+      if (blockArg.getOwner() != genericOp.getBlock()) {
         continue;
       }
       int64_t argNumber = blockArg.getArgNumber();
-      if (argNumber < linalgOp.getNumDpsInputs()) {
+      if (argNumber < genericOp.getNumDpsInputs()) {
         usedInputIndices.insert(argNumber);
         continue;
       }
-      if (argNumber - linalgOp.getNumDpsInputs() != resultNumber) {
+      if (argNumber - genericOp.getNumDpsInputs() != resultNumber) {
         return failure();
       }
     }
@@ -1114,6 +1123,7 @@ decomposeMultipleResults(linalg::GenericOp genericOp, RewriterBase &rewriter) {
     return SmallVector<linalg::GenericOp>{genericOp};
   }
 
+  IRRewriter::InsertionGuard g(rewriter);
   SmallVector<linalg::GenericOp> results;
   // Create num_results linalg.generics, each producing a single result (and
   // relying on canonicalizations to simplify).
