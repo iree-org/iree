@@ -1177,9 +1177,6 @@ decomposeMultipleResults(linalg::GenericOp genericOp, RewriterBase &rewriter) {
           }
           linalg::YieldOp::create(b, loc, regionMapping.lookup(result));
         });
-    if (unusedDims.none()) {
-      newOp->setDiscardableAttrs(genericOp->getDiscardableAttrDictionary());
-    }
     rewriter.replaceAllUsesWith(genericOp.getResult(resultNumber),
                                 newOp.getResult(0));
 
