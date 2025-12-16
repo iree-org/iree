@@ -17,7 +17,7 @@ vm.module @ref_ops {
   vm.export @test_zero_ref_eq
   vm.func @test_zero_ref_eq() {
     %ref = vm.const.ref.zero : !vm.ref<?>
-    %ref_dno = util.optimization_barrier %ref : !vm.ref<?>
+    %ref_dno = vm.optimization_barrier %ref : !vm.ref<?>
     vm.check.eq %ref_dno, %ref_dno : !vm.ref<?>
     vm.return
   }
@@ -30,9 +30,9 @@ vm.module @ref_ops {
   vm.export @test_ref_eq attributes {emitc.exclude}
   vm.func @test_ref_eq() {
     %ref_1 = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_1_dno = util.optimization_barrier %ref_1 : !vm.buffer
+    %ref_1_dno = vm.optimization_barrier %ref_1 : !vm.buffer
     %ref_2 = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_2_dno = util.optimization_barrier %ref_2 : !vm.buffer
+    %ref_2_dno = vm.optimization_barrier %ref_2 : !vm.buffer
     vm.check.eq %ref_1_dno, %ref_2_dno : !vm.buffer
     vm.return
   }
@@ -40,9 +40,9 @@ vm.module @ref_ops {
   vm.export @test_ref_ne
   vm.func @test_ref_ne() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     vm.check.ne %ref_a_dno, %ref_b_dno : !vm.buffer
     vm.return
   }
@@ -50,7 +50,7 @@ vm.module @ref_ops {
   vm.export @test_ref_nz
   vm.func @test_ref_nz() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     vm.check.nz %ref_dno : !vm.buffer
     vm.return
   }
@@ -64,7 +64,7 @@ vm.module @ref_ops {
   vm.export @test_ref_survives_call attributes {emitc.exclude}
   vm.func @test_ref_survives_call() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     vm.check.nz %ref_dno, "ref valid before call" : !vm.buffer
     vm.call @_consume_ref(%ref_dno) : (!vm.buffer) -> ()
     // Ref should still be valid after the call.
@@ -74,7 +74,7 @@ vm.module @ref_ops {
 
   vm.func private @_consume_ref(%arg : !vm.buffer)
       attributes {inlining_policy = #util.inline.never} {
-    %arg_dno = util.optimization_barrier %arg : !vm.buffer
+    %arg_dno = vm.optimization_barrier %arg : !vm.buffer
     vm.check.nz %arg_dno, "ref valid in callee" : !vm.buffer
     vm.return
   }
@@ -83,7 +83,7 @@ vm.module @ref_ops {
   vm.export @test_same_ref_multiple_args attributes {emitc.exclude}
   vm.func @test_same_ref_multiple_args() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     vm.call @_consume_two_refs(%ref_dno, %ref_dno) : (!vm.buffer, !vm.buffer) -> ()
     // Ref should still be valid after the call.
     vm.check.nz %ref_dno, "ref valid after call with same ref twice" : !vm.buffer
@@ -92,8 +92,8 @@ vm.module @ref_ops {
 
   vm.func private @_consume_two_refs(%arg0 : !vm.buffer, %arg1 : !vm.buffer)
       attributes {inlining_policy = #util.inline.never} {
-    %arg0_dno = util.optimization_barrier %arg0 : !vm.buffer
-    %arg1_dno = util.optimization_barrier %arg1 : !vm.buffer
+    %arg0_dno = vm.optimization_barrier %arg0 : !vm.buffer
+    %arg1_dno = vm.optimization_barrier %arg1 : !vm.buffer
     vm.check.nz %arg0_dno, "first arg valid" : !vm.buffer
     vm.check.nz %arg1_dno, "second arg valid" : !vm.buffer
     vm.check.eq %arg0_dno, %arg1_dno, "both args are same ref" : !vm.buffer
@@ -104,7 +104,7 @@ vm.module @ref_ops {
   vm.export @test_ref_returned_from_call attributes {emitc.exclude}
   vm.func @test_ref_returned_from_call() {
     %ref = vm.call @_return_ref() : () -> !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     vm.check.nz %ref_dno, "returned ref is valid" : !vm.buffer
     vm.return
   }
@@ -119,9 +119,9 @@ vm.module @ref_ops {
   vm.export @test_ref_passthrough attributes {emitc.exclude}
   vm.func @test_ref_passthrough() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %returned = vm.call @_passthrough_ref(%ref_dno) : (!vm.buffer) -> !vm.buffer
-    %returned_dno = util.optimization_barrier %returned : !vm.buffer
+    %returned_dno = vm.optimization_barrier %returned : !vm.buffer
     vm.check.eq %ref_dno, %returned_dno, "passthrough returns same ref" : !vm.buffer
     vm.return
   }
@@ -139,9 +139,9 @@ vm.module @ref_ops {
   vm.export @test_ref_cond_br_both_paths attributes {emitc.exclude}
   vm.func @test_ref_cond_br_both_paths() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %c1 = vm.const.i32 1
-    %c1_dno = util.optimization_barrier %c1 : i32
+    %c1_dno = vm.optimization_barrier %c1 : i32
     vm.cond_br %c1_dno, ^bb1(%ref_dno : !vm.buffer), ^bb2(%ref_dno : !vm.buffer)
   ^bb1(%arg1 : !vm.buffer):
     vm.check.nz %arg1, "ref valid in bb1" : !vm.buffer
@@ -157,9 +157,9 @@ vm.module @ref_ops {
   vm.export @test_ref_cond_br_one_path attributes {emitc.exclude}
   vm.func @test_ref_cond_br_one_path() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %c1 = vm.const.i32 1
-    %c1_dno = util.optimization_barrier %c1 : i32
+    %c1_dno = vm.optimization_barrier %c1 : i32
     vm.cond_br %c1_dno, ^bb1(%ref_dno : !vm.buffer), ^bb2
   ^bb1(%arg1 : !vm.buffer):
     vm.check.nz %arg1, "ref valid in bb1" : !vm.buffer
@@ -172,7 +172,7 @@ vm.module @ref_ops {
   vm.export @test_ref_in_loop attributes {emitc.exclude}
   vm.func @test_ref_in_loop() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %c0 = vm.const.i32 0
     %c1 = vm.const.i32 1
     %c3 = vm.const.i32 3
@@ -191,9 +191,9 @@ vm.module @ref_ops {
   vm.export @test_multiple_refs_in_loop attributes {emitc.exclude}
   vm.func @test_multiple_refs_in_loop() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     %c0 = vm.const.i32 0
     %c1 = vm.const.i32 1
     %c3 = vm.const.i32 3
@@ -217,10 +217,10 @@ vm.module @ref_ops {
   vm.export @test_global_store_load_ref attributes {emitc.exclude}
   vm.func @test_global_store_load_ref() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     vm.global.store.ref %ref_dno, @global_ref : !vm.buffer
     %loaded = vm.global.load.ref @global_ref : !vm.buffer
-    %loaded_dno = util.optimization_barrier %loaded : !vm.buffer
+    %loaded_dno = vm.optimization_barrier %loaded : !vm.buffer
     vm.check.eq %ref_dno, %loaded_dno, "loaded ref equals stored ref" : !vm.buffer
     vm.return
   }
@@ -229,7 +229,7 @@ vm.module @ref_ops {
   vm.export @test_ref_valid_after_global_store attributes {emitc.exclude}
   vm.func @test_ref_valid_after_global_store() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     vm.check.nz %ref_dno, "ref valid before store" : !vm.buffer
     vm.global.store.ref %ref_dno, @global_ref : !vm.buffer
     // Original ref should still be valid after storing to global.
@@ -248,12 +248,12 @@ vm.module @ref_ops {
     %c0 = vm.const.i32 0
     %c1 = vm.const.i32 1
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
     vm.list.resize %list, %c1 : (!vm.list<?>, i32)
     vm.list.set.ref %list, %c0, %ref_dno : (!vm.list<?>, i32, !vm.buffer)
     %retrieved = vm.list.get.ref %list, %c0 : (!vm.list<?>, i32) -> !vm.buffer
-    %retrieved_dno = util.optimization_barrier %retrieved : !vm.buffer
+    %retrieved_dno = vm.optimization_barrier %retrieved : !vm.buffer
     vm.check.eq %ref_dno, %retrieved_dno, "retrieved ref equals set ref" : !vm.buffer
     vm.return
   }
@@ -265,17 +265,17 @@ vm.module @ref_ops {
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     %list = vm.list.alloc %c2 : (i32) -> !vm.list<?>
     vm.list.resize %list, %c2 : (!vm.list<?>, i32)
     vm.list.set.ref %list, %c0, %ref_a_dno : (!vm.list<?>, i32, !vm.buffer)
     vm.list.set.ref %list, %c1, %ref_b_dno : (!vm.list<?>, i32, !vm.buffer)
     %retrieved_a = vm.list.get.ref %list, %c0 : (!vm.list<?>, i32) -> !vm.buffer
-    %retrieved_a_dno = util.optimization_barrier %retrieved_a : !vm.buffer
+    %retrieved_a_dno = vm.optimization_barrier %retrieved_a : !vm.buffer
     %retrieved_b = vm.list.get.ref %list, %c1 : (!vm.list<?>, i32) -> !vm.buffer
-    %retrieved_b_dno = util.optimization_barrier %retrieved_b : !vm.buffer
+    %retrieved_b_dno = vm.optimization_barrier %retrieved_b : !vm.buffer
     vm.check.eq %ref_a_dno, %retrieved_a_dno, "retrieved ref_a equals set ref_a" : !vm.buffer
     vm.check.eq %ref_b_dno, %retrieved_b_dno, "retrieved ref_b equals set ref_b" : !vm.buffer
     vm.check.ne %retrieved_a_dno, %retrieved_b_dno, "refs are different" : !vm.buffer
@@ -288,12 +288,12 @@ vm.module @ref_ops {
     %c0 = vm.const.i32 0
     %c1 = vm.const.i32 1
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
     vm.list.resize %list, %c1 : (!vm.list<?>, i32)
     vm.list.set.ref %list, %c0, %ref_dno : (!vm.list<?>, i32, !vm.buffer)
     %retrieved = vm.list.get.ref %list, %c0 : (!vm.list<?>, i32) -> !vm.buffer
-    %retrieved_dno = util.optimization_barrier %retrieved : !vm.buffer
+    %retrieved_dno = vm.optimization_barrier %retrieved : !vm.buffer
     // Use retrieved ref multiple times.
     vm.check.nz %retrieved_dno, "retrieved ref valid (use 1)" : !vm.buffer
     vm.check.nz %retrieved_dno, "retrieved ref valid (use 2)" : !vm.buffer
@@ -307,7 +307,7 @@ vm.module @ref_ops {
     %c0 = vm.const.i32 0
     %c1 = vm.const.i32 1
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     vm.check.nz %ref_dno, "ref valid before list set" : !vm.buffer
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
     vm.list.resize %list, %c1 : (!vm.list<?>, i32)
@@ -325,13 +325,13 @@ vm.module @ref_ops {
   vm.export @test_select_ref_true attributes {emitc.exclude}
   vm.func @test_select_ref_true() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     %c1 = vm.const.i32 1
-    %c1_dno = util.optimization_barrier %c1 : i32
+    %c1_dno = vm.optimization_barrier %c1 : i32
     %result = vm.select.ref %c1_dno, %ref_a_dno, %ref_b_dno : !vm.buffer
-    %result_dno = util.optimization_barrier %result : !vm.buffer
+    %result_dno = vm.optimization_barrier %result : !vm.buffer
     vm.check.eq %result_dno, %ref_a_dno, "select true returns first ref" : !vm.buffer
     vm.return
   }
@@ -339,13 +339,13 @@ vm.module @ref_ops {
   vm.export @test_select_ref_false attributes {emitc.exclude}
   vm.func @test_select_ref_false() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     %c0 = vm.const.i32 0
-    %c0_dno = util.optimization_barrier %c0 : i32
+    %c0_dno = vm.optimization_barrier %c0 : i32
     %result = vm.select.ref %c0_dno, %ref_a_dno, %ref_b_dno : !vm.buffer
-    %result_dno = util.optimization_barrier %result : !vm.buffer
+    %result_dno = vm.optimization_barrier %result : !vm.buffer
     vm.check.eq %result_dno, %ref_b_dno, "select false returns second ref" : !vm.buffer
     vm.return
   }
@@ -354,13 +354,13 @@ vm.module @ref_ops {
   vm.export @test_select_ref_input_survives attributes {emitc.exclude}
   vm.func @test_select_ref_input_survives() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     %c1 = vm.const.i32 1
-    %c1_dno = util.optimization_barrier %c1 : i32
+    %c1_dno = vm.optimization_barrier %c1 : i32
     %result = vm.select.ref %c1_dno, %ref_a_dno, %ref_b_dno : !vm.buffer
-    %result_dno = util.optimization_barrier %result : !vm.buffer
+    %result_dno = vm.optimization_barrier %result : !vm.buffer
     // Both input refs should still be valid after select.
     vm.check.nz %ref_a_dno, "ref_a valid after select" : !vm.buffer
     vm.check.nz %ref_b_dno, "ref_b valid after select" : !vm.buffer
@@ -376,7 +376,7 @@ vm.module @ref_ops {
   vm.export @test_ref_multiple_sequential_uses attributes {emitc.exclude}
   vm.func @test_ref_multiple_sequential_uses() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     // Use 1: check nz
     vm.check.nz %ref_dno, "use 1" : !vm.buffer
     // Use 2: pass to call
@@ -394,9 +394,9 @@ vm.module @ref_ops {
   vm.export @test_ref_call_chain attributes {emitc.exclude}
   vm.func @test_ref_call_chain() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %result = vm.call @_call_chain_a(%ref_dno) : (!vm.buffer) -> !vm.buffer
-    %result_dno = util.optimization_barrier %result : !vm.buffer
+    %result_dno = vm.optimization_barrier %result : !vm.buffer
     vm.check.eq %ref_dno, %result_dno, "chain returns same ref" : !vm.buffer
     vm.return
   }
@@ -416,9 +416,9 @@ vm.module @ref_ops {
   vm.export @test_return_multiple_refs attributes {emitc.exclude}
   vm.func @test_return_multiple_refs() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     %results:2 = vm.call @_return_two_refs(%ref_a_dno, %ref_b_dno)
         : (!vm.buffer, !vm.buffer) -> (!vm.buffer, !vm.buffer)
     vm.check.eq %results#0, %ref_a_dno, "first result is ref_a" : !vm.buffer
@@ -436,9 +436,9 @@ vm.module @ref_ops {
   vm.export @test_return_refs_swapped attributes {emitc.exclude}
   vm.func @test_return_refs_swapped() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     %results:2 = vm.call @_return_refs_swapped(%ref_a_dno, %ref_b_dno)
         : (!vm.buffer, !vm.buffer) -> (!vm.buffer, !vm.buffer)
     vm.check.eq %results#0, %ref_b_dno, "first result is ref_b (swapped)" : !vm.buffer
@@ -467,7 +467,7 @@ vm.module @ref_ops {
   vm.export @test_discard_single_ref attributes {emitc.exclude}
   vm.func private @test_discard_single_ref() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     vm.check.nz %ref_dno, "ref valid before discard" : !vm.buffer
     vm.discard.refs %ref_dno : !vm.buffer
     // Note: After discard, the ref is released. We shouldn't use it.
@@ -478,9 +478,9 @@ vm.module @ref_ops {
   vm.export @test_discard_multiple_refs attributes {emitc.exclude}
   vm.func private @test_discard_multiple_refs() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     vm.check.nz %ref_a_dno, "ref_a valid before discard" : !vm.buffer
     vm.check.nz %ref_b_dno, "ref_b valid before discard" : !vm.buffer
     vm.discard.refs %ref_a_dno, %ref_b_dno : !vm.buffer, !vm.buffer
@@ -491,9 +491,9 @@ vm.module @ref_ops {
   vm.export @test_discard_in_branch attributes {emitc.exclude}
   vm.func private @test_discard_in_branch() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %c1 = vm.const.i32 1
-    %c1_dno = util.optimization_barrier %c1 : i32
+    %c1_dno = vm.optimization_barrier %c1 : i32
     vm.cond_br %c1_dno, ^bb1, ^bb2
   ^bb1:
     vm.discard.refs %ref_dno : !vm.buffer
@@ -513,7 +513,7 @@ vm.module @ref_ops {
   vm.export @test_nested_loop_outer_ref attributes {emitc.exclude}
   vm.func private @test_nested_loop_outer_ref() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %c0 = vm.const.i32 0
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
@@ -543,9 +543,9 @@ vm.module @ref_ops {
   vm.export @test_ping_pong_swap attributes {emitc.exclude}
   vm.func private @test_ping_pong_swap() {
     %ref_a = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_a_dno = util.optimization_barrier %ref_a : !vm.buffer
+    %ref_a_dno = vm.optimization_barrier %ref_a : !vm.buffer
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
-    %ref_b_dno = util.optimization_barrier %ref_b : !vm.buffer
+    %ref_b_dno = vm.optimization_barrier %ref_b : !vm.buffer
     %c0 = vm.const.i32 0
     %c1 = vm.const.i32 1
     %c3 = vm.const.i32 3
@@ -571,9 +571,9 @@ vm.module @ref_ops {
   vm.export @test_diamond_asymmetric_use attributes {emitc.exclude}
   vm.func private @test_diamond_asymmetric_use() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %c1 = vm.const.i32 1
-    %c1_dno = util.optimization_barrier %c1 : i32
+    %c1_dno = vm.optimization_barrier %c1 : i32
     vm.cond_br %c1_dno, ^use_path(%ref_dno : !vm.buffer), ^nouse_path(%ref_dno : !vm.buffer)
   ^use_path(%r1 : !vm.buffer):
     vm.check.nz %r1, "ref valid in use_path" : !vm.buffer
@@ -589,9 +589,9 @@ vm.module @ref_ops {
   vm.export @test_diamond_asymmetric_nouse attributes {emitc.exclude}
   vm.func private @test_diamond_asymmetric_nouse() {
     %ref = vm.const.ref.rodata @buffer_a : !vm.buffer
-    %ref_dno = util.optimization_barrier %ref : !vm.buffer
+    %ref_dno = vm.optimization_barrier %ref : !vm.buffer
     %c0 = vm.const.i32 0
-    %c0_dno = util.optimization_barrier %c0 : i32
+    %c0_dno = vm.optimization_barrier %c0 : i32
     vm.cond_br %c0_dno, ^use_path(%ref_dno : !vm.buffer), ^nouse_path(%ref_dno : !vm.buffer)
   ^use_path(%r1 : !vm.buffer):
     vm.check.nz %r1, "ref valid in use_path" : !vm.buffer

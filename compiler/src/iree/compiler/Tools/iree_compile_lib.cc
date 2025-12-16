@@ -270,24 +270,30 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     // Switch on compileMode to choose a pipeline to run.
     switch (compileMode) {
     case CompileMode::std:
-      if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD))
+      if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD)) {
         return false;
+      }
       break;
     case CompileMode::vm:
+      if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_VM)) {
+        return false;
+      }
       break;
     case CompileMode::hal_executable: {
       // Compiling a HAL executable, it is only valid to output in that form.
       outputFormat = OutputFormat::hal_executable;
       if (!ireeCompilerInvocationPipeline(
-              r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
+              r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE)) {
         return false;
+      }
       break;
     }
     case CompileMode::precompile: {
       outputFormat = OutputFormat::precompile;
       if (!ireeCompilerInvocationPipeline(r.inv,
-                                          IREE_COMPILER_PIPELINE_PRECOMPILE))
+                                          IREE_COMPILER_PIPELINE_PRECOMPILE)) {
         return false;
+      }
       break;
     }
     default:

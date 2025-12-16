@@ -5344,4 +5344,47 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
 
 } // OpGroupDebuggingOps
 
+//===----------------------------------------------------------------------===//
+// Compiler hints
+//===----------------------------------------------------------------------===//
+
+def OpGroupCompilerHintOps : OpDocGroup {
+  let summary = "Compiler hint ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupCompilerHintOps in {
+
+def VM_OptimizationBarrierOp : VM_Op<"optimization_barrier", [
+    VM_PseudoOp,
+    AllTypesMatch<["operands", "results"]>,
+  ]> {
+  let summary = [{Prevents compiler optimizations across a value.}];
+  let description = [{
+    Wraps any operands in an unoptimizable identity to prevent its results from
+    being folded. It will be dropped during the final step in compilation and
+    has no effect at runtime.
+  }];
+
+  let arguments = (ins
+    Variadic<VM_AnyType>:$operands
+  );
+  let results = (outs
+    Variadic<VM_AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    attr-dict ($operands^ `:` type($operands))?
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
+}
+
+} // OpGroupCompilerHintOps
+
 #endif  // IREE_DIALECT_VM_OPS

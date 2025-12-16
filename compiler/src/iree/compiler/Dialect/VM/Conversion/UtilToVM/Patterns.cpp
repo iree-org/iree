@@ -103,6 +103,22 @@ struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// util.optimization_barrier
+//===----------------------------------------------------------------------===//
+
+struct OptimizationBarrierOpConversion
+    : public OpConversionPattern<IREE::Util::OptimizationBarrierOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::VM::OptimizationBarrierOp>(
+        op, adaptor.getOperands());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateUtilToVMPatterns(MLIRContext *context,
@@ -113,6 +129,7 @@ void populateUtilToVMPatterns(MLIRContext *context,
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
   patterns.insert<CmpNEOpConversion>(typeConverter, context);
+  patterns.insert<OptimizationBarrierOpConversion>(typeConverter, context);
 
   populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,
                                     patterns);

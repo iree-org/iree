@@ -2,13 +2,15 @@
 // RUN:   --pass-pipeline="builtin.module(vm.module(iree-vm-materialize-ref-discards))" \
 // RUN:   %s | FileCheck %s
 
-// Single ref, single use - discard after use.
+// Single ref, single use - NO discard (vm.call has MOVE semantics).
 // CHECK-LABEL: @single_ref_single_use
 // CHECK-SAME: (%[[BUF:.*]]: !vm.buffer)
 vm.module @my_module {
   vm.func @single_ref_single_use(%buf: !vm.buffer) {
+    // vm.call supports MOVE, so ref is consumed by call - no discard needed.
     // CHECK: vm.call @consume(%[[BUF]])
-    // CHECK-NEXT: vm.discard.refs %[[BUF]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
     vm.call @consume(%buf) : (!vm.buffer) -> ()
     vm.return
   }
@@ -17,16 +19,19 @@ vm.module @my_module {
 
 // -----
 
-// Multiple uses - discard after LAST use only.
+// Multiple uses - NO discard (both calls have MOVE semantics, only last matters).
 // CHECK-LABEL: @multiple_uses
 // CHECK-SAME: (%[[BUF:.*]]: !vm.buffer)
 vm.module @my_module {
   vm.func @multiple_uses(%buf: !vm.buffer) {
+    // First call: not last use, no discard.
     // CHECK: vm.call @consume(%[[BUF]])
     // CHECK-NOT: vm.discard.refs
     vm.call @consume(%buf) : (!vm.buffer) -> ()
+    // Second call: last use with MOVE semantics - ref consumed by call.
     // CHECK: vm.call @consume(%[[BUF]])
-    // CHECK-NEXT: vm.discard.refs %[[BUF]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
     vm.call @consume(%buf) : (!vm.buffer) -> ()
     vm.return
   }
@@ -58,8 +63,10 @@ vm.module @my_module {
     vm.cond_br %cond, ^bb1(%buf : !vm.buffer), ^bb2
   // CHECK: ^[[BB1]](%[[ARG:.*]]: !vm.buffer):
   ^bb1(%arg: !vm.buffer):
+    // vm.call has MOVE semantics - ref consumed by call.
     // CHECK: vm.call @consume(%[[ARG]])
-    // CHECK-NEXT: vm.discard.refs %[[ARG]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.br ^[[EXIT:.*]]
     vm.call @consume(%arg) : (!vm.buffer) -> ()
     vm.br ^exit
   ^bb2:
@@ -72,13 +79,15 @@ vm.module @my_module {
 
 // -----
 
-// Multiple refs dying at same point - batched into single discard.
+// Multiple refs passed to call - NO discards (MOVE semantics).
 // CHECK-LABEL: @multiple_refs_same_death_point
 // CHECK-SAME: (%[[A:.*]]: !vm.buffer, %[[B:.*]]: !vm.buffer)
 vm.module @my_module {
   vm.func @multiple_refs_same_death_point(%a: !vm.buffer, %b: !vm.buffer) {
+    // Both refs consumed by call with MOVE semantics.
     // CHECK: vm.call @consume2(%[[A]], %[[B]])
-    // CHECK-NEXT: vm.discard.refs %[[A]], %[[B]] : !vm.buffer, !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
     vm.call @consume2(%a, %b) : (!vm.buffer, !vm.buffer) -> ()
     vm.return
   }
@@ -130,8 +139,10 @@ vm.module @my_module {
     vm.cond_br %cond, ^then, ^else
   // CHECK: ^[[THEN]]:
   ^then:
+    // vm.call has MOVE semantics - ref consumed by call.
     // CHECK: vm.call @consume(%[[BUF]])
-    // CHECK-NEXT: vm.discard.refs %[[BUF]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.br ^[[EXIT:.*]]
     vm.call @consume(%buf) : (!vm.buffer) -> ()
     vm.br ^exit
   // CHECK: ^[[ELSE]]:
@@ -157,14 +168,18 @@ vm.module @my_module {
     vm.cond_br %cond, ^then, ^else
   // CHECK: ^[[THEN]]:
   ^then:
+    // vm.call has MOVE semantics - ref consumed by call.
     // CHECK: vm.call @consume(%[[BUF]])
-    // CHECK-NEXT: vm.discard.refs %[[BUF]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.br ^[[EXIT:.*]]
     vm.call @consume(%buf) : (!vm.buffer) -> ()
     vm.br ^exit
   // CHECK: ^[[ELSE]]:
   ^else:
+    // vm.call has MOVE semantics - ref consumed by call.
     // CHECK: vm.call @consume(%[[BUF]])
-    // CHECK-NEXT: vm.discard.refs %[[BUF]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.br ^[[EXIT]]
     vm.call @consume(%buf) : (!vm.buffer) -> ()
     vm.br ^exit
   ^exit:
@@ -189,8 +204,10 @@ vm.module @my_module {
     vm.cond_br %cond, ^then, ^else
   // CHECK: ^[[THEN]]:
   ^then:
+    // vm.call has MOVE semantics - ref consumed by call.
     // CHECK: vm.call @consume(%[[USED]])
-    // CHECK-NEXT: vm.discard.refs %[[USED]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs %[[USED]]
+    // CHECK-NEXT: vm.br ^[[EXIT:.*]]
     vm.call @consume(%used) : (!vm.buffer) -> ()
     vm.br ^exit
   // CHECK: ^[[ELSE]]:
@@ -235,14 +252,18 @@ vm.module @my_module {
     vm.cond_br %cond, ^left, ^right
   // CHECK: ^[[LEFT]]:
   ^left:
+    // vm.call has MOVE semantics - ref consumed by call.
     // CHECK: vm.call @consume(%[[BUF]])
-    // CHECK-NEXT: vm.discard.refs %[[BUF]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.br ^[[MERGE:.*]]
     vm.call @consume(%buf) : (!vm.buffer) -> ()
     vm.br ^merge
   // CHECK: ^[[RIGHT]]:
   ^right:
+    // vm.call has MOVE semantics - ref consumed by call.
     // CHECK: vm.call @consume(%[[BUF]])
-    // CHECK-NEXT: vm.discard.refs %[[BUF]] : !vm.buffer
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.br ^[[MERGE]]
     vm.call @consume(%buf) : (!vm.buffer) -> ()
     vm.br ^merge
   ^merge:
@@ -314,8 +335,8 @@ vm.module @my_module {
     %ref = vm.cast.ref.any %buffer : !vm.buffer -> !vm.ref<?>
     // CHECK: %[[CAST:.*]] = vm.cast.any.ref %[[REF]]
     %cast = vm.cast.any.ref %ref : !vm.ref<?> -> !vm.buffer
-    // %ref is discarded after its last use (vm.cast.any.ref)
-    // CHECK: vm.discard.refs %[[REF]]
+    // vm.cast has MOVE semantics - %ref consumed by cast, no discard.
+    // CHECK-NOT: vm.discard.refs %[[REF]]
     // CHECK: vm.cmp.eq.ref %[[BUFFER]], %[[CAST]]
     %eq = vm.cmp.eq.ref %buffer, %cast : !vm.buffer
     // Both %buffer and %cast die at same point - batched discard
@@ -327,7 +348,8 @@ vm.module @my_module {
 // -----
 
 // Each cast produces a new ref with independent lifetime.
-// Refs are discarded after their last use.
+// vm.cast has MOVE semantics - refs consumed by casts, not discarded.
+// Only refs passed to vm.call operations (which also have MOVE) are consumed.
 // CHECK-LABEL: @chained_casts_independent
 vm.module @my_module {
   vm.func @chained_casts_independent() {
@@ -339,18 +361,21 @@ vm.module @my_module {
     %ref1 = vm.cast.ref.any %buf : !vm.buffer -> !vm.ref<?>
     // CHECK: %[[BUF2:.*]] = vm.cast.any.ref %[[REF1]]
     %buf2 = vm.cast.any.ref %ref1 : !vm.ref<?> -> !vm.buffer
-    // ref1's last use is vm.cast.any.ref, discard it now
-    // CHECK: vm.discard.refs %[[REF1]]
+    // vm.cast has MOVE semantics - ref1 consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[REF1]]
     // CHECK: %[[REF2:.*]] = vm.cast.ref.any %[[BUF2]]
     %ref2 = vm.cast.ref.any %buf2 : !vm.buffer -> !vm.ref<?>
-    // buf2's last use is vm.cast.ref.any, discard it now
-    // CHECK: vm.discard.refs %[[BUF2]]
+    // vm.cast has MOVE semantics - buf2 consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[BUF2]]
     // CHECK: vm.call @use_buffer(%[[BUF]])
     vm.call @use_buffer(%buf) : (!vm.buffer) -> ()
-    // CHECK: vm.discard.refs %[[BUF]]
+    // vm.call has MOVE semantics - buf consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[BUF]]
     // CHECK: vm.call @use_ref(%[[REF2]])
     vm.call @use_ref(%ref2) : (!vm.ref<?>) -> ()
-    // CHECK: vm.discard.refs %[[REF2]]
+    // vm.call has MOVE semantics - ref2 consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[REF2]]
+    // CHECK-NEXT: vm.return
     vm.return
   }
   vm.import private @use_buffer(%buf: !vm.buffer)
@@ -359,7 +384,7 @@ vm.module @my_module {
 
 // -----
 
-// Each ref discarded after its last use, no aliasing.
+// Each ref consumed by vm.call (MOVE semantics).
 // CHECK-LABEL: @ref_used_then_original_used
 vm.module @my_module {
   vm.func @ref_used_then_original_used() {
@@ -371,11 +396,13 @@ vm.module @my_module {
     %ref = vm.cast.ref.any %buf : !vm.buffer -> !vm.ref<?>
     // CHECK: vm.call @use_ref(%[[REF]])
     vm.call @use_ref(%ref) : (!vm.ref<?>) -> ()
-    // ref's last use is use_ref, discard it
-    // CHECK: vm.discard.refs %[[REF]]
+    // vm.call has MOVE semantics - ref consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[REF]]
     // CHECK: vm.call @use_buffer(%[[BUF]])
     vm.call @use_buffer(%buf) : (!vm.buffer) -> ()
-    // CHECK: vm.discard.refs %[[BUF]]
+    // vm.call has MOVE semantics - buf consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[BUF]]
+    // CHECK-NEXT: vm.return
     vm.return
   }
   vm.import private @use_buffer(%buf: !vm.buffer)
@@ -384,7 +411,7 @@ vm.module @my_module {
 
 // -----
 
-// Ref used in branch, original used after merge - independent lifetimes.
+// Ref used in branch (vm.call has MOVE), original used after merge.
 // CHECK-LABEL: @ref_in_branch_original_after_merge
 vm.module @my_module {
   vm.func @ref_in_branch_original_after_merge(%cond: i32) {
@@ -399,8 +426,9 @@ vm.module @my_module {
   ^left:
     // CHECK: vm.call @use_ref(%[[REF]])
     vm.call @use_ref(%ref) : (!vm.ref<?>) -> ()
-    // ref's last use on this path
-    // CHECK: vm.discard.refs %[[REF]]
+    // vm.call has MOVE semantics - ref consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[REF]]
+    // CHECK-NEXT: vm.br ^[[MERGE:.*]]
     vm.br ^merge
   ^right:
     // ref not used on this path - edge discard
@@ -409,7 +437,9 @@ vm.module @my_module {
   ^merge:
     // CHECK: vm.call @use_buffer(%[[BUF]])
     vm.call @use_buffer(%buf) : (!vm.buffer) -> ()
-    // CHECK: vm.discard.refs %[[BUF]]
+    // vm.call has MOVE semantics - buf consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[BUF]]
+    // CHECK-NEXT: vm.return
     vm.return
   }
   vm.import private @use_buffer(%buf: !vm.buffer)
@@ -418,7 +448,7 @@ vm.module @my_module {
 
 // -----
 
-// Ref used in loop, original used after loop exit - independent lifetimes.
+// Ref used in loop (vm.call has MOVE), original used after loop exit.
 // CHECK-LABEL: @ref_in_loop_original_after
 vm.module @my_module {
   vm.func @ref_in_loop_original_after(%n: i32) {
@@ -438,11 +468,14 @@ vm.module @my_module {
     %cmp = vm.cmp.lt.i32.s %next, %n : i32
     vm.cond_br %cmp, ^loop(%next : i32), ^exit
   ^exit:
-    // ref is live throughout loop, dies at exit
+    // ref is NOT live at exit - it's consumed by vm.call in the loop.
+    // The last iteration's vm.call has MOVE semantics - ref consumed.
     // CHECK: vm.discard.refs %[[REF]]
     // CHECK: vm.call @use_buffer(%[[BUF]])
     vm.call @use_buffer(%buf) : (!vm.buffer) -> ()
-    // CHECK: vm.discard.refs %[[BUF]]
+    // vm.call has MOVE semantics - buf consumed, no discard.
+    // CHECK-NOT: vm.discard.refs %[[BUF]]
+    // CHECK-NEXT: vm.return
     vm.return
   }
   vm.import private @use_buffer(%buf: !vm.buffer)
@@ -972,6 +1005,178 @@ vm.module @my_module {
     // Unused ref result needs discard.
     // CHECK-NEXT: vm.discard.refs %[[RESULT]]
     // CHECK-NEXT: vm.return
+    vm.return
+  }
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// MOVE semantics for regular vm.call and vm.call.variadic
+// These are the key tests for the bug fix: non-terminator calls that support
+// MOVE semantics must NOT have discards inserted for their ref operands.
+//===----------------------------------------------------------------------===//
+
+// vm.call with ref operand at last use - MOVE semantics, no discard.
+// This was the original bug: mid-block discard logic would insert a discard
+// after the call, but the call already consumed the ref with MOVE.
+// CHECK-LABEL: @call_ref_move_last_use
+vm.module @my_module {
+  vm.import private @consume(!vm.buffer)
+  vm.func @call_ref_move_last_use(%buf: !vm.buffer) {
+    // Ref passed to call with MOVE semantics - no discard should be inserted.
+    // CHECK: vm.call @consume(%[[BUF:.*]])
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
+    vm.call @consume(%buf) : (!vm.buffer) -> ()
+    vm.return
+  }
+}
+
+// -----
+
+// vm.call.variadic with ref operands at last use - MOVE semantics, no discard.
+// This is the specific case from the smoketest.mlir bug report.
+// CHECK-LABEL: @call_variadic_ref_move_last_use
+vm.module @my_module {
+  vm.import private @hal.command_buffer.dispatch(!vm.buffer, !vm.ref<?>, i32, i32, i32, i32)
+  vm.func @call_variadic_ref_move_last_use(%cmd: !vm.buffer, %exec: !vm.ref<?>) {
+    %c0 = vm.const.i32 0
+    %c1 = vm.const.i32 1
+    // Ref operands passed with MOVE semantics - no discards should be inserted.
+    // CHECK: vm.call.variadic @hal.command_buffer.dispatch(%[[CMD:.*]], %[[EXEC:.*]], %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}})
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
+    vm.call.variadic @hal.command_buffer.dispatch(%cmd, %exec, %c0, %c1, %c1, %c1) : (!vm.buffer, !vm.ref<?>, i32, i32, i32, i32) -> ()
+    vm.return
+  }
+}
+
+// -----
+
+// Multiple refs passed to vm.call - all with MOVE semantics.
+// CHECK-LABEL: @call_multiple_ref_operands_move
+vm.module @my_module {
+  vm.import private @multi(!vm.buffer, !vm.buffer, !vm.ref<?>)
+  vm.func @call_multiple_ref_operands_move(%buf1: !vm.buffer, %buf2: !vm.buffer, %ref: !vm.ref<?>) {
+    // Use refs before call to ensure they're live.
+    // CHECK-DAG: vm.cmp.nz.ref %[[BUF1:[^ ]+]]
+    %nz1 = vm.cmp.nz.ref %buf1 : !vm.buffer
+    // CHECK-DAG: vm.cmp.nz.ref %[[BUF2:[^ ]+]]
+    %nz2 = vm.cmp.nz.ref %buf2 : !vm.buffer
+    // CHECK-DAG: vm.cmp.nz.ref %[[REF:[^ ]+]]
+    %nz3 = vm.cmp.nz.ref %ref : !vm.ref<?>
+    // All refs passed to call with MOVE - no discards.
+    // CHECK-NOT: vm.discard.refs
+    // CHECK: vm.call @multi(%[[BUF1]], %[[BUF2]], %[[REF]])
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
+    vm.call @multi(%buf1, %buf2, %ref) : (!vm.buffer, !vm.buffer, !vm.ref<?>) -> ()
+    vm.return
+  }
+}
+
+// -----
+
+// Ref used, then NOT passed to call - still needs discard.
+// This verifies the fix is precise: only refs actually passed to MOVE calls
+// are exempted from mid-block discards.
+// CHECK-LABEL: @call_ref_not_passed
+vm.module @my_module {
+  vm.import private @compute(i32)
+  vm.func @call_ref_not_passed(%buf: !vm.buffer, %x: i32) {
+    // CHECK: vm.cmp.nz.ref %[[BUF:[^ ]+]]
+    %nz = vm.cmp.nz.ref %buf : !vm.buffer
+    // Ref NOT passed to call, so it needs a discard after its last use.
+    // CHECK-NEXT: vm.discard.refs %[[BUF]]
+    // CHECK: vm.call @compute
+    vm.call @compute(%x) : (i32) -> ()
+    vm.return
+  }
+}
+
+// -----
+
+// Mixed scenario: one ref passed to call (MOVE), another not passed (discard).
+// CHECK-LABEL: @call_mixed_ref_operands
+vm.module @my_module {
+  vm.import private @consume(!vm.buffer)
+  vm.func @call_mixed_ref_operands(%buf1: !vm.buffer, %buf2: !vm.buffer) {
+    // CHECK-DAG: vm.cmp.nz.ref %[[BUF1:[^ ]+]]
+    %nz1 = vm.cmp.nz.ref %buf1 : !vm.buffer
+    // CHECK-DAG: vm.cmp.nz.ref %[[BUF2:[^ ]+]]
+    %nz2 = vm.cmp.nz.ref %buf2 : !vm.buffer
+    // buf2 NOT passed to call, discarded after its last use.
+    // CHECK: vm.discard.refs %[[BUF2]]
+    // buf1 passed to call with MOVE, not discarded.
+    // CHECK: vm.call @consume(%[[BUF1]])
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
+    vm.call @consume(%buf1) : (!vm.buffer) -> ()
+    vm.return
+  }
+}
+
+// -----
+
+// Ref passed to multiple calls - only last call gets MOVE, earlier uses need ref retained.
+// CHECK-LABEL: @call_ref_multiple_calls
+vm.module @my_module {
+  vm.import private @consume(!vm.buffer)
+  vm.func @call_ref_multiple_calls(%buf: !vm.buffer) {
+    // First call: not last use, no discard.
+    // CHECK: vm.call @consume(%[[BUF:.*]])
+    // CHECK-NOT: vm.discard.refs
+    vm.call @consume(%buf) : (!vm.buffer) -> ()
+    // Second call: last use, MOVE semantics, no discard.
+    // CHECK: vm.call @consume(%[[BUF]])
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
+    vm.call @consume(%buf) : (!vm.buffer) -> ()
+    vm.return
+  }
+}
+
+// -----
+
+// vm.call.variadic with mixed ref and non-ref operands.
+// CHECK-LABEL: @call_variadic_mixed_operands
+vm.module @my_module {
+  vm.import private @mixed(!vm.buffer, i32, i32, !vm.ref<?>, i32)
+  vm.func @call_variadic_mixed_operands(%buf: !vm.buffer, %ref: !vm.ref<?>) {
+    %c1 = vm.const.i32 1
+    %c2 = vm.const.i32 2
+    %c3 = vm.const.i32 3
+    // Refs passed with MOVE, integers are just values.
+    // CHECK: vm.call.variadic @mixed(%[[BUF:.*]], %{{.*}}, %{{.*}}, %[[REF:.*]], %{{.*}})
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
+    vm.call.variadic @mixed(%buf, %c1, %c2, %ref, %c3) : (!vm.buffer, i32, i32, !vm.ref<?>, i32) -> ()
+    vm.return
+  }
+}
+
+// -----
+
+// Control flow with vm.call: ref used in one branch, passed to call in another.
+// CHECK-LABEL: @call_ref_control_flow
+vm.module @my_module {
+  vm.import private @consume(!vm.buffer)
+  vm.func @call_ref_control_flow(%buf: !vm.buffer, %cond: i32) {
+    // CHECK: vm.cond_br %{{.*}}, ^[[USE:.*]], ^[[CALL:.*]]
+    vm.cond_br %cond, ^use, ^call
+  ^use:
+    // Ref used here, then discarded.
+    // CHECK: vm.cmp.nz.ref %[[BUF:.*]]
+    // CHECK-NEXT: vm.discard.refs %[[BUF]]
+    %nz = vm.cmp.nz.ref %buf : !vm.buffer
+    vm.return
+  ^call:
+    // Ref passed to call with MOVE here, not discarded.
+    // CHECK: vm.call @consume(%[[BUF:.*]])
+    // CHECK-NOT: vm.discard.refs
+    // CHECK-NEXT: vm.return
+    vm.call @consume(%buf) : (!vm.buffer) -> ()
     vm.return
   }
 }

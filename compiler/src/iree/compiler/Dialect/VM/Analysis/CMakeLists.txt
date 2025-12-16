@@ -52,4 +52,18 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    OrdinalAnalysis
+  HDRS
+    "OrdinalAnalysis.h"
+  SRCS
+    "OrdinalAnalysis.cpp"
+  DEPS
+    LLVMSupport
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::VM::IR
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

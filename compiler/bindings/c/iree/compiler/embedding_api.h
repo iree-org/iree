@@ -268,6 +268,9 @@ enum iree_compiler_pipeline_t {
   // This is experimental and this should be changed as we move to a more
   // cohesive approach for managing compilation phases.
   IREE_COMPILER_PIPELINE_PRECOMPILE = 2,
+  // VM transformation pipeline only. Converts from input dialects to the VM
+  // dialect without serialization.
+  IREE_COMPILER_PIPELINE_VM = 3,
 };
 IREE_EMBED_EXPORTED bool
 ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,

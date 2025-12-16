@@ -27,18 +27,16 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRPass
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
     MLIRTranslateLib
     iree::compiler::Dialect::Util::IR
-    iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Analysis
+    iree::compiler::Dialect::VM::Analysis::OrdinalAnalysis
     iree::compiler::Dialect::VM::Analysis::ValueLiveness
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VM::Utils::CallingConvention
     iree::compiler::Dialect::VM::Utils::TypeTable
     iree::compiler::Utils
