@@ -29,6 +29,7 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-fold-unit-extent-dims"
 
@@ -258,8 +259,7 @@ struct FoldUnitDimsFromExtractOp : OpRewritePattern<tensor::ExtractOp> {
 
 } // namespace
 
-static void
-populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
+static linalg::ControlDropUnitDims getControlDropUnitDimsOptions() {
   linalg::ControlDropUnitDims options;
   auto defaultFn = options.controlFn;
 
@@ -273,14 +273,25 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
     }
     return defaultFn(op);
   };
+  return options;
+}
 
-  linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
-  IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
-                                                      options);
-  linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
-  foldUnitDimsPatterns
-      .insert<DropUnitDimsFromCollapseOfExpand, FoldUnitDimsFromExtractOp>(
-          foldUnitDimsPatterns.getContext());
+/// Populate patterns for the core unit-extent dim folding transformations.
+/// These patterns are applied with a walk-based driver.
+static void populateFoldUnitDimsPatterns(RewritePatternSet &patterns,
+                                         linalg::ControlDropUnitDims &options) {
+  linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
+  IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(patterns, options);
+}
+
+/// Populate canonicalization patterns that clean up after unit-extent dim
+/// folding. These patterns are applied with a greedy driver.
+static void populateFoldUnitDimsCanonicalizationPatterns(
+    RewritePatternSet &patterns, linalg::ControlDropUnitDims &options) {
+  patterns.insert<DropUnitDimsFromCollapseOfExpand, FoldUnitDimsFromExtractOp>(
+      patterns.getContext());
+  linalg::populateMoveInitOperandsToInputPattern(patterns);
+  linalg::populateFoldUnitExtentDimsCanonicalizationPatterns(patterns, options);
 }
 
 static LogicalResult
@@ -405,25 +416,42 @@ void FoldUnitExtentDimsPass::runOnOperation() {
     }
   });
 
-  RewritePatternSet foldUnitDimsPatterns(context);
-  populatefoldUnitDimsPatterns(foldUnitDimsPatterns);
-  GreedyRewriteConfig rewriterConfig;
-  rewriterConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
-  if (failed(applyPatternsGreedily(moduleOp, std::move(foldUnitDimsPatterns),
-                                   rewriterConfig))) {
-    return signalPassFailure();
+  linalg::ControlDropUnitDims options = getControlDropUnitDimsOptions();
+  // Apply fold unit extent dims patterns with walk-based driver.
+  {
+    RewritePatternSet patterns(context);
+    populateFoldUnitDimsPatterns(patterns, options);
+    walkAndApplyPatterns(moduleOp, std::move(patterns));
+  }
+
+  // Apply canonicalization patterns with greedy driver.
+  {
+    RewritePatternSet patterns(context);
+    populateFoldUnitDimsCanonicalizationPatterns(patterns, options);
+    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 
 void FoldUnitExtentDimsForFuncPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  RewritePatternSet foldUnitDimsPatterns(context);
-  populatefoldUnitDimsPatterns(foldUnitDimsPatterns);
-  GreedyRewriteConfig rewriterConfig;
-  rewriterConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
-  if (failed(applyPatternsGreedily(
-          getOperation(), std::move(foldUnitDimsPatterns), rewriterConfig))) {
-    return signalPassFailure();
+  Operation *op = getOperation();
+  linalg::ControlDropUnitDims options = getControlDropUnitDimsOptions();
+  // Apply fold unit extent dims patterns with walk-based driver.
+  {
+    RewritePatternSet patterns(context);
+    populateFoldUnitDimsPatterns(patterns, options);
+    walkAndApplyPatterns(op, std::move(patterns));
+  }
+
+  // Apply canonicalization patterns with greedy driver.
+  {
+    RewritePatternSet patterns(context);
+    populateFoldUnitDimsCanonicalizationPatterns(patterns, options);
+    if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 
