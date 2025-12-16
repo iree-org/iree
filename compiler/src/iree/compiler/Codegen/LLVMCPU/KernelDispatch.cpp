@@ -2109,6 +2109,13 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   int srcRank = op.getSourceRank();
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  // Try to infer scalable tile sizes. This is a no-op in case of static inner
+  // tiles or if dynamic tile sizes are found, but scalable tile sizes cannot be
+  // inferred.
+  if (auto sizesAndScalableFlags =
+          getScalableTileSizesAndFlags(op.getMixedTiles())) {
+    innerTiles = sizesAndScalableFlags->first;
+  }
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
 
@@ -3069,20 +3076,34 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
 ///
 /// Steps:
 /// 1. Divide the tile sizes of inner dimensions by the corresponding inner
-///    tile factors (ignores dynamic sizes).
+///    tile factors. Handles static and scalable sizes but ignores dynamic
+///    sizes.
 /// 2. Apply the outer dimension permutation, if present.
 static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
                                              SmallVector<int64_t> &tileSizes,
                                              SmallVector<bool> &scalableFlags) {
-  ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+  SmallVector<int64_t> innerTiles(packOp.getStaticInnerTiles());
+  SmallVector<bool> innerTileScalableFlags(innerTiles.size(), false);
+  // Infer scalable tile sizes and flags if present.
+  if (auto sizesAndScalableFlags =
+          getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
+    innerTiles = sizesAndScalableFlags->first;
+    innerTileScalableFlags = sizesAndScalableFlags->second;
+  }
   ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
   ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
   // First scale tile sizes by dividing by the inner tile sizes.
-  for (auto [pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
+  for (auto [pos, size, scalable] :
+       llvm::zip_equal(innerDimPos, innerTiles, innerTileScalableFlags)) {
+    // Ignore non-scalable dynamic sizes.
     if (ShapedType::isDynamic(size)) {
       continue;
     }
     tileSizes[pos] /= size;
+    // Division by vscale by setting the scalable flag to false.
+    if (scalable) {
+      scalableFlags[pos] = false;
+    }
   }
   // Then apply dimension permutation if present.
   if (!outerDimsPerm.empty()) {
@@ -3099,12 +3120,20 @@ static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
 /// 1. Undo the outer dimension permutation, if present, by applying the
 ///    inverted permutation.
 /// 2. Multiply the inner dimension tile sizes by the corresponding inner
-///    tile factors (ignores dynamic sizes).
+///    tile factors. Handles static and scalable tile sizes but ignores dynamic
+///    sizes.
 static void
 undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
                                      SmallVector<int64_t> &tileSizes,
                                      SmallVector<bool> &scalableFlags) {
-  ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+  SmallVector<int64_t> innerTiles(packOp.getStaticInnerTiles());
+  SmallVector<bool> innerTileScalableFlags(innerTiles.size(), false);
+  // Infer scalable tile sizes and flags if present.
+  if (auto sizesAndScalableFlags =
+          getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
+    innerTiles = sizesAndScalableFlags->first;
+    innerTileScalableFlags = sizesAndScalableFlags->second;
+  }
   ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
   ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
   // First undo dimension permutation if present.
@@ -3113,12 +3142,16 @@ undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
     applyPermutationToVector(tileSizes, invertedPerm);
     applyPermutationToVector(scalableFlags, invertedPerm);
   }
-  // Then unscale tile sizes by multiplying the inner tile sizes.
-  for (auto [pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
+  // Then unscale tile sizes by multiplying the inner tile sizes and setting the
+  // corresponding scalable flags to true.
+  for (auto [pos, size, scalable] :
+       llvm::zip_equal(innerDimPos, innerTiles, innerTileScalableFlags)) {
+    // Ignore non-scalable dynamic inner tile sizes.
     if (ShapedType::isDynamic(size)) {
       continue;
     }
     tileSizes[pos] *= size;
+    scalableFlags[pos] = scalableFlags[pos] || scalable;
   }
 }
 
@@ -3205,7 +3238,7 @@ private:
   /// As a result, the Pack op expects its producer (potentially the root op) to
   /// use tile sizes `[1, 16]` for those two dimensions, enabling tile-and-fuse
   /// optimizations.
-  SmallVector<int64_t>
+  SizesAndScalableFlags
   getVecTileSizesForNonRootPackOp(mlir::FunctionOpInterface entryPointFn,
                                   linalg::PackOp packOp);
 
@@ -3334,7 +3367,7 @@ void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
       continue;
     }
     if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-      nonRootOpVecTileSizes[op] =
+      std::tie(nonRootOpVecTileSizes[op], nonRootOpScalableFlags[op]) =
           getVecTileSizesForNonRootPackOp(entryPointFn, packOp);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
       std::tie(nonRootOpVecTileSizes[op], nonRootOpScalableFlags[op]) =
@@ -3383,10 +3416,13 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
   for (auto &[op, vecTileSize] : nonRootOpVecTileSizes) {
     if (isa<linalg::PackOp>(op)) {
       // For pack op, align the distribution tile size and overwrite the
-      // vector parallel tile size.
+      // vector parallel tile size and scalable flag.
       adjust(op, vecTileSize, IREE::CPU::TilingLevel::DistributionTiles, align);
       adjust(op, vecTileSize, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
              overwrite);
+      adjustScalableFlags(op, nonRootOpScalableFlags.lookup(op),
+                          IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+                          overwrite);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
       // For unpack op, just overwrite the vector parallel tile size and the
       // scalable flag. However, dimension tracking is expected be broken in the
@@ -3470,6 +3506,12 @@ void MultiLoweringConfigGenerator::fillTileSizesWithNonRootOps() {
       // Only set the tile size if it hasn't been assigned yet.
       if (tile == 0 && size > 0) {
         tile = size;
+        auto it = nonRootOpScalableFlags.find(op);
+        if (it != nonRootOpScalableFlags.end() && pos < it->second.size()) {
+          globalScalableTileFlags
+              [IREE::CPU::TilingLevel::VectorCommonParallelTiles]
+              [globalDimIdx] = it->second[pos];
+        }
       }
     }
   }
@@ -3592,7 +3634,7 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
   }
 }
 
-SmallVector<int64_t>
+SizesAndScalableFlags
 MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
     mlir::FunctionOpInterface entryPointFn, linalg::PackOp packOp) {
   SmallVector<int64_t> vecTileSizes =
@@ -3600,9 +3642,9 @@ MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
   SmallVector<bool> scalableFlags(vecTileSizes.size(), false);
   // Invert the Pack op's `outer_dims_perm` on `vecTileSizes` and
   // `scalableFlags`, then multiply `vecTileSizes` by the Pack op's
-  // `inner_tiles`.
+  // `inner_tiles` and set the corresponding `scalableFlags`.
   undoScaleAndPermutateTilingForPackOp(packOp, vecTileSizes, scalableFlags);
-  return vecTileSizes;
+  return {vecTileSizes, scalableFlags};
 }
 
 SizesAndScalableFlags
