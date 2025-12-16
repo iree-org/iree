@@ -18,17 +18,13 @@ Common usage:
   Run across all default paths in the project (in .bazel_to_cmake.cfg.py):
       $ python build_tools/bazel_to_cmake/bazel_to_cmake.py
 
-  Run on an individual file:
+  Run on individual files or directories (most common):
+      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py runtime/src/iree/base/
       $ python build_tools/bazel_to_cmake/bazel_to_cmake.py runtime/src/iree/base/BUILD.bazel
+      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py runtime/src/iree/base/ runtime/src/iree/vm/
 
-  Run on multiple files (e.g. as part of a pre-commit hook):
-      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py runtime/src/iree/base/BUILD.bazel runtime/src/iree/vm/BUILD.bazel
-
-  Run on a single directory:
-      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py --dir runtime/src/iree/base/
-
-  Run on all files under a root directory:
-      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py --root-dir runtime/src/iree/
+  Run on all files under a root directory (recursively - use sparingly):
+      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py --recursive_dir runtime/src/iree/
 
 Configuration
 -------------
@@ -38,8 +34,8 @@ for the repository root and provides repository specific configuration.
 
 The file is evaluated as a module and can have the following customizations:
 
-* DEFAULT_ROOT_DIRS: A list of root directory names that should be processed
-  (relative to the repository root) when invoked without a --repo_root or --dir.
+* DEFAULT_ROOT_DIRS: A list of root directory names that should be recursively
+  processed (relative to the repository root) when invoked without arguments.
 * REPO_MAP: Mapping of canonical Bazel repo name (i.e. "@iree_core") to what it
   is known as locally (most commonly the empty string). This is used in global
   target rules to make sure that they work either in the defining or referencing
@@ -114,10 +110,14 @@ def parse_arguments():
         " 2: Also output when conversion was successful.",
     )
 
-    # Specify only one of these (defaults to --root_dir=<main source dirs>).
+    # Specify only one of these (defaults to --recursive_dir=<main source dirs>).
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
-        "files", nargs="*", help="Converts (or generates) the given files", default=[]
+        "paths",
+        nargs="*",
+        help="BUILD files or directories to convert (directories are treated as "
+        "containing BUILD.bazel)",
+        default=[],
     )
     group.add_argument(
         "--dir", help="Converts the BUILD file in the given directory", default=None
@@ -126,18 +126,20 @@ def parse_arguments():
         repo_cfg.DEFAULT_ROOT_DIRS if hasattr(repo_cfg, "DEFAULT_ROOT_DIRS") else []
     )
     group.add_argument(
-        "--root_dir",
+        "--recursive_dir",
         nargs="+",
-        help="Converts all BUILD files under a root directory",
+        help="Recursively converts ALL BUILD files under the given directories, "
+        "including third_party/. You almost never want this - prefer passing "
+        "specific paths as positional arguments instead.",
         default=default_root_dirs,
     )
 
     args = parser.parse_args()
 
-    # 'files' and '--dir' take precedence over '--root_dir'.
+    # 'paths' and '--dir' take precedence over '--recursive_dir'.
     # They are mutually exclusive, but the default value is still set.
-    if args.files or args.dir:
-        args.root_dir = None
+    if args.paths or args.dir:
+        args.recursive_dir = None
 
     return args
 
@@ -347,21 +349,29 @@ def convert_directory(directory_path, write_files, allow_partial_conversion, ver
     return Status.UPDATED
 
 
+def path_to_directory(path):
+    """Converts a path (file or directory) to the directory containing the BUILD file."""
+    if os.path.isdir(path):
+        return path
+    else:
+        return str(Path(path).parent)
+
+
 def main(args):
     """Runs Bazel to CMake conversion."""
     global repo_root
 
     write_files = not args.preview
 
-    if args.files:
+    if args.paths:
         convert_directories(
-            [Path(file).parent for file in args.files],
+            [path_to_directory(p) for p in args.paths],
             write_files=write_files,
             allow_partial_conversion=args.allow_partial_conversion,
             verbosity=args.verbosity,
         )
-    elif args.root_dir:
-        for root_dir in args.root_dir:
+    elif args.recursive_dir:
+        for root_dir in args.recursive_dir:
             root_directory_path = os.path.join(repo_root, root_dir)
             log(f"Converting directory tree rooted at: {root_directory_path}")
             convert_directories(
@@ -379,9 +389,10 @@ def main(args):
         )
     else:
         log(
-            f"ERROR: None of (positional) 'file', '--root-dir', or '--dir' "
-            f"arguments or DEFAULT_ROOT_DIRS in .bazel_to_cmake.cfg.py: No "
-            f"conversion will be done"
+            f"ERROR: No paths provided and no DEFAULT_ROOT_DIRS in "
+            f".bazel_to_cmake.cfg.py. Pass BUILD files or directories as "
+            f"positional arguments, use --dir for a single directory, or "
+            f"--recursive_dir to process an entire tree."
         )
         sys.exit(1)
 
