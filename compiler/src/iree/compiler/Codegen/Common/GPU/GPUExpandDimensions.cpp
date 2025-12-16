@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -160,8 +162,11 @@ createDimensionExpansionOps(RewriterBase &rewriter,
 
 static LogicalResult expandIterationSpace(RewriterBase &rewriter,
                                           linalg::LinalgOp op) {
+  auto loweringConfig = IREE::Codegen::getLoweringConfig(op);
+  auto gpuConfig =
+      dyn_cast_or_null<IREE::GPU::LoweringConfigAttr>(loweringConfig);
   auto config =
-      IREE::GPU::getDimensionExpansion<IREE::GPU::DimensionExpansionAttr>(op);
+      gpuConfig ? IREE::GPU::getDimensionExpansion(gpuConfig) : nullptr;
   if (!config) {
     return success();
   }
@@ -198,9 +203,12 @@ void GPUExpandDimensionsPass::runOnOperation() {
 
   SmallVector<Operation *> worklist;
   operation->walk([&](Operation *op) {
-    if (IREE::GPU::getDimensionExpansion<IREE::GPU::DimensionExpansionAttr>(
-            op)) {
-      worklist.push_back(op);
+    auto loweringConfig = IREE::Codegen::getLoweringConfig(op);
+    if (auto gpuConfig =
+            dyn_cast_or_null<IREE::GPU::LoweringConfigAttr>(loweringConfig)) {
+      if (IREE::GPU::getDimensionExpansion(gpuConfig)) {
+        worklist.push_back(op);
+      }
     }
   });
 

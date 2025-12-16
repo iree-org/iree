@@ -83,8 +83,8 @@ func.func @reduction_with_no_consumer() {
 // CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 
 // CHECK-LABEL: func.func @reduction_with_no_consumer
-// CHECK:           expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1], [2], [3, 4]{{\]}}, output_shape = [?, ?, ?, ?, 8]>
-// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK:           lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:      expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1], [2], [3, 4]{{\]}}, output_shape = [?, ?, ?, ?, 8]>
 // CHECK-SAME:      lane_basis = {{\[}}[1, 1, 1, 64, 1], [0, 1, 2, 3, 4]{{\]}}
 // CHECK-SAME:      partial_reduction = [0, 0, 1, 512, 0]
 // CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 8, 1], [0, 1, 2, 3, 4]{{\]}}
@@ -150,7 +150,8 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
 // CHECK-SAME:    ins(%{{.*}} : tensor<2x32x10x16384xf32>)
 // CHECK-SAME:    outs({{.*}}: tensor<2x32xf32>)
-// CHECK-SAME:    attrs =  {expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1], [2], [3, 4]{{\]}}, output_shape = [?, ?, ?, ?, 8]>, lowering_config = #iree_gpu.lowering_config<{
+// CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+// CHECK-SAME:               expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1], [2], [3, 4]{{\]}}, output_shape = [?, ?, ?, ?, 8]>,
 // CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 64, 1], [0, 1, 2, 3, 4]{{\]}},
 // CHECK-SAME:               partial_reduction = [0, 0, 1, 1024, 0],
 // CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 16, 1], [0, 1, 2, 3, 4]{{\]}},
@@ -160,7 +161,8 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
 // CHECK-SAME:    ins{{.*}}, {{.*}} : tensor<2x32x10x16384xf32>, tensor<2x32xf32>)
 // CHECK-SAME:    outs(%{{.*}} : tensor<2x32xf32>)
-// CHECK-SAME:    attrs =  {expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1], [2], [3, 4]{{\]}}, output_shape = [?, ?, ?, ?, 8]>, lowering_config = #iree_gpu.lowering_config<{
+// CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+// CHECK-SAME:              expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1], [2], [3, 4]{{\]}}, output_shape = [?, ?, ?, ?, 8]>,
 // CHECK-SAME:              lane_basis = {{\[}}[1, 1, 1, 64, 1], [0, 1, 2, 3, 4]{{\]}},
 // CHECK-SAME:              partial_reduction = [0, 0, 1, 1024, 0],
 // CHECK-SAME:              subgroup_basis = {{\[}}[1, 1, 1, 16, 1], [0, 1, 2, 3, 4]{{\]}},
@@ -250,7 +252,8 @@ func.func @test_multiple_stores(%arg0: !iree_tensor_ext.dispatch.tensor<readonly
 //  CHECK-SAME:               thread = [0, 4],
 //  CHECK-SAME:               workgroup = [1, 0]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:      attrs =  {expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1, 2]{{\]}}, output_shape = [?, ?, 4]>, lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1, 2]{{\]}}, output_shape = [?, ?, 4]>,
 //  CHECK-SAME:               lane_basis = {{\[}}[1, 64, 1], [0, 1, 2]{{\]}},
 //  CHECK-SAME:               partial_reduction = [0, 1024, 0],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 16, 1], [0, 1, 2]{{\]}},
@@ -432,7 +435,8 @@ func.func @batch_matvec_f16_f32() {
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: @batch_matvec_f16_f32
 //       CHECK:   linalg.generic
-//  CHECK-SAME:      attrs = {expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1], [2, 3]{{\]}}, output_shape = [?, ?, ?, 8]>, lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:      attrs = {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:                 expand_dims = #iree_gpu.expand_dims<{{\[}}[0], [1], [2, 3]{{\]}}, output_shape = [?, ?, ?, 8]>,
 //  CHECK-SAME:                 lane_basis = {{\[}}[1, 1, 64, 1], [0, 1, 2, 3]{{\]}},
 //  CHECK-SAME:                 partial_reduction = [0, 0, 64, 0],
 //  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]{{\]}},

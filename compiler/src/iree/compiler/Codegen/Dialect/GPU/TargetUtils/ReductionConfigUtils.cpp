@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 
@@ -334,28 +335,28 @@ getVectorDistributeReductionConfig(
     subGroupCounts[lastReductionDim] = subgroupBasis;
   }
 
-  if (!reassociations.empty()) {
-    auto dimExpandAttr =
-        DimensionExpansionAttr::get(context, reassociations, outputShape);
-    setDimensionExpansion(op, dimExpandAttr);
-  }
-
   ArrayAttr subgroupBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
 
   ArrayAttr threadBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
 
-  NamedAttribute configAttrs[] = {
-      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
-      NamedAttribute("partial_reduction",
-                     b.getI64ArrayAttr(partialReductionTileSizes)),
-      NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
-      NamedAttribute("lane_basis", threadBasisAttr),
-      NamedAttribute("subgroup_basis", subgroupBasisAttr),
-  };
+  SmallVector<NamedAttribute> configAttrsList;
+  configAttrsList.emplace_back("workgroup",
+                               b.getI64ArrayAttr(workgroupTileSizes));
+  configAttrsList.emplace_back("partial_reduction",
+                               b.getI64ArrayAttr(partialReductionTileSizes));
+  configAttrsList.emplace_back("thread", b.getI64ArrayAttr(threadTileSizes));
+  configAttrsList.emplace_back("lane_basis", threadBasisAttr);
+  configAttrsList.emplace_back("subgroup_basis", subgroupBasisAttr);
 
-  auto configDict = b.getDictionaryAttr(configAttrs);
+  if (!reassociations.empty()) {
+    auto dimExpandAttr =
+        DimensionExpansionAttr::get(context, reassociations, outputShape);
+    setDimensionExpansion(context, configAttrsList, dimExpandAttr);
+  }
+
+  auto configDict = b.getDictionaryAttr(configAttrsList);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   return loweringConfig;
 }

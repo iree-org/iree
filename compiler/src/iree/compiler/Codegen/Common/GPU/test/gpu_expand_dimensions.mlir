@@ -14,8 +14,8 @@ func.func @expand_matvec(%a: tensor<4x16384xf16>, %b: tensor<1x16384xf16>) -> te
     ins(%a, %b : tensor<4x16384xf16>, tensor<1x16384xf16>)
     outs(%fill : tensor<4x1xf32>)
     attrs = {
-      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
       lowering_config = #iree_gpu.lowering_config<{
+      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
       lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]],
       partial_reduction = [0, 0, 64, 0],
       subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]],
@@ -54,8 +54,8 @@ func.func @expand_matvec_multiple_dims(%a: tensor<4x16384xf16>, %b: tensor<1x163
     ins(%a, %b : tensor<4x16384xf16>, tensor<1x16384xf16>)
     outs(%fill : tensor<4x1xf32>)
     attrs = {
-      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3, 4]], output_shape = [?, ?, ?, 2, 4]>,
       lowering_config = #iree_gpu.lowering_config<{
+      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3, 4]], output_shape = [?, ?, ?, 2, 4]>,
       lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]],
       partial_reduction = [0, 0, 64, 0],
       subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]],
@@ -95,8 +95,8 @@ func.func @expand_dynamic_dim(%a: tensor<4x?xf16>, %b: tensor<1x?xf16>) -> tenso
     ins(%a, %b : tensor<4x?xf16>, tensor<1x?xf16>)
     outs(%fill : tensor<4x1xf32>)
     attrs = {
-      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
       lowering_config = #iree_gpu.lowering_config<{
+      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
       lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]],
       partial_reduction = [0, 0, 64, 0],
       subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]],
@@ -129,8 +129,8 @@ func.func @expand_not_divisible(%a: tensor<4x127xf16>, %b: tensor<1x127xf16>) ->
     ins(%a, %b : tensor<4x127xf16>, tensor<1x127xf16>)
     outs(%fill : tensor<4x1xf32>)
     attrs = {
-      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
       lowering_config = #iree_gpu.lowering_config<{
+      expand_dims = #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>,
       lane_basis = [[1, 1, 64, 1], [0, 1, 2, 3]],
       partial_reduction = [0, 0, 64, 0],
       subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]],

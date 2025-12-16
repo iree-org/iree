@@ -2313,10 +2313,6 @@ GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
 // DimensionExpansionAttr
 //===----------------------------------------------------------------------===//
 
-void setDimensionExpansion(Operation *op, Attribute config) {
-  op->setAttr(kExpandDimsAttrName, config);
-}
-
 DimensionExpansionAttr
 DimensionExpansionAttr::get(MLIRContext *context,
                             ArrayRef<ReassociationIndices> reassociations,
