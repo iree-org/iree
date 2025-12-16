@@ -209,7 +209,7 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
 }
 
 static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
-                       AffineMap maskMap, Value qk, Value mask) {
+                       AffineMap maskMap, Value qk, Value mask, bool useExp2) {
 
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{qkMap, maskMap});
@@ -245,9 +245,11 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
           maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
                                          /*isUnsignedCast=*/false);
           // Scaling to compensate for base-2 softmax
-          Value log2e = arith::ConstantOp::create(
-              b, loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
-          maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
+          if (useExp2) {
+            Value log2e = arith::ConstantOp::create(
+                b, loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
+            maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
+          }
         }
         // Finally, set the returned value to the qk element plus the mask
         // element (or 0/-infinity if bool mask). We opt for a AddFOp (instead
@@ -396,7 +398,7 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
 
   // S += mask
   if (mask != nullptr) {
-    s = applyMask(b, loc, sMap, *maskMap, s, mask.value());
+    s = applyMask(b, loc, sMap, *maskMap, s, mask.value(), useExp2);
   }
 
   return s;
