@@ -283,9 +283,9 @@ using TensorEncodingUpdates =
     llvm::DenseMap<Operation *, OperandEncodingUpdates>;
 
 // Updates encoding attributes for a TensorDispatchOp.
-static void
-updateTensorDispatchOp(TensorDispatchOp dispatchOp,
-                       const OperandEncodingUpdates &operandUpdates) {
+static void updateTensorDispatchOp(TensorDispatchOp dispatchOp,
+                                   const OperandEncodingUpdates &operandUpdates,
+                                   IRRewriter &rewriter) {
   // Update operand encodings.
   // The operand_encodings attribute has the same length as getMixedOperands().
   // For non-affinity types (e.g., index), the encoding is just the type.
@@ -312,14 +312,93 @@ updateTensorDispatchOp(TensorDispatchOp dispatchOp,
   }
   dispatchOp.setOperandEncodingsAttr(
       ArrayAttr::get(dispatchOp.getContext(), newOperandEncodings));
+
+  // Update result encodings for tied operands and track which results need
+  // re-encoding for downstream users.
+  //
+  // NOTE: This is a rare case that exists primarily for correctness as a safe
+  // fallback. In practice, tied operands with encodings that need unification
+  // are uncommon. The re-encode op inserted here ensures downstream users see
+  // the original encoding they expect, even though the dispatch internally
+  // uses the unified encoding.
+  auto tiedOp = cast<IREE::Util::TiedOpInterface>(dispatchOp.getOperation());
+
+  // Collect old encodings and build new result encodings.
+  SmallVector<Type> newResultEncodings;
+  SmallVector<std::pair<OpResult, RankedTensorType>> resultsToReencode;
+  for (auto [result, typeAttr] :
+       llvm::zip_equal(dispatchOp.getResults(),
+                       dispatchOp.getResultEncodings().getValue())) {
+    Type type = cast<TypeAttr>(typeAttr).getValue();
+    if (!isa<IREE::Stream::ResourceType>(result.getType())) {
+      newResultEncodings.push_back(type);
+      continue;
+    }
+    OpOperand *tiedOperand = tiedOp.getTiedResultOpOperand(result);
+    if (!tiedOperand) {
+      newResultEncodings.push_back(type);
+      continue;
+    }
+    if (!operandUpdates.contains(tiedOperand->getOperandNumber())) {
+      newResultEncodings.push_back(type);
+      continue;
+    }
+    // Track old encoding for re-encode op insertion.
+    auto rankedTensorType = cast<RankedTensorType>(type);
+    resultsToReencode.push_back({result, rankedTensorType});
+    newResultEncodings.push_back(rankedTensorType.cloneWithEncoding(
+        operandUpdates.lookup(tiedOperand->getOperandNumber())));
+  }
+  dispatchOp.setResultEncodingsAttr(
+      rewriter.getTypeArrayAttr(newResultEncodings));
+
+  // Insert re-encode ops after the dispatch for results that were updated.
+  // This converts results back to the original encoding for downstream users.
+  if (resultsToReencode.empty()) {
+    return;
+  }
+
+  // Build a map from result index to its encoding dims by iterating through
+  // the flattened result_encoding_dims list.
+  SmallVector<ValueRange> resultEncodingDimsMap(newResultEncodings.size());
+  ValueRange remainingDims = dispatchOp.getResultEncodingDims();
+  for (auto [idx, encodingType] : llvm::enumerate(newResultEncodings)) {
+    auto shapedType = cast<ShapedType>(encodingType);
+    int64_t dynamicDimCount = shapedType.getNumDynamicDims();
+    resultEncodingDimsMap[idx] = remainingDims.take_front(dynamicDimCount);
+    remainingDims = remainingDims.drop_front(dynamicDimCount);
+  }
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointAfter(dispatchOp);
+  for (auto [result, oldType] : resultsToReencode) {
+    unsigned resultIdx = result.getResultNumber();
+    Value resultSize = dispatchOp.getResultSize(resultIdx);
+    auto newType = cast<RankedTensorType>(newResultEncodings[resultIdx]);
+    ValueRange encodingDims = resultEncodingDimsMap[resultIdx];
+    Value oldSize = TensorSizeOfOp::create(
+        rewriter, dispatchOp.getLoc(), rewriter.getIndexType(),
+        TypeAttr::get(oldType), encodingDims, dispatchOp.getAffinityAttr());
+    auto reencodeOp =
+        TensorEncodeOp::create(rewriter, dispatchOp.getLoc(), result.getType(),
+                               result, TypeAttr::get(newType),
+                               /*source_encoding_dims=*/encodingDims,
+                               resultSize, TypeAttr::get(oldType),
+                               /*result_encoding_dims=*/encodingDims, oldSize,
+                               dispatchOp.getAffinityAttr());
+    rewriter.replaceAllUsesExcept(result, reencodeOp.getResult(), reencodeOp);
+    LDBG() << "  Inserted re-encode op for result " << resultIdx << ": "
+           << reencodeOp;
+  }
 }
 
 // Applies all cached encoding updates to tensor ops.
 static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
   for (auto &[op, operandUpdates] : updates) {
+    IRRewriter rewriter(op->getContext());
     // TODO: Handle other TensorPhaseOp ops (TensorFillOp, etc.) via TypeSwitch.
     if (auto dispatchOp = dyn_cast<TensorDispatchOp>(op)) {
-      updateTensorDispatchOp(dispatchOp, operandUpdates);
+      updateTensorDispatchOp(dispatchOp, operandUpdates, rewriter);
     }
   }
 }
