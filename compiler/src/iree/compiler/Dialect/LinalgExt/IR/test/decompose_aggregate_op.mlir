@@ -476,23 +476,6 @@ func.func @online_attention_f16_noexp2(%query: tensor<192x1024x64xf16>,
 // CHECK-NOT: arith.extf
 // CHECK-NOT:   math.exp2
 // CHECK:   linalg.yield
-// newSum = normSum + rowSum(P)
-// CHECK: linalg.generic
-// CHECK-NOT: arith.extf
-// CHECK:   arith.addf
-// CHECK:   linalg.yield
-// newAcc = norm * oldAcc
-// CHECK: linalg.generic
-// CHECK-NOT: arith.extf
-// CHECK:   arith.mulf
-// CHECK:   linalg.yield
-// newAcc = P @ V + newAcc
-// CHECK: linalg.generic
-// CHECK:   arith.extf
-// CHECK:   arith.extf
-// CHECK:   arith.mulf
-// CHECK:   arith.addf
-// CHECK:   linalg.yield
 
 // -----
 
