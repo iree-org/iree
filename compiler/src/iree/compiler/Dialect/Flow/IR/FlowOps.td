@@ -1306,19 +1306,26 @@ def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
   let summary = [{Performs a full tensor encode operation.}];
   let description = [{
     Encode the input tensor into an encoded output tensor.
+
+    The optional `encoding_dims` operand carries encoding-specific dynamic
+    values (e.g., M, N, K dimensions for matmul encodings). These values are
+    used for runtime layout selection based on problem size.
   }];
 
   let arguments = (ins
     FLOW_Tensor:$operand,
     FLOW_ShapeDynamicDims:$operand_dims,
-    FLOW_ShapeDynamicDims:$result_dims
+    FLOW_ShapeDynamicDims:$result_dims,
+    Variadic<Index>:$encoding_dims
   );
   let results = (outs
     FLOW_Tensor:$result
   );
 
   let assemblyFormat = [{
-    $operand `:`
+    $operand
+    (`encoding_dims` `{` $encoding_dims^ `}`)?
+    `:`
     type($operand) (`{` $operand_dims^ `}`)? `->`
     type($result) (`{` $result_dims^ `}`)?
     attr-dict-with-keyword

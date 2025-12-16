@@ -227,6 +227,46 @@ util.func public @tensorEncodeChangeEncoding(%arg0 : tensor<?x4xf32, #encoding>,
 
 // -----
 
+// Test encoding with encoding_dims for dynamic iteration sizes.
+// CHECK-DAG:   #[[$MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK-DAG:   #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]]], iteration_sizes = [?, 128, 64]>
+// CHECK-LABEL: @tensorEncodeWithEncodingDims
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[M:[a-zA-Z0-9]+]]
+#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_with_dims = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2], iteration_sizes = [?, 128, 64]>
+util.func public @tensorEncodeWithEncodingDims(%arg0 : tensor<?x64xf32>, %m : index) -> tensor<?x64xf32, #encoding_with_dims> {
+  // CHECK: %[[RES:.+]] = flow.tensor.encode %[[ARG0]] encoding_dims{%[[M]]} : tensor<?x64xf32>{%[[M]]} -> tensor<?x64xf32, #[[$ENCODING]]>{%[[M]]}
+  %0 = flow.tensor.encode %arg0 encoding_dims{%m} : tensor<?x64xf32>{%m} -> tensor<?x64xf32, #encoding_with_dims>{%m}
+  util.return %0 : tensor<?x64xf32, #encoding_with_dims>
+}
+
+// -----
+
+// Test decoding (unset_encoding direction) - operand has encoding, result doesn't.
+// CHECK-DAG:   #[[$MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK-DAG:   #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]]], iteration_sizes = [?, 128, 64]>
+// CHECK-LABEL: @tensorDecodeWithEncodingDims
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[M:[a-zA-Z0-9]+]]
+#map0_dec = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1_dec = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2_dec = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_dec = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0_dec, #map1_dec, #map2_dec], iteration_sizes = [?, 128, 64]>
+util.func public @tensorDecodeWithEncodingDims(%arg0 : tensor<?x64xf32, #encoding_dec>, %m : index) -> tensor<?x64xf32> {
+  // CHECK: %[[RES:.+]] = flow.tensor.encode %[[ARG0]] encoding_dims{%[[M]]} : tensor<?x64xf32, #[[$ENCODING]]>{%[[M]]} -> tensor<?x64xf32>{%[[M]]}
+  %0 = flow.tensor.encode %arg0 encoding_dims{%m} : tensor<?x64xf32, #encoding_dec>{%m} -> tensor<?x64xf32>{%m}
+  util.return %0 : tensor<?x64xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorSlice
 util.func public @tensorSlice(%arg0 : tensor<4x4xf32>, %arg1 : index, %arg2 : index) -> tensor<2x2xf32> {
   // CHECK-NEXT: %0 = flow.tensor.slice %arg0[%arg1, %arg2 for %arg2, %arg1] : tensor<4x4xf32> -> tensor<2x2xf32>

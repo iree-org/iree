@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
@@ -1656,6 +1657,18 @@ LogicalResult TensorEncodeOp::verify() {
   if (failed(mlir::verifyCompatibleShape(operandType.getShape(),
                                          resultType.getShape()))) {
     return emitOpError("the operand shape and result shape are not compatible");
+  }
+  // Verify encoding_dims count matches what the encoding expects.
+  // Check both operand (for decode) and result (for encode) encodings.
+  for (Type type : {operandType, resultType}) {
+    std::optional<int64_t> expectedDims =
+        IREE::Encoding::getNumDynamicEncodingDims(type);
+    if (expectedDims.has_value() &&
+        static_cast<int64_t>(getEncodingDims().size()) != *expectedDims) {
+      return emitOpError() << "encoding expects " << *expectedDims
+                           << " encoding dim(s), but "
+                           << getEncodingDims().size() << " provided";
+    }
   }
   return success();
 }

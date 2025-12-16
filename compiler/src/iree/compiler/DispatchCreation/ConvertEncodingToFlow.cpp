@@ -45,7 +45,8 @@ void ConvertEncodingToFlowPass::runOnOperation() {
     std::tie(std::ignore, dynamicDimSizes) = decomposeMixedValues(mixedSizes);
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorEncodeOp>(
         encodingOp, encodingOp.getResultType(), source,
-        /*operand_dims=*/dynamicDimSizes, /*result_dims=*/dynamicDimSizes);
+        /*operand_dims=*/dynamicDimSizes, /*result_dims=*/dynamicDimSizes,
+        /*encoding_dims=*/encodingOp.getEncodingDims());
   });
 
   // Convert the unset_encoding ops.
@@ -57,7 +58,8 @@ void ConvertEncodingToFlowPass::runOnOperation() {
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorEncodeOp>(
         encodingOp, encodingOp.getResultType(), encodingOp.getSource(),
         /*operand_dims=*/encodingOp.getResultDims(),
-        /*result_dims=*/encodingOp.getResultDims());
+        /*result_dims=*/encodingOp.getResultDims(),
+        /*encoding_dims=*/encodingOp.getEncodingDims());
   });
 }
 

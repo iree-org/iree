@@ -1359,10 +1359,14 @@ def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
 ]> {
   let summary = [{Encodes the contents of a value.}];
   let description = [{
-    Elones the contents of a value at a snapshot in time. Future changes to the
+    Encodes the contents of a value at a snapshot in time. Future changes to the
     identity encoding will not effect the result. Acts as a copy-on-write
     operation. Otherwise, an executable for encoding the value is generated
     during lowering.
+
+    The optional `encoding_dims` operand carries encoding-specific dynamic
+    values (e.g., M, N, K dimensions for matmul encodings). These values are
+    used for runtime layout selection based on problem size.
   }];
 
   let arguments = (ins
@@ -1373,6 +1377,7 @@ def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
     TypeAttr:$result_encoding,
     Stream_ShapeDynamicDims:$result_encoding_dims,
     Stream_Size:$result_size,
+    Variadic<Index>:$encoding_dims,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1381,7 +1386,9 @@ def Stream_TensorEncodeOp : Stream_PureOp<"tensor.encode", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $source `:`
+    $source
+    (`encoding_dims` `{` $encoding_dims^ `}`)?
+    `:`
     $source_encoding (`` `{` $source_encoding_dims^ `}`)?
     `in`
     type($source) `` `{` $source_size `}`

@@ -192,4 +192,17 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
   return (narrowM && (!narrowN || mSize <= nSize)) ? narrowM : narrowN;
 }
 
+std::optional<int64_t> getNumDynamicEncodingDims(Type type) {
+  auto tensorType = dyn_cast<RankedTensorType>(type);
+  if (!tensorType) {
+    return std::nullopt;
+  }
+  auto encodingAttr =
+      dyn_cast_or_null<SerializableAttr>(tensorType.getEncoding());
+  if (!encodingAttr) {
+    return std::nullopt;
+  }
+  return encodingAttr.getNumDynamicEncodingDims();
+}
+
 } // namespace mlir::iree_compiler::IREE::Encoding

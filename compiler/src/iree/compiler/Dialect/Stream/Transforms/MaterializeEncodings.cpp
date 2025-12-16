@@ -66,6 +66,7 @@ static std::string getDispatchFuncName(IREE::Stream::TensorEncodeOp encodeOp) {
 ///   - source_binding
 ///   - dynamic dimension sizes of the source type
 ///   - dynamic dimension sizes of the destination type
+///   - encoding_dims (M, N, K for matmul encodings)
 ///   - destination binding
 static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
                                         StringRef functionName) {
@@ -80,17 +81,24 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
   // dimension sizes.
   argumentTypes.push_back(bindingType);
   argumentLocs.push_back(loc);
-  for (auto argument : encodeOp.getSourceEncodingDims()) {
+  for (Value argument : encodeOp.getSourceEncodingDims()) {
     argumentTypes.push_back(argument.getType());
     argumentLocs.push_back(argument.getLoc());
   }
 
   // Add the block argument for the result resource and corresponding dynamic
   // dimension sizes.
-  for (auto argument : encodeOp.getResultEncodingDims()) {
+  for (Value argument : encodeOp.getResultEncodingDims()) {
     argumentTypes.push_back(argument.getType());
     argumentLocs.push_back(argument.getLoc());
   }
+
+  // Add the block arguments for encoding-specific dimensions (e.g., M, N, K).
+  for (Value argument : encodeOp.getEncodingDims()) {
+    argumentTypes.push_back(argument.getType());
+    argumentLocs.push_back(argument.getLoc());
+  }
+
   argumentTypes.push_back(bindingType);
   argumentLocs.push_back(loc);
 
@@ -104,17 +112,30 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
   // Build operations to handle load/store from/to the bindings.
   SmallVector<Value> sourceDynamicDims;
   SmallVector<Value> destinationDynamicDims;
-  for (auto argument : block.getArguments().drop_front(1).take_front(
-           encodeOp.getSourceEncodingDims().size())) {
+  SmallVector<Value> encodingDimsValues;
+  unsigned numSourceDims = encodeOp.getSourceEncodingDims().size();
+  unsigned numResultDims = encodeOp.getResultEncodingDims().size();
+  unsigned numEncodingDims = encodeOp.getEncodingDims().size();
+  unsigned argIndex = 1; // Skip source binding
+  for (BlockArgument arg :
+       block.getArguments().slice(argIndex, numSourceDims)) {
     sourceDynamicDims.push_back(
         IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
-            builder, loc, argument, builder.getIndexAttr(ordinalCount++)));
+            builder, loc, arg, builder.getIndexAttr(ordinalCount++)));
   }
-  for (auto argument : block.getArguments().drop_back(1).take_back(
-           encodeOp.getResultEncodingDims().size())) {
+  argIndex += numSourceDims;
+  for (BlockArgument arg :
+       block.getArguments().slice(argIndex, numResultDims)) {
     destinationDynamicDims.push_back(
         IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
-            builder, loc, argument, builder.getIndexAttr(ordinalCount++)));
+            builder, loc, arg, builder.getIndexAttr(ordinalCount++)));
+  }
+  argIndex += numResultDims;
+  for (BlockArgument arg :
+       block.getArguments().slice(argIndex, numEncodingDims)) {
+    encodingDimsValues.push_back(
+        IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
+            builder, loc, arg, builder.getIndexAttr(ordinalCount++)));
   }
 
   auto zero = arith::ConstantIndexOp::create(builder, loc, 0);
@@ -143,11 +164,11 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
     if (sourceType.getEncoding()) {
       value = IREE::Encoding::UnsetEncodingOp::create(
           builder, loc, sourceType.dropEncoding(), value, sourceDynamicDims,
-          /*encoding_dims=*/ValueRange{});
+          encodingDimsValues);
     }
     if (destinationType.getEncoding()) {
       value = IREE::Encoding::SetEncodingOp::create(
-          builder, loc, destinationType, value, /*encoding_dims=*/ValueRange{});
+          builder, loc, destinationType, value, encodingDimsValues);
     }
   }
 
@@ -166,7 +187,7 @@ createExportOp(RewriterBase &rewriter, Location loc,
                IREE::Stream::ExecutableOp executableOp, func::FuncOp funcOp) {
   SmallVector<Type> workloadTypes;
   SmallVector<Location> workloadLocs;
-  for (auto argument : encodeOp.getSourceEncodingDims()) {
+  for (Value argument : encodeOp.getSourceEncodingDims()) {
     Type argumentType = argument.getType();
     if (!isa<IndexType>(argumentType)) {
       continue;
@@ -174,7 +195,16 @@ createExportOp(RewriterBase &rewriter, Location loc,
     workloadTypes.push_back(argumentType);
     workloadLocs.push_back(argument.getLoc());
   }
-  for (auto argument : encodeOp.getResultEncodingDims()) {
+  for (Value argument : encodeOp.getResultEncodingDims()) {
+    Type argumentType = argument.getType();
+    if (!isa<IndexType>(argumentType)) {
+      continue;
+    }
+    workloadTypes.push_back(argumentType);
+    workloadLocs.push_back(argument.getLoc());
+  }
+  // Add encoding_dims to workload (e.g., M, N, K for matmul encodings).
+  for (Value argument : encodeOp.getEncodingDims()) {
     Type argumentType = argument.getType();
     if (!isa<IndexType>(argumentType)) {
       continue;
@@ -250,25 +280,32 @@ replaceEncodeOpWithDispatchOp(RewriterBase &rewriter,
   SmallVector<Value> operandEnds = {encodeOp.getSourceSize()};
   SmallVector<Value> operandLengths = {encodeOp.getSourceSize()};
   SmallVector<Value> operands = {encodeOp.getSource()};
-  for (auto argument : encodeOp.getSourceEncodingDims()) {
+  for (Value argument : encodeOp.getSourceEncodingDims()) {
     operands.push_back(argument);
   }
-  for (auto argument : encodeOp.getResultEncodingDims()) {
+  for (Value argument : encodeOp.getResultEncodingDims()) {
+    operands.push_back(argument);
+  }
+  // Add encoding_dims to operands (e.g., M, N, K for matmul encodings).
+  for (Value argument : encodeOp.getEncodingDims()) {
     operands.push_back(argument);
   }
 
   SmallVector<int64_t> tiedArguments = {
       IREE::Util::TiedOpInterface::kUntiedIndex};
-  SmallVector<Value> dynamicDims;
+  // Build workload: source dims, result dims, and encoding dims.
+  SmallVector<Value> workload;
   for (Value argument : encodeOp.getSourceEncodingDims()) {
-    dynamicDims.push_back(argument);
+    workload.push_back(argument);
   }
   for (Value argument : encodeOp.getResultEncodingDims()) {
-    dynamicDims.push_back(argument);
+    workload.push_back(argument);
+  }
+  for (Value argument : encodeOp.getEncodingDims()) {
+    workload.push_back(argument);
   }
   rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
-      encodeOp, exportOp,
-      /*workload=*/dynamicDims, encodeOp.getResult().getType(), operands,
+      encodeOp, exportOp, workload, encodeOp.getResult().getType(), operands,
       encodeOp.getSourceSize(), operandOffsets, operandEnds, operandLengths,
       encodeOp.getResultSize(), tiedArguments, encodeOp.getAffinityAttr());
 }

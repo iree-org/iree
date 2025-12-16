@@ -257,7 +257,8 @@ struct ConvertTensorEncodeOp
         rewriter, op.getLoc(), unknownType, operand.resource,
         op.getOperand().getType(), op.getOperandDims(), operand.resourceSize,
         op.getResult().getType(), flattenValues(adaptor.getResultDims()),
-        resultSize, executionAffinityAttr);
+        resultSize, flattenValues(adaptor.getEncodingDims()),
+        executionAffinityAttr);
     rewriter.replaceOpWithMultiple(op, {{encodeOp, resultSize}});
     return success();
   }
