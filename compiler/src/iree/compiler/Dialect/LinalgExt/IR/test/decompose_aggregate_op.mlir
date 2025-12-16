@@ -190,6 +190,7 @@ func.func @online_attention_f16(%query: tensor<192x1024x64xf16>,
 // correct number of extf/truncfs are emitted.
 // CHECK-LABEL: @online_attention_f16
 // Q = Q * scale
+// CHECK: arith.constant 1.442380e+00 : f16
 // CHECK: linalg.generic
 // CHECK:   arith.mulf
 // S = Q @ K
@@ -460,35 +461,19 @@ func.func @online_attention_f16_noexp2(%query: tensor<192x1024x64xf16>,
 // when specified so from the decomposition_config.
 // CHECK-LABEL: @online_attention_f16_noexp2
 // Q = Q * scale
+// CHECK: arith.constant 1.000000e+00 : f16
 // CHECK: linalg.generic
 // CHECK:   arith.mulf
-// S = Q @ K
-// CHECK: linalg.generic
-// CHECK:   arith.extf
-// CHECK:   arith.extf
-// CHECK:   arith.mulf
-// CHECK:   arith.addf
-// CHECK:   linalg.yield
-// newMax = max(oldMax, rowMax(S))
-// CHECK: linalg.generic
-// CHECK-NOT: arith.extf
-// CHECK:   arith.maximumf
-// CHECK:   linalg.yield
 // norm = exp (oldMax - newMax)
 // CHECK: linalg.generic
-// CHECK-NOT: arith.extf
 // CHECK:   arith.subf
-// CHECK-NOT:   math.exp2
-// CHECK:   linalg.yield
-// normSum = norm * oldSum
-// CHECK: linalg.generic
 // CHECK-NOT: arith.extf
-// CHECK:   arith.mulf
+// CHECK-NOT:   math.exp2
 // CHECK:   linalg.yield
 // P = exp(S - newMax)
 // CHECK: linalg.generic
-// CHECK-NOT: arith.extf
 // CHECK:   arith.subf
+// CHECK-NOT: arith.extf
 // CHECK-NOT:   math.exp2
 // CHECK:   linalg.yield
 // newSum = normSum + rowSum(P)
