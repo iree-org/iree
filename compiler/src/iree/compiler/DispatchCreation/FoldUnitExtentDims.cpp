@@ -185,7 +185,12 @@ struct DropUnitDimsFromCollapseOfExpand
     // needed. Both ops require a non-identity reassociation (i.e. they can't be
     // no-ops).
     Value newExpanded = expandOp.getSrc();
-    if (!llvm::all_of(newExpandReassoc,
+    // Special case: If the source has no shape (e.g., `tensor<f32>`), we
+    // produce an empty reassociation, but still need to insert an
+    // `expand_shape`.
+    bool noSrcShape = srcShape.empty() && !newInterShape.empty();
+    if (noSrcShape ||
+        !llvm::all_of(newExpandReassoc,
                       llvm::hasSingleElement<ReassociationIndicesRef>)) {
       newExpanded = tensor::ExpandShapeOp::create(
           rewriter, expandOp.getLoc(),
