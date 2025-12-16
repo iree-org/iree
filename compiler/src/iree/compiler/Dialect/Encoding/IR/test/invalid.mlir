@@ -256,3 +256,23 @@ func.func @illegal_unset_encoding_wrong_encoding_dims_count(%arg0 : tensor<?x?xf
   %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%m}: tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
   return %0 : tensor<?x?xf32>
 }
+
+// -----
+
+func.func @dim_no_encoding(%arg0: tensor<?x?xf32>) -> index {
+  // expected-error @+1 {{source tensor <block argument> of type 'tensor<?x?xf32>' at index: 0 must have an encoding}}
+  %dim = iree_encoding.dim %arg0[0] : tensor<?x?xf32>
+  return %dim : index
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+func.func @dim_out_of_bounds(%arg0: tensor<?x?xf32, #encoding>) -> index {
+  // expected-error @+1 {{encoding dimension index 5 is out of bounds for encoding with 3 dimensions}}
+  %dim = iree_encoding.dim %arg0[5] : tensor<?x?xf32, #encoding>
+  return %dim : index
+}

@@ -17,6 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "canonicalize.mlir",
             "invalid.mlir",
             "roundtrip.mlir",
         ],
