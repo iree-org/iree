@@ -846,7 +846,7 @@ util.func public @dont_sink_through_edge_expand_shape(%arg0 : tensor<2x3x4xf32>)
 
 // -----
 
-// Matmul generic transpose fusion
+// Matmul generic transpose fusion.
 #map_lhs = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map_rhs = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map_out = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -884,7 +884,7 @@ util.func public @fuse_transpose_through_generic_matmul(
 
 // -----
 
-// Batch matmul generic transpose fusion
+// Batch matmul generic transpose fusion.
 #map_bmm_lhs = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map_bmm_rhs = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map_bmm_out = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
@@ -921,7 +921,7 @@ util.func public @fuse_transpose_through_generic_batch_matmul(
 //       CHECK:   util.return %[[BMM]]
 // -----
 
-// Generic reduction transpose fusion
+// Generic reduction transpose fusion.
 #map_red_in = affine_map<(d0, d1) -> (d0)>
 #map_red_rhs = affine_map<(d0, d1) -> (d1, d0)>
 #map_red_out = affine_map<(d0, d1) -> (d0)>

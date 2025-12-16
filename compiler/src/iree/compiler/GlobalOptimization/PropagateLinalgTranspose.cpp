@@ -1012,7 +1012,7 @@ private:
 class FuseTransposeThroughGenericReduction
     : public OpRewritePattern<linalg::GenericOp> {
 public:
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -1034,8 +1034,8 @@ public:
     }
 
     // Look for a transpose on any input.
-    for (int64_t inputIdx = 0; inputIdx < genericOp.getNumDpsInputs();
-         ++inputIdx) {
+    for (int64_t inputIdx = 0, endIdx = genericOp.getNumDpsInputs();
+         inputIdx < endIdx; ++inputIdx) {
       auto transpose = genericOp.getDpsInputs()[inputIdx]
                            .getDefiningOp<linalg::TransposeOp>();
       if (!transpose) {
@@ -1055,8 +1055,8 @@ public:
       // efficient memory access patterns. This should offset the fact that the
       // transpose may have multiple uses.
       int64_t prevDim = -1;
-      for (int64_t i = 0; i < newExprs.size(); ++i) {
-        int64_t dim = cast<AffineDimExpr>(newExprs[i]).getPosition();
+      for (AffineExpr expr : newExprs) {
+        const int64_t dim = cast<AffineDimExpr>(expr).getPosition();
         if (dim < prevDim) {
           return rewriter.notifyMatchFailure(genericOp,
                                              "newExprs are not contiguous");
@@ -1064,7 +1064,7 @@ public:
         prevDim = dim;
       }
 
-      AffineMap transposedMap =
+      auto transposedMap =
           AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
                          newExprs, rewriter.getContext());
 
