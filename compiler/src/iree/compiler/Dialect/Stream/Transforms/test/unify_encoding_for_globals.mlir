@@ -257,6 +257,85 @@ module @cross_function_tracking {
 
 // -----
 
+// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+
+util.global private @weight : !stream.resource<constant>
+util.global private @weight_size : index
+util.global private @encoded_v1 : !stream.resource<constant>
+util.global private @encoded_v1_size : index
+util.global private @encoded_v2 : !stream.resource<constant>
+util.global private @encoded_v2_size : index
+
+// CHECK: util.initializer
+util.initializer {
+  %cst = stream.tensor.constant : tensor<4096x4096xf32> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight"> : tensor<4096x4096xf32>
+  %0 = stream.resource.size %cst : !stream.resource<constant>
+  util.global.store %cst, @weight : !stream.resource<constant>
+  util.global.store %0, @weight_size : index
+  // CHECK: %[[SOURCE:.+]] = util.global.load @weight
+  %source = util.global.load @weight : !stream.resource<constant>
+  %source_size = util.global.load @weight_size : index
+
+  // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.encode %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  %size1 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding1> : index
+  %enc1 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<constant>{%size1}
+  util.global.store %enc1, @encoded_v1 : !stream.resource<constant>
+  util.global.store %size1, @encoded_v1_size : index
+
+  // CHECK: stream.tensor.sizeof tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.encode %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  %size2 = stream.tensor.sizeof tensor<4096x4096xf32, #encoding2> : index
+  %enc2 = stream.tensor.encode %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<constant>{%size2}
+  util.global.store %enc2, @encoded_v2 : !stream.resource<constant>
+  util.global.store %size2, @encoded_v2_size : index
+
+  util.return
+}
+
+// Executable with tied operand for in-place update.
+stream.executable private @executable_tied {
+  stream.executable.export public @dispatch_inplace
+  builtin.module {
+    func.func @dispatch_inplace(%arg0: !stream.binding) {
+      %c0 = arith.constant 0 : index
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4096x4096xf32, #encoding1>>
+      return
+    }
+  }
+}
+
+// Test tied operand: dispatch result tied to input operand.
+// When encoding changes, both operand and result encoding must change.
+// A re-encode op should be inserted after dispatch.
+// CHECK-LABEL: util.func public @dispatch_with_tied_operand
+// CHECK-SAME:    %[[N:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
+util.func public @dispatch_with_tied_operand(%N: index, %M: index) -> !stream.resource<*> {
+  %encoded = util.global.load @encoded_v1 : !stream.resource<constant>
+  %encoded_size = util.global.load @encoded_v1_size : index
+  %cloned = stream.async.clone %encoded : !stream.resource<constant>{%encoded_size} -> !stream.resource<*>{%encoded_size}
+
+  // The dispatch has a tied result (result -> %cloned).
+  // CHECK:      %[[DISPATCH:.+]] = stream.tensor.dispatch @executable_tied::@dispatch_inplace
+  // CHECK-SAME:   tensor<?x?xf32, #iree_encoding.identity>{%[[N]], %[[M]]}
+  // CHECK-SAME:   -> tensor<?x?xf32, #iree_encoding.identity>{%[[N]], %[[M]]}
+  // Re-encode sizeof and encode ops are inserted after dispatch.
+  // CHECK:      stream.tensor.sizeof tensor<?x?xf32, #[[$ENC]]>{%[[N]], %[[M]]}
+  // CHECK:      stream.tensor.encode %[[DISPATCH]] :
+  // CHECK-SAME:   tensor<?x?xf32, #iree_encoding.identity>
+  // CHECK-SAME:   -> tensor<?x?xf32, #[[$ENC]]>{%[[N]], %[[M]]}
+  %result = stream.tensor.dispatch @executable_tied::@dispatch_inplace(%cloned)
+    : (tensor<?x?xf32, #encoding1>{%N, %M} in !stream.resource<*>{%encoded_size})
+    -> tensor<?x?xf32, #encoding1>{%N, %M} in %cloned{%encoded_size}
+
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
 // Test: mutable source global - should be skipped, encoding unchanged.
 
 #encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
