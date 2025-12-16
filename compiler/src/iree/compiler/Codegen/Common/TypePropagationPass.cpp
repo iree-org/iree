@@ -10,7 +10,10 @@
 // within the dispatch, the type needs to be propagated to avoid having tensors
 // of illegal bitwidths.
 //
-// This pass uses the dialect conversion framework to propagate the types,
+// This pass works in two phases.
+//
+// In the first phase, it uses the dialect conversion framework to propagate
+// the types to ensure all tensors have legal bitwidths:
 // - All ops are marked dynamically illegal if their operands/result uses
 //   unsupported element type.
 // - A generic pattern is added to legalize all such ops that triggers on every
@@ -19,8 +22,24 @@
 //     operations with legalized return types.
 //   - This pattern uses the generic operation creation methods to be
 //     op-agnostic.
-// - For ops that need specifc handling, patterns are added with higher benefit,
+// - For ops that need specific handling, patterns are added with higher
+// benefit,
 //   so that they trigger first during legalization.
+//
+// In the second phase, encoding attributes that don't need further
+// materialization after the propagation are dropped from types, so they don't
+// need to be handled in later stages of Codegen.
+//
+// This needs to happen in a separate, second phase due to the fix-point
+// iterative nature of the dialect conversion. If the encoding attributes were
+// removed in the first phase, multiple visits to the same operation might
+// change the bitwidth due to missing encoding information
+// (e.g., 'packed_storage').
+//
+// The second phase works similar to the first one, it also uses the dialect
+// conversion framework, marking all operations dynamically illegal if operands
+// or results have an encoding attribute that should be be dropped and using
+// generic patterns to update operations.
 //
 //===---------------------------------------------------------------------===//
 
@@ -61,9 +80,8 @@ static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
 /// std::nullopt.
 static std::optional<Type> getLegalizedType(Type t) {
   if (auto shapedType = dyn_cast<RankedTensorType>(t)) {
-    Type elementType = shapedType.getElementType();
     std::optional<Type> legalizedElementType =
-        legalizeStorageElementType(elementType);
+        legalizeStorageElementType(shapedType);
     if (!legalizedElementType)
       return std::nullopt;
     return RankedTensorType::get(shapedType.getShape(),
@@ -71,6 +89,18 @@ static std::optional<Type> getLegalizedType(Type t) {
                                  shapedType.getEncoding());
   }
   return std::nullopt;
+}
+
+static Type dropEncodingWithoutMaterialization(Type t) {
+  if (auto shapedType = dyn_cast<RankedTensorType>(t)) {
+    // TODO(#21185): Remove special casing and replace with more generic logic.
+    if (auto packedStorage =
+            dyn_cast_if_present<IREE::Encoding::PackedStorageAttr>(
+                shapedType.getEncoding())) {
+      return shapedType.dropEncoding();
+    }
+  }
+  return t;
 }
 
 namespace {
@@ -94,11 +124,29 @@ struct TypePropagationTypeConverter : public TypeConverter {
   }
 };
 
+/// Type converter used to drop encodings that need no materialization.
+struct DropEncodingTypeConverter : public TypeConverter {
+  DropEncodingTypeConverter() {
+    addConversion([](Type t) -> Type {
+      if (auto dispatchTensor =
+              dyn_cast<IREE::TensorExt::DispatchTensorType>(t)) {
+        Type oldBoundTy = dispatchTensor.getBoundType();
+        Type newBoundTy = dropEncodingWithoutMaterialization(oldBoundTy);
+        if (newBoundTy == oldBoundTy) {
+          return t;
+        }
+        return IREE::TensorExt::DispatchTensorType::get(
+            dispatchTensor.getAccess(), newBoundTy);
+      }
+      return dropEncodingWithoutMaterialization(t);
+    });
+  }
+};
+
 /// Base class for patterns that handle individual operations.
 template <typename T>
 struct TypePropagationPattern : public OpConversionPattern<T> {
-  TypePropagationPattern(TypePropagationTypeConverter &typeConverter,
-                         MLIRContext *context)
+  TypePropagationPattern(TypeConverter &typeConverter, MLIRContext *context)
       : OpConversionPattern<T>(typeConverter, context, 100) {}
 };
 
@@ -203,7 +251,7 @@ struct GenericOpTypePropagation
         rewriter, linalgOp, resultTypes, adaptor.getOperands()));
 
     if (genericOp->getNumRegions() != 1) {
-      return genericOp.emitOpError("unhanled linalg op with numRegions != 1");
+      return genericOp.emitOpError("unhandled linalg op with numRegions != 1");
     }
 
     // 4. Inline the region from the original operation into the new
@@ -450,8 +498,7 @@ struct ForwardSourceType : public TypePropagationPattern<OpTy> {
 /// Rewrite pattern to replace the element type (if it is not legal) with the
 /// legal element type.
 struct LegalizeResultElementType : public ConversionPattern {
-  LegalizeResultElementType(TypePropagationTypeConverter &typeConverter,
-                            MLIRContext *context)
+  LegalizeResultElementType(TypeConverter &typeConverter, MLIRContext *context)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), /*benefit=*/1,
                           context) {}
 
@@ -462,6 +509,7 @@ struct LegalizeResultElementType : public ConversionPattern {
     SmallVector<Type> resultTypes;
     for (Type resultType : op->getResultTypes()) {
       Type legalizedType = this->typeConverter->convertType(resultType);
+      assert(legalizedType && "Failed to drop encoding from type");
       resultTypes.push_back(legalizedType);
     }
     OperationState state(loc, op->getName(), convertedOperands, resultTypes,
@@ -519,6 +567,38 @@ struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
   }
 };
 
+static void configureConversionTarget(ConversionTarget &target,
+                                      TypeConverter &typeConverter) {
+  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
+    Region &body = funcOp.getBody();
+    for (Block &block : body) {
+      for (auto arg : block.getArguments()) {
+        Type argType = arg.getType();
+        Type convertedArgType = typeConverter.convertType(argType);
+        if (convertedArgType != argType) {
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+  target.markUnknownOpDynamicallyLegal([&](Operation *op) {
+    for (auto operand : op->getOperands()) {
+      Type operandType = operand.getType();
+      if (operandType != typeConverter.convertType(operandType)) {
+        return false;
+      }
+    }
+    for (auto result : op->getResults()) {
+      Type resultType = result.getType();
+      if (resultType != typeConverter.convertType(resultType)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
 struct TypePropagationPass final
     : impl::TypePropagationPassBase<TypePropagationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -528,6 +608,8 @@ struct TypePropagationPass final
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
 
+    // First phase, legalize element type bitwidth for all tensors by
+    // propagating types.
     TypePropagationTypeConverter typeConverter;
     typeConverter.addSourceMaterialization(materializeAsConvertElementType);
     typeConverter.addTargetMaterialization(materializeAsConvertElementType);
@@ -545,37 +627,28 @@ struct TypePropagationPass final
         typeConverter, context);
 
     ConversionTarget target(*context);
-    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
-      Region &body = funcOp.getBody();
-      for (Block &block : body) {
-        for (auto arg : block.getArguments()) {
-          Type argType = arg.getType();
-          Type convertedArgType = typeConverter.convertType(argType);
-          if (convertedArgType != argType) {
-            return false;
-          }
-        }
-      }
-      return true;
-    });
-    target.markUnknownOpDynamicallyLegal([&](Operation *op) {
-      for (auto operand : op->getOperands()) {
-        Type operandType = operand.getType();
-        if (operandType != typeConverter.convertType(operandType)) {
-          return false;
-        }
-      }
-      for (auto result : op->getResults()) {
-        Type resultType = result.getType();
-        if (resultType != typeConverter.convertType(resultType)) {
-          return false;
-        }
-      }
-      return true;
-    });
+    configureConversionTarget(target, typeConverter);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
+      signalPassFailure();
+    }
+
+    // Second phase, drop encoding attributes that are no longer needed.
+    DropEncodingTypeConverter dropConverter;
+    RewritePatternSet dropPatterns(context);
+    // We need less specific patterns here because we simply drop attributes
+    // from result and operand types.
+    dropPatterns
+        .insert<LegalizeBasicBlocks<func::FuncOp>, LegalizeResultElementType,
+                NamedOpTypePropagation<linalg::BatchMatmulOp>,
+                NamedOpTypePropagation<linalg::MatmulOp>,
+                NamedOpTypePropagation<linalg::MatvecOp>,
+                NamedOpTypePropagation<linalg::DotOp>>(dropConverter, context);
+    ConversionTarget dropTarget(*context);
+    configureConversionTarget(dropTarget, dropConverter);
+    if (failed(applyPartialConversion(getOperation(), dropTarget,
+                                      std::move(dropPatterns)))) {
       signalPassFailure();
     }
   }
