@@ -33,7 +33,6 @@
     "compiler_flags": [
         "--iree-hal-target-device=hip",
         "--iree-opt-level=O3",
-        "--iree-opt-generalize-matmul=false",
         "--iree-opt-const-eval=false",
         "--iree-hip-waves-per-eu=2",
         "--iree-llvmgpu-enable-prefetch",
