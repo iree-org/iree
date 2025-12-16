@@ -34,8 +34,8 @@ namespace {
 template <typename T>
 SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
-  for (auto dialect : moduleOp.getContext()->getLoadedDialects()) {
-    auto *dialectInterface = dialect->getRegisteredInterface<T>();
+  for (Dialect *dialect : moduleOp.getContext()->getLoadedDialects()) {
+    const T *dialectInterface = dialect->getRegisteredInterface<T>();
     if (!dialectInterface)
       continue;
     resultSet.insert(dialectInterface);
@@ -119,19 +119,13 @@ public:
   // Returns the SourceGlobalInfo for the given source global name. There is a
   // copy in the call, so it is not a cheap call.
   SourceGlobalInfo getSourceGlobals(StringRef name) {
-    assert(sourceGlobals.contains(name) &&
-           "Expected all the source globals are parsed");
-    return sourceGlobals.find(name)->second;
+    return sourceGlobals.at(name);
   }
 
   // Returns the unified encoding for the given source global name, or
   // std::nullopt if not found.
-  std::optional<Attribute> getUnifiedEncoding(StringRef name) const {
-    auto it = unifiedEncodings.find(name);
-    if (it != unifiedEncodings.end()) {
-      return it->second;
-    }
-    return std::nullopt;
+  Attribute getUnifiedEncoding(StringRef name) const {
+    return unifiedEncodings.at(name);
   }
 
 private:
@@ -618,7 +612,7 @@ struct UnifyEncodingForGlobalsPass
     for (StringRef sourceName : candidates) {
       SourceGlobalInfo sourceInfo = analyzer.getSourceGlobals(sourceName);
       // Update each encode op to use the unified encoding.
-      Attribute unifiedEncoding = *analyzer.getUnifiedEncoding(sourceName);
+      Attribute unifiedEncoding = analyzer.getUnifiedEncoding(sourceName);
       LDBG() << "Unifying encodings for source global: " << sourceName
              << " to " << unifiedEncoding;
       for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
