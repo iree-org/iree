@@ -725,7 +725,8 @@ vm.module @my_module {
   // CHECK: %[[ARGSDATA:.+]] = load %[[ARGSDATA_LVAL]] : <!emitc.ptr<ui8>>
   // CHECK: call_opaque "iree_host_align"
   // CHECK: %[[ARG:.+]] = cast %{{.+}} : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
-  // CHECK: call_opaque "iree_vm_ref_assign"(%arg2, %[[ARG]])
+  // Retain the ref into args_storage (not just assign/borrow).
+  // CHECK: call_opaque "iree_vm_ref_retain"(%arg2, %[[ARG]])
 
   // Create the call to the imported function.
   // CHECK: %[[MODULE_LVAL:.+]] = "emitc.member_of_ptr"(%[[FUNC_LVAL]]) <{member = "module"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>>
@@ -734,6 +735,9 @@ vm.module @my_module {
   // CHECK-NEXT: %[[MODULE:.+]] = load %[[MODULE_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>>
   // CHECK-NEXT: %[[ARGSTRUCT_RVAL:.+]] = load %[[ARGSTRUCT]] : <!emitc.opaque<"iree_vm_function_call_t">>
   // CHECK-NEXT: %{{.+}} = call_opaque "EMITC_CALL_INDIRECT"(%[[BEGIN_CALL]], %[[MODULE]], %arg0, %[[ARGSTRUCT_RVAL]])
+
+  // Release refs in argument buffer after call returns.
+  // CHECK: call_opaque "iree_vm_ref_release"
 
   // Unpack the function results (with pointer alignment).
   // CHECK:      %[[RES_MEMBER:.+]] = "emitc.member"(%[[ARGSTRUCT]]) <{member = "results"}> : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_call_t">>) -> !emitc.lvalue<!emitc.opaque<"iree_byte_span_t">>
