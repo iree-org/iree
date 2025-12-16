@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "annotate_functions.mlir"
+    "convert_to_yieldable_calls.mlir"
     "deduplicate_rodata.mlir"
     "drop_empty_module_initializers.mlir"
     "drop_unused_calls.mlir"

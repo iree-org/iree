@@ -128,6 +128,22 @@ def AnnotateFunctionsPass :
   }];
 }
 
+def ConvertToYieldableCallsPass :
+    Pass<"iree-vm-convert-to-yieldable-calls", "IREE::VM::ModuleOp"> {
+  let summary = "Converts calls to yieldable functions to vm.call.yieldable.";
+  let description = [{
+    Converts vm.call ops that target functions marked with vm.yield to
+    vm.call.yieldable ops. This makes yield points explicit in the IR,
+    enabling proper async handling in the bytecode interpreter and C export.
+
+    This pass must run after AnnotateFunctionsPass which marks functions
+    with vm.yield based on call graph analysis.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::VM::VMDialect"
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Optimization passes
 //===----------------------------------------------------------------------===//

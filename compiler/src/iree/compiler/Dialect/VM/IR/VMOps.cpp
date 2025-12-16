@@ -60,6 +60,39 @@ void setResultIntegerName(OpAsmSetValueNameFn &setNameFn, Value result,
 } // namespace
 
 //===----------------------------------------------------------------------===//
+// custom<ResultTypeList>
+//===----------------------------------------------------------------------===//
+// (type, type, ...)
+
+ParseResult parseResultTypeList(OpAsmParser &parser, ArrayAttr &resultTypes) {
+  if (failed(parser.parseLParen()))
+    return failure();
+  SmallVector<Attribute> typeAttrs;
+  if (succeeded(parser.parseOptionalRParen()))
+    goto done; // empty list
+  do {
+    Type type;
+    if (failed(parser.parseType(type)))
+      return failure();
+    typeAttrs.push_back(TypeAttr::get(type));
+  } while (succeeded(parser.parseOptionalComma()));
+  if (failed(parser.parseRParen()))
+    return failure();
+done:
+  resultTypes = parser.getBuilder().getArrayAttr(typeAttrs);
+  return success();
+}
+
+void printResultTypeList(OpAsmPrinter &p, Operation *op,
+                         ArrayAttr resultTypes) {
+  p << '(';
+  llvm::interleaveComma(resultTypes, p.getStream(), [&](Attribute attr) {
+    p.printType(cast<TypeAttr>(attr).getValue());
+  });
+  p << ')';
+}
+
+//===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
 
@@ -1416,6 +1449,52 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
   } else if (getNumResults() > 1) {
     p << " -> (" << getResultTypes() << ")";
   }
+}
+
+void CallYieldableOp::setDest(Block *block) {
+  return getOperation()->setSuccessor(block, 0);
+}
+
+SuccessorOperands CallYieldableOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  // Results are produced by the callee at runtime and passed to the successor
+  // block arguments. Use produced operand count to tell MLIR about this.
+  unsigned producedCount = getResultTypes().size();
+  return SuccessorOperands(producedCount,
+                           MutableOperandRange(getOperation(), 0, 0));
+}
+
+void CallYieldableOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // Yieldable calls always have side effects (the yield itself).
+  effects.emplace_back(MemoryEffects::Read::get());
+  effects.emplace_back(MemoryEffects::Write::get());
+}
+
+LogicalResult CallYieldableOp::verify() {
+  // Verify that the result types count matches the destination block arguments.
+  Block *destBlock = getDest();
+  size_t resultCount = getResultTypes().size();
+  size_t destArgCount = destBlock->getNumArguments();
+  if (resultCount != destArgCount) {
+    return emitOpError() << "result type count (" << resultCount
+                         << ") must match successor block argument count ("
+                         << destArgCount << ")";
+  }
+
+  // Verify result types match destination block argument types.
+  for (auto [i, pair] : llvm::enumerate(
+           llvm::zip_equal(getResultTypes(), destBlock->getArguments()))) {
+    Type resultType = cast<TypeAttr>(std::get<0>(pair)).getValue();
+    Type argType = std::get<1>(pair).getType();
+    if (resultType != argType) {
+      return emitOpError() << "result type #" << i << " (" << resultType
+                           << ") must match successor block argument type ("
+                           << argType << ")";
+    }
+  }
+
+  return success();
 }
 
 SuccessorOperands CondBranchOp::getSuccessorOperands(unsigned index) {

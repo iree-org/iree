@@ -127,6 +127,8 @@ class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
     "e.encodeStrAttr(getOperation()->getAttrOfType<StringAttr>(\"" # name # "\"))">;
 class VM_EncBranch<string blockName, string operandsName, int successorIndex> : VM_EncEncodeExpr<
     "e.encodeBranch({0}(), " # operandsName # "(), " # successorIndex # ")", [blockName]>;
+class VM_EncBranchTarget<string blockName> : VM_EncEncodeExpr<
+    "e.encodeBranchTarget({0}())", [blockName]>;
 class VM_EncBranchTable<string caseBlockNames, string caseOperandsName, int baseSuccessorIndex> : VM_EncEncodeExpr<
     "e.encodeBranchTable(" # caseBlockNames # "(), " # caseOperandsName # "(), " # baseSuccessorIndex # ")">;
 class VM_EncOperand<string name, int ordinal> : VM_EncEncodeExpr<
@@ -137,6 +139,8 @@ class VM_EncResult<string name> : VM_EncEncodeExpr<
     "e.encodeResult({0}())", [name]>;
 class VM_EncVariadicResults<string name> : VM_EncEncodeExpr<
     "e.encodeResults({0}())", [name]>;
+class VM_EncBlockArgResults<string blockName> : VM_EncEncodeExpr<
+    "e.encodeBlockArgResults({0}())", [blockName]>;
 
 def VM_SerializableOpInterface : OpInterface<"VMSerializableOp"> {
   let description = [{

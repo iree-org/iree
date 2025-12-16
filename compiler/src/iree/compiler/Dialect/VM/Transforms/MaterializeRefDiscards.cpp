@@ -64,6 +64,52 @@ class MaterializeRefDiscardsPass
   }
 
   //===--------------------------------------------------------------------===//
+  // Terminator Operand Analysis
+  //===--------------------------------------------------------------------===//
+
+  // Returns true if value is a MOVE operand of a terminator (but not
+  // forwarded). MOVE operands transfer ownership to the callee/op, so we must
+  // NOT discard. Note: Forwarded operands (branch args) may also be marked as
+  // MOVE, but forwarding is handled separately by isForwardedOnEdge - this
+  // function only identifies true MOVE semantics (like vm.call.yieldable args
+  // to callee).
+  bool isTerminatorMoveOperand(Value value, Operation *terminator) {
+    auto refMoveOp = dyn_cast<IREE::VM::RefMoveInterface>(terminator);
+    if (!refMoveOp)
+      return false;
+
+    // Check if value is forwarded to any successor - if so, it's not a "pure"
+    // MOVE to callee, it's a forward to successor block.
+    if (auto branchOp = dyn_cast<BranchOpInterface>(terminator)) {
+      for (unsigned i = 0; i < terminator->getNumSuccessors(); ++i) {
+        auto operands = branchOp.getSuccessorOperands(i);
+        if (llvm::is_contained(operands.getForwardedOperands(), value)) {
+          return false; // Forwarded, not a callee MOVE
+        }
+      }
+    }
+
+    // Check if value is a MOVE operand (callee takes ownership)
+    for (OpOperand &operand : terminator->getOpOperands()) {
+      if (operand.get() == value && isa<IREE::VM::RefType>(value.getType()) &&
+          refMoveOp.isRefOperandMovable(operand.getOperandNumber())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Returns true if value is used by the terminator (any operand position).
+  bool isTerminatorOperand(Value value, Operation *terminator) {
+    for (OpOperand &operand : terminator->getOpOperands()) {
+      if (operand.get() == value) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  //===--------------------------------------------------------------------===//
   // Edge-Based Discard Insertion
   //===--------------------------------------------------------------------===//
 
@@ -86,15 +132,30 @@ class MaterializeRefDiscardsPass
   }
 
   // Inserts a discard on the edge Pred->Succ for the given values.
+  // For values that are terminator operands, we must insert AFTER the
+  // terminator (in the successor), never before it.
   void insertDiscardOnEdge(OpBuilder &builder, Block *pred, Block *succ,
                            ValueRange values, Location loc) {
-    unsigned numPredSuccessors = pred->getTerminator()->getNumSuccessors();
+    Operation *terminator = pred->getTerminator();
+    unsigned numPredSuccessors = terminator->getNumSuccessors();
     unsigned numSuccPredecessors = std::distance(
         succ->getPredecessors().begin(), succ->getPredecessors().end());
 
-    if (numPredSuccessors == 1) {
-      // Single successor: insert before terminator in predecessor.
-      builder.setInsertionPoint(pred->getTerminator());
+    // Check if any value is a terminator operand (non-MOVE, non-forwarded).
+    // Such values require discard AFTER the terminator executes.
+    bool hasTerminatorOperand = false;
+    for (Value value : values) {
+      if (isTerminatorOperand(value, terminator)) {
+        hasTerminatorOperand = true;
+        break;
+      }
+    }
+
+    // Only use before-terminator insertion if no values are terminator
+    // operands.
+    if (numPredSuccessors == 1 && !hasTerminatorOperand) {
+      // Single successor, no terminator operands: insert before terminator.
+      builder.setInsertionPoint(terminator);
       IREE::VM::DiscardRefsOp::create(builder, loc, values);
     } else if (numSuccPredecessors == 1) {
       // Single predecessor: insert at start of successor.
@@ -231,6 +292,12 @@ class MaterializeRefDiscardsPass
           if (isForwardedOnEdge(ref, &block, succ))
             continue;
 
+          // Skip if ref is a MOVE operand of the terminator.
+          // MOVE operands transfer ownership to the callee, so we must NOT
+          // discard them - the callee takes responsibility for the ref.
+          if (isTerminatorMoveOperand(ref, terminator))
+            continue;
+
           // Ref dies on this edge.
           dyingRefs.push_back(ref);
         }
@@ -274,21 +341,16 @@ class MaterializeRefDiscardsPass
           if (liveness.isLastValueUse(value, &op, operand.getOperandNumber())) {
             auto liveOuts = liveness.getBlockLiveOuts(&block);
             if (!llvm::is_contained(liveOuts, value)) {
-              // Skip if the value is forwarded as a branch argument (MOVE
-              // semantics). Branch arguments are the "last use" but ownership
-              // transfers to the successor block.
-              if (auto branchOp = dyn_cast<BranchOpInterface>(&op)) {
-                bool isForwarded = false;
-                for (unsigned i = 0; i < op.getNumSuccessors(); ++i) {
-                  auto succOperands = branchOp.getSuccessorOperands(i);
-                  if (llvm::is_contained(succOperands.getForwardedOperands(),
-                                         value)) {
-                    isForwarded = true;
-                    break;
-                  }
-                }
-                if (isForwarded)
-                  continue;
+              // For terminators, don't insert mid-block discards for their
+              // operands. Terminator ref operands fall into three categories:
+              // 1. Forwarded (branch args) → successor block takes ownership
+              // 2. MOVE (vm.call.yieldable args) → callee takes ownership
+              // 3. Non-MOVE, non-forwarded → Phase 1 inserts edge discards in
+              //    successors (after terminator executes)
+              // In all cases, a mid-block discard would kill the value before
+              // the terminator can use it.
+              if (op.hasTrait<OpTrait::IsTerminator>()) {
+                continue;
               }
               // Group by insertion point.
               auto it = opToIndex.find(&op);

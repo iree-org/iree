@@ -213,6 +213,14 @@ public:
     return success();
   }
 
+  LogicalResult encodeBranchTarget(Block *targetBlock) override {
+    // Reserve space for the block offset. It will get fixed up when we are all
+    // done and know all of the block offsets.
+    blockOffsetFixups_.push_back({targetBlock, bytecode_.size()});
+    bytecode_.resize(bytecode_.size() + sizeof(int32_t));
+    return success();
+  }
+
   LogicalResult encodeBranchTable(SuccessorRange caseSuccessors,
                                   OperandRangeRange caseOperands,
                                   int baseSuccessorIndex) override {
@@ -278,6 +286,20 @@ public:
     }
     for (auto value : values) {
       uint16_t reg = registerAllocation_->mapToRegister(value).encode();
+      if (failed(writeUint16(reg))) {
+        return failure();
+      }
+    }
+    return success();
+  }
+
+  LogicalResult encodeBlockArgResults(Block *targetBlock) override {
+    auto blockArgs = targetBlock->getArguments();
+    if (failed(ensureAlignment(2)) || failed(writeUint16(blockArgs.size()))) {
+      return failure();
+    }
+    for (auto arg : blockArgs) {
+      uint16_t reg = registerAllocation_->mapToRegister(arg).encode();
       if (failed(writeUint16(reg))) {
         return failure();
       }

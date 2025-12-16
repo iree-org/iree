@@ -55,6 +55,30 @@ iree_c_embed_data(
   PUBLIC
 )
 
+iree_c_embed_data(
+  NAME
+    async_bytecode_modules_c
+  SRCS
+    "async_ops.vmfb"
+  C_FILE_OUTPUT
+    "async_bytecode_modules.c"
+  H_FILE_OUTPUT
+    "async_bytecode_modules.h"
+  FLATTEN
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    async_ops_test_module
+  HDRS
+    "async_ops_test_module.h"
+  DEPS
+    iree::base
+    iree::vm
+  PUBLIC
+)
+
 iree_bytecode_module(
   NAME
     arithmetic_ops
@@ -134,6 +158,16 @@ iree_bytecode_module(
     assignment_ops_i64
   SRC
     "assignment_ops_i64.mlir"
+  FLAGS
+    "--compile-mode=vm"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    async_ops
+  SRC
+    "async_ops.mlir"
   FLAGS
     "--compile-mode=vm"
   PUBLIC
@@ -350,29 +384,6 @@ iree_bytecode_module(
     shift_ops_i64
   SRC
     "shift_ops_i64.mlir"
-  FLAGS
-    "--compile-mode=vm"
-  PUBLIC
-)
-
-iree_c_embed_data(
-  NAME
-    async_bytecode_modules_c
-  SRCS
-    "async_ops.vmfb"
-  C_FILE_OUTPUT
-    "async_bytecode_modules.c"
-  H_FILE_OUTPUT
-    "async_bytecode_modules.h"
-  FLATTEN
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    async_ops
-  SRC
-    "async_ops.mlir"
   FLAGS
     "--compile-mode=vm"
   PUBLIC

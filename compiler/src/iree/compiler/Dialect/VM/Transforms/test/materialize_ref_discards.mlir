@@ -802,6 +802,49 @@ vm.module @my_module {
 // -----
 
 //===----------------------------------------------------------------------===//
+// vm.call.yieldable with refs - terminators that use refs as call operands
+//===----------------------------------------------------------------------===//
+
+// Yieldable call with ref operands.
+// This was the actual bug: refs passed to vm.call.yieldable were discarded
+// BEFORE the call because mid-block discards were inserting before terminators.
+// The ref must NOT be discarded before the call - it's used by the call.
+// CHECK-LABEL: @yieldable_call_ref_operands
+vm.module @my_module {
+  vm.import private @consume(%buf: !vm.buffer) -> !vm.buffer attributes {vm.yield}
+  vm.func @yieldable_call_ref_operands(%buf: !vm.buffer) -> !vm.buffer {
+    // CHECK-NOT: vm.discard.refs
+    // CHECK: vm.call.yieldable @consume({{.*}}) : (!vm.buffer) -> ^bb1 (!vm.buffer)
+    vm.call.yieldable @consume(%buf) : (!vm.buffer) -> ^done(!vm.buffer)
+  // CHECK: ^bb1(%[[RESULT:.*]]: !vm.buffer):
+  ^done(%result: !vm.buffer):
+    // CHECK: vm.return %[[RESULT]]
+    vm.return %result : !vm.buffer
+  }
+}
+
+// -----
+
+// Ref used before yieldable call, then passed to call.
+// The ref must NOT be discarded after the first use since it's still needed.
+// CHECK-LABEL: @ref_used_then_passed_to_yieldable
+vm.module @my_module {
+  vm.import private @consume(%buf: !vm.buffer) -> !vm.buffer attributes {vm.yield}
+  vm.func @ref_used_then_passed_to_yieldable(%buf: !vm.buffer) -> !vm.buffer {
+    // CHECK: vm.cmp.nz.ref
+    %nz = vm.cmp.nz.ref %buf : !vm.buffer
+    // Ref NOT discarded after cmp.nz.ref - it's used by the call below.
+    // CHECK-NOT: vm.discard.refs
+    // CHECK: vm.call.yieldable @consume({{.*}}) : (!vm.buffer) -> ^bb1 (!vm.buffer)
+    vm.call.yieldable @consume(%buf) : (!vm.buffer) -> ^done(!vm.buffer)
+  ^done(%result: !vm.buffer):
+    vm.return %result : !vm.buffer
+  }
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
 // Irreducible CFG with refs
 //===----------------------------------------------------------------------===//
 
@@ -839,6 +882,96 @@ vm.module @my_module {
   // CHECK: ^[[EXIT]]:
   // CHECK-NEXT: vm.return
   ^exit:
+    vm.return
+  }
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// MOVE semantics for yieldable calls - comprehensive tests
+//===----------------------------------------------------------------------===//
+
+// Multiple ref operands to yieldable call - all have MOVE semantics.
+// None should be discarded; callee takes ownership of all.
+// CHECK-LABEL: @yieldable_multiple_ref_operands
+vm.module @my_module {
+  vm.import private @multi(%a: !vm.buffer, %b: !vm.buffer) -> !vm.buffer attributes {vm.yield}
+  vm.func @yieldable_multiple_ref_operands(%buf1: !vm.buffer, %buf2: !vm.buffer) -> !vm.buffer {
+    // Use both refs before the call to ensure they're live.
+    // CHECK: vm.cmp.nz.ref
+    %nz1 = vm.cmp.nz.ref %buf1 : !vm.buffer
+    // CHECK: vm.cmp.nz.ref
+    %nz2 = vm.cmp.nz.ref %buf2 : !vm.buffer
+    // Neither ref should be discarded - both are passed to yieldable call.
+    // CHECK-NOT: vm.discard.refs
+    // CHECK: vm.call.yieldable @multi(%{{.*}}, %{{.*}}) : (!vm.buffer, !vm.buffer) -> ^bb1 (!vm.buffer)
+    vm.call.yieldable @multi(%buf1, %buf2) : (!vm.buffer, !vm.buffer) -> ^done(!vm.buffer)
+  ^done(%result: !vm.buffer):
+    vm.return %result : !vm.buffer
+  }
+}
+
+// -----
+
+// Variadic yieldable call with ref operands - MOVE semantics applies.
+// CHECK-LABEL: @variadic_yieldable_ref_operands
+vm.module @my_module {
+  vm.import private @variadic(%a: !vm.buffer, %b: !vm.buffer) -> !vm.buffer attributes {vm.yield}
+  vm.func @variadic_yieldable_ref_operands(%buf1: !vm.buffer, %buf2: !vm.buffer) -> !vm.buffer {
+    // CHECK: vm.cmp.nz.ref
+    %nz1 = vm.cmp.nz.ref %buf1 : !vm.buffer
+    // CHECK: vm.cmp.nz.ref
+    %nz2 = vm.cmp.nz.ref %buf2 : !vm.buffer
+    // Neither ref should be discarded - both are passed to variadic yieldable call.
+    // CHECK-NOT: vm.discard.refs
+    // CHECK: vm.call.variadic.yieldable @variadic(%{{.*}}, %{{.*}})
+    vm.call.variadic.yieldable @variadic(%buf1, %buf2) {segment_sizes = dense<[1, 1]> : vector<2xi16>, segment_types = [!vm.buffer, !vm.buffer]} : (!vm.buffer, !vm.buffer) -> ^done(!vm.buffer)
+  ^done(%result: !vm.buffer):
+    vm.return %result : !vm.buffer
+  }
+}
+
+// -----
+
+// Ref NOT passed to call but live across it - needs discard AFTER call completes.
+// This tests the case where a ref is live-out past a yieldable call.
+// CHECK-LABEL: @ref_live_across_yieldable
+vm.module @my_module {
+  vm.import private @compute(%x: i32) -> i32 attributes {vm.yield}
+  vm.func @ref_live_across_yieldable(%x: i32) {
+    // CHECK: %[[BUF:.*]] = vm.const.ref.rodata
+    %buf = vm.const.ref.rodata @data : !vm.buffer
+    // Ref is not passed to call, lives past it.
+    // CHECK: vm.call.yieldable @compute(%{{.*}}) : (i32) -> ^bb1 (i32)
+    vm.call.yieldable @compute(%x) : (i32) -> ^done(i32)
+  // CHECK: ^bb1(%{{.*}}: i32):
+  ^done(%result: i32):
+    // Ref is used after call completes.
+    // CHECK: vm.cmp.nz.ref %[[BUF]]
+    %nz = vm.cmp.nz.ref %buf : !vm.buffer
+    // Discard after last use.
+    // CHECK-NEXT: vm.discard.refs %[[BUF]]
+    // CHECK-NEXT: vm.return
+    vm.return
+  }
+  vm.rodata private @data dense<[1, 2, 3]> : tensor<3xi32>
+}
+
+// -----
+
+// Unused ref result from yieldable call - needs discard.
+// CHECK-LABEL: @yieldable_unused_ref_result
+vm.module @my_module {
+  vm.import private @produce(%x: i32) -> !vm.buffer attributes {vm.yield}
+  vm.func @yieldable_unused_ref_result(%x: i32) {
+    // CHECK: vm.call.yieldable @produce(%{{.*}}) : (i32) -> ^bb1 (!vm.buffer)
+    vm.call.yieldable @produce(%x) : (i32) -> ^done(!vm.buffer)
+  // CHECK: ^bb1(%[[RESULT:.*]]: !vm.buffer):
+  ^done(%result: !vm.buffer):
+    // Unused ref result needs discard.
+    // CHECK-NEXT: vm.discard.refs %[[RESULT]]
+    // CHECK-NEXT: vm.return
     vm.return
   }
 }

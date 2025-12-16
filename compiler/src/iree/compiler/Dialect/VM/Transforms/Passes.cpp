@@ -161,6 +161,11 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   // graph. This must happen after all inlining is complete.
   passManager.addNestedPass<IREE::VM::ModuleOp>(createAnnotateFunctionsPass());
 
+  // Convert calls to yieldable functions to vm.call.yieldable. This must run
+  // after AnnotateFunctionsPass which marks functions with vm.yield.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
+      createConvertToYieldableCallsPass());
+
   if (targetOptions.optimizeForStackSize) {
     passManager.addNestedPass<IREE::VM::ModuleOp>(createSinkDefiningOpsPass());
   }
