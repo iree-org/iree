@@ -613,8 +613,8 @@ struct UnifyEncodingForGlobalsPass
       SourceGlobalInfo sourceInfo = analyzer.getSourceGlobals(sourceName);
       // Update each encode op to use the unified encoding.
       Attribute unifiedEncoding = analyzer.getUnifiedEncoding(sourceName);
-      LDBG() << "Unifying encodings for source global: " << sourceName
-             << " to " << unifiedEncoding;
+      LDBG() << "Unifying encodings for source global: " << sourceName << " to "
+             << unifiedEncoding;
       for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
         auto encodeOp = encodedInfo.encodeOp;
         auto oldResultType =
