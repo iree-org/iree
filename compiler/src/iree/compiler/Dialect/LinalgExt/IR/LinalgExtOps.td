@@ -1078,7 +1078,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
       - "pv_attrs": DictionaryAttr - Attributes to attach to the P@V matmul
         operation after decomposition
       - "use_exp2": BoolAttr - If true, uses exp2 with log2(e) scaling instead
-        of exp. (Might be better accuracy-wise on some hardware)
+        of exp. (Gives better perf on some hardware, but trades off accuracy)
   }];
 
   let arguments = (ins AnyShaped:$query,
