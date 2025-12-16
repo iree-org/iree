@@ -65,9 +65,40 @@ struct EncodedGlobalInfo {
   IREE::Stream::TensorEncodeOp encodeOp;
 };
 
-// Information about a source global and all its encoded versions.
-struct SourceGlobalInfo {
+// Result of tracing from an encode op's source back to its origin.
+struct SourceTraceResult {
+  // The source global, if found (may be null if the source is from
+  // parameterAttr). If there are multiple source globals chain, it is the
+  // topmost one.
   IREE::Util::GlobalOpInterface sourceGlobal;
+  // The named parameter attribute, if the source is a TensorConstantOp with
+  // a NamedParameterAttr value.
+  IREE::Stream::NamedParameterAttr parameterAttr;
+
+  // Returns true if we found a valid source (either global or parameter).
+  explicit operator bool() const { return sourceGlobal || parameterAttr; }
+
+  // Returns a unique key identifying this source. Prioritizes parameter name
+  // over global name since parameters represent the actual data identity.
+  std::string getSourceKey() {
+    if (parameterAttr) {
+      std::string key;
+      if (auto scope = parameterAttr.getScope()) {
+        key = scope.str() + "::";
+      }
+      key += parameterAttr.getKey().str();
+      return key;
+    }
+    if (sourceGlobal) {
+      return sourceGlobal.getGlobalName().str();
+    }
+    return {};
+  }
+};
+
+// Information about a source and all its encoded versions.
+struct SourceGlobalInfo {
+  SourceTraceResult source;
   SmallVector<EncodedGlobalInfo> encodedVersions;
 };
 
@@ -90,7 +121,7 @@ static IREE::Util::GlobalStoreOpInterface findStoreOp(Value value) {
 // Analyzes a module to find immutable globals that have multiple encoded
 // versions, and computes unified encodings for them using the layout resolver
 // from the dialect interface. Use run() to perform analysis, then query results
-// with getSourcesWithMultipleEncodings(), getSourceGlobals(), or
+// with getSourcesWithMultipleEncodings(), getSourceInfo(), or
 // getUnifiedEncoding().
 class GlobalEncodingAnalyzer {
 public:
@@ -101,31 +132,30 @@ public:
   // unified encodings.
   LogicalResult run();
 
-  // Returns all source globals that have multiple distinct encodings.
+  // Returns all source keys that have multiple distinct encodings.
   SmallVector<StringRef> getSourcesWithMultipleEncodings() const {
     SmallVector<StringRef> result;
-    for (const auto &[name, info] : sourceGlobals) {
+    for (const auto &entry : sourceGlobals) {
       llvm::SmallDenseSet<Attribute, 4> uniqueEncodings;
-      for (const EncodedGlobalInfo &encoded : info.encodedVersions) {
+      for (const EncodedGlobalInfo &encoded : entry.second.encodedVersions) {
         uniqueEncodings.insert(encoded.encodingAttr);
       }
       if (uniqueEncodings.size() > 1) {
-        result.push_back(name);
+        result.push_back(entry.first());
       }
     }
     return result;
   }
 
-  // Returns the SourceGlobalInfo for the given source global name. There is a
-  // copy in the call, so it is not a cheap call.
-  SourceGlobalInfo getSourceGlobals(StringRef name) {
-    return sourceGlobals.at(name);
+  // Returns the SourceGlobalInfo for the given source key. There is a copy in
+  // the call, so it is not a cheap call.
+  SourceGlobalInfo getSourceInfo(StringRef key) {
+    return sourceGlobals.at(key);
   }
 
-  // Returns the unified encoding for the given source global name, or
-  // std::nullopt if not found.
-  Attribute getUnifiedEncoding(StringRef name) const {
-    return unifiedEncodings.at(name);
+  // Returns the unified encoding for the given source key.
+  Attribute getUnifiedEncoding(StringRef key) const {
+    return unifiedEncodings.at(key);
   }
 
 private:
@@ -143,9 +173,9 @@ private:
   // Computes unified encodings for all source globals with multiple encodings.
   LogicalResult computeUnifiedEncodings();
 
-  // Traces from encode op's source operand back to a source global.
-  // Returns nullptr if tracing fails or source is mutable.
-  IREE::Util::GlobalOpInterface traceToSourceGlobal(Value value);
+  // Traces from encode op's source operand back to its source.
+  // Returns an empty SourceTraceResult if tracing fails or source is mutable.
+  SourceTraceResult traceToSource(Value value);
 
   // Returns true if the type has a recognized encoding attribute.
   bool hasRecognizedEncoding(Type type) const;
@@ -157,10 +187,9 @@ private:
   // Layout resolver function from dialect interface.
   IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr;
 
-  // Maps source global name to its info. Populated by run(). The global name
-  // must match the name of `sourceGlobal` inside SourceGlobalInfo. StringRef is
-  // used for easier lookup, which works better with SymbolTable, etc.
-  llvm::MapVector<StringRef, SourceGlobalInfo> sourceGlobals;
+  // Maps source key to its info. Populated by run(). The key is generated from
+  // either the NamedParameterAttr (prioritized) or the global name.
+  llvm::StringMap<SourceGlobalInfo> sourceGlobals;
 
   // Maps source global name to its unified encoding. Populated by run().
   llvm::StringMap<Attribute> unifiedEncodings;
@@ -213,7 +242,7 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
   // Build queries for layout resolution.
   SmallVector<IREE::Stream::AffinityAndOpPair> queries;
   for (StringRef sourceName : candidates) {
-    SourceGlobalInfo sourceInfo = getSourceGlobals(sourceName);
+    SourceGlobalInfo sourceInfo = getSourceInfo(sourceName);
     for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
       queries.push_back(
           {encodedInfo.encodeOp.getAffinityAttr(), encodedInfo.encodedGlobal});
@@ -233,7 +262,7 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
   for (StringRef sourceName : candidates) {
     SetVector<Attribute> layoutResolvers;
     SmallVector<Attribute> encodingAttrVersions;
-    SourceGlobalInfo sourceInfo = getSourceGlobals(sourceName);
+    SourceGlobalInfo sourceInfo = getSourceInfo(sourceName);
     for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
       const SetVector<Attribute> &resolvers =
           cachedLayoutAttrs[IREE::Stream::AffinityAndOpPair(
@@ -288,7 +317,7 @@ bool GlobalEncodingAnalyzer::hasRecognizedEncoding(Type type) const {
 LogicalResult GlobalEncodingAnalyzer::collectGlobalEncodings() {
   LDBG() << "--- collectGlobalEncodings ---";
   // Walk all initializers to find encoding patterns:
-  //   %source = util.global.load @source_global
+  //   %source = util.global.load @source_global  (or stream.tensor.constant)
   //   %encoded = stream.tensor.encode %source ...
   //   util.global.store %encoded, @encoded_global
   for (auto initOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
@@ -316,13 +345,15 @@ LogicalResult GlobalEncodingAnalyzer::collectGlobalEncodings() {
         LDBG() << "    Skipping: mutable encoded global";
         return;
       }
-      auto sourceGlobal = traceToSourceGlobal(encodeOp.getSource());
-      if (!sourceGlobal) {
-        LDBG() << "    Skipping: failed to trace to source global";
+      SourceTraceResult traceResult = traceToSource(encodeOp.getSource());
+      if (!traceResult) {
+        LDBG() << "    Skipping: failed to trace to source";
         return;
       }
 
-      LDBG() << "    Source: " << sourceGlobal.getGlobalName();
+      std::string sourceKey = traceResult.getSourceKey();
+      LDBG() << "    Source: " << sourceKey;
+
       EncodedGlobalInfo encodedInfo;
       encodedInfo.encodedGlobal = encodedGlobalOp;
       encodedInfo.encodeOp = encodeOp;
@@ -335,10 +366,10 @@ LogicalResult GlobalEncodingAnalyzer::collectGlobalEncodings() {
                   "update corresponding size computations later";
         return;
       }
-      SourceGlobalInfo &sourceInfo =
-          sourceGlobals[sourceGlobal.getGlobalName()];
-      if (!sourceInfo.sourceGlobal) {
-        sourceInfo.sourceGlobal = sourceGlobal;
+      SourceGlobalInfo &sourceInfo = sourceGlobals[sourceKey];
+      // Store the trace result if not already set.
+      if (!sourceInfo.source) {
+        sourceInfo.source = traceResult;
       }
       sourceInfo.encodedVersions.push_back(encodedInfo);
     });
@@ -346,15 +377,14 @@ LogicalResult GlobalEncodingAnalyzer::collectGlobalEncodings() {
   return success();
 }
 
-IREE::Util::GlobalOpInterface
-GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
-  IREE::Util::GlobalOpInterface foundSourceGlobal;
+SourceTraceResult GlobalEncodingAnalyzer::traceToSource(Value value) {
+  SourceTraceResult result;
   bool shouldContinue = true;
   while (shouldContinue) {
     Operation *defOp = value.getDefiningOp();
     if (!defOp) {
       LDBG() << "      Bail: block argument";
-      return nullptr;
+      return {};
     }
     shouldContinue = false;
     bool isValid =
@@ -371,9 +401,9 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
                 LDBG() << "      Bail: mutable source global";
                 return false;
               }
-              assert(!foundSourceGlobal &&
-                     "should only find one source global");
-              foundSourceGlobal = globalOp;
+              // It is okay to trace through globalOp because data is unchanged.
+              // I.e., there are no tensor dispatch ops in the chain.
+              result.sourceGlobal = globalOp;
               // Has inline initial value, done tracing.
               if (globalOp.getGlobalInitialValue()) {
                 return true;
@@ -389,8 +419,13 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
               shouldContinue = true;
               return true;
             })
-            .Case([&](IREE::Stream::TensorConstantOp) {
-              // Constant is a valid leaf source.
+            .Case([&](IREE::Stream::TensorConstantOp constantOp) {
+              // Constant is a valid leaf source. Extract NamedParameterAttr if
+              // present.
+              if (auto namedParam = dyn_cast<IREE::Stream::NamedParameterAttr>(
+                      constantOp.getValue())) {
+                result.parameterAttr = namedParam;
+              }
               return true;
             })
             .Case([&](IREE::Stream::AsyncCloneOp cloneOp) {
@@ -404,10 +439,10 @@ GlobalEncodingAnalyzer::traceToSourceGlobal(Value value) {
               return false;
             });
     if (!isValid) {
-      return nullptr;
+      return {};
     }
   }
-  return foundSourceGlobal;
+  return result;
 }
 
 // Maps a tensor op to a set of (operand index -> new encoding).
@@ -610,7 +645,7 @@ struct UnifyEncodingForGlobalsPass
     explorer.initialize();
     TensorEncodingUpdates tensorEncodingUpdates;
     for (StringRef sourceName : candidates) {
-      SourceGlobalInfo sourceInfo = analyzer.getSourceGlobals(sourceName);
+      SourceGlobalInfo sourceInfo = analyzer.getSourceInfo(sourceName);
       // Update each encode op to use the unified encoding.
       Attribute unifiedEncoding = analyzer.getUnifiedEncoding(sourceName);
       LDBG() << "Unifying encodings for source global: " << sourceName << " to "
