@@ -629,6 +629,16 @@ struct GPULayoutResolverAttr final
     MLIRContext *ctx = attr.getContext();
     return GPUEncodingResolverAttr::get(ctx, getPackedLayoutImpl(attr, type));
   }
+
+  // TODO: Improve the heuristic. This is a placeholder that demonstrates the
+  // encoding unification is working in practice.
+  Attribute getUnifiedEncoding(Attribute attr,
+                               ArrayRef<Attribute> encodings) const {
+    if (encodings.empty()) {
+      return nullptr;
+    }
+    return encodings[0];
+  }
 };
 
 struct GPUEncodingResolverVerifier

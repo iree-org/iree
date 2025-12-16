@@ -22,6 +22,12 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clUnifyEncodingForGlobals(
+    "iree-stream-experimental-unify-encoding-for-globals",
+    llvm::cl::desc("Unifies multiple encodings of the same immutable global to "
+                   "reduce memory. It is an experimental flag for data-tiling"),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -133,6 +139,17 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // fold duplicate arguments/results and inline constants to allow the local
   // optimizations to work more effectively.
   {
+    OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
+    buildStreamCleanupPassPipeline(ipoPipeline, transformOptions);
+    passManager.addPass(
+        IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
+  }
+
+  // Unify encodings for globals, which ensures that we don't increase memory
+  // footprint significantly, unless the program explicitly requires it. Then it
+  // folds the duplicate globals away.
+  if (clUnifyEncodingForGlobals) {
+    passManager.addPass(IREE::Stream::createUnifyEncodingForGlobalsPass());
     OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
     buildStreamCleanupPassPipeline(ipoPipeline, transformOptions);
     passManager.addPass(

@@ -733,3 +733,66 @@ util.initializer {
 
   util.return
 }
+
+// -----
+
+//------------------------------------------------------------------------------
+// #iree_gpu.gpu_encoding_resolver encoding unification tests.
+//------------------------------------------------------------------------------
+
+// TODO(hanchung): Add a testing pass in Codegen/ if the test cases expand
+// further. We can have basic tests like specialize_encoding.mlir, but we should
+// not have too many backend-specific tests in Stream/.
+// This is a simplified test case of https://github.com/iree-org/iree/issues/21659
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {
+    abi = "hip",
+    iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
+  }>
+#device_target_local = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_hsaco_fb]> : !hal.device
+#map = affine_map<(m, n, k) -> (m, k)>
+#map1 = affine_map<(m, n, k) -> (k, n)>
+#map2 = affine_map<(m, n, k) -> (m, n)>
+#encoding1 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 4096, 4096]>
+#encoding2 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, 4096, 4096]>
+
+// The GPU resolver's getUnifiedEncoding returns the first encoding, so both
+// should be unified to #encoding1 (with iteration_sizes = [?, 4096, 4096]).
+
+// CHECK: #[[$UNIFIED_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [{{.+}}], iteration_sizes = [?, 4096, 4096]>
+// CHECK: util.global private @[[$DEVICE_A:.+]] =
+util.global private @device_a = #device_target_local
+util.global private @weight : !stream.resource<constant>
+util.global private @weight_size : index
+util.global private @encoded_v1 : !stream.resource<constant>
+util.global private @encoded_v1_size : index
+util.global private @encoded_v2 : !stream.resource<constant>
+util.global private @encoded_v2_size : index
+
+// CHECK: util.initializer
+util.initializer {
+  %cst = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight"> : tensor<4096x4096xf8E4M3FNUZ>
+  %0 = stream.resource.size %cst : !stream.resource<constant>
+  util.global.store %cst, @weight : !stream.resource<constant>
+  util.global.store %0, @weight_size : index
+  // CHECK: %[[SOURCE:.+]] = util.global.load @weight
+  %source = util.global.load @weight : !stream.resource<constant>
+  %source_size = util.global.load @weight_size : index
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_ENC]]>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_ENC]]>
+  %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf8E4M3FNUZ, #encoding1> : index
+  %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf8E4M3FNUZ, #encoding1> in !stream.resource<constant>{%size1}
+  util.global.store %enc1, @encoded_v1 : !stream.resource<constant>
+  util.global.store %size1, @encoded_v1_size : index
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_ENC]]>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_ENC]]>
+  %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf8E4M3FNUZ, #encoding2> : index
+  %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf8E4M3FNUZ, #encoding2> in !stream.resource<constant>{%size2}
+  util.global.store %enc2, @encoded_v2 : !stream.resource<constant>
+  util.global.store %size2, @encoded_v2_size : index
+
+  util.return
+}
