@@ -91,6 +91,8 @@ def IREEEncoding_LayoutResolverAttr :
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
+        // TODO(hanchung): Remove the assertion once we know what to do for the
+        // default implementation.
         assert(false && "unimplemented interface method");
         return {};
       }]
