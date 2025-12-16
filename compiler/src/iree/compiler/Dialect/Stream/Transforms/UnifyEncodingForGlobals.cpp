@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
@@ -27,6 +28,29 @@ namespace mlir::iree_compiler::IREE::Stream {
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
 
 namespace {
+
+/// Returns a stably sorted list of dialect interfaces of T for all dialects
+/// used within the given module.
+template <typename T>
+SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
+  SmallPtrSet<const T *, 4> resultSet;
+  for (Dialect *dialect : moduleOp.getContext()->getLoadedDialects()) {
+    const T *dialectInterface = dialect->getRegisteredInterface<T>();
+    if (!dialectInterface)
+      continue;
+    resultSet.insert(dialectInterface);
+  }
+
+  // NOTE: to ensure deterministic output we sort the result so that imports are
+  // always added in a consistent order.
+  auto results = llvm::to_vector_of<const T *>(resultSet);
+  llvm::sort(
+      results, +[](const T *a, const T *b) {
+        return a->getDialect()->getNamespace().compare(
+                   b->getDialect()->getNamespace()) < 0;
+      });
+  return results;
+}
 
 //===----------------------------------------------------------------------===//
 // Analysis.
@@ -64,13 +88,17 @@ static IREE::Util::GlobalStoreOpInterface findStoreOp(Value value) {
 }
 
 // Analyzes a module to find immutable globals that have multiple encoded
-// versions. Use run() to perform analysis, then query results with
-// getSourcesWithMultipleEncodings() or getSourceGlobals().
+// versions, and computes unified encodings for them using the layout resolver
+// from the dialect interface. Use run() to perform analysis, then query results
+// with getSourcesWithMultipleEncodings(), getSourceGlobals(), or
+// getUnifiedEncoding().
 class GlobalEncodingAnalyzer {
 public:
   explicit GlobalEncodingAnalyzer(ModuleOp moduleOp)
       : moduleOp(moduleOp), symbolTable(moduleOp), globalTable(moduleOp) {}
 
+  // Runs the full analysis: sets up resolver, collects encodings, and computes
+  // unified encodings.
   LogicalResult run();
 
   // Returns all source globals that have multiple distinct encodings.
@@ -88,16 +116,22 @@ public:
     return result;
   }
 
-  // Returns the SourceGlobalInfo for the given source global name, or
+  // Returns the SourceGlobalInfo for the given source global name. There is a
+  // copy in the call, so it is not a cheap call.
+  SourceGlobalInfo getSourceGlobals(StringRef name) {
+    return sourceGlobals.at(name);
+  }
+
+  // Returns the unified encoding for the given source global name, or
   // std::nullopt if not found.
-  std::optional<SourceGlobalInfo> getSourceGlobals(StringRef name) const {
-    if (sourceGlobals.contains(name)) {
-      return sourceGlobals.find(name)->second;
-    }
-    return std::nullopt;
+  Attribute getUnifiedEncoding(StringRef name) const {
+    return unifiedEncodings.at(name);
   }
 
 private:
+  // Sets up the layout resolver from dialect interfaces.
+  LogicalResult setupLayoutResolver();
+
   // Walks all initializers to find encoding patterns and populates
   // sourceGlobals map. Looks for patterns like:
   //   %source = util.global.load @source_global
@@ -105,6 +139,9 @@ private:
   //   util.global.store %encoded, @encoded_global
   // Only considers immutable source and encoded globals.
   LogicalResult collectGlobalEncodings();
+
+  // Computes unified encodings for all source globals with multiple encodings.
+  LogicalResult computeUnifiedEncodings();
 
   // Traces from encode op's source operand back to a source global.
   // Returns nullptr if tracing fails or source is mutable.
@@ -117,14 +154,23 @@ private:
   SymbolTable symbolTable;
   IREE::Util::GlobalTable globalTable;
 
+  // Layout resolver function from dialect interface.
+  IREE::Stream::ResolveLayoutAttrFn resolveLayoutAttr;
+
   // Maps source global name to its info. Populated by run(). The global name
   // must match the name of `sourceGlobal` inside SourceGlobalInfo. StringRef is
   // used for easier lookup, which works better with SymbolTable, etc.
   llvm::MapVector<StringRef, SourceGlobalInfo> sourceGlobals;
+
+  // Maps source global name to its unified encoding. Populated by run().
+  llvm::StringMap<Attribute> unifiedEncodings;
 };
 
 LogicalResult GlobalEncodingAnalyzer::run() {
   LDBG() << "=== GlobalEncodingAnalyzer::run() ===";
+  if (failed(setupLayoutResolver())) {
+    return failure();
+  }
   globalTable.rebuild();
   if (failed(collectGlobalEncodings())) {
     return failure();
@@ -137,6 +183,93 @@ LogicalResult GlobalEncodingAnalyzer::run() {
          << " encoded versions\n";
     }
   });
+
+  if (failed(computeUnifiedEncodings())) {
+    return failure();
+  }
+
+  return success();
+}
+
+LogicalResult GlobalEncodingAnalyzer::setupLayoutResolver() {
+  auto usedDialects = gatherUsedDialectInterfaces<
+      IREE::Stream::AffinityAnalysisDialectInterface>(moduleOp);
+  if (usedDialects.size() != 1) {
+    LDBG() << "Expected only one dialect implementing "
+              "AffinityAnalysisDialectInterface";
+    return failure();
+  }
+  resolveLayoutAttr = usedDialects[0]->makeLayoutAttrResolver(moduleOp);
+  return success();
+}
+
+LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
+  SmallVector<StringRef> candidates = getSourcesWithMultipleEncodings();
+  if (candidates.empty()) {
+    LDBG() << "No source globals with multiple encodings found.";
+    return success();
+  }
+
+  // Build queries for layout resolution.
+  SmallVector<IREE::Stream::AffinityAndOpPair> queries;
+  for (StringRef sourceName : candidates) {
+    SourceGlobalInfo sourceInfo = getSourceGlobals(sourceName);
+    for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
+      queries.push_back(
+          {encodedInfo.encodeOp.getAffinityAttr(), encodedInfo.encodedGlobal});
+    }
+  }
+
+  // Resolve layout attributes for all queries.
+  llvm::DenseMap<IREE::Stream::AffinityAndOpPair, SetVector<Attribute>>
+      cachedLayoutAttrs;
+  if (failed(resolveLayoutAttr(queries, cachedLayoutAttrs))) {
+    LDBG() << "Failed to resolve layouts for a query";
+    return failure();
+  }
+
+  // Compute unified encoding for each source global.
+  MLIRContext *ctx = moduleOp.getContext();
+  for (StringRef sourceName : candidates) {
+    SetVector<Attribute> layoutResolvers;
+    SmallVector<Attribute> encodingAttrVersions;
+    SourceGlobalInfo sourceInfo = getSourceGlobals(sourceName);
+    for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
+      const SetVector<Attribute> &resolvers =
+          cachedLayoutAttrs[IREE::Stream::AffinityAndOpPair(
+              encodedInfo.encodeOp.getAffinityAttr(),
+              encodedInfo.encodedGlobal)];
+      layoutResolvers.insert(resolvers.begin(), resolvers.end());
+      encodingAttrVersions.push_back(encodedInfo.encodingAttr);
+    }
+
+    // TODO: It is not clear which encoding to pick when there are multiple
+    // layout resolvers. For now, just fallback to identity encoding for safety.
+    // A minor improvement can be checking if all the resolvers return the
+    // identical unified encoding and use that.
+    if (layoutResolvers.size() != 1) {
+      unifiedEncodings[sourceName] = IREE::Encoding::IdentityAttr::get(ctx);
+      continue;
+    }
+
+    // Invalid layout resolver, use identity encoding.
+    IREE::Encoding::LayoutResolverAttr layoutResolver =
+        dyn_cast<IREE::Encoding::LayoutResolverAttr>(layoutResolvers[0]);
+    if (!layoutResolver) {
+      unifiedEncodings[sourceName] = IREE::Encoding::IdentityAttr::get(ctx);
+      continue;
+    }
+
+    LDBG() << "Use encoding resolver " << layoutResolver
+           << " to unify encodings for source global: " << sourceName;
+    unifiedEncodings[sourceName] =
+        layoutResolver.getUnifiedEncoding(encodingAttrVersions);
+    // Fallback to identity encoding on failure.
+    if (!unifiedEncodings[sourceName]) {
+      unifiedEncodings[sourceName] = IREE::Encoding::IdentityAttr::get(ctx);
+    }
+  }
+
   return success();
 }
 
@@ -463,15 +596,11 @@ struct UnifyEncodingForGlobalsPass
       LDBG() << "Analysis failed, skipping.";
       return;
     }
-    auto candidates = analyzer.getSourcesWithMultipleEncodings();
+    SmallVector<StringRef> candidates =
+        analyzer.getSourcesWithMultipleEncodings();
     if (candidates.empty()) {
       LDBG() << "No source globals with multiple encodings found.";
       return;
-    }
-    LDBG() << "Found " << candidates.size()
-           << " source globals with multiple encodings:";
-    for (auto name : candidates) {
-      LDBG() << "  - " << name;
     }
 
     // Unify encodings for each source global with multiple encodings, and cache
@@ -480,21 +609,13 @@ struct UnifyEncodingForGlobalsPass
     explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
     explorer.initialize();
     TensorEncodingUpdates tensorEncodingUpdates;
-    for (auto sourceName : candidates) {
-      std::optional<SourceGlobalInfo> sourceInfo =
-          analyzer.getSourceGlobals(sourceName);
-      if (!sourceInfo) {
-        LDBG() << "  ERROR: source global info not found for " << sourceName;
-        continue;
-      }
-
-      // TODO(#22485): Select unified encoding via resolver. For now, use
-      // identity encoding.
-      auto unifiedEncoding =
-          IREE::Encoding::IdentityAttr::get(moduleOp.getContext());
-
+    for (StringRef sourceName : candidates) {
+      SourceGlobalInfo sourceInfo = analyzer.getSourceGlobals(sourceName);
       // Update each encode op to use the unified encoding.
-      for (EncodedGlobalInfo &encodedInfo : sourceInfo->encodedVersions) {
+      Attribute unifiedEncoding = analyzer.getUnifiedEncoding(sourceName);
+      LDBG() << "Unifying encodings for source global: " << sourceName << " to "
+             << unifiedEncoding;
+      for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
         auto encodeOp = encodedInfo.encodeOp;
         auto oldResultType =
             cast<RankedTensorType>(encodeOp.getResultEncoding());
