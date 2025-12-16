@@ -233,10 +233,10 @@ util.initializer {
 // This test also verifies that stream.async.clone between load and encode is
 // properly traced through (matching real-world patterns from input pipelines).
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.identity_resolver}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
 #device_target_local = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
-#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<789>]>
 
 // CHECK-LABEL: module @immutable_source_initialized_from_parameter
 //       CHECK:   util.global private @[[$DEVICE_A:.+]] =
@@ -263,8 +263,8 @@ module @immutable_source_initialized_from_parameter {
     // CHECK: %[[CLONE1:.+]] = stream.async.clone on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]]
     %cloned1 = stream.async.clone on(#hal.device.affinity<@device_a>) %source : !stream.resource<constant>{%source_size} -> !stream.resource<*>{%source_size}
 
-    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
-    // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[CLONE1]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+    // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[CLONE1]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
     %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding1> : index
     %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %cloned1 : tensor<4096x4096xf32> in !stream.resource<*>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
     %const1 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
@@ -274,8 +274,8 @@ module @immutable_source_initialized_from_parameter {
     // CHECK: %[[CLONE2:.+]] = stream.async.clone on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]]
     %cloned2 = stream.async.clone on(#hal.device.affinity<@device_a>) %source : !stream.resource<constant>{%source_size} -> !stream.resource<*>{%source_size}
 
-    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
-    // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[CLONE2]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+    // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[CLONE2]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
     %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding2> : index
     %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %cloned2 : tensor<4096x4096xf32> in !stream.resource<*>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
     %const2 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
@@ -330,7 +330,7 @@ module @immutable_source_initialized_from_parameter {
     %encoded = util.global.load @encoded_v1 : !stream.resource<constant>
     %encoded_size = util.global.load @encoded_v1_size : index
     // CHECK:      stream.tensor.dispatch
-    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.specialized<123>>
     %result = stream.tensor.dispatch @executable_v1::@dispatch(%encoded)
       : (tensor<4096x4096xf32, #encoding1> in !stream.resource<constant>{%encoded_size})
       -> tensor<16xf32> in !stream.resource<*>{%arg0}
@@ -342,7 +342,7 @@ module @immutable_source_initialized_from_parameter {
     %encoded = util.global.load @encoded_v2 : !stream.resource<constant>
     %encoded_size = util.global.load @encoded_v2_size : index
     // CHECK:      stream.tensor.dispatch
-    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.specialized<123>>
     %result = stream.tensor.dispatch @executable_v2::@dispatch(%encoded)
       : (tensor<4096x4096xf32, #encoding2> in !stream.resource<constant>{%encoded_size})
       -> tensor<16xf32> in !stream.resource<*>{%arg0}
@@ -367,8 +367,8 @@ module @immutable_source_initialized_from_parameter {
     %cloned_v2 = stream.async.clone %encoded_v2 : !stream.resource<constant>{%encoded_v2_size} -> !stream.resource<*>{%encoded_v2_size}
 
     // CHECK:      stream.tensor.dispatch @executable_both::@dispatch
-    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
-    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.specialized<123>>
     %result = stream.tensor.dispatch @executable_both::@dispatch[%c16, %c32](%cloned_v1, %c0, %cloned_v2, %c1) : (tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%encoded_v1_size}, index, tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%encoded_v2_size}, index) -> tensor<16xf32> in !stream.resource<*>{%arg0}
 
     util.return %result : !stream.resource<*>
@@ -380,10 +380,10 @@ module @immutable_source_initialized_from_parameter {
 // Test: cross-function tracking - load encoded global, pass to callee via
 // util.call, and verify dispatch site encoding is updated in callee.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.identity_resolver}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
 #device_target_local = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
-#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<789>]>
 
 // CHECK-LABEL: module @cross_function_tracking
 //       CHECK:   util.global private @[[$DEVICE_A:.+]] =
@@ -399,16 +399,16 @@ module @cross_function_tracking {
     %source = util.global.load @source : !stream.resource<constant>
     %source_size = stream.resource.size %source : !stream.resource<constant>
 
-    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
-    // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+    // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
     %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding1> : index
     %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%size1}
     %const1 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc1 : !stream.resource<*>{%size1} -> !stream.resource<constant>{%size1}
     util.global.store %const1, @encoded_v1 : !stream.resource<constant>
     util.global.store %size1, @encoded_v1_size : index
 
-    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
-    // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+    // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
     %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding2> : index
     %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%size2}
     %const2 = stream.async.clone on(#hal.device.affinity<@device_a>) %enc2 : !stream.resource<*>{%size2} -> !stream.resource<constant>{%size2}
@@ -435,8 +435,8 @@ module @cross_function_tracking {
   // CHECK-LABEL: util.func private @dispatch_helper
   util.func private @dispatch_helper(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index, %arg4: index) -> !stream.resource<*> {
     // CHECK:      stream.tensor.dispatch @executable_both::@dispatch
-    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
-    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.identity>
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+    // CHECK-SAME:   tensor<4096x4096xf32, #iree_encoding.specialized<123>>
     %result = stream.tensor.dispatch @executable_both::@dispatch(%arg0, %arg2) : (tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%arg1}, tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%arg3}) -> tensor<16xf32> in !stream.resource<*>{%arg4}
     util.return %result : !stream.resource<*>
   }
@@ -459,11 +459,11 @@ module @cross_function_tracking {
 // When encoding changes, both operand and result encoding must change.
 // A re-encode op should be inserted after dispatch.
 
-#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.identity_resolver}>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
 #device_target_local = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
-// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
-#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
-#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+// CHECK: #[[$ENC:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<789>]>
 
 // CHECK: util.global private @[[$DEVICE_A:.+]] =
 util.global private @device_a = #device_target_local
@@ -484,15 +484,15 @@ util.initializer {
   %source = util.global.load @weight : !stream.resource<constant>
   %source_size = util.global.load @weight_size : index
 
-  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
-  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
   %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding1> : index
   %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<constant>{%size1}
   util.global.store %enc1, @encoded_v1 : !stream.resource<constant>
   util.global.store %size1, @encoded_v1_size : index
 
-  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.identity>
-  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.identity>
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
   %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding2> : index
   %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf32> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<constant>{%size2}
   util.global.store %enc2, @encoded_v2 : !stream.resource<constant>
@@ -523,12 +523,12 @@ util.func public @dispatch_with_tied_operand(%N: index, %M: index) -> !stream.re
 
   // The dispatch has a tied result (result -> %cloned).
   // CHECK:      %[[DISPATCH:.+]] = stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @executable_tied::@dispatch_inplace
-  // CHECK-SAME:   tensor<?x?xf32, #iree_encoding.identity>{%[[N]], %[[M]]}
-  // CHECK-SAME:   -> tensor<?x?xf32, #iree_encoding.identity>{%[[N]], %[[M]]}
+  // CHECK-SAME:   tensor<?x?xf32, #iree_encoding.specialized<123>>{%[[N]], %[[M]]}
+  // CHECK-SAME:   -> tensor<?x?xf32, #iree_encoding.specialized<123>>{%[[N]], %[[M]]}
   // Re-encode sizeof and encode ops are inserted after dispatch.
   // CHECK:      stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<?x?xf32, #[[$ENC]]>{%[[N]], %[[M]]}
   // CHECK:      stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[DISPATCH]] :
-  // CHECK-SAME:   tensor<?x?xf32, #iree_encoding.identity>
+  // CHECK-SAME:   tensor<?x?xf32, #iree_encoding.specialized<123>>
   // CHECK-SAME:   -> tensor<?x?xf32, #[[$ENC]]>{%[[N]], %[[M]]}
   %result = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable_tied::@dispatch_inplace(%cloned)
     : (tensor<?x?xf32, #encoding1>{%N, %M} in !stream.resource<*>{%encoded_size})
