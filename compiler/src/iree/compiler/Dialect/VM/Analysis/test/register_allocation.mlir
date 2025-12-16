@@ -250,3 +250,125 @@ vm.module @module_realistic {
     vm.return %final : i32
   }
 }
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// Call Yieldable
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: @module_call_yieldable
+vm.module @module_call_yieldable {
+
+  vm.import private @yieldable_int(%arg: i32) -> i32 attributes {vm.yield}
+  vm.import private @yieldable_ref(%buf: !vm.buffer) -> !vm.buffer attributes {vm.yield}
+  vm.import private @yieldable_consume_ref(%buf: !vm.buffer) -> i32 attributes {vm.yield}
+  vm.import private @yieldable_mixed(%i: i32, %buf: !vm.buffer) -> (i32, !vm.buffer) attributes {vm.yield}
+  vm.import private @use_int(%i: i32)
+  vm.import private @use_ref(%r: !vm.buffer)
+
+  // CHECK-LABEL: @yieldable_basic_int
+  // Basic yieldable call with integer operand and result.
+  vm.func @yieldable_basic_int(%arg: i32) -> i32 {
+    // CHECK: vm.call.yieldable @yieldable_int
+    // CHECK-SAME: operand_registers = ["i0"]
+    vm.call.yieldable @yieldable_int(%arg) : (i32) -> ^resume(i32)
+  ^resume(%result: i32):
+    // CHECK: vm.return
+    // CHECK-SAME: block_registers = ["i{{[0-9]+}}"]
+    vm.return %result : i32
+  }
+
+  // CHECK-LABEL: @yieldable_basic_ref
+  // Yieldable call with ref operand - NOT MOVE because it's used in successor.
+  vm.func @yieldable_basic_ref(%buf: !vm.buffer) -> !vm.buffer {
+    // CHECK: vm.call.yieldable @yieldable_ref
+    // Not MOVE - %buf used again in ^resume for discard.
+    // CHECK-SAME: operand_registers = ["r0"]
+    vm.call.yieldable @yieldable_ref(%buf) : (!vm.buffer) -> ^resume(!vm.buffer)
+  ^resume(%result: !vm.buffer):
+    vm.discard.refs %buf : !vm.buffer
+    vm.return %result : !vm.buffer
+  }
+
+  // CHECK-LABEL: @yieldable_ref_move
+  // Ref operand consumed by call - not used in successor, so gets MOVE.
+  vm.func @yieldable_ref_move(%buf: !vm.buffer) -> i32 {
+    // CHECK: vm.call.yieldable @yieldable_consume_ref
+    // CHECK-SAME: operand_registers = ["R0"]
+    vm.call.yieldable @yieldable_consume_ref(%buf) : (!vm.buffer) -> ^resume(i32)
+  ^resume(%result: i32):
+    vm.return %result : i32
+  }
+
+  // CHECK-LABEL: @yieldable_ref_not_last_use
+  // Ref operand used after yieldable call - should NOT get MOVE.
+  vm.func @yieldable_ref_not_last_use(%buf: !vm.buffer) -> !vm.buffer {
+    // CHECK: vm.call.yieldable @yieldable_ref
+    // CHECK-SAME: operand_registers = ["r0"]
+    vm.call.yieldable @yieldable_ref(%buf) : (!vm.buffer) -> ^resume(!vm.buffer)
+  ^resume(%result: !vm.buffer):
+    // %buf is used again after the call
+    // CHECK: vm.call @use_ref
+    // CHECK-SAME: operand_registers = ["R0"]
+    vm.call @use_ref(%buf) : (!vm.buffer) -> ()
+    vm.discard.refs %buf : !vm.buffer
+    vm.return %result : !vm.buffer
+  }
+
+  // CHECK-LABEL: @yieldable_mixed_types
+  // Mixed int and ref operands and results.
+  vm.func @yieldable_mixed_types(%i: i32, %buf: !vm.buffer) -> (i32, !vm.buffer) {
+    // CHECK: vm.call.yieldable @yieldable_mixed
+    // Not MOVE - %buf used again in ^resume for discard.
+    // CHECK-SAME: operand_registers = ["i0", "r0"]
+    vm.call.yieldable @yieldable_mixed(%i, %buf) : (i32, !vm.buffer) -> ^resume(i32, !vm.buffer)
+  ^resume(%ri: i32, %rbuf: !vm.buffer):
+    // CHECK: vm.discard.refs
+    // block_registers shows the resume block args (%ri, %rbuf).
+    // CHECK-SAME: block_registers = ["i{{[0-9]+}}", "r{{[0-9]+}}"]
+    vm.discard.refs %buf : !vm.buffer
+    vm.return %ri, %rbuf : i32, !vm.buffer
+  }
+
+  // CHECK-LABEL: @yieldable_value_live_across
+  // Value live across the yieldable call - ensure it's not clobbered.
+  vm.func @yieldable_value_live_across(%x: i32, %arg: i32) -> i32 {
+    // %x is live across the call
+    // CHECK: vm.call.yieldable @yieldable_int
+    // CHECK-SAME: operand_registers = ["i1"]
+    vm.call.yieldable @yieldable_int(%arg) : (i32) -> ^resume(i32)
+  ^resume(%result: i32):
+    // %x used after the yieldable call
+    %sum = vm.add.i32 %x, %result : i32
+    vm.return %sum : i32
+  }
+
+  // CHECK-LABEL: @yieldable_ref_live_across
+  // Ref value live across the yieldable call.
+  vm.func @yieldable_ref_live_across(%buf: !vm.buffer, %arg: i32) -> i32 {
+    // %buf is live across the call
+    // CHECK: vm.call.yieldable @yieldable_int
+    // CHECK-SAME: operand_registers = ["i0"]
+    vm.call.yieldable @yieldable_int(%arg) : (i32) -> ^resume(i32)
+  ^resume(%result: i32):
+    // %buf used after the yieldable call
+    // CHECK: vm.call @use_ref
+    // CHECK-SAME: operand_registers = ["R0"]
+    vm.call @use_ref(%buf) : (!vm.buffer) -> ()
+    vm.discard.refs %buf : !vm.buffer
+    vm.return %result : i32
+  }
+
+  // CHECK-LABEL: @yieldable_sequence
+  // Two yieldable calls in sequence.
+  vm.func @yieldable_sequence(%arg: i32) -> i32 {
+    // CHECK: vm.call.yieldable @yieldable_int
+    vm.call.yieldable @yieldable_int(%arg) : (i32) -> ^resume1(i32)
+  ^resume1(%r1: i32):
+    // CHECK: vm.call.yieldable @yieldable_int
+    vm.call.yieldable @yieldable_int(%r1) : (i32) -> ^resume2(i32)
+  ^resume2(%r2: i32):
+    vm.return %r2 : i32
+  }
+}

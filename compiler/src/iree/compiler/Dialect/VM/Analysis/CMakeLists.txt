@@ -44,6 +44,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAnalysis
+    MLIRControlFlowInterfaces
     MLIRIR
     MLIRSupport
     iree::compiler::Dialect::Util::IR

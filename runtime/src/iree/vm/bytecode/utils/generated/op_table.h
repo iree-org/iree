@@ -142,7 +142,7 @@ typedef enum {
   IREE_VM_OP_CORE_BufferHash = 0x84,
   IREE_VM_OP_CORE_DiscardRefs = 0x85,
   IREE_VM_OP_CORE_AssignRef = 0x86,
-  IREE_VM_OP_CORE_RSV_0x87,
+  IREE_VM_OP_CORE_CallYieldable,
   IREE_VM_OP_CORE_RSV_0x88,
   IREE_VM_OP_CORE_RSV_0x89,
   IREE_VM_OP_CORE_RSV_0x8A,

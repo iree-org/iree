@@ -19,6 +19,7 @@ iree_cc_library(
   SRCS
     "AnnotateFunctions.cpp"
     "Conversion.cpp"
+    "ConvertToYieldableCalls.cpp"
     "DeduplicateRodata.cpp"
     "DropEmptyModuleInitializers.cpp"
     "DropUnusedCalls.cpp"

@@ -862,3 +862,91 @@ vm.module @my_module {
     vm.return %has_optional_import_fn : i32
   }
 }
+
+// -----
+
+// Test vm.call.yieldable conversion with integer result.
+vm.module @my_module {
+  // CHECK: emitc.func private @my_module_call_[[YIELDABLEFN:[^\(]+]]
+  vm.import private @yieldable_fn(%arg0 : i32) -> i32
+
+  // CHECK: emitc.func private @my_module_call_yieldable_fn
+  vm.func @call_yieldable_fn(%arg0 : i32) -> i32 {
+    // Lookup import from module struct.
+    // CHECK-NEXT: %[[STATE_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
+    // CHECK-NEXT: assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
+    // CHECK-NEXT: %[[IMPORTS_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "imports"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
+    // CHECK-NEXT: %[[IMPORTS:.+]] = load %[[IMPORTS_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
+    // CHECK-NEXT: %[[IMPORT_INDEX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[IMPORT_SUBSCRIPT:.+]] = subscript %[[IMPORTS]][%[[IMPORT_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = apply "&"(%[[IMPORT_SUBSCRIPT]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+
+    // Create result variable.
+    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<i32>
+    // CHECK-NEXT: %[[RESPTR:.+]] = apply "&"(%[[RESULT]]) : (!emitc.lvalue<i32>) -> !emitc.ptr<i32>
+
+    // Call the import.
+    // CHECK-NEXT: %{{.+}} = call @my_module_call_[[YIELDABLEFN]](%arg0, %[[IMPORT]], %arg3, %[[RESPTR]])
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, i32, !emitc.ptr<i32>)
+    // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
+
+    // Load result.
+    // CHECK: %[[RESVAL:.+]] = load %[[RESULT]] : <i32>
+
+    // Branch to successor with result.
+    // CHECK-NEXT: cf.br ^bb2(%[[RESVAL]] : i32)
+    vm.call.yieldable @yieldable_fn(%arg0) : (i32) -> ^resume(i32)
+  ^resume(%result : i32):
+    // CHECK: return
+    vm.return %result : i32
+  }
+}
+
+// -----
+
+// Test vm.call.yieldable conversion with ref result.
+vm.module @my_module {
+  // CHECK: emitc.func private @my_module_call_[[YIELDABLEFN:[^\(]+]]
+  vm.import private @yieldable_ref_fn(%arg0 : !vm.ref<?>) -> !vm.ref<?>
+
+  // CHECK: emitc.func private @my_module_call_yieldable_ref_fn
+  vm.func @call_yieldable_ref_fn(%arg0 : !vm.ref<?>) -> !vm.ref<?> {
+    // Lookup import from module struct.
+    // CHECK-NEXT: %[[STATE_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
+    // CHECK-NEXT: assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
+    // CHECK-NEXT: %[[IMPORTS_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "imports"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
+    // CHECK-NEXT: %[[IMPORTS:.+]] = load %[[IMPORTS_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>>
+    // CHECK-NEXT: %[[IMPORT_INDEX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: %[[IMPORT_SUBSCRIPT:.+]] = subscript %[[IMPORTS]][%[[IMPORT_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORT:.+]] = apply "&"(%[[IMPORT_SUBSCRIPT]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+
+    // Allocate ref variable for argument.
+    // CHECK-NEXT: %[[ARGREF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[ARGREFPTR:.+]] = apply "&"(%[[ARGREF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[ARGREFSIZE:.+]] = call_opaque "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: call_opaque "memset"(%[[ARGREFPTR]], %[[ARGREFSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> ()
+    // CHECK-NEXT: call_opaque "iree_vm_ref_assign"(%arg3, %[[ARGREFPTR]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> ()
+
+    // Allocate ref variable for result.
+    // CHECK-NEXT: %[[RESREF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[RESREFPTR:.+]] = apply "&"(%[[RESREF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[RESREFSIZE:.+]] = call_opaque "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: call_opaque "memset"(%[[RESREFPTR]], %[[RESREFSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> ()
+
+    // Call the import.
+    // CHECK-NEXT: %{{.+}} = call @my_module_call_[[YIELDABLEFN]](%arg0, %[[IMPORT]], %[[ARGREFPTR]], %[[RESREFPTR]])
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
+    // CHECK-SAME:        !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>)
+    // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
+
+    // Branch to dispatch block, then move ref to block arg and branch to successor.
+    // CHECK: cf.br ^[[DISPATCH:.+]]
+    // CHECK: ^[[DISPATCH]]:
+    // CHECK: call_opaque "iree_vm_ref_move"
+    // CHECK: cf.br ^bb3
+    vm.call.yieldable @yieldable_ref_fn(%arg0) : (!vm.ref<?>) -> ^resume(!vm.ref<?>)
+  ^resume(%result : !vm.ref<?>):
+    // CHECK: return
+    vm.return %result : !vm.ref<?>
+  }
+}
