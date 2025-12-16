@@ -258,6 +258,47 @@ struct EncodingCastableOpPropagationInterfaceHelper {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// EncodingDimReificationInterface external models
+//===----------------------------------------------------------------------===//
+
+/// External model for tensor::CastOp to implement
+/// EncodingDimReificationInterface. tensor.cast preserves encoding dims from
+/// its source.
+struct TensorCastEncodingDimModel
+    : public IREE::Encoding::EncodingDimReificationInterface::ExternalModel<
+          TensorCastEncodingDimModel, tensor::CastOp> {
+
+  FailureOr<Value> reifyEncodingDim(Operation *op, OpBuilder &builder,
+                                    unsigned resultIndex,
+                                    unsigned dimIndex) const {
+    // tensor.cast is a pass-through - we don't directly provide values.
+    return failure();
+  }
+
+  Value getEncodingDimSource(Operation *op, unsigned resultIndex) const {
+    auto castOp = cast<tensor::CastOp>(op);
+
+    // Only result index 0 is valid for tensor.cast.
+    if (resultIndex != 0) {
+      return {};
+    }
+
+    // Check that the cast preserves the encoding.
+    auto srcType = dyn_cast<RankedTensorType>(castOp.getSource().getType());
+    auto dstType = dyn_cast<RankedTensorType>(castOp.getType());
+    if (!srcType || !dstType) {
+      return {};
+    }
+
+    if (srcType.getEncoding() != dstType.getEncoding()) {
+      return {};
+    }
+
+    return castOp.getSource();
+  }
+};
+
 } // namespace
 
 void registerEncodingExternalModels(DialectRegistry &registry) {
@@ -272,6 +313,7 @@ void registerEncodingExternalModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, mlir::tensor::TensorDialect *dialect) {
         EncodingCastableOpPropagationInterfaceHelper<
             tensor::CollapseShapeOp, tensor::CastOp>::registerOpInterface(ctx);
+        tensor::CastOp::attachInterface<TensorCastEncodingDimModel>(*ctx);
       });
   registry.addExtension(
       +[](MLIRContext *ctx, mlir::linalg::LinalgDialect *dialect) {
