@@ -341,22 +341,22 @@ getVectorDistributeReductionConfig(
   ArrayAttr threadBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
 
-  SmallVector<NamedAttribute> configAttrsList;
-  configAttrsList.emplace_back("workgroup",
-                               b.getI64ArrayAttr(workgroupTileSizes));
-  configAttrsList.emplace_back("partial_reduction",
-                               b.getI64ArrayAttr(partialReductionTileSizes));
-  configAttrsList.emplace_back("thread", b.getI64ArrayAttr(threadTileSizes));
-  configAttrsList.emplace_back("lane_basis", threadBasisAttr);
-  configAttrsList.emplace_back("subgroup_basis", subgroupBasisAttr);
+  SmallVector<NamedAttribute> configAttrs = {
+      b.getNamedAttr("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      b.getNamedAttr("partial_reduction",
+                     b.getI64ArrayAttr(partialReductionTileSizes)),
+      b.getNamedAttr("thread", b.getI64ArrayAttr(threadTileSizes)),
+      b.getNamedAttr("lane_basis", threadBasisAttr),
+      b.getNamedAttr("subgroup_basis", subgroupBasisAttr),
+  };
 
   if (!reassociations.empty()) {
     auto dimExpandAttr =
         DimensionExpansionAttr::get(context, reassociations, outputShape);
-    setDimensionExpansion(context, configAttrsList, dimExpandAttr);
+    setDimensionExpansion(context, configAttrs, dimExpandAttr);
   }
 
-  auto configDict = b.getDictionaryAttr(configAttrsList);
+  auto configDict = b.getDictionaryAttr(configAttrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
   return loweringConfig;
 }
