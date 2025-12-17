@@ -16,6 +16,9 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-decompose-map-scatter"
@@ -143,7 +146,7 @@ struct VectorizationResult {
   /// The vectorized mask values for conditional stores.
   Value maskVector;
   /// The flattened 1D output buffer.
-  Value flatOutputBuffer;
+  Value flatOutput;
 };
 
 /// Vectorize the index computation and mask evaluation for a `map_scatter` op.
@@ -161,11 +164,25 @@ performIndexAndMaskVectorization(MapScatterOp mapScatterOp,
   Location loc = mapScatterOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(mapScatterOp);
-  SmallVector<OpFoldResult> outputSizes =
-      memref::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
+  Value flatOutput;
   SmallVector<Value> strides;
-  Value flatOutputBuffer = createFlatOutputBuffer(
-      rewriter, loc, mapScatterOp.getOutput(), outputSizes, strides);
+  SmallVector<OpFoldResult> outputSizes;
+  if (mapScatterOp.hasPureBufferSemantics()) {
+    outputSizes =
+        memref::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
+    flatOutput = createFlatOutputBuffer(rewriter, loc, mapScatterOp.getOutput(),
+                                        outputSizes, strides);
+  } else {
+    // For tensor outputs, create a flat output buffer as an empty tensor.
+    outputSizes =
+        tensor::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
+    auto outputType = cast<TensorType>(mapScatterOp.getOutputType());
+    SmallVector<ReassociationIndices> reassociations;
+    reassociations.push_back(
+        llvm::to_vector(llvm::seq<int64_t>(outputType.getRank())));
+    flatOutput = tensor::CollapseShapeOp::create(
+        rewriter, loc, mapScatterOp.getOutput(), reassociations);
+  }
   auto inputType = cast<VectorType>(mapScatterOp.getInputType());
   auto bodyBuilder = [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
     auto inlineBodyBuilder = [&](OpBuilder inlineBuilder, Location inlineLoc,
@@ -258,7 +275,7 @@ performIndexAndMaskVectorization(MapScatterOp mapScatterOp,
   rewriter.eraseOp(indexWriteOp);
   rewriter.eraseOp(maskWriteOp);
   rewriter.eraseOp(genericOp);
-  return VectorizationResult{indexVector, maskVector, flatOutputBuffer};
+  return VectorizationResult{indexVector, maskVector, flatOutput};
 }
 
 /// Decompose the `map_scatter` into a sequence of `vector.extract` and
@@ -275,7 +292,7 @@ static LogicalResult decomposeToLoadStore(MapScatterOp mapScatterOp,
   }
   Value indexVector = vectorizationResult->indexVector;
   Value maskVector = vectorizationResult->maskVector;
-  Value flatOutputBuffer = vectorizationResult->flatOutputBuffer;
+  Value flatOutputBuffer = vectorizationResult->flatOutput;
 
   // Flatten all the index and mask vectors, since the scatter op lowering
   // expects 1D vectors.
@@ -335,7 +352,7 @@ static LogicalResult decomposeToScatter(MapScatterOp mapScatterOp,
   }
   Value indexVector = vectorizationResult->indexVector;
   Value maskVector = vectorizationResult->maskVector;
-  Value flatOutputBuffer = vectorizationResult->flatOutputBuffer;
+  Value flatOutput = vectorizationResult->flatOutput;
 
   // Flatten all the vectors, since the scatter op lowering expects 1D vectors.
   auto inputType = cast<VectorType>(mapScatterOp.getInputType());
@@ -356,10 +373,25 @@ static LogicalResult decomposeToScatter(MapScatterOp mapScatterOp,
 
   SmallVector<Value> offsets = {
       arith::ConstantIndexOp::create(rewriter, loc, 0)};
-  SmallVector<Value> operands = {flatOutputBuffer, offsets[0], indexVector,
+  SmallVector<Value> operands = {flatOutput, offsets[0], indexVector,
                                  maskVector, inputVector};
-  rewriter.replaceOpWithNewOp<vector::ScatterOp>(
-      mapScatterOp, /*resultTypes=*/TypeRange{}, operands);
+
+  if (mapScatterOp.hasPureBufferSemantics()) {
+    rewriter.replaceOpWithNewOp<vector::ScatterOp>(
+        mapScatterOp, /*resultTypes=*/TypeRange{}, operands);
+    return success();
+  }
+
+  // For tensor outputs, expand the result back to the original shape.
+  auto scatterOp =
+      vector::ScatterOp::create(rewriter, loc, flatOutput.getType(), operands);
+  SmallVector<ReassociationIndices> reassociations;
+  reassociations.push_back(llvm::to_vector(
+      llvm::seq<int64_t>(mapScatterOp.getOutputType().getRank())));
+  auto expandOp =
+      tensor::ExpandShapeOp::create(rewriter, loc, mapScatterOp.getOutputType(),
+                                    scatterOp.getResult(), reassociations);
+  rewriter.replaceOp(mapScatterOp, expandOp.getResult());
   return success();
 }
 
@@ -388,7 +420,8 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
   const bool isMaskForwardSlice = maskOp && slice.contains(maskOp);
   const bool isUnitFunctionOfInnermostInputIdx =
       isUnitFunctionOf(innermostOutputIdx, innermostInputIdx);
-  if (!isMaskForwardSlice && isUnitFunctionOfInnermostInputIdx) {
+  if (!isMaskForwardSlice && isUnitFunctionOfInnermostInputIdx &&
+      mapScatterOp.hasPureBufferSemantics()) {
     return decomposeToLoadStore(mapScatterOp, rewriter);
   }
   // In case of a sub-byte map_scatter that hasn't been decomposed into a
@@ -431,11 +464,9 @@ struct DecomposeMapScatterPass final
     // Decomposition is only supported for map_scatter ops that are both
     // vectorized and bufferized. Bufferization is a requirement because
     // vector.scatter only takes memref destinations.
-    // TODO(#21135): Allow tensor outputs when vector.scatter supports tensor
-    // destinations.
     SmallVector<MapScatterOp> candidates;
     funcOp->walk([&](MapScatterOp op) {
-      if (isa<VectorType>(op.getInputType()) && op.hasPureBufferSemantics()) {
+      if (isa<VectorType>(op.getInputType())) {
         candidates.push_back(op);
       }
     });
