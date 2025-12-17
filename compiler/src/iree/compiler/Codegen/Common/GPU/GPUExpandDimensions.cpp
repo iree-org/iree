@@ -40,6 +40,9 @@ struct GPUExpandDimensionsPass final
 };
 } // namespace
 
+// Compute the expanded shape for a reassociation group. Requires the original
+// dimension to be static and evenly divisible by the product of static factors
+// in the target shape.
 static FailureOr<SmallVector<OpFoldResult>> computeExpandedGroupShape(
     RewriterBase &rewriter, Location loc, OpFoldResult origDimSize,
     ArrayRef<int64_t> groupTargetShape, unsigned iteratorDim) {
@@ -81,6 +84,32 @@ static FailureOr<SmallVector<OpFoldResult>> computeExpandedGroupShape(
       });
 }
 
+// For an operation annotated with the `expand_dims` attribute, replace relevant
+// operands with tensor.expand_shape/tensor.collapse_shape pair to materialize
+// dimension expansion according to the reassociation and output_shape defined
+// in the attribute.
+//
+// Example:
+//
+// ```mlir
+// %0 = <some_op>(..., %0, ...) {
+//   lowering_config = #iree_gpu.lowering_config<{
+//     expand_dims = #iree_gpu.expand_dims
+//       [[0], [1, 2]], output_shape = [?, ?, 8]>
+//   }>
+// } : ... -> tensor<4x128xf32>
+// ```
+//
+// becomes:
+//
+// ```mlir
+// %expanded = tensor.expand_shape %0 [[0], [1, 2]]
+//     : tensor<4x128xf32> into tensor<4x16x8xf32>
+// %barrier = util.optimization_barrier %expanded
+// %collapsed = tensor.collapse_shape %barrier [[0], [1, 2]]
+//     : tensor<4x16x8xf32> into tensor<4x128xf32>
+// %1 = <some_op>(..., %collapsed, ...) : ... -> tensor<4x128xf32>
+// ```
 static std::optional<ReshapeOps>
 createDimensionExpansionOps(RewriterBase &rewriter,
                             IREE::GPU::DimensionExpansionAttr config, Value v,
