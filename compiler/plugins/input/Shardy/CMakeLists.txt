@@ -1,8 +1,13 @@
-# Copyright 2024 The IREE Authors
+# Copyright 2025 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Shardy depends on StableHLO
+if(NOT IREE_INPUT_STABLEHLO)
+  message(FATAL_ERROR "IREE_INPUT_SHARDY requires IREE_INPUT_STABLEHLO to be enabled")
+endif()
 
 iree_add_all_subdirs()
 

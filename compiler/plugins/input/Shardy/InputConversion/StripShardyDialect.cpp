@@ -1,10 +1,11 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "compiler/plugins/input/Shardy/InputConversion/Passes.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -52,16 +53,27 @@ struct StripShardyDialectPass
       signalPassFailure();
     }
 
-    // Remove any remaining sdy ops by replacing with their operands
-    module.walk([](Operation *op) {
+    // Collect sdy ops to remove (can't erase during walk - iterator invalidation)
+    SmallVector<Operation *> sdyOpsToErase;
+    module.walk([&](Operation *op) {
       if (op->getDialect() && op->getDialect()->getNamespace() == "sdy") {
-        // For single-result ops, replace with operand
         if (op->getNumResults() == 1 && op->getNumOperands() >= 1) {
-          op->getResult(0).replaceAllUsesWith(op->getOperand(0));
-          op->erase();
+          sdyOpsToErase.push_back(op);
+        } else if (op->getNumResults() > 0 || op->getNumOperands() > 0) {
+          // Warn about unexpected patterns we can't handle
+          op->emitWarning() << "Unexpected Shardy op pattern (results="
+                            << op->getNumResults()
+                            << ", operands=" << op->getNumOperands()
+                            << ") - may not be fully stripped";
         }
       }
     });
+
+    // Erase in reverse order to handle nested ops correctly
+    for (Operation *op : llvm::reverse(sdyOpsToErase)) {
+      op->getResult(0).replaceAllUsesWith(op->getOperand(0));
+      op->erase();
+    }
   }
 };
 

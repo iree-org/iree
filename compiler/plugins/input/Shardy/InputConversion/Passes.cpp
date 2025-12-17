@@ -1,4 +1,4 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -16,7 +16,9 @@ void buildShardyInputConversionPassPipeline(OpPassManager &passManager) {
 }
 
 void registerShardyInputConversionPasses() {
-  // Individual passes registered here
+  registerPass([]() -> std::unique_ptr<Pass> {
+    return createStripShardyDialectPass();
+  });
 }
 
 } // namespace mlir::iree_compiler::shardy
