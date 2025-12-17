@@ -44,7 +44,7 @@ func.func @expand_multiple_dims(%a: tensor<4x16384xf16>, %b: tensor<4x16384xf16>
   %result = linalg.add {
     lowering_config = #iree_gpu.lowering_config<{
       expand_dims = #iree_gpu.expand_dims<[[0], [1, 2, 3]], output_shape = [?, ?, 2, 4]>
-    }>} 
+    }>}
     ins(%a, %b : tensor<4x16384xf16>, tensor<4x16384xf16>) outs(%empty : tensor<4x16384xf16>) -> tensor<4x16384xf16>
   return %result : tensor<4x16384xf16>
 }
@@ -63,7 +63,7 @@ func.func @no_expand_dynamic_dims(%a: tensor<4x?xf16>, %b: tensor<4x?xf16>) -> t
   %result = linalg.add {
     lowering_config = #iree_gpu.lowering_config<{
       expand_dims = #iree_gpu.expand_dims<[[0], [1, 2]], output_shape = [?, ?, 8]>
-    }>} 
+    }>}
     ins(%a, %b : tensor<4x?xf16>, tensor<4x?xf16>) outs(%empty : tensor<4x128xf16>) -> tensor<4x128xf16>
   return %result : tensor<4x128xf16>
 }
@@ -81,7 +81,7 @@ func.func @no_expand_not_divisible(%a: tensor<4x127xf16>, %b: tensor<4x127xf16>)
   %result = linalg.add {
     lowering_config = #iree_gpu.lowering_config<{
       expand_dims = #iree_gpu.expand_dims<[[0], [1, 2]], output_shape = [?, ?, 8]>
-    }>} 
+    }>}
     ins(%a, %b : tensor<4x127xf16>, tensor<4x127xf16>) outs(%empty : tensor<4x127xf16>) -> tensor<4x127xf16>
   return %result : tensor<4x127xf16>
 }
