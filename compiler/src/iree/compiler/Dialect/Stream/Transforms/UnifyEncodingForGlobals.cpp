@@ -83,7 +83,7 @@ struct SourceTraceResult {
   std::string getSourceKey() {
     if (parameterAttr) {
       std::string key;
-      if (auto scope = parameterAttr.getScope()) {
+      if (StringAttr scope = parameterAttr.getScope()) {
         key = scope.str() + "::";
       }
       key += parameterAttr.getKey().str();
@@ -135,13 +135,13 @@ public:
   // Returns all source keys that have multiple distinct encodings.
   SmallVector<StringRef> getSourcesWithMultipleEncodings() const {
     SmallVector<StringRef> result;
-    for (const auto &entry : sourceGlobals) {
+    for (const auto &[name, info] : sourceGlobals) {
       llvm::SmallDenseSet<Attribute, 4> uniqueEncodings;
-      for (const EncodedGlobalInfo &encoded : entry.second.encodedVersions) {
+      for (const EncodedGlobalInfo &encoded : info.encodedVersions) {
         uniqueEncodings.insert(encoded.encodingAttr);
       }
       if (uniqueEncodings.size() > 1) {
-        result.push_back(entry.first());
+        result.push_back(name);
       }
     }
     return result;
@@ -317,7 +317,7 @@ bool GlobalEncodingAnalyzer::hasRecognizedEncoding(Type type) const {
 LogicalResult GlobalEncodingAnalyzer::collectGlobalEncodings() {
   LDBG() << "--- collectGlobalEncodings ---";
   // Walk all initializers to find encoding patterns:
-  //   %source = util.global.load @source_global  (or stream.tensor.constant)
+  //   %source = util.global.load @source_global (or stream.tensor.constant)
   //   %encoded = stream.tensor.encode %source ...
   //   util.global.store %encoded, @encoded_global
   for (auto initOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
