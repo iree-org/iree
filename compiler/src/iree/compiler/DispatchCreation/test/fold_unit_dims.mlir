@@ -347,6 +347,21 @@ util.func @collapse_of_expand_preserved_trailing_unit_dims(%arg0: tensor<1x23040
 
 // -----
 
+// This test considers the case where we have no shape at all on the source for the expand,
+// but still need one unit dim for the output.
+util.func @collapse_of_expand_no_source_shape(%arg0: tensor<f32>) -> tensor<1xf32> {
+  %expanded = tensor.expand_shape %arg0 [] output_shape[1, 1] : tensor<f32> into tensor<1x1xf32>
+  %collapsed = tensor.collapse_shape %expanded [[0, 1]] : tensor<1x1xf32> into tensor<1xf32>
+  util.return %collapsed : tensor<1xf32>
+}
+// CHECK-LABEL:   util.func public @collapse_of_expand_no_source_shape
+// CHECK-SAME:      %[[ARG0:.+]]: tensor<f32>
+// CHECK:           %[[EXPAND:.*]] = tensor.expand_shape %[[ARG0]]
+// CHECK-SAME:        tensor<f32> into tensor<1xf32>
+// CHECK:           util.return %[[EXPAND]] : tensor<1xf32>
+
+// -----
+
 util.func @fold_unit_dims_from_extract_leading(%arg0: tensor<1x4x8xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
   %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<1x4x8xf32>
   util.return %extracted : f32
