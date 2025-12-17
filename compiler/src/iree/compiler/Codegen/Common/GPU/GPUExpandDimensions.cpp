@@ -40,34 +40,34 @@ struct GPUExpandDimensionsPass final
 };
 } // namespace
 
-static FailureOr<SmallVector<OpFoldResult>>
-computeExpandedGroupShape(RewriterBase &rewriter, Location loc,
-                          OpFoldResult origDimSize,
-                          ArrayRef<int64_t> groupTargetShape,
-                          unsigned iteratorDim, linalg::LinalgOp op) {
+static FailureOr<SmallVector<OpFoldResult>> computeExpandedGroupShape(
+    RewriterBase &rewriter, Location loc, OpFoldResult origDimSize,
+    ArrayRef<int64_t> groupTargetShape, unsigned iteratorDim) {
   if (groupTargetShape.size() == 1) {
     return SmallVector<OpFoldResult>{origDimSize};
   }
 
   std::optional<int64_t> staticOrigDim = getConstantIntValue(origDimSize);
   if (!staticOrigDim) {
-    return op.emitOpError("dimension ")
-           << iteratorDim
-           << " is dynamic, but expand_dims requires static dimensions";
+    return rewriter.notifyMatchFailure(
+        loc, "dimension " + Twine(iteratorDim) +
+                 " is dynamic, but expand_dims requires static dimensions");
   }
 
   int64_t staticFactor = llvm::product_of(
       llvm::make_filter_range(groupTargetShape, ShapedType::isStatic));
 
   if (staticFactor < 1) {
-    return op.emitOpError("invalid expansion factor ")
-           << staticFactor << " for iterator dimension " << iteratorDim;
+    return rewriter.notifyMatchFailure(
+        loc, "invalid expansion factor " + Twine(staticFactor) +
+                 " for iterator dimension " + Twine(iteratorDim));
   }
 
   if (staticOrigDim.value() % staticFactor != 0) {
-    return op.emitOpError("dimension ")
-           << iteratorDim << " (size=" << staticOrigDim.value()
-           << ") not divisible by expansion factor " << staticFactor;
+    return rewriter.notifyMatchFailure(
+        loc, "dimension " + Twine(iteratorDim) +
+                 " (size=" + Twine(staticOrigDim.value()) +
+                 ") not divisible by expansion factor " + Twine(staticFactor));
   }
 
   return llvm::map_to_vector(
@@ -109,9 +109,8 @@ createDimensionExpansionOps(RewriterBase &rewriter,
     auto groupOutputShape = llvm::map_to_vector(
         reassocIndices, [&](int64_t i) { return outputShape[i]; });
 
-    FailureOr<SmallVector<OpFoldResult>> groupShape =
-        computeExpandedGroupShape(rewriter, loc, origShape[tensorDim.value()],
-                                  groupOutputShape, iterDim, op);
+    FailureOr<SmallVector<OpFoldResult>> groupShape = computeExpandedGroupShape(
+        rewriter, loc, origShape[tensorDim.value()], groupOutputShape, iterDim);
     if (failed(groupShape)) {
       return std::nullopt;
     }
@@ -122,7 +121,6 @@ createDimensionExpansionOps(RewriterBase &rewriter,
   // Build reassociation indices and expanded shape in tensor dimension order.
   SmallVector<ReassociationIndices> reassociation;
   SmallVector<OpFoldResult> expandedShape;
-
   for (auto [tensorDim, expanded] : llvm::enumerate(expandedShapes)) {
     ReassociationIndices &indices = reassociation.emplace_back();
     auto addDim = [&](OpFoldResult dim) {
@@ -172,10 +170,8 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
 
   LDBG() << "Expanding dimensions for op: " << *op;
 
-  SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
-
   for (OpOperand &operand : op->getOpOperands()) {
-    AffineMap indexingMap = indexingMaps[operand.getOperandNumber()];
+    AffineMap indexingMap = op.getMatchingIndexingMap(&operand);
     std::optional<ReshapeOps> reshapes = createDimensionExpansionOps(
         rewriter, config, operand.get(), indexingMap, op);
     if (reshapes.has_value()) {
@@ -187,21 +183,13 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
   return success();
 }
 
-static LogicalResult expandIterationSpace(RewriterBase &rewriter,
-                                          Operation *operation) {
-  if (auto op = dyn_cast<linalg::LinalgOp>(operation)) {
-    return expandIterationSpace(rewriter, op);
-  }
-  return success();
-}
-
 void GPUExpandDimensionsPass::runOnOperation() {
   Operation *operation = getOperation();
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
 
-  SmallVector<Operation *> worklist;
-  operation->walk([&](Operation *op) {
+  SmallVector<linalg::LinalgOp> worklist;
+  operation->walk([&](linalg::LinalgOp op) {
     if (auto cfg = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op)) {
       if (IREE::GPU::getDimensionExpansion(cfg)) {
         worklist.push_back(op);
@@ -209,7 +197,7 @@ void GPUExpandDimensionsPass::runOnOperation() {
     }
   });
 
-  for (Operation *op : worklist) {
+  for (linalg::LinalgOp op : worklist) {
     rewriter.setInsertionPoint(op);
     if (failed(expandIterationSpace(rewriter, op))) {
       return signalPassFailure();
