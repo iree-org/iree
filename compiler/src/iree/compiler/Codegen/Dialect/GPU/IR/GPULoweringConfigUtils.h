@@ -65,11 +65,6 @@ std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config,
 /// Helper to retrieve dimension expansion config from lowering config.
 DimensionExpansionAttr getDimensionExpansion(LoweringConfigAttr config);
 
-/// Helper to set dimension expansion config when building lowering config.
-void setDimensionExpansion(MLIRContext *context,
-                           SmallVectorImpl<NamedAttribute> &attrs,
-                           DimensionExpansionAttr dimExpansion);
-
 } // namespace mlir::iree_compiler::IREE::GPU
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_GPULOWERINGCONFIGUTILS_H_

@@ -353,7 +353,8 @@ getVectorDistributeReductionConfig(
   if (!reassociations.empty()) {
     auto dimExpandAttr =
         DimensionExpansionAttr::get(context, reassociations, outputShape);
-    setDimensionExpansion(context, configAttrs, dimExpandAttr);
+    configAttrs.emplace_back(
+        b.getNamedAttr("dimension_expansion", dimExpandAttr));
   }
 
   auto configDict = b.getDictionaryAttr(configAttrs);

@@ -158,10 +158,4 @@ DimensionExpansionAttr getDimensionExpansion(LoweringConfigAttr config) {
       kDimensionExpansionName);
 }
 
-void setDimensionExpansion(MLIRContext *context,
-                           SmallVectorImpl<NamedAttribute> &attrs,
-                           DimensionExpansionAttr dimExpansion) {
-  attrs.emplace_back(kDimensionExpansionName, dimExpansion);
-}
-
 } // namespace mlir::iree_compiler::IREE::GPU
