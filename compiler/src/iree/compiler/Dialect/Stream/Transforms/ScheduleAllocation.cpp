@@ -2082,6 +2082,85 @@ static LogicalResult convertAsyncStoreOp(IREE::Stream::AsyncStoreOp asyncOp) {
   return success();
 }
 
+static LogicalResult
+convertAsyncParameterLoadOp(IREE::Stream::AsyncParameterLoadOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  SmallVector<Type> resultTypes = {asyncOp.getResult().getType()};
+  SmallVector<Value> resultSizes = {asyncOp.getResultSize()};
+  SmallVector<StringRef> sourceKeys = {asyncOp.getSourceKey()};
+  SmallVector<Value> sourceOffsets = {asyncOp.getSourceOffset()};
+  auto cmdOp = IREE::Stream::CmdParameterLoadOp::create(
+      builder, asyncOp.getLoc(), resultTypes,
+      builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSourceScopeAttr(), builder.getStrArrayAttr(sourceKeys),
+      sourceOffsets, resultSizes, asyncOp.getAwaitTimepoint(),
+      asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(cmdOp.getResults()[0]);
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterReadOp(IREE::Stream::AsyncParameterReadOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  auto cmdOp = IREE::Stream::CmdParameterReadOp::create(
+      builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSourceScopeAttr(), asyncOp.getSourceKeyAttr(),
+      asyncOp.getSourceOffset(), asyncOp.getTarget(), asyncOp.getTargetSize(),
+      asyncOp.getTargetOffset(), asyncOp.getTargetLength(),
+      asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(asyncOp.getTarget());
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterWriteOp(IREE::Stream::AsyncParameterWriteOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  auto cmdOp = IREE::Stream::CmdParameterWriteOp::create(
+      builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSource(), asyncOp.getSourceSize(), asyncOp.getSourceOffset(),
+      asyncOp.getSourceLength(), asyncOp.getTargetScopeAttr(),
+      asyncOp.getTargetKeyAttr(), asyncOp.getTargetOffset(),
+      asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(asyncOp.getSource());
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterGatherOp(IREE::Stream::AsyncParameterGatherOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  auto cmdOp = IREE::Stream::CmdParameterGatherOp::create(
+      builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSourceScopeAttr(), asyncOp.getSourceKeysAttr(),
+      asyncOp.getSourceOffsets(), asyncOp.getTarget(), asyncOp.getTargetSize(),
+      asyncOp.getTargetOffsets(), asyncOp.getTargetLengths(),
+      asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(asyncOp.getTarget());
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterScatterOp(IREE::Stream::AsyncParameterScatterOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  auto cmdOp = IREE::Stream::CmdParameterScatterOp::create(
+      builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSource(), asyncOp.getSourceSize(), asyncOp.getSourceOffsets(),
+      asyncOp.getSourceLengths(), asyncOp.getTargetScopeAttr(),
+      asyncOp.getTargetKeysAttr(), asyncOp.getTargetOffsets(),
+      asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(asyncOp.getSource());
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // --iree-stream-schedule-allocation
 //===----------------------------------------------------------------------===//
@@ -2123,6 +2202,21 @@ struct ScheduleAllocationPass
                        })
                        .Case([&](IREE::Stream::AsyncStoreOp op) {
                          return convertAsyncStoreOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterLoadOp op) {
+                         return convertAsyncParameterLoadOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterReadOp op) {
+                         return convertAsyncParameterReadOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterWriteOp op) {
+                         return convertAsyncParameterWriteOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterGatherOp op) {
+                         return convertAsyncParameterGatherOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterScatterOp op) {
+                         return convertAsyncParameterScatterOp(op);
                        })
                        .Default(success()))) {
           return signalPassFailure();
