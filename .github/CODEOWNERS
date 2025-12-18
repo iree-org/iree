@@ -52,6 +52,7 @@
 
 # Tests
 /tests/external/iree-test-suites @Groverkss @MaheshRavishankar @kuhar
+/tests/e2e @bjacob
 
 # Compiler
 /compiler/src/iree/compiler/ @benvanik
