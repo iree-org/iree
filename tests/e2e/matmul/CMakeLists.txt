@@ -1142,9 +1142,31 @@ iree_generated_e2e_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
+### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# To distinguish between CDNA(gfx9), RDNA3(gfx11), and RDNA4(gfx12)
+if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
+
+unset(IREE_HIP_TEST_COMPILER_FLAGS)
+list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
+  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+)
+
+if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94")
+  set(_CDNA_ARCH "cdna3")
+  set(_F8E4M3_TYPE "f8E4M3FNUZ")
+  set(_F8E5M2_TYPE "f8E5M2FNUZ")
+elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx95")
+  set(_CDNA_ARCH "cdna4")
+  set(_F8E4M3_TYPE "f8E4M3FN")
+  set(_F8E5M2_TYPE "f8E5M2")
+endif()
+
+if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94" OR IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx95")
+
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_coalesced_dma_f32
+    e2e_matmul_${_CDNA_ARCH}_coalesced_dma_f32
   TEST_TYPE
     matmul
   GENERATOR
@@ -1161,19 +1183,19 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "hip"
   COMPILER_FLAGS
-    "--iree-hip-target=gfx942"
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-llvmgpu-use-direct-load"
   LABELS
     "noasan"
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-cdna3"
+    "requires-gpu-${_CDNA_ARCH}"
 )
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_coalesced_dma_f32_larger
+    e2e_matmul_${_CDNA_ARCH}_coalesced_dma_f32_larger
   TEST_TYPE
     matmul
   GENERATOR
@@ -1190,19 +1212,19 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "hip"
   COMPILER_FLAGS
-    "--iree-hip-target=gfx942"
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-llvmgpu-use-direct-load"
   LABELS
     "noasan"
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-cdna3"
+    "requires-gpu-${_CDNA_ARCH}"
 )
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_coalesced_dma_f32_multi_transfer
+    e2e_matmul_${_CDNA_ARCH}_coalesced_dma_f32_multi_transfer
   TEST_TYPE
     matmul
   GENERATOR
@@ -1219,19 +1241,19 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "hip"
   COMPILER_FLAGS
-    "--iree-hip-target=gfx942"
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-llvmgpu-use-direct-load"
   LABELS
     "noasan"
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-cdna3"
+    "requires-gpu-${_CDNA_ARCH}"
 )
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_coalesced_dma_f32_large
+    e2e_matmul_${_CDNA_ARCH}_coalesced_dma_f32_large
   TEST_TYPE
     matmul
   GENERATOR
@@ -1248,29 +1270,19 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "hip"
   COMPILER_FLAGS
-    "--iree-hip-target=gfx942"
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-llvmgpu-use-direct-load"
   LABELS
     "noasan"
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-cdna3"
-)
-
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-# To distinguish between CDNA(gfx9), RDNA3(gfx11), and RDNA4(gfx12)
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
-
-unset(IREE_HIP_TEST_COMPILER_FLAGS)
-list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+    "requires-gpu-${_CDNA_ARCH}"
 )
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_vecdistmfma_f16
+    e2e_matmul_${_CDNA_ARCH}_vecdistmfma_f16
   TEST_TYPE
     matmul
   GENERATOR
@@ -1293,12 +1305,12 @@ iree_generated_e2e_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-cdna3"
+    "requires-gpu-${_CDNA_ARCH}"
 )
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_vecdistmfma_f32
+    e2e_matmul_${_CDNA_ARCH}_vecdistmfma_f32
   TEST_TYPE
     matmul
   GENERATOR
@@ -1321,12 +1333,12 @@ iree_generated_e2e_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-cdna3"
+    "requires-gpu-${_CDNA_ARCH}"
 )
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_vecdistmfma_tb_f16
+    e2e_matmul_${_CDNA_ARCH}_vecdistmfma_tb_f16
   TEST_TYPE
     matmul
   GENERATOR
@@ -1350,20 +1362,8 @@ iree_generated_e2e_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-cdna3"
+    "requires-gpu-${_CDNA_ARCH}"
 )
-
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94")
-  set(_CDNA_ARCH "cdna3")
-  set(_F8E4M3_TYPE "f8E4M3FNUZ")
-  set(_F8E5M2_TYPE "f8E5M2FNUZ")
-elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx95")
-  set(_CDNA_ARCH "cdna4")
-  set(_F8E4M3_TYPE "f8E4M3FN")
-  set(_F8E5M2_TYPE "f8E5M2")
-endif()
-
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94" OR IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx95")
 
 iree_generated_e2e_runner_test(
   NAME
