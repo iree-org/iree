@@ -146,14 +146,9 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   }
 
   // Unify encodings for globals, which ensures that we don't increase memory
-  // footprint significantly, unless the program explicitly requires it. Then it
-  // folds the duplicate globals away.
+  // footprint significantly, unless the program explicitly requires it.
   if (clUnifyEncodingForGlobals) {
     passManager.addPass(IREE::Stream::createUnifyEncodingForGlobalsPass());
-    OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
-    buildStreamCleanupPassPipeline(ipoPipeline, transformOptions);
-    passManager.addPass(
-        IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
   }
 
   //----------------------------------------------------------------------------
