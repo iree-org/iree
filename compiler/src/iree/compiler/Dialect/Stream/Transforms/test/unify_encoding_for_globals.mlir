@@ -681,3 +681,55 @@ module @same_encoding_twice_no_unification {
     util.return
   }
 }
+
+// -----
+
+// The constant is created via stream.tensor.constant with NamedParameterAttr
+// and directly encoded without being stored to a source global first.
+// Should unify based on the parameter name as the source key.
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
+#device_target_local = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding2 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<789>]>
+
+//       CHECK:   util.global private @[[$DEVICE_A:.+]] =
+util.global private @device_a = #device_target_local
+util.global private @weight : !stream.resource<constant>
+util.global private @encoded_v1 : !stream.resource<constant>
+util.global private @encoded_v2 : !stream.resource<constant>
+
+// CHECK: util.initializer
+util.initializer {
+  // The constant is created with parameter attribute, not loaded from a global.
+  // CHECK: %[[CST:.+]] = stream.tensor.constant
+  %cst = stream.tensor.constant on(#hal.device.affinity<@device_a>) : tensor<4096x4096xf32> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight"> : tensor<4096x4096xf32>
+  %cst_size = stream.resource.size %cst : !stream.resource<constant>
+
+  util.global.store %cst, @weight : !stream.resource<constant>
+
+  // CHECK: %[[SOURCE:.+]] = util.global.load @weight
+  %weight = util.global.load @weight : !stream.resource<constant>
+
+  // One source is from global load, and the other is from the constant directly.
+  // The unification happens based on the parameter name.
+  // Note that this is not common if a full global cleanup is performed, since
+  // the source will be `stream.tensor.constant` directly. It is mostly for
+  // demonstrating that the unification prioritizes parameter names.
+
+  // Should unify to specialized<123> from the resolver.
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding1> : index
+  %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %weight : tensor<4096x4096xf32> in !stream.resource<constant>{%cst_size} -> tensor<4096x4096xf32, #encoding1> in !stream.resource<constant>{%size1}
+  util.global.store %enc1, @encoded_v1 : !stream.resource<constant>
+
+  // Should also unify to specialized<123>.
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[CST]] : {{.*}} -> tensor<4096x4096xf32, #iree_encoding.specialized<123>>
+  %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf32, #encoding2> : index
+  %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %cst : tensor<4096x4096xf32> in !stream.resource<constant>{%cst_size} -> tensor<4096x4096xf32, #encoding2> in !stream.resource<constant>{%size2}
+  util.global.store %enc2, @encoded_v2 : !stream.resource<constant>
+
+  util.return
+}
