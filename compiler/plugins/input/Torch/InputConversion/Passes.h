@@ -23,7 +23,8 @@ struct BackendLegalOps {
   static const llvm::SmallVector<std::string> get() {
     return {"aten.flatten.using_ints",  "aten.unflatten.int",
             "aten.adaptive_avg_pool1d", "aten.adaptive_avg_pool2d",
-            "aten.adaptive_max_pool1d", "aten.fft_rfft"};
+            "aten.adaptive_max_pool1d", "aten.fft_rfft",
+            "aten.convolution_backward"};
   };
 };
 
