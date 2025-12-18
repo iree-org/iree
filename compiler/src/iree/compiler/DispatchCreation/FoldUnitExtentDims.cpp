@@ -256,6 +256,159 @@ struct FoldUnitDimsFromExtractOp : OpRewritePattern<tensor::ExtractOp> {
   }
 };
 
+// Fold unit dims from `tensor.extract_slice` ops by inserting a collapse_shape
+// on the input tensor.
+//
+// Example:
+// ```
+// %slice = tensor.extract_slice %src[%i, 0, %j, 0, %k]
+//                                    [%si, 1, %sj, 1, %sk]
+//                                    [1, 1, 1, 1, 1]
+//   : tensor<10x1x20x1x30xf32> to tensor<?x1x?x1x?xf32>
+// ```
+// becomes:
+// ```
+// %collapsed = tensor.collapse_shape %src [[0], [1, 2], [3, 4]]
+//   : tensor<10x1x20x1x30xf32> into tensor<10x20x30xf32>
+// %slice = tensor.extract_slice %collapsed[%i, %j, %k]
+//                                          [%si, %sj, %sk]
+//                                          [1, 1, 1]
+//   : tensor<10x20x30xf32> to tensor<?x?x?xf32>
+// ```
+struct FoldUnitDimsFromExtractSliceOp
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    RankedTensorType srcType = sliceOp.getSourceType();
+    if (srcType.getShape().empty() ||
+        llvm::none_of(srcType.getShape(),
+                      [](int64_t size) { return size == 1; })) {
+      return failure();
+    }
+
+    // Get original offsets, sizes, and strides
+    SmallVector<OpFoldResult> oldOffsets = sliceOp.getMixedOffsets();
+    SmallVector<OpFoldResult> oldSizes = sliceOp.getMixedSizes();
+    SmallVector<OpFoldResult> oldStrides = sliceOp.getMixedStrides();
+
+    // Build new shape and reassociation indices
+    SmallVector<int64_t> newShape;
+    SmallVector<OpFoldResult> newOffsets, newSizes, newStrides;
+    SmallVector<ReassociationIndices> reassoc;
+    ReassociationIndices currReassoc;
+
+    // Track which result dimensions are kept (for rank-reducing slices)
+    llvm::SmallBitVector droppedDims = sliceOp.getDroppedDims();
+    SmallVector<int64_t> newResultShape;
+    SmallVector<OpFoldResult> resultSizes; // Track sizes for result dimensions
+    int64_t resultDimIdx = 0;
+
+    // Build reassociation groups where each non-unit dimension forms one output
+    // dimension, and unit dimensions are grouped with adjacent non-unit dims.
+    for (auto [idx, size] : llvm::enumerate(srcType.getShape())) {
+      currReassoc.push_back(idx);
+
+      if (size != 1) {
+        // Non-unit dimension: this forms one output dimension
+        reassoc.push_back(std::move(currReassoc));
+        currReassoc.clear();
+        newShape.push_back(size);
+        newOffsets.push_back(oldOffsets[idx]);
+        newSizes.push_back(oldSizes[idx]);
+        newStrides.push_back(oldStrides[idx]);
+
+        // Determine if this dimension is kept in the result
+        if (!droppedDims.test(idx)) {
+          // This dimension is in the result, get its size
+          auto resultType = sliceOp.getType();
+          if (resultDimIdx < resultType.getRank()) {
+            newResultShape.push_back(resultType.getShape()[resultDimIdx]);
+            resultSizes.push_back(oldSizes[idx]);
+          }
+          resultDimIdx++;
+        }
+      }
+      // Unit dimensions are skipped in the collapsed tensor
+    }
+
+    // If we have trailing unit dims, merge them with the last group
+    if (!currReassoc.empty() && !reassoc.empty()) {
+      reassoc.back().append(currReassoc.begin(), currReassoc.end());
+    }
+
+    // If no unit dims were found, nothing to do
+    if (newShape.size() == srcType.getRank()) {
+      return failure();
+    }
+
+    // Create collapsed source tensor
+    rewriter.setInsertionPointAfterValue(sliceOp.getSource());
+    Value collapsedSrc = tensor::CollapseShapeOp::create(
+        rewriter, sliceOp.getLoc(), sliceOp.getSource(), reassoc);
+
+    // Create new extract_slice on the collapsed tensor (without unit dims)
+    RankedTensorType newResultType = RankedTensorType::get(
+        newResultShape, srcType.getElementType(), srcType.getEncoding());
+
+    rewriter.setInsertionPoint(sliceOp);
+    Value newSlice = tensor::ExtractSliceOp::create(
+        rewriter, sliceOp.getLoc(), newResultType, collapsedSrc, newOffsets,
+        newSizes, newStrides);
+
+    // If the original result had unit dimensions, expand them back
+    RankedTensorType originalResultType = sliceOp.getType();
+    if (originalResultType.getRank() != newResultType.getRank()) {
+      // Build reassociation for expanding back to original result shape
+      // Map from collapsed result dims back to original result dims
+      SmallVector<ReassociationIndices> resultReassoc;
+      ReassociationIndices currResultReassoc;
+
+      for (auto [idx, size] : llvm::enumerate(originalResultType.getShape())) {
+        currResultReassoc.push_back(idx);
+
+        if (size != 1) {
+          // Non-unit dimension in result
+          resultReassoc.push_back(std::move(currResultReassoc));
+          currResultReassoc.clear();
+        }
+      }
+
+      // Handle trailing unit dims
+      if (!currResultReassoc.empty() && !resultReassoc.empty()) {
+        resultReassoc.back().append(currResultReassoc.begin(),
+                                    currResultReassoc.end());
+      }
+
+      // Build output shape for expand_shape
+      SmallVector<OpFoldResult> outputShape;
+      int64_t nonUnitIdx = 0;
+      for (auto [resultIdx, size] :
+           llvm::enumerate(originalResultType.getShape())) {
+        if (size == 1) {
+          // Unit dimension - use constant 1
+          outputShape.push_back(rewriter.getIndexAttr(1));
+        } else {
+          // Non-unit dimension - use the size from resultSizes
+          if (nonUnitIdx < resultSizes.size()) {
+            outputShape.push_back(resultSizes[nonUnitIdx]);
+            nonUnitIdx++;
+          }
+        }
+      }
+
+      Value expandedSlice = tensor::ExpandShapeOp::create(
+          rewriter, sliceOp.getLoc(), originalResultType, newSlice,
+          resultReassoc, outputShape);
+      rewriter.replaceOp(sliceOp, expandedSlice);
+    } else {
+      rewriter.replaceOp(sliceOp, newSlice);
+    }
+
+    return success();
+  }
+};
+
 } // namespace
 
 static void
@@ -279,7 +432,8 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
                                                       options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
   foldUnitDimsPatterns
-      .insert<DropUnitDimsFromCollapseOfExpand, FoldUnitDimsFromExtractOp>(
+      .insert<DropUnitDimsFromCollapseOfExpand, FoldUnitDimsFromExtractOp,
+              FoldUnitDimsFromExtractSliceOp>(
           foldUnitDimsPatterns.getContext());
 }
 
