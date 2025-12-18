@@ -24,24 +24,63 @@ util.func public @tensorBitCastCastProducer(%arg0: tensor<10x3x6xi8>, %arg1: ind
 
 // -----
 
-// CHECK-LABEL: @barrierStartFoldDuplicate
-util.func public @barrierStartFoldDuplicate(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+// CHECK-LABEL: @barrierFoldDuplicate
+util.func public @barrierFoldDuplicate(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
   // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]
-  %0 = iree_tensor_ext.compute_barrier.start %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
-  // CHECK-NEXT: %[[BARRIER:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
-  %1 = iree_tensor_ext.compute_barrier.start %0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  %0 = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: %[[BARRIER:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %1 = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %0 : tensor<4x8xf32> -> tensor<4x8xf32>
   // CHECK-NEXT: util.return %[[BARRIER]]
   util.return %1 : tensor<4x8xf32>
 }
 
 // -----
 
-// CHECK-LABEL: @barrierEndFoldDuplicate
-util.func public @barrierEndFoldDuplicate(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+// CHECK-LABEL: @barrierNoFoldDifferentDirection
+util.func public @barrierNoFoldDifferentDirection(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
   // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]
-  %0 = iree_tensor_ext.compute_barrier.end %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
-  // CHECK-NEXT: %[[BARRIER:.+]] = iree_tensor_ext.compute_barrier.end %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
-  %1 = iree_tensor_ext.compute_barrier.end %0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: %[[BARRIER0:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %0 = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: %[[BARRIER1:.+]] = iree_tensor_ext.compute_barrier<down, "AllowExpand|AllowCollapse"> %[[BARRIER0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %1 = iree_tensor_ext.compute_barrier<down, "AllowExpand|AllowCollapse"> %0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: util.return %[[BARRIER1]]
+  util.return %1 : tensor<4x8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @barrierNoFoldDifferentFlags
+util.func public @barrierNoFoldDifferentFlags(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+  // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]
+  // CHECK-NEXT: %[[BARRIER0:.+]] = iree_tensor_ext.compute_barrier<up, AllowExpand> %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %0 = iree_tensor_ext.compute_barrier<up, "AllowExpand"> %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: %[[BARRIER1:.+]] = iree_tensor_ext.compute_barrier<up, AllowCollapse> %[[BARRIER0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %1 = iree_tensor_ext.compute_barrier<up, "AllowCollapse"> %0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: util.return %[[BARRIER1]]
+  util.return %1 : tensor<4x8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @barrierNoFoldDifferentFlagCombination
+util.func public @barrierNoFoldDifferentFlagCombination(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+  // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]
+  // CHECK-NEXT: %[[BARRIER0:.+]] = iree_tensor_ext.compute_barrier<up, AllowExpand> %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %0 = iree_tensor_ext.compute_barrier<up, "AllowExpand"> %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: %[[BARRIER1:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[BARRIER0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %1 = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: util.return %[[BARRIER1]]
+  util.return %1 : tensor<4x8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @barrierFoldSameDirectionAndFlagsDown
+util.func public @barrierFoldSameDirectionAndFlagsDown(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
+  // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]
+  %0 = iree_tensor_ext.compute_barrier<down, "AllowExpand"> %arg0 : tensor<4x8xf32> -> tensor<4x8xf32>
+  // CHECK-NEXT: %[[BARRIER:.+]] = iree_tensor_ext.compute_barrier<down, AllowExpand> %[[ARG0]] : tensor<4x8xf32> -> tensor<4x8xf32>
+  %1 = iree_tensor_ext.compute_barrier<down, "AllowExpand"> %0 : tensor<4x8xf32> -> tensor<4x8xf32>
   // CHECK-NEXT: util.return %[[BARRIER]]
   util.return %1 : tensor<4x8xf32>
 }

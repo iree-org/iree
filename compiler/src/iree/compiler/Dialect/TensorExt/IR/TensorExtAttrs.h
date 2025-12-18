@@ -9,6 +9,9 @@
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrInterfaces.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
+
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtEnums.h.inc"
 
 // clang-format off
 #define GET_ATTRDEF_CLASSES
