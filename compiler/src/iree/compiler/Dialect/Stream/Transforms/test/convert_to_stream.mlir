@@ -32,7 +32,7 @@ util.func public @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attrib
   // CHECK: hal.buffer_view.assert<%arg0 : !hal.buffer_view> message("tensor") shape([%0, %c4]) type(%[[ELEMENT_TYPE]]) encoding(%[[ENCODING_TYPE]])
   // CHECK: %[[ARG0_SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]} : index
   // CHECK: %[[ARG0_IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[ARG0_SIZE]]}
-  // CHECK: %[[ARG0_T:.+]] = stream.async.transfer %[[ARG0_IMPORT]] : !stream.resource<external>{%[[ARG0_SIZE]]} -> !stream.resource<*>{%[[ARG0_SIZE]]}
+  // CHECK: %[[ARG0_T:.+]] = stream.async.cast %[[ARG0_IMPORT]] : !stream.resource<external>{%[[ARG0_SIZE]]} -> !stream.resource<*>{%[[ARG0_SIZE]]}
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%dim0}
 
   %c1 = arith.constant 1 : index
@@ -41,7 +41,7 @@ util.func public @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attrib
   // CHECK: %[[RET0:.+]] = stream.tensor.dispatch @executable::@dispatch[%c2, %c1, %c1](%[[ARG0_T]]) : (tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<*>{%[[ARG0_SIZE]]}) -> tensor<?xf32>{%[[DIM0]]} in !stream.resource<*>{%[[RET0_SIZE]]}
   %1 = flow.dispatch @executable::@dispatch[%c2, %c1, %c1](%0) : (tensor<?x4xf32>{%dim0}) -> tensor<?xf32>{%dim0}
 
-  // CHECK: %[[RET0_T:.+]] = stream.async.transfer %[[RET0]] : !stream.resource<*>{%[[RET0_SIZE]]} -> !stream.resource<external>{%[[RET0_SIZE]]}
+  // CHECK: %[[RET0_T:.+]] = stream.async.cast %[[RET0]] : !stream.resource<*>{%[[RET0_SIZE]]} -> !stream.resource<external>{%[[RET0_SIZE]]}
   // CHECK: %[[RET0_EXPORT:.+]] = stream.tensor.export %[[RET0_T]] : tensor<?xf32>{%[[DIM0]]} in !stream.resource<external>{%[[RET0_SIZE]]} -> !hal.buffer_view
   %2 = hal.tensor.export %1 : tensor<?xf32>{%dim0} -> !hal.buffer_view
   // CHECK: util.return %[[RET0_EXPORT]] : !hal.buffer_view
