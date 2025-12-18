@@ -589,6 +589,11 @@ def IREEBufferizeConstantsPass :
   let summary = "Convert from arith.constant on tensors to buffers";
 }
 
+def IREECodegenAffineExpandIndexOpsPass :
+    Pass<"iree-codegen-affine-expand-index-ops", ""> {
+  let summary = "Expand affine index ops with region simplification config";
+}
+
 def IREECodegenCanonicalizerPass :
     Pass<"iree-codegen-canonicalize", ""> {
   let summary = "Codegen canonicalization pass with IREE specific patterns";
@@ -596,6 +601,16 @@ def IREECodegenCanonicalizerPass :
     Option<"testConvergence", "test-convergence", "bool",
            /*default=*/"false", "Fails if the patterns fail to converge">
   ];
+}
+
+def IREECodegenFoldMemRefAliasOpsPass :
+    Pass<"iree-codegen-fold-memref-alias-ops", ""> {
+  let summary = "Fold memref alias ops with region simplification config";
+}
+
+def IREECodegenLowerAffinePass :
+    Pass<"iree-codegen-lower-affine", ""> {
+  let summary = "Lower affine operations to standard with region simplification config";
 }
 
 def IREEComprehensiveBufferizePass :

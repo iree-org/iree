@@ -315,7 +315,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   // Post bufferization optimizations.
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
@@ -597,7 +597,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass(prefetchOpts));
   }
 
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   {
@@ -642,7 +642,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   // Post bufferization optimizations.
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
@@ -857,7 +857,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
     funcPassManager.addPass(createGPUReuseSharedMemoryAllocsPass());
   }
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -927,7 +927,7 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       // since some of the following patterns have trouble dealing with their
       // full complexity.
       .addPass(createVectorTransferLoweringPass)
-      .addPass(memref::createFoldMemRefAliasOpsPass)
+      .addPass(createIREECodegenFoldMemRefAliasOpsPass)
       // Propagate constants close to loads/stores to improve the ability for
       // swizzling to CSE.
       .addPass(createPropagateConstantOffsetsPass)
@@ -950,8 +950,8 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createCSEPass)
       // Hoist the resulting decompositions.
       .addPass(createIREELoopInvariantCodeMotionPass)
-      .addPass(affine::createAffineExpandIndexOpsPass)
-      .addPass(createLowerAffinePass)
+      .addPass(createIREECodegenAffineExpandIndexOpsPass)
+      .addPass(createIREECodegenLowerAffinePass)
       .addPass([]() {
         return IREE::Util::createOptimizeIntArithmeticPass(
             IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true});
@@ -1031,7 +1031,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
-      .addPass(memref::createFoldMemRefAliasOpsPass)
+      .addPass(createIREECodegenFoldMemRefAliasOpsPass)
       .addPass([]() {
         IREEExpandStridedMetadataPassOptions options;
         options.allowSubviewExpansion = true;
@@ -1039,8 +1039,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       })
       .addPass(forROCDL ? createAMDGPUEmulateNarrowTypePass
                         : createEmulateNarrowTypePass)
-      .addPass(affine::createAffineExpandIndexOpsPass)
-      .addPass(createLowerAffinePass);
+      .addPass(createIREECodegenAffineExpandIndexOpsPass)
+      .addPass(createIREECodegenLowerAffinePass);
 
   if (!preserveDebugInfo) {
     modulePassManager.addPass(createStripDebugInfoPass());
@@ -1201,7 +1201,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager,
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
   variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
-  variantPassManager.addPass(createLowerAffinePass());
+  variantPassManager.addPass(createIREECodegenLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
       IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
