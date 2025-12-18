@@ -320,9 +320,9 @@ builtin.module {
   }
 }
 
-// CHECK-DAG: llvm.mlir.global private @__shared_memory___1() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<16 x array<32 x f32>>>
+// CHECK-DAG: llvm.mlir.global private @__shared_memory___1() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<8 x array<16 x f32>>>
 // CHECK-DAG: llvm.mlir.global private @__shared_memory___0() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<32 x array<16 x f32>>>
-// CHECK-DAG: llvm.mlir.global private @__shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<8 x array<16 x f32>>>
+// CHECK-DAG: llvm.mlir.global private @__shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<16 x array<32 x f32>>>
 // CHECK-LABEL: llvm.func @shared_memory_lowering() {
 //   CHECK-DAG: %[[A1:.+]] = llvm.mlir.addressof @__shared_memory___1
 //   CHECK-DAG: llvm.getelementptr %[[A1]][0, 0, 0, 0]
