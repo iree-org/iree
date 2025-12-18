@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iree-utils"
+version = "0.1.0"
+description = "IREE developer utilities for lit testing and CI triage"
+requires-python = ">=3.10"
+dependencies = [
+    # Required by LLVM's lit test framework (third_party/llvm-project/llvm/utils/lit/):
+    # - psutil: Used by lit.util.killProcessAndChildren() to terminate timed-out
+    #   tests and their child processes. Only needed when maxIndividualTestTime > 0
+    #   (iree-lit-test uses --timeout 60 by default). Without psutil, lit will error
+    #   if a timeout is set. See lit/LitConfig.py:maxIndividualTestTimeIsSupported.
+    "psutil",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "black",
+]
+
+[tool.setuptools.packages.find]
+include = ["common*", "lit_tools*", "ci*", "triage_common*", "scripts*"]
+
+# Enable preview mode for latest Ruff rules
+[tool.ruff]
+preview = true
+
+[tool.ruff.lint]
+# Enable specific rule sets for code quality
+# Base rules from pre-commit (E=pycodestyle errors, F=pyflakes, I=isort, B=flake8-bugbear, UP=pyupgrade)
+# Additional quality rules for maintainability
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes (undefined names, unused imports, etc.)
+    "I",     # isort (import sorting)
+    "B",     # flake8-bugbear (common bugs and design problems)
+    "BLE",   # flake8-blind-except (no bare except Exception)
+    "UP",    # pyupgrade (modern Python idioms)
+    "C90",   # mccabe complexity - catches overly complex functions
+    "ANN",   # flake8-annotations - enforces type hints
+    "D",     # pydocstyle - docstring conventions
+    "TCH",   # flake8-type-checking - optimize type checking imports
+    "RET",   # flake8-return - simplify return statements
+    "SIM",   # flake8-simplify - suggest code simplifications
+    "PLC0415",  # import-outside-toplevel (no inline imports in impl/scripts)
+    "RUF100",   # unused-noqa (clean up unused noqa comments)
+    "TID252",   # relative-imports (enforce absolute imports)
+    "T201",     # print found (use logging instead)
+]
+
+ignore = [
+    "E501",  # line-too-long (black handles this)
+    "ANN101",  # missing-type-self (self type is always obvious)
+    "ANN102",  # missing-type-cls (cls type is always obvious)
+    "ANN202",  # missing-return-type-private-function (private functions don't need public API docs)
+    "ANN401",  # any-type (sometimes Any is the right choice)
+]
+
+# Complexity threshold - functions exceeding this trigger C901
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+# Docstring style configuration
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+# Per-file rule exceptions
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["ANN", "D", "BLE001"]  # Relax type hints and docstrings for tests, but enforce import placement
+"**/test/**/*.py" = ["ANN", "D", "BLE001"]  # Relax for test directory files, but enforce import placement
+"scripts/*.py" = ["T201"]  # Allow print in CLI scripts
+"lit_tools/core/lit_wrapper.py" = ["PLC0415"]  # Allow inline imports (from pre-commit config)
+"lit.cfg.py" = ["E", "F", "I", "B", "UP"]  # Exclude lit config files (from pre-commit)
+# No exceptions for complexity - if it's complex, refactor it!
