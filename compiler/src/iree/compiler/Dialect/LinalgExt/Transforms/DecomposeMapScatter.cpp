@@ -395,8 +395,8 @@ static LogicalResult decomposeToScatter(MapScatterOp mapScatterOp,
   return success();
 }
 
-/// Decompose an `iree_linalg_ext.map_scatter` op with vector input and memref
-/// output. This is the main dispatch function that analyzes the `map_scatter`
+/// Decompose an `iree_linalg_ext.map_scatter` op with vector input.
+/// This is the main dispatch function that analyzes the `map_scatter`
 /// operation and chooses the most appropriate decomposition strategy.
 ///
 /// Decomposition strategies (in order of preference):
@@ -461,9 +461,7 @@ struct DecomposeMapScatterPass final
       return;
     }
 
-    // Decomposition is only supported for map_scatter ops that are both
-    // vectorized and bufferized. Bufferization is a requirement because
-    // vector.scatter only takes memref destinations.
+    // Decomposition is only supported for map_scatter ops that are vectorized.
     SmallVector<MapScatterOp> candidates;
     funcOp->walk([&](MapScatterOp op) {
       if (isa<VectorType>(op.getInputType())) {
