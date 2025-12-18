@@ -302,6 +302,117 @@ static VectorValue extractSliceAsVector(RewriterBase &rewriter, Location loc,
 
 namespace {
 
+struct DistributeTransferReadWithSingleRead final
+    : OpDistributionPattern<vector::TransferReadOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeTransferReadWithSingleRead(MLIRContext *context, Value threadId,
+                                       int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[readOp.getResult()]);
+    if (!vectorLayout) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "non-nested transfer_read layout");
+    }
+
+    if (readOp.getMask()) {
+      // TODO: Decide whether we can handle masks.
+      return rewriter.notifyMatchFailure(readOp, "masks not supported");
+    }
+    // Guard on memrefs for distribution. In isolation this pattern is agnostic
+    // to tensors or memrefs.
+    auto memrefTy = dyn_cast<MemRefType>(readOp.getBase().getType());
+    if (!memrefTy) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "distribution expects memrefs");
+    }
+
+    auto printShape = [](llvm::SmallVectorImpl<int64_t> &shape) {
+      llvm::interleaveComma(shape, llvm::dbgs());
+      llvm::dbgs() << "\n";
+    };
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    printShape(distShape);
+    auto shape = vectorLayout.getUndistributedPackedShape();
+    printShape(shape);
+    auto shape2 = vectorLayout.getPackedShapeForUndistributedDim(0);
+    printShape(shape2);
+    auto shape3 = vectorLayout.getPackedShapeForUndistributedDim(1);
+    printShape(shape3);
+    // llvm::product_of
+
+    // We require the memref to be static in the last `rank` dimensions.
+    int64_t rank = vectorLayout.getRank();
+    int64_t memRank = memrefTy.getRank();
+    for (int64_t i = memRank - rank; i < memRank; ++i) {
+      if (memrefTy.isDynamicDim(i)) {
+        return rewriter.notifyMatchFailure(readOp,
+                                           "memref type has dynamic shape");
+      }
+    }
+    // TODO: Zero-distribution signals that no distribution happens in that
+    // dimension. Handle that. Also, handle permutations.
+    SmallVector<int64_t> expandedMemShape;
+    SmallVector<OpFoldResult> outputShapes;
+    SmallVector<ReassociationIndices> reassociation;
+    Location loc = readOp->getLoc();
+    expandedMemShape.reserve(distShape.size() + memRank);
+    // TODO: Do we also need to put the static sizes into `outputShapes`?
+    for (int i = 0; i < memRank; ++i) {
+      if (i < memRank - rank) {
+        expandedMemShape.push_back(memrefTy.getDimSize(i));
+        if (memrefTy.isDynamicDim(i)) {
+          Value constIndex = arith::ConstantIndexOp::create(rewriter, loc, i);
+          outputShapes.push_back(
+              memref::DimOp::create(rewriter, loc, readOp.getBase(), constIndex)
+                  ->getResult(0));
+        }
+        reassociation.push_back({i});
+        continue;
+      }
+      int64_t vecDim = i - (memRank - rank);
+      int64_t divider = llvm::product_of(
+          vectorLayout.getPackedShapeForUndistributedDim(vecDim));
+      expandedMemShape.push_back(memrefTy.getDimSize(i) / divider);
+      ReassociationIndices reassoc;
+      reassoc.reserve(rank + 1);
+      for (int idx = 0; idx < 6; ++idx) {
+        reassoc.push_back(i + idx * rank);
+      }
+      reassociation.push_back(reassoc);
+    }
+    expandedMemShape.append(vectorLayout.getUndistributedPackedShape());
+    printShape(expandedMemShape);
+    for (auto &r : reassociation) {
+      printShape(r);
+    }
+    auto expandedMemTy =
+        MemRefType::get(expandedMemShape, memrefTy.getElementType());
+    expandedMemTy.dump();
+    auto expandedMem = memref::ExpandShapeOp::create(
+        rewriter, loc, expandedMemTy, readOp.getBase(), reassociation,
+        outputShapes);
+    expandedMem->dump();
+    // TODO: Next steps:
+    //       - Delinearize the original index for the dimensions that are
+    //       reassociated
+    //       - Construct permutation map that only keeps the dimensions relevant
+    //       for the vector loaded
+    //       - Insert transfer read that actually loads the vector.
+    //       - Think about permutations and masks.
+    return failure();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
+
 /// Pattern to distribute `vector.transfer_read` ops with nested layouts.
 struct DistributeTransferRead final
     : OpDistributionPattern<vector::TransferReadOp> {
@@ -342,8 +453,14 @@ struct DistributeTransferRead final
                                          "distribution expects memrefs");
     }
 
+    auto printShape = [](SmallVector<int64_t> &shape) {
+      llvm::interleaveComma(shape, llvm::dbgs());
+      llvm::dbgs() << "\n";
+    };
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    printShape(distShape);
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    printShape(tileShape);
     int64_t rank = vectorLayout.getRank();
 
     Type elementType = readOp.getBase().getType().getElementType();
@@ -2208,9 +2325,9 @@ struct DistributeConstantMask final
 void populateGPUDistributeNestedLayoutAttrPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferRead, DistributeTransferGather,
-               DistributeMapScatter>(patterns.getContext(), threadId,
-                                     subgroupSize);
+  patterns.add<DistributeTransferReadWithSingleRead, DistributeTransferRead,
+               DistributeTransferGather, DistributeMapScatter>(
+      patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
