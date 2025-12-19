@@ -6,6 +6,7 @@
 
 #include "iree/compiler/DispatchCreation/Passes.h"
 
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -27,124 +28,6 @@ namespace mlir::iree_compiler::DispatchCreation {
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 namespace {
-
-/// WAR (Workaround): Pattern to fold extract_slice(broadcast) into the
-/// broadcast input when the extract_slice is rank-reducing and only extracts
-/// along the broadcasted dimensions (with size 1), leaving all non-broadcasted
-/// dimensions intact. This is valid because the broadcast only duplicates data
-/// along the broadcasted dimension, and extracting a single slice from that
-/// dimension gives back the original input.
-///
-/// TODO(Bangtian): Investigate and fix the root cause of the race condition in
-/// the lower levels of the stack to eliminate the need for this fold pattern
-/// workaround.
-///
-/// This fold masks an underlying race condition in the lower levels of the
-/// stack. When the broadcast's outs operand comes from extracting
-/// a slice of a shared_outs tensor in scf.forall, the broadcast operation
-/// writes to that extracted slice, which aliases back to the shared tensor.
-/// Since the extracted slice spans parallel dimensions (e.g., [4, 1, 1] where
-/// dim 0 is the batch dimension), multiple parallel workgroups would all write
-/// to the same aliased memory location, creating a race condition. By folding
-/// to the broadcast input (which doesn't alias the shared tensor), this pattern
-/// works around the race, allowing subsequent passes to properly tile and
-/// distribute the initialization per workgroup. However, the root cause of the
-/// race condition exists deeper in the stack and is not addressed by this fold.
-///
-/// Example:
-///   %broadcast = linalg.broadcast ins(%in : tensor<4x1xf16>)
-///                                 outs(%out : tensor<4x1x1xf16>) dimensions =
-///                                 [2]
-///   %extract = tensor.extract_slice %broadcast[0, 0, 0] [4, 1, 1] [1, 1, 1]
-///              : tensor<4x1x1xf16> to tensor<4x1xf16>
-///   // Extracts all of dims 0,1 (sizes 4,1) and reduces dim 2 (size 1).
-/// ->
-///   %extract is replaced by %in (tensor<4x1xf16>)
-struct FoldExtractSliceOfBroadcast final
-    : OpRewritePattern<tensor::ExtractSliceOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
-                                PatternRewriter &rewriter) const override {
-    auto broadcastOp =
-        extractOp.getSource().getDefiningOp<linalg::BroadcastOp>();
-    if (!broadcastOp) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "source is not a linalg.broadcast operation");
-    }
-
-    if (!extractOp.hasUnitStride()) {
-      return rewriter.notifyMatchFailure(extractOp,
-                                         "extract_slice has non-unit stride");
-    }
-
-    auto inputType =
-        dyn_cast<RankedTensorType>(broadcastOp.getInput().getType());
-    auto broadcastOutputType =
-        dyn_cast<RankedTensorType>(broadcastOp.getInit().getType());
-    auto extractResultType =
-        dyn_cast<RankedTensorType>(extractOp.getResult().getType());
-    if (!inputType || !broadcastOutputType || !extractResultType) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "operand or result types are not RankedTensorType");
-    }
-
-    // Extract result type must match broadcast input type.
-    if (inputType != extractResultType) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "extract result type does not match broadcast input type");
-    }
-
-    // Verify that we're extracting from offset [0, 0, ..., 0] with the same
-    // shape as the input (essentially undoing the broadcast).
-    SmallVector<OpFoldResult> offsets = extractOp.getMixedOffsets();
-    SmallVector<OpFoldResult> sizes = extractOp.getMixedSizes();
-    if (llvm::any_of(offsets, [](OpFoldResult offset) {
-          return !isConstantIntValue(offset, 0);
-        })) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "extract_slice offsets are not all zeros");
-    }
-
-    // Sizes should match input dimensions (accounting for broadcast dims).
-    ArrayRef<int64_t> broadcastDims = broadcastOp.getDimensions();
-    int64_t broadcastRank = broadcastOutputType.getRank();
-
-    // Verify that for broadcast dimensions, the size is 1.
-    if (llvm::any_of(broadcastDims, [&](int64_t broadcastDim) {
-          return !isOneInteger(sizes[broadcastDim]);
-        })) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "broadcast dimensions do not all have size 1");
-    }
-
-    // Collect the indices of dimensions in the broadcast output that were not
-    // broadcasted (i.e., dimensions that existed in the original input).
-    auto nonBroadcastDims = llvm::to_vector(llvm::make_filter_range(
-        llvm::seq<int64_t>(0, broadcastRank),
-        [&](int64_t i) { return !llvm::is_contained(broadcastDims, i); }));
-
-    // Verify that for non-broadcast dimensions, sizes match input shape.
-    if (llvm::any_of(llvm::enumerate(nonBroadcastDims), [&](auto pair) {
-          auto [idx, inputDim] = pair;
-          int64_t inputDimSize = inputType.getDimSize(idx);
-          return !isConstantIntValue(sizes[inputDim], inputDimSize);
-        })) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "non-broadcast dimension sizes do not match input shape");
-    }
-
-    // Only fold if broadcast has a single use to avoid leaving dead broadcast
-    // ops or breaking other uses that expect the broadcast result.
-    if (!broadcastOp->hasOneUse()) {
-      return rewriter.notifyMatchFailure(
-          extractOp, "broadcast operation has multiple uses");
-    }
-
-    rewriter.replaceOp(extractOp, broadcastOp.getInput());
-    return success();
-  }
-};
 
 struct FormSplitReductionDispatchesPass final
     : public impl::FormSplitReductionDispatchesPassBase<
@@ -325,7 +208,7 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
   RewritePatternSet patterns(context);
   linalg::populateSwapExtractSliceWithFillPatterns(patterns);
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-  patterns.add<FoldExtractSliceOfBroadcast>(context);
+  populateFoldExtractSliceOfBroadcastPattern(patterns);
   GreedyRewriteConfig config;
   config.setMaxIterations(GreedyRewriteConfig::kNoLimit).enableFolding(true);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
