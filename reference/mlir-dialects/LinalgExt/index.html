@@ -5771,9 +5771,10 @@ the scale to use.</p>
   - <code>pmax</code> is the value from the previous iteration.
   - <code>nmax</code> is the new maximum, read from the current element from the input
     tensor</p>
+<p>The other input operands are unaffected.</p>
 <p>The operands listed in <code>exp_reduced_operands</code> will be multiplied by <code>norm</code>
-  before executing the basic block.</p>
-<p>For example,</p>
+  before executing the basic block. Other output operands are unaffected.</p>
+<p>For example, we write the online normalized softmax algorithm as follows:</p>
 <p><code>mlir
   // compute the exponentials and the sum
   %M, %O = iree_linalg_ext.exp_reduction {
@@ -5785,7 +5786,7 @@ the scale to use.</p>
     iterator_types = [
       #iree_linalg_ext.iterator_type&lt;reduction&gt;
     ],
-    exp_reduced_operands = [ 1 ]
+    exp_reduced_operands = [ 1 ]  // 1 corresponds to %s being normalized by %m
   } ins(%V: tensor&lt;256xf32&gt;)
     outs(%M_init, %S: tensor&lt;f32&gt;, tensor&lt;f32&gt;) {
     ^bb0(%exp_v: f32, %m: f32, %s: f32):
@@ -5794,34 +5795,28 @@ the scale to use.</p>
       %add = arith.addf %exp_v, %s : f32
       linalg.yield %m, %add        : f32, f32
   } -&gt; tensor&lt;f32&gt;, tensor&lt;f32&gt;</code></p>
-<p>Encodes the following computation</p>
+<p>This encodes the following computation, sans handling of the norms</p>
 <div class="highlight"><pre><span></span><code>%M, %O = linalg.generic {
-  indexing_maps = [
-    affine_map&lt;(i) -&gt; (i)&gt;,
-    affine_map&lt;(i) -&gt; ()&gt;,
-    affine_map&lt;(i) -&gt; ()&gt;
-  ],
-  iterator_types = [
-    &quot;reduction&quot;
-  ],
+    indexing_maps = [
+      affine_map&lt;(i) -&gt; (i)&gt;,
+      affine_map&lt;(i) -&gt; ()&gt;,
+      affine_map&lt;(i) -&gt; ()&gt;
+    ],
 } ins(%V: tensor&lt;256xf32&gt;)
   outs(%M_init, %S: tensor&lt;f32&gt;, tensor&lt;f32&gt;) {
   ^bb0(%v: f32, %m: f32, %s: f32):
     %exp_v = math.exp2 %v       : f32
-    %add = arith.addf %norm, %s : f32
+    %add = arith.addf %exp_v, %s : f32
     linalg.yield %m, %add       : f32, f32
-} -&gt; tensor&lt;256xf32&gt;, tensor&lt;f32&gt;
+} -&gt; tensor&lt;f32&gt;, tensor&lt;f32&gt;
 </code></pre></div>
-<p>And transforms it into operations equivalent to the following:</p>
+<p>And decomposes into operations equivalent to the following:</p>
 <div class="highlight"><pre><span></span><code>%M, %O = linalg.generic {
-  indexing_maps = [
-    affine_map&lt;(i) -&gt; (i)&gt;,
-    affine_map&lt;(i) -&gt; ()&gt;,
-    affine_map&lt;(i) -&gt; ()&gt;
-  ],
-  iterator_types = [
-    &quot;reduction&quot;
-  ],
+    indexing_maps = [
+      affine_map&lt;(i) -&gt; (i)&gt;,
+      affine_map&lt;(i) -&gt; ()&gt;,
+      affine_map&lt;(i) -&gt; ()&gt;
+    ],
 } ins(%V: tensor&lt;256xf32&gt;)
   outs(%M_init, %S: tensor&lt;f32&gt;, tensor&lt;f32&gt;) {
   ^bb0(%v: f32, %prev_m: f32, %prev_s: f32):
@@ -5833,10 +5828,10 @@ the scale to use.</p>
     %s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
     %add    = arith.addf %exp_v, %s      : f32
     linalg.yield %m, %add                : f32, f32
-} -&gt; tensor&lt;256xf32&gt;, tensor&lt;f32&gt;
+} -&gt; tensor&lt;f32&gt;, tensor&lt;f32&gt;
 </code></pre></div>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>IndexingMapOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>TilingInterface</code></p>
+<p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>IndexingMapOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
