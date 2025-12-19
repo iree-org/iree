@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -114,6 +115,7 @@ struct ROCDLConfigureBufferInstructionsPass final
 
     // Initialize the DataFlowSolver with IntegerRangeAnalysis.
     DataFlowSolver solver;
+    solver.load<dataflow::SparseConstantPropagation>();
     solver.load<dataflow::DeadCodeAnalysis>();
     solver.load<dataflow::IntegerRangeAnalysis>();
     if (failed(solver.initializeAndRun(funcOp))) {
