@@ -381,8 +381,7 @@ struct FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
     GreedyRewriteConfig config;
-    config.setUseTopDownTraversal().setRegionSimplificationLevel(
-        GreedySimplifyRegionLevel::Normal);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
 
     mlir::ModuleOp moduleOp = getOperation();
     GlobalTable globalTable(moduleOp);

@@ -32,8 +32,7 @@ public:
 
   void runOnOperation() override {
     GreedyRewriteConfig config;
-    config.setUseTopDownTraversal().setRegionSimplificationLevel(
-        GreedySimplifyRegionLevel::Normal);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
 
     RewritePatternSet patterns(&getContext());
     populateAffineToStdConversionPatterns(patterns);

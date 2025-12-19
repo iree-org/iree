@@ -636,8 +636,7 @@ LogicalResult emulateNarrowType(
   }
 
   GreedyRewriteConfig config;
-  config.setUseTopDownTraversal().setRegionSimplificationLevel(
-      GreedySimplifyRegionLevel::Normal);
+  config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
 
   RewritePatternSet sinkBroadcast(ctx);
   vector::populateSinkVectorOpsPatterns(sinkBroadcast);

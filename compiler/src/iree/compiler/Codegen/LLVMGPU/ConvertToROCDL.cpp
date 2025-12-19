@@ -227,8 +227,7 @@ struct ConvertToROCDLPass final
     // conversion pass.
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     GreedyRewriteConfig config;
-    config.setUseTopDownTraversal().setRegionSimplificationLevel(
-        GreedySimplifyRegionLevel::Normal);
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
 
     {
       RewritePatternSet patterns(&getContext());
