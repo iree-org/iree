@@ -27,6 +27,7 @@ constexpr char kUKernelInfoName[] = "ukernel_info";
 constexpr char kUKernelInfoTypesName[] = "types";
 constexpr char kUKernelInfoIterationSizesConstraintsName[] =
     "iteration_sizes_constraints";
+constexpr char kUKernelInfoArchsName[] = "archs";
 
 } // namespace mlir::iree_compiler::IREE::ROCM
 

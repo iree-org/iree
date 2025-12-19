@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "mlir-c/BuiltinAttributes.h"
@@ -318,5 +319,48 @@ ireeCodegenGetIGEMMGenericConvDetails(MlirOperation op) {
   }
   result.convToIgemmDimMap = wrap(builder.getArrayAttr(dimMapAttrs));
 
+  return result;
+}
+
+bool ireeCodegenMlirOperationIsAScaledContractionOp(MlirOperation op) {
+  auto linalgOp = llvm::cast<mlir::linalg::LinalgOp>(unwrap(op));
+  return mlir::iree_compiler::IREE::LinalgExt::isaScaledContractionOpInterface(
+      linalgOp);
+}
+
+ireeCodegenScaledContractionDimensions
+ireeCodegenInferScaledContractionDimensions(MlirOperation op) {
+  ireeCodegenScaledContractionDimensions result{};
+  auto linalgOp = llvm::dyn_cast<mlir::linalg::LinalgOp>(unwrap(op));
+  if (!linalgOp) {
+    return result;
+  }
+
+  llvm::FailureOr<
+      mlir::iree_compiler::IREE::LinalgExt::ScaledContractionDimensions>
+      maybeDims =
+          mlir::iree_compiler::IREE::LinalgExt::inferScaledContractionDims(
+              linalgOp);
+  if (failed(maybeDims)) {
+    return result;
+  }
+
+  const mlir::iree_compiler::IREE::LinalgExt::ScaledContractionDimensions
+      &scaledContractionDims = *maybeDims;
+  mlir::MLIRContext *ctx = linalgOp.getContext();
+  mlir::Builder b(ctx);
+  auto toAttr = [&b](llvm::ArrayRef<unsigned> vals) -> MlirAttribute {
+    llvm::SmallVector<mlir::Attribute, 2> attrs =
+        llvm::map_to_vector(vals, [&b](unsigned val) -> mlir::Attribute {
+          return b.getI32IntegerAttr(val);
+        });
+    return wrap(b.getArrayAttr(attrs));
+  };
+
+  result.batch = toAttr(scaledContractionDims.batch);
+  result.m = toAttr(scaledContractionDims.m);
+  result.n = toAttr(scaledContractionDims.n);
+  result.k = toAttr(scaledContractionDims.k);
+  result.kB = toAttr(scaledContractionDims.kB);
   return result;
 }

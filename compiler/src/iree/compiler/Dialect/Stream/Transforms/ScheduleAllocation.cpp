@@ -2047,14 +2047,16 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
     joinTimepoints.push_back(newExecuteOp.getResultTimepoint());
     auto fusedLoc = builder.getFusedLoc(llvm::map_to_vector(
         joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); }));
-    auto joinOp = IREE::Stream::TimepointJoinOp::create(
-        builder, fusedLoc, newExecuteOp.getResultTimepoint().getType(),
-        joinTimepoints);
-    executeTimepointUsers.insert(joinOp);
-    newExecuteOp.getResultTimepoint().replaceUsesWithIf(
-        joinOp.getResultTimepoint(), [&](OpOperand &operand) {
-          return !executeTimepointUsers.contains(operand.getOwner());
-        });
+    Value joinedTimepoint =
+        IREE::Stream::TimepointJoinOp::join(fusedLoc, joinTimepoints, builder);
+    // Only replace uses if a join was actually created (size > 1).
+    if (joinedTimepoint != newExecuteOp.getResultTimepoint()) {
+      executeTimepointUsers.insert(joinedTimepoint.getDefiningOp());
+      newExecuteOp.getResultTimepoint().replaceUsesWithIf(
+          joinedTimepoint, [&](OpOperand &operand) {
+            return !executeTimepointUsers.contains(operand.getOwner());
+          });
+    }
   }
 
   return success();

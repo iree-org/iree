@@ -11,6 +11,7 @@
 // - IREE::Encoding::SerializableAttr
 // - IREE::Encoding::LayoutMaterializerAttr
 // - IREE::Codegen::PackedLayoutMaterializerAttr
+// - VerifiableTensorEncoding
 //
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
@@ -42,6 +43,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/TensorEncoding.h"
 
 #include <cassert>
 #include <cfloat>
@@ -629,6 +631,19 @@ struct GPULayoutResolverAttr final
   }
 };
 
+struct GPUEncodingResolverVerifier
+    : mlir::VerifiableTensorEncoding::ExternalModel<GPUEncodingResolverVerifier,
+                                                    GPUEncodingResolverAttr> {
+  LogicalResult
+  verifyEncoding(Attribute attr, ArrayRef<int64_t> shape, Type elementType,
+                 function_ref<InFlightDiagnostic()> emitError) const {
+    auto packedLayoutMaterializerAttr =
+        cast<Codegen::PackedLayoutMaterializerAttr>(attr);
+    return packedLayoutMaterializerAttr.verifyPackedLayoutWithType(
+        shape, elementType, emitError);
+  }
+};
+
 // Returns the pad encoding layout, or nullptr if this is not the only layout or
 // if there's no encoding at all.
 static IREE::Encoding::PaddingAttr
@@ -840,7 +855,7 @@ void registerGPUEncodingExternalModels(DialectRegistry &registry) {
     IREE::GPU::GPUEncodingResolverAttr::attachInterface<
         GPUEncodingPackedLayoutMaterializerAttr,
         GPUEncodingResolverMaterializerAttr, GPULayoutResolverAttr,
-        GPUSerializableAttr>(*ctx);
+        GPUSerializableAttr, GPUEncodingResolverVerifier>(*ctx);
     IREE::GPU::GPUPaddingResolverAttr::attachInterface<
         GPUPadEncodingLayoutMaterializerAttr, GPUPadLayoutResolverAttr>(*ctx);
   });

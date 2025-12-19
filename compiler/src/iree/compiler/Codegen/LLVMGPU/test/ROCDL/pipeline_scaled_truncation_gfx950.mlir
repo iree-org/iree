@@ -24,7 +24,8 @@ hal.executable @fp4_dynamic_quantt {
         %cst_0.25 = arith.constant 2.500000e-01 : f32
         %cst_neg_inf = arith.constant 0xff800000 : f32
         %len_i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-        %len = arith.index_castui %len_i32 : i32 to index
+        %cast = arith.index_castui %len_i32 : i32 to index
+        %len = iree_tensor_ext.dispatch.workload.ordinal %cast, 0 : index
         %input.bind = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x32xf32>>{%len}
         %trunc.bind = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x32xf4E2M1FN>>{%len}
         %scales.bind = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xi8>>{%len}

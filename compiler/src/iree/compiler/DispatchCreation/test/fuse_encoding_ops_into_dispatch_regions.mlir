@@ -229,8 +229,8 @@ util.func public @move_dependencies_before_dispatch(%arg0: tensor<?xf32>, %arg1:
 
 // -----
 
-#encoding0 = #iree_encoding.testing<[#iree_encoding.specialized<0>]>
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<1>]>
+#encoding0 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<0>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<1>]>
 util.func public @encoding_fusion(%arg0: tensor<128xf32, #encoding0>) -> tensor<128xf32, #encoding1> {
   %1 = flow.dispatch.region -> (tensor<128xf32>) {
     %3 = iree_encoding.unset_encoding %arg0 : tensor<128xf32, #encoding0> -> tensor<128xf32>

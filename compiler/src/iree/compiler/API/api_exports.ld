@@ -21,7 +21,9 @@ VER_0 {
     ireeGPUGetSingleSubgroupLayout;
     ireeCodegenGetTunerRootOps;
     ireeCodegenGetAttentionOpDetail;
+    ireeCodegenInferScaledContractionDimensions;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
+    ireeCodegenMlirOperationIsAScaledContractionOp;
     ireeCodegenHasIGEMMGenericConvDetails;
     ireeCodegenGetIGEMMGenericConvDetails;
     ireeCodegenTranslationInfoAttrGet;
@@ -98,7 +100,7 @@ VER_0 {
     ireeGPUMMAAttrGetVirtualMMAIntrinsic;
     ireeGPUPipelineOptionsAttrGet;
     ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts;
-    ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory;
+    ireeGPUPipelineOptionsAttrGetPrefetchNumStages;
     ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy;
     ireeGPUPipelineOptionsAttrGetTypeID;
     ireeGPUPipelineOptionsAttrGetUseIgemmConvolution;

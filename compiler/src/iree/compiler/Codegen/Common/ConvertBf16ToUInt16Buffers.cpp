@@ -315,7 +315,8 @@ struct ConvertBf16ToUInt16BuffersPass final
           vector::MaskedLoadOp, vector::MaskedStoreOp, vector::GatherOp,
           vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
           vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
-          vector::MaskOp, vector::TransposeOp, vector::YieldOp>(
+          vector::MaskOp, vector::TransposeOp, vector::YieldOp,
+          vector::FromElementsOp, vector::ToElementsOp>(
           [&typeConverter](Operation *op) {
             bool legal = typeConverter.isLegal(op);
             LLVM_DEBUG(if (!legal) llvm::dbgs()

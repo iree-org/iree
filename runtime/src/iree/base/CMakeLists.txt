@@ -85,6 +85,7 @@ iree_cc_library(
     ::core_headers
     iree::base::internal::time
     iree::base::tracing::provider
+    ${IREE_LIBBACKTRACE_TARGET}
     ${_IREE_ALLOCATOR_SYSTEM_DEPS}
   PUBLIC
 )

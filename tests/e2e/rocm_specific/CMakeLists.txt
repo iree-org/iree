@@ -10,19 +10,4 @@
 
 iree_add_all_subdirs()
 
-iree_check_single_backend_test_suite(
-  NAME
-    check_global_load_rocm_hip
-  SRCS
-    "lds_matmul.mlir"
-  TARGET_BACKEND
-    "rocm"
-  DRIVER
-    "hip"
-  COMPILER_FLAGS
-    "--iree-llvmgpu-use-direct-load"
-  LABELS
-    "requires-gpu-cdna3"
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

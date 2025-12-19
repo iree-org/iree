@@ -4,16 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Just import if IREE_HOST_BIN_DIR is set (e.g. when cross-compiling).
-if(IREE_HOST_BIN_DIR)
-  iree_import_binary(NAME iree-c-embed-data)
-  install(IMPORTED_RUNTIME_ARTIFACTS iree-c-embed-data
-          COMPONENT iree-c-embed-data
-          RUNTIME DESTINATION bin
-          BUNDLE DESTINATION bin)
-  return()
-endif()
-
 add_executable(iree-c-embed-data)
 target_sources(iree-c-embed-data PRIVATE iree-c-embed-data-main.cc)
 set_target_properties(iree-c-embed-data PROPERTIES

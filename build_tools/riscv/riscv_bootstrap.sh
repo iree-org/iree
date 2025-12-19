@@ -83,10 +83,6 @@ case ${answer:0:1} in
     download_file "${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" \
                   "${TOOLCHAIN_PATH_PREFIX}" \
                   "${RISCV_CLANG_TOOLCHAIN_FILE_SHA}"
-
-    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    echo " PLEASE run 'export RISCV_TOOLCHAIN_ROOT=${TOOLCHAIN_PATH_PREFIX}'   "
-    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
   ;;
   * )
     echo "Skip RISCV clang toolchain."

@@ -41,7 +41,7 @@ hal.executable public @main {
     builtin.module {
       // expected-remark@+1 {{Applied transform configuration strategy @iree_default_tuning_spec_gfx942::@__kernel_config}}
       func.func @mmt_2048x1280x5120_f16_f16_f32() {
-        %cst = arith.constant 0.000000e+00 : f16
+        %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x5120xf16>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1280x5120xf16>>
@@ -49,7 +49,7 @@ hal.executable public @main {
         %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 5120], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x5120xf16>> -> tensor<2048x5120xf16>
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1280, 5120], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1280x5120xf16>> -> tensor<1280x5120xf16>
         %5 = tensor.empty() : tensor<2048x1280xf32>
-        %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2048x1280xf32>) -> tensor<2048x1280xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2048x1280xf32>) -> tensor<2048x1280xf32>
         %7 = linalg.matmul
           indexing_maps = [
             affine_map<(d0, d1, d2) -> (d0, d2)>,

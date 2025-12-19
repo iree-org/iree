@@ -50,6 +50,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":core_headers",
+        "//build_tools/third_party/libbacktrace",
         "//runtime/src/iree/base/internal:time",
         "//runtime/src/iree/base/tracing:provider",
     ],

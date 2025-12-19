@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-dispatch-creation-test-set-scaled-matmul-encodings \
+// RUN: iree-opt --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints,iree-dispatch-creation-set-encoding))" %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
 // Test with `iree-dispatch-creation-annotate-data-tiling-hints` that adds the
 // data-tiling hint to all the available gemm ops. Otherwise, we have to add the

@@ -68,7 +68,7 @@ func.func @matmul_4096_32_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) 
 !DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4096x4096xf32>>
 //      CHECK:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
 // CHECK-SAME:   workgroup_size = [128, 1, 1] subgroup_size = 64
-// CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>
+// CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>
 func.func @matmul_4096_1_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
   //      CHECK: #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
   // CHECK-SAME: padding = [32, 32, 4], promote_operands = [0, 1], reduction = [0, 0, 1], subgroup = [1, 2, 0], workgroup = [32, 32, 0]}
@@ -100,7 +100,7 @@ func.func @matmul_DYN_32_32(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC, %ar
 
 //      CHECK:         #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // CHECK-SAME:         workgroup_size = [1024, 1, 1] subgroup_size = 64,
-// CHECK-SAME:         {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>
+// CHECK-SAME:         {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>
 !TA = tensor<?x4096xf32>
 !TB = tensor<4096x4096xf32>
 !TC = tensor<?x4096xf32>
@@ -153,8 +153,7 @@ func.func @matmul_DYN_1_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC, %a
 !DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<32x32xf32>>
 
 //      CHECK:    #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-// CHECK-SAME:    workgroup_size = [64, 16, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false,
-// CHECK-SAME:    no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+// CHECK-SAME:    workgroup_size = [64, 16, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 func.func @matmul_32_32_DYN(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
    // CHECK:     #iree_gpu.lowering_config<{reduction = [0, 0, 1], thread = [1, 8, 0], workgroup = [64, 128, 1]}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
@@ -169,8 +168,7 @@ func.func @matmul_32_32_DYN(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
 !TC = tensor<4096x4096xf32>
 !DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4096x4096xf32>>
 //      CHECK:         #translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-// CHECK-SAME:         workgroup_size = [64, 16, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false,
-// CHECK-SAME:         no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+// CHECK-SAME:         workgroup_size = [64, 16, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 func.func @matmul_4096_4096_DYN(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
    // CHECK:      #iree_gpu.lowering_config<{reduction = [0, 0, 1], thread = [1, 8, 0], workgroup = [64, 128, 1]}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC

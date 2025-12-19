@@ -20,7 +20,9 @@ EXPORTS
   ireeGPUGetSingleSubgroupLayout
   ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
+  ireeCodegenInferScaledContractionDimensions
   ireeCodegenMlirOperationIsACodegenAttentionOp
+  ireeCodegenMlirOperationIsAScaledContractionOp
   ireeCodegenHasIGEMMGenericConvDetails
   ireeCodegenGetIGEMMGenericConvDetails
   ireeCodegenTranslationInfoAttrGet
@@ -97,7 +99,7 @@ EXPORTS
   ireeGPUMMAAttrGetVirtualMMAIntrinsic
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
-  ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory
+  ireeGPUPipelineOptionsAttrGetPrefetchNumStages
   ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy
   ireeGPUPipelineOptionsAttrGetTypeID
   ireeGPUPipelineOptionsAttrGetUseIgemmConvolution

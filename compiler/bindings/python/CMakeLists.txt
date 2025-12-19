@@ -118,6 +118,16 @@ declare_mlir_dialect_python_bindings(
   DIALECT_NAME iree_gpu
 )
 
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/TensorExtBinding.td
+  GEN_ENUM_BINDINGS
+  SOURCES dialects/iree_tensor_ext.py
+  DIALECT_NAME iree_tensor_ext
+)
+
+
 declare_mlir_dialect_extension_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"

@@ -230,6 +230,85 @@ static void eraseStreamRegionResults(Region &region,
   }
 }
 
+// Checks if a timepoint transitively covers another timepoint through the
+// await dependency chain. This performs a local dominance-based check without
+// requiring global analysis.
+static bool timepointCoversTimepoint(Value coveringTimepoint,
+                                     Value coveredTimepoint) {
+  if (coveringTimepoint == coveredTimepoint) {
+    return true;
+  }
+
+  // Check if coveringTimepoint is defined by an op that awaits
+  // coveredTimepoint.
+  auto coveringOp = dyn_cast_or_null<IREE::Stream::TimelineOpInterface>(
+      coveringTimepoint.getDefiningOp());
+  if (!coveringOp) {
+    return false;
+  }
+
+  // Get await timepoints and check if any match or transitively cover.
+  SmallVector<Value> awaitTimepoints = coveringOp.getAwaitTimepoints();
+  for (Value awaitTp : awaitTimepoints) {
+    if (timepointCoversTimepoint(awaitTp, coveredTimepoint)) {
+      return true;
+    }
+  }
+
+  // Check stream.timepoint.join operations.
+  if (auto joinOp = dyn_cast<IREE::Stream::TimepointJoinOp>(
+          coveringTimepoint.getDefiningOp())) {
+    for (Value joinedTp : joinOp.getAwaitTimepoints()) {
+      if (timepointCoversTimepoint(joinedTp, coveredTimepoint)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Verifies that a timeline op's await clause covers all the resources it uses.
+// For each resource operand, if it was produced by a timeline op with a
+// timepoint, that timepoint should be in the await list or transitively
+// covered.
+static LogicalResult
+verifyTimelineResourceDominance(IREE::Stream::TimelineOpInterface timelineOp,
+                                ValueRange resourceOperands) {
+  SmallVector<Value> awaitTimepoints = timelineOp.getAwaitTimepoints();
+  for (Value resource : resourceOperands) {
+    // Skip resources not defined by timeline ops.
+    auto producerTimeline =
+        dyn_cast_if_present<IREE::Stream::TimelineOpInterface>(
+            resource.getDefiningOp());
+    if (!producerTimeline) {
+      continue;
+    }
+    Value producerTimepoint = producerTimeline.getResultTimepoint();
+    if (!producerTimepoint) {
+      continue;
+    }
+
+    // Check if any of the await timepoints cover the producer's timepoint.
+    bool isCovered = false;
+    for (Value awaitTp : awaitTimepoints) {
+      if (timepointCoversTimepoint(awaitTp, producerTimepoint)) {
+        isCovered = true;
+        break;
+      }
+    }
+
+    if (!isCovered) {
+      return timelineOp->emitOpError()
+             << "uses resource produced by timeline op but does not await its "
+                "completion timepoint (resource produced at "
+             << resource.getLoc() << ", timepoint not covered by await clause)";
+    }
+  }
+
+  return success();
+}
+
 // Computes the value access bits starting from |rootValue|.
 // Traverses the IR graph along tied ops but does not handle branches.
 static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
@@ -4247,6 +4326,19 @@ Value TimepointJoinOp::join(ValueRange timepoints, OpBuilder &builder) {
               timepoints, builder);
 }
 
+void TimepointJoinOp::setAwaitTimepoint(Value timepoint) {
+  if (timepoint) {
+    getAwaitTimepointsMutable().assign(timepoint);
+  } else {
+    getAwaitTimepointsMutable().clear();
+  }
+}
+
+void TimepointJoinOp::setAwaitTimepoints(ValueRange timepoints,
+                                         OpBuilder &builder) {
+  getAwaitTimepointsMutable().assign(timepoints);
+}
+
 //===----------------------------------------------------------------------===//
 // stream.timepoint.barrier
 //===----------------------------------------------------------------------===//
@@ -4319,6 +4411,24 @@ TimepointAwaitOp::getTiedResultOperandIndex(unsigned resultIndex) {
 SmallVector<int64_t> TimepointAwaitOp::getTiedResultOperandIndices() {
   return llvm::to_vector(llvm::seq<int64_t>(0, getResourceOperands().size()));
 }
+
+SmallVector<Value> TimepointAwaitOp::getAwaitTimepoints() {
+  if (getAwaitTimepoint()) {
+    return {getAwaitTimepoint()};
+  } else {
+    return {};
+  }
+}
+
+void TimepointAwaitOp::setAwaitTimepoint(Value timepoint) {
+  if (timepoint) {
+    getAwaitTimepointMutable().set(timepoint);
+  } else {
+    getAwaitTimepointMutable().drop();
+  }
+}
+
+Value TimepointAwaitOp::getResultTimepoint() { return {}; }
 
 //===----------------------------------------------------------------------===//
 // stream.channel.create
@@ -4490,6 +4600,31 @@ YieldOp::getMutableSuccessorOperands(RegionSuccessor successor) {
 
 MutableOperandRange YieldOp::getClosureResultsMutable() {
   return getResourceOperandsMutable();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.test.timeline_aware
+//===----------------------------------------------------------------------===//
+
+SmallVector<Value>
+TestTimelineAwareOp::buildAwaitTimepoints(OpBuilder &builder) {
+  // Build timepoint.import ops for each wait fence.
+  SmallVector<Value> timepoints;
+  for (auto fence : getWaitFenceLikes()) {
+    auto importOp = IREE::Stream::TimepointImportOp::create(
+        builder, getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+        ValueRange{fence}, /*affinity=*/nullptr);
+    timepoints.push_back(importOp.getResultTimepoint());
+  }
+  return timepoints;
+}
+
+Value TestTimelineAwareOp::buildResultTimepoint(OpBuilder &builder) {
+  // Build timepoint.import for signal fence.
+  auto importOp = IREE::Stream::TimepointImportOp::create(
+      builder, getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      ValueRange{getSignalFenceLike()}, /*affinity=*/nullptr);
+  return importOp.getResultTimepoint();
 }
 
 } // namespace mlir::iree_compiler::IREE::Stream

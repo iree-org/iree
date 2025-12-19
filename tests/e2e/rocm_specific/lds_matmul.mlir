@@ -8,9 +8,9 @@
 func.func @matmul_16x64x16_i8() {
   %lhs = util.unfoldable_constant dense<1> : !A_size
   %rhs = util.unfoldable_constant dense<1> : !B_size
-  %cst = arith.constant 0.000000e+00 : f32
+  %cst = arith.constant 0 : i32
   %empty = tensor.empty() : !C_size
-  %C = linalg.fill ins(%cst : f32) outs(%empty : !C_size) -> !C_size
+  %C = linalg.fill ins(%cst : i32) outs(%empty : !C_size) -> !C_size
   %0 = linalg.matmul ins(%lhs, %rhs : !A_size, !B_size)
                      outs(%C : !C_size) -> !C_size
   %E = tensor.empty() : !out_size

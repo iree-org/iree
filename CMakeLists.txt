@@ -64,6 +64,14 @@ endif()
 set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
 
+# Enable libbacktrace for Linux stack traces by default on Linux.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(IREE_ENABLE_LIBBACKTRACE_DEFAULT ON)
+else()
+  set(IREE_ENABLE_LIBBACKTRACE_DEFAULT OFF)
+endif()
+option(IREE_ENABLE_LIBBACKTRACE "Enables libbacktrace for Linux stack traces." ${IREE_ENABLE_LIBBACKTRACE_DEFAULT})
+
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
@@ -1134,6 +1142,10 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   set(_PYTHONPATH_ENV_PS1 "$env:PYTHONPATH = '$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>'\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env.ps1" CONTENT "${_PYTHONPATH_ENV_PS1}")
 endif()
+
+# Build libbacktrace from source for Linux stack traces.
+# Creates an empty target if disabled or not on Linux.
+add_subdirectory(build_tools/third_party/libbacktrace EXCLUDE_FROM_ALL)
 
 if(IREE_BUILD_BINDINGS_TFLITE)
   add_subdirectory(runtime/bindings/tflite)

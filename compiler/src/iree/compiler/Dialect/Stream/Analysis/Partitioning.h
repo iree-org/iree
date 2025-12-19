@@ -60,6 +60,15 @@ struct PartitionSet {
 };
 
 //===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+// Collects all values consumed by an operation, including those used in nested
+// regions (e.g. scf.for bodies). Uses a worklist-based approach to avoid stack
+// overflow on deeply nested regions.
+void collectConsumedValues(Operation *rootOp, SetVector<Value> &consumedValues);
+
+//===----------------------------------------------------------------------===//
 // Stream partitioning algorithms
 //===----------------------------------------------------------------------===//
 //

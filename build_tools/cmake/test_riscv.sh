@@ -19,9 +19,6 @@ BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
 RISCV_PLATFORM="${IREE_TARGET_PLATFORM:-linux}"
 RISCV_ARCH="${IREE_TARGET_ARCH:-riscv_64}"
 
-# Environment variable used by the emulator.
-export RISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
-
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 ctest_args=(

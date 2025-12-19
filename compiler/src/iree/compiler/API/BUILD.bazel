@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/API/Internal:IREEReduceToolEntryPoint",
         "//compiler/src/iree/compiler/API/Internal:LLDToolEntryPoint",
         "//llvm-external-projects/iree-dialects:CAPI",
+        "@llvm-project//mlir:CAPIAMDGPU",
         "@llvm-project//mlir:CAPIDebug",
         "@llvm-project//mlir:CAPIGPU",
         "@llvm-project//mlir:CAPIIR",

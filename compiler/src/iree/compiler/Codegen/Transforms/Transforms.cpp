@@ -352,6 +352,38 @@ template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
 // Lowering `iree_tensor_ext.dispatch.workgroup_count_from_slice` operation.
 //===---------------------------------------------------------------------===//
 
+LogicalResult materializeSliceFromOrdinals(
+    RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
+    ArrayRef<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinals,
+    ArrayRef<Operation *> slice) {
+  for (auto ordinalOp : ordinals) {
+    // Map `tensor_ext.dispatch.workload.ordinal` op with the corresponding
+    // workload value.
+    int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
+    if (ordinal >= static_cast<int64_t>(workloadVals.size())) {
+      return ordinalOp.emitOpError(
+          "ordinal number is higher than the number of workloads captured in "
+          "the workgroup count region");
+    }
+    map.map(ordinalOp.getResult(), workloadVals[ordinal]);
+  }
+  for (auto op : slice) {
+    // TODO(#13038) This is a WAR for these ops ending up in workgroup count
+    // computation. They should not. Some pre-processing at MaterializeEncoding
+    // time might make these go away.
+    if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
+      Value constVal =
+          arith::ConstantIndexOp::create(rewriter, op->getLoc(), 16);
+      for (auto result : op->getResults()) {
+        map.map(result, constVal);
+      }
+      continue;
+    }
+    rewriter.clone(*op, map);
+  }
+  return success();
+}
+
 FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, ValueRange workloadVals) {
@@ -379,35 +411,12 @@ FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
   auto slicedOps = llvm::to_vector(slice);
   mlir::computeTopologicalSorting(slicedOps);
 
-  // Insert the slice into workgroup count region with all `hal.constant.index`
-  // operations replaced with arguments (drop the front argument since that is
-  // `hal.device`).
+  // Insert the slice into workgroup count region with all ordinal operations
+  // replaced with the corresponding workload values.
   IRMapping map;
-  for (auto ordinalOp : leaves) {
-    // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
-    // the `flow.dispatch.workgroup_count_default` operation.
-    int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
-    if (ordinal >= workloadVals.size()) {
-      return ordinalOp.emitOpError(
-          "ordinal number is higher than the number of workloads captured in "
-          "the workgroup count region");
-    }
-    map.map(ordinalOp.getResult(),
-            workloadVals[ordinalOp.getOrdinal().getSExtValue()]);
-  }
-  for (auto op : slice) {
-    // TODO(#13038) This is a WAR for the these ops ending up in workgroup count
-    // computation. They should not. Some pre-processing at MaterializeEncoding
-    // time might make these go away.
-    if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
-      Value constVal =
-          arith::ConstantIndexOp::create(rewriter, op->getLoc(), 16);
-      for (auto result : op->getResults()) {
-        map.map(result, constVal);
-      }
-      continue;
-    }
-    rewriter.clone(*op, map);
+  if (failed(materializeSliceFromOrdinals(rewriter, map, workloadVals, leaves,
+                                          slicedOps))) {
+    return failure();
   }
   SmallVector<OpFoldResult> results;
   // Since the workgroup count at HAL level is in x, y, z form, process the
@@ -501,6 +510,36 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
                                         entryPointFn, workgroupCount,
                                         maxWorkgroupParallelDims);
+}
+
+LogicalResult createWorkgroupCountHint(RewriterBase &rewriter, Location loc,
+                                       ArrayRef<OpFoldResult> workgroupCount,
+                                       int maxWorkgroupParallelDims,
+                                       bool reverse) {
+  SmallVector<OpFoldResult> results(reverse ? llvm::reverse(workgroupCount)
+                                            : workgroupCount);
+  if (results.size() > maxWorkgroupParallelDims) {
+    MutableArrayRef<OpFoldResult> resultsRef =
+        llvm::MutableArrayRef<OpFoldResult>(results);
+    assert(maxWorkgroupParallelDims != 0 &&
+           "unexpected max parallel dimensions being 0");
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    AffineMap foldMap = AffineMap::get(0, 2, s0 * s1);
+    for (auto [index, foldedResult] : llvm::enumerate(
+             resultsRef.take_back(results.size() - maxWorkgroupParallelDims))) {
+      resultsRef[maxWorkgroupParallelDims - 1] =
+          affine::makeComposedFoldedAffineApply(
+              rewriter, loc, foldMap,
+              {resultsRef[maxWorkgroupParallelDims - 1],
+               resultsRef[maxWorkgroupParallelDims + index]});
+    }
+    results.resize(maxWorkgroupParallelDims);
+  }
+
+  // Hint resolution pads the list of counts with 1s, no need to do this here.
+  IREE::Codegen::WorkgroupCountHintOp::create(rewriter, loc, results);
+  return success();
 }
 
 /// Pattern to fold `scf.forall` created from split reduction with an

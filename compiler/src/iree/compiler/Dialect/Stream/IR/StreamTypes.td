@@ -49,6 +49,24 @@ def Stream_TimepointAttr : Stream_AttrDef<"Timepoint",
   let hasCustomAssemblyFormat = 1;
 }
 
+def Stream_TestFence : Stream_TypeDef<"TestFence", []> {
+  let mnemonic = "test.fence";
+
+  let summary = [{Test-only fence type for timeline-aware op testing.}];
+  let description = [{
+    A test-only type that behaves like hal.fence for testing TimelineAwareOpInterface
+    without introducing HAL dependencies in Stream unit tests.
+  }];
+
+  let parameters = (ins);
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return $_get($_ctxt);
+    }]>,
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Stream resource value types
 //===----------------------------------------------------------------------===//

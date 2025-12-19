@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           path: "c" # Windows can hit path length limits, so use a short path.
           submodules: false
@@ -99,7 +99,7 @@ jobs:
           cat ./c/runtime/version_local.json
 
       - name: Upload version_local.json
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: version_local
           path: |
@@ -180,7 +180,7 @@ jobs:
       MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
 
     steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           path: "c" # Windows can hit path length limits, so use a short path.
           submodules: true
@@ -207,7 +207,7 @@ jobs:
       ##########################################################################
 
       - name: Download version_local.json
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: version_local
           path: ./c/
@@ -343,7 +343,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: wheels-${{ matrix.build-family }}-${{ matrix.build-package }}
           # We upload all wheels (which includes deps so that subsequent

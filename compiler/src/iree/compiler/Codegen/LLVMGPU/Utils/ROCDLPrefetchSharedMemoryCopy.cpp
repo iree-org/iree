@@ -371,7 +371,7 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
   };
 
   if (numStages == 2) {
-    // Two-stage pipelining: readStage in stage 0, compute+write in stage 1.
+    // Two-stage pipelining: read+write in stage 0, compute in stage 1.
     for (Operation *op : stages.readStage)
       assignOp(op, /*stage=*/0);
     for (Operation *op : stages.writeStage)
@@ -379,6 +379,8 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
     for (Operation *op : stages.computeStage)
       assignOp(op, /*stage=*/1);
   } else {
+    // Three-stage pipelining: read in stage 0, write in stage 1, compute in
+    // stage 2.
     for (Operation *op : stages.readStage)
       assignOp(op, /*stage=*/0);
     for (Operation *op : stages.writeStage)
@@ -389,32 +391,54 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
 }
 
 // Populates cluster IDs for each operation based on stage groupings.
-// Operations are assigned cluster IDs in execution order: read -> compute ->
-// write. Each stage group gets its own cluster ID.
+// Cluster ordering determines execution order within each iteration:
+// - 2-stage pipeline: read -> compute -> write
+//   (read i+1, compute i, write i+1)
+// - 3-stage pipeline: compute -> write -> read
+//   (compute i, write i+1, read i+2)
 static void
-populateOpToClusterMap(const StageClassification &stages,
+populateOpToClusterMap(const StageClassification &stages, unsigned numStages,
                        llvm::DenseMap<Operation *, unsigned> &opToCluster) {
-
   unsigned clusterID = 0;
 
-  // Assign cluster ID 0 to all read stage operations
-  for (Operation *op : stages.readStage) {
-    opToCluster[op] = clusterID;
-  }
-  ++clusterID;
+  if (numStages == 2) {
+    // 2-stage pipeline: read first, then compute, then write
+    // This allows reading for next iteration while computing current
+    for (Operation *op : stages.readStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
 
-  // Assign cluster ID 1 to all compute stage operations
-  for (Operation *op : stages.computeStage) {
-    opToCluster[op] = clusterID;
-  }
-  ++clusterID;
+    for (Operation *op : stages.computeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
 
-  // Assign cluster ID 2 to all write stage operations
-  for (Operation *op : stages.writeStage) {
-    opToCluster[op] = clusterID;
+    for (Operation *op : stages.writeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+  } else {
+    // 3-stage pipeline: compute first, then write, then read
+    // This maximizes distance between read and use
+    for (Operation *op : stages.computeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.writeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.readStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
   }
 
-  LDBG() << "Built opToCluster map with " << clusterID + 1 << " clusters";
+  LDBG() << "Built opToCluster map with " << clusterID << " clusters "
+         << "(numStages=" << numStages << ")";
 }
 
 // Builds the final schedule using opToCluster and opToStage mappings.
@@ -572,6 +596,18 @@ static SharedBarrierState insertBarriersInRange(RewriterBase &rewriter,
   return state;
 }
 
+// Check if the operation is inside a loop (scf.for, scf.while, etc.)
+static bool isInsideLoop(Operation *op) {
+  Operation *parent = op->getParentOp();
+  while (parent) {
+    if (isa<scf::ForOp, scf::WhileOp, scf::ParallelOp>(parent)) {
+      return true;
+    }
+    parent = parent->getParentOp();
+  }
+  return false;
+}
+
 // Inserts synchronization barriers in the pipelined loop.
 static void insertPipelineBarriers(RewriterBase &rewriter,
                                    scf::ForOp newForOp) {
@@ -579,10 +615,29 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
   Location loc = newForOp.getLoc();
   SharedBarrierState state;
 
-  // Prologue (operations before the loop).
-  state.needBarrierBeforeWrite = true;
-  state = insertBarriersInRange(rewriter, loc, parentBlock->begin(),
-                                newForOp->getIterator(), state);
+  // Check if the pipelined loop is nested inside another loop.
+  // If nested, we need prologue barriers because:
+  //   - The epilogue of outer iteration N writes to shared memory
+  //   - The prologue of outer iteration N+1 reads from shared memory
+  //   - Without a barrier, there's a data race between iterations
+  bool isNested = isInsideLoop(newForOp);
+
+  if (isNested) {
+    // Nested loop: insert barriers in prologue for correctness.
+    // Start with needBarrierBeforeWrite=true because the epilogue of the
+    // previous outer iteration may have read from shared memory.
+    state.needBarrierBeforeWrite = true;
+    state = insertBarriersInRange(rewriter, loc, parentBlock->begin(),
+                                  newForOp->getIterator(), state);
+  } else {
+    // Non-nested loop: skip prologue barriers for performance.
+    // The prologue contains global->shared memory copies that don't require
+    // barriers between them since there are no shared memory reads in prologue.
+    // We only need to set up the state for the loop body: since the prologue
+    // writes to shared memory, subsequent shared reads in the loop body will
+    // need a barrier.
+    state.needBarrierBeforeRead = true;
+  }
 
   // Loop body (exclude terminator).
   Block *body = newForOp.getBody();
@@ -622,11 +677,12 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     return forOp;
   }
 
-  // Multi-stage pipelining (numStages > 2) is not yet implemented.
-  if (numStages > 2) {
-    LDBG()
-        << "Multi-stage pipelining with numStages > 2 is not yet implemented";
-    return failure();
+  // For global->shared->register data flow, we have 3 operation groups (read,
+  // write, compute), so 3 stages is the maximum meaningful pipeline depth.
+  if (numStages > 3) {
+    LDBG() << "numStages=" << numStages
+           << " requested but capping to 3 (maximum for read, write, compute)";
+    numStages = 3;
   }
 
   // Compute stage classification using the new refactored approach
@@ -645,7 +701,7 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   // Step 1: Populate standalone opToCluster map
   llvm::DenseMap<Operation *, unsigned> opToCluster;
-  populateOpToClusterMap(stages, opToCluster);
+  populateOpToClusterMap(stages, numStages, opToCluster);
 
   // Step 2: Use opToCluster + opToStage to build the final schedule
   std::vector<std::pair<Operation *, unsigned>> finalSchedule;

@@ -12,8 +12,8 @@ module attributes {
 } {
 
 stream.executable public @add_dispatch_0 {
-  stream.executable.export @add_dispatch_0 workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export @add_dispatch_0 workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module  {

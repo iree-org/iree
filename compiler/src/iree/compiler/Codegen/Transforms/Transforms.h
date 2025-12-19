@@ -125,6 +125,15 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups);
 
+/// Materialize the provided slice at the current insertion point. The leaves of
+/// the slice are expected to be `iree_tensor_ext.workload.ordinal` ops that
+/// are mapped to the corresponding `workloadVals`. The `map` is updated with
+/// the mapping from the original ops to the cloned ops.
+LogicalResult materializeSliceFromOrdinals(
+    RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
+    ArrayRef<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinals,
+    ArrayRef<Operation *> slice);
+
 /// Materialize the backward slice starting at the values in `workgroupCount`
 /// at the current insertion point of the `rewriter`. The leaves of the slice
 /// are expected to be `iree_tensor_ext.workload.ordinal` ops that
@@ -164,6 +173,15 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
+
+/// Creates an `iree_codegen.workgroup_count_hint` op at the current insertion
+/// point with the provided operands. If there are more operands provided than
+/// |maxWorkgroupParallelDims| the outermost sizes are linearized into the
+/// one at the maximum dim. If |reverse| is true, the workgroupCount is added in
+/// reverse order to the hint.
+LogicalResult createWorkgroupCountHint(
+    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> workgroupCount,
+    int maxWorkgroupParallelDims = kNumMaxParallelDims, bool reverse = true);
 
 /// Helper to perform LICM on loops nested within |target| that are guaranteed
 /// to have at least one trip. Additionally LICM on `scf.forall` ops with

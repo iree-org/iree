@@ -181,7 +181,8 @@ bool isValueUsableForOp(Value value, Block *block,
     return true;
   } else {
     // See if block the value is defined in dominates the forOp block.
-    // TODO(benvanik): optimize this, it's terribly expensive to recompute.
+    // NOTE: this can be very expensive - we hope the fast paths have taken
+    // care of things before reaching this point.
     DominanceInfo dominanceInfo(block->getParentOp());
     return dominanceInfo.dominates(definingBlock, block);
   }

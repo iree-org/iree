@@ -15,6 +15,7 @@ iree_cc_library(
     StaticImpl
   DEPS
     IREEDialectsCAPI
+    MLIRCAPIAMDGPU
     MLIRCAPIDebug
     MLIRCAPIGPU
     MLIRCAPIIR
@@ -70,6 +71,7 @@ iree_cc_library(
 ################################################################################
 
 set(_EXPORT_OBJECT_LIBS
+  obj.MLIRCAPIAMDGPU
   obj.IREEDialectsCAPI
   obj.MLIRCAPIDebug
   obj.MLIRCAPIIR

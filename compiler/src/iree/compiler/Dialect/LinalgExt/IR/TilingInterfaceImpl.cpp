@@ -2615,6 +2615,12 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   assert(offsets.size() == getIterationDomainRank());
   assert(sizes.size() == getIterationDomainRank());
 
+  // TODO: Add support for linalg_ext.index operations in the region.
+  // Currently, tiling will break if index operations are present.
+  if (!getBody()->getOps<IREE::LinalgExt::IndexOp>().empty()) {
+    return failure();
+  }
+
   Location loc = getLoc();
 
   SmallVector<Range> querySlice =

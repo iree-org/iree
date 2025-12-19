@@ -67,22 +67,30 @@ static void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim) {
   swizzle.permutation.insert(swizzle.permutation.begin(), dstIdx);
 }
 
-// Interleaves the layout in `swizzle` by mutating `swizzle.permutation` to
-// move permutation[0], the outer-most dimension (which the unroll() function
-// created to be the unrolling dimension), to the inner dimension given by
-// `expandedIdx`.
-//
-// Example:
-//    Input swizzle = { expandShape = [[16], [4, 4]], permutation = [1, 2, 0] }
-//    Input srcIdx = 1
-//    Input expandedIdx = 1
-// -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [2, 0, 1] }
-//
-static void interleave(TileSwizzle &swizzle, size_t srcIdx, int expandedIdx) {
-  size_t dstIdx = expandedDimIdx(swizzle.expandShape, srcIdx) + expandedIdx;
+/// Interleaves the layout in `swizzle` by mutating `swizzle.permutation` to
+/// move permutation[0], the outer-most dimension (which the unroll() function
+/// created to be the unrolling dimension), to the inner dimension given by
+/// `dstIdx`.
+///
+/// Example:
+///   Input swizzle = { expandShape = [[["CrossIntrinsic", 4],
+///                                      ["CrossThread", 16]],
+///                                     [["CrossIntrinsic", 2],
+///                                      ["CrossThread", 4]]],
+///                     permutation = [0, 3, 1, 2] }
+///   Input dstIdx = 2
+///   -> Output swizzle = { expandShape = [[["CrossIntrinsic", 4],
+///                                          ["CrossThread", 16]],
+///                                         [["CrossIntrinsic", 2],
+///                                          ["CrossThread", 4]]],
+///                         permutation = [3, 1, 0, 2] }
+///
+static void interleave(TileSwizzle &swizzle, size_t dstIdx) {
+  assert(dstIdx < swizzle.permutation.size() && "dstIdx out of bounds");
+
   SmallVector<int64_t> outPermutation(swizzle.permutation.size());
   // The leading dimension, permutation[0], gets moved inwards to the
-  // position that we just computed, dstIdx.
+  // inner position, dstIdx.
   outPermutation[dstIdx] = swizzle.permutation[0];
   // Outer dimensions get shifted outwards to fill the gap.
   for (size_t i = 0; i < dstIdx; ++i) {
@@ -189,14 +197,33 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   return swizzle;
 }
 
-static size_t getInnermostNonInternalDimIdx(
-    const TileSwizzle::ExpandShapeDimVectorType &shape) {
-  for (size_t idx = shape.size() - 1; idx >= 0; --idx) {
-    if (shape[idx].kind != Kind::Internal) {
-      return idx;
+/// Returns the index of the innermost cross thread dimension after applying the
+/// swizzle permutation.
+///
+/// Example:
+///   Input swizzle = { expandShape = [[["CrossIntrinsic", 4],
+///                                      ["CrossThread", 16]],
+///                                     [["CrossIntrinsic", 2],
+///                                      ["CrossThread", 4]]],
+///                     permutation = [0, 3, 1, 2] }
+///   -> flatDims = [["CrossIntrinsic", 4], ["CrossThread", 4],
+///                  ["CrossThread", 16], ["CrossIntrinsic", 2]]
+///   -> Output innermostCrossThreadDimIdx = 2
+static size_t getInnermostCrossThreadDimIdx(const TileSwizzle &swizzle) {
+  // Flatten the expandShape.
+  SmallVector<TileSwizzle::Dim> flatDims;
+  for (const auto &shape : swizzle.expandShape) {
+    flatDims.append(shape.begin(), shape.end());
+  }
+  // Apply the permutation to the flatDims.
+  applyPermutationToVector(flatDims, swizzle.permutation);
+  // Iterate in reverse to find the innermost CrossThread dimension.
+  for (int64_t i = flatDims.size() - 1; i >= 0; --i) {
+    if (flatDims[i].kind == Kind::CrossThread) {
+      return i;
     }
   }
-  assert(false && "all dimensions are internal!");
+  assert(false && "no cross thread dimension found!");
   return 0;
 }
 
@@ -205,9 +232,7 @@ static void expandIfNonUnit(TileSwizzle &swizzle, size_t srcIdx,
   if (dim.size > 1) {
     expand(swizzle, srcIdx, dim);
     if (interleave) {
-      IREE::GPU::interleave(
-          swizzle, srcIdx,
-          getInnermostNonInternalDimIdx(swizzle.expandShape[srcIdx]));
+      IREE::GPU::interleave(swizzle, getInnermostCrossThreadDimIdx(swizzle));
     }
   }
 }

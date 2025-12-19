@@ -1,0 +1,53 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# CMake builds libbacktrace via FetchContent.
+# This file is only used for Bazel builds.
+iree_cmake_extra_content(
+    content = """
+# libbacktrace is built by build_tools/third_party/libbacktrace/CMakeLists.txt
+# using FetchContent. This file is only used for Bazel builds.
+return()
+""",
+    inline = True,
+)
+
+# Linux implementation with libbacktrace from BCR.
+# Includes pthreads since libbacktrace usage requires pthread_once.
+# Includes dl since status_stack_trace.c uses dladdr (needed on glibc < 2.34).
+# The hdrs exports our wrapper header which re-exports BCR's backtrace.h,
+# allowing the layering check to see the header dependency chain.
+# We use includes=["."] to make the wrapper includable as <iree_libbacktrace.h>.
+iree_runtime_cc_library(
+    name = "libbacktrace_linux",
+    hdrs = ["iree_libbacktrace.h"],
+    defines = ["IREE_HAVE_LIBBACKTRACE=1"],
+    includes = ["."],
+    deps = [
+        "//build_tools:dl",
+        "//build_tools:pthreads",
+        "@libbacktrace//:libbacktrace",
+    ],
+)
+
+# Empty target for non-Linux platforms.
+iree_runtime_cc_library(
+    name = "libbacktrace_disabled",
+)
+
+# Transparent alias that switches between implementations.
+# Using alias (not cc_library wrapper) properly propagates headers for layering check.
+alias(
+    name = "libbacktrace",
+    actual = select({
+        "@platforms//os:linux": ":libbacktrace_linux",
+        "//conditions:default": ":libbacktrace_disabled",
+    }),
+)

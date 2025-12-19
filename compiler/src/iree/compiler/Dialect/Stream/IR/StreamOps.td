@@ -670,6 +670,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
     Value getOperandSize(unsigned idx) { return {}; }
     Value getResultSize(unsigned idx) { return getResultSizes()[idx]; }
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 }
 
@@ -3939,6 +3940,7 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
 
   let extraClassDeclaration = [{
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 
   let hasFolder = 1;
@@ -4032,7 +4034,10 @@ def Stream_TimepointChainExternalOp :
 }
 
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
-  Stream_TimelineOp,
+  DeclareOpInterfaceMethods<Stream_TimelineOp, [
+    "setAwaitTimepoint",
+    "setAwaitTimepoints",
+  ]>,
 ]> {
   let summary = [{Joins one or more timepoints into the max of all of them.}];
   let description = [{
@@ -4115,6 +4120,7 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
     Value getOperandSize(unsigned idx) { return getResourceSize(); }
     Value getResultSize(unsigned idx) { return getResourceSize(); }
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 
   let hasVerifier = 1;
@@ -4124,7 +4130,11 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
 
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
-  Stream_TimelineOp,
+  DeclareOpInterfaceMethods<Stream_TimelineOp, [
+    "getAwaitTimepoints",
+    "setAwaitTimepoint",
+    "getResultTimepoint",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResultOperandIndex",
@@ -4181,10 +4191,6 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
     Value getResultSize(unsigned idx) {
       return getResourceOperandSizes()[idx];
     }
-    SmallVector<Value> getAwaitTimepoints() {
-      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
-    }
-    Value getResultTimepoint() { return {}; }
   }];
 
   let hasVerifier = 1;
@@ -4663,5 +4669,193 @@ def Stream_YieldOp : Stream_Op<"yield", [
 }
 
 } // OpGroupMiscellaneousOps
+
+//===----------------------------------------------------------------------===//
+// Test ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupTestOps : OpDocGroup {
+  let summary = "Test-only ops for Stream dialect testing";
+  let description = "Ops used only in unit tests.";
+}
+
+let opDocGroup = OpGroupTestOps in {
+
+def Stream_TestTimelineOp : Stream_PureOp<"test.timeline_op", [
+  AttrSizedOperandSegments,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{Test op implementing TimelineOpInterface.}];
+  let description = [{
+    Test-only operation that implements TimelineOpInterface directly,
+    allowing Stream dialect tests to verify timeline behavior without
+    requiring execution regions or specific op semantics.
+
+    This op takes zero or more resource operands with their sizes, zero or more
+    await timepoints, and produces zero or more resource results with a result
+    timepoint. It has no side effects and no execution region - it purely exists
+    to test timepoint propagation, coverage analysis, and timeline scheduling.
+
+    The `await_limit` attribute (default -1) controls how many await timepoints
+    this op can accept before forcing join creation:
+    - await_limit = -1: Unlimited awaits (default, no joins created)
+    - await_limit = 0: No awaits allowed (all timepoints must be joined)
+    - await_limit = 1: Max 1 await (mimics stream.async.execute behavior)
+    - await_limit = N: Max N awaits
+
+    Use this op when testing passes that operate on TimelineOpInterface methods.
+    It's simpler than stream.async.execute (no execution region) but can still
+    model resource-timepoint flows. For example:
+    - ElideTimepointsPass coverage analysis (elide_timepoints_coverage.mlir)
+    - PropagateTimepointsPass scheduling (propagate_timepoints.mlir)
+    - SCF region handling with resources (elide_timepoints_scf.mlir)
+
+    Examples:
+      // Simple timeline op with no dependencies or resources.
+      %tp0 = stream.test.timeline_op with() : () -> () => !stream.timepoint
+
+      // Timeline op awaiting other timepoints.
+      %tp1 = stream.test.timeline_op await(%tp0) => with() : () -> () => !stream.timepoint
+
+      // Timeline op with resource operands and results.
+      %r, %tp = stream.test.timeline_op
+        with(%arg) : (!stream.resource<external>{%size}) -> !stream.resource<external>{%size}
+        => !stream.timepoint
+
+      // Timeline op with await_limit to test join creation.
+      %r, %tp = stream.test.timeline_op await_limit(1) await(%tp0) =>
+        with(%arg) : (!stream.resource<external>{%size}) -> !stream.resource<external>{%size}
+        => !stream.timepoint
+  }];
+
+  let arguments = (ins
+    Variadic<AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_StagingResource,
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
+    Variadic<Stream_Size>:$result_sizes,
+    Variadic<Stream_Timepoint>:$await_operands,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<I64Attr>:$await_limit
+  );
+  let results = (outs
+    Variadic<AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_StagingResource,
+    ]>>:$results,
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`await_limit` `(` $await_limit^ `)`)?
+    (`await` `(` $await_operands^ `)` `=` `` `>`)?
+    `with` `(` $resource_operands `)` attr-dict `:`
+    custom<ShapedFunctionType>(ref($resource_operands),
+                               type($resource_operands), $resource_operand_sizes,
+                               type($results), $result_sizes,
+                               $tied_operands)
+    `=` `` `>` type($result_timepoint)
+  }];
+
+  let extraClassDeclaration = [{
+    // TimelineOpInterface methods.
+    SmallVector<Value> getAwaitTimepoints() {
+      SmallVector<Value> timepoints;
+      for (auto &tp : getAwaitOperandsMutable()) {
+        timepoints.push_back(tp.get());
+      }
+      return timepoints;
+    }
+
+    void setAwaitTimepoint(Value timepoint) {
+      if (timepoint) {
+        getAwaitOperandsMutable().assign(timepoint);
+      } else {
+        getAwaitOperandsMutable().clear();
+      }
+    }
+
+    void setAwaitTimepoints(ValueRange timepoints, OpBuilder &builder) {
+      // Check await_limit attribute to determine behavior.
+      // If attribute is missing, treat as unlimited (-1).
+      auto limitAttr = getAwaitLimitAttr();
+      int64_t limit = limitAttr ? limitAttr.getInt() : -1;
+      if (limit >= 0 && static_cast<int64_t>(timepoints.size()) > limit) {
+        // Exceed limit - create join and set single timepoint.
+        setAwaitTimepoint(
+            IREE::Stream::joinTimepoints(getLoc(), timepoints, builder));
+      } else {
+        // Within limit or unlimited - assign directly.
+        getAwaitOperandsMutable().assign(timepoints);
+      }
+    }
+
+    // Util_SizeAwareOp methods.
+    Value getOperandSize(unsigned index) {
+      return getResourceOperandSizes()[index];
+    }
+    Value getResultSize(unsigned index) {
+      return getResultSizes()[index];
+    }
+
+    // getResultTimepoint() is auto-generated from the result_timepoint result.
+    // getAwaitOperandsMutable() is auto-generated from the await_operands operand.
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_TestTimelineAwareOp : Stream_PureOp<"test.timeline_aware", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Stream_TimelineAwareOp, [
+    "buildAwaitTimepoints",
+    "buildResultTimepoint",
+  ]>,
+]> {
+  let summary = [{Test op implementing TimelineAwareOpInterface.}];
+  let description = [{
+    Test-only operation that implements TimelineAwareOpInterface directly,
+    allowing Stream dialect tests to verify timeline-aware behavior without
+    requiring HAL/etc dialect dependencies.
+
+    Mimics util.call with the HAL coarse-fences model:
+    - Takes wait fences that must complete before execution.
+    - Takes a signal fence to signal when complete.
+    - Returns an arbitrary result.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$args,
+    Variadic<Stream_TestFence>:$wait_fence_likes,
+    Stream_TestFence:$signal_fence_like
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    `(` $args `)` `waits` `(` $wait_fence_likes `)` `signals` `(` $signal_fence_like `)`
+    attr-dict `:` functional-type($args, $results)
+  }];
+
+  let extraClassDeclaration = [{
+    bool participatesInTimeline() { return true; }
+
+    SmallVector<Value> getAwaitFences() {
+      // Return all wait fences (excluding signal fence).
+      SmallVector<Value> fences;
+      for (auto fence : getWaitFenceLikes()) {
+        fences.push_back(fence);
+      }
+      return fences;
+    }
+
+    Value getSignalFence() { return getSignalFenceLike(); }
+  }];
+}
+
+}  // OpGroupTestOps
 
 #endif  // IREE_DIALECT_STREAM_OPS

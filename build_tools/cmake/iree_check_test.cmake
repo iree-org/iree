@@ -10,6 +10,7 @@ function(iree_is_bytecode_module_test_excluded_by_labels _DST_IS_EXCLUDED_VAR _S
      (EMSCRIPTEN AND ("nowasm" IN_LIST _SRC_LABELS)) OR
      (IREE_ENABLE_ASAN AND ("noasan" IN_LIST _SRC_LABELS)) OR
      (IREE_ENABLE_TSAN AND ("notsan" IN_LIST _SRC_LABELS)) OR
+     (IREE_ENABLE_UBSAN AND ("noubsan" IN_LIST _SRC_LABELS)) OR
      (CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS) OR
      ((_LOWERCASE_BUILD_TYPE STREQUAL "debug") AND ( "optonly" IN_LIST _RULE_LABELS)))
     set("${_DST_IS_EXCLUDED_VAR}" TRUE PARENT_SCOPE)

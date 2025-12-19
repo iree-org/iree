@@ -93,6 +93,19 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
   return res;
 }
 
+LogicalResult LayoutAttr::verifyEncoding(
+    llvm::ArrayRef<int64_t> shape, mlir::Type elementType,
+    llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
+  for (Attribute attr : getLayouts()) {
+    auto verifiableAttr = dyn_cast<VerifiableTensorEncoding>(attr);
+    if (verifiableAttr &&
+        failed(verifiableAttr.verifyEncoding(shape, elementType, emitError))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
@@ -587,6 +600,12 @@ Attribute IdentityResolverAttr::getLayout(RankedTensorType type) const {
   return Encoding::IdentityAttr::get(getContext());
 }
 
+Attribute
+IdentityResolverAttr::getUnifiedEncoding(ArrayRef<Attribute> encodings) const {
+  MLIRContext *ctx = getContext();
+  return Encoding::IdentityAttr::get(ctx);
+}
+
 Type IdentityResolverAttr::convertType(Type type) const {
   using IREE::TensorExt::DispatchTensorType;
   return TypeSwitch<Type, Type>(type)
@@ -642,31 +661,6 @@ Attribute UnsupportedResolverAttr::getLayout(RankedTensorType) const {
 // Encoding attributes that are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 
-Attribute TestingAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess())) {
-    return {};
-  }
-  ArrayAttr layouts;
-  OptionalParseResult parseResult = p.parseOptionalAttribute(layouts);
-  if (parseResult.has_value() && parseResult.value().failed()) {
-    p.emitError(p.getNameLoc()) << "expected array attribute";
-    return {};
-  }
-  if (failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), layouts);
-}
-
-void TestingAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  if (auto layouts = getLayouts()) {
-    p.printAttribute(layouts);
-  }
-  os << ">";
-}
-
 bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
 Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
@@ -683,6 +677,12 @@ Attribute SpecializationResolverAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
   return SpecializedAttr::get(ctx, getSeed(),
                               TypeAttr::get(type.dropEncoding()));
+}
+
+Attribute SpecializationResolverAttr::getUnifiedEncoding(
+    ArrayRef<Attribute> encodings) const {
+  MLIRContext *ctx = getContext();
+  return SpecializedAttr::get(ctx, getSeed(), /*type=*/nullptr);
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

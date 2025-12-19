@@ -910,14 +910,7 @@ private:
 const char ValueResourceUsage::ID = 0;
 
 ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
-    : explorer(rootOp, TraversalAction::SHALLOW), solver(explorer, allocator) {
-  explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
-      TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::ForOp>(TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::WhileOp>(TraversalAction::RECURSE);
-  explorer.setDialectAction<IREE::Stream::StreamDialect>(
-      TraversalAction::RECURSE);
+    : explorer(rootOp, TraversalAction::RECURSE), solver(explorer, allocator) {
   // Ignore the contents of executables (linalg goo, etc).
   explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
   explorer.initialize();

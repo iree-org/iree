@@ -363,11 +363,14 @@ def IREEGPU_DataTiledMMAAttr :
     By default, intrinsic-level sub-tiles are contiguous and arranged
     side-by-side in the overall tile layout. When
     `operands_interleaving_intrinsics_{m,n,k}` is non-empty, each entry
-    indicates an operand (given by its operand index) for which the tile layout
-    has the corresponding intrinsics tiles interleaved. For example, when
-    `intrinsics_k = 2` and `operands_interleaving_intrinsics_k = [0, 1]`, there
-    are two intrinsics along the k-dimension and their layouts are interleaved
-    in operands 0 and 1, meaning LHS and RHS.
+    indicates an operand (given by its operand index) for which the
+    `intrinsics_{m,n,k}` tiles are interleaved to the innermost positions of
+    the entire swizzled layout. For example, when `intrinsics_k = 2` and
+    `operands_interleaving_intrinsics_k = [0, 1]`, there are two intrinsics
+    along the k-dimension and their layouts are interleaved in operands 0
+    and 1, meaning LHS and RHS. When multiple interleavings are applied,
+    `intrinsics_k` is placed innermost, then going outward `intrinsics_n`,
+    then `intrinsics_m`.
 
     The `subgroups_{m,n,k}` parameters control the number of subgroups and the
     layout of the tile accesses made by different subgroups. The product of the
@@ -917,8 +920,9 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let summary = [{Options attribute for linalg + tensors -> vector + memref GPU pipelines.}];
   let description = [{
     This attributes describes lowering pipeline specific configuration options:
-    * prefetch_shared_memory: Boolean option indicating whether or not to run
-      the loop prefetching pass in the lowering pipeline.
+    * prefetch_num_stages: Integer option controlling the software pipelining
+      stages for shared memory prefetching. 0 or 1 disables prefetching, 2+
+      enables prefetching with that many pipeline stages.
     * no_reduce_shared_memory_bank_conflicts: Boolean option indicating whether
       or not to skip the bank conflict reduction pass in the lowering pipeline.
     * reorder_workgroups_strategy: Enum attribute indicating which strategy to
@@ -930,7 +934,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
-    OptionalParameter<"BoolAttr">:$prefetch_shared_memory,
+    OptionalParameter<"std::optional<int64_t>">:$prefetch_num_stages,
     OptionalParameter<"BoolAttr">:$no_reduce_shared_memory_bank_conflicts,
     OptionalParameter<"BoolAttr">:$use_igemm_convolution,
     OptionalParameter<"ReorderWorkgroupsStrategyAttr">:$reorder_workgroups_strategy
@@ -938,7 +942,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
 
   let builders = [
     AttrBuilder<(ins
-        CArg<"bool", "false">:$prefetch_shared_memory,
+        CArg<"unsigned", "0">:$prefetch_num_stages,
         CArg<"bool", "false">:$no_reduce_shared_memory_bank_conflicts,
         CArg<"bool", "false">:$use_igemm_convolution,
         CArg<"std::optional<ReorderWorkgroupsStrategy>", "{}">:$reorder_workgroups_strategy)>

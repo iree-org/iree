@@ -234,15 +234,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
                           ireeGPUPipelineOptionsAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, std::optional<bool> prefetchSharedMemory,
+          [](const py::object &, std::optional<int64_t> prefetchNumStages,
              std::optional<bool> noReduceSharedMemoryBankConflicts,
              std::optional<bool> useIgemmConvolution,
              std::optional<MlirAttribute> reorderWorkgroupsStrategy,
              MlirContext ctx) {
             return ireeGPUPipelineOptionsAttrGet(
                 ctx,
-                prefetchSharedMemory.has_value() ? &*prefetchSharedMemory
-                                                 : nullptr,
+                prefetchNumStages.has_value() ? &*prefetchNumStages : nullptr,
                 noReduceSharedMemoryBankConflicts.has_value()
                     ? &*noReduceSharedMemoryBankConflicts
                     : nullptr,
@@ -252,18 +251,18 @@ NB_MODULE(_ireeCompilerDialects, m) {
                     ? &*reorderWorkgroupsStrategy
                     : nullptr);
           },
-          "cls"_a, "prefetch_shared_memory"_a = py::none(),
+          "cls"_a, "prefetch_num_stages"_a = py::none(),
           "no_reduce_shared_memory_bank_conflicts"_a = py::none(),
           "use_igemm_convolution"_a = py::none(),
           "reorder_workgroups_strategy"_a = py::none(), py::kw_only(),
           "ctx"_a = py::none(),
           "Gets an #iree_gpu.pipeline_options from parameters.")
       .def_property_readonly(
-          "prefetch_shared_memory",
-          [](MlirAttribute self) -> std::optional<bool> {
-            auto attr = ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory(self);
+          "prefetch_num_stages",
+          [](MlirAttribute self) -> std::optional<int64_t> {
+            auto attr = ireeGPUPipelineOptionsAttrGetPrefetchNumStages(self);
             if (!mlirAttributeIsNull(attr))
-              return mlirBoolAttrGetValue(attr);
+              return mlirIntegerAttrGetValueInt(attr);
             return std::nullopt;
           })
       .def_property_readonly(
@@ -770,4 +769,45 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "Gets IGEMM details for a linalg operation. "
       "Returns None if failed to infer IGEMM convolution details.",
       py::arg("linalg_op"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenGetScaledContractionDetails
+  //===-------------------------------------------------------------------===//
+  iree_codegen_module.def("isa_scaled_contraction_op",
+                          &ireeCodegenMlirOperationIsAScaledContractionOp,
+                          "Checks if the given operation is an IREE LinalgExt "
+                          "scaled contraction op.",
+                          py::arg("op"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to struct ireeCodegenScaledContractionDimensions
+  //===-------------------------------------------------------------------===//
+  py::class_<ireeCodegenScaledContractionDimensions>(
+      iree_codegen_module, "ScaledContractionDimensions")
+      .def_prop_ro("batch",
+                   [](const ireeCodegenScaledContractionDimensions &self) {
+                     return getIntArrayAttrValues(self.batch);
+                   })
+      .def_prop_ro("m",
+                   [](const ireeCodegenScaledContractionDimensions &self) {
+                     return getIntArrayAttrValues(self.m);
+                   })
+      .def_prop_ro("n",
+                   [](const ireeCodegenScaledContractionDimensions &self) {
+                     return getIntArrayAttrValues(self.n);
+                   })
+      .def_prop_ro("k",
+                   [](const ireeCodegenScaledContractionDimensions &self) {
+                     return getIntArrayAttrValues(self.k);
+                   })
+      .def_prop_ro("kB",
+                   [](const ireeCodegenScaledContractionDimensions &self) {
+                     return getIntArrayAttrValues(self.kB);
+                   });
+
+  iree_codegen_module.def(
+      "infer_scaled_contraction_dimensions",
+      &ireeCodegenInferScaledContractionDimensions,
+      "Infers the scaled contraction dimensions for a given operation.",
+      py::arg("op"));
 }

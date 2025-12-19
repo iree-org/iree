@@ -92,10 +92,16 @@ function(iree_c_embed_data)
     endif()
   endforeach(_SRC)
 
+  # When cross-compiling execute the binary from the host build.
+  set(IREE_C_EMBED_DATA_TOOL_BINARY iree-c-embed-data)
+  if (IREE_HOST_BIN_DIR)
+    set(IREE_C_EMBED_DATA_TOOL_BINARY "${IREE_HOST_BIN_DIR}/iree-c-embed-data")
+  endif()
+
   add_custom_command(
     OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_C_FILE_OUTPUT}"
-    COMMAND iree-c-embed-data ${_ARGS} ${_RESOLVED_SRCS}
-    DEPENDS iree-c-embed-data ${_RESOLVED_SRCS}
+    COMMAND ${IREE_C_EMBED_DATA_TOOL_BINARY} ${_ARGS} ${_RESOLVED_SRCS}
+    DEPENDS ${IREE_C_EMBED_DATA_TOOL_BINARY} ${_RESOLVED_SRCS}
   )
 
   if(_RULE_TESTONLY)

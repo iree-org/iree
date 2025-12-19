@@ -25,6 +25,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-propagate-timepoints"
@@ -240,7 +241,7 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
 // given |region|. All branches, ops, and nested regions will be processed.
 static void expandRegion(Region &region, bool canModifyEntryBlock,
                          SymbolTable &symbolTable, ExpandedGlobalMap &globalMap,
-                         IRMapping resourceTimepointMap) {
+                         IRMapping &resourceTimepointMap) {
   if (region.empty())
     return;
 
@@ -253,6 +254,8 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
       continue;
 
     // Insert and build a list of expanded (timepoint, resource) pairs.
+    // Don't add mappings here - we need to check if wrapExpandedBlockArgFn
+    // already set them up before deciding whether to insert awaits.
     SmallVector<std::pair<Value, Value>> expansions;
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto resourceArg = block.getArgument(i);
@@ -261,12 +264,18 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
       auto timepointArg =
           block.insertArgument(i + 1, timepointType, resourceArg.getLoc());
       expansions.push_back(std::make_pair(timepointArg, resourceArg));
-      resourceTimepointMap.map(resourceArg, timepointArg);
     }
 
     // Insert awaits that we've sunk from callers.
     auto builder = OpBuilder::atBlockBegin(&block);
     for (auto [timepoint, resource] : llvm::reverse(expansions)) {
+      // If the resource already has an associated timepoint mapping from the
+      // region branch expansion (wrapExpandedBlockArgFn), defer awaiting to
+      // the consumer to avoid over-synchronization at block boundaries.
+      if (resourceTimepointMap.contains(resource))
+        continue;
+      // Add the mapping for this block arg since we're inserting an await.
+      resourceTimepointMap.map(resource, timepoint);
       // If we can look down the chain and see the size then we can use that.
       // If it's a constant we can't use it as it may be defined anywhere in the
       // region. Dynamic dimensions usually come from outside or entry arguments
@@ -561,8 +570,16 @@ static void expandAwaitOp(IREE::Stream::TimepointAwaitOp op,
     return;
   }
   for (auto result : op.getResults()) {
-    resourceTimepointMap.map(op.getTiedResultOperand(result),
-                             op.getAwaitTimepoint());
+    Value inputOperand = op.getTiedResultOperand(result);
+    // Don't map block arguments - they already have mappings from
+    // wrapExpandedBlockArgFn (for region branch ops like scf.for/while) or
+    // from expandRegion's block arg expansion. Mapping them here would cause
+    // mappings to leak between sibling regions (e.g., scf.if then/else
+    // branches), leading to invalid IR where one branch tries to use a
+    // timepoint defined in another branch.
+    if (isa<BlockArgument>(inputOperand))
+      continue;
+    resourceTimepointMap.map(inputOperand, op.getAwaitTimepoint());
   }
 }
 
@@ -607,6 +624,86 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
   }
 }
 
+// Expands a RegionBranchOpInterface op (scf.if, scf.for, etc) to yield expanded
+// values.
+static void
+expandRegionBranchOp(IREE::Util::MutableRegionBranchOpInterface regionBranchOp,
+                     SymbolTable &symbolTable, ExpandedGlobalMap &globalMap,
+                     IRMapping &resourceTimepointMap) {
+  Operation *op = regionBranchOp;
+  if (!usesResources(op)) {
+    // No resources to expand - early exit.
+    return;
+  }
+
+  auto expandTypeFn = [](Type type, SmallVectorImpl<Type> &newTypes) {
+    if (isResourceType(type)) {
+      newTypes.push_back(type); // resource
+      newTypes.push_back(
+          IREE::Stream::TimepointType::get(type.getContext())); // timepoint
+    } else {
+      newTypes.push_back(type);
+    }
+  };
+  auto expandOperandFn = [&](Value operand, SmallVectorImpl<Value> &newOperands,
+                             OpBuilder &builder) {
+    expandOperand(op->getLoc(), operand, newOperands, resourceTimepointMap,
+                  builder);
+  };
+  auto wrapExpandedBlockArgFn = [&](Location loc, Value originalArg,
+                                    ValueRange expandedArgs,
+                                    OpBuilder &builder) -> Value {
+    // expandedArgs = [resource, timepoint]
+    assert(expandedArgs.size() == 2 &&
+           "expected resource expansion to produce resource+timepoint");
+    Value resource = expandedArgs[0];
+    Value timepoint = expandedArgs[1];
+
+    // Track mapping for downstream operand expansion.
+    resourceTimepointMap.map(resource, timepoint);
+
+    // Do not insert an await here; keeping the original block argument allows
+    // downstream operand expansion to thread the carried timepoint without
+    // forcing synchronization at the loop boundary.
+    return resource;
+  };
+  auto expandRegionFn = [&](Region &region, bool canModifyEntryBlock) {
+    expandRegion(region, canModifyEntryBlock, symbolTable, globalMap,
+                 resourceTimepointMap);
+  };
+
+  OpBuilder builder(op);
+  Operation *newOp = regionBranchOp.rebuildWithExpandedTypes(
+      expandTypeFn, expandOperandFn, wrapExpandedBlockArgFn, expandRegionFn,
+      builder);
+  if (!newOp) {
+    // Failed to rebuild, but that's (probably) because we're unsupported.
+    return;
+  }
+
+  // Map results and insert awaits on each.
+  unsigned newIdx = 0;
+  for (Value oldResult : op->getResults()) {
+    if (isResourceType(oldResult.getType())) {
+      Value newResource = newOp->getResult(newIdx++);
+      Value newTimepoint = newOp->getResult(newIdx++);
+      resourceTimepointMap.map(newResource, newTimepoint);
+      // Insert await to tie them together.
+      builder.setInsertionPointAfter(newOp);
+      auto resourceSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
+          op->getLoc(), newResource, builder);
+      auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
+          builder, op->getLoc(), {newResource}, {resourceSize}, newTimepoint,
+          {});
+      oldResult.replaceAllUsesWith(awaitOp.getResult(0));
+    } else {
+      oldResult.replaceAllUsesWith(newOp->getResult(newIdx++));
+    }
+  }
+
+  op->erase();
+}
+
 // Recursively expands resources into (timepoint, resource) in |op|.
 // Resource timepoint chains are established when possible by looking through
 // awaits.
@@ -636,6 +733,10 @@ static void expandTimepoints(Operation *op, SymbolTable &symbolTable,
     expandAwaitOp(awaitOp, resourceTimepointMap);
   } else if (auto executeOp = dyn_cast<IREE::Stream::AsyncExecuteOp>(op)) {
     expandAsyncExecuteOp(executeOp, resourceTimepointMap);
+  } else if (auto regionBranchOp =
+                 dyn_cast<IREE::Util::MutableRegionBranchOpInterface>(op)) {
+    expandRegionBranchOp(regionBranchOp, symbolTable, globalMap,
+                         resourceTimepointMap);
   }
 }
 

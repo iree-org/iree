@@ -233,7 +233,7 @@ func.func @matmul_dynamic_dim() {
 // -----
 
 // CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-NOT:   prefetch_shared_memory = true
+// CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64()
 
@@ -278,7 +278,7 @@ func.func @attention_20x4096x64x4096x64() {
 // -----
 
 // CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-NOT:   prefetch_shared_memory = true
+// CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64_f8()
 
@@ -324,7 +324,7 @@ func.func @attention_20x4096x64x4096x64_f8() {
 // -----
 
 // CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-NOT:   prefetch_shared_memory = true
+// CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_large_head_dim_shared_mem()
 

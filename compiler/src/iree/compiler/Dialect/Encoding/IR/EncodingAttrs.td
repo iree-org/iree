@@ -51,7 +51,8 @@ def LayoutAttr :
         "isSerialized",
         "isIdentityLayout",
         "calculateStorageSizeInBytes",
-      ]>
+      ]>,
+      DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
     ]> {
   let mnemonic = "layout";
   let assemblyFormat = "`<` $layouts `>`";
@@ -277,6 +278,7 @@ def IdentityResolverAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
+        "getUnifiedEncoding",
       ]>,
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutMaterializerAttr, [
         "convertType",
@@ -340,7 +342,7 @@ def TestingAttr :
     "layouts.">:$layouts
   );
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = "`<` struct(params) `>`";
   let genVerifyDecl = 0;
 }
 
@@ -360,6 +362,7 @@ def SpecializationResolverAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
+        "getUnifiedEncoding",
       ]>
     ]> {
   let mnemonic = "specialization_resolver";

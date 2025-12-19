@@ -1790,7 +1790,7 @@ func.func @custom_op_yield_type_mismatch(%arg0 : tensor<?xf32>, %arg1 : tensor<1
 // -----
 
 func.func @index_op_outside_custom_op() -> index {
-  // expected-error @+1 {{expected parent op to be `iree_linalg_ext.custom_op`}}
+  // expected-error @+1 {{expected parent op to be one of `iree_linalg_ext.custom_op`, `iree_linalg_ext.attention`}}
   %0 = iree_linalg_ext.index 0 : index
   return %0 : index
 }

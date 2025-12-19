@@ -192,11 +192,6 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // lifetime assigned.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
 
-  // Elide transfers we can provably detect are not required due to the target
-  // topology. We do this prior to copy-on-write so that we are only providing
-  // real transfers to the analysis.
-  passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
-
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
   // This will insert a lot of copies, so follow it up with a pass that elides
   // ones that aren't needed. This is easier to verify than if there was one

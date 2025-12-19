@@ -685,18 +685,14 @@ static void processFuncOp(FunctionOpInterface funcOp) {
           lastTimepoint.printAsOperand(llvm::dbgs(), *asmState);
           llvm::dbgs() << " as a join\n";
         });
-        auto joinOp = IREE::Stream::TimepointJoinOp::create(
-            builder, timepointsLoc,
-            builder.getType<IREE::Stream::TimepointType>(),
-            llvm::map_to_vector(timepoints,
-                                [](Value timepoint) { return timepoint; }));
+        Value joinedTimepoint = IREE::Stream::TimepointJoinOp::join(
+            timepointsLoc, llvm::to_vector(timepoints), builder);
         auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
             builder, timepointsLoc,
             builder.getType<IREE::Stream::TimepointType>(), resource,
-            resourceSize, preferOrigin, joinOp.getResultTimepoint(),
-            resourceAffinity);
+            resourceSize, preferOrigin, joinedTimepoint, resourceAffinity);
         lastTimepoint.replaceAllUsesExcept(deallocaOp.getResultTimepoint(),
-                                           joinOp);
+                                           joinedTimepoint.getDefiningOp());
       }
     });
   }

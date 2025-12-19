@@ -285,9 +285,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
   // once the pipeline is able to support it. After adding multiple dimensions,
-  // all instances of schedule->m/nSubgroupCounts[0] and
-  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
-  // just the first element.
+  // all instances of schedule->m/nSubgroupCounts[0],
+  // schedule->m/n/kTileSizes[0] and schedule->m/n/kSizes[0] need to use the
+  // full list of sizes instead of just the first element.
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
@@ -345,6 +345,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   LDBG() << "Schedule: " << schedule;
 
+  assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
+
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
       ShapedType::getNumElements(schedule->nSubgroupCounts) *
@@ -368,12 +370,12 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     reductionTileSizes[ic] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
-  workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  workgroupTileSizes[mDim] = schedule->mSubgroupCounts[0] *
+                             schedule->mTileSizes[0] * schedule->mSizes[0];
+  workgroupTileSizes[nDim] = schedule->nSubgroupCounts[0] *
+                             schedule->nTileSizes[0] * schedule->nSizes[0];
 
-  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSizes[0];
 
   // Tile all filter loop dimensions to 1.
   for (int64_t filterDim : convolutionDims->filterLoop) {
@@ -404,7 +406,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-        context, /*prefetchSharedMemory=*/true,
+        context, /*prefetchNumStages=*/2,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
         /*use_igemm_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
@@ -510,9 +512,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
   // once the pipeline is able to support it. After adding multiple dimensions,
-  // all instances of schedule->m/nSubgroupCounts[0] and
-  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
-  // just the first element.
+  // all instances of schedule->m/nSubgroupCounts[0],
+  // schedule->m/n/kTileSizes[0] and schedule->m/n/kSizes[0] need to use the
+  // full list of sizes instead of just the first element.
   GPUMatmulShapeType problem{
       {bounds[mDim]}, {bounds[nDim]}, {bounds[kDim]}, getDimBounds(batchDims),
       lhsElemType,    rhsElemType,    initElemType,   numHorizontallyFusedOps};
@@ -597,6 +599,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "Schedule: " << schedule;
 
+  assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
+
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
       ShapedType::getNumElements(schedule->nSubgroupCounts) *
@@ -623,12 +627,12 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
-  workgroupTileSizes[nDim] =
-      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  workgroupTileSizes[mDim] = schedule->mSubgroupCounts[0] *
+                             schedule->mTileSizes[0] * schedule->mSizes[0];
+  workgroupTileSizes[nDim] = schedule->nSubgroupCounts[0] *
+                             schedule->nTileSizes[0] * schedule->nSizes[0];
 
-  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSizes[0];
 
   LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
                                        *contractionDims, workgroupTileSizes));
@@ -663,7 +667,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Prefetch shared memory if requested.
   if (clLLVMGPUEnablePrefetch) {
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-        context, /*prefetchSharedMemory=*/true,
+        context, /*prefetchNumStages=*/2,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
         /*use_igemm_convolution=*/false,
         /*reorder_workgroups_strategy=*/std::nullopt);
@@ -893,7 +897,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
         pvSchedule.mSubgroupCounts[i] * pvSchedule.mTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == mDims.size() - 1) {
-      workgroupTileSizes[mDim] *= pvSchedule.mSize;
+      workgroupTileSizes[mDim] *= llvm::product_of(pvSchedule.mSizes);
     }
     subgroupBasis.counts[mDim] = pvSchedule.mSubgroupCounts[i];
   }
@@ -902,7 +906,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
         pvSchedule.nSubgroupCounts[i] * pvSchedule.nTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == nDims.size() - 1) {
-      workgroupTileSizes[nDim] *= pvSchedule.nSize;
+      workgroupTileSizes[nDim] *= llvm::product_of(pvSchedule.nSizes);
     }
     subgroupBasis.counts[nDim] = pvSchedule.nSubgroupCounts[i];
   }
@@ -910,7 +914,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     reductionTileSizes[k2Dim] = pvSchedule.kTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == k2Dims.size() - 1) {
-      reductionTileSizes[k2Dim] *= pvSchedule.kSize;
+      reductionTileSizes[k2Dim] *= llvm::product_of(pvSchedule.kSizes);
     }
   }
 
@@ -1493,7 +1497,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
           IREE::GPU::LoweringConfigAttr::get(context, configDict);
       SmallVector<NamedAttribute, 1> pipelineAttrs;
       auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-          context, /*prefetchSharedMemory=*/false,
+          context, /*prefetchNumStages=*/0,
           /*no_reduce_shared_memory_bank_conflicts=*/true,
           /*use_igemm_convolution=*/false,
           /*reorder_workgroups_strategy=*/std::nullopt);
@@ -1893,7 +1897,8 @@ static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
 // Transpose Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
+static LogicalResult setTransposeConfig(IREE::GPU::TargetAttr target,
+                                        mlir::FunctionOpInterface entryPoint,
                                         linalg::LinalgOp linalgOp) {
   LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
 
@@ -1922,12 +1927,16 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 
   int32_t tileM = 32;
   int32_t tileN = 32;
-  TileSizesListType tileSizes;
   // Set all tile sizes to 1 except for fastest moving dimensions.
-  SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
-  tileSizesTemp[outputFastestDim] = 32;
-  tileSizesTemp[inputFastestDim] = 32;
-  tileSizes.push_back(tileSizesTemp);
+  SmallVector<int64_t> workgroupTileSizes(linalgOp.getNumLoops(), 1);
+  workgroupTileSizes[outputFastestDim] = 32;
+  workgroupTileSizes[inputFastestDim] = 32;
+
+  // Set the thread tile sizes to 1 for all dims except the fastest varying
+  // output dim which we set to 4. Because we promote the tranposed input
+  // operands, this gives both vectorized global reads and writes.
+  SmallVector<int64_t> threadTileSizes(linalgOp.getNumLoops(), 1);
+  threadTileSizes[outputFastestDim] = 4;
 
   // Check alignment with tile size for each transpose. Only the fastest moving
   // dims need to match the transpose tile.
@@ -1941,9 +1950,38 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
   // moving dimension so each thread can execute a vectorized copy of 4
   // contiguous elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
+
+  MLIRContext *context = linalgOp.getContext();
+  Builder b(context);
+  SmallVector<NamedAttribute> attrs{
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes))};
+  SmallVector<int64_t> promotedOperands;
+  for (OpOperand *operand : transposedOperands) {
+    promotedOperands.push_back(operand->getOperandNumber());
+  }
+  IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
+  DictionaryAttr configDict = DictionaryAttr::get(context, attrs);
+  IREE::GPU::LoweringConfigAttr loweringConfig =
+      IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  IREE::GPU::GPUPipelineOptionsAttr pipelineOptions =
+      IREE::GPU::GPUPipelineOptionsAttr::get(
+          context, /*prefetchSharedMemory=*/false,
+          /*no_reduce_shared_memory_bank_conflicts=*/false,
+          /*use_igemm_convolution=*/false,
+          /*reorder_workgroups_strategy=*/std::nullopt);
+  DictionaryAttr pipelineConfig = DictionaryAttr::get(
+      context,
+      {NamedAttribute(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(),
+                      pipelineOptions)});
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, linalgOp, tileSizes,
-      CodeGenPipeline::LLVMGPUTransposeSharedMem, workgroupSize);
+      entryPoint, linalgOp, loweringConfig,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
 //====---------------------------------------------------------------------===//
@@ -2257,7 +2295,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp) {
-      if (succeeded(setTransposeConfig(entryPointFn, genericOp))) {
+      if (genericOp &&
+          succeeded(setTransposeConfig(target, entryPointFn, genericOp))) {
         LDBG() << "Transpose Config";
         return success();
       } else if (ukernelConfig &&

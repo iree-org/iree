@@ -50,6 +50,18 @@ def TopkSplitReductionPass:
   ];
 }
 
+def DecomposeAggregatedOpPass :
+    InterfacePass<"iree-linalg-ext-decompose-aggregated-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Decomposes ops that implement the AggregatedOpImpl interface";
+  let options = [
+    Option<"filterOps", "filter-ops", "std::string", /*default=*/"",
+            [{
+              A comma-delimited list of op names. This pass decomposes every op listed.
+              Op names must be fully-qualified (eg. `linalg.generic`).
+            }]>
+  ];
+}
+
 def DecomposeIm2colPass :
     InterfacePass<"iree-linalg-ext-decompose-im2col", "mlir::FunctionOpInterface"> {
   let summary =

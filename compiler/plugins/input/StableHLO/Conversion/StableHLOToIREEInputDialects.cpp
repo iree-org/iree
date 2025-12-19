@@ -521,7 +521,7 @@ struct ConvertStableHloToIreeInputDialects final
     // Run upstream stablehlo patterns with a default benefit.
     ::mlir::stablehlo::populateStablehloToLinalgConversionPatterns(
         context, *typeConverter, &patterns, /*enablePrimitiveOps=*/false,
-        /*enableSparseOps=*/false);
+        /*enableSparseOps=*/false, /*captureScalarInputs=*/true);
 
     // Lowerings using IREE-specific operators (and not just common dialects
     // like linalg, scf, arith, etc.).

@@ -1,5 +1,19 @@
 // RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors --verify-diagnostics %s | FileCheck %s
 
+// CHECK-LABEL: util.func public @denseTensorConstantI1Packed()
+util.func public @denseTensorConstantI1Packed() -> !stream.resource<constant> {
+  // CHECK: %[[STATIC_SIZE:.+]] = arith.constant 2 : index
+  // CHECK: %[[RET:.+]] = stream.async.constant : !stream.resource<constant>{%[[STATIC_SIZE]]} =
+  // CHECK-SAME: dense<[false, true, false, true, false, true, false, false, false, true, true, true]> : tensor<12xi1, #iree_encoding.packed_storage>
+  %0 = stream.tensor.constant : tensor<12xi1, #iree_encoding.packed_storage> in !stream.resource<constant> = dense<[
+    false, true, false, true, false, true, false, false, false, true, true, true
+  ]> : tensor<12xi1, #iree_encoding.packed_storage>
+  // CHECK: util.return %[[RET]]
+  util.return %0 : !stream.resource<constant>
+}
+
+// -----
+
 // CHECK-LABEL:  util.func public @denseTensorConstantI2()
 util.func public @denseTensorConstantI2() -> !stream.resource<constant> {
   // CHECK: %[[STATIC_SIZE:.+]] = arith.constant 4 : index
@@ -117,6 +131,32 @@ util.func public @denseTensorStore(%arg0: !stream.resource<staging>, %arg1: inde
 
 // -----
 
+// CHECK-LABEL: @denseTensorSplatI1Packed
+util.func public @denseTensorSplatI1Packed(%arg0: i1, %arg1: index) -> !stream.resource<*> {
+  // CHECK: %[[CONSTANT_0:.*]] = arith.constant 1 : i8
+  // CHECK: %[[EXTUI_0:.*]] = arith.extui %arg0 : i1 to i8
+  // CHECK: %[[SHLI_0:.*]] = arith.shli %[[EXTUI_0]], %[[CONSTANT_0]] : i8
+  // CHECK: %[[ORI_0:.*]] = arith.ori %[[SHLI_0]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_1:.*]] = arith.shli %[[ORI_0]], %[[CONSTANT_0]] : i8
+  // CHECK: %[[ORI_1:.*]] = arith.ori %[[SHLI_1]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_2:.*]] = arith.shli %[[ORI_1]], %[[CONSTANT_0]] : i8
+  // CHECK: %[[ORI_2:.*]] = arith.ori %[[SHLI_2]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_3:.*]] = arith.shli %[[ORI_2]], %[[CONSTANT_0]] : i8
+  // CHECK: %[[ORI_3:.*]] = arith.ori %[[SHLI_3]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_4:.*]] = arith.shli %[[ORI_3]], %[[CONSTANT_0]] : i8
+  // CHECK: %[[ORI_4:.*]] = arith.ori %[[SHLI_4]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_5:.*]] = arith.shli %[[ORI_4]], %[[CONSTANT_0]] : i8
+  // CHECK: %[[ORI_5:.*]] = arith.ori %[[SHLI_5]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_6:.*]] = arith.shli %[[ORI_5]], %[[CONSTANT_0]] : i8
+  // CHECK: %[[ORI_6:.*]] = arith.ori %[[SHLI_6]], %[[EXTUI_0]] : i8
+  // CHECK: %[[ASYNC_0:.*]] = stream.async.splat %[[ORI_6]] : i8 -> !stream.resource<*>{%arg1}
+  %0 = stream.tensor.splat %arg0 : i1 -> tensor<4x3xi1, #iree_encoding.packed_storage> in !stream.resource<*>{%arg1}
+  // CHECK: util.return %[[ASYNC_0]] : !stream.resource<*>
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @denseTensorSplatI2
 util.func public @denseTensorSplatI2(%arg0: i2, %arg1: index, %arg2: index) -> !stream.resource<*> {
   // CHECK: %[[C2:.+]] = arith.constant 2 : i8
@@ -130,6 +170,41 @@ util.func public @denseTensorSplatI2(%arg0: i2, %arg1: index, %arg2: index) -> !
   // CHECK: %[[SPLAT:.+]] = stream.async.splat %[[FULL]] : i8 -> !stream.resource<*>{%arg2}
   %0 = stream.tensor.splat %arg0 : i2 -> tensor<?x1x16xi2>{%arg1} in !stream.resource<*>{%arg2}
   // CHECK: util.return %[[SPLAT]] : !stream.resource<*>
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorFillI1Packed
+util.func public @denseTensorFillI1Packed(%arg0: i1, %arg1: !stream.resource<*>, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index) -> !stream.resource<*> {
+  // CHECK-DAG: %[[CONSTANT_0:.*]] = arith.constant 8 : index
+  // CHECK-DAG: %[[CONSTANT_1:.*]] = arith.constant 16 : index
+  // CHECK-DAG: %[[CONSTANT_2:.*]] = arith.constant 1 : i8
+  // CHECK: %[[EXTUI_0:.*]] = arith.extui %arg0 : i1 to i8
+  // CHECK: %[[SHLI_0:.*]] = arith.shli %[[EXTUI_0]], %[[CONSTANT_2]] : i8
+  // CHECK: %[[ORI_0:.*]] = arith.ori %[[SHLI_0]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_1:.*]] = arith.shli %[[ORI_0]], %[[CONSTANT_2]] : i8
+  // CHECK: %[[ORI_1:.*]] = arith.ori %[[SHLI_1]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_2:.*]] = arith.shli %[[ORI_1]], %[[CONSTANT_2]] : i8
+  // CHECK: %[[ORI_2:.*]] = arith.ori %[[SHLI_2]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_3:.*]] = arith.shli %[[ORI_2]], %[[CONSTANT_2]] : i8
+  // CHECK: %[[ORI_3:.*]] = arith.ori %[[SHLI_3]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_4:.*]] = arith.shli %[[ORI_3]], %[[CONSTANT_2]] : i8
+  // CHECK: %[[ORI_4:.*]] = arith.ori %[[SHLI_4]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_5:.*]] = arith.shli %[[ORI_4]], %[[CONSTANT_2]] : i8
+  // CHECK: %[[ORI_5:.*]] = arith.ori %[[SHLI_5]], %[[EXTUI_0]] : i8
+  // CHECK: %[[SHLI_6:.*]] = arith.shli %[[ORI_5]], %[[CONSTANT_2]] : i8
+  // CHECK: %[[ORI_6:.*]] = arith.ori %[[SHLI_6]], %[[EXTUI_0]] : i8
+  // CHECK: %[[MULI_0:.*]] = arith.muli %arg4, %[[CONSTANT_1]] : index
+  // CHECK: %[[ADDI_0:.*]] = arith.addi %[[MULI_0]], %arg5 : index
+  // CHECK: %[[DIVUI_0:.*]] = arith.divui %[[ADDI_0]], %[[CONSTANT_0]] : index
+  // CHECK: %[[MULI_1:.*]] = arith.muli %arg6, %[[CONSTANT_1]] : index
+  // CHECK: %[[ADDI_1:.*]] = arith.addi %[[MULI_1]], %arg7 : index
+  // CHECK: %[[DIVUI_1:.*]] = arith.divui %[[ADDI_1]], %[[CONSTANT_0]] : index
+  // CHECK: %[[ADDI_2:.*]] = arith.addi %[[DIVUI_0]], %[[DIVUI_1]] : index
+  // CHECK: %[[ASYNC_0:.*]] = stream.async.fill %[[ORI_6]], %arg1{{\[}}%[[DIVUI_0]] to %[[ADDI_2]] for %[[DIVUI_1]]] : i8 -> %arg1 as !stream.resource<*>{%arg3}
+  // CHECK: util.return %[[ASYNC_0]] : !stream.resource<*>
+  %0 = stream.tensor.fill %arg0, %arg1[%arg4, %arg5 for %arg6, %arg7] : i1 -> tensor<?x16xi1, #iree_encoding.packed_storage>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
   util.return %0 : !stream.resource<*>
 }
 
@@ -153,6 +228,22 @@ util.func public @denseTensorFillI4(%arg0: i4, %arg1: !stream.resource<*>, %arg2
   // CHECK: %[[FILL:.+]] = stream.async.fill %[[FULL]], %arg1[%[[OFFSET]] to %[[END]] for %[[LEN]]] : i8 -> %arg1 as !stream.resource<*>{%arg3}
   %0 = stream.tensor.fill %arg0, %arg1[%arg4, %arg5 for %arg6, %arg7] : i4 -> tensor<?x16xi4>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
   // CHECK: util.return %[[FILL]]
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorSliceI1Packed
+util.func public @denseTensorSliceI1Packed(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index) -> !stream.resource<*> {
+  %c2 = arith.constant 2 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK: %[[MUL:.+]] = arith.muli %arg5, %[[C8]] : index
+  // CHECK: %[[ADD:.+]] = arith.addi %[[MUL]], %arg6 : index
+  // CHECK: %[[START:.+]] = arith.divui %[[ADD]], %[[C8]] : index
+  // CHECK: %[[END:.+]] = arith.addi %[[START]], %arg4 : index
+  // CHECK: %[[SLICE:.+]] = stream.async.slice %arg0[%[[START]] to %[[END]]] : !stream.resource<*>{%arg2} -> !stream.resource<*>{%arg4}
+  %0 = stream.tensor.slice %arg0[%arg5, %arg6 for %arg3, %c2] : tensor<?x8xi1, #iree_encoding.packed_storage>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x2xi1, #iree_encoding.packed_storage>{%arg3} in !stream.resource<*>{%arg4}
+  // CHECK: util.return %[[SLICE]] : !stream.resource<*>
   util.return %0 : !stream.resource<*>
 }
 
@@ -188,6 +279,22 @@ util.func public @denseTensorSliceI3(%arg0: !stream.resource<*>, %arg1: index, %
   // CHECK: %[[SLICE:.+]] = stream.async.slice %arg0[%[[OFFSET]] to %[[LEN]]] : !stream.resource<*>{%arg2} -> !stream.resource<*>{%arg4}
   %0 = stream.tensor.slice %arg0[%arg5, %arg6 for %arg3, %c2] : tensor<?x8xi3>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x2xi3>{%arg3} in !stream.resource<*>{%arg4}
   // CHECK: util.return %[[SLICE]] : !stream.resource<*>
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorUpdateI1Packed
+util.func public @denseTensorUpdateI1Packed(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index, %arg4: index, %arg5: index, %arg6: index) -> !stream.resource<*> {
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK: %[[MUL:.+]] = arith.muli %arg5, %[[C4]] : index
+  // CHECK: %[[ADD:.+]] = arith.addi %[[MUL]], %arg6 : index
+  // CHECK: %[[START:.+]] = arith.divui %[[ADD]], %[[C8]] : index
+  // CHECK: %[[END:.+]] = arith.addi %[[START]], %arg1 : index
+  // CHECK: %[[UPDATE:.+]] = stream.async.update %arg0, %arg2[%[[START]] to %[[END]]] : !stream.resource<*>{%arg1} -> %arg2 as !stream.resource<*>{%arg4}
+  %0 = stream.tensor.update %arg0, %arg2[%arg5, %arg6] : tensor<8x4xi1, #iree_encoding.packed_storage> in !stream.resource<*>{%arg1} -> tensor<?x4xi1, #iree_encoding.packed_storage>{%arg3} in %arg2 as !stream.resource<*>{%arg4}
+  // CHECK: util.return %[[UPDATE]] : !stream.resource<*>
   util.return %0 : !stream.resource<*>
 }
 

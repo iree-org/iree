@@ -20,7 +20,8 @@
     "--hip_allow_inline_execution=true",
     "--device_allocator=caching",
     "--function=main",
-    "--device=hip"
+    "--device=hip",
+    "--expected_f16_threshold=0.2f"
   ],
   "inputs" : [
     {

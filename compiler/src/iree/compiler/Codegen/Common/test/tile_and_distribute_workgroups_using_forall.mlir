@@ -1244,7 +1244,7 @@ func.func @multi_fusable_users(%arg0: tensor<?x65536x32xf16>, %arg1: index, %arg
 // -----
 func.func @matmul_transposed_reordering_static_on(%arg0 : tensor<8192x4096xf16>,%arg1 : tensor<128256x4096xf16>) -> tensor<8192x128256xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
-{gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+{gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<8192x128256xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<8192x128256xf32>) -> tensor<8192x128256xf32>
@@ -1273,7 +1273,7 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 
 func.func @matmul_transposed_reordering_static_no_reordering(%arg0 : tensor<8192x4096xf16>,%arg1 : tensor<128256x4096xf16>) -> tensor<8192x128256xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
-{gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+{gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<8192x128256xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<8192x128256xf32>) -> tensor<8192x128256xf32>
@@ -1301,7 +1301,7 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 
 func.func @matmul_transposed_reordering_static_off(%arg0 : tensor<128256x4096xf16>,%arg1 : tensor<8192x4096xf16>) -> tensor<128256x8192xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
-{gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+{gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %7 = tensor.empty() : tensor<128256x8192xf32>
   %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128256x8192xf32>) -> tensor<128256x8192xf32>
@@ -1330,7 +1330,7 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 
 func.func @matmul_transposed_reordering_dynamic(%arg0 : tensor<?x256x4096xf16>,%arg1 : tensor<8192x4096xf16>) -> tensor<?x256x8192xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
-{gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+{gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %dim0 = tensor.dim %arg0, %c0 : tensor<?x256x4096xf16>

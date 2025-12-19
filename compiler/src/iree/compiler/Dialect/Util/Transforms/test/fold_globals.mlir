@@ -2,15 +2,19 @@
 
 // CHECK: util.global public mutable @uniformConstants = 5 : index
 util.global public mutable @uniformConstants : index
+// CHECK-LABEL: util.func public @foo
 util.func @foo() {
   %c5 = arith.constant 5 : index
-  // CHECK-NOT: util.global.store %c5, @uniformConstants : index
+  // CHECK-NOT: util.global.store
+  // CHECK: util.return
   util.global.store %c5, @uniformConstants : index
   util.return
 }
+// CHECK-LABEL: util.func public @bar
 util.func @bar() {
   %c5 = arith.constant 5 : index
-  // CHECK-NOT: util.global.store %c5, @uniformConstants : index
+  // CHECK-NOT: util.global.store
+  // CHECK: util.return
   util.global.store %c5, @uniformConstants : index
   util.return
 }
@@ -19,12 +23,14 @@ util.func @bar() {
 
 // CHECK: util.global public mutable @nonuniformConstants : index
 util.global public mutable @nonuniformConstants : index
+// CHECK-LABEL: util.func public @foo
 util.func @foo() {
   %c5 = arith.constant 5 : index
   // CHECK: util.global.store %c5, @nonuniformConstants : index
   util.global.store %c5, @nonuniformConstants : index
   util.return
 }
+// CHECK-LABEL: util.func public @bar
 util.func @bar() {
   %c6 = arith.constant 6 : index
   // CHECK: util.global.store %c6, @nonuniformConstants : index
@@ -38,12 +44,13 @@ util.func @bar() {
 util.global private mutable @chained0 : index
 // CHECK-NOT: util.global private mutable @chained1 : index
 util.global private mutable @chained1 : index
+// CHECK-LABEL: util.func public @foo
 util.func @foo() -> index {
   // CHECK: %[[VALUE:.+]] = util.global.load immutable @chained0 : index
   %0 = util.global.load @chained0 : index
   // CHECK-NOT: util.global.store
+  // CHECK: return %[[VALUE]]
   util.global.store %0, @chained1 : index
-  // CHECK-NEXT: return %[[VALUE]]
   util.return %0 : index
 }
 
@@ -53,6 +60,7 @@ util.func @foo() -> index {
 util.global public mutable @unchained0 : index
 // CHECK: util.global public mutable @unchained1 : index
 util.global public mutable @unchained1 : index
+// CHECK-LABEL: util.func public @foo
 util.func @foo() {
   // CHECK: %[[VALUE:.+]] = util.global.load @unchained0 : index
   %0 = util.global.load @unchained0 : index
@@ -60,6 +68,7 @@ util.func @foo() {
   util.global.store %0, @unchained1 : index
   util.return
 }
+// CHECK-LABEL: util.func public @bar
 util.func @bar(%arg0: index) {
   // CHECK: util.global.store %arg0, @unchained1 : index
   util.global.store %arg0, @unchained1 : index
@@ -71,28 +80,32 @@ util.func @bar(%arg0: index) {
 // NOTE: we're indirectly testing the mutable -> immutable change as the
 // patterns will inline the constants iff the globals are made immutable.
 
-// CHECK-NOT: @immutable0
-util.global private mutable @immutable0 = 5 : index
-// CHECK-NOT: @immutable1
-util.global private mutable @immutable1 : index
+// Globals @immutable0 and @immutable1 should be removed and inlined.
+// Only @mutable should remain.
 // CHECK: util.global private mutable @mutable : index
+util.global private mutable @immutable0 = 5 : index
+util.global private mutable @immutable1 : index
 util.global private mutable @mutable : index
-// CHECK-NOT: util.initializer
 util.initializer {
   %c6 = arith.constant 6 : index
   util.global.store %c6, @immutable1 : index
   util.return
 }
+// Verify the globals and initializer are removed.
+// CHECK-NOT: @immutable0
+// CHECK-NOT: @immutable1
+// CHECK-NOT: util.initializer
+// CHECK-LABEL: util.func public @foo
 util.func @foo(%arg0: index) -> (index, index, index) {
-  // CHECK-DAG: %[[C5:.+]] = arith.constant 5
+  // CHECK-DAG: %[[CONST5:.+]] = arith.constant 5
   %0 = util.global.load @immutable0 : index
-  // CHECK-DAG: %[[C6:.+]] = arith.constant 6
+  // CHECK-DAG: %[[CONST6:.+]] = arith.constant 6
   %1 = util.global.load @immutable1 : index
   // CHECK: %[[MUTABLE:.+]] = util.global.load @mutable
   %2 = util.global.load @mutable : index
   // CHECK: util.global.store %arg0, @mutable
   util.global.store %arg0, @mutable : index
-  // CHECK: return %[[C5]], %[[C6]], %[[MUTABLE]]
+  // CHECK: return %[[CONST5]], %[[CONST6]], %[[MUTABLE]]
   util.return %0, %1, %2 : index, index, index
 }
 
@@ -104,7 +117,7 @@ util.func @foo(%arg0: index) -> (index, index, index) {
 
 // CHECK: util.global private @dont_inline
 util.global private @dont_inline {some.attr = "hello!"} = 5 : index
-// CHECK: @ignore_dialect_attrs
+// CHECK-LABEL: util.func public @ignore_dialect_attrs
 util.func @ignore_dialect_attrs() -> index {
   // CHECK: util.global.load immutable @dont_inline
   %0 = util.global.load immutable @dont_inline : index
@@ -125,6 +138,7 @@ util.initializer {
   util.global.store %value, @immutable_initializer_local : index
   util.return
 }
+// CHECK-LABEL: util.func public @public_func
 util.func @public_func() -> (index, index, index) {
   util.call @public_callee() : () -> ()
   // CHECK-DAG: %[[LOCAL:.+]] = util.global.load immutable @immutable_initializer_local
@@ -150,6 +164,7 @@ util.global private mutable @used0 = 5 : index
 util.global private mutable @used1 : index
 // CHECK: util.global private @referenced : index
 util.global private @referenced : index
+// CHECK-LABEL: util.func public @foo
 util.func @foo(%arg0: index, %arg1: index) -> (index, index) attributes {
   some.attr = @referenced
 } {
@@ -167,13 +182,13 @@ util.func @foo(%arg0: index, %arg1: index) -> (index, index) attributes {
 
 // -----
 
+// Both unused globals should be removed.
 // CHECK-NOT: @unused0
-util.global private mutable @unused0 = 5 : index
 // CHECK-NOT: @unused1
+util.global private mutable @unused0 = 5 : index
 util.global private mutable @unused1 : index
 util.initializer {
   %c6 = arith.constant 6 : index
-  // CHECK-NOT: util.global.store %c6, @unused1 : index
   util.global.store %c6, @unused1 : index
   util.return
 }
@@ -202,17 +217,18 @@ builtin.module @named_module attributes {
 util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
 // CHECK-NOT: util.global private @dupeCst1
 util.global private @dupeCst1 {inlining_policy = #util.inline.never} = 5 : index
+// CHECK-LABEL: util.func public @foo
 util.func @foo() -> (index, index) attributes {
   some.attr = @dupeCst1
 } {
-  // CHECK-DAG: %[[VALUE0:.+]] = util.global.load immutable @dupeCst0
+  // CHECK-NEXT: %[[VALUE0:.+]] = util.global.load immutable @dupeCst0
   %0 = util.global.load @dupeCst0 : index
-  // CHECK-DAG: %[[VALUE1:.+]] = util.global.load immutable @dupeCst0
+  // CHECK-NEXT: %[[VALUE1:.+]] = util.global.load immutable @dupeCst0
   %1 = util.global.load @dupeCst1 : index
-  // CHECK-DAG: util.optimization_barrier
+  // CHECK-NEXT: %{{.+}} = util.optimization_barrier
   // CHECK-SAME: op.attr = @dupeCst0
   util.optimization_barrier {op.attr = @dupeCst1} %1 : index
-  // CHECK: return %[[VALUE0]], %[[VALUE1]]
+  // CHECK-NEXT: return %[[VALUE0]], %[[VALUE1]]
   util.return %0, %1 : index, index
 }
 
@@ -230,21 +246,22 @@ util.global private @dontFoldInitialized = 6 : index
 util.global private @foldUnintialized : index
 // CHECK: util.initializer
 util.initializer {
-  // CHECK-DAG: %[[C7:.+]] = arith.constant 7
+  // CHECK-NEXT: %[[STORE_VAL:.+]] = arith.constant 7
   %c7 = arith.constant 7 : index
-  // CHECK-DAG: util.global.store %[[C7]], @dontFoldInitialized
+  // CHECK-NEXT: util.global.store %[[STORE_VAL]], @dontFoldInitialized
   util.global.store %c7, @dontFoldInitialized : index
   %c8 = arith.constant 8 : index
-  // CHECK-NOT: util.global.store %{{.+}}, @foldUnintialized
   util.global.store %c8, @foldUnintialized : index
+  // CHECK-NEXT: util.return
   util.return
 }
+// CHECK-LABEL: util.func public @foo
 util.func @foo() -> (index, index) {
-  // CHECK-DAG: %[[UNFOLDED:.+]] = util.global.load immutable @dontFoldInitialized
-  %0 = util.global.load @dontFoldInitialized : index
-  // CHECK-DAG: %[[FOLDED:.+]] = arith.constant 8 : index
+  // CHECK-NEXT: %[[FOLDED:.+]] = arith.constant 8 : index
   %1 = util.global.load @foldUnintialized : index
-  // CHECK: return %[[UNFOLDED]], %[[FOLDED]]
+  // CHECK-NEXT: %[[UNFOLDED:.+]] = util.global.load immutable @dontFoldInitialized
+  %0 = util.global.load @dontFoldInitialized : index
+  // CHECK-NEXT: return %[[UNFOLDED]], %[[FOLDED]]
   util.return %0, %1 : index, index
 }
 
@@ -274,15 +291,38 @@ util.global private @nondupeCst1 {
   inlining_policy = #util.inline.never,
   some.attr = 123 : index
 } = 5 : index
+// CHECK-LABEL: util.func public @foo
 util.func @foo() -> (index, index, index, index) {
-  // CHECK-DAG: %[[VALUE0:.+]] = util.global.load immutable @dupeCst0
+  // CHECK-NEXT: %[[VALUE0:.+]] = util.global.load immutable @dupeCst0
   %0 = util.global.load @dupeCst0 : index
-  // CHECK-DAG: %[[VALUE1:.+]] = util.global.load immutable @dupeCst0
+  // CHECK-NEXT: %[[VALUE1:.+]] = util.global.load immutable @dupeCst0
   %1 = util.global.load @dupeCst1 : index
-  // CHECK-DAG: %[[VALUE2:.+]] = util.global.load immutable @nondupeCst0
+  // CHECK-NEXT: %[[VALUE2:.+]] = util.global.load immutable @nondupeCst0
   %2 = util.global.load @nondupeCst0 : index
-  // CHECK-DAG: %[[VALUE3:.+]] = util.global.load immutable @nondupeCst1
+  // CHECK-NEXT: %[[VALUE3:.+]] = util.global.load immutable @nondupeCst1
   %3 = util.global.load @nondupeCst1 : index
-  // CHECK: return %[[VALUE0]], %[[VALUE1]], %[[VALUE2]], %[[VALUE3]]
+  // CHECK-NEXT: return %[[VALUE0]], %[[VALUE1]], %[[VALUE2]], %[[VALUE3]]
   util.return %0, %1, %2, %3 : index, index, index, index
+}
+
+// -----
+
+// Tests that globals with the same initial value but different types are not
+// deduplicated.
+
+// CHECK: util.global private @untyped_list = #util.uninitialized : !util.list<?>
+util.global private @untyped_list = #util.uninitialized : !util.list<?>
+// CHECK: util.global private @typed_list = #util.uninitialized : !util.list<i32>
+util.global private @typed_list = #util.uninitialized : !util.list<i32>
+// CHECK-LABEL: util.func public @use_untyped
+util.func @use_untyped() -> !util.list<?> {
+  // CHECK: util.global.load immutable @untyped_list : !util.list<?>
+  %0 = util.global.load @untyped_list : !util.list<?>
+  util.return %0 : !util.list<?>
+}
+// CHECK-LABEL: util.func public @use_typed
+util.func @use_typed() -> !util.list<i32> {
+  // CHECK: util.global.load immutable @typed_list : !util.list<i32>
+  %0 = util.global.load @typed_list : !util.list<i32>
+  util.return %0 : !util.list<i32>
 }

@@ -30,6 +30,15 @@ bool needToPackSubByteElements(RankedTensorType shapedType);
 /// cases.
 Type legalizeStorageElementType(Type elementType);
 
+/// Legalizes the underlying element type of |shapedType| for storage, taking
+/// into account the encoding attributes of |shapedType|, if present.
+///
+/// In IREE, if compiling from the same source model, we control both the
+/// runtime and kernel. For such cases, we perform tight packing for supported
+/// sub-byte elements, and expand to the next power-of-two bit width for other
+/// cases.
+Type legalizeStorageElementType(RankedTensorType shapedType);
+
 /// Emits IR with the given |builder| to calculate the total number of bytes
 /// required for the given |shapedType| in storage. Returns the value for the
 /// final count on success; returns nullptr on failure. Dynamic dimensions in

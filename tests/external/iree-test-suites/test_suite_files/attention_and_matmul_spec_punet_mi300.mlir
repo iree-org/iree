@@ -103,7 +103,7 @@ transform.named_sequence @match_mmt_2048x10240x1280(%matmul: !transform.any_op {
                                                  workgroup = [128, 320, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
       workgroup_size = [128, 4, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>
       }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }
@@ -127,7 +127,7 @@ transform.named_sequence @match_mmt_2048x1280x5120(%matmul: !transform.any_op {t
                                                  workgroup = [128, 80, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
       workgroup_size = [64, 4, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>
       }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }
@@ -151,7 +151,7 @@ transform.named_sequence @match_mmt_2048x1280x1280(%matmul: !transform.any_op {t
                                                  workgroup = [64, 160, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
       workgroup_size = [256, 1, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2,
                                                          reorder_workgroups_strategy = <Transpose>>}>
   > -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
@@ -176,7 +176,7 @@ transform.named_sequence @match_mmt_8192x640x640(%matmul: !transform.any_op {tra
                                                  workgroup = [256, 64, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
       workgroup_size = [512, 1, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
   > -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }
@@ -200,7 +200,7 @@ transform.named_sequence @match_mmt_8192x5120x640(%matmul: !transform.any_op {tr
                                                  workgroup = [256, 128, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
       workgroup_size = [512, 1, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
   > -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }
@@ -224,7 +224,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                  workgroup = [256, 64, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
       workgroup_size = [512, 1, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
   > -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }
@@ -261,7 +261,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 128, 320, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
     > -> !transform.any_param
     transform.yield %generic, %config : !transform.any_op, !transform.any_param
   }
@@ -286,7 +286,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 64, 160, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [256, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2,
                                                            reorder_workgroups_strategy = <Transpose>>}>
     > -> !transform.any_param
     transform.yield %generic, %config : !transform.any_op, !transform.any_param
@@ -312,7 +312,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 64, 160, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [256, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2,
                                                            reorder_workgroups_strategy = <Transpose>>
         }>
     > -> !transform.any_param
@@ -339,7 +339,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 256, 64, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
     > -> !transform.any_param
     transform.yield %generic, %config : !transform.any_op, !transform.any_param
   }
@@ -364,7 +364,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 32, 320, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [128, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
     > -> !transform.any_param
     transform.yield %generic, %config : !transform.any_op, !transform.any_param
   }
@@ -389,7 +389,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 256, 128, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
     > -> !transform.any_param
     transform.yield %generic, %config : !transform.any_op, !transform.any_param
   }
@@ -419,7 +419,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 1, 64, 160, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [256, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2,
                                                            reorder_workgroups_strategy = <Transpose>>
         }>
     > -> !transform.any_param
@@ -449,7 +449,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 1, 160, 64, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [256, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true,
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2,
                                                            reorder_workgroups_strategy = <Transpose>>
         }>
     > -> !transform.any_param
@@ -477,7 +477,7 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                                                    workgroup = [1, 1, 32, 320, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [128, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
     > -> !transform.any_param
     transform.yield %cont, %config : !transform.any_op, !transform.any_param
   }
@@ -504,7 +504,7 @@ transform.named_sequence @match_matmul_like_Bx20x64x64x2048_transposev_i8xi8xi32
                                                    workgroup = [1, 1, 320, 32, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [128, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
     > -> !transform.any_param
     transform.yield %cont, %config : !transform.any_op, !transform.any_param
   }
@@ -530,7 +530,7 @@ transform.named_sequence @match_matmul_like_Bx20x64x64x2048_transposev_i8xi8xi32
                                                    workgroup = [1, 1, 256, 64, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+        {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
     > -> !transform.any_param
     transform.yield %cont, %config : !transform.any_op, !transform.any_param
   }

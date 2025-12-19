@@ -102,9 +102,6 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize:
     addGPUWinogradVectorizePassPipeline(pipeline);
     break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
-    addGPUTransposePassPipeline(pipeline, pipelineOptions);
-    break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
     addGPUVectorDistributePassPipeline(pipeline, pipelineOptions, forROCDL);
     break;

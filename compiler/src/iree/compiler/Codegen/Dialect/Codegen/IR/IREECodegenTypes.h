@@ -11,6 +11,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -48,7 +49,7 @@ struct TileSwizzle {
       // "unrolled" across subgroups. Such dimensions are cross-subgroup, so in
       // particular they are cross-thread.
       CrossThread,
-      // This dimensions is across intrinsics, as in, actual instructions in the
+      // This dimension is across intrinsics, as in, actual instructions in the
       // generated code. In other words, it is an actual unrolling factor,
       // resulting in this many more instructions being generated and executed
       // on each thread/subgroup.
@@ -82,8 +83,8 @@ struct TileSwizzle {
         : kind(kind), size(size), distributionSize(distributionSize) {}
   };
 
-  using ExpandShapeDimVectorType = llvm::SmallVector<Dim, 4>;
-  using ExpandShapeType = llvm::SmallVector<ExpandShapeDimVectorType>;
+  using ExpandShapeDimVectorType = SmallVector<Dim, 4>;
+  using ExpandShapeType = SmallVector<ExpandShapeDimVectorType>;
 
   // This vector-of-vectors contains all the information needed to generate
   // a `tensor.expand_shape` creating additional internal dimensions into the
@@ -96,7 +97,15 @@ struct TileSwizzle {
   // to generate a `linalg.transpose` changing the layout of the tile. For
   // example, permutation[0] dictates which of the expanded dimensions becomes
   // the leading dimension of the layout.
-  llvm::SmallVector<int64_t> permutation;
+  SmallVector<int64_t> permutation;
+
+  // Returns the total number of expanded dimensions.
+  int64_t getExpandedSize() const;
+
+  // Verifies consistency of the tile swizzle:
+  // - The permutation size must match the total number of expanded dimensions.
+  // - The permutation indices must be valid (within bounds and unique).
+  LogicalResult verify(function_ref<InFlightDiagnostic()> emitError) const;
 };
 
 using ScalableTileFlags = SmallVector<bool>;

@@ -168,10 +168,10 @@ util.func public @decode_source_resource(%resource: !stream.resource<*>, %total_
 
 // -----
 
-// CHECK-DAG:  #[[ENCODING0:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
-// CHECK-DAG:  #[[ENCODING1:.+]] = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
-#encoding0 = #iree_encoding.testing<[#iree_encoding.specialized<123>]>
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
+// CHECK-DAG:  #[[ENCODING0:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+// CHECK-DAG:  #[[ENCODING1:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
+#encoding0 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<456>]>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
 // CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]])
