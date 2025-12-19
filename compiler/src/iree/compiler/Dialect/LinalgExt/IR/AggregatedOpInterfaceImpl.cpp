@@ -10,6 +10,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -1041,6 +1042,211 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
   rewriter.mergeBlocks(newBlock, oldBlock);
 
   return customOpReplacements;
+}
+
+//===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+/// The return value of captureUsedOperationsAndBlockArguments
+struct UsedOperationsAndBlockArguments {
+  SetVector<int64_t> usedInputIndices;
+  SetVector<Operation *> usedOperations;
+};
+
+/// For a given `resultNumber` in a linalg::GenericOp, this op scans the
+/// GenericOp's body for the block arguments and operations that are involved
+/// in its computation.
+///
+/// Block arguments used are returned as indices over the dpsInputs and
+/// dpsInputs, to be used as:
+/// ```
+/// for (auto idx : usedInputIndices)
+///   if (idx < getNumDpsInputs())
+///     getDpsInputOperand(idx)
+///   else
+///     getDpsInitOperand(idx)
+/// ```
+/// As resultNumber is specified, if a dpsInit is used that is not resultNumber
+/// failure is returned.
+///
+/// Operations are returned as generic operations.
+static FailureOr<UsedOperationsAndBlockArguments>
+captureUsedOperationsAndBlockArguments(linalg::GenericOp genericOp,
+                                       int64_t resultNumber) {
+  BackwardSliceOptions options;
+  options.inclusive = true;
+  options.filter = [&genericOp](Operation *op) -> bool {
+    return op->getBlock() == genericOp.getBody();
+  };
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBlock()->getTerminator());
+  Value result = yieldOp.getOperand(resultNumber);
+  SetVector<Operation *> usedOperations;
+  if (failed(getBackwardSlice(result, &usedOperations, options))) {
+    return failure();
+  }
+
+  SetVector<int64_t> usedInputIndices;
+  // Get all block arguments used by the operations. If any of the arguments
+  // used is a dpsInit argument other than resultNumber, return failure.
+  for (Operation *op : usedOperations) {
+    for (Value operand : op->getOperands()) {
+      auto blockArg = dyn_cast<BlockArgument>(operand);
+      if (!blockArg) {
+        continue;
+      }
+      if (blockArg.getOwner() != genericOp.getBlock()) {
+        continue;
+      }
+      int64_t argNumber = blockArg.getArgNumber();
+      if (argNumber < genericOp.getNumDpsInputs()) {
+        usedInputIndices.insert(argNumber);
+        continue;
+      }
+      if (argNumber - genericOp.getNumDpsInputs() != resultNumber) {
+        return failure();
+      }
+    }
+  }
+
+  return UsedOperationsAndBlockArguments{usedInputIndices, usedOperations};
+}
+
+/// Returns a vector of GenericOps with only one output.
+/// Each generic op in the vector corresponds to an output in the input
+/// generic op. However, these resultant ops will only contain the:
+///   1. Block Arguments that are involved in the result's computation and
+///   2. The Operations involved in the result's computation
+static FailureOr<SmallVector<linalg::GenericOp>>
+decomposeMultipleResults(linalg::GenericOp genericOp, RewriterBase &rewriter) {
+  if (genericOp.getNumResults() < 2) {
+    return SmallVector<linalg::GenericOp>{genericOp};
+  }
+
+  IRRewriter::InsertionGuard g(rewriter);
+  SmallVector<linalg::GenericOp> results;
+  // Create num_results linalg.generics, each producing a single result (and
+  // relying on canonicalizations to simplify).
+  for (auto resultNumber : llvm::seq<int64_t>(genericOp.getNumResults())) {
+    rewriter.setInsertionPoint(genericOp);
+    auto yieldOp = cast<linalg::YieldOp>(genericOp.getBlock()->getTerminator());
+    Value result = yieldOp.getOperand(resultNumber);
+    // Get all operations required to produce this result.
+    auto usedOperationsAndBlockArguments =
+        captureUsedOperationsAndBlockArguments(genericOp, resultNumber);
+    if (failed(usedOperationsAndBlockArguments)) {
+      return failure();
+    }
+    // Create a new linalg.generic operation for this result.
+    SmallVector<Value> inputs = llvm::map_to_vector(
+        usedOperationsAndBlockArguments->usedInputIndices,
+        [&](int64_t x) { return genericOp.getDpsInputOperand(x)->get(); });
+    SmallVector<Value> inits = {
+        genericOp.getDpsInitOperand(resultNumber)->get()};
+
+    SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
+        usedOperationsAndBlockArguments->usedInputIndices,
+        [&](int64_t x) { return genericOp.getIndexingMapsArray()[x]; });
+    indexingMaps.push_back(genericOp.getIndexingMapMatchingResult(
+        genericOp->getOpResult(resultNumber)));
+    llvm::SmallBitVector unusedDims = getUnusedDimsBitVector(indexingMaps);
+    indexingMaps = compressUnusedDims(indexingMaps);
+    SmallVector<utils::IteratorType> iteratorTypes;
+    for (auto i : llvm::seq<int64_t>(genericOp.getNumLoops())) {
+      if (!unusedDims.test(i)) {
+        iteratorTypes.push_back(genericOp.getIteratorTypesArray()[i]);
+      }
+    }
+    auto newOp = linalg::GenericOp::create(
+        rewriter, genericOp.getLoc(), TypeRange(inits), inputs, inits,
+        indexingMaps, iteratorTypes,
+        [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
+          Block *oldBody = genericOp.getBody();
+          usedOperationsAndBlockArguments->usedInputIndices.insert(
+              resultNumber + genericOp.getNumDpsInputs());
+          IRMapping regionMapping;
+          for (auto [oldBlockArgNum, newBlockArg] : llvm::zip_equal(
+                   usedOperationsAndBlockArguments->usedInputIndices,
+                   blockArgs)) {
+            regionMapping.map(oldBody->getArgument(oldBlockArgNum),
+                              newBlockArg);
+          }
+          for (Operation *usedOperation :
+               usedOperationsAndBlockArguments->usedOperations) {
+            b.clone(*usedOperation, regionMapping);
+          }
+          linalg::YieldOp::create(b, loc, regionMapping.lookup(result));
+        });
+    rewriter.replaceAllUsesWith(genericOp.getResult(resultNumber),
+                                newOp.getResult(0));
+
+    results.push_back(newOp);
+  }
+
+  return results;
+}
+
+FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
+  Location loc = getLoc();
+  IRRewriter rewriter(b);
+
+  // Let the first dpsInputOperand be s
+  // Split the op into:
+  // curr_max = max(s, old_max)
+  // ex = e^{x - curr_max}
+  // norm = e^{curr_max - old_max}
+  // for each outs in exp_reduction:
+  //     norm_outs = outs * norm
+  // linalg.generic ins(ex, ...) outs(norm_outs)
+
+  const int reducingOpIndex = getReducingOpIndex();
+  OpOperand *sValue = getDpsInputOperand(reducingOpIndex);
+  OpOperand *prevMax = getDpsInitOperand(reducingOpIndex);
+  AffineMap normValMap = getMatchingIndexingMap(sValue);
+  AffineMap prevMaxMap = getMatchingIndexingMap(prevMax);
+
+  // curr_max = max(sValue, prev_max)
+  Value currMax = reduce<arith::MaximumFOp>(
+      rewriter, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
+  // ex = e^{sValue - curr_max}
+  Value ex = computeSubAndExp2(rewriter, loc, prevMaxMap, normValMap, currMax,
+                               sValue->get());
+  // norm = e^(prev_max - curr_max)
+  Value norm = computeSubAndExp2(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
+                                 prevMax->get());
+
+  SmallVector<Value> inputs = getDpsInputs();
+  SmallVector<Value> normOuts(getNumDpsInits());
+  inputs[reducingOpIndex] = ex;
+  normOuts[reducingOpIndex] = currMax;
+  for (int64_t index : getExpReducedOperands()) {
+    OpOperand *oldOut = getDpsInitOperand(index);
+    AffineMap oldOutMap = getMatchingIndexingMap(oldOut);
+    Value normOut = elementwiseValueInPlace<arith::MulFOp>(
+        rewriter, loc, oldOutMap, prevMaxMap, oldOut->get(), norm);
+    normOuts[index] = normOut;
+  }
+
+  auto expRedGeneric = linalg::GenericOp::create(
+      rewriter, loc, TypeRange(normOuts), inputs, normOuts,
+      getIndexingMapsArray(), getLoopIteratorTypes());
+
+  IRMapping mapper;
+  getBodyRegion().cloneInto(&expRedGeneric.getBodyRegion(), mapper);
+  IRRewriter::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(expRedGeneric.getBody()->getTerminator());
+  auto yieldOp =
+      cast<IREE::LinalgExt::YieldOp>(expRedGeneric.getBody()->getTerminator());
+  rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp, yieldOp.getOperands());
+  FailureOr<SmallVector<linalg::GenericOp>> decomposedResults =
+      decomposeMultipleResults(expRedGeneric, rewriter);
+  if (failed(decomposedResults)) {
+    return failure();
+  }
+
+  return llvm::map_to_vector(
+      decomposedResults.value(),
+      [](linalg::GenericOp op) -> Value { return op->getResult(0); });
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

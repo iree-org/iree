@@ -1018,6 +1018,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
 
 def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
   AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
   DeclareOpInterfaceMethods<IndexingMapOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
   [
@@ -1065,10 +1066,12 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     - `nmax` is the new maximum, read from the current element from the input
       tensor
 
-    The operands listed in `exp_reduced_operands` will be multiplied by `norm`
-    before executing the basic block.
+    The other input operands are unaffected.
 
-    For example,
+    The operands listed in `exp_reduced_operands` will be multiplied by `norm`
+    before executing the basic block. Other output operands are unaffected.
+
+    For example, we write the online normalized softmax algorithm as follows:
 
     ```mlir
     // compute the exponentials and the sum
@@ -1081,7 +1084,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
       iterator_types = [
         #iree_linalg_ext.iterator_type<reduction>
       ],
-      exp_reduced_operands = [ 1 ]
+      exp_reduced_operands = [ 1 ]  // 1 corresponds to %s being normalized by %m
     } ins(%V: tensor<256xf32>)
       outs(%M_init, %S: tensor<f32>, tensor<f32>) {
       ^bb0(%exp_v: f32, %m: f32, %s: f32):
@@ -1092,39 +1095,33 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     } -> tensor<f32>, tensor<f32>
   ```
 
-  Encodes the following computation
+  This encodes the following computation, sans handling of the norms
 
   ```
   %M, %O = linalg.generic {
-    indexing_maps = [
-      affine_map<(i) -> (i)>,
-      affine_map<(i) -> ()>,
-      affine_map<(i) -> ()>
-    ],
-    iterator_types = [
-      "reduction"
-    ],
+      indexing_maps = [
+        affine_map<(i) -> (i)>,
+        affine_map<(i) -> ()>,
+        affine_map<(i) -> ()>
+      ],
   } ins(%V: tensor<256xf32>)
     outs(%M_init, %S: tensor<f32>, tensor<f32>) {
     ^bb0(%v: f32, %m: f32, %s: f32):
       %exp_v = math.exp2 %v       : f32
-      %add = arith.addf %norm, %s : f32
+      %add = arith.addf %exp_v, %s : f32
       linalg.yield %m, %add       : f32, f32
-  } -> tensor<256xf32>, tensor<f32>
+  } -> tensor<f32>, tensor<f32>
   ```
 
-  And transforms it into operations equivalent to the following:
+  And decomposes into operations equivalent to the following:
 
   ```
   %M, %O = linalg.generic {
-    indexing_maps = [
-      affine_map<(i) -> (i)>,
-      affine_map<(i) -> ()>,
-      affine_map<(i) -> ()>
-    ],
-    iterator_types = [
-      "reduction"
-    ],
+      indexing_maps = [
+        affine_map<(i) -> (i)>,
+        affine_map<(i) -> ()>,
+        affine_map<(i) -> ()>
+      ],
   } ins(%V: tensor<256xf32>)
     outs(%M_init, %S: tensor<f32>, tensor<f32>) {
     ^bb0(%v: f32, %prev_m: f32, %prev_s: f32):
@@ -1136,7 +1133,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
       %s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
       %add    = arith.addf %exp_v, %s      : f32
       linalg.yield %m, %add                : f32, f32
-  } -> tensor<256xf32>, tensor<f32>
+  } -> tensor<f32>, tensor<f32>
   ```
   }];
 
@@ -1173,6 +1170,10 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     // DestinationStyleOpInterface methods.
     MutableOperandRange getDpsInitsMutable() {
       return getOutputsMutable();
+    }
+
+    int64_t getReducingOpIndex() {
+      return 0;
     }
   }];
 }
