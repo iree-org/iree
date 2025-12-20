@@ -8,9 +8,11 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -18,13 +20,14 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/TilingInterface.h"
 
+#define DEBUG_TYPE "iree-codegen-promotion-utils"
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 /// Helper to insert copy with the specified attr.
 Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
-
   Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
                                         tensorType.getElementType());
   auto copy = linalg::CopyOp::create(builder, loc, v, empty);
@@ -32,28 +35,41 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
   return copy.getResult(0);
 }
 
-/// Inserts a `linalg.copy` directly before the given operation on the
-/// specified operand, for example with operand index = 1:
-///
-///   %2 = linalg.matmul ins(%0, %1)
-///
-/// becomes
-///
-///   %empty = tensor.empty()
-///   %copy = linalg.copy %1 to %empty {
-///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
-///   linalg.matmul ins(%0, %copy)
-///
-/// If the producer is already a tilable op, the producer is just annotated with
-/// the underlying attribute.
-/// Additionally we can also promote results so in above example we will
-/// generate for index = 2 :
-///   %out_buffer = bufferization.alloc_tensor
-///   %copy1 = linalg.copy %2 to %out_buffer
-///   %copy2 = linalg.copy %copy1 to %empty {
-///     lowering_config = #iree_gpu.derived_thread_config}
-Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
-                           Attribute attr) {
+// Helper to insert a swizzle hint op and flatten the associated alloc.
+Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v,
+                          Attribute attr, int64_t rowWidth,
+                          int64_t accessWidth) {
+  auto tensorType = cast<RankedTensorType>(v.getType());
+  SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
+  if (!tensorType.hasStaticShape()) {
+    LDBG() << "Cannot create swizzle_hint op for non static shapes";
+    Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
+                                          tensorType.getElementType());
+    auto copy = linalg::CopyOp::create(builder, loc, v, empty);
+    if (attr) {
+      setLoweringConfig(copy, attr);
+    }
+    return copy.getResult(0);
+  }
+  int64_t numElements = tensorType.getNumElements();
+  Value empty = tensor::EmptyOp::create(builder, loc, {numElements},
+                                        tensorType.getElementType());
+  Value swizzled = IREE::Codegen::SwizzleHintOp::create(
+      builder, loc, empty,
+      IREE::Codegen::XORShuffleAttr::get(builder.getContext(), rowWidth,
+                                         accessWidth, int64_t(), int64_t()));
+  Value expanded = tensor::ExpandShapeOp::create(
+      builder, loc, tensorType, swizzled,
+      {llvm::to_vector(llvm::seq(tensorType.getRank()))});
+  auto copy = linalg::CopyOp::create(builder, loc, v, expanded);
+  if (attr) {
+    setLoweringConfig(copy, attr);
+  }
+  return copy.getResult(0);
+}
+
+std::optional<Value> promotionImpl(OpBuilder &builder, OpOperand &operand,
+                                   Attribute attr) {
   if (auto producer = operand.get().getDefiningOp<TilingInterface>()) {
     // Skip promotion of fills.
     if (isa<linalg::FillOp>(producer)) {
@@ -78,9 +94,63 @@ Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
   if (!tensorType) {
     return operand.get();
   }
+  return std::nullopt;
+}
 
+/// Inserts a `linalg.copy` directly before the given operation on the
+/// specified operand, for example with operand index = 1:
+///
+///   %2 = linalg.matmul ins(%0, %1)
+///
+/// becomes
+///
+///   %empty = tensor.empty()
+///   %copy = linalg.copy %1 to %empty {
+///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
+///   linalg.matmul ins(%0, %copy)
+///
+/// If the producer is already a tilable op, the producer is just annotated with
+/// the underlying attribute.
+/// Additionally we can also promote results so in above example we will
+/// generate for index = 2 :
+///   %out_buffer = bufferization.alloc_tensor
+///   %copy1 = linalg.copy %2 to %out_buffer
+///   %copy2 = linalg.copy %copy1 to %empty {
+///     lowering_config = #iree_gpu.derived_thread_config}
+Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
+                           Attribute attr) {
+  std::optional<Value> promotedValue = promotionImpl(builder, operand, attr);
+  if (promotedValue.has_value()) {
+    return promotedValue.value();
+  }
   return promoteValue(builder, operand.getOwner()->getLoc(), operand.get(),
                       attr);
+}
+
+/// Inserts a `linalg.copy` directly before the given operation on the
+/// specified operand, similar to the defaultPromotionImpl.
+/// The difference is this also assigns a `iree_codegen.swizzle_hint` op
+/// to the generated `tensor.empty` op.
+/// For example:
+///
+///   %2 = linalg.matmul ins(%0, %1)
+///
+/// becomes
+///
+///   %empty = tensor.empty()
+///   %swizzle = iree_codegen.swizzle_hint %empty[...]
+///   %copy = linalg.copy %1 to %swizzle {
+///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
+///   linalg.matmul ins(%0, %copy)
+Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
+                           Attribute attr, int64_t rowWidth,
+                           int64_t accessWidth) {
+  std::optional<Value> promotedValue = promotionImpl(builder, operand, attr);
+  if (promotedValue.has_value()) {
+    return promotedValue.value();
+  }
+  return swizzlePromoteValue(builder, operand.getOwner()->getLoc(),
+                             operand.get(), attr, rowWidth, accessWidth);
 }
 
 /// Inserts a `linalg.copy` directly before the given operation on the
