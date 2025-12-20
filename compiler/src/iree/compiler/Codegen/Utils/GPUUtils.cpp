@@ -18,6 +18,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -743,6 +744,240 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     }
   }
   return std::nullopt;
+}
+
+static FailureOr<int64_t>
+getOperandBitwidth(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                   int operandIndex) {
+  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
+    SmallVector<Type> elementTypes;
+    smma.getElementTypes(elementTypes);
+    return elementTypes[operandIndex].getIntOrFloatBitWidth();
+  }
+  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
+    auto [aType, bType, _] = mma.getABCElementTypes();
+    return operandIndex == IREE::GPU::kMMAOperandLhs
+               ? aType.getIntOrFloatBitWidth()
+               : bType.getIntOrFloatBitWidth();
+  }
+  return failure();
+}
+
+static FailureOr<int64_t>
+getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
+  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
+    return getKSize(smma.getIntrinsic()) * getKbSize(smma.getIntrinsic());
+  }
+  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
+    return getKSize(mma.getIntrinsic());
+  }
+  return failure();
+}
+
+static FailureOr<int64_t>
+getNumAccessElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                  int operandIndex) {
+  IREE::GPU::MMASingleSubgroupLayout layout;
+  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
+    layout =
+        IREE::GPU::getSingleSubgroupLayout(smma.getIntrinsic(), operandIndex);
+    return llvm::product_of(layout.element);
+  }
+  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
+    layout =
+        IREE::GPU::getSingleSubgroupLayout(mma.getIntrinsic(), operandIndex);
+    return llvm::product_of(layout.element);
+  }
+  return failure();
+}
+
+static FailureOr<int64_t>
+getTotalTileElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                  int operandIndex) {
+  IREE::GPU::MMASingleSubgroupLayout layout;
+  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
+    layout =
+        IREE::GPU::getSingleSubgroupLayout(smma.getIntrinsic(), operandIndex);
+    return llvm::product_of(layout.outer) * llvm::product_of(layout.thread) *
+           llvm::product_of(layout.element);
+  }
+  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
+    layout =
+        IREE::GPU::getSingleSubgroupLayout(mma.getIntrinsic(), operandIndex);
+    return llvm::product_of(layout.outer) * llvm::product_of(layout.thread) *
+           llvm::product_of(layout.element);
+  }
+  return failure();
+}
+
+FailureOr<std::pair<int64_t, int64_t>>
+getXORShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                    int operandIndex) {
+  FailureOr<int64_t> maybeMinimumAccessElems =
+      getNumAccessElems(intrinsic, operandIndex);
+  FailureOr<int64_t> maybeTotalTileElems =
+      getTotalTileElems(intrinsic, operandIndex);
+  if (failed(maybeMinimumAccessElems) || failed(maybeTotalTileElems)) {
+    return failure();
+  }
+  return std::make_pair(*maybeMinimumAccessElems, *maybeTotalTileElems);
+}
+
+bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
+                       int64_t totalTileElems) {
+  // The number of total tile elements we want to swizzle must be greater than
+  // or equal to the number of elements in a row.
+  if (totalTileElems < numRowElems) {
+    return false;
+  }
+  // We need at least one column of access elements to swizzle within a row.
+  if (numAccessElems < numRowElems) {
+    return false;
+  }
+  // The size of a row must evenly divide the total number of tile elements.
+  if (totalTileElems % numRowElems != 0) {
+    return false;
+  }
+  // The number of access elements must evenly divide the number of row
+  // elements.
+  if (numRowElems % numAccessElems != 0) {
+    return false;
+  }
+  // The number of columns in a row must evenly divide the total number of tile
+  // elements. This is to avoid incomplete rows at the end of the tile.
+  if (((numRowElems / numAccessElems) % totalTileElems) != 0) {
+    return false;
+  }
+  return true;
+}
+
+static FailureOr<std::pair<int64_t, int64_t>>
+validatedShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
+                 IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                 int operandIndex) {
+  if (failed(swizzle)) {
+    return failure();
+  }
+  FailureOr<int64_t> maybeTotalTileElems =
+      getTotalTileElems(intrinsic, operandIndex);
+  if (failed(maybeTotalTileElems)) {
+    return failure();
+  }
+  int64_t totalTileElems = *maybeTotalTileElems;
+  if (!isXORShuffleValid(swizzle->first, swizzle->second, totalTileElems)) {
+    return failure();
+  }
+  return swizzle;
+}
+
+// TODO(muzasyed): Add more intrinsics for gfx950.
+static FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForGfx950(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
+  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
+    switch (smma.getIntrinsic()) {
+    case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+      return std::make_pair(/*row_width*/ 256l, /*access_width*/ 32l);
+    default:
+      return failure();
+    }
+  }
+  return failure();
+}
+
+FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForTunedChipset(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
+  FailureOr<amdgpu::Chipset> maybeChipset =
+      amdgpu::Chipset::parse(target.getArch());
+  if (failed(maybeChipset)) {
+    return failure();
+  }
+  if (*maybeChipset == amdgpu::Chipset(9, 5, 0)) {
+    return validatedShuffle(
+        getXORShuffleParamsForGfx950(target, intrinsic, operandIndex),
+        intrinsic, operandIndex);
+  }
+  return failure();
+}
+
+FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForUntunedChipset(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+    ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
+  // Compute XOR shuffle swizzle parameters for bank conflict avoidance.
+  // - row_width: Select entirety of K Tile size, may not prevent bank
+  //              conflicts if the K tile size is too small.
+  // - access_width: number of contiguous elements each thread accesses,
+  //                 derived from the MMA intrinsic's element layout.
+  int64_t numAccessElems = getNumAccessElems(intrinsic, operandIndex).value();
+
+  // Calculate K tile size (total K elements in shared memory) to use as row
+  // width. For small K tiles, this may not reduce bank conflicts effectively.
+  int64_t kTileSize =
+      llvm::product_of(reductionTileSizes) * getKSize(intrinsic).value();
+  int64_t kTilePow2 = llvm::PowerOf2Ceil(kTileSize);
+
+  // Figure out how many elements can fit across all banks of LDS.
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+  FailureOr<int64_t> bitwidth = getOperandBitwidth(intrinsic, operandIndex);
+  if (failed(bitwidth)) {
+    return failure();
+  }
+  // Assumptions:
+  // - Each bank is 4 bytes wide (32 bits).
+  // - If not specified, assume 64 banks.
+  constexpr int64_t defaultBankWidthBits = 32;
+  constexpr int64_t defaultBankCount = 64;
+  int64_t ldsBankWidthBits =
+      (defaultBankCount * defaultBankWidthBits) / *bitwidth;
+  if (std::optional<int64_t> workgroupMemoryBankCount =
+          wgp.getWorkgroupMemoryBankCount()) {
+    ldsBankWidthBits =
+        (*workgroupMemoryBankCount * defaultBankWidthBits) / *bitwidth;
+  }
+
+  // Row width must be less than or equal to the row size (in elements) of LDS
+  // bank width to prevent bank conflicts.
+  int64_t effectiveRowWidth = std::min(ldsBankWidthBits, kTilePow2);
+
+  // Ensure row width is at least access width (minimum 1 column).
+  effectiveRowWidth = std::max(effectiveRowWidth, numAccessElems);
+  return validatedShuffle(std::make_pair(effectiveRowWidth, numAccessElems),
+                          intrinsic, operandIndex);
+}
+
+FailureOr<std::pair<int64_t, int64_t>>
+getXORShuffleParams(IREE::GPU::TargetAttr target,
+                    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                    ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
+  FailureOr<std::pair<int64_t, int64_t>> xorShuffleAttr =
+      getXORShuffleParamsForTunedChipset(target, intrinsic, operandIndex);
+  if (failed(xorShuffleAttr)) {
+    xorShuffleAttr = getXORShuffleParamsForUntunedChipset(
+        target, intrinsic, reductionTileSizes, operandIndex);
+  }
+  return xorShuffleAttr;
+}
+
+FailureOr<Attribute>
+getXORShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
+                  IREE::GPU::TargetAttr target,
+                  IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                  ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
+  FailureOr<std::pair<int64_t, int64_t>> xorShuffleParams =
+      getXORShuffleParams(target, intrinsic, reductionTileSizes, operandIndex);
+  if (failed(xorShuffleParams)) {
+    return failure();
+  }
+  auto [effectiveRowWidth, numAccessElems] = xorShuffleParams.value();
+  auto swizzleAttr = IREE::Codegen::XORShuffleAttr::get(
+      context, effectiveRowWidth, numAccessElems,
+      /*row_stride=*/int64_t(0),
+      /*per_phase=*/int64_t(0));
+  Attribute swizzleOperand =
+      IREE::GPU::SwizzleOperandAttr::get(context, baseConfigAttr, swizzleAttr);
+  return swizzleOperand;
 }
 
 //===----------------------------------------------------------------------===//

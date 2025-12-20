@@ -937,8 +937,20 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // TODO(#22119): We don't use global load DMA for scaled matmuls, because
     // compilation doesn't support it. Once this is fixed, we should use global
     // load DMA here when possible.
-    promotionArray = {};
+
     promotionList.append({2, 3});
+    auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
+    FailureOr<Attribute> lhsSwizzleAttr =
+        getXORShuffleAttr(context, defaultConfigAttr, target, kind,
+                          schedule->kTileSizes, kMMAOperandLhs);
+    FailureOr<Attribute> rhsSwizzleAttr =
+        getXORShuffleAttr(context, defaultConfigAttr, target, kind,
+                          schedule->kTileSizes, kMMAOperandRhs);
+    if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+      return failure();
+    }
+    promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                      defaultConfigAttr};
   }
   if ((!mustBeAligned || couldNeedPadding) && cPromoteIfPadding) {
     // If needed then add C operand which would be operand 2 or 4 for unscaled
