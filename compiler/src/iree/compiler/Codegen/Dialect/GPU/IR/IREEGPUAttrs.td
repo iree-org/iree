@@ -754,6 +754,8 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     OptionalParameter<"std::optional<int32_t>">:$vgpr_space_bits,
     // Available bit-widths for direct load from global to LDS memory.
     OptionalParameter<"DenseI64ArrayAttr">:$dma_sizes,
+    // Number of banks in LDS.
+    OptionalParameter<"std::optional<int32_t>">:$workgroup_memory_bank_count,
 
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
