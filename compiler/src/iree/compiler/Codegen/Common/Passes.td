@@ -886,6 +886,11 @@ def RemoveSingleIterationLoopPass :
   let summary = "Remove distributed loop with single iteration.";
 }
 
+def FlattenSwizzleHintAllocsPass :
+    InterfacePass<"iree-codegen-flatten-swizzle-hint-allocs", "mlir::FunctionOpInterface"> {
+  let summary = "Flattens allocations associated with iree_codegen.swizzle_hint ops";
+}
+
 def ResolveSwizzleHintsPass :
     InterfacePass<"iree-codegen-resolve-swizzle-hints", "mlir::FunctionOpInterface"> {
   let summary = "Resolves iree_codegen.swizzle_hint ops";

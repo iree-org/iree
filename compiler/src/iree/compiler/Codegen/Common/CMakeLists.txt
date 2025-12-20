@@ -97,6 +97,7 @@ iree_cc_library(
     "FastMathPatterns.cpp"
     "FissionTransferOpsInControlFlow.cpp"
     "FlattenMemRefSubspanPass.cpp"
+    "FlattenSwizzleHintAllocs.cpp"
     "FlattenMemRefs.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldSplitReductionAndWorkgroupMappingLoopsPass.cpp"
