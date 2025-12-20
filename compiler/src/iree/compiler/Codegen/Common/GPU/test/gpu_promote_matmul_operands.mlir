@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands),canonicalize)" | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands,cse),canonicalize)" | FileCheck %s
 
 #lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
 
@@ -392,3 +392,28 @@ func.func @swizzle_operand_no_promote_fill(%b: tensor<128x128xf32>) -> tensor<4x
 //   CHECK-NOT:   tensor.expand_shape
 //       CHECK:   linalg.matmul
 //       CHECK: return
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<128, 16>>,
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]}>
+
+func.func @promote_with_multiple_swizzle_operand(%a: tensor<64x64xf32>, %b: tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<64x64xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config}
+    ins(%a, %b : tensor<64x64xf32>, tensor<64x64xf32>) outs(%fill : tensor<64x64xf32>) -> tensor<64x64xf32>
+  return %mm : tensor<64x64xf32>
+}
+
+// SwizzleOperand attribute creates swizzle_hint op with xor_shuffle
+// and flattens/expands the tensor for shared memory swizzling.
+// CHECK-LABEL: func.func @promote_with_multiple_swizzle_operand
+//       CHECK:   %[[EMPTY_A:.+]] = tensor.empty() : tensor<4096xf32>
+//       CHECK:   %[[SWIZZLE_A:.+]] = iree_codegen.swizzle_hint %[[EMPTY_A]][#iree_codegen.xor_shuffle<128, 16>] : tensor<4096xf32>
+//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_A]][#iree_codegen.xor_shuffle<256, 32>] : tensor<4096xf32>
+

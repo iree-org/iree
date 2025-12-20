@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline='builtin.module(func.func(iree-codegen-gpu-fuse-and-hoist-parallel-loops))' --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: iree-opt /home/muzasyed/iree/compiler/src/iree/compiler/Codegen/Common/GPU/test/gpu_fuse_and_hoist_forall.mlir --pass-pipeline='builtin.module(func.func(iree-codegen-gpu-fuse-and-hoist-parallel-loops))' --split-input-file --verify-diagnostics | FileCheck %s
 
 #translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 
@@ -961,3 +961,89 @@ func.func @no_swap_same_block_expand_slice(%arg0: tensor<64xf16>) -> tensor<4x4x
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape
 //       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[EXPAND]]
 //       CHECK:   return %[[SLICE]]
+
+// -----
+
+// func.func @no_fuse_multi_use_swizzled_destinations(%2: tensor<128x128xf16>, %3: tensor<128x128xf16>) -> tensor<128x128xf16> {
+//   %c4 = arith.constant 4 : index
+//   %c128 = arith.constant 128 : index
+//   %c0 = arith.constant 0 : index
+//   %empty = tensor.empty() : tensor<128x128xf16>
+//   %swizzle_1 = iree_codegen.swizzle_hint %empty[#iree_codegen.xor_shuffle<64, 8>] : tensor<128x128xf16>
+//   %swizzle_2 = iree_codegen.swizzle_hint %empty[#iree_codegen.xor_shuffle<64, 16>] : tensor<128x128xf16>
+//   %10:2 = scf.forall (%arg5, %arg6) in (32, 32) shared_outs(%arg7 = %swizzle_1, %arg8 = %swizzle_2) -> (tensor<128x128xf16>, tensor<128x128xf16>) {
+//     %extracted_slice_1 = tensor.extract_slice %2[%arg5, %arg6] [2, 2] [1, 1] : tensor<128x128xf16> to tensor<2x2xf16>
+//     %extracted_slice_2 = tensor.extract_slice %arg7[%arg5, %arg6] [2, 2] [1, 1] : tensor<128x128xf16> to tensor<2x2xf16>
+//     %extracted_slice_3 = tensor.extract_slice %arg8[%arg6, %arg5] [2, 2] [1, 1] : tensor<128x128xf16> to tensor<2x2xf16>
+//     %16 = linalg.copy ins(%extracted_slice_1 : tensor<2x2xf16>) outs(%extracted_slice_2 : tensor<2x2xf16>) -> tensor<2x2xf16>
+//     scf.forall.in_parallel {
+//       tensor.parallel_insert_slice %16 into %arg7[%arg5, %arg6] [2, 2] [1, 1] : tensor<2x2xf16> into tensor<128x128xf16>
+//       tensor.parallel_insert_slice %16 into %arg8[%arg5, %arg6] [2, 2] [1, 1] : tensor<2x2xf16> into tensor<128x128xf16>
+//     }
+//   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+//   %add = linalg.add
+//     ins(%10#0, %10#1 : tensor<128x128xf16>, tensor<128x128xf16>)
+//     outs(%empty: tensor<128x128xf16>) -> tensor<128x128xf16>
+//   return %add : tensor<128x128xf16>
+// }
+
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+#map = affine_map<(d0) -> (d0 * 2)>
+#map1 = affine_map<(d0) -> (d0 * 4)>
+#map2 = affine_map<(d0)[s0] -> (d0 * 4 + s0)>
+#map3 = affine_map<(d0)[s0] -> (d0 * 2 + s0)>
+#map4 = affine_map<(d0) -> (d0 * 16)>
+func.func @forall_fuse_then_hoist_with_swizzle(%3: tensor<128x128xf16>, %4: tensor<128x128xf16>, %5: tensor<128x128xf16>) -> tensor<128x128xf16>
+    attributes {translation_info = #translation_info} {
+  // CHECK-DAG: %[[EMPTY:.+]] = tensor.empty() : tensor<128x4xf16>
+  // CHECK-DAG: %[[SWIZZLE1:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.xor_shuffle<64, 8>]
+  // CHECK-DAG: %[[SWIZZLE2:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.xor_shuffle<64, 4>]
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %6 = tensor.empty() : tensor<128x4xf16>
+  %swizzle_1 = iree_codegen.swizzle_hint %6[#iree_codegen.xor_shuffle<64, 8>] : tensor<128x4xf16>
+  %swizzle_2 = iree_codegen.swizzle_hint %6[#iree_codegen.xor_shuffle<64, 4>] : tensor<128x4xf16>
+  %8 = scf.for %arg0 = %c0 to %c128 step %c4 iter_args(%arg1 = %5) -> (tensor<128x128xf16>) {
+    // CHECK: scf.forall {{.*}} shared_outs(%{{.+}} = %[[SWIZZLE1]])
+    %9 = scf.forall (%arg2, %arg3) in (64, 1) shared_outs(%arg4 = %swizzle_1) -> (tensor<128x4xf16>) {
+      %12 = affine.apply #map(%arg2)
+      %13 = affine.apply #map1(%arg3)
+      %14 = affine.apply #map(%arg2)
+      %15 = affine.apply #map2(%arg3)[%arg0]
+      %extracted_slice = tensor.extract_slice %3[%14, %15] [2, 4] [1, 1] : tensor<128x128xf16> to tensor<2x4xf16>
+      %extracted_slice_0 = tensor.extract_slice %arg4[%12, %13] [2, 4] [1, 1] : tensor<128x4xf16> to tensor<2x4xf16>
+      %16 = linalg.copy ins(%extracted_slice : tensor<2x4xf16>) outs(%extracted_slice_0 : tensor<2x4xf16>) -> tensor<2x4xf16>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %16 into %arg4[%12, %13] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<128x4xf16>
+      }
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+    // CHECK: scf.forall {{.*}} shared_outs(%{{.+}} = %[[SWIZZLE2]])
+    %10 = scf.forall (%arg2, %arg3) in (2, 32) shared_outs(%arg4 = %swizzle_2) -> (tensor<128x4xf16>) {
+      %12 = affine.apply #map(%arg2)
+      %13 = affine.apply #map1(%arg3)
+      %14 = affine.apply #map(%arg2)
+      %15 = affine.apply #map2(%arg3)[%arg0]
+      %extracted_slice = tensor.extract_slice %4[%14, %15] [2, 4] [1, 1] : tensor<128x128xf16> to tensor<2x4xf16>
+      %extracted_slice_0 = tensor.extract_slice %arg4[%12, %13] [2, 4] [1, 1] : tensor<128x4xf16> to tensor<2x4xf16>
+      %16 = linalg.copy ins(%extracted_slice : tensor<2x4xf16>) outs(%extracted_slice_0 : tensor<2x4xf16>) -> tensor<2x4xf16>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %16 into %arg4[%12, %13] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<128x4xf16>
+      }
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+    %11 = scf.forall (%arg2, %arg3) in (8, 8) shared_outs(%arg4 = %arg1) -> (tensor<128x128xf16>) {
+      %12 = affine.apply #map4(%arg2)
+      %13 = affine.apply #map4(%arg3)
+      %extracted_slice = tensor.extract_slice %9[%12, 0] [16, 4] [1, 1] : tensor<128x4xf16> to tensor<16x4xf16>
+      %extracted_slice_0 = tensor.extract_slice %10[%13, 0] [16, 4] [1, 1] : tensor<128x4xf16> to tensor<16x4xf16>
+      %extracted_slice_1 = tensor.extract_slice %arg4[%12, %13] [16, 4] [1, 1] : tensor<128x128xf16> to tensor<16x4xf16>
+      %add = linalg.add ins(%extracted_slice, %extracted_slice_0 : tensor<16x4xf16>, tensor<16x4xf16>) outs(%extracted_slice_1: tensor<16x4xf16>) -> tensor<16x4xf16>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %add into %arg4[%12, %13] [16, 4] [1, 1] : tensor<16x4xf16> into tensor<128x128xf16>
+      }
+    } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+    scf.yield %11 : tensor<128x128xf16>
+  }
+  return %8 : tensor<128x128xf16>
+}
