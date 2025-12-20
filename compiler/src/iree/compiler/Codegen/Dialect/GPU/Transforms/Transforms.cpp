@@ -101,7 +101,17 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
     return failure();
   }
 
-  auto empty = forallOp.getDpsInits()[0].getDefiningOp<tensor::EmptyOp>();
+  // Skip swizzle hint ops.
+  auto getEmptyOpSkipIrrelevant = [](Value value) -> Value {
+    Operation *op = value.getDefiningOp();
+    while (op && isa<gpu::SwizzleHintOp>(op)) {
+        op = op->getOperand(0).getDefiningOp();
+    }
+    return dyn_cast<tensor::EmptyOp>(op);
+  };
+
+  // auto empty = forallOp.getDpsInits()[0].getDefiningOp<tensor::EmptyOp>();
+  auto empty = getDefiningOpSkipIrrelevant(forallOp.getDpsInits()[0]);
   // Fail if the destination is not a `tensor.empty` op and cannot be trivially
   // converted to a `bufferization.alloc_tensor`.
   if (!empty) {

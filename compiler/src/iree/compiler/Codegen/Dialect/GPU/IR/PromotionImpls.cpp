@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -27,7 +28,9 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
 
   Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
                                         tensorType.getElementType());
-  auto copy = linalg::CopyOp::create(builder, loc, v, empty);
+  Value swizzled = IREE::Codegen::SwizzleHintOp::create(builder, loc, empty,
+      IREE::Codegen::XORShuffleAttr::get(builder.getContext(), 256, 32, int64_t(), int64_t()));
+  auto copy = linalg::CopyOp::create(builder, loc, v, swizzled);
   setLoweringConfig(copy, attr);
   return copy.getResult(0);
 }
