@@ -1298,6 +1298,15 @@ void registerCodegenROCDLPasses() {
       "iree-codegen-llvmgpu-bufferization-pipeline",
       "Runs pass pipeline to bufferize for llvmgpu backends",
       [](OpPassManager &passManager) { addBufferizePasses(passManager); });
+
+  static PassPipelineRegistration<ROCDLPipelineOptions>
+      LowerToROCMLLVMGPUPasses(
+          "iree-codegen-lower-to-rocm-gpu",
+          "Runs pass pipeline to progressively lower Linalg to ROCDL",
+          [](OpPassManager &passManager, const ROCDLPipelineOptions &options) {
+            addLowerToLLVMGPUPasses(passManager, /*forROCDL=*/true,
+                                    options.preserveDebugInfo);
+          });
 }
 
 } // namespace mlir::iree_compiler
