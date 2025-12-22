@@ -225,6 +225,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AMDGPUUtils",
         "@llvm-project//mlir:AffineAnalysis",
         "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:Analysis",

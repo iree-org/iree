@@ -175,6 +175,7 @@ iree_cc_library(
     MLIRAMDGPUUtils
     MLIRAffineAnalysis
     MLIRAffineDialect
+    MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRAffineUtils
     MLIRAnalysis
