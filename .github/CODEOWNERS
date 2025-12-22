@@ -52,15 +52,17 @@
 
 # Tests
 /tests/external/iree-test-suites @Groverkss @MaheshRavishankar @kuhar
+/tests/e2e @bjacob
 
 # Compiler
 /compiler/src/iree/compiler/ @benvanik
 /compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
-/compiler/src/iree/compiler/Codegen/Common @hanhanW @Max191 @MaheshRavishankar
+/compiler/src/iree/compiler/Codegen/Common @hanhanW @Max191 @MaheshRavishankar @qedawkins
 /compiler/src/iree/compiler/Codegen/Common/GPU @qedawkins @Groverkss @kuhar
-/compiler/src/iree/compiler/Codegen/Dialect/Codegen @Max191 @MaheshRavishankar
+/compiler/src/iree/compiler/Codegen/Dialect/Codegen @Max191 @MaheshRavishankar @qedawkins
 /compiler/src/iree/compiler/Codegen/Dialect/CPU @hanhanW
 /compiler/src/iree/compiler/Codegen/Dialect/GPU @qedawkins @Max191 @Groverkss @nirvedhmeshram @krzysz00
+/compiler/src/iree/compiler/Codegen/Dialect/PCF @qedawkins
 /compiler/src/iree/compiler/Codegen/Dialect/VectorExt @Groverkss
 /compiler/src/iree/compiler/Codegen/ExternalInterfaces @hanhanW @Max191 @jtuyls
 /compiler/src/iree/compiler/Codegen/LLVMCPU/ @hanhanW

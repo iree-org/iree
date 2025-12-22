@@ -63,6 +63,29 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
                                    int narrowThreshold);
 
 // The structs defined here because they are used by encoding_interfaces.td.
+
+/// Bundles an encoding attribute with its associated dynamic information.
+/// This is returned by interface methods that query encoding properties
+/// from operations. Dynamic values can include runtime information needed
+/// by the encoding (e.g., M, N, K dimensions for matmul encodings).
+struct EncodingProperties {
+  /// The encoding attribute for the operand/result.
+  Attribute encoding;
+  /// Dynamic values needed by the encoding. For matmul-like operations,
+  /// these typically correspond to the iteration domain dimensions (M, N, K).
+  /// TODO(#22370): Currently empty; will be populated to support dynamic
+  /// layout decisions.
+  SmallVector<Value> dynamicValues;
+};
+
+/// Bundles encoding properties for all operands and DPS init operands of an
+/// operation. This is returned by SerializableAttr::getEncodingProperties()
+/// when deriving encodings from an operation (e.g., linalg.matmul).
+struct OpEncodingProperties {
+  SmallVector<EncodingProperties> operands;
+  SmallVector<EncodingProperties> inits;
+};
+
 struct PropagationEncoding {
   SmallVector<Attribute> operandEncodings;
   SmallVector<Attribute> resultEncodings;

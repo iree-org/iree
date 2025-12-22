@@ -11,6 +11,10 @@ include "mlir/IR/CommonTypeConstraints.td"
 
 def AnyRankedTensorOrMemRef : AnyTypeOf<[AnyRankedTensor, AnyMemRef],
   "ranked tensor or memref of any type", "::mlir::ShapedType">;
+def AnyRankedTensorVectorOrMemRef
+    : AnyTypeOf<[AnyRankedTensor, AnyVectorOfAnyRank, AnyMemRef],
+                "ranked tensor, vector, or memref of any type",
+                "::mlir::ShapedType">;
 
 class RankedTensorOrMemRefOf<list<Type> allowedTypes, list<int> ranks>
     : AnyTypeOf<[TensorRankOf<allowedTypes, ranks>,
