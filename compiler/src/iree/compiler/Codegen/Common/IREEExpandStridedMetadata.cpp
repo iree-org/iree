@@ -343,7 +343,10 @@ void IREEExpandStridedMetadataPass::runOnOperation() {
   RewritePatternSet patterns(context);
   populateIREEResolveExtractStridedMetadataPatterns(patterns,
                                                     allowSubviewExpansion);
-  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+  GreedyRewriteConfig config;
+  config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
+  if (failed(
+          applyPatternsGreedily(getOperation(), std::move(patterns), config))) {
     return signalPassFailure();
   }
 
