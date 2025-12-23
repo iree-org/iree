@@ -233,6 +233,30 @@ void createScoreModificationRegion(
 }
 
 // Utility to compute dynamic sizes for attention tensors.
+// This helper is used in two places:
+//
+// For the mask tensor. Shape = (B, Hq, L, S). Any of these may be dynamic, so
+// we extract B/Hq/L from the query tensor and S from the key tensor. The
+// resulting dynamic sizes are passed to tensor.empty when materialising the
+// mask.
+//
+// For the output tensor. Shape = (B, Hq, L, Ev). Since Ev is statically known,
+// only B/Hq/L may be dynamic. The helper again generates the needed tensor.dim
+// ops from the query/value tensors so that tensor.splat/tensor.empty gets the
+// correct dynamic extents. Assuming the standard 4D layout:
+//   Query: (B, Hq, L, E)
+//   Key:   (B, Hkv, S, E)
+//   Value: (B, Hkv, S, Ev)
+// When constructing new tensors (mask/output), we need dynamic sizes for
+// dimensions that come from the input shapes.
+//
+// For dims (B, H, L), the runtime sizes always come from the query tensor.
+// For dim 3, the required runtime size depends on what we are building:
+// For the mask (shape = B×H×L×S), the 3rd axis is S, which lives at
+// index 2 of the Key tensor.
+// For the output (shape = B×H×L×Ev), Ev is statically known, so we never need a
+// dynamic dimension for i = 3.
+
 void computeDynamicSizes(PatternRewriter &rewriter, Location loc,
                          const SmallVector<int64_t> &shape,
                          SmallVector<Value> &dynSizes, Value first,
