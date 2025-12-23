@@ -112,7 +112,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
 
 static void buildLoopOptimizationVMVXTransformPassPipeline(
     FunctionLikeNest &funcPassManager) {
-  funcPassManager.addPass(createLowerAffinePass)
+  funcPassManager.addPass(createIREECodegenLowerAffinePass)
       .addPass(createForOpCanonicalizationPass)
       .addPass(createIREELoopInvariantCodeMotionPass);
 }

@@ -635,16 +635,19 @@ LogicalResult emulateNarrowType(
     return root->emitOpError("failed to emulate bit width");
   }
 
+  GreedyRewriteConfig config;
+  config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
+
   RewritePatternSet sinkBroadcast(ctx);
   vector::populateSinkVectorOpsPatterns(sinkBroadcast);
-  if (failed(applyPatternsGreedily(root, std::move(sinkBroadcast)))) {
+  if (failed(applyPatternsGreedily(root, std::move(sinkBroadcast), config))) {
     return root->emitOpError("failed in sinking of broadcasts");
   }
 
   // Also do the `bitcast -> extui/extsi` rewrite.
   RewritePatternSet foldExtPatterns(ctx);
   vector::populateVectorNarrowTypeRewritePatterns(foldExtPatterns);
-  if (failed(applyPatternsGreedily(root, std::move(foldExtPatterns)))) {
+  if (failed(applyPatternsGreedily(root, std::move(foldExtPatterns), config))) {
     return failure();
   }
   return success();

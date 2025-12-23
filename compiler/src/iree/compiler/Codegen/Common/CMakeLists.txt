@@ -107,7 +107,10 @@ iree_cc_library(
     "GenericVectorization.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "HoistUnrolledVectorExtractInsertSlice.cpp"
+    "IREECodegenAffineExpandIndexOps.cpp"
     "IREECodegenCanonicalizer.cpp"
+    "IREECodegenFoldMemRefAliasOps.cpp"
+    "IREECodegenLowerAffine.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
     "IREEInjectAssumeAlignment.cpp"
@@ -172,6 +175,7 @@ iree_cc_library(
     MLIRAMDGPUUtils
     MLIRAffineAnalysis
     MLIRAffineDialect
+    MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRAffineUtils
     MLIRAnalysis

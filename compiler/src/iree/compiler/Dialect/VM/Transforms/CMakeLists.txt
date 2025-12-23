@@ -48,6 +48,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Codegen::Common
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::Conversion::MemRefToUtil
