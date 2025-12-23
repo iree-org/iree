@@ -149,14 +149,12 @@ func.func private @sdpa_mask0(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vten
 // CHECK-LABEL:   func.func private @sdpa_mask0(
 // CHECK:             %{{.*}} = torch.aten.ge.Tensor %{{.*}}, %{{.*}} : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
 
-// -----
-
 func.func @flex_attn_with_scoremod_only(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>) attributes {torch.assume_strict_symbolic_shapes} {
   %float1.000000e00 = torch.constant.float 1.000000e+00
   %false = torch.constant.bool false
   %true = torch.constant.bool true
   // expected-warning @+1 {{FlexAttention: logsumexp output is a dummy (zeros), actual values are not available from AttentionOp}}
-  %output, %logsumexp, %maxscores = torch.hop_flex_attention %arg0, %arg1, %arg2, %float1.000000e00, %true, %false {score_mod_fn = @sdpa_score1} : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.float, !torch.bool, !torch.bool -> !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>, !torch.vtensor<[4,8,1024],f32>
+  %output, %logsumexp, %maxscores = torch.hop_flex_attention %arg0, %arg1, %arg2, %float1.000000e00, %true, %false {score_mod_fn = @sdpa_score0} : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.float, !torch.bool, !torch.bool -> !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>, !torch.vtensor<[4,8,1024],f32>
   return %output : !torch.vtensor<[4,8,1024,64],f32>
 }
 // CHECK-LABEL:   func.func @flex_attn_with_scoremod_only(
@@ -166,28 +164,20 @@ func.func @flex_attn_with_scoremod_only(%arg0: !torch.vtensor<[4,8,1024,64],f32>
 // CHECK:             %[[QUERY:.*]] = torch_c.to_builtin_tensor %[[ARG0]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
 // CHECK:             %[[KEY:.*]] = torch_c.to_builtin_tensor %[[ARG1]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
 // CHECK:             %[[VALUE:.*]] = torch_c.to_builtin_tensor %[[ARG2]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
+// CHECK-NOT:           func.call @sdpa_mask0
 // CHECK:             %[[ATTENTION:.*]] = iree_linalg_ext.attention
 // CHECK-SAME:           ins(%[[QUERY]], %[[KEY]], %[[VALUE]], %[[CST_0]] :
 // CHECK-SAME:           outs(%[[CST]] : tensor<4x8x1024x64xf32>)
-// CHECK:               func.call @sdpa_score1
+// CHECK:               func.call @sdpa_score0
 // CHECK:             %[[RESULT:.*]] = torch_c.from_builtin_tensor %[[ATTENTION]] : tensor<4x8x1024x64xf32> -> !torch.vtensor<[4,8,1024,64],f32>
 // CHECK:             return %[[RESULT]] : !torch.vtensor<[4,8,1024,64],f32>
-
-func.func private @sdpa_score1(%arg0: !torch.vtensor<[],f32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>, %arg4: !torch.vtensor<[],si32>) -> !torch.vtensor<[],f32> {
-    %0 = torch.aten.tanh %arg0 : !torch.vtensor<[],f32> -> !torch.vtensor<[],f32>
-    return %0 : !torch.vtensor<[],f32>
-}
-// CHECK-LABEL:   func.func private @sdpa_score1(
-// CHECK:             %{{.*}} = torch.aten.tanh %{{.*}} : !torch.vtensor<[],f32> -> !torch.vtensor<[],f32>
-
-// -----
 
 func.func @flex_attn_with_maskmod_only(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg1: !torch.vtensor<[4,8,1024,64],f32>, %arg2: !torch.vtensor<[4,8,1024,64],f32>) -> (!torch.vtensor<[4,8,1024,64],f32>) attributes {torch.assume_strict_symbolic_shapes} {
   %float1.000000e00 = torch.constant.float 1.000000e+00
   %false = torch.constant.bool false
   %true = torch.constant.bool true
   // expected-warning @+1 {{FlexAttention: logsumexp output is a dummy (zeros), actual values are not available from AttentionOp}}
-  %output, %logsumexp, %maxscores = torch.hop_flex_attention %arg0, %arg1, %arg2, %float1.000000e00, %true, %false {mask_mod_fn = @sdpa_mask1} : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.float, !torch.bool, !torch.bool -> !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>, !torch.vtensor<[4,8,1024],f32>
+  %output, %logsumexp, %maxscores = torch.hop_flex_attention %arg0, %arg1, %arg2, %float1.000000e00, %true, %false {mask_mod_fn = @sdpa_mask0} : !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024,64],f32>, !torch.float, !torch.bool, !torch.bool -> !torch.vtensor<[4,8,1024,64],f32>, !torch.vtensor<[4,8,1024],f32>, !torch.vtensor<[4,8,1024],f32>
   return %output : !torch.vtensor<[4,8,1024,64],f32>
 }
 // CHECK-LABEL:   func.func @flex_attn_with_maskmod_only(
@@ -202,19 +192,13 @@ func.func @flex_attn_with_maskmod_only(%arg0: !torch.vtensor<[4,8,1024,64],f32>,
 // CHECK:             %[[MASK_EMPTY:.*]] = tensor.empty() : tensor<4x8x1024x1024xf32>
 // CHECK:             %[[MASK:.*]] = linalg.generic
 // CHECK-SAME:           outs(%[[MASK_EMPTY]] : tensor<4x8x1024x1024xf32>)
-// CHECK:               func.call @sdpa_mask1
+// CHECK:               func.call @sdpa_mask0
 // CHECK:             %[[ATTENTION:.*]] = iree_linalg_ext.attention
 // CHECK-SAME:           ins(%[[QUERY]], %[[KEY]], %[[VALUE]], %[[CST_2]], %[[MASK]] :
 // CHECK-SAME:           outs(%[[CST]] : tensor<4x8x1024x64xf32>)
+// CHECK-NOT:           func.call @sdpa_score0
 // CHECK:             %[[RESULT:.*]] = torch_c.from_builtin_tensor %[[ATTENTION]] : tensor<4x8x1024x64xf32> -> !torch.vtensor<[4,8,1024,64],f32>
 // CHECK:             return %[[RESULT]] : !torch.vtensor<[4,8,1024,64],f32>
-
-func.func private @sdpa_mask1(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>) -> !torch.vtensor<[],i1> {
-  %0 = torch.aten.ge.Tensor %arg2, %arg3 : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
-  return %0 : !torch.vtensor<[],i1>
-}
-// CHECK-LABEL:   func.func private @sdpa_mask1(
-// CHECK:             %{{.*}} = torch.aten.ge.Tensor %{{.*}}, %{{.*}} : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
 
 // -----
 
@@ -233,9 +217,11 @@ func.func @flex_attn_without_mods(%arg0: !torch.vtensor<[4,8,1024,64],f32>, %arg
 // CHECK:             %[[QUERY:.*]] = torch_c.to_builtin_tensor %[[ARG0]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
 // CHECK:             %[[KEY:.*]] = torch_c.to_builtin_tensor %[[ARG1]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
 // CHECK:             %[[VALUE:.*]] = torch_c.to_builtin_tensor %[[ARG2]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
+// CHECK-NOT:         func.call @sdpa_mask0
 // CHECK:             %[[ATTENTION:.*]] = iree_linalg_ext.attention
 // CHECK-SAME:           ins(%[[QUERY]], %[[KEY]], %[[VALUE]], %[[CST_0]] :
 // CHECK-SAME:           outs(%[[CST]] : tensor<4x8x1024x64xf32>)
+// CHECK-NOT:           func.call @sdpa_score0
 // CHECK:             %[[RESULT:.*]] = torch_c.from_builtin_tensor %[[ATTENTION]] : tensor<4x8x1024x64xf32> -> !torch.vtensor<[4,8,1024,64],f32>
 // CHECK:             return %[[RESULT]] : !torch.vtensor<[4,8,1024,64],f32>
 
@@ -256,8 +242,10 @@ func.func @flex_attn_without_mods_returnmaxscore(%arg0: !torch.vtensor<[4,8,1024
 // CHECK:             %[[QUERY:.*]] = torch_c.to_builtin_tensor %[[ARG0]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
 // CHECK:             %[[KEY:.*]] = torch_c.to_builtin_tensor %[[ARG1]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
 // CHECK:             %[[VALUE:.*]] = torch_c.to_builtin_tensor %[[ARG2]] : !torch.vtensor<[4,8,1024,64],f32> -> tensor<4x8x1024x64xf32>
+// CHECK-NOT:         func.call @sdpa_mask0
 // CHECK:             %[[ATTENTION:.*]] = iree_linalg_ext.attention
 // CHECK-SAME:           ins(%[[QUERY]], %[[KEY]], %[[VALUE]], %[[CST_0]] :
 // CHECK-SAME:           outs(%[[CST]] : tensor<4x8x1024x64xf32>)
+// CHECK-NOT:           func.call @sdpa_score0
 // CHECK:             %[[RESULT:.*]] = torch_c.from_builtin_tensor %[[ATTENTION]] : tensor<4x8x1024x64xf32> -> !torch.vtensor<[4,8,1024,64],f32>
 // CHECK:             return %[[RESULT]] : !torch.vtensor<[4,8,1024,64],f32>
