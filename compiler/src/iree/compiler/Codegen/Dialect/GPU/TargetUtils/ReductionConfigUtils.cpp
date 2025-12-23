@@ -44,6 +44,11 @@ static bool hasReductionIterator(linalg::LinalgOp op) {
   return llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
+static bool hasExpandCompatibleIndexing(linalg::LinalgOp op) {
+  return llvm::all_of(op.getIndexingMapsArray(),
+                      [](AffineMap m) { return m.isProjectedPermutation(); });
+}
+
 struct TensorSizeEstimate {
   int64_t elementBitwidth;
   int64_t staticSize;
@@ -301,8 +306,8 @@ getVectorDistributeReductionConfig(
 
   // We require the reduction dimension to be evenly divisible by threadLoads
   // because the current expansion strategy doesn't support padding.
-  if (ShapedType::isStaticShape(bounds) && threadLoads > 1 &&
-      bounds[lastReductionDim] % threadLoads == 0) {
+  if (ShapedType::isStaticShape(bounds) && hasExpandCompatibleIndexing(op) &&
+      threadLoads > 1 && bounds[lastReductionDim] % threadLoads == 0) {
     workgroupTileSizes.push_back(0);
     partialReductionTileSizes.push_back(0);
     threadTileSizes.push_back(0);
