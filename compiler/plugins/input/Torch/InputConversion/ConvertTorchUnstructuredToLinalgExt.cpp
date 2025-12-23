@@ -242,7 +242,7 @@ void createScoreModificationRegion(
 //
 // For the output tensor. Shape = (B, Hq, L, Ev). Since Ev is statically known,
 // only B/Hq/L may be dynamic. The helper again generates the needed tensor.dim
-// ops from the query/value tensors so that linalg.fill/tensor.empty gets the
+// ops from the query/value tensors so that tensor.splat/tensor.empty gets the
 // correct dynamic extents. Assuming the standard 4D layout:
 //   Query: (B, Hq, L, E)
 //   Key:   (B, Hkv, S, E)
@@ -448,7 +448,8 @@ struct FlexAttentionOpConversion
     Value outputInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
                                                floatType, rewriter, loc,
                                                /*useOnlyFiniteValue=*/true);
-    Value outputTensor = linalg::FillOp::create(rewriter, loc, outputInit, outputShape, outputDynSizes);
+    Value outputTensor = tensor::SplatOp::create(rewriter, loc, outputInit,
+                                                 outputShape, outputDynSizes);
 
     // Build indexing maps for attention.
     // Standard maps: Q, K, V, scale, [mask], output.
@@ -507,7 +508,8 @@ struct FlexAttentionOpConversion
       lseDynSizes.pop_back();
     }
 
-    Value lseTensor = linalg::FillOp::create(rewriter, loc, zero, lseShape, lseDynSizes);
+    Value lseTensor =
+        tensor::SplatOp::create(rewriter, loc, zero, lseShape, lseDynSizes);
 
     auto lseTorchType = queryType.getWithSizesAndDtype(lseShape, floatType);
     Value torchLogsumexp = torch::TorchConversion::FromBuiltinTensorOp::create(
