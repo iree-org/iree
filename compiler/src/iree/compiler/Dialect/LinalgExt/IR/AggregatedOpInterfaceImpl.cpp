@@ -1220,11 +1220,11 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   Value currMax = reduce<arith::MaximumFOp>(
       rewriter, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
   // ex = e^{sValue - curr_max}
-  Value ex = computeSubAndExp2(rewriter, loc, prevMaxMap, normValMap, currMax,
-                               sValue->get());
+  Value ex = computeSubAndExp(rewriter, loc, prevMaxMap, normValMap, currMax,
+                               sValue->get(), /*useExp2=*/true);
   // norm = e^(prev_max - curr_max)
-  Value norm = computeSubAndExp2(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
-                                 prevMax->get());
+  Value norm = computeSubAndExp(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
+                                 prevMax->get(), /*useExp2=*/true);
 
   SmallVector<Value> inputs = getDpsInputs();
   SmallVector<Value> normOuts(getNumDpsInits());
