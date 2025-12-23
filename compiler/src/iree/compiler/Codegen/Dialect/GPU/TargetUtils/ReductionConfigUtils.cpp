@@ -44,6 +44,11 @@ static bool hasReductionIterator(linalg::LinalgOp op) {
   return llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
+// Dimension expansion inserts tensor.expand_shape/tensor.collapse_shape pairs
+// around operands, then relies on
+// linalg::populateFoldReshapeOpsByExpansionPatterns to fuse them into the
+// linalg op by expanding its iteration space. This fusion requires all indexing
+// maps to be projected permutations.
 static bool hasExpandCompatibleIndexing(linalg::LinalgOp op) {
   return llvm::all_of(op.getIndexingMapsArray(),
                       [](AffineMap m) { return m.isProjectedPermutation(); });

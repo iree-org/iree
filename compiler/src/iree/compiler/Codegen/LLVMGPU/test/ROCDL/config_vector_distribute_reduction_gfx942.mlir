@@ -442,3 +442,49 @@ func.func @batch_matvec_f16_f32() {
 //  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]{{\]}},
 //  CHECK-SAME:                 thread = [0, 0, 1, 8],
 //  CHECK-SAME:                 workgroup = [4, 1, 0, 0]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+// Test that no expand dims attribute is added when the indexing maps are not compatible.
+func.func @reduction_non_compatible_map_no_expand_dims() {
+  %cst = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16384x1x1xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x16384xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf16>>
+  %in0 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16384, 1, 1], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16384x1x1xf16>> -> tensor<16384x1x1xf16>
+  %in1 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [4, 16384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x16384xf16>> -> tensor<4x16384xf16>
+  %empty = tensor.empty() : tensor<4xf16>
+  %filled = linalg.fill ins(%cst : f16) outs(%empty : tensor<4xf16>) -> tensor<4xf16>
+  %result = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d1, 0, 0)>,
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0)>
+    ], iterator_types = ["parallel", "reduction"]
+  } ins(%in0, %in1 : tensor<16384x1x1xf16>, tensor<4x16384xf16>)
+  outs(%filled : tensor<4xf16>) {
+  ^bb0(%a: f16, %b: f16, %out: f16):
+    %mul = arith.mulf %a, %b : f16
+    %add = arith.addf %out, %mul : f16
+    linalg.yield %add : f16
+  } -> tensor<4xf16>
+  iree_tensor_ext.dispatch.tensor.store %result, %2, offsets = [0], sizes = [4], strides = [1] : tensor<4xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf16>>
+  return
+}
+
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 64
+// CHECK-LABEL: @reduction_non_compatible_map_no_expand_dims
+//       CHECK:   linalg.generic
+//  CHECK-SAME:      attrs = {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-NOT:                  expand_dims
+//  CHECK-SAME:                 lane_basis = {{\[}}[1, 64], [0, 1]{{\]}},
+//  CHECK-SAME:                 partial_reduction = [0, 8192],
+//  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 16], [0, 1]{{\]}},
+//  CHECK-SAME:                 thread = [0, 8],
+//  CHECK-SAME:                 workgroup = [1, 0]
