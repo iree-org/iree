@@ -270,7 +270,7 @@ void buildIREEPrecompileTransformPassPipeline(
         hooks.beforePhase(IREEVMPipelinePhase::GlobalOptimization, passManager);
       }
       GlobalOptimization::buildGlobalOptimizationPassPipeline(
-          passManager, globalTransformOptions);
+          passManager, globalTransformOptions, preprocessingOptions);
       if (hooks.afterPhase) {
         hooks.afterPhase(IREEVMPipelinePhase::GlobalOptimization, passManager);
       }

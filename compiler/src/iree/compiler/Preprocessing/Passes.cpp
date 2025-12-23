@@ -92,6 +92,11 @@ static void buildPreprocessingPassPipelineFromCommandLine(
     passManager.addPass(createCanonicalizerPass());
     passManager.addPass(createCSEPass());
   }
+  if (preprocessingOptions.preprocessingEnableConv2dToImg2col) {
+    passManager.addPass(createConvertConv2DToImg2ColPass());
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
+  }
 }
 
 void buildPreprocessingPassPipeline(
