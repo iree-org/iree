@@ -36,17 +36,6 @@ using TensorDivisibilityInfo =
 
 namespace {
 
-struct RemoveOptimizationBarrier final
-    : public OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp barrierOp,
-                                PatternRewriter &rewriter) const override {
-    rewriter.replaceOp(barrierOp, barrierOp.getOperands());
-    return success();
-  }
-};
-
 /// This pass is used to materialize information about dynamic dimensions of
 /// `tensor` operands of an operation in the IR. If a dynamic dimension is
 /// known to be a multiple of a compile-time constant value, this pass
@@ -110,10 +99,6 @@ getTensorDivisibilityInfo(const TensorDynamicDimAnalysis &dynamicDimAnalysis,
 /// inverses of each other. The `util.optimization.barrier` avoid these from
 /// getting folded away during reshape propagation. Return the result of the
 /// `tensor.collapse_shape generated.
-struct ReshapeOps {
-  tensor::ExpandShapeOp expandShapeOp;
-  tensor::CollapseShapeOp collapseShapeOp;
-};
 static std::optional<ReshapeOps>
 blockDynamicDimensionsOfValue(RewriterBase &rewriter,
                               const TensorDivisibilityInfo &divisibilityInfo,
@@ -413,7 +398,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
   // Delete the optimization barrier and run some further cleanup.
   {
     RewritePatternSet removeBarrierOpsPatterns(context);
-    removeBarrierOpsPatterns.insert<RemoveOptimizationBarrier>(context);
+    populateRemoveOptimizationBarrierPatterns(removeBarrierOpsPatterns);
     tensor::ExpandShapeOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
