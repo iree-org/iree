@@ -12,7 +12,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
-#include "iree/compiler/Utils/EncodingUtils.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -2307,90 +2306,6 @@ GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
   return Base::get(context, prefetchOpt,
                    b.getBoolAttr(noReduceSharedMemoryBankConflicts),
                    b.getBoolAttr(useIgemmConvolution), strategyAttr);
-}
-
-//===----------------------------------------------------------------------===//
-// DimensionExpansionAttr
-//===----------------------------------------------------------------------===//
-
-DimensionExpansionAttr
-DimensionExpansionAttr::get(MLIRContext *context,
-                            ArrayRef<ReassociationIndices> reassociations,
-                            ArrayRef<int64_t> outputShape) {
-  Builder b(context);
-  SmallVector<Attribute> reassociationAttrs;
-  for (const ReassociationIndices &indices : reassociations) {
-    SmallVector<Attribute> indexAttrs;
-    for (int64_t idx : indices) {
-      indexAttrs.push_back(b.getI64IntegerAttr(idx));
-    }
-    reassociationAttrs.push_back(b.getArrayAttr(indexAttrs));
-  }
-  ArrayAttr reassociationAttr = b.getArrayAttr(reassociationAttrs);
-  DenseI64ArrayAttr outputShapeAttr = b.getDenseI64ArrayAttr(outputShape);
-  return get(context, reassociationAttr, outputShapeAttr);
-}
-
-LogicalResult
-DimensionExpansionAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                               ArrayAttr reassociations,
-                               DenseI64ArrayAttr outputShape) {
-  if (reassociations.empty()) {
-    return emitError() << "reassociations cannot be empty";
-  }
-
-  int64_t nextExpected = 0;
-
-  for (auto [groupIdx, attr] : llvm::enumerate(reassociations)) {
-    auto indexArray = dyn_cast<ArrayAttr>(attr);
-    if (!indexArray) {
-      return emitError() << "reassociation at index " << groupIdx
-                         << " must be an array";
-    }
-
-    if (indexArray.empty()) {
-      return emitError() << "reassociation group " << groupIdx
-                         << " cannot be empty";
-    }
-
-    int numDynamicDims = 0;
-    for (auto [innerIdx, idxAttr] : llvm::enumerate(indexArray)) {
-      auto intAttr = dyn_cast<IntegerAttr>(idxAttr);
-      if (!intAttr) {
-        return emitError() << "reassociation index at [" << groupIdx << "]["
-                           << innerIdx << "] must be an integer";
-      }
-
-      int64_t idx = intAttr.getInt();
-      if (idx != nextExpected) {
-        return emitError() << "reassociation indices must form contiguous "
-                           << "sequence; expected dimension " << nextExpected
-                           << " at [" << groupIdx << "][" << innerIdx
-                           << "], got " << idx;
-      }
-
-      if (outputShape[idx] == ShapedType::kDynamic) {
-        numDynamicDims++;
-      }
-
-      nextExpected++;
-    }
-
-    if (numDynamicDims > 1) {
-      return emitError()
-             << "reassociation group " << groupIdx
-             << " has multiple dynamic dimensions; at most 1 allowed";
-    }
-  }
-
-  ArrayRef<int64_t> outputShapeArray = outputShape.asArrayRef();
-  if (nextExpected != static_cast<int64_t>(outputShapeArray.size())) {
-    return emitError() << "reassociations cover " << nextExpected
-                       << " dimensions, but output_shape has rank "
-                       << outputShapeArray.size();
-  }
-
-  return success();
 }
 
 //===----------------------------------------------------------------------===//

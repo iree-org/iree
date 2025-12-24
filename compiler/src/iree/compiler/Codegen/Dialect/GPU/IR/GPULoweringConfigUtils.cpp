@@ -151,11 +151,4 @@ std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config,
   return getIntegerVector(array);
 }
 
-constexpr StringLiteral kDimensionExpansionName = "expand_dims";
-
-DimensionExpansionAttr getDimensionExpansion(LoweringConfigAttr config) {
-  return config.getAttributes().getAs<DimensionExpansionAttr>(
-      kDimensionExpansionName);
-}
-
 } // namespace mlir::iree_compiler::IREE::GPU
