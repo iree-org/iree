@@ -110,7 +110,7 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
     Value encodedInput = IREE::Encoding::SetEncodingOp::create(
-        rewriter, loc, resType, operand->get());
+        rewriter, loc, resType, operand->get(), /*encodingDims=*/ValueRange{});
     encodedOperands.push_back(encodedInput);
   }
 
