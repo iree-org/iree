@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
-#include "iree/compiler/Utils/EncodingUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -251,6 +250,60 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
       iterationSizes.empty() ? ArrayAttr() : b.getI64ArrayAttr(iterationSizes);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
              b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
+}
+
+/// Parse a list of integer values and/or dynamic values ('?')
+static FailureOr<SmallVector<int64_t>>
+parseDynamicI64IntegerList(AsmParser &parser) {
+  SmallVector<int64_t> integerVals;
+  if (failed(parser.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&] {
+        int64_t value = ShapedType::kDynamic;
+        if (failed(parser.parseOptionalQuestion()) &&
+            failed(parser.parseInteger(value))) {
+          return failure();
+        }
+        integerVals.push_back(value);
+        return success();
+      }))) {
+    return failure();
+  }
+  return integerVals;
+}
+
+/// Utility to parse an array of integer and/or dynamic values (`?`).
+static ParseResult parseDynamicI64ArrayAttr(AsmParser &p, ArrayAttr &attr) {
+  FailureOr<SmallVector<int64_t>> integerVals = parseDynamicI64IntegerList(p);
+  if (failed(integerVals)) {
+    return failure();
+  }
+  auto integerValsAttr =
+      llvm::map_to_vector(integerVals.value(), [&](int64_t val) -> Attribute {
+        return IntegerAttr::get(IntegerType::get(p.getContext(), 64), val);
+      });
+  attr = ArrayAttr::get(p.getContext(), integerValsAttr);
+  return success();
+}
+
+/// Print a list of integer values and/or dynamic values ('?')
+static void printDynamicI64IntegerList(AsmPrinter &printer,
+                                       ArrayRef<int64_t> vals) {
+  printer << "[";
+  llvm::interleaveComma(vals, printer, [&](int64_t val) {
+    if (ShapedType::isDynamic(val)) {
+      printer << "?";
+    } else {
+      printer << val;
+    }
+  });
+  printer << "]";
+}
+
+/// Utility to print an array of integer and/or dynamic values. Dynamic values
+/// are printed as `?`.
+static void printDynamicI64ArrayAttr(AsmPrinter &p, ArrayAttr attrs) {
+  SmallVector<int64_t> intVals = llvm::map_to_vector(
+      attrs, [&](Attribute attr) { return cast<IntegerAttr>(attr).getInt(); });
+  return printDynamicI64IntegerList(p, intVals);
 }
 
 LogicalResult
