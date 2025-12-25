@@ -20,6 +20,8 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -38,6 +40,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/TilingInterface.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -1108,6 +1111,31 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
   }
   return bitwidth;
 };
+
+//===---------------------------------------------------------------------===//
+// Integer range analysis utility functions
+//===---------------------------------------------------------------------===//
+
+FailureOr<int64_t> getDynamicUpperBound(Value value,
+                                        const DataFlowSolver &solver) {
+  // First try IntegerRangeAnalysis (cached, efficient).
+  if (auto *maybeRange =
+          solver.lookupState<dataflow::IntegerValueRangeLattice>(value)) {
+    IntegerValueRange range = maybeRange->getValue();
+    if (!range.isUninitialized() &&
+        range.getValue().smax() !=
+            IntegerValueRange::getMaxRange(value).getValue().smax()) {
+      return range.getValue().smax().getSExtValue();
+    }
+  }
+  // Fallback to ValueBoundsConstraintSet for complex cases.
+  auto ub = ValueBoundsConstraintSet::computeConstantBound(
+      presburger::BoundType::UB, {value, std::nullopt},
+      /*stopCondition=*/nullptr, /*closedUB=*/true);
+  if (succeeded(ub))
+    return ub.value();
+  return failure();
+}
 
 //===---------------------------------------------------------------------===//
 // Bufferization utility functions
