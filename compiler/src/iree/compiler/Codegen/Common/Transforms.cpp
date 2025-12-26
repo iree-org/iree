@@ -456,6 +456,90 @@ void populateFoldExtractSliceOfBroadcastPattern(RewritePatternSet &patterns) {
   patterns.add<FoldExtractSliceOfBroadcast>(patterns.getContext());
 }
 
+namespace {
+/// Pattern to fold extract_slice of a fill through a forall's block argument.
+/// When extracting a slice from a block argument where the init value is a
+/// linalg.fill, we update the forall's shared_outs to use the fill's
+/// destination (the empty tensor), and then create a fill on the extracted
+/// slice inside the loop body.
+///
+/// Example:
+///   %empty = tensor.empty() : tensor<4x1xf16>
+///   %fill = linalg.fill ins(%cst) outs(%empty) -> tensor<4x1xf16>
+///   scf.forall ... shared_outs(%arg = %fill) {
+///     %slice = tensor.extract_slice %arg[%i, 0] [1, 1] -> tensor<1x1xf16>
+///     ...
+///   }
+/// ->
+///   %empty = tensor.empty() : tensor<4x1xf16>
+///   scf.forall ... shared_outs(%arg = %empty) {  // Updated to use %empty
+///     %extracted = tensor.extract_slice %arg[%i, 0] [1, 1] -> tensor<1x1xf16>
+///     %slice = linalg.fill ins(%cst) outs(%extracted) -> tensor<1x1xf16>
+///     ...
+///   }
+struct FoldExtractSliceOfFillThroughBlockArg final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
+                                PatternRewriter &rewriter) const override {
+    auto blockArg = dyn_cast<BlockArgument>(extractOp.getSource());
+    if (!blockArg) {
+      return rewriter.notifyMatchFailure(extractOp,
+                                         "source is not a block argument");
+    }
+
+    auto forallOp = dyn_cast<scf::ForallOp>(blockArg.getOwner()->getParentOp());
+    if (!forallOp) {
+      return rewriter.notifyMatchFailure(
+          extractOp, "block argument is not from an scf.forall");
+    }
+
+    unsigned argNum = blockArg.getArgNumber();
+    unsigned numIVs = forallOp.getInductionVars().size();
+    if (argNum < numIVs) {
+      return rewriter.notifyMatchFailure(
+          extractOp, "block argument is an induction variable, not shared_out");
+    }
+
+    unsigned outputIdx = argNum - numIVs;
+    if (outputIdx >= forallOp.getOutputs().size()) {
+      return rewriter.notifyMatchFailure(extractOp,
+                                         "invalid output index for block arg");
+    }
+
+    Value initValue = forallOp.getOutputs()[outputIdx];
+
+    auto fillOp = initValue.getDefiningOp<linalg::FillOp>();
+    if (!fillOp) {
+      return rewriter.notifyMatchFailure(
+          extractOp, "init value is not a linalg.fill operation");
+    }
+
+    Value fillValue = fillOp.getInputs()[0];
+    Value fillDest = fillOp.getOutputs()[0];
+    rewriter.modifyOpInPlace(forallOp, [&]() {
+      forallOp.getOutputsMutable()[outputIdx].set(fillDest);
+    });
+
+    rewriter.setInsertionPointAfter(extractOp);
+    Location loc = extractOp.getLoc();
+    auto newFillOp =
+        linalg::FillOp::create(rewriter, loc, fillValue, extractOp.getResult());
+    newFillOp->setDiscardableAttrs(fillOp->getDiscardableAttrDictionary());
+    rewriter.replaceAllUsesExcept(extractOp.getResult(), newFillOp.getResult(0),
+                                  newFillOp);
+    return success();
+  }
+};
+
+} // namespace
+
+void populateFoldExtractSliceOfFillThroughBlockArgPattern(
+    RewritePatternSet &patterns) {
+  patterns.add<FoldExtractSliceOfFillThroughBlockArg>(patterns.getContext());
+}
+
 /// Note the following pattern is adapted from the upstream pattern
 /// `BubbleUpCollapseShapeThroughExtractSlice` by allowing some special cases.
 ///
