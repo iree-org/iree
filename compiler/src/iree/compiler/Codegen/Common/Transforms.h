@@ -193,6 +193,10 @@ void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 /// `tensor.expand_shape(tensor.extract_slice)`.
 void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
 
+/// Populate pattern to fold `tensor.extract_slice(linalg.broadcast)` into the
+/// broadcast input when the extract_slice undoes the broadcast.
+void populateFoldExtractSliceOfBroadcastPattern(RewritePatternSet &patterns);
+
 /// Populate pattern to convert `tensor.extract_slice(tensor.collapse_shape)` to
 /// `tensor.collapse_shape(tensor.extract_slice)`.
 void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns);
