@@ -1553,6 +1553,57 @@ static void getMatmulVectorSizesUsingFullVectorHeuristics(
   sizes[1] = std::max(sizes[1], minNumElements);
 }
 
+/// Compute vector tile sizes using a heuristic that aims to keep the entire
+/// ACC/OUT tile in registers, leave a few registers for LHS/RHS columns
+/// or rows, and all that while not exceeding the number of available registers.
+/// The rationale is that a matrix multiplication typically lowers to a loop
+/// nest in which the ACC/OUT tile remains live across all iterations of the
+/// innermost loop, whereas the LHS and RHS operands live for a single iteration
+/// and do not require the entire tiles to be simultaneously resident in
+/// registers.
+/// The base element type used is the element type of the output
+/// vector under the assumption the operand types with smaller bitwidths
+/// will be promoted to the output type and thus require more registers for the
+/// same number of elements.
+/// TODO: I might be worth extending the heuristic to consider target
+/// architecture features and operand types as well, e.g. for AArch64 FEAT_I8MM
+/// we might want to consider tile sizes that are multiples of 2x8.
+static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
+    mlir::FunctionOpInterface entryPointFn, linalg::LinalgOp op,
+    int64_t vectorSize, SmallVectorImpl<int64_t> &sizes,
+    SmallVectorImpl<bool> &scalableSizeFlags) {
+  assert(sizes.empty() && "Pre-condition enforced by caller");
+
+  // Find the output element type of the matmul.
+  assert(op->getResultTypes().size() == 1 &&
+         "Expected single output type for matmul op");
+  auto shType = dyn_cast<ShapedType>(op->getResultTypes()[0]);
+  if (!shType)
+    return;
+  Type outputEltType = shType.getElementType();
+  if (!outputEltType.isSignlessIntOrFloat())
+    return;
+
+  constexpr int64_t byteSizeInBits = 8;
+  int64_t outBitWidth = outputEltType.getIntOrFloatBitWidth();
+  int64_t outNumElements =
+      (getNativeVectorSizeInBytes(entryPointFn) * byteSizeInBits) / outBitWidth;
+
+  // Numbers picked experimentally for a range of element types.
+  constexpr int64_t M = 8, N = 2, K = 1;
+
+  // Multiply "horizontal" extents by the number of elements that fit in a vector
+  // register.
+  sizes.append({M, N * outNumElements, K * outNumElements});
+
+  // Mark N dimension as scalable, if doing scalable vectorization.
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  scalableSizeFlags.append({false,
+                            isScalableVectorizationEnabled() &&
+                                hasAnySVEFeature(targetAttr.getConfiguration()),
+                            false});
+}
+
 /// Utility to compute the tile sizes for RISC-V Vector.
 /// For now, it only supports nonWideningLinalgElementType float.
 /// TileSize is set to m = 7, n = maxNumberElementsForLMUL4, and k = 1.
@@ -1671,7 +1722,7 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
     // Try to maximize the vector register utilization for all the matmul
     // element types.
     if (matmulTileSizes.empty()) {
-      getMatmulVectorSizesUsingFullVectorHeuristics(
+      getMatmulVectorSizesUsingFillRegisterFileHeuristic(
           entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
     }
   }
