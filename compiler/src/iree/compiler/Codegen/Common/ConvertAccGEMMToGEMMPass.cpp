@@ -31,6 +31,36 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTACCGEMMTOGEMMPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
+// Get the `iree_tensor_ext.dispatch.tensor.load` that this value is
+// populated with. This could potentially walk the use-def chain to get the load
+// operation, but for now it just returns the load op if that is the defining
+// operation for `v`.
+std::optional<IREE::TensorExt::DispatchTensorLoadOp>
+getDispatchTensorLoadOp(Value v) {
+  auto loadOp = v.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
+  if (loadOp) {
+    return loadOp;
+  }
+  return std::nullopt;
+}
+
+// Get the `iree_tensor_ext.dispatch.tensor.store` that this value is
+// populated writes to. This could potentially walk the use-def chain of DPS
+// init operands to get the store operation, but for now it just returns the
+// store op if the result has a singe use and that use is the store op.
+std::optional<IREE::TensorExt::DispatchTensorStoreOp>
+getDispatchTensorStoreOp(Value v) {
+  if (v.getNumUses() != 1) {
+    return std::nullopt;
+  }
+  auto storeOp =
+      dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(*(v.getUsers().begin()));
+  if (storeOp) {
+    return storeOp;
+  }
+  return std::nullopt;
+}
+
 static bool accGemmToGemmPrecondition(Operation *op) {
   if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
     return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr,
@@ -48,8 +78,39 @@ static bool accGemmToGemmPrecondition(Operation *op) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return false;
   }
+  assert(linalgOp.getNumDpsInits() == 1 &&
+         "expected op to have a single outs operand");
+  // If the `outs` operand is from a read-write buffer, and the result is
+  // writing into the same buffer, do not convert to a non-accumulating gemm.
+  // This currently would only work for very simple cases, but could be
+  // generalized further.
+  OpOperand *initValue = linalgOp.getDpsInitOperand(0);
+  std::optional<IREE::TensorExt::DispatchTensorLoadOp> initLoadOp =
+      getDispatchTensorLoadOp(initValue->get());
+  std::optional<IREE::TensorExt::DispatchTensorStoreOp> resultStoreOp =
+      getDispatchTensorStoreOp(linalgOp->getResult(0));
+  if (initLoadOp && resultStoreOp && initLoadOp->getSource() &&
+      resultStoreOp->getTarget()) {
+    // Check that the source and the result have a read/write tag. If they dont
+    // then its really a bug in the way the dispatch is formed, but check here
+    // for safety.
+    if (initLoadOp->getSourceType().getAccess() ==
+        IREE::TensorExt::TensorAccess::ReadWrite) {
+      return false;
+    }
+  }
+
   return linalgOp.getMatchingIndexingMap(linalgOp.getDpsInitOperand(0))
       .isProjectedPermutation();
+}
+
+static bool isFuncArgument(Value v) {
+  auto blockArg = dyn_cast<BlockArgument>(v);
+  if (!blockArg) {
+    return false;
+  }
+  return isa<func::FuncOp, IREE::Util::FuncOp>(
+      blockArg.getParentBlock()->getParentOp());
 }
 
 static void convertAccGemmToGemm(RewriterBase &rewriter,
@@ -58,8 +119,10 @@ static void convertAccGemmToGemm(RewriterBase &rewriter,
       llvm::to_vector(llvm::make_pointer_range(dpsOp.getDpsInitsMutable()));
   Value outputOperand = outputOperands.front()->get();
   auto outsDefiningOp = outputOperand.getDefiningOp();
-  // If not DispatchTensorLoadOp or LoadFromBufferOp then do nothing.
-  if (!isa_and_nonnull<IREE::TensorExt::DispatchTensorLoadOp,
+  // If, not a function argument, and not DispatchTensorLoadOp/LoadFromBufferOp
+  // then do nothing.
+  if (!isFuncArgument(outputOperand) &&
+      !isa_and_nonnull<IREE::TensorExt::DispatchTensorLoadOp,
                        IREE::Codegen::LoadFromBufferOp>(outsDefiningOp)) {
     return;
   }

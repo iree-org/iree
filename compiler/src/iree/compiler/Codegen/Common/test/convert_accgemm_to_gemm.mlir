@@ -4,10 +4,9 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-func.func @accumulate_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>) {
+func.func @accumulate_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>, %4 : tensor<512x512xi32>) {
   %c0 = arith.constant 0 : index
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<512x512xi32>>
-  %4 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [512, 512], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<512x512xi32>> -> tensor<512x512xi32>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                      affine_map<(d0, d1, d2) -> (d1, d2)>,
@@ -104,10 +103,9 @@ func.func @accumulate_inner_tiled(%1 : tensor<?x?x4xf16>, %2 : tensor<?x?x4xf16>
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-func.func @acc_conv_nchw(%1 : tensor<1x64x58x58xf32>, %2 : tensor<64x64x3x3xf32>) {
+func.func @acc_conv_nchw(%1 : tensor<1x64x58x58xf32>, %2 : tensor<64x64x3x3xf32>, %4 : tensor<1x64x56x56xf32>) {
   %c0 = arith.constant 0 : index
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1x64x56x56xf32>>
-  %4 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0, 0], sizes = [1, 64, 56, 56], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1x64x56x56xf32>> -> tensor<1x64x56x56xf32>
   %5 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
       ins(%1, %2 : tensor<1x64x58x58xf32>, tensor<64x64x3x3xf32>) outs(%4 : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
   iree_tensor_ext.dispatch.tensor.store %5, %3, offsets = [0, 0, 0, 0], sizes = [1, 64, 56, 56], strides = [1, 1, 1, 1] : tensor<1x64x56x56xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1x64x56x56xf32>>
@@ -152,3 +150,33 @@ func.func @nonacc_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>) {
 // CHECK-LABEL: func.func @nonacc_gemm
 //       CHECK: linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 //   CHECK-NOT: linalg.generic
+
+// -----
+
+// For accumulating gemms that are reading and writing to read-write bindings
+// there is no need to convert these to non-accumulating gemms.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @acc_gemm_with_readwrite(%1 : tensor<512x128xi8>, %2 : tensor<128x512xi8>) {
+  %c0_i32 = arith.constant 0 : i32
+  %c0 = arith.constant 0 : index
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<512x512xi32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [512, 512], strides = [1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<512x512xi32>> -> tensor<512x512xi32>
+  %5 = linalg.matmul
+    ins(%1, %2 : tensor<512x128xi8>, tensor<128x512xi8>) outs(%4 : tensor<512x512xi32>) -> tensor<512x512xi32>
+  iree_tensor_ext.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [512, 512], strides = [1, 1]
+      : tensor<512x512xi32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<512x512xi32>>
+  return
+}
+// CHECK-LABEL: func @acc_gemm_with_readwrite
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite
+//       CHECK:   %[[INIT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[BINDING]]
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:       outs(%[[INIT]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[MATMUL]], %[[BINDING]]
