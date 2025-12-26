@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -27,6 +28,36 @@
 #define DEBUG_TYPE "iree-encoding-attrs"
 
 namespace mlir::iree_compiler::IREE::Encoding {
+
+/// Returns the bit-width of the scalar type. If the type is complex, it
+/// returns the type of individual elements * 2 (1 for real and 1 for
+/// complex).
+static unsigned getTypeBitWidth(Type type) {
+  if (auto complexType = dyn_cast<ComplexType>(type)) {
+    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
+  }
+  return type.getIntOrFloatBitWidth();
+}
+
+/// Returns the number of bytes an element of the given type occupies in
+/// memory. This is in the default dense conversion to machine words where
+/// sizes must be powers of two aligned to bytes.
+///
+/// Examples:
+///   getRoundedElementByteWidth(i1) = 1
+///   getRoundedElementByteWidth(i23) = 4
+///   getRoundedElementByteWidth(i32) = 4
+///   getRoundedElementByteWidth(bf16) = 2
+///   getRoundedElementByteWidth(i33) = 8
+///   getRoundedElementByteWidth(complex<f32>) = 8
+static int32_t getRoundedElementByteWidth(Type type) {
+  unsigned bitsUnaligned = getTypeBitWidth(type);
+  assert(bitsUnaligned > 0 && "0-width types unsupported");
+  // Round up to 8-bit aligned bytes.
+  unsigned byteAligned = (bitsUnaligned + 8 - 1) / 8;
+  // Round up to the next power of two (unless already a power of two).
+  return llvm::PowerOf2Ceil(byteAligned);
+}
 
 //===---------------------------------------------------------------------===//
 // iree_encoding.layout
@@ -123,36 +154,6 @@ bool PackedStorageAttr::isCompatibleWith(
   return isa<IREE::Encoding::PackedStorageAttr>(other);
 }
 
-/// Returns the bit-width of the scalar type. If the type is complex, it
-/// returns the type of individual elements * 2 (1 for real and 1 for
-/// complex).
-static unsigned getTypeBitWidth(Type type) {
-  if (auto complexType = dyn_cast<ComplexType>(type)) {
-    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
-  }
-  return type.getIntOrFloatBitWidth();
-}
-
-/// Returns the number of bytes an element of the given type occupies in
-/// memory. This is in the default dense conversion to machine words where
-/// sizes must be powers of two aligned to bytes.
-///
-/// Examples:
-///   getRoundedElementByteWidth(i1) = 1
-///   getRoundedElementByteWidth(i23) = 4
-///   getRoundedElementByteWidth(i32) = 4
-///   getRoundedElementByteWidth(bf16) = 2
-///   getRoundedElementByteWidth(i33) = 8
-///   getRoundedElementByteWidth(complex<f32>) = 8
-static int32_t getRoundedElementByteWidth(Type type) {
-  unsigned bitsUnaligned = getTypeBitWidth(type);
-  assert(bitsUnaligned > 0 && "0-width types unsupported");
-  // Round up to 8-bit aligned bytes.
-  unsigned byteAligned = (bitsUnaligned + 8 - 1) / 8;
-  // Round up to the next power of two (unless already a power of two).
-  return llvm::PowerOf2Ceil(byteAligned);
-}
-
 Value PackedStorageAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
@@ -241,15 +242,19 @@ static FailureOr<AffineMap> getComposedAffineMap(Attribute attr) {
 
 EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                EncodingOpType opType, ArrayRef<Type> elemTypes,
+                               Type originalElementType,
                                ArrayRef<AffineMap> maps,
                                ArrayRef<int64_t> iterationSizes) {
   Builder b(ctx);
   auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
+  auto originalElementTypeAttr =
+      originalElementType ? TypeAttr::get(originalElementType) : TypeAttr();
   auto mapsAttr = maps.empty() ? ArrayAttr() : b.getAffineMapArrayAttr(maps);
   auto iterationSizesAttr =
       iterationSizes.empty() ? ArrayAttr() : b.getI64ArrayAttr(iterationSizes);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
+             b.getTypeArrayAttr(elemTypes), originalElementTypeAttr, mapsAttr,
+             iterationSizesAttr);
 }
 
 /// Parse a list of integer values and/or dynamic values ('?')
@@ -306,12 +311,11 @@ static void printDynamicI64ArrayAttr(AsmPrinter &p, ArrayAttr attrs) {
   return printDynamicI64IntegerList(p, intVals);
 }
 
-LogicalResult
-EncodingAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
-                     IntegerAttr operandIndexAttr,
-                     EncodingOpTypeAttr opTypeAttr, ArrayAttr elementTypesAttr,
-                     ArrayAttr userIndexingMapsAttr,
-                     ArrayAttr iterationSizesAttr) {
+LogicalResult EncodingAttr::verify(
+    function_ref<mlir::InFlightDiagnostic()> emitError,
+    IntegerAttr operandIndexAttr, EncodingOpTypeAttr opTypeAttr,
+    ArrayAttr elementTypesAttr, TypeAttr originalElementTypeAttr,
+    ArrayAttr userIndexingMapsAttr, ArrayAttr iterationSizesAttr) {
   AffineMap indexingMap;
   if (userIndexingMapsAttr) {
     unsigned operandIndex = operandIndexAttr.getValue().getZExtValue();
@@ -410,7 +414,7 @@ SmallVector<int64_t> EncodingAttr::getIterationSizesArray() const {
   });
 }
 
-SmallVector<Type> EncodingAttr::getElementTypesArray() {
+SmallVector<Type> EncodingAttr::getElementTypesArray() const {
   return llvm::map_to_vector(getElementTypes().getValue(), [](Attribute a) {
     return cast<TypeAttr>(a).getValue();
   });
@@ -434,7 +438,8 @@ EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
   maps.push_back(AffineMapAttr::get(newIndexingMap));
   newMaps[operandIndex] = ArrayAttr::get(getContext(), maps);
   return get(getContext(), getOperandIndex(), getOpType(), getElementTypes(),
-             ArrayAttr::get(getContext(), newMaps), getIterationSizes());
+             getOriginalElementType(), ArrayAttr::get(getContext(), newMaps),
+             getIterationSizes());
 }
 
 bool EncodingAttr::isSerialized() const { return false; }
@@ -442,6 +447,64 @@ bool EncodingAttr::isSerialized() const { return false; }
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
   return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+}
+
+/// Helper to compute new shape when bitcasting a tensor to a different element
+/// type. Returns failure if the shape is empty or bits don't divide evenly.
+/// On success, returns the new shape with the last dimension adjusted.
+static FailureOr<SmallVector<int64_t>>
+computeBitcastShape(ArrayRef<int64_t> shape, Type originalElementType,
+                    Type newElementType) {
+  if (shape.empty()) {
+    return failure();
+  }
+
+  unsigned oldBitWidth = IREE::Util::getTypeBitWidth(originalElementType);
+  unsigned newBitWidth = IREE::Util::getTypeBitWidth(newElementType);
+
+  // If bit widths are the same, shape doesn't change.
+  if (oldBitWidth == newBitWidth) {
+    return SmallVector<int64_t>(shape);
+  }
+
+  int64_t lastDim = shape.back();
+  if (ShapedType::isDynamic(lastDim)) {
+    return failure();
+  }
+
+  // Compute the new last dimension based on the ratio of bit widths.
+  // totalBits = lastDim * oldBitWidth must equal newLastDim * newBitWidth.
+  int64_t totalBits = lastDim * oldBitWidth;
+  if (totalBits % newBitWidth != 0) {
+    return failure();
+  }
+  int64_t newLastDim = totalBits / newBitWidth;
+
+  SmallVector<int64_t> newShape(shape.drop_back());
+  newShape.push_back(newLastDim);
+  return newShape;
+}
+
+FailureOr<BitcastEncodingInfo>
+EncodingAttr::convertForBitcast(ArrayRef<int64_t> shape,
+                                Type originalElementType,
+                                Type newElementType) const {
+  FailureOr<SmallVector<int64_t>> newShape =
+      computeBitcastShape(shape, originalElementType, newElementType);
+  if (failed(newShape)) {
+    return failure();
+  }
+
+  // Preserve the original element type if not already set, or keep the
+  // existing one if this is a chain of bitcasts.
+  Type origElemType = getOriginalElementType()
+                          ? getOriginalElementType().getValue()
+                          : originalElementType;
+  EncodingAttr newEncoding = EncodingAttr::get(
+      getContext(), getOperandIndex().getValue().getZExtValue(),
+      getOpType().getValue(), getElementTypesArray(), origElemType,
+      getRootMaps(), getIterationSizesArray());
+  return BitcastEncodingInfo{*newShape, newEncoding};
 }
 
 std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
@@ -665,7 +728,26 @@ bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
 
 Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
-  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
+  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts),
+                          getOriginalElementType());
+}
+
+FailureOr<BitcastEncodingInfo>
+TestingAttr::convertForBitcast(ArrayRef<int64_t> shape,
+                               Type originalElementType,
+                               Type newElementType) const {
+  FailureOr<SmallVector<int64_t>> newShape =
+      computeBitcastShape(shape, originalElementType, newElementType);
+  if (failed(newShape)) {
+    return failure();
+  }
+
+  // Preserve the original element type if not already set, or keep the
+  // existing one if this is a chain of bitcasts.
+  Type origElemType =
+      getOriginalElementType() ? getOriginalElementType() : originalElementType;
+  auto newAttr = TestingAttr::get(getContext(), getLayouts(), origElemType);
+  return BitcastEncodingInfo{*newShape, newAttr};
 }
 
 Attribute

@@ -1087,3 +1087,40 @@ func.func @missing_user_indexing_maps() {
 // CHECK-DAG:     %[[STORE_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
 // CHECK-DAG:     %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LOAD_BINDING]]{{.+}} -> tensor<255x513xf32>
 // CHECK-DAG:     iree_tensor_ext.dispatch.tensor.store %[[LOAD]], %[[STORE_BINDING]]
+
+// -----
+
+//-----------------------------------------------------------------------------
+// Bitcast encoding test: f16 to f32 packing (demonstrates tile size adjustment)
+//-----------------------------------------------------------------------------
+
+// Test case: RHS tensor was bitcast from f16 to f32 (storage type differs from
+// original type). The encoding's original_element_type = f16 records the type
+// before bitcast packing. Tile sizes and swizzle expandShape should be halved
+// since f32 (32 bits) stores data that was originally f16 (16 bits).
+// This is analogous to i4->i8 packing where tile sizes are halved.
+#encoding_bitcast = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f16, f16, f32],
+                                            original_element_type = f16,
+                                            user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                            iteration_sizes = [?, ?, ?]>
+func.func @set_encoding_rhs_bitcast_f16_to_f32(
+    %arg0: tensor<?x?xf32>
+) -> tensor<?x?xf32, #encoding_bitcast> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_bitcast>
+  return %0 : tensor<?x?xf32, #encoding_bitcast>
+}
+
+// For f16/f16/f32 matmul RHS, normal tiles would be [128, 32] with expandShape
+// splitting 32 into [2, 4, 4]. With f16->f32 bitcast (ratio 16/32 = 1/2):
+// - innerTileSize: 32 * 16/32 = 16
+// - innermost expandShape dim: 4 * 16/32 = 2
+// So expandShape becomes [2, 4, 2] and tiles become [128, 16].
+// CHECK-LABEL: func.func @set_encoding_rhs_bitcast_f16_to_f32
+// CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+// CHECK:         %[[PACK:.*]] = linalg.pack %[[ARG0]]
+// CHECK-SAME:      inner_tiles = [128, 16]
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
+// CHECK-SAME:      into tensor<?x?x2x4x16x2x4x2xf32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:      ins(%[[EXPAND]] : tensor<?x?x2x4x16x2x4x2xf32>)
+// CHECK:         return %[[TRANSPOSE]]
