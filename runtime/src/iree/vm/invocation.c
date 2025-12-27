@@ -20,6 +20,12 @@
 // Invocation utilities for I/O
 //===----------------------------------------------------------------------===//
 
+// Aligns a pointer up to the required alignment.
+static inline uint8_t* iree_vm_invoke_align_ptr(uint8_t* p,
+                                                iree_host_size_t alignment) {
+  return (uint8_t*)iree_host_align((uintptr_t)p, alignment);
+}
+
 // Releases reference counted values in |storage|.
 static void iree_vm_invoke_release_io_refs(iree_string_view_t cconv_fragment,
                                            iree_byte_span_t storage) {
@@ -40,10 +46,12 @@ static void iree_vm_invoke_release_io_refs(iree_string_view_t cconv_fragment,
         break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64:
+        p = iree_vm_invoke_align_ptr(p, sizeof(int64_t));
         p += sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:
-        iree_vm_ref_release((iree_vm_ref_t*)p);  // safe unaligned
+        p = iree_vm_invoke_align_ptr(p, iree_alignof(iree_vm_ref_t));
+        iree_vm_ref_release((iree_vm_ref_t*)p);
         p += sizeof(iree_vm_ref_t);
         break;
     }
@@ -109,6 +117,7 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
         p += sizeof(int32_t);
       } break;
       case IREE_VM_CCONV_TYPE_I64: {
+        p = iree_vm_invoke_align_ptr(p, sizeof(int64_t));
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             inputs, arg_i, IREE_VM_VALUE_TYPE_I64, &value));
@@ -123,6 +132,7 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
         p += sizeof(float);
       } break;
       case IREE_VM_CCONV_TYPE_F64: {
+        p = iree_vm_invoke_align_ptr(p, sizeof(double));
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             inputs, arg_i, IREE_VM_VALUE_TYPE_F64, &value));
@@ -130,10 +140,11 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
         p += sizeof(double);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
+        p = iree_vm_invoke_align_ptr(p, iree_alignof(iree_vm_ref_t));
         // TODO(benvanik): see if we can't remove this retain by instead relying
         // on the caller still owning the list.
-        IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_assign(
-            inputs, arg_i, (iree_vm_ref_t*)p));  // safe unaligned
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_get_ref_assign(inputs, arg_i, (iree_vm_ref_t*)p));
         p += sizeof(iree_vm_ref_t);
       } break;
     }
@@ -176,9 +187,8 @@ static iree_status_t iree_vm_invoke_marshal_outputs(
         p += sizeof(int32_t);
       } break;
       case IREE_VM_CCONV_TYPE_I64: {
-        int64_t result = 0;
-        memcpy(&result, p, sizeof(result));
-        iree_vm_value_t value = iree_vm_value_make_i64(result);
+        p = iree_vm_invoke_align_ptr(p, sizeof(int64_t));
+        iree_vm_value_t value = iree_vm_value_make_i64(*(int64_t*)p);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
         p += sizeof(int64_t);
       } break;
@@ -188,15 +198,15 @@ static iree_status_t iree_vm_invoke_marshal_outputs(
         p += sizeof(float);
       } break;
       case IREE_VM_CCONV_TYPE_F64: {
-        double result = 0;
-        memcpy(&result, p, sizeof(result));
-        iree_vm_value_t value = iree_vm_value_make_f64(result);
+        p = iree_vm_invoke_align_ptr(p, sizeof(double));
+        iree_vm_value_t value = iree_vm_value_make_f64(*(double*)p);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
         p += sizeof(double);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
-        IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_move(
-            outputs, arg_i, (iree_vm_ref_t*)p));  // safe unaligned
+        p = iree_vm_invoke_align_ptr(p, iree_alignof(iree_vm_ref_t));
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_set_ref_move(outputs, arg_i, (iree_vm_ref_t*)p));
         p += sizeof(iree_vm_ref_t);
       } break;
     }

@@ -148,22 +148,17 @@ TEST(FunctionCallTest, ComputeCconvFragmentSize) {
   EXPECT_THAT(ComputeCconvFragmentSize("r"),
               IsOkAndHolds(sizeof(iree_vm_ref_t)));
 
-  // No external trailing padding (to min alignment of int64_t) expected.
-  EXPECT_THAT(ComputeCconvFragmentSize("Ii"),
-              IsOkAndHolds(sizeof(int64_t) + sizeof(int32_t)));
+  // Types are aligned to their natural alignment, plus struct trailing padding
+  // to align the total size to the max element alignment.
+  // "Ii": int64_t (8) + int32_t (4) + 4 trailing padding = 16
+  EXPECT_THAT(ComputeCconvFragmentSize("Ii"), IsOkAndHolds(16));
 
-  // No internal padding (to align the int64_t) expected.
-  EXPECT_THAT(ComputeCconvFragmentSize("iI"),
-              IsOkAndHolds(sizeof(int32_t) + sizeof(int64_t)));
+  // "iI": int32_t (4) + 4 padding + int64_t (8) = 16
+  EXPECT_THAT(ComputeCconvFragmentSize("iI"), IsOkAndHolds(16));
 
-  // No internal padding for the ref and external padding to min alignment of
-  // ref. We bake out the logic here for readability: this is what the function
-  // does internally (generically).
-  iree_host_size_t iri_size = 0;
-  iri_size += sizeof(int32_t);        // `i`
-  iri_size += sizeof(iree_vm_ref_t);  // `r`
-  iri_size += sizeof(int32_t);        // `i`
-  EXPECT_THAT(ComputeCconvFragmentSize("iri"), IsOkAndHolds(iri_size));
+  // "iri": int32_t (4) + 4 padding + iree_vm_ref_t (16) + int32_t (4) +
+  //        4 trailing padding = 32
+  EXPECT_THAT(ComputeCconvFragmentSize("iri"), IsOkAndHolds(32));
 }
 
 TEST(FunctionCallTest, ComputeVariadicCconvFragmentSize) {
@@ -185,15 +180,11 @@ TEST(FunctionCallTest, ComputeVariadicCconvFragmentSize) {
   EXPECT_THAT(ComputeCconvFragmentSize("CfD", {2}),
               IsOkAndHolds(sizeof(int32_t) + 2 * sizeof(float)));
 
-  // Spans have no padding.
-  iree_host_size_t iri_size = 0;
-  iri_size += sizeof(int32_t);  // span count
-  for (iree_host_size_t i = 0; i < 2; ++i) {
-    iri_size += sizeof(int32_t);        // `i`
-    iri_size += sizeof(iree_vm_ref_t);  // `r`
-    iri_size += sizeof(int32_t);        // `i`
-  }
-  EXPECT_THAT(ComputeCconvFragmentSize("CiriD", {2}), IsOkAndHolds(iri_size));
+  // Span elements have alignment padding.
+  // "CiriD" with count=2: span_count (4) + 2 * (i32 (4) + 4 pad + ref (16) +
+  //                       i32 (4)) + 4 trailing padding
+  //                     = 4 + 2*28 + 4 = 64
+  EXPECT_THAT(ComputeCconvFragmentSize("CiriD", {2}), IsOkAndHolds(64));
 }
 
 }  // namespace
