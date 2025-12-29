@@ -123,16 +123,23 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
     return {};
   }
   IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(targetConfiguration);
-  ArrayAttr indexingMapsAttr = encodingAttr.getUserIndexingMaps();
-  if (!indexingMapsAttr) {
-    return {};
-  }
-  if (failed(linalg::inferContractionDims(encodingAttr.getRootMaps()))) {
+  IREE::Encoding::EncodingOpType opType = encodingAttr.getOpType().getValue();
+  if (opType != IREE::Encoding::EncodingOpType::matmul &&
+      opType != IREE::Encoding::EncodingOpType::scaled_matmul) {
     return {};
   }
   SmallVector<Type> types = encodingAttr.getElementTypesArray();
   SmallVector<int64_t> iterationSizes = encodingAttr.getIterationSizesArray();
-  if (types.size() != 3 || iterationSizes.size() != 3) {
+  // Matmul has LHS, RHS, and ACC types. Scaled matmul has LHS, RHS, LHS scale,
+  // RHS scale, and ACC types.
+  int64_t expectedTypeSize =
+      (opType == IREE::Encoding::EncodingOpType::matmul) ? 3 : 5;
+  // Matmul has M, N, and K iteration sizes. Scaled matmul has M, N, K, and Kb
+  // iteration sizes.
+  int64_t expectedIterationSize =
+      (opType == IREE::Encoding::EncodingOpType::matmul) ? 3 : 4;
+  if (types.size() != expectedTypeSize ||
+      iterationSizes.size() != expectedIterationSize) {
     return {};
   }
   auto &rocmDialect = cast<ROCMDialect>(getDialect());
@@ -192,19 +199,27 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
     // Depending on the type of data-tiled layout attribute, read the
     // appropriate kind of MMA-like intrinsic and check that it's supported by
     // the target.
-    if (auto dtMma = dyn_cast<GPU::DataTiledMMAAttr>(mma)) {
+    if (opType == IREE::Encoding::EncodingOpType::matmul) {
+      auto dtMma = dyn_cast<GPU::DataTiledMMAAttr>(mma);
+      if (!dtMma) {
+        continue;
+      }
       // Regular MMA intrinsic.
       auto intrinsicAttr =
           GPU::MMAAttr::get(matchTypes.getContext(), dtMma.getIntrinsic());
       if (!llvm::is_contained(targetAttr.getWgp().getMma(), intrinsicAttr)) {
         continue;
       }
-    } else if (auto dtScaledMma = dyn_cast<GPU::DataTiledScaledMMAAttr>(mma)) {
+    } else if (opType == IREE::Encoding::EncodingOpType::scaled_matmul) {
+      auto dtScaledMma = dyn_cast<GPU::DataTiledScaledMMAAttr>(mma);
+      if (!dtScaledMma) {
+        continue;
+      }
       // Scaled MMA intrinsic.
       auto intrinsicAttr = GPU::ScaledMMAAttr::get(
           matchTypes.getContext(), dtScaledMma.getIntrinsic(),
           /*lhs_elem_type=*/types[0], /*rhs_elem_type=*/types[1],
-          /*acc_elem_type=*/types[2], /*col_major=*/false);
+          /*acc_elem_type=*/types[4], /*col_major=*/false);
       if (!llvm::is_contained(targetAttr.getWgp().getScaledMma(),
                               intrinsicAttr)) {
         continue;
