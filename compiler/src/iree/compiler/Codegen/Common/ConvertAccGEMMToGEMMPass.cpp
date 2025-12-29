@@ -92,8 +92,8 @@ static bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp) {
     if (initLoadOp && resultStoreOp && initLoadOp->getSource() &&
         resultStoreOp->getTarget()) {
       // Check that the source and the result have a read/write tag. If they
-      // don't then its really a bug in the way the dispatch is formed, but check
-      // here for safety.
+      // don't then its really a bug in the way the dispatch is formed, but
+      // check here for safety.
       if (initLoadOp->getSourceType().getAccess() ==
           IREE::TensorExt::TensorAccess::ReadWrite) {
         return true;
