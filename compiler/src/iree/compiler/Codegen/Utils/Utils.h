@@ -26,6 +26,10 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
 
+namespace mlir {
+class DataFlowSolver;
+} // namespace mlir
+
 namespace mlir::iree_compiler {
 
 static constexpr unsigned kNumMaxParallelDims = 3;
@@ -210,6 +214,17 @@ int getReductionTilingFactor(int64_t dimSize);
 // Returns the minimal element bitwidth used in the operands and results of the
 // given Linalg op.
 int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
+
+//===---------------------------------------------------------------------===//
+// Integer range analysis utility functions.
+//===---------------------------------------------------------------------===//
+
+/// Get the upper bound of a dynamic value. First tries IntegerRangeAnalysis
+/// (cached, efficient), then falls back to ValueBoundsConstraintSet for complex
+/// cases like affine.apply. The solver should have IntegerRangeAnalysis loaded
+/// and initialized before calling this function.
+FailureOr<int64_t> getDynamicUpperBound(Value value,
+                                        const DataFlowSolver &solver);
 
 //===---------------------------------------------------------------------===//
 // Bufferization utility functions
