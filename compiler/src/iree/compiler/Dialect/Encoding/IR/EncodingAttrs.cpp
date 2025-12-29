@@ -203,7 +203,10 @@ LogicalResult PackedStorageAttr::verifyEncoding(
   return success();
 }
 
-bool PackedStorageAttr::canCollapse() const { return true; }
+Attribute PackedStorageAttr::getCollapsedEncoding(ArrayRef<int64_t>,
+                                                  ArrayRef<int64_t>) const {
+  return *this;
+}
 
 //===---------------------------------------------------------------------===//
 // iree_encoding.encoding

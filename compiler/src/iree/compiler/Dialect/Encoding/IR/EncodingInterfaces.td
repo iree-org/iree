@@ -220,6 +220,23 @@ def IREEEncoding_SerializableAttr :
         assert(false && "unimplemented interface method");
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the new encoding after collapsing the type from `origShape`
+        to `targetShape`. If the type with this encoding cannot be collapsed,
+        returns `nullptr`.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getCollapsedEncoding",
+      /*args=*/(ins
+        "::llvm::ArrayRef<int64_t>":$origShape,
+        "::llvm::ArrayRef<int64_t>":$targetShape
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return nullptr;
+      }]
     >
   ];
 
@@ -337,32 +354,6 @@ def IREEEncoding_ContractionEncodingAttrInterface :
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return std::nullopt;
-      }]
-    >
-  ];
-}
-
-def IREEEncoding_CollapsibleEncodingAttrInterface :
-  AttrInterface<"CollapsibleEncodingAttrInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Encoding";
-  let description = [{
-    Interface used to query whether a tensor with the encoding
-    can be collapsed, e.g., to fold away unit extent dimensions.
-  }];
-
-  let methods = [
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns true if a tensor type with this encoding can be
-        collapsed.
-      }],
-      /*retTy=*/"bool",
-      /*methodName=*/"canCollapse",
-      /*args=*/(ins
-      ),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return false;
       }]
     >
   ];
