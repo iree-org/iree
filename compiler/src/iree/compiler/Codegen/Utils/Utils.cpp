@@ -1132,8 +1132,9 @@ FailureOr<int64_t> getDynamicUpperBound(Value value,
   auto ub = ValueBoundsConstraintSet::computeConstantBound(
       presburger::BoundType::UB, {value, std::nullopt},
       /*stopCondition=*/nullptr, /*closedUB=*/true);
-  if (succeeded(ub))
+  if (succeeded(ub)) {
     return ub.value();
+  }
   return failure();
 }
 
