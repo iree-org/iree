@@ -35,9 +35,9 @@ namespace mlir::iree_compiler {
 // populated with. This could potentially walk the use-def chain to get the load
 // operation, but for now it just returns the load op if that is the defining
 // operation for `v`.
-std::optional<IREE::TensorExt::DispatchTensorLoadOp>
-getDispatchTensorLoadOp(Value v) {
-  auto loadOp = v.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
+template <typename LoadOpTy>
+std::optional<LoadOpTy> getLoadOp(Value v) {
+  auto loadOp = v.getDefiningOp<LoadOpTy>();
   if (loadOp) {
     return loadOp;
   }
@@ -47,18 +47,60 @@ getDispatchTensorLoadOp(Value v) {
 // Get the `iree_tensor_ext.dispatch.tensor.store` that this value is
 // populated writes to. This could potentially walk the use-def chain of DPS
 // init operands to get the store operation, but for now it just returns the
-// store op if the result has a singe use and that use is the store op.
-std::optional<IREE::TensorExt::DispatchTensorStoreOp>
-getDispatchTensorStoreOp(Value v) {
+// store op if the result has a single use and that use is the store op.
+template <typename StoreOpTy>
+std::optional<StoreOpTy> getStoreOp(Value v) {
   if (v.getNumUses() != 1) {
     return std::nullopt;
   }
-  auto storeOp =
-      dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(*(v.getUsers().begin()));
+  auto storeOp = dyn_cast<StoreOpTy>(*(v.getUsers().begin()));
   if (storeOp) {
     return storeOp;
   }
   return std::nullopt;
+}
+
+// Check if the init value of the operation is read/write from the same buffer.
+// If not, it is invalid to use an accumulating GEMM operation, and convert it
+// to a non-accumulating GEMM.
+static bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp) {
+  assert(dpsOp.getNumDpsInits() == 1 &&
+         "expected op to have a single outs operand");
+  OpOperand *initValue = dpsOp.getDpsInitOperand(0);
+
+  // Case 1. Check for the case when reading/writing from the same buffer
+  // through `iree_codegen.load_from_buffer`/`iree_codegen.store_to_buffer`.
+  {
+    std::optional<IREE::Codegen::LoadFromBufferOp> loadOp =
+        getLoadOp<IREE::Codegen::LoadFromBufferOp>(initValue->get());
+    std::optional<IREE::Codegen::StoreToBufferOp> storeOp =
+        getStoreOp<IREE::Codegen::StoreToBufferOp>(dpsOp->getResult(0));
+    if (loadOp && storeOp && loadOp->getBuffer() == storeOp->getBuffer()) {
+      return true;
+    }
+  }
+
+  // Case 2. If the `outs` operand is from a read-write buffer, and the result
+  // is writing into the same buffer, do not convert to a non-accumulating gemm.
+  // This currently would only work for very simple cases, but could be
+  // generalized further.
+  {
+    std::optional<IREE::TensorExt::DispatchTensorLoadOp> initLoadOp =
+        getLoadOp<IREE::TensorExt::DispatchTensorLoadOp>(initValue->get());
+    std::optional<IREE::TensorExt::DispatchTensorStoreOp> resultStoreOp =
+        getStoreOp<IREE::TensorExt::DispatchTensorStoreOp>(dpsOp->getResult(0));
+    if (initLoadOp && resultStoreOp && initLoadOp->getSource() &&
+        resultStoreOp->getTarget()) {
+      // Check that the source and the result have a read/write tag. If they
+      // don't then its really a bug in the way the dispatch is formed, but check
+      // here for safety.
+      if (initLoadOp->getSourceType().getAccess() ==
+          IREE::TensorExt::TensorAccess::ReadWrite) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 static bool accGemmToGemmPrecondition(Operation *op) {
@@ -78,26 +120,9 @@ static bool accGemmToGemmPrecondition(Operation *op) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return false;
   }
-  assert(linalgOp.getNumDpsInits() == 1 &&
-         "expected op to have a single outs operand");
-  // If the `outs` operand is from a read-write buffer, and the result is
-  // writing into the same buffer, do not convert to a non-accumulating gemm.
-  // This currently would only work for very simple cases, but could be
-  // generalized further.
-  OpOperand *initValue = linalgOp.getDpsInitOperand(0);
-  std::optional<IREE::TensorExt::DispatchTensorLoadOp> initLoadOp =
-      getDispatchTensorLoadOp(initValue->get());
-  std::optional<IREE::TensorExt::DispatchTensorStoreOp> resultStoreOp =
-      getDispatchTensorStoreOp(linalgOp->getResult(0));
-  if (initLoadOp && resultStoreOp && initLoadOp->getSource() &&
-      resultStoreOp->getTarget()) {
-    // Check that the source and the result have a read/write tag. If they dont
-    // then its really a bug in the way the dispatch is formed, but check here
-    // for safety.
-    if (initLoadOp->getSourceType().getAccess() ==
-        IREE::TensorExt::TensorAccess::ReadWrite) {
-      return false;
-    }
+  if (isValidInPlaceAccumulatingOp(
+          cast<DestinationStyleOpInterface>(linalgOp.getOperation()))) {
+    return false;
   }
 
   return linalgOp.getMatchingIndexingMap(linalgOp.getDpsInitOperand(0))
