@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <limits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -76,6 +78,47 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   // Get subgroup size from translation_info.
   std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
   if (!subgroupSize) {
+    return {};
+  }
+
+  // Skip coalesced DMA if the innermost dimension is smaller than the minimum
+  // transfer size. The minimum transfer size is subgroupSize *
+  // minElementsPerLane.
+  int64_t rank = outputType.getRank();
+  int64_t innermostDim = outputType.getShape()[rank - 1];
+  if (ShapedType::isDynamic(innermostDim)) {
+    return {};
+  }
+
+  // Get element type bit width.
+  Type elementType = outputType.getElementType();
+  int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+  // Get DMA sizes from target to compute minimum transfer size.
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target) {
+    return {};
+  }
+
+  ArrayRef<int64_t> dmaSizes;
+  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    dmaSizes = dmaSizesAttr.asArrayRef();
+  }
+
+  // Find minimum elements per transfer across all DMA sizes.
+  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % elementBits != 0)
+      continue;
+    int64_t elementsPerLane = dmaSize / elementBits;
+    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+    minElementsPerTransfer =
+        std::min(minElementsPerTransfer, elementsPerTransfer);
+  }
+
+  // If no valid DMA size found or innermost dim is too small, skip.
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+      innermostDim < minElementsPerTransfer) {
     return {};
   }
 
@@ -357,6 +400,43 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
+    // Validate that innermost dimension is large enough for coalesced DMA.
+    auto outputType =
+        cast<RankedTensorType>(gatherOp.getOutputs()[0].getType());
+    int64_t rank = outputType.getRank();
+    int64_t innermostDim = outputType.getShape()[rank - 1];
+    if (ShapedType::isDynamic(innermostDim)) {
+      return failure();
+    }
+
+    Type elementType = outputType.getElementType();
+    int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    if (!target) {
+      return failure();
+    }
+
+    ArrayRef<int64_t> dmaSizes;
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
+      dmaSizes = dmaSizesAttr.asArrayRef();
+    }
+
+    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+    for (int64_t dmaSize : dmaSizes) {
+      if (dmaSize % elementBits != 0)
+        continue;
+      int64_t elementsPerLane = dmaSize / elementBits;
+      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+      minElementsPerTransfer =
+          std::min(minElementsPerTransfer, elementsPerTransfer);
+    }
+
+    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+        innermostDim < minElementsPerTransfer) {
+      return failure();
+    }
+
     SmallVector<OpFoldResult> threadNumThreads;
     threadNumThreads.push_back(rewriter.getIndexAttr(*subgroupSize));
 
@@ -518,10 +598,45 @@ private:
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
-    // Skip coalesced DMA if the innermost dimension is smaller than subgroup
-    // size. Coalesced DMA requires at least one element per lane.
+    // Skip coalesced DMA if the innermost dimension is smaller than the minimum
+    // transfer size. The minimum transfer size is subgroupSize *
+    // minElementsPerLane, where minElementsPerLane is determined by the
+    // smallest DMA size and element type.
     int64_t innermostDim = shape[rank - 1];
-    if (ShapedType::isStatic(innermostDim) && innermostDim < *subgroupSize) {
+    if (ShapedType::isDynamic(innermostDim)) {
+      return failure();
+    }
+
+    // Get the element type bit width.
+    Type elementType = outputType.getElementType();
+    int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+    // Get DMA sizes from target to compute minimum transfer size.
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    if (!target) {
+      return failure();
+    }
+
+    ArrayRef<int64_t> dmaSizes;
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
+      dmaSizes = dmaSizesAttr.asArrayRef();
+    }
+
+    // Find minimum elements per transfer across all DMA sizes.
+    // We need innermostDim >= subgroupSize * minElementsPerLane.
+    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+    for (int64_t dmaSize : dmaSizes) {
+      if (dmaSize % elementBits != 0)
+        continue;
+      int64_t elementsPerLane = dmaSize / elementBits;
+      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+      minElementsPerTransfer =
+          std::min(minElementsPerTransfer, elementsPerTransfer);
+    }
+
+    // If no valid DMA size found or innermost dim is too small, skip.
+    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+        innermostDim < minElementsPerTransfer) {
       return failure();
     }
 
