@@ -68,6 +68,16 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
   return _VTABLE_DISPATCH(device, query_i64)(device, category, key, out_value);
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_device_query_string(
+    iree_hal_device_t* device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_size,
+    char* out_string) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_string);
+  return _VTABLE_DISPATCH(device, query_string)(device, category, key,
+                                                out_string_size, out_string);
+}
+
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
 iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
                                               iree_hal_semaphore_t* semaphore) {
