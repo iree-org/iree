@@ -488,6 +488,21 @@ IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
     iree_hal_device_t* device,
     const iree_hal_device_topology_info_t* topology_info);
 
+// Queries a configuration value as string data.
+// The |category| and |key| will be provided to the device driver to interpret
+// in a device-specific way and if recognized the value will be converted to a
+// utf-8 string and stored in |out_string|. Fails if the value represented by
+// the key is not convertable, or the size exceeds that of out_string.
+//
+// Well-known queries (category :: key):
+//   hal.device.architecture :: some-pattern-*
+//
+// Returned values must remain the same for the lifetime of the device as
+// callers may cache them to avoid redundant calls.
+IREE_API_EXPORT iree_status_t iree_hal_device_query_string(
+    iree_hal_device_t* device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_size, char* out_string);
+
 // Queries in what ways the given |semaphore| may be used with |device|.
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
 iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
@@ -872,6 +887,11 @@ typedef struct iree_hal_device_vtable_t {
   iree_status_t(IREE_API_PTR* assign_topology_info)(
       iree_hal_device_t* device,
       const iree_hal_device_topology_info_t* topology_info);
+  iree_status_t(IREE_API_PTR* query_string)(iree_hal_device_t* device,
+                                            iree_string_view_t category,
+                                            iree_string_view_t key,
+                                            iree_host_size_t out_string_size,
+                                            char* out_string);
 
   iree_status_t(IREE_API_PTR* create_channel)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,

@@ -770,6 +770,23 @@ static iree_status_t iree_hal_cuda_device_assign_topology_info(
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   device->topology_info = *topology_info;
   return iree_ok_status();
+static iree_status_t iree_hal_cuda_device_query_string(
+    iree_hal_device_t* base_device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_size,
+    char* out_string) {
+  (void)base_device;
+  if (out_string_size == 0) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "output string too small");
+  }
+  out_string[0] = '\0';
+
+  // CUDA doesn't have architecture string queries like HIP's gcnArchName.
+  // Return NOT_FOUND for any string queries.
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "unknown device configuration key value '%.*s :: %.*s'",
+      (int)category.size, category.data, (int)key.size, key.data);
 }
 
 static iree_status_t iree_hal_cuda_device_create_channel(
@@ -1152,6 +1169,7 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .topology_info = iree_hal_cuda_device_topology_info,
     .refine_topology_edge = iree_hal_cuda_device_refine_topology_edge,
     .assign_topology_info = iree_hal_cuda_device_assign_topology_info,
+    .query_string = iree_hal_cuda_device_query_string,
     .create_channel = iree_hal_cuda_device_create_channel,
     .create_command_buffer = iree_hal_cuda_device_create_command_buffer,
     .create_event = iree_hal_cuda_device_create_event,
