@@ -803,6 +803,37 @@ static iree_status_t iree_hal_hip_device_assign_topology_info(
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   device->topology_info = *topology_info;
   return iree_ok_status();
+static iree_status_t iree_hal_hip_device_query_string(
+    iree_hal_device_t* base_device, iree_string_view_t category,
+    iree_string_view_t key, iree_host_size_t out_string_size,
+    char* out_string) {
+  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  if (out_string_size == 0) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "output string too small");
+  }
+  out_string[0] = '\0';
+
+  if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
+    if (iree_string_view_equal(key, IREE_SV("architecture"))) {
+      hipDeviceProp_tR0000 prop;
+      IREE_HIP_RETURN_IF_ERROR(
+          device->hip_symbols,
+          hipGetDeviceProperties(&prop, device->devices[0].hip_device),
+          "hipGetDeviceProperties");
+      if (out_string_size <= strlen(prop.gcnArchName)) {
+        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "output string too small");
+      }
+      memcpy(out_string, prop.gcnArchName, strlen(prop.gcnArchName) + 1);
+      return iree_ok_status();
+    }
+  }
+
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "unknown device configuration key value '%.*s :: %.*s'",
+      (int)category.size, category.data, (int)key.size, key.data);
 }
 
 static iree_status_t iree_hal_hip_device_create_channel(
@@ -2800,6 +2831,7 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .topology_info = iree_hal_hip_device_topology_info,
     .refine_topology_edge = iree_hal_hip_device_refine_topology_edge,
     .assign_topology_info = iree_hal_hip_device_assign_topology_info,
+    .query_string = iree_hal_hip_device_query_string,
     .create_channel = iree_hal_hip_device_create_channel,
     .create_command_buffer = iree_hal_hip_device_create_command_buffer,
     .create_event = iree_hal_hip_device_create_event,
