@@ -46,6 +46,15 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+      - name: "Reclaim disk space"
+        # GitHub-hosted runners have 14GB of disk space -- reclaim some by removing SDKs
+        # we don't need.
+        run: |
+          echo "Free space before"
+          df -h
+          sudo rm -rf /Users/runner/Library/Android/sdk
+          echo "Free space after"
+          df -h
       - name: "Installing Python packages"
         run: pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Installing requirements"
