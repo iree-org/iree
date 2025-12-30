@@ -314,6 +314,12 @@ struct DistributeTransferReadWithSingleRead final
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    // TODO(sommerlukas): Check how to handle the following:
+    // - Non-unit strides in the memref
+    // - 0-distribution
+    // - Permutation maps that are not a minor identity map
+    // - Masks
+    // - Out-of-bounds access
     NestedLayoutAttr vectorLayout =
         dyn_cast<NestedLayoutAttr>(signature[readOp.getResult()]);
     if (!vectorLayout) {
@@ -322,7 +328,6 @@ struct DistributeTransferReadWithSingleRead final
     }
 
     if (readOp.getMask()) {
-      // TODO: Decide whether we can handle masks.
       return rewriter.notifyMatchFailure(readOp, "masks not supported");
     }
     // Guard on memrefs for distribution. In isolation this pattern is agnostic
@@ -332,21 +337,6 @@ struct DistributeTransferReadWithSingleRead final
       return rewriter.notifyMatchFailure(readOp,
                                          "distribution expects memrefs");
     }
-
-    auto printShape = [](llvm::Twine comment,
-                         llvm::SmallVectorImpl<int64_t> &shape) {
-      llvm::dbgs() << comment << ": ";
-      llvm::interleaveComma(shape, llvm::dbgs());
-      llvm::dbgs() << "\n";
-    };
-    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
-    printShape("distributed shape", distShape);
-    auto shape = vectorLayout.getUndistributedPackedShape();
-    printShape("undistributed packed shape", shape);
-    auto shape2 = vectorLayout.getPackedShapeForUndistributedDim(0);
-    printShape("packed for undistributed dim 0", shape2);
-    auto shape3 = vectorLayout.getPackedShapeForUndistributedDim(1);
-    printShape("packed for undistributed dim 1", shape3);
 
     // We require the memref to be static in the last `rank` dimensions.
     int64_t rank = vectorLayout.getRank();
@@ -364,73 +354,65 @@ struct DistributeTransferReadWithSingleRead final
       return rewriter.notifyMatchFailure(
           readOp, "warp or thread tiles have overlapping strides");
     }
-    // TODO: Zero-distribution signals that no distribution happens in that
-    // dimension. Handle that. Also, handle permutations.
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> expandedMemShape;
+    expandedMemShape.reserve(distShape.size() + memRank);
     SmallVector<OpFoldResult> outputShapes;
     SmallVector<ReassociationIndices> reassociation;
     SmallVector<Value> newIndices;
-    Location loc = readOp->getLoc();
-    expandedMemShape.reserve(distShape.size() + memRank);
     newIndices.reserve(distShape.size() + memRank);
+    ImplicitLocOpBuilder builder{readOp->getLoc(), rewriter};
     // TODO: Do we also need to put the static sizes into `outputShapes`?
     for (int i = 0; i < memRank; ++i) {
       if (i < memRank - rank) {
+        // Handle the dimensions of the memref that are not distributed.
         expandedMemShape.push_back(memrefTy.getDimSize(i));
         if (memrefTy.isDynamicDim(i)) {
-          Value constIndex = arith::ConstantIndexOp::create(rewriter, loc, i);
+          Value constIndex = arith::ConstantIndexOp::create(builder, i);
           outputShapes.push_back(
-              memref::DimOp::create(rewriter, loc, readOp.getBase(), constIndex)
+              memref::DimOp::create(builder, readOp.getBase(), constIndex)
                   ->getResult(0));
         }
         reassociation.push_back({i});
         newIndices.push_back(readOp.getIndices()[i]);
         continue;
       }
+      // Handle dimensions that are distributed.
       assert(!memrefTy.isDynamicDim(i));
       int64_t vecDim = i - (memRank - rank);
+      // The remaining size of the memref in the distributed dimension is the
+      // original size divided by the product of the distributed sizes in that
+      // dimension.
       SmallVector<int64_t> undistributedPackedShape =
           vectorLayout.getPackedShapeForUndistributedDim(vecDim);
       int64_t divider = llvm::product_of(undistributedPackedShape);
       int64_t remainingSize = memrefTy.getDimSize(i) / divider;
       expandedMemShape.push_back(remainingSize);
-      ReassociationIndices reassoc;
-      reassoc.reserve(rank + 1);
-      for (int idx = 0; idx < 6; ++idx) {
-        reassoc.push_back(i + idx * rank);
-      }
+      // For the reassociation, we need six elements: The five dimensions of the
+      // layout plus one dimension for the remaining size in the memref.
+      ReassociationIndices reassoc = llvm::to_vector(llvm::map_range(
+          llvm::seq(0, 6), [&](int idx) { return i + idx * rank; }));
       reassociation.push_back(reassoc);
-      // Delinearize the index.
+      // Delinearize the index into the memref over the distributed dimensions.
       SmallVector<int64_t, 6> basis;
       basis.push_back(remainingSize);
-      basis.append(undistributedPackedShape.begin(),
-                   undistributedPackedShape.end());
+      basis.append(undistributedPackedShape);
       auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
-          rewriter, loc, readOp.getIndices()[i], {}, basis,
+          builder, readOp.getIndices()[i], {}, basis,
           /*hasOuterBound=*/true);
-      delinearizeOp->dump();
       newIndices.push_back(delinearizeOp->getResult(0));
     }
+    // Append the undistributed, packed shape as the inner shape of the new
+    // memref.
     expandedMemShape.append(vectorLayout.getUndistributedPackedShape());
-    printShape("expanded mem shape", expandedMemShape);
-    for (auto &r : reassociation) {
-      printShape("reassociation", r);
-    }
     auto expandedMemTy =
         MemRefType::get(expandedMemShape, memrefTy.getElementType());
     auto expandedMem = memref::ExpandShapeOp::create(
-        rewriter, loc, expandedMemTy, readOp.getBase(), reassociation,
-        outputShapes);
+        builder, expandedMemTy, readOp.getBase(), reassociation, outputShapes);
     expandedMem->dump();
 
-    auto appendRange = [](llvm::SmallVectorImpl<unsigned> &appendTo,
-                          unsigned &index, unsigned length) {
-      for (unsigned i = 0; i < length; ++i, ++index) {
-        appendTo.push_back(index);
-      }
-    };
     // Construct the remaining indices and the permutation map.
-    auto zeroIndex = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    auto zeroIndex = arith::ConstantIndexOp::create(builder, 0);
     SmallVector<unsigned> targets;
     unsigned targetIndex = memRank;
     targets.reserve(3 * rank);
@@ -439,39 +421,33 @@ struct DistributeTransferReadWithSingleRead final
     targetIndex += rank;
     // Batch dimension
     newIndices.append(rank, zeroIndex);
-    appendRange(targets, targetIndex, rank);
+    llvm::append_range(targets,
+                       llvm::seq<unsigned>(targetIndex, targetIndex + rank));
+    targetIndex += rank;
     // Outer dimension
     newIndices.append(rank, zeroIndex);
-    appendRange(targets, targetIndex, rank);
+    llvm::append_range(targets,
+                       llvm::seq<unsigned>(targetIndex, targetIndex + rank));
+    targetIndex += rank;
     // Thread dimension
     newIndices.append(threadIndices);
     targetIndex += rank;
     // Element dimension
     newIndices.append(rank, zeroIndex);
-    appendRange(targets, targetIndex, rank);
+    llvm::append_range(targets,
+                       llvm::seq<unsigned>(targetIndex, targetIndex + rank));
 
     AffineMap newPermMap = AffineMap::getMultiDimMapWithTargets(
         expandedMemTy.getRank(), targets, rewriter.getContext());
-    newPermMap.dump();
 
     Type elementTy = readOp.getBase().getType().getElementType();
     auto newVectorTy = VectorType::get(distShape, elementTy);
     newVectorTy.dump();
-    SmallVector<bool> inBounds;
-    inBounds.append(readOp.getInBoundsValues());
-    inBounds.append(readOp.getInBoundsValues());
-    inBounds.append(readOp.getInBoundsValues());
+    SmallVector<bool> inBounds(3 * rank, true);
     auto newRead = vector::TransferReadOp::create(
-        rewriter, loc, newVectorTy, expandedMem, newIndices, std::nullopt,
-        newPermMap, inBounds);
+        builder, newVectorTy, expandedMem, newIndices, std::nullopt, newPermMap,
+        inBounds);
     newRead->dump();
-    // TODO: Next steps:
-    //       - Delinearize the original index for the dimensions that are
-    //       reassociated
-    //       - Construct permutation map that only keeps the dimensions relevant
-    //       for the vector loaded
-    //       - Insert transfer read that actually loads the vector.
-    //       - Think about permutations and masks.
     replaceOpWithDistributedValues(rewriter, readOp, newRead->getResults());
     return success();
   }
@@ -520,14 +496,8 @@ struct DistributeTransferRead final
                                          "distribution expects memrefs");
     }
 
-    auto printShape = [](SmallVector<int64_t> &shape) {
-      llvm::interleaveComma(shape, llvm::dbgs());
-      llvm::dbgs() << "\n";
-    };
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
-    printShape(distShape);
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
-    printShape(tileShape);
     int64_t rank = vectorLayout.getRank();
 
     Type elementType = readOp.getBase().getType().getElementType();
