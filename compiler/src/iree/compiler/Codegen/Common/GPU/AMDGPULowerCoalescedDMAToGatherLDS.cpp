@@ -252,9 +252,7 @@ struct LowerCoalescedGatherDMAPattern final
     LDBG() << "  Element bits: " << elementBits;
 
     ArrayRef<int64_t> destShape = destType.getShape();
-    int64_t innermostDimSize = destShape.back();
-    LDBG() << "  Destination innermost dimension size: " << innermostDimSize;
-    LDBG() << "  Destination rank: " << destShape.size();
+    LDBG() << "  Destination shape: " << destShape.size() << "D";
 
     std::optional<int64_t> subgroupSize =
         getSubgroupSize(dmaOp->getParentOfType<FunctionOpInterface>());
@@ -268,26 +266,33 @@ struct LowerCoalescedGatherDMAPattern final
     size_t numIndexDims = indices.size();
     LDBG() << "Number of index dimensions: " << numIndexDims;
 
-    // Check if destination is fully contiguous for optimized linearized
-    // transfer. A memref is fully contiguous when all dimensions are
-    // contiguous.
-    bool useLinearizedTransfer =
-        destType.getNumContiguousTrailingDims() == destType.getRank();
-    LDBG() << "  Destination is fully contiguous: " << useLinearizedTransfer;
+    // Compute how many trailing dimensions to linearize.
+    // We can linearize dimensions that are contiguous in the destination
+    // memref. Gather indices don't affect this - they determine how we compute
+    // source indices, but the destination layout determines what we can
+    // linearize.
+    //
+    // Example: For dest <2x4x128> fully contiguous:
+    //   - numLinearDims = 3 -> linearize all dims (1024 elements)
+    // Example: For dest <2x4x128> with only dims 1-2 contiguous:
+    //   - numLinearDims = 2 -> linearize dims 1-2 (512 elements)
+    int64_t destRank = destShape.size();
+    int64_t numLinearDims = destType.getNumContiguousTrailingDims();
+    // Always linearize at least the innermost dimension.
+    numLinearDims = std::max(numLinearDims, int64_t(1));
+    LDBG() << "  Number of linear dims: " << numLinearDims;
 
-    // Compute total elements for segment calculation.
-    // For contiguous dest: use total elements across all dimensions.
-    // For non-contiguous: use innermost dimension only (row-wise).
-    int64_t totalElements =
-        useLinearizedTransfer
-            ? std::accumulate(destShape.begin(), destShape.end(), int64_t(1),
-                              std::multiplies<int64_t>())
-            : innermostDimSize;
-    LDBG() << "  Total elements for segmentation: " << totalElements;
+    // Compute total elements in the linearized portion (last numLinearDims
+    // dims).
+    int64_t linearSize = 1;
+    for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
+      linearSize *= destShape[i];
+    }
+    LDBG() << "  Linear size for segmentation: " << linearSize;
 
     // Compute transfer segments using the helper function.
     FailureOr<SmallVector<TransferSegment>> segmentsOrFailure =
-        computeTransferSegments(totalElements, elementBits, *subgroupSize,
+        computeTransferSegments(linearSize, elementBits, *subgroupSize,
                                 targetDmaSizes);
     if (failed(segmentsOrFailure)) {
       return rewriter.notifyMatchFailure(
@@ -311,82 +316,50 @@ struct LowerCoalescedGatherDMAPattern final
       segmentLaneOffsets.push_back(laneOffset);
     }
 
-    if (useLinearizedTransfer) {
-      emitLinearizedTransfers(rewriter, loc, source, dest, destShape,
-                              elementType, indices, segments,
-                              segmentLaneOffsets);
-    } else {
-      emitRowWiseTransfers(rewriter, loc, source, dest, destShape,
-                           innermostDimSize, elementType, indices, segments,
-                           segmentLaneOffsets);
-    }
+    emitTransfers(rewriter, loc, source, dest, destShape, numLinearDims,
+                  elementType, indices, segments, segmentLaneOffsets);
 
     rewriter.eraseOp(dmaOp);
     return success();
   }
 
 private:
-  /// Emits GatherToLDS operations using linearized transfer path.
+  /// Emits GatherToLDS operations with configurable linearization.
   ///
-  /// Treats the destination memref as a 1D array, allowing transfers to span
-  /// multiple rows. This is more efficient for fully contiguous memrefs as it
-  /// can use larger DMA sizes across row boundaries.
-  void emitLinearizedTransfers(PatternRewriter &rewriter, Location loc,
-                               Value source, Value dest,
-                               ArrayRef<int64_t> destShape, Type elementType,
-                               OperandRange indices,
-                               ArrayRef<TransferSegment> segments,
-                               ArrayRef<Value> segmentLaneOffsets) const {
-    LDBG() << "Using linearized transfer path";
+  /// Iterates over the outer (rank - numLinearDims) dimensions individually,
+  /// and treats the inner numLinearDims dimensions as a single linear block.
+  /// This unified approach handles:
+  ///   - numLinearDims == rank: fully linearized (all dims contiguous)
+  ///   - numLinearDims == 1: row-wise (only innermost dim)
+  ///   - 1 < numLinearDims < rank: hybrid (some trailing dims linearized)
+  ///
+  /// The linearization is capped by both memory contiguity and gather indices,
+  /// allowing efficient transfers while respecting memory layout constraints.
+  void emitTransfers(PatternRewriter &rewriter, Location loc, Value source,
+                     Value dest, ArrayRef<int64_t> destShape,
+                     int64_t numLinearDims, Type elementType,
+                     OperandRange indices, ArrayRef<TransferSegment> segments,
+                     ArrayRef<Value> segmentLaneOffsets) const {
+    int64_t destRank = destShape.size();
+    int64_t numOuterDims = destRank - numLinearDims;
+    LDBG() << "Emitting transfers: " << numOuterDims << " outer dims, "
+           << numLinearDims << " linear dims";
 
-    for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
-      VectorType transferType =
-          VectorType::get({segment.elementsPerLane}, elementType);
-      Value laneOffset = segmentLaneOffsets[segmentIdx];
-
-      for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
-           ++transferIdx) {
-        int64_t linearOffset =
-            segment.startOffset + transferIdx * segment.elementsPerTransfer;
-
-        // Convert linear offset to multi-dimensional indices using
-        // affine.delinearize_index.
-        Value linearOffsetVal =
-            arith::ConstantIndexOp::create(rewriter, loc, linearOffset);
-        SmallVector<OpFoldResult> basis =
-            getAsIndexOpFoldResult(rewriter.getContext(), destShape);
-        auto delinearize = affine::AffineDelinearizeIndexOp::create(
-            rewriter, loc, linearOffsetVal, basis,
-            /*hasOuterBound=*/true);
-
-        auto [srcIndices, dstIndices] = generateGatherIndices(
-            rewriter, loc, delinearize.getResults(), laneOffset, indices);
-
-        amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
-                                      dstIndices, TypeAttr::get(transferType));
-      }
+    // Build tile sizes: outer dims have size 1 (iterate individually),
+    // linear dims have their full size (handled via linearization).
+    SmallVector<int64_t> tileSizes(destRank, 1);
+    for (int64_t i = numOuterDims; i < destRank; ++i) {
+      tileSizes[i] = destShape[i];
     }
-  }
 
-  /// Emits GatherToLDS operations using row-wise transfer path.
-  ///
-  /// Processes each row independently. This is used for non-contiguous memrefs
-  /// where transfers cannot span multiple rows due to gaps in memory layout.
-  void emitRowWiseTransfers(PatternRewriter &rewriter, Location loc,
-                            Value source, Value dest,
-                            ArrayRef<int64_t> destShape,
-                            int64_t innermostDimSize, Type elementType,
-                            OperandRange indices,
-                            ArrayRef<TransferSegment> segments,
-                            ArrayRef<Value> segmentLaneOffsets) const {
-    LDBG() << "Using row-wise transfer path";
-
-    // Build tile sizes for outer dimensions: [1, 1, ..., 1, innermost].
-    SmallVector<int64_t> outerTileSizes(destShape.size(), 1);
-    outerTileSizes.back() = innermostDimSize;
+    // Build delinearization basis for the linear portion.
+    SmallVector<int64_t> linearBasis;
+    for (int64_t i = numOuterDims; i < destRank; ++i) {
+      linearBasis.push_back(destShape[i]);
+    }
 
     for (const SmallVector<int64_t> &outerOffsets :
-         StaticTileOffsetRange(destShape, outerTileSizes)) {
+         StaticTileOffsetRange(destShape, tileSizes)) {
       for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
         VectorType transferType =
             VectorType::get({segment.elementsPerLane}, elementType);
@@ -394,21 +367,32 @@ private:
 
         for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
              ++transferIdx) {
-          int64_t innerOffset =
+          int64_t linearOffset =
               segment.startOffset + transferIdx * segment.elementsPerTransfer;
 
-          // Convert static offsets to Values. The innermost offset is
-          // replaced with innerOffset.
-          SmallVector<Value> dimOffsetValues;
-          for (size_t i = 0; i < outerOffsets.size(); ++i) {
-            int64_t offset =
-                (i == outerOffsets.size() - 1) ? innerOffset : outerOffsets[i];
-            dimOffsetValues.push_back(
-                arith::ConstantIndexOp::create(rewriter, loc, offset));
+          // Build dimension offsets: outer dims use static offsets,
+          // linear dims use delinearized offsets.
+          SmallVector<Value> dimOffsets;
+
+          // Add outer dimension offsets (constant values from iteration).
+          for (int64_t i = 0; i < numOuterDims; ++i) {
+            dimOffsets.push_back(
+                arith::ConstantIndexOp::create(rewriter, loc, outerOffsets[i]));
+          }
+
+          // Delinearize the linear offset into the trailing dimensions.
+          Value linearOffsetVal =
+              arith::ConstantIndexOp::create(rewriter, loc, linearOffset);
+          SmallVector<OpFoldResult> basis =
+              getAsIndexOpFoldResult(rewriter.getContext(), linearBasis);
+          auto delinearize = affine::AffineDelinearizeIndexOp::create(
+              rewriter, loc, linearOffsetVal, basis, /*hasOuterBound=*/true);
+          for (Value v : delinearize.getResults()) {
+            dimOffsets.push_back(v);
           }
 
           auto [srcIndices, dstIndices] = generateGatherIndices(
-              rewriter, loc, dimOffsetValues, laneOffset, indices);
+              rewriter, loc, dimOffsets, laneOffset, indices);
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
                                         dstIndices,

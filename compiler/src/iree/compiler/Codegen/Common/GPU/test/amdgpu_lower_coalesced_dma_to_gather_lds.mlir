@@ -714,3 +714,132 @@ func.func @lower_coalesced_dma_linearized_2_rows_per_transfer(
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
+
+// -----
+
+#executable_target_rocm_hsaco_fb_3d = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx942", features = "", wgp = <
+    compute = fp64|fp32|fp16|int64|int32|int16|int8,
+    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [128, 32]>>}>
+
+#translation_3d = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+// Test with 3D shape where only innermost 2 dims are contiguous.
+// Dest shape: <2x4x32xf32> with strided<[256, 32, 1]>
+//   - dim 0 stride = 256, but product of dims 1-2 = 4*32 = 128, so NOT contiguous
+//   - dim 1 stride = 32 = 32*1 (dim 2 size * stride), contiguous
+//   - dim 2 stride = 1, contiguous
+// numContiguousTrailingDims = 2 (dims 1-2), numLinearDims = 2
+// linearSize = 4 * 32 = 128 elements
+//
+// With subgroupSize=32, dma_sizes=[128, 32]:
+//   - 128-bit DMA: 4 elem/lane * 32 lanes = 128 = linearSize, 1 transfer
+// Total: 2 outer iterations (dim 0) × 1 transfer = 2 GatherToLDS ops
+//
+// This tests the hybrid linearization where only trailing contiguous dims
+// are linearized, while outer non-contiguous dims are iterated separately.
+//
+// CHECK-LABEL: func.func @lower_3d_partial_contiguous
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<2x4x32xf32, strided<[256, 32, 1]>, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<2x4x32xf32, strided<[256, 32, 1]>, #gpu.address_space<workgroup>>
+func.func @lower_3d_partial_contiguous(
+    %source: memref<2x4x32xf32, strided<[256, 32, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<2x4x32xf32, strided<[256, 32, 1]>, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_3d,
+    translation_info = #translation_3d} {
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
+  scf.forall (%arg6) in (32) {
+    // 128-bit DMA: 4 elements per lane
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Outer iteration 0 (dim 0 = 0):
+    // Linear dims (1-2) are delinearized into (4, 32)
+    // CHECK: %[[OUTER0:[a-zA-Z0-9_]+]] = arith.constant 0 : index
+    // CHECK: %[[DELIN0:.+]]:2 = affine.delinearize_index %{{.+}} into (4, 32)
+    // CHECK: %[[SRC_COL0:.+]] = arith.addi %[[DELIN0]]#1, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[OUTER0]], %[[DELIN0]]#0, %[[SRC_COL0]]], %[[DST]][%[[OUTER0]], %[[DELIN0]]#0, %[[DELIN0]]#1] : vector<4xf32>
+    //
+    // Outer iteration 1 (dim 0 = 1):
+    // CHECK: %[[OUTER1:[a-zA-Z0-9_]+]] = arith.constant 1 : index
+    // CHECK: %[[DELIN1:.+]]:2 = affine.delinearize_index %{{.+}} into (4, 32)
+    // CHECK: %[[SRC_COL1:.+]] = arith.addi %[[DELIN1]]#1, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[OUTER1]], %[[DELIN1]]#0, %[[SRC_COL1]]], %[[DST]][%[[OUTER1]], %[[DELIN1]]#0, %[[DELIN1]]#1] : vector<4xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
+      memref<2x4x32xf32, strided<[256, 32, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<2x4x32xf32, strided<[256, 32, 1]>, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// -----
+
+#executable_target_rocm_hsaco_fb_3d_mixed = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx942", features = "", wgp = <
+    compute = fp64|fp32|fp16|int64|int32|int16|int8,
+    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [128, 32]>>}>
+
+#translation_3d_mixed = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+// Test with 3D shape where innermost 2 dims require mixed DMA sizes.
+// Dest shape: <2x5x32xf32> with strided<[256, 32, 1]>
+//   - dim 0 stride = 256, but product of dims 1-2 = 5*32 = 160, so NOT contiguous
+//   - dim 1 stride = 32 = 32*1 (dim 2 size * stride), contiguous
+//   - dim 2 stride = 1, contiguous
+// numContiguousTrailingDims = 2 (dims 1-2), numLinearDims = 2
+// linearSize = 5 * 32 = 160 elements
+//
+// With subgroupSize=32, dma_sizes=[128, 32]:
+//   - 128-bit DMA: 4 elem/lane * 32 lanes = 128, 1 transfer (covers 128 elements)
+//   - 32-bit DMA: 1 elem/lane * 32 lanes = 32, 1 transfer (covers remaining 32)
+// Per outer iteration: 2 transfers (one 128-bit at offset 0, one 32-bit at offset 128)
+// Total: 2 outer iterations × 2 transfers = 4 GatherToLDS ops
+//
+// CHECK-LABEL: func.func @lower_3d_partial_contiguous_mixed_dma
+func.func @lower_3d_partial_contiguous_mixed_dma(
+    %source: memref<2x5x32xf32, strided<[256, 32, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<2x5x32xf32, strided<[256, 32, 1]>, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_3d_mixed,
+    translation_info = #translation_3d_mixed} {
+  // CHECK: scf.forall
+  scf.forall (%arg6) in (32) {
+    // Outer iteration 0: 128-bit DMA (vector<4xf32>)
+    // CHECK: affine.delinearize_index %{{.+}} into (5, 32)
+    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // Outer iteration 0: 32-bit DMA (vector<1xf32>)
+    // CHECK: affine.delinearize_index %{{.+}} into (5, 32)
+    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<1xf32>
+    // Outer iteration 1: 128-bit DMA (vector<4xf32>)
+    // CHECK: affine.delinearize_index %{{.+}} into (5, 32)
+    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // Outer iteration 1: 32-bit DMA (vector<1xf32>)
+    // CHECK: affine.delinearize_index %{{.+}} into (5, 32)
+    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<1xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
+      memref<2x5x32xf32, strided<[256, 32, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<2x5x32xf32, strided<[256, 32, 1]>, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
