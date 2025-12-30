@@ -358,7 +358,6 @@ struct DistributeTransferReadWithSingleRead final
     SmallVector<int64_t> expandedMemShape;
     expandedMemShape.reserve(distShape.size() + memRank);
     SmallVector<OpFoldResult> outputShapes;
-    SmallVector<ReassociationIndices> reassociation;
     SmallVector<Value> newIndices;
     newIndices.reserve(distShape.size() + memRank);
     ImplicitLocOpBuilder builder{readOp->getLoc(), rewriter};
@@ -372,8 +371,9 @@ struct DistributeTransferReadWithSingleRead final
           outputShapes.push_back(
               memref::DimOp::create(builder, readOp.getBase(), constIndex)
                   ->getResult(0));
+        } else {
+          outputShapes.push_back(builder.getIndexAttr(memrefTy.getDimSize(i)));
         }
-        reassociation.push_back({i});
         newIndices.push_back(readOp.getIndices()[i]);
         continue;
       }
@@ -388,11 +388,7 @@ struct DistributeTransferReadWithSingleRead final
       int64_t divider = llvm::product_of(undistributedPackedShape);
       int64_t remainingSize = memrefTy.getDimSize(i) / divider;
       expandedMemShape.push_back(remainingSize);
-      // For the reassociation, we need six elements: The five dimensions of the
-      // layout plus one dimension for the remaining size in the memref.
-      ReassociationIndices reassoc = llvm::to_vector(llvm::map_range(
-          llvm::seq(0, 6), [&](int idx) { return i + idx * rank; }));
-      reassociation.push_back(reassoc);
+      outputShapes.push_back(builder.getIndexAttr(remainingSize));
       // Delinearize the index into the memref over the distributed dimensions.
       SmallVector<int64_t, 6> basis;
       basis.push_back(remainingSize);
@@ -405,10 +401,21 @@ struct DistributeTransferReadWithSingleRead final
     // Append the undistributed, packed shape as the inner shape of the new
     // memref.
     expandedMemShape.append(vectorLayout.getUndistributedPackedShape());
+    llvm::for_each(vectorLayout.getUndistributedPackedShape(),
+                   [&](int64_t size) {
+                     outputShapes.push_back(builder.getIndexAttr(size));
+                   });
     auto expandedMemTy =
         MemRefType::get(expandedMemShape, memrefTy.getElementType());
-    auto expandedMem = memref::ExpandShapeOp::create(
-        builder, expandedMemTy, readOp.getBase(), reassociation, outputShapes);
+    // TODO: These strides are probably wrong and only work for all-static
+    // memrefs.
+    SmallVector<OpFoldResult> strides(llvm::map_range(
+        expandedMemTy.getStridesAndOffset().first,
+        [&](int64_t stride) { return builder.getIndexAttr(stride); }));
+    expandedMemTy.dump();
+    auto expandedMem = memref::ReinterpretCastOp::create(
+        builder, expandedMemTy, readOp.getBase(), builder.getIndexAttr(0),
+        outputShapes, strides);
     expandedMem->dump();
 
     // Construct the remaining indices and the permutation map.
