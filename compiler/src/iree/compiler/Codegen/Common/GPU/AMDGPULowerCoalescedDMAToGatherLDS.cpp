@@ -67,34 +67,6 @@ verifyMemoryLayoutContiguous(IREE::GPU::CoalescedGatherDMAOp dmaOp,
   return success();
 }
 
-/// Returns true if the memref type is fully contiguous, i.e., there are no
-/// gaps between elements across all dimensions. A memref is fully contiguous
-/// when the strides form a row-major layout where each stride equals the
-/// product of all inner dimension sizes.
-static bool isFullyContiguousMemRef(MemRefType memrefType) {
-  // A memref is fully contiguous if all dimensions are contiguous.
-  return memrefType.getNumContiguousTrailingDims() == memrefType.getRank();
-}
-
-/// Converts a linear index to multi-dimensional indices for a given shape.
-/// Uses row-major (C-style) layout where the last dimension varies fastest.
-///
-/// Example: shape = [4, 3, 2], linearIdx = 7
-///   strides = [6, 2, 1]
-///   indices[0] = 7 / 6 = 1, remainder = 7 % 6 = 1
-///   indices[1] = 1 / 2 = 0, remainder = 1 % 2 = 1
-///   indices[2] = 1 / 1 = 1
-///   Result: [1, 0, 1]
-static SmallVector<int64_t> linearToMultiIndex(int64_t linearIdx,
-                                               ArrayRef<int64_t> shape) {
-  SmallVector<int64_t> indices(shape.size());
-  for (int64_t i = shape.size() - 1; i >= 0; --i) {
-    indices[i] = linearIdx % shape[i];
-    linearIdx /= shape[i];
-  }
-  return indices;
-}
-
 /// A segment of elements that will be transferred using a specific DMA size.
 ///
 /// For non-contiguous memrefs (row-wise transfer):
@@ -180,43 +152,36 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
 /// Generates source and destination indices for a GatherToLDS operation.
 ///
 /// For each dimension, computes:
-/// - dstIdx: The destination offset for this dimension.
-/// - srcIdx: The source offset, which may come from:
+/// * dstIdx: The destination offset for this dimension.
+/// * srcIdx: The source offset, which may come from:
 ///   1. An index memref (for gather dimensions)
 ///   2. The destination offset directly (for non-gather dimensions)
 ///   3. For the innermost dimension: adds laneOffset for lane-parallel access.
 ///
 /// \param rewriter The pattern rewriter for creating IR.
 /// \param loc The location for created operations.
-/// \param dimOffsets Static offsets for each dimension.
-/// \param innermostOffset The offset within the innermost dimension.
+/// \param dimOffsets Value offsets for each dimension.
 /// \param laneOffset Runtime lane offset (lane_id * elements_per_lane).
 /// \param indices Index memrefs for gather dimensions (may be empty).
-/// \param destRank The rank of the destination memref.
 /// \returns A pair of (srcIndices, dstIndices).
 static std::pair<SmallVector<Value>, SmallVector<Value>>
 generateGatherIndices(PatternRewriter &rewriter, Location loc,
-                      ArrayRef<int64_t> dimOffsets, int64_t innermostOffset,
-                      Value laneOffset, OperandRange indices,
-                      int64_t destRank) {
+                      ValueRange dimOffsets, Value laneOffset,
+                      OperandRange indices) {
   SmallVector<Value> srcIndices;
   SmallVector<Value> dstIndices;
   size_t numIndexDims = indices.size();
+  int64_t destRank = dimOffsets.size();
 
-  for (auto [dim, offset] : llvm::enumerate(dimOffsets)) {
+  for (auto [dim, offsetVal] : llvm::enumerate(dimOffsets)) {
     bool isInnermost = (static_cast<int64_t>(dim) == destRank - 1);
-    int64_t offsetValue = isInnermost ? innermostOffset : offset;
-    Value offsetVal =
-        arith::ConstantIndexOp::create(rewriter, loc, offsetValue);
 
     // Build source index for this dimension.
     Value srcIdx;
     if (dim < numIndexDims) {
       // This dimension has an index memref - load from it.
-      Value indexOffsetVal =
-          arith::ConstantIndexOp::create(rewriter, loc, offset);
       srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
-                                      ValueRange{indexOffsetVal});
+                                      ValueRange{offsetVal});
     }
 
     if (isInnermost) {
@@ -299,8 +264,10 @@ struct LowerCoalescedGatherDMAPattern final
     LDBG() << "Number of index dimensions: " << numIndexDims;
 
     // Check if destination is fully contiguous for optimized linearized
-    // transfer.
-    bool useLinearizedTransfer = isFullyContiguousMemRef(destType);
+    // transfer. A memref is fully contiguous when all dimensions are
+    // contiguous.
+    bool useLinearizedTransfer =
+        destType.getNumContiguousTrailingDims() == destType.getRank();
     LDBG() << "  Destination is fully contiguous: " << useLinearizedTransfer;
 
     // Compute total elements for segment calculation.
@@ -328,7 +295,6 @@ struct LowerCoalescedGatherDMAPattern final
     rewriter.setInsertionPoint(dmaOp);
     TypedValue<IndexType> laneId = dmaOp.getLane();
     Location loc = dmaOp.getLoc();
-    int64_t destRank = destShape.size();
 
     // Precompute laneOffset for each segment type.
     SmallVector<Value> segmentLaneOffsets;
@@ -355,15 +321,18 @@ struct LowerCoalescedGatherDMAPattern final
           int64_t linearOffset =
               segment.startOffset + transferIdx * segment.elementsPerTransfer;
 
-          // Convert linear offset to multi-dimensional indices.
-          SmallVector<int64_t> multiDimOffsets =
-              linearToMultiIndex(linearOffset, destShape);
+          // Convert linear offset to multi-dimensional indices using
+          // affine.delinearize_index. The constants will be folded by LLVM.
+          Value linearOffsetVal =
+              arith::ConstantIndexOp::create(rewriter, loc, linearOffset);
+          SmallVector<OpFoldResult> basis =
+              getAsIndexOpFoldResult(rewriter.getContext(), destShape);
+          auto delinearize = affine::AffineDelinearizeIndexOp::create(
+              rewriter, loc, linearOffsetVal, basis,
+              /*hasOuterBound=*/true);
 
-          // The innermost offset from linearToMultiIndex is already correct.
-          int64_t innermostOffset = multiDimOffsets.back();
           auto [srcIndices, dstIndices] = generateGatherIndices(
-              rewriter, loc, multiDimOffsets, innermostOffset, laneOffset,
-              indices, destRank);
+              rewriter, loc, delinearize.getResults(), laneOffset, indices);
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
                                         dstIndices,
@@ -390,9 +359,18 @@ struct LowerCoalescedGatherDMAPattern final
             int64_t innerOffset =
                 segment.startOffset + transferIdx * segment.elementsPerTransfer;
 
-            auto [srcIndices, dstIndices] =
-                generateGatherIndices(rewriter, loc, outerOffsets, innerOffset,
-                                      laneOffset, indices, destRank);
+            // Convert static offsets to Values. The innermost offset is
+            // replaced with innerOffset.
+            SmallVector<Value> dimOffsetValues;
+            for (size_t i = 0; i < outerOffsets.size(); ++i) {
+              int64_t offset = (i == outerOffsets.size() - 1) ? innerOffset
+                                                              : outerOffsets[i];
+              dimOffsetValues.push_back(
+                  arith::ConstantIndexOp::create(rewriter, loc, offset));
+            }
+
+            auto [srcIndices, dstIndices] = generateGatherIndices(
+                rewriter, loc, dimOffsetValues, laneOffset, indices);
 
             amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices,
                                           dest, dstIndices,
