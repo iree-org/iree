@@ -562,11 +562,18 @@ func.func @lower_coalesced_dma_mixed_sizes_1d(
 
 #translation_32 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
-// Test: Mixed DMA sizes with 2D memref.
-//   - Shape: 2x160 f32s
+// Test: Mixed DMA sizes with 2D contiguous memref (linearized path).
+// Since the destination is fully contiguous, the linearized transfer path is
+// used, which issues all large DMA transfers first, then smaller ones.
+//   - Shape: 2x160 f32s = 320 total elements
 //   - subgroupSize = 32, dma_sizes = [32, 128]
-//   - Per row: 1×128-bit transfer + 1×32-bit transfer
-//   - Total: 4 transfers (2 rows × 2 transfers/row)
+//   - 128-bit DMA (4 f32s/lane): 32*4=128 elements/transfer, 320/128=2, rem=64
+//   - 32-bit DMA (1 f32/lane): 32*1=32 elements/transfer, 64/32=2
+//   - Total: 4 transfers (2×vector<4xf32> + 2×vector<1xf32>)
+//   - Transfer 1: linear 0 → [0, 0]
+//   - Transfer 2: linear 128 → [0, 128] (128/160=0, 128%160=128)
+//   - Transfer 3: linear 256 → [1, 96] (256/160=1, 256%160=96)
+//   - Transfer 4: linear 288 → [1, 128] (288/160=1, 288%160=128)
 //
 // CHECK-LABEL: func.func @lower_coalesced_dma_mixed_sizes_2d
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<2x160xf32, #amdgpu.address_space<fat_raw_buffer>>
@@ -579,20 +586,83 @@ func.func @lower_coalesced_dma_mixed_sizes_2d(
     translation_info = #translation_32} {
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
   scf.forall (%arg6) in (32) {
-    // Row 0, Transfer 1: 128-bit DMA, [0, 0:128)
-    // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
+    // Linearized path: all 128-bit transfers first, then 32-bit transfers.
+    // Transfer 1: linear offset 0 → [0, 0], 128-bit DMA
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %{{.+}}], %[[DST]][%{{c0[^,]*}}, %{{.+}}] : vector<4xf32>
     //
-    // Row 0, Transfer 2: 32-bit DMA, [0, 128:160)
-    // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<1xf32>
+    // Transfer 2: linear offset 128 → [0, 128], 128-bit DMA
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %{{.+}}], %[[DST]][%{{c0[^,]*}}, %{{.+}}] : vector<4xf32>
     //
-    // Row 1, Transfer 1: 128-bit DMA, [1, 0:128)
-    // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<4xf32>
+    // Transfer 3: linear offset 256 → [1, 96], 32-bit DMA
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c1[^,]*}}, %{{.+}}], %[[DST]][%{{c1[^,]*}}, %{{.+}}] : vector<1xf32>
     //
-    // Row 1, Transfer 2: 32-bit DMA, [1, 128:160)
-    // CHECK: amdgpu.gather_to_lds %[[SRC]]{{.+}} : vector<1xf32>
+    // Transfer 4: linear offset 288 → [1, 128], 32-bit DMA
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c1[^,]*}}, %{{.+}}], %[[DST]][%{{c1[^,]*}}, %{{.+}}] : vector<1xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x160xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<2x160xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// -----
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp64|fp32|fp16|int64|int32|int16|int8,
+    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [128]>>}>
+
+#translation_32 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+// Test: Linearized transfer spanning 2 rows per transfer.
+// When destination is fully contiguous, the entire memref is treated as a 1D
+// array and transfers can span multiple rows.
+//   - Shape: 4x64 f32s = 256 total elements
+//   - subgroupSize = 32, dma_sizes = [128]
+//   - elementsPerLane = 128 bits / 32 bits = 4 f32s per lane
+//   - elementsPerTransfer = 32 * 4 = 128 elements = 2 rows (64 elements/row)
+//   - numTransfers = 256 / 128 = 2 transfers
+//   - Transfer 0 covers rows 0-1 (linear elements 0-127)
+//   - Transfer 1 covers rows 2-3 (linear elements 128-255)
+//
+// This tests the linearized transfer optimization that allows larger DMA
+// transfers to span multiple rows when the destination is contiguous.
+//
+// CHECK-LABEL: func.func @lower_coalesced_dma_linearized_2_rows_per_transfer
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<4x64xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<4x64xf32, #gpu.address_space<workgroup>>
+func.func @lower_coalesced_dma_linearized_2_rows_per_transfer(
+    %source: memref<4x64xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<4x64xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb,
+    translation_info = #translation_32} {
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
+  scf.forall (%arg6) in (32) {
+    // Each lane transfers 4 elements.
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Transfer 1: linear offset 0, multi-dim [0, 0]
+    // Covers rows 0-1 (elements 0-127)
+    // CHECK: %[[SRC_COL0:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %[[SRC_COL0]]], %[[DST]][%{{c0[^,]*}}, %{{c0[^]]*}}] : vector<4xf32>
+    //
+    // Transfer 2: linear offset 128, multi-dim [2, 0] (128 / 64 = 2, 128 % 64 = 0)
+    // Covers rows 2-3 (elements 128-255)
+    // CHECK: %[[SRC_COL1:.+]] = arith.addi %{{.+}}, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c2[^,]*}}, %[[SRC_COL1]]], %[[DST]][%{{c2[^,]*}}, %{{c0[^]]*}}] : vector<4xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<4x64xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<4x64xf32, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }

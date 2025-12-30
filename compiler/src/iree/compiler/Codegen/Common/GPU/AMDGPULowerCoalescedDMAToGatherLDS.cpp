@@ -67,13 +67,180 @@ verifyMemoryLayoutContiguous(IREE::GPU::CoalescedGatherDMAOp dmaOp,
   return success();
 }
 
-// A segment of the innermost dimension that will be transferred
-// using a specific DMA size.
+/// Returns true if the memref type is fully contiguous, i.e., there are no
+/// gaps between elements across all dimensions. A memref is fully contiguous
+/// when the strides form a row-major layout where each stride equals the
+/// product of all inner dimension sizes.
+static bool isFullyContiguousMemRef(MemRefType memrefType) {
+  // A memref is fully contiguous if all dimensions are contiguous.
+  return memrefType.getNumContiguousTrailingDims() == memrefType.getRank();
+}
+
+/// Converts a linear index to multi-dimensional indices for a given shape.
+/// Uses row-major (C-style) layout where the last dimension varies fastest.
+///
+/// Example: shape = [4, 3, 2], linearIdx = 7
+///   strides = [6, 2, 1]
+///   indices[0] = 7 / 6 = 1, remainder = 7 % 6 = 1
+///   indices[1] = 1 / 2 = 0, remainder = 1 % 2 = 1
+///   indices[2] = 1 / 1 = 1
+///   Result: [1, 0, 1]
+static SmallVector<int64_t> linearToMultiIndex(int64_t linearIdx,
+                                               ArrayRef<int64_t> shape) {
+  SmallVector<int64_t> indices(shape.size());
+  for (int64_t i = shape.size() - 1; i >= 0; --i) {
+    indices[i] = linearIdx % shape[i];
+    linearIdx /= shape[i];
+  }
+  return indices;
+}
+
+/// A segment of elements that will be transferred using a specific DMA size.
+///
+/// For non-contiguous memrefs (row-wise transfer):
+///   - Segments are computed per-row based on the innermost dimension size.
+///   - `startOffset` is the element offset within the innermost dimension.
+///   - Each row is processed independently.
+///
+/// For fully contiguous memrefs (linearized transfer):
+///   - The entire memref is treated as a 1D array of `totalElements` size.
+///   - `startOffset` is the linear element offset from the memref start.
+///   - Segments can span multiple rows since there are no gaps between rows.
+///   - This allows using larger DMA transfers (e.g., 128-bit instead of 32-bit)
+///     more efficiently by covering more elements per transfer.
+///
+/// In both cases, larger DMA sizes are prioritized to minimize the number of
+/// transfers. The total elements covered must exactly match the memref size
+/// to avoid copying excess elements.
+///
+/// Example for contiguous memref with shape <4x32xf32>, subgroup_size=64:
+///   Total elements = 128, using 128-bit DMA (4 elements/lane):
+///   - elementsPerTransfer = 64 * 4 = 256, but we only have 128 elements
+///   - Fall back to 32-bit DMA (1 element/lane):
+///   - elementsPerTransfer = 64 * 1 = 64
+///   - numTransfers = 128 / 64 = 2 transfers covering all elements
 struct TransferSegment {
-  int64_t elementsPerLane; // Number of elements each lane transfers.
-  int64_t numTransfers;    // Number of full transfers for this segment.
-  int64_t startOffset;     // Element offset in innermost dimension.
+  int64_t elementsPerLane;     // Number of elements each lane transfers.
+  int64_t numTransfers;        // Number of DMA operations for this segment.
+  int64_t startOffset;         // Element offset from segment start.
+  int64_t elementsPerTransfer; // Total elements moved per transfer
+                               // (subgroupSize * elementsPerLane).
 };
+
+/// Computes transfer segments for a given number of elements.
+/// Prioritizes larger DMA sizes to minimize the number of transfers.
+/// Returns failure if the elements cannot be fully covered by the available
+/// DMA sizes.
+static FailureOr<SmallVector<TransferSegment>>
+computeTransferSegments(int64_t totalElements, int64_t elementBits,
+                        int64_t subgroupSize, ArrayRef<int64_t> dmaSizes) {
+  // Sort DMA sizes in descending order to prioritize larger transfers.
+  SmallVector<int64_t> sortedDmaSizes(dmaSizes);
+  llvm::sort(sortedDmaSizes, std::greater<>());
+
+  SmallVector<TransferSegment> segments;
+  int64_t remainingElements = totalElements;
+  int64_t currentOffset = 0;
+
+  for (int64_t dmaSize : sortedDmaSizes) {
+    // Calculate elements per lane for this DMA size.
+    if (dmaSize % elementBits != 0)
+      continue;
+    int64_t elementsPerLane = dmaSize / elementBits;
+
+    // Calculate total elements per transfer (all lanes combined).
+    int64_t elementsPerTransfer = subgroupSize * elementsPerLane;
+
+    // Calculate how many full transfers we can do with this DMA size.
+    int64_t numTransfers = remainingElements / elementsPerTransfer;
+    if (numTransfers > 0) {
+      segments.push_back(
+          {elementsPerLane, numTransfers, currentOffset, elementsPerTransfer});
+      LDBG() << "Segment: " << dmaSize << "-bit DMA, " << numTransfers
+             << " transfers, elementsPerLane=" << elementsPerLane
+             << ", startOffset=" << currentOffset
+             << ", elementsPerTransfer=" << elementsPerTransfer;
+
+      int64_t coveredElements = numTransfers * elementsPerTransfer;
+      remainingElements -= coveredElements;
+      currentOffset += coveredElements;
+    }
+
+    if (remainingElements == 0)
+      break;
+  }
+
+  if (remainingElements != 0) {
+    return failure();
+  }
+
+  return segments;
+}
+
+/// Generates source and destination indices for a GatherToLDS operation.
+///
+/// For each dimension, computes:
+/// - dstIdx: The destination offset for this dimension.
+/// - srcIdx: The source offset, which may come from:
+///   1. An index memref (for gather dimensions)
+///   2. The destination offset directly (for non-gather dimensions)
+///   3. For the innermost dimension: adds laneOffset for lane-parallel access.
+///
+/// \param rewriter The pattern rewriter for creating IR.
+/// \param loc The location for created operations.
+/// \param dimOffsets Static offsets for each dimension.
+/// \param innermostOffset The offset within the innermost dimension.
+/// \param laneOffset Runtime lane offset (lane_id * elements_per_lane).
+/// \param indices Index memrefs for gather dimensions (may be empty).
+/// \param destRank The rank of the destination memref.
+/// \returns A pair of (srcIndices, dstIndices).
+static std::pair<SmallVector<Value>, SmallVector<Value>>
+generateGatherIndices(PatternRewriter &rewriter, Location loc,
+                      ArrayRef<int64_t> dimOffsets, int64_t innermostOffset,
+                      Value laneOffset, OperandRange indices,
+                      int64_t destRank) {
+  SmallVector<Value> srcIndices;
+  SmallVector<Value> dstIndices;
+  size_t numIndexDims = indices.size();
+
+  for (auto [dim, offset] : llvm::enumerate(dimOffsets)) {
+    bool isInnermost = (static_cast<int64_t>(dim) == destRank - 1);
+    int64_t offsetValue = isInnermost ? innermostOffset : offset;
+    Value offsetVal =
+        arith::ConstantIndexOp::create(rewriter, loc, offsetValue);
+
+    // Build source index for this dimension.
+    Value srcIdx;
+    if (dim < numIndexDims) {
+      // This dimension has an index memref - load from it.
+      Value indexOffsetVal =
+          arith::ConstantIndexOp::create(rewriter, loc, offset);
+      srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
+                                      ValueRange{indexOffsetVal});
+    }
+
+    if (isInnermost) {
+      // For innermost dimension: add base offset and lane offset.
+      if (srcIdx) {
+        srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, offsetVal);
+      } else {
+        srcIdx = offsetVal;
+      }
+      srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, laneOffset);
+      dstIndices.push_back(offsetVal);
+    } else if (!srcIdx) {
+      // Non-innermost dimension without index memref.
+      srcIdx = offsetVal;
+      dstIndices.push_back(offsetVal);
+    } else {
+      // Dimension with index memref (non-innermost).
+      dstIndices.push_back(offsetVal);
+    }
+    srcIndices.push_back(srcIdx);
+  }
+
+  return {srcIndices, dstIndices};
+}
 
 struct LowerCoalescedGatherDMAPattern final
     : public OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
@@ -107,16 +274,17 @@ struct LowerCoalescedGatherDMAPattern final
     Value dest = dmaOp.getInit();
 
     auto sourceType = cast<MemRefType>(source.getType());
+    auto destType = cast<MemRefType>(dest.getType());
 
     Type elementType = sourceType.getElementType();
     int64_t elementBits = sourceType.getElementTypeBitWidth();
     LDBG() << "  Element type: " << elementType;
     LDBG() << "  Element bits: " << elementBits;
 
-    int64_t innermostDimSize = sourceType.getShape().back();
-    int64_t transferSizeBits = innermostDimSize * elementBits;
-    LDBG() << "  Source innermost dimension size: " << innermostDimSize;
-    LDBG() << "  Transfer size in bits: " << transferSizeBits;
+    ArrayRef<int64_t> destShape = destType.getShape();
+    int64_t innermostDimSize = destShape.back();
+    LDBG() << "  Destination innermost dimension size: " << innermostDimSize;
+    LDBG() << "  Destination rank: " << destShape.size();
 
     std::optional<int64_t> subgroupSize =
         getSubgroupSize(dmaOp->getParentOfType<FunctionOpInterface>());
@@ -126,74 +294,43 @@ struct LowerCoalescedGatherDMAPattern final
     }
     LDBG() << "Subgroup size: " << *subgroupSize;
 
-    // Build transfer segments: try to use larger DMA sizes first, then smaller
-    // sizes to cover the remainder.
-    //
-    // Example: subgroup_size=32, dma_sizes=[32,128], innermost_dim=<160xf32>
-    //   issue 2 transfers for 160 elements:
-    //   * Transfer 1: 128-bit DMA, 32*4=128 elements/transfer, 160/128=1
-    //   transfer
-    //   * Transfer 2: 32-bit DMA, 32*1=32 elements/transfer
-    auto sortedDmaSizes = llvm::to_vector_of<int64_t>(targetDmaSizes);
-    llvm::sort(sortedDmaSizes, std::greater<>());
-
-    SmallVector<TransferSegment> segments;
-    int64_t remainingElements = innermostDimSize;
-    int64_t currentOffset = 0;
-
-    for (int64_t dmaSize : sortedDmaSizes) {
-      // Calculate elements per lane for this DMA size.
-      if (dmaSize % elementBits != 0)
-        continue;
-      int64_t elementsPerLane = dmaSize / elementBits;
-
-      // Calculate total elements per transfer (all lanes combined).
-      int64_t totalElementsPerTransfer = *subgroupSize * elementsPerLane;
-
-      // Calculate how many full transfers we can do with this DMA size.
-      int64_t numTransfers = remainingElements / totalElementsPerTransfer;
-      if (numTransfers > 0) {
-        segments.push_back({elementsPerLane, numTransfers, currentOffset});
-        LDBG() << "Segment: " << dmaSize << "-bit DMA, " << numTransfers
-               << " transfers, elementsPerLane=" << elementsPerLane
-               << ", startOffset=" << currentOffset;
-
-        int64_t coveredElements = numTransfers * totalElementsPerTransfer;
-        remainingElements -= coveredElements;
-        currentOffset += coveredElements;
-      }
-
-      if (remainingElements == 0)
-        break;
-    }
-
-    if (remainingElements != 0) {
-      return rewriter.notifyMatchFailure(
-          dmaOp, "innermost dimension cannot be covered by any combination "
-                 "of supported DMA transfer sizes");
-    }
-
-    auto destType = cast<MemRefType>(dest.getType());
-    ArrayRef<int64_t> destShape = destType.getShape();
-    LDBG() << "Destination rank: " << destShape.size();
-
     OperandRange indices = dmaOp.getIndices();
     size_t numIndexDims = indices.size();
     LDBG() << "Number of index dimensions: " << numIndexDims;
 
-    // Actually create the GatherToLDS ops to perform the transfer.
-    rewriter.setInsertionPoint(dmaOp);
+    // Check if destination is fully contiguous for optimized linearized
+    // transfer.
+    bool useLinearizedTransfer = isFullyContiguousMemRef(destType);
+    LDBG() << "  Destination is fully contiguous: " << useLinearizedTransfer;
 
+    // Compute total elements for segment calculation.
+    // For contiguous dest: use total elements across all dimensions.
+    // For non-contiguous: use innermost dimension only (row-wise).
+    int64_t totalElements =
+        useLinearizedTransfer
+            ? std::accumulate(destShape.begin(), destShape.end(), int64_t(1),
+                              std::multiplies<int64_t>())
+            : innermostDimSize;
+    LDBG() << "  Total elements for segmentation: " << totalElements;
+
+    // Compute transfer segments using the helper function.
+    FailureOr<SmallVector<TransferSegment>> segmentsOrFailure =
+        computeTransferSegments(totalElements, elementBits, *subgroupSize,
+                                targetDmaSizes);
+    if (failed(segmentsOrFailure)) {
+      return rewriter.notifyMatchFailure(
+          dmaOp, "cannot cover elements with any combination "
+                 "of supported DMA transfer sizes");
+    }
+    SmallVector<TransferSegment> segments = std::move(*segmentsOrFailure);
+
+    // Set up for code generation.
+    rewriter.setInsertionPoint(dmaOp);
     TypedValue<IndexType> laneId = dmaOp.getLane();
     Location loc = dmaOp.getLoc();
+    int64_t destRank = destShape.size();
 
-    // Build tile sizes for outer dimensions: [1, 1, ..., 1, innermost].
-    // We handle the innermost dimension separately via segments.
-    SmallVector<int64_t> outerTileSizes(destShape.size(), 1);
-    outerTileSizes.back() = innermostDimSize;
-
-    // Precompute laneOffset for each unique segment type. This allows the
-    // values to be reused across all rows while maintaining row-major order.
+    // Precompute laneOffset for each segment type.
     SmallVector<Value> segmentLaneOffsets;
     for (const TransferSegment &segment : segments) {
       Value laneOffset =
@@ -203,65 +340,64 @@ struct LowerCoalescedGatherDMAPattern final
       segmentLaneOffsets.push_back(laneOffset);
     }
 
-    // Iterate over each row, then segments within each row.
-    for (const SmallVector<int64_t> &outerOffsets :
-         StaticTileOffsetRange(destShape, outerTileSizes)) {
-      // For each segment, generate the transfers.
+    if (useLinearizedTransfer) {
+      // Linearized transfer path: treat dest as 1D array, transfers can span
+      // multiple rows.
+      LDBG() << "Using linearized transfer path";
+
       for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
-        int64_t elementsPerLane = segment.elementsPerLane;
-        int64_t totalElementsPerTransfer = *subgroupSize * elementsPerLane;
-        auto transferType = VectorType::get({elementsPerLane}, elementType);
+        VectorType transferType =
+            VectorType::get({segment.elementsPerLane}, elementType);
         Value laneOffset = segmentLaneOffsets[segmentIdx];
 
-        // Generate transfers for this segment.
         for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
              ++transferIdx) {
-          int64_t innerOffset =
-              segment.startOffset + transferIdx * totalElementsPerTransfer;
+          int64_t linearOffset =
+              segment.startOffset + transferIdx * segment.elementsPerTransfer;
 
-          SmallVector<Value> srcIndices;
-          SmallVector<Value> dstIndices;
+          // Convert linear offset to multi-dimensional indices.
+          SmallVector<int64_t> multiDimOffsets =
+              linearToMultiIndex(linearOffset, destShape);
 
-          for (auto [dim, outerOffset] : llvm::enumerate(outerOffsets)) {
-            // Build source index for this dimension.
-            Value srcIdx;
-            Value outerOffsetVal =
-                arith::ConstantIndexOp::create(rewriter, loc, outerOffset);
-            if (dim < numIndexDims) {
-              // This dimension has an index memref - load from it.
-              srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
-                                              ValueRange{outerOffsetVal});
-            }
-
-            // For the innermost dimension, compute the full offset.
-            if (dim == destShape.size() - 1) {
-              Value innerOffsetVal =
-                  arith::ConstantIndexOp::create(rewriter, loc, innerOffset);
-              if (srcIdx) {
-                // Had an index memref - add inner offset to loaded index.
-                srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx,
-                                               innerOffsetVal);
-              } else {
-                // No index memref - use inner offset directly.
-                srcIdx = innerOffsetVal;
-              }
-              srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, laneOffset);
-              // Reuse innerOffsetVal for destination index.
-              dstIndices.push_back(innerOffsetVal);
-            } else if (!srcIdx) {
-              // Non-innermost dimension without index memref.
-              srcIdx = outerOffsetVal;
-              dstIndices.push_back(outerOffsetVal);
-            } else {
-              // Dimension with index memref (non-innermost).
-              dstIndices.push_back(outerOffsetVal);
-            }
-            srcIndices.push_back(srcIdx);
-          }
+          // The innermost offset from linearToMultiIndex is already correct.
+          int64_t innermostOffset = multiDimOffsets.back();
+          auto [srcIndices, dstIndices] = generateGatherIndices(
+              rewriter, loc, multiDimOffsets, innermostOffset, laneOffset,
+              indices, destRank);
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
                                         dstIndices,
                                         TypeAttr::get(transferType));
+        }
+      }
+    } else {
+      // Row-wise transfer path: process each row independently.
+      LDBG() << "Using row-wise transfer path";
+
+      // Build tile sizes for outer dimensions: [1, 1, ..., 1, innermost].
+      SmallVector<int64_t> outerTileSizes(destShape.size(), 1);
+      outerTileSizes.back() = innermostDimSize;
+
+      for (const SmallVector<int64_t> &outerOffsets :
+           StaticTileOffsetRange(destShape, outerTileSizes)) {
+        for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
+          VectorType transferType =
+              VectorType::get({segment.elementsPerLane}, elementType);
+          Value laneOffset = segmentLaneOffsets[segmentIdx];
+
+          for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
+               ++transferIdx) {
+            int64_t innerOffset =
+                segment.startOffset + transferIdx * segment.elementsPerTransfer;
+
+            auto [srcIndices, dstIndices] =
+                generateGatherIndices(rewriter, loc, outerOffsets, innerOffset,
+                                      laneOffset, indices, destRank);
+
+            amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices,
+                                          dest, dstIndices,
+                                          TypeAttr::get(transferType));
+          }
         }
       }
     }
