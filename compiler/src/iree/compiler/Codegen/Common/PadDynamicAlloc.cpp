@@ -8,9 +8,11 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -38,6 +40,31 @@ static Value skipAffineMaxZero(Value dim) {
   return *affineMax.getSymbolOperands().begin();
 }
 
+static FailureOr<int64_t> getUpperBound(Value dim,
+                                        const DataFlowSolver &solver) {
+  // Check the integer range analysis.
+  if (auto *maybeRange =
+          solver.lookupState<dataflow::IntegerValueRangeLattice>(dim)) {
+    IntegerValueRange range = maybeRange->getValue();
+    if (!range.isUninitialized() &&
+        range.getValue().smax() !=
+            IntegerValueRange::getMaxRange(dim).getValue().smax()) {
+      return range.getValue().smax().getSExtValue();
+    }
+  }
+
+  // Check the value bounds constraint set.
+  // TODO: These two analysis could be merged, but probably needs
+  // to happen usptream.
+  auto ub = ValueBoundsConstraintSet::computeConstantBound(
+      presburger::BoundType::UB, {dim, /*dim=*/std::nullopt},
+      /*stopCondition=*/nullptr, /*closedUB=*/true);
+  if (succeeded(ub)) {
+    return ub.value();
+  }
+  return failure();
+}
+
 template <typename AllocLikeOp>
 static LogicalResult padAlloc(MLIRContext *context, AllocLikeOp allocOp,
                               const DataFlowSolver &solver) {
@@ -54,7 +81,7 @@ static LogicalResult padAlloc(MLIRContext *context, AllocLikeOp allocOp,
     }
     Value dim = allocOp.getDynamicSizes()[dynamicDimIdx++];
     dim = skipAffineMaxZero(dim);
-    FailureOr<int64_t> ub = getDynamicUpperBound(dim, solver);
+    FailureOr<int64_t> ub = getUpperBound(dim, solver);
     if (failed(ub)) {
       return allocOp.emitOpError(
           "unexpected allocation without upper bound shapes");
