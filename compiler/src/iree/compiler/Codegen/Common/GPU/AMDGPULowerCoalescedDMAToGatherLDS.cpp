@@ -176,30 +176,35 @@ generateGatherIndices(PatternRewriter &rewriter, Location loc,
   for (auto [dim, offsetVal] : llvm::enumerate(dimOffsets)) {
     bool isInnermost = (static_cast<int64_t>(dim) == destRank - 1);
 
-    // Build source index for this dimension.
+    // Destination always uses the tile offset directly.
+    dstIndices.push_back(offsetVal);
+
+    // Build source index for this dimension. The source index computation
+    // depends on whether this dimension has an index memref (gather) and
+    // whether it's the innermost dimension.
     Value srcIdx;
     if (dim < numIndexDims) {
-      // This dimension has an index memref - load from it.
+      // Gather dimension: load the source row index from the index memref.
+      // The index memref maps destination positions to source positions.
+      // Example: indices[dim][offsetVal] gives the source row for dest row
+      // offsetVal.
       srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
                                       ValueRange{offsetVal});
+      // For innermost gather dimension, add the column offset to the loaded
+      // base index. This handles the case where we're gathering from a
+      // different row but need to add the column offset within that row.
+      if (isInnermost) {
+        srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, offsetVal);
+      }
+    } else {
+      // Non-gather dimension: source and dest use the same offset.
+      srcIdx = offsetVal;
     }
 
+    // For innermost dimension: add lane offset so each lane accesses a
+    // different element in parallel. This distributes the work across lanes.
     if (isInnermost) {
-      // For innermost dimension: add base offset and lane offset.
-      if (srcIdx) {
-        srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, offsetVal);
-      } else {
-        srcIdx = offsetVal;
-      }
       srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, laneOffset);
-      dstIndices.push_back(offsetVal);
-    } else if (!srcIdx) {
-      // Non-innermost dimension without index memref.
-      srcIdx = offsetVal;
-      dstIndices.push_back(offsetVal);
-    } else {
-      // Dimension with index memref (non-innermost).
-      dstIndices.push_back(offsetVal);
     }
     srcIndices.push_back(srcIdx);
   }
@@ -307,77 +312,13 @@ struct LowerCoalescedGatherDMAPattern final
     }
 
     if (useLinearizedTransfer) {
-      // Linearized transfer path: treat dest as 1D array, transfers can span
-      // multiple rows.
-      LDBG() << "Using linearized transfer path";
-
-      for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
-        VectorType transferType =
-            VectorType::get({segment.elementsPerLane}, elementType);
-        Value laneOffset = segmentLaneOffsets[segmentIdx];
-
-        for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
-             ++transferIdx) {
-          int64_t linearOffset =
-              segment.startOffset + transferIdx * segment.elementsPerTransfer;
-
-          // Convert linear offset to multi-dimensional indices using
-          // affine.delinearize_index. The constants will be folded by LLVM.
-          Value linearOffsetVal =
-              arith::ConstantIndexOp::create(rewriter, loc, linearOffset);
-          SmallVector<OpFoldResult> basis =
-              getAsIndexOpFoldResult(rewriter.getContext(), destShape);
-          auto delinearize = affine::AffineDelinearizeIndexOp::create(
-              rewriter, loc, linearOffsetVal, basis,
-              /*hasOuterBound=*/true);
-
-          auto [srcIndices, dstIndices] = generateGatherIndices(
-              rewriter, loc, delinearize.getResults(), laneOffset, indices);
-
-          amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
-                                        dstIndices,
-                                        TypeAttr::get(transferType));
-        }
-      }
+      emitLinearizedTransfers(rewriter, loc, source, dest, destShape,
+                              elementType, indices, segments,
+                              segmentLaneOffsets);
     } else {
-      // Row-wise transfer path: process each row independently.
-      LDBG() << "Using row-wise transfer path";
-
-      // Build tile sizes for outer dimensions: [1, 1, ..., 1, innermost].
-      SmallVector<int64_t> outerTileSizes(destShape.size(), 1);
-      outerTileSizes.back() = innermostDimSize;
-
-      for (const SmallVector<int64_t> &outerOffsets :
-           StaticTileOffsetRange(destShape, outerTileSizes)) {
-        for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
-          VectorType transferType =
-              VectorType::get({segment.elementsPerLane}, elementType);
-          Value laneOffset = segmentLaneOffsets[segmentIdx];
-
-          for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
-               ++transferIdx) {
-            int64_t innerOffset =
-                segment.startOffset + transferIdx * segment.elementsPerTransfer;
-
-            // Convert static offsets to Values. The innermost offset is
-            // replaced with innerOffset.
-            SmallVector<Value> dimOffsetValues;
-            for (size_t i = 0; i < outerOffsets.size(); ++i) {
-              int64_t offset = (i == outerOffsets.size() - 1) ? innerOffset
-                                                              : outerOffsets[i];
-              dimOffsetValues.push_back(
-                  arith::ConstantIndexOp::create(rewriter, loc, offset));
-            }
-
-            auto [srcIndices, dstIndices] = generateGatherIndices(
-                rewriter, loc, dimOffsetValues, laneOffset, indices);
-
-            amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices,
-                                          dest, dstIndices,
-                                          TypeAttr::get(transferType));
-          }
-        }
-      }
+      emitRowWiseTransfers(rewriter, loc, source, dest, destShape,
+                           innermostDimSize, elementType, indices, segments,
+                           segmentLaneOffsets);
     }
 
     rewriter.eraseOp(dmaOp);
@@ -385,6 +326,98 @@ struct LowerCoalescedGatherDMAPattern final
   }
 
 private:
+  /// Emits GatherToLDS operations using linearized transfer path.
+  ///
+  /// Treats the destination memref as a 1D array, allowing transfers to span
+  /// multiple rows. This is more efficient for fully contiguous memrefs as it
+  /// can use larger DMA sizes across row boundaries.
+  void emitLinearizedTransfers(PatternRewriter &rewriter, Location loc,
+                               Value source, Value dest,
+                               ArrayRef<int64_t> destShape, Type elementType,
+                               OperandRange indices,
+                               ArrayRef<TransferSegment> segments,
+                               ArrayRef<Value> segmentLaneOffsets) const {
+    LDBG() << "Using linearized transfer path";
+
+    for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
+      VectorType transferType =
+          VectorType::get({segment.elementsPerLane}, elementType);
+      Value laneOffset = segmentLaneOffsets[segmentIdx];
+
+      for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
+           ++transferIdx) {
+        int64_t linearOffset =
+            segment.startOffset + transferIdx * segment.elementsPerTransfer;
+
+        // Convert linear offset to multi-dimensional indices using
+        // affine.delinearize_index.
+        Value linearOffsetVal =
+            arith::ConstantIndexOp::create(rewriter, loc, linearOffset);
+        SmallVector<OpFoldResult> basis =
+            getAsIndexOpFoldResult(rewriter.getContext(), destShape);
+        auto delinearize = affine::AffineDelinearizeIndexOp::create(
+            rewriter, loc, linearOffsetVal, basis,
+            /*hasOuterBound=*/true);
+
+        auto [srcIndices, dstIndices] = generateGatherIndices(
+            rewriter, loc, delinearize.getResults(), laneOffset, indices);
+
+        amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
+                                      dstIndices, TypeAttr::get(transferType));
+      }
+    }
+  }
+
+  /// Emits GatherToLDS operations using row-wise transfer path.
+  ///
+  /// Processes each row independently. This is used for non-contiguous memrefs
+  /// where transfers cannot span multiple rows due to gaps in memory layout.
+  void emitRowWiseTransfers(PatternRewriter &rewriter, Location loc,
+                            Value source, Value dest,
+                            ArrayRef<int64_t> destShape,
+                            int64_t innermostDimSize, Type elementType,
+                            OperandRange indices,
+                            ArrayRef<TransferSegment> segments,
+                            ArrayRef<Value> segmentLaneOffsets) const {
+    LDBG() << "Using row-wise transfer path";
+
+    // Build tile sizes for outer dimensions: [1, 1, ..., 1, innermost].
+    SmallVector<int64_t> outerTileSizes(destShape.size(), 1);
+    outerTileSizes.back() = innermostDimSize;
+
+    for (const SmallVector<int64_t> &outerOffsets :
+         StaticTileOffsetRange(destShape, outerTileSizes)) {
+      for (auto [segmentIdx, segment] : llvm::enumerate(segments)) {
+        VectorType transferType =
+            VectorType::get({segment.elementsPerLane}, elementType);
+        Value laneOffset = segmentLaneOffsets[segmentIdx];
+
+        for (int64_t transferIdx = 0; transferIdx < segment.numTransfers;
+             ++transferIdx) {
+          int64_t innerOffset =
+              segment.startOffset + transferIdx * segment.elementsPerTransfer;
+
+          // Convert static offsets to Values. The innermost offset is
+          // replaced with innerOffset.
+          SmallVector<Value> dimOffsetValues;
+          for (size_t i = 0; i < outerOffsets.size(); ++i) {
+            int64_t offset =
+                (i == outerOffsets.size() - 1) ? innerOffset : outerOffsets[i];
+            dimOffsetValues.push_back(
+                arith::ConstantIndexOp::create(rewriter, loc, offset));
+          }
+
+          auto [srcIndices, dstIndices] = generateGatherIndices(
+              rewriter, loc, dimOffsetValues, laneOffset, indices);
+
+          amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
+                                        dstIndices,
+                                        TypeAttr::get(transferType));
+        }
+      }
+    }
+  }
+
   ArrayRef<int64_t> targetDmaSizes;
 };
 

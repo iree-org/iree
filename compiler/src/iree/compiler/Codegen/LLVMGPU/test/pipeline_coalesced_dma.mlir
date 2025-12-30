@@ -253,11 +253,15 @@ hal.executable public @coalesced_dma_multi_transfer {
           // CHECK-DAG: %[[C4:.+]] = arith.constant 4
           // CHECK-DAG: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C4]]
           //
-          // Transfer 1: src[0, lane_offset], dst[0, 0]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %{{.+}}], %[[DST]][%{{c0[^,]*}}, %{{c0[^]]*}}] : vector<4xf32>
+          // Transfer 1: linear offset 0 → [0, 0]
+          // CHECK: %[[C0:.+]] = arith.constant 0 : index
+          // CHECK: %[[DELINEAR0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 128)
+          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[DELINEAR0]]#0, %{{.+}}], %[[DST]][%[[DELINEAR0]]#0, %[[DELINEAR0]]#1] : vector<4xf32>
           //
-          // Transfer 2: src[2, lane_offset], dst[2, 0]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c2[^,]*}}, %{{.+}}], %[[DST]][%{{c2[^,]*}}, %{{c0[^]]*}}] : vector<4xf32>
+          // Transfer 2: linear offset 256 → [2, 0]
+          // CHECK: %[[C256:.+]] = arith.constant 256 : index
+          // CHECK: %[[DELINEAR256:.+]]:2 = affine.delinearize_index %[[C256]] into (4, 128)
+          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[DELINEAR256]]#0, %{{.+}}], %[[DST]][%[[DELINEAR256]]#0, %[[DELINEAR256]]#1] : vector<4xf32>
           // CHECK-NOT: amdgpu.gather_to_lds
           // CHECK-NOT: iree_gpu.coalesced_gather_dma
           iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
@@ -320,31 +324,32 @@ hal.executable public @coalesced_dma_multi_transfer_128bit {
         %dest = memref.alloc() : memref<2x512xf32, #gpu.address_space<workgroup>>
         // CHECK: scf.forall (%[[LANE_ID:.+]]) in (64)
         scf.forall (%arg6) in (64) {
-          // With 2x512 f32 elements and 64 threads:
-          // - innermost=512, use 128-bit (512 % 256 = 0)
-          // - elementsPerLane = 4, totalElementsPerTransfer = 256
-          // - Each row needs 512/256 = 2 transfers (at offsets 0 and 256)
-          // - 2 rows * 2 transfers = 4 gather_to_lds ops total
+          // With 2x512 f32 elements and 64 threads (linearized path):
+          // - Total elements = 1024, with 64 lanes and 4 elements/lane
+          // - elementsPerTransfer = 256, numTransfers = 4
+          // - Linear offsets: 0→[0,0], 256→[0,256], 512→[1,0], 768→[1,256]
           // CHECK-DAG: %[[C4:.+]] = arith.constant 4
           // CHECK-DAG: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C4]]
           //
-          // Row 0, Transfer 1: source[0, 0 + lane_offset], dest[0, 0]
-          // CHECK: %[[SRC_COL0_T0:.+]] = arith.addi %{{c0.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0.+}}, %[[SRC_COL0_T0]]], %[[DST]][%{{c0.+}}, %{{c0.+}}] : vector<4xf32>
+          // Transfer 1: linear offset 0 → [0, 0]
+          // CHECK: %[[C0:.+]] = arith.constant 0 : index
+          // CHECK: %[[DELINEAR0:.+]]:2 = affine.delinearize_index %[[C0]] into (2, 512)
+          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[DELINEAR0]]#0, %{{.+}}], %[[DST]][%[[DELINEAR0]]#0, %[[DELINEAR0]]#1] : vector<4xf32>
           //
-          // Row 0, Transfer 2: source[0, 256 + lane_offset], dest[0, 256]
-          // CHECK: %[[C256:.+]] = arith.constant 256
-          // CHECK: %[[SRC_COL0_T1:.+]] = arith.addi %[[C256]], %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0.+}}, %[[SRC_COL0_T1]]], %[[DST]][%{{c0.+}}, %[[C256]]] : vector<4xf32>
+          // Transfer 2: linear offset 256 → [0, 256]
+          // CHECK: %[[C256:.+]] = arith.constant 256 : index
+          // CHECK: %[[DELINEAR256:.+]]:2 = affine.delinearize_index %[[C256]] into (2, 512)
+          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[DELINEAR256]]#0, %{{.+}}], %[[DST]][%[[DELINEAR256]]#0, %[[DELINEAR256]]#1] : vector<4xf32>
           //
-          // Row 1, Transfer 1: source[1, 0 + lane_offset], dest[1, 0]
-          // CHECK: %[[ROW1:.+]] = arith.constant 1
-          // CHECK: %[[SRC_COL1_T0:.+]] = arith.addi %{{c0.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW1]], %[[SRC_COL1_T0]]], %[[DST]][%[[ROW1]], %{{c0.+}}] : vector<4xf32>
+          // Transfer 3: linear offset 512 → [1, 0]
+          // CHECK: %[[C512:.+]] = arith.constant 512 : index
+          // CHECK: %[[DELINEAR512:.+]]:2 = affine.delinearize_index %[[C512]] into (2, 512)
+          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[DELINEAR512]]#0, %{{.+}}], %[[DST]][%[[DELINEAR512]]#0, %[[DELINEAR512]]#1] : vector<4xf32>
           //
-          // Row 1, Transfer 2: source[1, 256 + lane_offset], dest[1, 256]
-          // CHECK: %[[SRC_COL1_T1:.+]] = arith.addi %{{c256.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %[[SRC_COL1_T1]]], %[[DST]][%{{.+}}, %{{c256.+}}] : vector<4xf32>
+          // Transfer 4: linear offset 768 → [1, 256]
+          // CHECK: %[[C768:.+]] = arith.constant 768 : index
+          // CHECK: %[[DELINEAR768:.+]]:2 = affine.delinearize_index %[[C768]] into (2, 512)
+          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[DELINEAR768]]#0, %{{.+}}], %[[DST]][%[[DELINEAR768]]#0, %[[DELINEAR768]]#1] : vector<4xf32>
           // CHECK-NOT: amdgpu.gather_to_lds
           // CHECK-NOT: iree_gpu.coalesced_gather_dma
           iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
