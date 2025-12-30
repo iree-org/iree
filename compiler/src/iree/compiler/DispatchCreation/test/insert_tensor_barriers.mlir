@@ -14,10 +14,10 @@ util.func public @simple_linalg(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
 }
 // CHECK-LABEL: util.func public @simple_linalg
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[ARG0]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier<down, "AllowExpand|AllowCollapse"> %[[GENERIC]]
 //       CHECK:   util.return %[[END]]
 
 // -----
@@ -45,13 +45,13 @@ util.func public @multiple_compute_ops(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 }
 // CHECK-LABEL: util.func public @multiple_compute_ops
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[ARG0]]
 //       CHECK:   %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
 //       CHECK:   %[[GENERIC1:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[GENERIC0]] :
-//   CHECK-NOT:   compute_barrier.start
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC1]]
+//   CHECK-NOT:   compute_barrier
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier<down, "AllowExpand|AllowCollapse"> %[[GENERIC1]]
 //       CHECK:   util.return %[[END]]
 
 // -----
@@ -73,13 +73,13 @@ util.func public @with_reshapes(%arg0: tensor<32xf32>) -> tensor<4x8xf32> {
 }
 // CHECK-LABEL: util.func public @with_reshapes
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[ARG0]]
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[START]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[EXPANDED]] :
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[GENERIC]]
 //       CHECK:   %[[RESULT:.+]] = tensor.expand_shape %[[COLLAPSED]]
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[RESULT]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier<down, "AllowExpand|AllowCollapse"> %[[RESULT]]
 //       CHECK:   util.return %[[END]]
 
 // -----
@@ -90,9 +90,9 @@ util.func public @tensor_reshape_only(%arg0: tensor<32xf32>) -> tensor<4x8xf32> 
 }
 // CHECK-LABEL: util.func public @tensor_reshape_only
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[ARG0]]
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[START]]
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[EXPANDED]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier<down, "AllowExpand|AllowCollapse"> %[[EXPANDED]]
 //       CHECK:   util.return %[[END]]
 
 // -----
@@ -115,10 +115,10 @@ util.func public @with_hal_ops(%arg0: !hal.buffer_view, %arg1: !hal.fence) -> !h
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !hal.buffer_view
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.fence
 //       CHECK:   %[[IMPORT:.+]] = hal.tensor.import wait(%[[ARG1]]) => %[[ARG0]]
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[IMPORT]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[IMPORT]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier<down, "AllowExpand|AllowCollapse"> %[[GENERIC]]
 //       CHECK:   %[[EXPORT:.+]] = hal.tensor.export %[[END]]
 //       CHECK:   util.return %[[EXPORT]]
 
@@ -137,13 +137,13 @@ util.func public @with_hal_barrier_dynamic(%arg0: tensor<?xf32>, %arg1: !hal.fen
 // CHECK-LABEL: util.func public @with_hal_barrier_dynamic
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.fence
-//   CHECK-NOT:   compute_barrier.start
+//   CHECK-NOT:   compute_barrier
 //       CHECK:   %[[BARRIER:.+]]:2 = hal.tensor.barrier join(%[[ARG0]], %[[ARG0]]
 //       CHECK:   %[[DIM0:.+]] = tensor.dim %[[BARRIER]]#0
 //       CHECK:   %[[DIM1:.+]] = tensor.dim %[[BARRIER]]#1
 //       CHECK:   %[[EXPORT0:.+]] = hal.tensor.export %[[BARRIER]]#0
 //       CHECK:   %[[EXPORT1:.+]] = hal.tensor.export %[[BARRIER]]#1
-//   CHECK-NOT:   compute_barrier.end
+//   CHECK-NOT:   compute_barrier
 //       CHECK:   util.return %[[EXPORT0]], %[[EXPORT1]]
 
 // -----
@@ -166,8 +166,8 @@ util.func public @linalg_with_dynamic_dims(%arg0: tensor<?x?xf32>) -> tensor<?x?
 }
 // CHECK-LABEL: util.func public @linalg_with_dynamic_dims
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
-//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier<up, "AllowExpand|AllowCollapse"> %[[ARG0]]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[START]] :
-//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier<down, "AllowExpand|AllowCollapse"> %[[GENERIC]]
 //       CHECK:   util.return %[[END]]
