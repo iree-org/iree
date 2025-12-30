@@ -163,6 +163,32 @@ private:
   PadDistributionConfigFn padDistributionConfigFn;
 };
 
+struct FoldPackOpIntoMapScatterPattern
+    : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
+  using OpRewritePattern::OpRewritePattern;
+  FoldPackOpIntoMapScatterPattern(MLIRContext *context,
+                                  PadDistributionConfigFn configFn,
+                                  PatternBenefit benefit = 1)
+      : OpRewritePattern<IREE::LinalgExt::MapScatterOp>(context, benefit),
+        padDistributionConfigFn(std::move(configFn)) {}
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+                                PatternRewriter &rewriter) const override {
+    auto packOp = mapScatterOp.getInput().getDefiningOp<linalg::PackOp>();
+    if (!packOp) {
+      return failure();
+    }
+    if (failed(foldPackIntoMapScatter(rewriter, packOp, mapScatterOp,
+                                      padDistributionConfigFn))) {
+      return failure();
+    }
+    return success();
+  }
+
+private:
+  PadDistributionConfigFn padDistributionConfigFn;
+};
+
 } // namespace
 
 void populateCombineRelayoutOpPatterns(
@@ -170,8 +196,9 @@ void populateCombineRelayoutOpPatterns(
     PadDistributionConfigFn padDistributionConfigFn) {
   patterns.add<FoldRelayoutOpIntoMapScatterPattern>(patterns.getContext());
   if (padDistributionConfigFn) {
-    patterns.add<FoldPadOpIntoMapScatterPattern>(patterns.getContext(),
-                                                 padDistributionConfigFn);
+    patterns
+        .add<FoldPadOpIntoMapScatterPattern, FoldPackOpIntoMapScatterPattern>(
+            patterns.getContext(), padDistributionConfigFn);
   }
 }
 

@@ -1089,11 +1089,6 @@ static void buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
     if (clCombineLayoutTransformation) {
       funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass);
       funcPassManager.addPass(createGPUCombineLayoutTransformationPass);
-      // GPUCombineLayoutTransformationPass specializes transpose ops, so they
-      // need to be generalized again.
-      // TODO(Max191): Re-generalize in the GPUCombineLayoutTransformationPass,
-      // and remove the extra GPUGeneralizeNamedOpsPass invocation.
-      funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     }
     // This materializes into 'nop' in the absence of pad encoding layout
     // attributes.
