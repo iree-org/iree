@@ -1168,6 +1168,14 @@ iree_generated_e2e_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
+### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+###########################################################################
+##
+## CUDA backend
+##
+###########################################################################
+
 iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_vecdist_f16
@@ -1264,7 +1272,11 @@ iree_generated_e2e_runner_test(
     "requires-gpu-sm80"
 )
 
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+###########################################################################
+##
+## HIP backend
+##
+###########################################################################
 
 # To distinguish between CDNA(gfx9), RDNA3(gfx11), and RDNA4(gfx12)
 if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
