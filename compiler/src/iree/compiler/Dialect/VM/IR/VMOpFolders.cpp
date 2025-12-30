@@ -1714,7 +1714,7 @@ OpFoldResult CastSI64F64Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float64Type::get(getContext()), operands.getOperand(),
       [&](const APInt &a) {
-        APFloat b = APFloat(0.0);
+        APFloat b{0.0};
         b.convertFromAPInt(a, /*IsSigned=*/true, APFloat::rmNearestTiesToAway);
         return b;
       });
@@ -1724,7 +1724,7 @@ OpFoldResult CastUI64F64Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float64Type::get(getContext()), operands.getOperand(),
       [&](const APInt &a) {
-        APFloat b = APFloat(0.0);
+        APFloat b{0.0};
         b.convertFromAPInt(a, /*IsSigned=*/false, APFloat::rmNearestTiesToAway);
         return b;
       });
