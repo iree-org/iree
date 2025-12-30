@@ -105,20 +105,22 @@ hal.executable public @coalesced_dma_matmul_operand {
           translation_info = #translation} {
         %c0 = arith.constant 0 : index
         // This shape (32x64 f32) mirrors the LHS of the e2e matmul test.
-        // innermost dim (64) == subgroup size (64), so each thread handles 1 element per row.
+        // With linearized transfer: 32*64 = 2048 total elements.
+        // 128-bit DMA: 4 elements/lane, 256 elements/transfer, 2048/256 = 8 transfers.
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<32x64xf32, #hal.descriptor_type<storage_buffer>>
         %assumed = memref.assume_alignment %0, 64 : memref<32x64xf32, #hal.descriptor_type<storage_buffer>>
         %source = amdgpu.fat_raw_buffer_cast %assumed resetOffset : memref<32x64xf32, #hal.descriptor_type<storage_buffer>> to memref<32x64xf32, #amdgpu.address_space<fat_raw_buffer>>
         %dest = memref.alloc() : memref<32x64xf32, #gpu.address_space<workgroup>>
         // CHECK: scf.forall (%[[THREAD_IDX:.+]]) in (64)
         scf.forall (%arg6) in (64) {
-          // With 32x64 f32 elements and 64 threads:
-          // - Each thread handles 64/64 = 1 element per row
-          // - 1 f32 element = 4 bytes = 32 bits (matches dma_sizes)
-          // - 32 rows means 32 gather_to_lds ops per thread
-          // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-          // CHECK-DAG: %[[OFFSET:.+]] = arith.muli %[[THREAD_IDX]], %[[C1]]
-          // CHECK-COUNT-32: amdgpu.gather_to_lds
+          // With 32x64 f32 elements and 64 threads (linearized path):
+          // - Total elements = 2048
+          // - 128-bit DMA: 4 elements/lane, 256 elements/transfer
+          // - 2048/256 = 8 gather_to_lds ops with vector<4xf32>
+          // - Each transfer covers 4 rows (256/64 = 4)
+          // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+          // CHECK-DAG: %[[OFFSET:.+]] = arith.muli %[[THREAD_IDX]], %[[C4]]
+          // CHECK-COUNT-8: amdgpu.gather_to_lds {{.*}} : vector<4xf32>
           // CHECK-NOT: iree_gpu.coalesced_gather_dma
           iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
             memref<32x64xf32, #amdgpu.address_space<fat_raw_buffer>>,
@@ -192,16 +194,14 @@ hal.executable public @coalesced_dma_f16 {
 
 // -----
 
-// Test: Multiple DMA transfers per lane (N-transfer mode).
-// When innermost dimension > subgroupSize * elementsPerLane, multiple GatherToLDS
-// ops are generated to cover the entire dimension.
+// Test: Multiple DMA transfers per lane with linearized path.
+// With contiguous destination, the linearized transfer path is used.
 //
 // With 4x128 f32 elements and 64 threads:
-//   - innermost = 128, dma_sizes = [32, 128]
-//   - dma_size=128: elementsPerLane=4, totalElementsPerTransfer=256, 128 % 256 != 0 -> skip
-//   - dma_size=32: elementsPerLane=1, totalElementsPerTransfer=64, 128 % 64 = 0 -> 2 transfers
-// Each row requires 2 gather_to_lds ops (128/64 = 2 transfers per row).
-// 4 rows * 2 transfers = 8 total gather_to_lds ops.
+//   - Total elements = 512
+//   - 128-bit DMA: 4 elements/lane, 256 elements/transfer, 512/256 = 2 transfers
+//   - Transfer 1: linear 0 → [0, 0]
+//   - Transfer 2: linear 256 → [2, 0]
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
@@ -244,49 +244,20 @@ hal.executable public @coalesced_dma_multi_transfer {
         %dest = memref.alloc() : memref<4x128xf32, #gpu.address_space<workgroup>>
         // CHECK: scf.forall (%[[LANE_ID:.+]]) in (64)
         scf.forall (%arg6) in (64) {
-          // With 4x128 f32 elements and 64 threads:
-          // - innermost=128, can't use 128-bit (128 % 256 != 0), use 32-bit
-          // - elementsPerLane = 1, totalElementsPerTransfer = 64
-          // - Each row needs 128/64 = 2 transfers (at offsets 0 and 64)
-          // - 4 rows * 2 transfers = 8 gather_to_lds ops total
-          // CHECK-DAG: %[[C1:.+]] = arith.constant 1
-          // CHECK-DAG: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C1]]
+          // With 4x128 f32 elements and 64 threads (linearized path):
+          // - Total elements = 512
+          // - 128-bit DMA: 4 elements/lane, 256 elements/transfer
+          // - 512/256 = 2 gather_to_lds ops with vector<4xf32>
+          // - Transfer 1: linear 0 → [0, 0]
+          // - Transfer 2: linear 256 → [2, 0]
+          // CHECK-DAG: %[[C4:.+]] = arith.constant 4
+          // CHECK-DAG: %[[LANE_OFFSET:.+]] = arith.muli %[[LANE_ID]], %[[C4]]
           //
-          // Row 0, Transfer 1: source[0, 0 + lane_offset], dest[0, 0]
-          // CHECK: %[[SRC_COL0_T0:.+]] = arith.addi %{{c0.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0.+}}, %[[SRC_COL0_T0]]], %[[DST]][%{{c0.+}}, %{{c0.+}}] : vector<1xf32>
+          // Transfer 1: src[0, lane_offset], dst[0, 0]
+          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %{{.+}}], %[[DST]][%{{c0[^,]*}}, %{{c0[^]]*}}] : vector<4xf32>
           //
-          // Row 0, Transfer 2: source[0, 64 + lane_offset], dest[0, 64]
-          // CHECK: %[[C64:.+]] = arith.constant 64
-          // CHECK: %[[SRC_COL0_T1:.+]] = arith.addi %[[C64]], %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0.+}}, %[[SRC_COL0_T1]]], %[[DST]][%{{c0.+}}, %[[C64]]] : vector<1xf32>
-          //
-          // Row 1, Transfer 1: source[1, 0 + lane_offset], dest[1, 0]
-          // CHECK: %[[ROW1:.+]] = arith.constant 1
-          // CHECK: %[[SRC_COL1_T0:.+]] = arith.addi %{{c0.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW1]], %[[SRC_COL1_T0]]], %[[DST]][%[[ROW1]], %{{c0.+}}] : vector<1xf32>
-          //
-          // Row 1, Transfer 2: source[1, 64 + lane_offset], dest[1, 64]
-          // CHECK: %[[SRC_COL1_T1:.+]] = arith.addi %{{c64.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %[[SRC_COL1_T1]]], %[[DST]][%{{.+}}, %{{c64.+}}] : vector<1xf32>
-          //
-          // Row 2, Transfer 1: source[2, 0 + lane_offset], dest[2, 0]
-          // CHECK: %[[ROW2:.+]] = arith.constant 2
-          // CHECK: %[[SRC_COL2_T0:.+]] = arith.addi %{{c0.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW2]], %[[SRC_COL2_T0]]], %[[DST]][%[[ROW2]], %{{c0.+}}] : vector<1xf32>
-          //
-          // Row 2, Transfer 2: source[2, 64 + lane_offset], dest[2, 64]
-          // CHECK: %[[SRC_COL2_T1:.+]] = arith.addi %{{c64.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %[[SRC_COL2_T1]]], %[[DST]][%{{.+}}, %{{c64.+}}] : vector<1xf32>
-          //
-          // Row 3, Transfer 1: source[3, 0 + lane_offset], dest[3, 0]
-          // CHECK: %[[ROW3:.+]] = arith.constant 3
-          // CHECK: %[[SRC_COL3_T0:.+]] = arith.addi %{{c0.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[ROW3]], %[[SRC_COL3_T0]]], %[[DST]][%[[ROW3]], %{{c0.+}}] : vector<1xf32>
-          //
-          // Row 3, Transfer 2: source[3, 64 + lane_offset], dest[3, 64]
-          // CHECK: %[[SRC_COL3_T1:.+]] = arith.addi %{{c64.+}}, %[[LANE_OFFSET]]
-          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{.+}}, %[[SRC_COL3_T1]]], %[[DST]][%{{.+}}, %{{c64.+}}] : vector<1xf32>
+          // Transfer 2: src[2, lane_offset], dst[2, 0]
+          // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c2[^,]*}}, %{{.+}}], %[[DST]][%{{c2[^,]*}}, %{{c0[^]]*}}] : vector<4xf32>
           // CHECK-NOT: amdgpu.gather_to_lds
           // CHECK-NOT: iree_gpu.coalesced_gather_dma
           iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
