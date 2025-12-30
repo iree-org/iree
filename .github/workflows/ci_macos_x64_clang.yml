@@ -23,7 +23,7 @@ concurrency:
 jobs:
   macos_x64_clang:
     if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env:
       BUILD_DIR: build-macos
     defaults:
