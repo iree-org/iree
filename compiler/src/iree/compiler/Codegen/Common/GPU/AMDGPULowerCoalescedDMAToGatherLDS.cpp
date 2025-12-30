@@ -427,7 +427,7 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
 
     // dma_sizes is optional - if not specified, skip the size validation.
     ArrayRef<int64_t> dmaSizes;
-    if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
       dmaSizes = dmaSizesAttr.asArrayRef();
     }
 
