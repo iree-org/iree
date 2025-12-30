@@ -587,17 +587,17 @@ func.func @lower_coalesced_dma_mixed_sizes_2d(
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
   scf.forall (%arg6) in (32) {
     // Linearized path: all 128-bit transfers first, then 32-bit transfers.
-    // Transfer 1: linear offset 0 → [0, 0], 128-bit DMA
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %{{.+}}], %[[DST]][%{{c0[^,]*}}, %{{.+}}] : vector<4xf32>
+    // Transfer 1: linear offset 0 → dest[0, 0], 128-bit DMA
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %{{.+}}], %[[DST]][%{{c0[^,]*}}, %{{c0[^]]*}}] : vector<4xf32>
     //
-    // Transfer 2: linear offset 128 → [0, 128], 128-bit DMA
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %{{.+}}], %[[DST]][%{{c0[^,]*}}, %{{.+}}] : vector<4xf32>
+    // Transfer 2: linear offset 128 → dest[0, 128], 128-bit DMA
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c0[^,]*}}, %{{.+}}], %[[DST]][%{{c0[^,]*}}, %{{c128[^]]*}}] : vector<4xf32>
     //
-    // Transfer 3: linear offset 256 → [1, 96], 32-bit DMA
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c1[^,]*}}, %{{.+}}], %[[DST]][%{{c1[^,]*}}, %{{.+}}] : vector<1xf32>
+    // Transfer 3: linear offset 256 → dest[1, 96], 32-bit DMA
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c1[^,]*}}, %{{.+}}], %[[DST]][%{{c1[^,]*}}, %{{c96[^]]*}}] : vector<1xf32>
     //
-    // Transfer 4: linear offset 288 → [1, 128], 32-bit DMA
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c1[^,]*}}, %{{.+}}], %[[DST]][%{{c1[^,]*}}, %{{.+}}] : vector<1xf32>
+    // Transfer 4: linear offset 288 → dest[1, 128], 32-bit DMA
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%{{c1[^,]*}}, %{{.+}}], %[[DST]][%{{c1[^,]*}}, %{{c128[^]]*}}] : vector<1xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x160xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<2x160xf32, #gpu.address_space<workgroup>>, index
