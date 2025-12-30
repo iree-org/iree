@@ -46,23 +46,12 @@ jobs:
           submodules: true
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-      - name: CMake - configure
+      - name: Build IREE
+        env:
+          CMAKE_BUILD_TYPE: Debug
         run: |
           source ./build_tools/cmake/setup_sccache.sh
-          cmake \
-            -G Ninja \
-            -B ${BUILD_DIR} \
-            -DPython3_EXECUTABLE="$(which python3)" \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DIREE_BUILD_PYTHON_BINDINGS=ON \
-            -DIREE_ENABLE_LLD=ON \
-            -DIREE_ENABLE_ASSERTIONS=ON \
-            -DIREE_ENABLE_SPLIT_DWARF=ON \
-            -DIREE_ENABLE_THIN_ARCHIVES=ON
-      - name: CMake - build
-        run: |
-          cmake --build ${BUILD_DIR} -- -k 0
-          sccache --show-stats
+          ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       # We could build `iree-test-deps` or run some unit tests here, but the
       # main thing we want coverage for is the build itself and those steps
       # would add 10+ minutes to the job.
