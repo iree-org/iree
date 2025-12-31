@@ -453,6 +453,12 @@ runs.
     ci-extra: windows_x64_msvc
     ```
 
+* Opt in to the MacOS build and test workflows:
+
+    ``` text
+    ci-extra: macos_arm64_clang, macos_x64_clang
+    ```
+
 For example, this PR opted in to running the `build_test_all_windows` job
 (which was renamed to `windows_x64_msvc`):
 
