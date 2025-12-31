@@ -38,16 +38,6 @@ endif()
 
 include(CMakeDependentOption)
 
-execute_process(
-    COMMAND "${Python3_EXECUTABLE}" -m pip install nanobind numpy pyyaml typing_extensions ml_dtypes
-    RESULT_VARIABLE PIP_INSTALL_RESULT
-    OUTPUT_VARIABLE PIP_INSTALL_OUTPUT
-    ERROR_VARIABLE PIP_INSTALL_ERROR
-    # Share output with the console for visibility
-    OUTPUT_QUIET
-    ERROR_QUIET
-)
-
 #-------------------------------------------------------------------------------
 # Project component configuration
 #-------------------------------------------------------------------------------
