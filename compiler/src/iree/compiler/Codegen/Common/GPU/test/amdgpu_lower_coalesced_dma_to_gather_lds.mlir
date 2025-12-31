@@ -185,6 +185,55 @@ func.func @lower_coalesced_copy_dma_1d(
 
 #translation_32 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
+// Test: Single-row 2D memref (1x128) with 32 lanes.
+// This verifies that a 2D memref with only 1 row produces a single transfer,
+// equivalent to the 1D case. The delinearization should still work correctly.
+//   * Elements per lane = 128 / 32 = 4 (each lane reads 4 contiguous f32s)
+//   * Only one gather_to_lds op (single row = single transfer)
+//
+// CHECK-LABEL: func.func @lower_coalesced_copy_dma_single_row_2d
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<1x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<1x128xf32, #gpu.address_space<workgroup>>
+func.func @lower_coalesced_copy_dma_single_row_2d(
+    %source: memref<1x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<1x128xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb,
+    translation_info = #translation_32} {
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
+  scf.forall (%arg6) in (32) {
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Single transfer: linear offset 0 → [0, 0]
+    // CHECK: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK: %[[DELINEAR:.+]]:2 = affine.delinearize_index %[[C0]] into (1, 128)
+    // CHECK: %[[SRC_COL:.+]] = arith.addi %[[DELINEAR]]#1, %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[DELINEAR]]#0, %[[SRC_COL]]], %[[DST]][%[[DELINEAR]]#0, %[[DELINEAR]]#1] : vector<4xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<1x128xf32, #amdgpu.address_space<fat_raw_buffer>>, memref<1x128xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// -----
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp64|fp32|fp16|int64|int32|int16|int8,
+    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_32 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+
 // Test: 3D memref with shape 2x2x128 and 32 lanes.
 //   * Elements per lane = 128 / 32 = 4
 //   * Tile sizes = [1, 1, 128], iterate over 2*2 = 4 tiles
@@ -840,6 +889,73 @@ func.func @lower_3d_partial_contiguous_mixed_dma(
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
       memref<2x5x32xf32, strided<[256, 32, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
       memref<2x5x32xf32, strided<[256, 32, 1]>, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// -----
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp64|fp32|fp16|int64|int32|int16|int8,
+    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
+    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_32 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+// Test gather with indices on the innermost (only) dimension.
+// This tests the code path where dim < numIndexDims AND isInnermost is true.
+// The simplified implementation computes:
+//   srcIdx = indices[0][dimOffset] + laneOffset
+//
+// For a 1D gather from source[1024] to dest[256] with 32 lanes:
+//   - 32 lanes * 4 elements/lane = 128 elements per transfer
+//   - 256 / 128 = 2 transfers needed
+//   - Transfer 0: dimOffset = 0, srcIdx = indices[0] + lane_offset
+//   - Transfer 1: dimOffset = 128, srcIdx = indices[128] + lane_offset
+//
+// The semantic is: indices[i] provides the absolute source position for
+// destination position i, and lane_offset is added for parallel access.
+//
+// CHECK-LABEL: func.func @lower_coalesced_gather_dma_innermost_1d
+func.func @lower_coalesced_gather_dma_innermost_1d(
+    %source: memref<1024xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %col_indices: memref<256xindex>,
+    %dest: memref<256xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb,
+    translation_info = #translation_32} {
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
+  scf.forall (%arg6) in (32) {
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Transfer 1: dimOffset = 0, srcIdx = indices[0] + lane_offset
+    // CHECK: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK: %[[DELINEAR0:.+]] = affine.delinearize_index %[[C0]] into (256)
+    // CHECK: %[[LOADED0:.+]] = memref.load %{{.+}}[%[[DELINEAR0]]]
+    // CHECK: %[[SRC0:.+]] = arith.addi %[[LOADED0]], %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %{{.+}}[%[[SRC0]]], %{{.+}}[%[[DELINEAR0]]]
+    //
+    // Transfer 2: dimOffset = 128, srcIdx = indices[128] + lane_offset
+    // CHECK: %[[C128:.+]] = arith.constant 128 : index
+    // CHECK: %[[DELINEAR128:.+]] = affine.delinearize_index %[[C128]] into (256)
+    // CHECK: %[[LOADED128:.+]] = memref.load %{{.+}}[%[[DELINEAR128]]]
+    // CHECK: %[[SRC128:.+]] = arith.addi %[[LOADED128]], %[[LANE_OFFSET]]
+    // CHECK: amdgpu.gather_to_lds %{{.+}}[%[[SRC128]]], %{{.+}}[%[[DELINEAR128]]]
+    //
+    // CHECK-NOT: amdgpu.gather_to_lds
+    iree_gpu.coalesced_gather_dma %source[%col_indices] into %dest lane(%arg6) :
+      memref<1024xf32, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<256xindex>,
+      memref<256xf32, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }

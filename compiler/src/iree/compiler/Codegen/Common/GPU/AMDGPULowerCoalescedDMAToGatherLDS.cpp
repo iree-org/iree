@@ -144,12 +144,21 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
 
 /// Generates source and destination indices for a GatherToLDS operation.
 ///
-/// For each dimension, computes:
-/// * dstIdx: The destination offset for this dimension (from dimOffsets).
-/// * srcIdx: The source offset, which may come from:
-///   1. An index memref (for gather dimensions) - loads indirection index
-///   2. The destination offset directly (for non-gather dimensions)
-///   3. For the innermost dimension: adds laneOffset for lane-parallel access
+/// Index computation rules for each dimension:
+///
+/// | Condition                 | dstIdx    | srcIdx                         |
+/// |---------------------------|-----------|--------------------------------|
+/// | Gather dimension          | dimOffset | load(indices[dim][dimOffset])  |
+/// | Non-gather, non-innermost | dimOffset | dimOffset                      |
+/// | Non-gather, innermost     | dimOffset | dimOffset + laneOffset         |
+///
+/// Where:
+///   - dimOffset: position in this dimension from delinearization
+///   - laneOffset: lane_id * elementsPerLane (for parallel access)
+///   - indices[dim]: index memref mapping dest positions to source positions
+///
+/// The innermost dimension always adds laneOffset so lanes access different
+/// elements in parallel.
 static std::pair<SmallVector<Value>, SmallVector<Value>>
 generateGatherIndices(PatternRewriter &rewriter, Location loc,
                       ValueRange dimOffsets, Value laneOffset,
@@ -165,23 +174,13 @@ generateGatherIndices(PatternRewriter &rewriter, Location loc,
     // Destination always uses the dimension offset directly.
     dstIndices.push_back(dimOffset);
 
-    // Build source index for this dimension. The source index computation
-    // depends on whether this dimension has an index memref (gather) and
-    // whether it's the innermost dimension.
+    // Build source index for this dimension.
     Value srcIdx;
     if (dim < numIndexDims) {
       // Gather dimension: load the source index from the index memref.
       // The index memref maps destination positions to source positions.
-      // Example: indices[dim][dimOffset] gives the source index for dest
-      // position dimOffset.
       srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
                                       ValueRange{dimOffset});
-      // For innermost gather dimension, add the dimension offset to the loaded
-      // base index. This handles the case where we're gathering from a
-      // different position but need to add the offset within that dimension.
-      if (isInnermost) {
-        srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, dimOffset);
-      }
     } else {
       // Non-gather dimension: source and dest use the same offset.
       srcIdx = dimOffset;
@@ -265,7 +264,7 @@ struct LowerCoalescedGatherDMAPattern final
     int64_t destRank = destShape.size();
     int64_t numLinearDims = destType.getNumContiguousTrailingDims();
     // Always linearize at least the innermost dimension.
-    numLinearDims = std::max(numLinearDims, int64_t(1));
+    numLinearDims = std::max<int64_t>(numLinearDims, 1);
     LDBG() << "  Number of linear dims: " << numLinearDims;
 
     // Compute total elements in the linearized portion (last numLinearDims
