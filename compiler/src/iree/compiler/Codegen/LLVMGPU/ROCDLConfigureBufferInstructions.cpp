@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
@@ -72,7 +73,7 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
 }
 
 /// Return the maximum number of bytes spanned by the binding, or nullopt if
-/// unable to determine.
+/// unable to determine or if the calculation would overflow.
 static std::optional<int64_t>
 getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding,
                 const DataFlowSolver &solver) {
@@ -82,21 +83,31 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding,
           dyn_cast<IREE::TensorExt::DispatchTensorType>(binding.getType())) {
     resultTy = tensorType.asRankedTensorType();
   }
-  if (!resultTy || !resultTy.hasRank())
+  if (!resultTy || !resultTy.hasRank()) {
     return std::nullopt;
+  }
   for (Value dynArg : binding.getResultDynamicDims(0)) {
     FailureOr<int64_t> dimMax = getDynamicUpperBound(dynArg, solver);
-    if (failed(dimMax))
+    if (failed(dimMax)) {
       return std::nullopt;
-    maxNumElems *= (*dimMax);
+    }
+    if (llvm::MulOverflow(maxNumElems, *dimMax, maxNumElems)) {
+      return std::nullopt;
+    }
   }
   for (int64_t dim : resultTy.getShape()) {
-    if (ShapedType::isDynamic(dim))
+    if (ShapedType::isDynamic(dim)) {
       continue;
-    maxNumElems *= dim;
+    }
+    if (llvm::MulOverflow(maxNumElems, dim, maxNumElems)) {
+      return std::nullopt;
+    }
   }
-  return maxNumElems * IREE::Util::getTypeBitWidth(resultTy.getElementType()) /
-         8;
+  int64_t elementBits = IREE::Util::getTypeBitWidth(resultTy.getElementType());
+  if (llvm::MulOverflow(maxNumElems, elementBits, maxNumElems)) {
+    return std::nullopt;
+  }
+  return maxNumElems / 8;
 }
 
 namespace {
