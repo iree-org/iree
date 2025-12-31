@@ -13,16 +13,9 @@ on:
   workflow_call:
   workflow_dispatch:
 
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit). The workflow name is prepended to avoid conflicts between
-  # different workflows.
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
-
 jobs:
   macos_x64_clang:
+    # Prevent scheduled runs in forks (only allow for iree-org or non-schedule triggers).
     if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: macos-15-intel
     env:
