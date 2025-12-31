@@ -69,21 +69,14 @@ verifyMemoryLayoutContiguous(IREE::GPU::CoalescedGatherDMAOp dmaOp,
 
 /// A segment of elements that will be transferred using a specific DMA size.
 ///
-/// For non-contiguous memrefs (row-wise transfer):
-///   - Segments are computed per-row based on the innermost dimension size.
-///   - `startOffset` is the element offset within the innermost dimension.
-///   - Each row is processed independently.
+/// The pass linearizes contiguous trailing dimensions and iterates over
+/// non-contiguous outer dimensions. For each linearized block:
+///   - `startOffset` is the element offset within the linearized portion.
+///   - `elementsPerTransfer` is subgroupSize * elementsPerLane.
+///   - `numTransfers` is how many DMA operations use this segment's DMA size.
 ///
-/// For fully contiguous memrefs (linearized transfer):
-///   - The entire memref is treated as a 1D array of `totalElements` size.
-///   - `startOffset` is the linear element offset from the memref start.
-///   - Segments can span multiple rows since there are no gaps between rows.
-///   - This allows using larger DMA transfers (e.g., 128-bit instead of 32-bit)
-///     more efficiently by covering more elements per transfer.
-///
-/// In both cases, larger DMA sizes are prioritized to minimize the number of
-/// transfers. The total elements covered must exactly match the memref size
-/// to avoid copying excess elements.
+/// Larger DMA sizes are prioritized to minimize the number of transfers.
+/// The total elements covered must exactly match the linearized block size.
 ///
 /// Example for contiguous memref with shape <4x32xf32>, subgroup_size=64:
 ///   Total elements = 128, using 128-bit DMA (4 elements/lane):
@@ -152,18 +145,11 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
 /// Generates source and destination indices for a GatherToLDS operation.
 ///
 /// For each dimension, computes:
-/// * dstIdx: The destination offset for this dimension.
+/// * dstIdx: The destination offset for this dimension (from dimOffsets).
 /// * srcIdx: The source offset, which may come from:
-///   1. An index memref (for gather dimensions)
+///   1. An index memref (for gather dimensions) - loads indirection index
 ///   2. The destination offset directly (for non-gather dimensions)
-///   3. For the innermost dimension: adds laneOffset for lane-parallel access.
-///
-/// \param rewriter The pattern rewriter for creating IR.
-/// \param loc The location for created operations.
-/// \param dimOffsets Value offsets for each dimension.
-/// \param laneOffset Runtime lane offset (lane_id * elements_per_lane).
-/// \param indices Index memrefs for gather dimensions (may be empty).
-/// \returns A pair of (srcIndices, dstIndices).
+///   3. For the innermost dimension: adds laneOffset for lane-parallel access
 static std::pair<SmallVector<Value>, SmallVector<Value>>
 generateGatherIndices(PatternRewriter &rewriter, Location loc,
                       ValueRange dimOffsets, Value laneOffset,
@@ -173,32 +159,32 @@ generateGatherIndices(PatternRewriter &rewriter, Location loc,
   size_t numIndexDims = indices.size();
   int64_t destRank = dimOffsets.size();
 
-  for (auto [dim, offsetVal] : llvm::enumerate(dimOffsets)) {
+  for (auto [dim, dimOffset] : llvm::enumerate(dimOffsets)) {
     bool isInnermost = (static_cast<int64_t>(dim) == destRank - 1);
 
-    // Destination always uses the tile offset directly.
-    dstIndices.push_back(offsetVal);
+    // Destination always uses the dimension offset directly.
+    dstIndices.push_back(dimOffset);
 
     // Build source index for this dimension. The source index computation
     // depends on whether this dimension has an index memref (gather) and
     // whether it's the innermost dimension.
     Value srcIdx;
     if (dim < numIndexDims) {
-      // Gather dimension: load the source row index from the index memref.
+      // Gather dimension: load the source index from the index memref.
       // The index memref maps destination positions to source positions.
-      // Example: indices[dim][offsetVal] gives the source row for dest row
-      // offsetVal.
+      // Example: indices[dim][dimOffset] gives the source index for dest
+      // position dimOffset.
       srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
-                                      ValueRange{offsetVal});
-      // For innermost gather dimension, add the column offset to the loaded
+                                      ValueRange{dimOffset});
+      // For innermost gather dimension, add the dimension offset to the loaded
       // base index. This handles the case where we're gathering from a
-      // different row but need to add the column offset within that row.
+      // different position but need to add the offset within that dimension.
       if (isInnermost) {
-        srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, offsetVal);
+        srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, dimOffset);
       }
     } else {
       // Non-gather dimension: source and dest use the same offset.
-      srcIdx = offsetVal;
+      srcIdx = dimOffset;
     }
 
     // For innermost dimension: add lane offset so each lane accesses a
@@ -330,11 +316,12 @@ private:
   /// and treats the inner numLinearDims dimensions as a single linear block.
   /// This unified approach handles:
   ///   - numLinearDims == rank: fully linearized (all dims contiguous)
-  ///   - numLinearDims == 1: row-wise (only innermost dim)
+  ///   - numLinearDims == 1: only innermost dim linearized
   ///   - 1 < numLinearDims < rank: hybrid (some trailing dims linearized)
   ///
-  /// The linearization is capped by both memory contiguity and gather indices,
-  /// allowing efficient transfers while respecting memory layout constraints.
+  /// The number of linearized dimensions is determined by destination memory
+  /// contiguity, allowing efficient transfers while respecting layout
+  /// constraints.
   void emitTransfers(PatternRewriter &rewriter, Location loc, Value source,
                      Value dest, ArrayRef<int64_t> destShape,
                      int64_t numLinearDims, Type elementType,
