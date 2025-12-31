@@ -58,8 +58,8 @@ static iree_hal_hip_native_executable_t* iree_hal_hip_native_executable_cast(
 }
 
 typedef struct iree_hal_hip_limits_t {
-  uint32_t max_block_dims[3];
-  uint32_t max_block_shared_memory_size;
+  int max_block_dims[3];
+  int max_block_shared_memory_size;
 } iree_hal_hip_limits_t;
 static iree_status_t iree_hal_hip_query_limits(
     const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
