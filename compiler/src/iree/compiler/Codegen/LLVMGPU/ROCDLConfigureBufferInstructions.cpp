@@ -86,6 +86,7 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding,
   if (!resultTy || !resultTy.hasRank()) {
     return std::nullopt;
   }
+  // Handle dynamic dimensions.
   for (Value dynArg : binding.getResultDynamicDims(0)) {
     FailureOr<int64_t> dimMax = getDynamicUpperBound(dynArg, solver);
     if (failed(dimMax)) {
@@ -95,10 +96,9 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding,
       return std::nullopt;
     }
   }
-  for (int64_t dim : resultTy.getShape()) {
-    if (ShapedType::isDynamic(dim)) {
-      continue;
-    }
+  // Handle static dimensions.
+  for (int64_t dim :
+       llvm::make_filter_range(resultTy.getShape(), ShapedType::isStatic)) {
     if (llvm::MulOverflow(maxNumElems, dim, maxNumElems)) {
       return std::nullopt;
     }
