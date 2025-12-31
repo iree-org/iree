@@ -24,6 +24,11 @@ extern "C" {
 #define IREE_HAL_HIP_OFFLOAD_BUNDLE_MAGIC "__CLANG_OFFLOAD_BUNDLE__"
 #define IREE_HAL_HIP_OFFLOAD_BUNDLE_MAGIC_SIZE 24
 
+// Uncompressed bundle format magic as uint32_t (first 4 bytes: "__CL").
+// Note: "__CLANG_OFFLOAD_BUNDLE__" starts with "__CL" = 0x5f5f434c (big-endian)
+// or 0x4c435f5f (little-endian when read as uint32_t).
+#define IREE_HAL_HIP_OFFLOAD_BUNDLE_MAGIC_INT 0x4c435f5f
+
 // Compressed bundle format.
 #define IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC "CCOB"
 #define IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC_SIZE 4

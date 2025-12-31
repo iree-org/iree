@@ -2222,6 +2222,28 @@ iree_status_t iree_hal_hip_parse_fat_binary_kernels(
     return iree_ok_status();
   }
 
+  // Check if this is a bare uncompressed offload bundle (__CLANG_OFFLOAD_BUNDLE__)
+  if (iree_hal_hip_is_code_object_uncompressed(executable_data, false)) {
+    // Parse as offload bundle directly
+    // No need to copy names - executable_data persists
+    iree_hal_hip_kernel_info_t* matched_kernels = NULL;
+    iree_host_size_t matched_kernel_count = 0;
+    iree_host_size_t bundle_size = 0;
+    iree_status_t status = iree_hal_hip_parse_offload_bundle_kernels(
+        executable_data, target_triple, allocator,
+        /*copy_kernel_names=*/false, &matched_kernel_count, &matched_kernels,
+        &bundle_size);
+    if (!iree_status_is_ok(status)) {
+      return status;
+    }
+    // Fill output structure
+    out_info->bundle_data = executable_data.data;
+    out_info->bundle_size = bundle_size;
+    out_info->kernel_count = matched_kernel_count;
+    out_info->kernels = matched_kernels;
+    return iree_ok_status();
+  }
+
   // Read the fat binary header
   iree_hal_hip_fat_binary_header_t fat_header;
   memcpy(&fat_header, executable_data.data, sizeof(fat_header));
@@ -2329,11 +2351,21 @@ iree_status_t iree_hal_hip_read_native_header(
   }
 
   if (magic == IREE_HAL_HIP_OFFLOAD_BUNDLE_COMPRESSED_MAGIC_INT) {
-    // It's a raw ELF binary. Validate the header and get the size.
+    // It's a compressed offload bundle. Validate the header and get the size.
     iree_host_size_t elf_size = 0;
     IREE_RETURN_IF_ERROR(iree_hal_hip_validate_ccob_header(
         executable_data, unsafe_infer_size, &elf_size));
     *out_elf_data = iree_make_const_byte_span(executable_data.data, elf_size);
+    return iree_ok_status();
+  }
+
+  if (magic == IREE_HAL_HIP_OFFLOAD_BUNDLE_MAGIC_INT) {
+    // It's an uncompressed offload bundle (__CLANG_OFFLOAD_BUNDLE__).
+    // Parse it directly without a fat binary wrapper.
+    iree_host_size_t bundle_size = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_hip_parse_offload_bundle(
+        executable_data, unsafe_infer_size, &bundle_size));
+    *out_elf_data = iree_make_const_byte_span(executable_data.data, bundle_size);
     return iree_ok_status();
   }
 
