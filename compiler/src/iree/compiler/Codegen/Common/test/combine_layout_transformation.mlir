@@ -432,3 +432,21 @@ func.func @consumer_unfusable_due_to_init(%arg0: tensor<?xi32>, %arg1: tensor<?x
 //       DISPATCH-SCOPE:     scf.forall.in_parallel
 //       DISPATCH-SCOPE:       tensor.parallel_insert_slice
 //       DISPATCH-SCOPE:   linalg.generic
+
+// -----
+
+// Test that unpack without padding, so map_scatter doesn't need masking.
+func.func @unpack_no_padding_no_masking(%dim : index, %result : memref<?x16384xf32>) {
+  %assumed = util.assume.int %dim<umin = 1024, umax = 16384, udiv = 128> : index
+  %workload = iree_tensor_ext.dispatch.workload.ordinal %assumed, 0 : index
+  %tiled_dim = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%workload]
+  %source = tensor.empty(%tiled_dim) : tensor<?x64x128x256xf32>
+  %dest = tensor.empty(%workload) : tensor<?x16384xf32>
+  %unpack = linalg.unpack %source outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 256] into %dest : tensor<?x64x128x256xf32> -> tensor<?x16384xf32>
+  iree_codegen.store_to_buffer %unpack, %result : tensor<?x16384xf32> into memref<?x16384xf32>
+  return
+}
+// DISPATCH-SCOPE-LABEL: func @unpack_no_padding_no_masking
+// DISPATCH-SCOPE: iree_linalg_ext.map_scatter
+// DISPATCH-SCOPE-NOT: arith.cmpi ult
+// DISPATCH-SCOPE: return

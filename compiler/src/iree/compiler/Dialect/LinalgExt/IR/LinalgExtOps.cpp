@@ -765,7 +765,7 @@ bool MapScatterOp::isIdentity() {
   return true;
 }
 namespace {
-struct ConvertIdentityMapScatterToCopy
+struct FoldIdentityMapScatter
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
@@ -779,10 +779,8 @@ struct ConvertIdentityMapScatterToCopy
     if (!mapScatterOp.hasPureTensorSemantics()) {
       return failure();
     }
-    auto copyOp = linalg::CopyOp::create(rewriter, mapScatterOp.getLoc(),
-                                         mapScatterOp.getInput(),
-                                         mapScatterOp.getOutput());
-    rewriter.replaceOp(mapScatterOp, copyOp.getResults());
+    // Fold the identity map_scatter by replacing it with its input.
+    rewriter.replaceOp(mapScatterOp, mapScatterOp.getInput());
     return success();
   }
 };
@@ -790,7 +788,7 @@ struct ConvertIdentityMapScatterToCopy
 
 void MapScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *ctx) {
-  results.add<ConvertIdentityMapScatterToCopy>(ctx);
+  results.add<FoldIdentityMapScatter>(ctx);
 }
 
 //===----------------------------------------------------------------------===//

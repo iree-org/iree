@@ -16,6 +16,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-combine-layout-transformation"
@@ -170,9 +171,10 @@ foldCollapseShapeIntoMapScatter(RewriterBase &rewriter,
   return foldReshapeIntoMapScatter(rewriter, collapseShapeOp, mapScatterOp);
 }
 
-/// Fold an `extractSliceOp` into a consumer `mapScatterOp` by applying a mask
-/// based on the bounds of the extractSliceOp. Currently, only zero offsets and
-/// unit strides are supported.
+/// Fold an `extractSliceOp` into a consumer `mapScatterOp`. If the
+/// extract_slice is an identity operation, the input is replaced directly.
+/// Otherwise, a mask is applied based on the bounds of the extractSliceOp.
+/// Currently, only zero offsets and unit strides are supported.
 ///
 /// For a given `%mask` value, and slice sizes of `%size0`, `%size1`, ...,
 /// `%sizeN`, the `%new_mask` becomes:
@@ -206,6 +208,29 @@ foldExtractSliceIntoMapScatter(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(extractSliceOp,
                                        "non-unit strides are not supported");
   }
+
+  // Check if this is an identity extract_slice (all sizes match the source).
+  // If so, just replace the input without adding any masking.
+  SmallVector<OpFoldResult> sliceSizes = extractSliceOp.getMixedSizes();
+  Value source = extractSliceOp.getSource();
+  bool isIdentity = true;
+  for (auto [dim, sliceSize] : llvm::enumerate(sliceSizes)) {
+    ValueBoundsConstraintSet::Variable sourceDimVar(source, dim);
+    FailureOr<bool> areEqual =
+        ValueBoundsConstraintSet::areEqual(sliceSize, sourceDimVar);
+    if (!succeeded(areEqual) || !*areEqual) {
+      isIdentity = false;
+      break;
+    }
+  }
+
+  if (isIdentity) {
+    // Identity extract_slice: just replace the input without any masking.
+    rewriter.modifyOpInPlace(
+        mapScatterOp, [&]() { mapScatterOp.getInputMutable().assign(source); });
+    return mapScatterOp;
+  }
+
   SmallVector<OpFoldResult> bounds(extractSliceOp.getMixedSizes());
   Block &transformBody = mapScatterOp.getTransformationRegion().front();
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
