@@ -118,9 +118,17 @@ CONTROL_JOB_REGEXES = frozenset(
 # They may also run on presubmit only under certain conditions.
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
-        # None.
         "windows_x64_msvc",
         "test_torch",
+    ]
+)
+
+# Jobs to only run on schedule or when explicitly requested via ci-extra.
+# These are excluded from both presubmit and postsubmit by default.
+DEFAULT_SCHEDULE_ONLY_JOBS = frozenset(
+    [
+        "macos_arm64_clang",
+        "macos_x64_clang",
     ]
 )
 
@@ -404,10 +412,10 @@ def get_enabled_jobs(
     """
     if not is_pr:
         print(
-            "Running all jobs because run was not triggered by a pull request event.",
+            "Running default postsubmit jobs (excluding schedule-only jobs).",
             file=sys.stderr,
         )
-        return all_jobs
+        return all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS
     if is_llvm_integrate_pr:
         print(
             "Running all jobs because run was triggered by an LLVM integrate pull request event.",
@@ -456,7 +464,7 @@ def get_enabled_jobs(
             f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}"
         )
 
-    enabled_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS
+    enabled_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS - DEFAULT_SCHEDULE_ONLY_JOBS
 
     if not modifies_non_skip_paths(modified_paths):
         print(
