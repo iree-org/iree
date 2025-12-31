@@ -1386,6 +1386,36 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Unmask
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_UnMaskOp : IREELinalgExt_PureOp<"unmask", [
+  AllTypesMatch<["dest", "result"]>,
+  Pure,
+  DestinationStyleOpInterface
+  ]> {
+  let summary = "";
+  let description = [{}];
+  let arguments = (ins AnyRankedTensor:$src,
+                       AnyRankedTensor:$dest);
+  let results = (outs AnyShaped:$result);
+  let assemblyFormat = [{
+    attr-dict
+    $src `into` $dest `:` type($src) `->` type($result)
+  }];
+  let hasVerifier = 1;
+  let hasFolder = 1;
+
+  let extraClassDeclaration = [{
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getDestMutable();
+    }
+  }];
+}
+
 } // OpGroupNonStructuredOps
 
 //===----------------------------------------------------------------------===//

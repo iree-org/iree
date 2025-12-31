@@ -2254,3 +2254,12 @@ func.func @split_reduction_mapping(%arg0 : index,
 //  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<1>,
 //  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<0>,
 //  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<2>]
+
+// -----
+
+func.func @unmask(%src: tensor<4x4xf32>, %dst: tensor<4x?xf32>) -> tensor<4x?xf32> {
+  %0 = iree_linalg_ext.unmask %src into %dst : tensor<4x4xf32> -> tensor<4x?xf32>
+  return %0 : tensor<4x?xf32>
+}
+// CHECK-LABEL: @unmask
+// CHECK: iree_linalg_ext.unmask %{{.*}} into %{{.*}} : tensor<4x4xf32> -> tensor<4x?xf32>
