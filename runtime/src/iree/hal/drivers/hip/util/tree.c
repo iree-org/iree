@@ -498,31 +498,44 @@ iree_hal_hip_util_tree_node_t* iree_hal_hip_util_tree_get(
 iree_hal_hip_util_tree_node_t* iree_hal_hip_util_tree_lower_bound(
     const iree_hal_hip_util_tree_t* tree, iree_host_size_t key) {
   iree_hal_hip_util_tree_node_t* node = tree->root;
-  iree_hal_hip_util_tree_node_t* result = NULL;
+  iree_hal_hip_util_tree_node_t* last = NULL;
   while (node->is_sentinel == false) {
-    if (key <= node->key) {
-      result = node;
+    last = node;
+    if (key == node->key) {
+      return node;
+    } else if (key < node->key) {
       node = node->left;
     } else {
       node = node->right;
     }
   }
-  return result;
+  if (!last || last->key > key) {
+    return last;
+  }
+  return iree_hal_hip_util_tree_node_next(last);
 }
 
 iree_hal_hip_util_tree_node_t* iree_hal_hip_util_tree_upper_bound(
     const iree_hal_hip_util_tree_t* tree, iree_host_size_t key) {
   iree_hal_hip_util_tree_node_t* node = tree->root;
-  iree_hal_hip_util_tree_node_t* result = NULL;
+  iree_hal_hip_util_tree_node_t* last = NULL;
   while (node->is_sentinel == false) {
-    if (key < node->key) {
-      result = node;
+    last = node;
+    if (key == node->key) {
+      return node;
+    } else if (key < node->key) {
       node = node->left;
     } else {
       node = node->right;
     }
   }
-  return result;
+  if (!last || last->key > key) {
+    return last;
+  }
+  while (last && last->key <= key) {
+    last = iree_hal_hip_util_tree_node_next(last);
+  }
+  return last;
 }
 
 iree_hal_hip_util_tree_node_t* iree_hal_hip_util_tree_first(
