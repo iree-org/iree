@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_TensorExt_TRANSFORMS_PASSES_H_
-#define IREE_COMPILER_DIALECT_TensorExt_TRANSFORMS_PASSES_H_
+#ifndef IREE_COMPILER_DIALECT_TENSOREXT_TRANSFORMS_PASSES_H_
+#define IREE_COMPILER_DIALECT_TENSOREXT_TRANSFORMS_PASSES_H_
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -20,4 +20,4 @@ void registerPasses();
 
 } // namespace mlir::iree_compiler::IREE::TensorExt
 
-#endif // IREE_COMPILER_DIALECT_TensorExt_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_TENSOREXT_TRANSFORMS_PASSES_H_

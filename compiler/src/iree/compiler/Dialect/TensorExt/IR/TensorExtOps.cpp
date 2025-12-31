@@ -659,8 +659,8 @@ CastToRaggedShapeOp::getEstimatedLoopRange(RewriterBase &rewriter,
       cloneAndReplaceDimInBackwardSlice(
           rewriter, loc, dominanceInfo, innerUb, *this, expectedSparseDims[1],
           [&](RewriterBase &rewriter, Location loc) {
-            if (Value maxRaggedColumnLength = getAvgRaggedColumnLength()) {
-              return maxRaggedColumnLength;
+            if (Value avgRaggedColumnLength = getAvgRaggedColumnLength()) {
+              return avgRaggedColumnLength;
             }
             OpFoldResult sourceDim =
                 memref::DimOp::create(rewriter, loc, getSource(),
@@ -741,7 +741,7 @@ CastToRaggedShapeOp::lowerLoopRange(RewriterBase &rewriter,
   // For the inner sparse dimension, lower to loops by creating a loop with
   // - Lower bound being `max(givenLowerBound, column_lengths[outerIv])`
   // - Upper bound obtained by replacing the `memref.dim %sparseOp, 1` with
-  //   `column_lengthts[outerIv + 1]`
+  //   `column_lengths[outerIv + 1]`
   Value innerLb =
       getValueOrCreateConstantIndexOp(rewriter, loc, givenRange[1].offset);
   Value innerUb =
@@ -775,7 +775,7 @@ CastToRaggedShapeOp::lowerLoopRange(RewriterBase &rewriter,
   Value clonedUb = innerDimReplacementResult.value()[1];
   AffineExpr s0, s1;
   bindSymbols(rewriter.getContext(), s0, s1);
-  AffineMap minMap = AffineMap::get(0, 2, {s0, s1}, rewriter.getContext());
+  AffineMap maxMap = AffineMap::get(0, 2, {s0, s1}, rewriter.getContext());
   Value columnLb =
       memref::LoadOp::create(rewriter, loc, columnLengths, outerIv);
   if (columnLb.getType() != clonedLb.getType()) {
@@ -783,7 +783,7 @@ CastToRaggedShapeOp::lowerLoopRange(RewriterBase &rewriter,
         arith::IndexCastOp::create(rewriter, loc, clonedLb.getType(), columnLb);
   }
   OpFoldResult newLb = affine::makeComposedFoldedAffineMax(
-      rewriter, loc, minMap, ArrayRef<OpFoldResult>{clonedLb, columnLb});
+      rewriter, loc, maxMap, ArrayRef<OpFoldResult>{clonedLb, columnLb});
   Value newLbVal = getValueOrCreateConstantIndexOp(rewriter, loc, newLb);
   auto innerFor =
       scf::ForOp::create(rewriter, loc, newLbVal, clonedUb, innerStep);
