@@ -5614,6 +5614,11 @@ runs.</p>
 <div class="highlight"><pre><span></span><code>ci-extra: windows_x64_msvc
 </code></pre></div>
 </li>
+<li>
+<p>Opt in to the MacOS build and test workflows:</p>
+<div class="highlight"><pre><span></span><code>ci-extra: macos_arm64_clang, macos_x64_clang
+</code></pre></div>
+</li>
 </ul>
 <p>For example, this PR opted in to running the <code>build_test_all_windows</code> job
 (which was renamed to <code>windows_x64_msvc</code>):</p>
