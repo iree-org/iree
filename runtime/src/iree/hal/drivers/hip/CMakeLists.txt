@@ -10,11 +10,26 @@
 
 iree_add_all_subdirs()
 
+if(NOT DEFINED HIP_API_HEADERS_ROOT)
+  set(HIP_API_HEADERS_ROOT "${IREE_SOURCE_DIR}/third_party/hip-build-deps/include")
+endif()
+
+if(NOT EXISTS "${HIP_API_HEADERS_ROOT}/hip/hip_version.h")
+  message(SEND_ERROR "Could not find HIP headers at: ${HIP_API_HEADERS_ROOT}")
+endif()
+
+set(ADDITIONAL_HIP_LIBS)
+if (IREE_HAL_DRIVER_ENABLE_ZSTD)
+  set(ADDITIONAL_HIP_LIBS zstd)
+endif()
+
 iree_cc_library(
   NAME
     hip
   HDRS
     "api.h"
+  COPTS
+    ${IREE_HIP_DRIVER_COPTS}
   SRCS
     "api.h"
     "cleanup_thread.c"
@@ -41,6 +56,8 @@ iree_cc_library(
     "memory_pools.h"
     "native_executable.c"
     "native_executable.h"
+    "native_executable_hipf.c"
+    "native_executable_hipf.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
     "per_device_information.h"
@@ -48,6 +65,8 @@ iree_cc_library(
     "rccl_channel.h"
     "stream_command_buffer.c"
     "stream_command_buffer.h"
+  SYSTEM_INCLUDES
+    "${HIP_API_HEADERS_ROOT}"
   DEPS
     ::dynamic_symbols
     iree::async
@@ -74,6 +93,7 @@ iree_cc_library(
     iree::hal::utils::stream_tracing
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::hip_executable_def_c_fbs
+    ${ADDITIONAL_HIP_LIBS}
   PUBLIC
 )
 
