@@ -58,6 +58,45 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   return mapping;
 }
 
+/// Check if a value traces back to tensor.empty (possibly through forall args).
+static bool tracesToTensorEmpty(Value value) {
+  // Direct tensor.empty.
+  if (value.getDefiningOp<tensor::EmptyOp>()) {
+    return true;
+  }
+
+  // Check if value is an extract_slice from a forall block argument.
+  auto extractSlice = value.getDefiningOp<tensor::ExtractSliceOp>();
+  if (!extractSlice) {
+    return false;
+  }
+
+  auto blockArg = dyn_cast<BlockArgument>(extractSlice.getSource());
+  if (!blockArg) {
+    return false;
+  }
+
+  auto forallOp = dyn_cast<scf::ForallOp>(blockArg.getOwner()->getParentOp());
+  if (!forallOp) {
+    return false;
+  }
+
+  // Find the corresponding shared_out init value.
+  unsigned numIVs = forallOp.getInductionVars().size();
+  unsigned argIndex = blockArg.getArgNumber();
+  if (argIndex < numIVs) {
+    return false;
+  }
+
+  unsigned sharedOutIndex = argIndex - numIVs;
+  if (sharedOutIndex >= forallOp.getOutputs().size()) {
+    return false;
+  }
+
+  Value initValue = forallOp.getOutputs()[sharedOutIndex];
+  return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
@@ -117,9 +156,22 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
         std::min(minElementsPerTransfer, elementsPerTransfer);
   }
 
-  // If no valid DMA size found or innermost dim is too small, skip.
+  // Determine how many elements are available for coalesced access.
+  // For CopyOp with output tracing to tensor.empty(), we can linearize.
+  ArrayRef<int64_t> shape = outputType.getShape();
+  int64_t availableElements = innermostDim;
+  if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
+    Value output = copyOp.getOutputs()[0];
+    if (tracesToTensorEmpty(output)) {
+      if (llvm::none_of(shape, ShapedType::isDynamic)) {
+        availableElements = ShapedType::getNumElements(shape);
+      }
+    }
+  }
+
+  // If no valid DMA size found or available elements are too small, skip.
   if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-      innermostDim < minElementsPerTransfer) {
+      availableElements < minElementsPerTransfer) {
     return {};
   }
 
@@ -583,9 +635,11 @@ private:
     int64_t totalWarps = llvm::product_of(positiveWarps);
 
     // Greedily distribute warps to outer dimensions, keeping innermost whole.
+    // For 1D tensors, distribute across the single dimension (no inner/outer).
     int64_t remainingWarps = totalWarps;
     for (int64_t i = 0; i < rank; ++i) {
-      if (i == rank - 1) {
+      bool isInnermostOfMultiDim = (i == rank - 1) && (rank > 1);
+      if (isInnermostOfMultiDim) {
         // Keep innermost dimension whole (tile size = full dimension).
         tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
         ++numTiledDims;
@@ -684,9 +738,23 @@ private:
           std::min(minElementsPerTransfer, elementsPerTransfer);
     }
 
-    // If no valid DMA size found or innermost dim is too small, skip.
+    // Determine how many elements are available for coalesced access.
+    // For CopyOp with tensor.empty() output, we can linearize all dimensions.
+    // Otherwise, we can only use the innermost dimension.
+    int64_t availableElements = innermostDim;
+    if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
+      Value output = copyOp.getOutputs()[0];
+      if (output.getDefiningOp<tensor::EmptyOp>()) {
+        // Can linearize all dimensions - compute total static elements.
+        if (llvm::none_of(shape, ShapedType::isDynamic)) {
+          availableElements = ShapedType::getNumElements(shape);
+        }
+      }
+    }
+
+    // If no valid DMA size found or available elements are too small, skip.
     if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim < minElementsPerTransfer) {
+        availableElements < minElementsPerTransfer) {
       return failure();
     }
 
