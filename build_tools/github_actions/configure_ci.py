@@ -418,10 +418,10 @@ def get_enabled_jobs(
         return all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS
     if is_llvm_integrate_pr:
         print(
-            "Running all jobs because run was triggered by an LLVM integrate pull request event.",
+            "Running all jobs (excluding schedule-only) because run was triggered by an LLVM integrate pull request event.",
             file=sys.stderr,
         )
-        return all_jobs
+        return all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS
 
     if Trailer.SKIP_CI in trailers:
         if (
