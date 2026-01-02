@@ -40,8 +40,8 @@ jobs:
           submodules: true
       - name: "Building IREE with gcc"
         env:
-          CC: /usr/bin/gcc-9
-          CXX: /usr/bin/g++-9
+          CC: gcc-11
+          CXX: g++-11
           CMAKE_BUILD_TYPE: Release
           IREE_TARGET_BACKEND_WEBGPU_SPIRV: OFF
           IREE_BUILD_SETUP_PYTHON_VENV: ${{ env.BUILD_DIR }}/.venv
