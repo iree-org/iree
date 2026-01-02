@@ -248,11 +248,12 @@ PCF::LoopOp convertForallToPCFImpl(RewriterBase &rewriter,
                              loopOp.getIdArgs().end());
     }
 
-    AffineExpr applyLbAndStep = (s0 + s1) * s2;
-    for (auto [id, lb, step] :
-         llvm::zip_equal(argReplacements, mixedLbs, mixedStep)) {
+    // id * step + lb.
+    AffineExpr applyLbAndStep = s0 * s1 + s2;
+    for (auto [id, step, lb] :
+         llvm::zip_equal(argReplacements, mixedStep, mixedLbs)) {
       OpFoldResult newId = affine::makeComposedFoldedAffineApply(
-          rewriter, loc, applyLbAndStep, {id, lb, step});
+          rewriter, loc, applyLbAndStep, {id, step, lb});
       id = getValueOrCreateConstantIndexOp(rewriter, loc, newId);
     }
   }

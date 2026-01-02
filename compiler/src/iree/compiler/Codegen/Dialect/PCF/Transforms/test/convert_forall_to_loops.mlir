@@ -55,3 +55,29 @@ func.func @convert_forall_multiple_results(%init: tensor<?xi32>, %init2: tensor<
 //       CHECK:       pcf.write_slice %[[SLICE2]] into %[[REF]][%[[ID]]] [1] [1]
 //       CHECK:       pcf.return
 //       CHECK:   return %[[LOOP]]#0, %[[LOOP]]#1
+
+// -----
+
+func.func @convert_forall_non_zero_lb_step(%init: tensor<16xi32>) -> tensor<16xi32> {
+  %0 = scf.forall (%id) = (2) to (11) step (3) shared_outs(%iter = %init) -> (tensor<16xi32>) {
+    %slice = tensor.extract_slice %iter[%id] [3] [1] : tensor<16xi32> to tensor<3xi32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %slice into %iter[%id] [3] [1] : tensor<3xi32> into tensor<16xi32>
+    }
+  }
+  return %0 : tensor<16xi32>
+}
+
+// CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 3 + 2)>
+// CHECK-LABEL: @convert_forall_non_zero_lb_step(
+//  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<16xi32>
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//       CHECK:   %[[LOOP:.+]] = pcf.loop scope(#pcf.sequential) count(%[[C3]])
+//       CHECK:     execute(%[[REF:.+]] = %[[INIT]])[%[[RAW_ID:.+]]: index]
+//       CHECK:          : (!pcf.sref<16xi32, sync(#pcf.sequential)>)
+//       CHECK:         -> (tensor<16xi32>) {
+//       CHECK:       %[[ID:.+]] = affine.apply #[[$MAP]]()[%[[RAW_ID]]]
+//       CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[INIT]][%[[ID]]] [3] [1]
+//       CHECK:       pcf.write_slice %[[SLICE]] into %[[REF]][%[[ID]]] [3] [1]
+//       CHECK:       pcf.return
+//       CHECK:   return %[[LOOP]]
