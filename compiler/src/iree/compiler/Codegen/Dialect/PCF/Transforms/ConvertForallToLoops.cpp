@@ -93,44 +93,6 @@ getProcessorIdPermutation(scf::ForallOp forallOp) {
   return perm;
 }
 
-static LogicalResult permuteForallIds(RewriterBase &rewriter,
-                                      scf::ForallOp forallOp) {
-  // Maps from fastest -> slowest to current order.
-  FailureOr<SmallVector<int64_t>> maybePerm =
-      getProcessorIdPermutation(forallOp);
-  if (failed(maybePerm)) {
-    return failure();
-  }
-
-  // Maps from current order to fastest -> slowest.
-  SmallVector<int64_t> invPerm = invertPermutationVector(maybePerm.value());
-
-  auto permuteAndReplace = [&](SmallVector<OpFoldResult> ofrs,
-                               MutableOperandRange operands) {
-    applyPermutationToVector(ofrs, invPerm);
-    SmallVector<Value> newDynamic;
-    SmallVector<int64_t> newStatic;
-    dispatchIndexOpFoldResults(ofrs, newDynamic, newStatic);
-    operands.assign(newDynamic);
-    return newStatic;
-  };
-
-  // Permute and replace all upper/lower bounds and steps.
-  SmallVector<int64_t> newStaticUbs = permuteAndReplace(
-      forallOp.getMixedUpperBound(), forallOp.getDynamicUpperBoundMutable());
-  forallOp.setStaticUpperBound(newStaticUbs);
-  SmallVector<int64_t> newStaticLbs = permuteAndReplace(
-      forallOp.getMixedLowerBound(), forallOp.getDynamicLowerBoundMutable());
-  forallOp.setStaticLowerBound(newStaticLbs);
-  SmallVector<int64_t> newStaticStep = permuteAndReplace(
-      forallOp.getMixedStep(), forallOp.getDynamicStepMutable());
-  forallOp.setStaticStep(newStaticStep);
-  // Permute back to the original order by permuting the uses.
-  permuteValues(rewriter, forallOp.getLoc(), forallOp.getInductionVars(),
-                maybePerm.value());
-  return success();
-}
-
 LogicalResult matchForallConversion(scf::ForallOp forallOp) {
   scf::InParallelOp terminator = forallOp.getTerminator();
   for (Operation &op : terminator.getBody()->getOperations()) {
@@ -163,6 +125,9 @@ LogicalResult matchForallConversion(scf::ForallOp forallOp) {
       }
     }
   }
+  if (failed(getProcessorIdPermutation(forallOp))) {
+    return failure();
+  }
   return success();
 }
 
@@ -172,6 +137,25 @@ PCF::LoopOp convertForallToPCFImpl(RewriterBase &rewriter,
                                    int64_t numIds) {
   assert(succeeded(matchForallConversion(forallOp)) &&
          "converting unsupported forall op");
+
+  // Maps from fastest -> slowest to current order.
+  SmallVector<int64_t> perm = *getProcessorIdPermutation(forallOp);
+
+  // Maps from current order to fastest -> slowest.
+  SmallVector<int64_t> invPerm = invertPermutationVector(perm);
+
+  // Get the permuted ubs/lbs/steps and save them for later since we need them
+  // to reconstruct the correct ids.
+  SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
+  applyPermutationToVector(mixedUbs, invPerm);
+  SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
+  applyPermutationToVector(mixedLbs, invPerm);
+  SmallVector<OpFoldResult> mixedStep = forallOp.getMixedStep();
+  applyPermutationToVector(mixedStep, invPerm);
+  // Permute the ivs of the body back to the original order by permuting the
+  // uses before we move it over to the new op.
+  permuteValues(rewriter, forallOp.getLoc(), forallOp.getInductionVars(), perm);
+
   scf::InParallelOp terminator = forallOp.getTerminator();
   MutableArrayRef<BlockArgument> bodySharedOuts = forallOp.getRegionIterArgs();
 
@@ -185,12 +169,6 @@ PCF::LoopOp convertForallToPCFImpl(RewriterBase &rewriter,
   }
 
   Location loc = forallOp.getLoc();
-
-  // Save the mixed ubs/lbs/steps since we need them to reconstruct the correct
-  // ids later.
-  SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
-  SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
-  SmallVector<OpFoldResult> mixedStep = forallOp.getMixedStep();
 
   AffineExpr s0, s1, s2;
   bindSymbols(rewriter.getContext(), s0, s1, s2);
@@ -312,9 +290,6 @@ FailureOr<PCF::LoopOp> convertForallToPCF(RewriterBase &rewriter,
                                           PCF::ScopeAttrInterface scope,
                                           int64_t numIds) {
   if (failed(matchForallConversion(forallOp))) {
-    return failure();
-  }
-  if (failed(permuteForallIds(rewriter, forallOp))) {
     return failure();
   }
   return convertForallToPCFImpl(rewriter, forallOp, scope, numIds);
