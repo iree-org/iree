@@ -27,6 +27,15 @@ void IREETensorExtDialect::initializeAttrs() {
       >();
 }
 
+SparseIterationDimsAttr getSparseIterationDimsAttr(Operation *op) {
+  static constexpr StringLiteral kAttrName =
+      "iree_tensor_ext.sparse_iteration_dims";
+  if (auto attr = op->getAttrOfType<SparseIterationDimsAttr>(kAttrName)) {
+    return attr;
+  }
+  return SparseIterationDimsAttr();
+}
+
 //===---------------------------------------------------------------------===//
 // iree_tensor_ext.ragged_shape
 //===---------------------------------------------------------------------===//
