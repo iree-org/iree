@@ -560,6 +560,110 @@ struct GPUConvertToCoalescedDMAPass final
   }
 
 private:
+  /// Compute tile sizes for subgroup-level distribution.
+  /// Returns {tileSizes, numTiledDims}.
+  ///
+  /// We prefer to keep the innermost dimension whole (not tiled) to ensure
+  /// contiguous memory access patterns. If tiling the innermost dimension
+  /// would create non-contiguous subviews, we redistribute warps to outer
+  /// dimensions instead.
+  std::pair<SmallVector<OpFoldResult>, int64_t>
+  computeSubgroupTileSizes(IRRewriter &rewriter, ArrayRef<int64_t> shape,
+                           ArrayRef<int64_t> numWarps, int64_t subgroupSize) {
+    SmallVector<OpFoldResult> tileSizes;
+    int64_t numTiledDims = 0;
+    int64_t rank = shape.size();
+
+    // Calculate total number of warps available.
+    // Note: numWarps may contain 0s for dimensions where wgSize < subgroupSize.
+    // We treat 0 as 1 for the purpose of counting total warps.
+    int64_t totalWarps = 1;
+    for (int64_t nw : numWarps) {
+      if (nw > 0) {
+        totalWarps *= nw;
+      }
+    }
+
+    // Check if default tiling would split the innermost dimension.
+    // Default mapping: innermost tensor dim → outermost workgroup dim.
+    int64_t innermostWarpDim = numWarps[0];
+    int64_t innermostDimSize = shape[rank - 1];
+    bool preferContiguousSubviews = shouldPreferContiguousSubviews(
+        innermostDimSize, innermostWarpDim, subgroupSize);
+
+    if (preferContiguousSubviews) {
+      // Redistribute all warps to outer dimensions, keeping innermost whole.
+      int64_t remainingWarps = totalWarps;
+      for (int64_t i = 0; i < rank; ++i) {
+        bool isInnermostDim = (i == rank - 1);
+
+        if (isInnermostDim) {
+          // Keep innermost dimension whole (tile size = full dimension).
+          tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
+          ++numTiledDims;
+        } else if (remainingWarps > 1 && ShapedType::isStatic(shape[i])) {
+          // Distribute remaining warps to this outer dimension.
+          int64_t warpsForThisDim = std::min(remainingWarps, shape[i]);
+          int64_t tileSize = llvm::divideCeil(shape[i], warpsForThisDim);
+          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+          remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
+          ++numTiledDims;
+        } else {
+          tileSizes.push_back(rewriter.getIndexAttr(0));
+        }
+      }
+    } else {
+      // Default behavior: map innermost dims to innermost workgroup dims.
+      for (int64_t i = 0; i < rank; ++i) {
+        // Map dimensions: innermost dims map to innermost workgroup dims.
+        // For 2D: dim 0 (rows) -> wgSize[1], dim 1 (cols) -> wgSize[0].
+        int64_t warpDim =
+            (rank - 1 - i) < numWarps.size() ? numWarps[rank - 1 - i] : 1;
+
+        bool isInnermostDim = (i == rank - 1);
+
+        // For innermost dimension: always tile if we need thread-level
+        // distribution, ensuring tile size is at least subgroup_size.
+        if (isInnermostDim && ShapedType::isStatic(shape[i])) {
+          int64_t tileSize =
+              (warpDim > 1) ? llvm::divideCeil(shape[i], warpDim) : shape[i];
+          tileSize = std::clamp(tileSize, subgroupSize, shape[i]);
+          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+          ++numTiledDims;
+        } else if (warpDim > 1 && ShapedType::isStatic(shape[i])) {
+          int64_t tileSize = llvm::divideCeil(shape[i], warpDim);
+          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+          ++numTiledDims;
+        } else {
+          tileSizes.push_back(rewriter.getIndexAttr(0));
+        }
+      }
+    }
+
+    return {tileSizes, numTiledDims};
+  }
+
+  /// Check if we should prefer contiguous subviews by keeping innermost
+  /// dimension whole. Returns true if default tiling would split the innermost
+  /// dimension, creating non-contiguous memory access patterns.
+  bool shouldPreferContiguousSubviews(int64_t innermostDimSize,
+                                      int64_t innermostWarpDim,
+                                      int64_t subgroupSize) {
+    if (!ShapedType::isStatic(innermostDimSize))
+      return false;
+
+    // Compute what the default innermost tile size would be.
+    int64_t defaultInnermostTileSize = innermostDimSize;
+    if (innermostWarpDim > 1) {
+      int64_t tileSize = llvm::divideCeil(innermostDimSize, innermostWarpDim);
+      defaultInnermostTileSize =
+          std::clamp(tileSize, subgroupSize, innermostDimSize);
+    }
+
+    // Prefer contiguous if tiling would split the innermost dimension.
+    return defaultInnermostTileSize < innermostDimSize;
+  }
+
   /// Tile operation at subgroup level using workgroup_size and subgroup_size
   /// from translation_info.
   template <typename OpTy>
@@ -640,100 +744,10 @@ private:
       return failure();
     }
 
-    // Compute tile sizes: divide the shape by number of warps.
-    // This distributes the work across warps in each dimension.
-    //
-    // We prefer to keep the innermost dimension whole (not tiled) to ensure
-    // contiguous memory access patterns. If tiling the innermost dimension
-    // would create non-contiguous subviews, we redistribute warps to outer
-    // dimensions instead.
-    SmallVector<OpFoldResult> tileSizes;
-    int64_t numTiledDims = 0;
+    // Compute tile sizes for subgroup-level distribution.
+    auto [tileSizes, numTiledDims] =
+        computeSubgroupTileSizes(rewriter, shape, numWarps, *subgroupSize);
 
-    // Calculate total number of warps available.
-    // Note: numWarps may contain 0s for dimensions where wgSize < subgroupSize.
-    // We treat 0 as 1 for the purpose of counting total warps.
-    int64_t totalWarps = 1;
-    for (int64_t nw : numWarps) {
-      if (nw > 0) {
-        totalWarps *= nw;
-      }
-    }
-
-    // Check if default tiling would split the innermost dimension.
-    // Default mapping: innermost tensor dim → outermost workgroup dim.
-    int64_t innermostWarpDim = numWarps[0];
-    int64_t innermostDimSize = shape[rank - 1];
-    int64_t defaultInnermostTileSize = innermostDimSize;
-    if (innermostWarpDim > 1) {
-      int64_t tileSize = llvm::divideCeil(innermostDimSize, innermostWarpDim);
-      defaultInnermostTileSize =
-          std::clamp(tileSize, *subgroupSize, innermostDimSize);
-    }
-
-    // If tiling innermost would create non-contiguous subviews (tile <
-    // innermost dim), prefer to distribute warps to outer dimensions only.
-    bool preferContiguousSubviews =
-        (defaultInnermostTileSize < innermostDimSize) &&
-        ShapedType::isStatic(innermostDimSize);
-
-    if (preferContiguousSubviews) {
-      // Redistribute all warps to outer dimensions, keeping innermost whole.
-      // This ensures subviews have the full innermost dimension and are
-      // contiguous.
-      int64_t remainingWarps = totalWarps;
-      for (int64_t i = 0; i < rank; ++i) {
-        bool isInnermostDim = (i == rank - 1);
-
-        if (isInnermostDim) {
-          // Keep innermost dimension whole (tile size = full dimension).
-          // This is needed for thread-level tiling later.
-          tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
-          ++numTiledDims;
-        } else if (remainingWarps > 1 && ShapedType::isStatic(shape[i])) {
-          // Distribute remaining warps to this outer dimension.
-          int64_t warpsForThisDim = std::min(remainingWarps, shape[i]);
-          int64_t tileSize = llvm::divideCeil(shape[i], warpsForThisDim);
-          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-          remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
-          ++numTiledDims;
-        } else {
-          tileSizes.push_back(rewriter.getIndexAttr(0));
-        }
-      }
-    } else {
-      // Default behavior: map innermost dims to innermost workgroup dims.
-      for (int64_t i = 0; i < rank; ++i) {
-        // Map dimensions: innermost dims map to innermost workgroup dims.
-        // For 2D: dim 0 (rows) -> wgSize[1], dim 1 (cols) -> wgSize[0].
-        int64_t warpDim =
-            (rank - 1 - i) < numWarps.size() ? numWarps[rank - 1 - i] : 1;
-
-        bool isInnermostDim = (i == rank - 1);
-
-        // For innermost dimension: always tile if we need thread-level
-        // distribution, ensuring tile size is at least subgroup_size (but not
-        // exceeding the dimension size).
-        if (isInnermostDim && ShapedType::isStatic(shape[i])) {
-          int64_t tileSize =
-              (warpDim > 1) ? llvm::divideCeil(shape[i], warpDim) : shape[i];
-          // Ensure tile size is at least subgroup_size, but cap at dimension
-          // size.
-          tileSize = std::clamp(tileSize, *subgroupSize, shape[i]);
-          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-          ++numTiledDims;
-        } else if (warpDim > 1 && ShapedType::isStatic(shape[i])) {
-          // For other dimensions: only tile if warpDim > 1.
-          int64_t tileSize = llvm::divideCeil(shape[i], warpDim);
-          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-          ++numTiledDims;
-        } else {
-          tileSizes.push_back(rewriter.getIndexAttr(0));
-        }
-      }
-    }
-
-    // Check if we have any non-zero tile sizes.
     if (numTiledDims == 0)
       return failure();
 
