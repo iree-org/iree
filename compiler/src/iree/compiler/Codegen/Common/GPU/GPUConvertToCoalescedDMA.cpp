@@ -593,6 +593,7 @@ private:
 
     if (preferContiguousSubviews) {
       // Redistribute all warps to outer dimensions, keeping innermost whole.
+      // We greedily assign warps to each dimension from outermost to innermost.
       int64_t remainingWarps = totalWarps;
       for (int64_t i = 0; i < rank; ++i) {
         bool isInnermostDim = (i == rank - 1);
@@ -606,6 +607,7 @@ private:
           int64_t warpsForThisDim = std::min(remainingWarps, shape[i]);
           int64_t tileSize = llvm::divideCeil(shape[i], warpsForThisDim);
           tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+          // Update remaining parallelism for subsequent dimensions.
           remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
           ++numTiledDims;
         } else {
@@ -617,8 +619,8 @@ private:
       for (int64_t i = 0; i < rank; ++i) {
         // Map dimensions: innermost dims map to innermost workgroup dims.
         // For 2D: dim 0 (rows) -> wgSize[1], dim 1 (cols) -> wgSize[0].
-        int64_t warpDim =
-            (rank - 1 - i) < numWarps.size() ? numWarps[rank - 1 - i] : 1;
+        int64_t warpIdx = rank - 1 - i;
+        int64_t warpDim = warpIdx < numWarps.size() ? numWarps[warpIdx] : 1;
 
         bool isInnermostDim = (i == rank - 1);
 
