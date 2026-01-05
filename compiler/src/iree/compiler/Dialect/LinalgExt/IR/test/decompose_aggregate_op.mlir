@@ -499,7 +499,8 @@ func.func @exp_reduction(
 
 // -----
 
-// Spec to decompose arg_compare op (argmax patterns).
+// Decompose arg_compare op. The decomposition inlines the comparator region,
+// so all comparison predicates follow the same code path.
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
@@ -508,9 +509,9 @@ module attributes { transform.with_named_sequence } {
   }
 }
 
-func.func @arg_compare_argmax_f32(%input: tensor<4x128xf32>,
-                                   %out_val: tensor<4xf32>,
-                                   %out_idx: tensor<4xi32>)
+func.func @arg_compare(%input: tensor<4x128xf32>,
+                       %out_val: tensor<4xf32>,
+                       %out_idx: tensor<4xi32>)
     -> (tensor<4xf32>, tensor<4xi32>) {
   %result:2 = iree_linalg_ext.arg_compare
       dimension(1)
@@ -523,164 +524,19 @@ func.func @arg_compare_argmax_f32(%input: tensor<4x128xf32>,
   return %result#0, %result#1 : tensor<4xf32>, tensor<4xi32>
 }
 
-// CHECK-LABEL: @arg_compare_argmax_f32
+// CHECK-LABEL: @arg_compare
 // CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<4x128xf32>
 // CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]: tensor<4xf32>
 // CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]: tensor<4xi32>
-// Fill with -inf for argmax (required by isArgmaxOp)
-// CHECK:       %[[NEG_INF:.*]] = arith.constant 0xFF800000 : f32
-// CHECK:       %[[ZERO:.*]] = arith.constant 0 : i32
-// CHECK:       %[[FILL_VAL:.*]] = linalg.fill ins(%[[NEG_INF]] : f32) outs(%[[OUT_VAL]] : tensor<4xf32>)
-// CHECK:       %[[FILL_IDX:.*]] = linalg.fill ins(%[[ZERO]] : i32) outs(%[[OUT_IDX]] : tensor<4xi32>)
 // CHECK:       %[[GENERIC:.*]]:2 = linalg.generic
 // CHECK-SAME:    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>]
 // CHECK-SAME:    iterator_types = ["parallel", "reduction"]
 // CHECK-SAME:    ins(%[[INPUT]] : tensor<4x128xf32>)
-// CHECK-SAME:    outs(%[[FILL_VAL]], %[[FILL_IDX]] : tensor<4xf32>, tensor<4xi32>)
+// CHECK-SAME:    outs(%[[OUT_VAL]], %[[OUT_IDX]] : tensor<4xf32>, tensor<4xi32>)
 // CHECK:         linalg.index 1
 // CHECK:         arith.index_cast
-// CHECK:         arith.maximumf
 // CHECK:         arith.cmpf ogt
 // CHECK:         arith.select
-// CHECK:         linalg.yield
-// CHECK:       return %[[GENERIC]]#0, %[[GENERIC]]#1
-
-// -----
-
-// Spec to decompose arg_compare op (argmin patterns).
-module attributes { transform.with_named_sequence } {
-  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
-    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
-    transform.yield
-  }
-}
-
-func.func @arg_compare_argmin_f32(%input: tensor<4x128xf32>,
-                                   %out_val: tensor<4xf32>,
-                                   %out_idx: tensor<4xi32>)
-    -> (tensor<4xf32>, tensor<4xi32>) {
-  %result:2 = iree_linalg_ext.arg_compare
-      dimension(1)
-      ins(%input : tensor<4x128xf32>)
-      outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>) {
-    ^bb0(%a: f32, %b: f32):
-      %cmp = arith.cmpf olt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
-  } -> tensor<4xf32>, tensor<4xi32>
-  return %result#0, %result#1 : tensor<4xf32>, tensor<4xi32>
-}
-
-// CHECK-LABEL: @arg_compare_argmin_f32
-// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<4x128xf32>
-// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]: tensor<4xf32>
-// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]: tensor<4xi32>
-// CHECK:       %[[POS_INF:.*]] = arith.constant 0x7F800000 : f32
-// CHECK:       %[[ZERO:.*]] = arith.constant 0 : i32
-// CHECK:       %[[FILL_VAL:.*]] = linalg.fill ins(%[[POS_INF]] : f32) outs(%[[OUT_VAL]] : tensor<4xf32>)
-// CHECK:       %[[FILL_IDX:.*]] = linalg.fill ins(%[[ZERO]] : i32) outs(%[[OUT_IDX]] : tensor<4xi32>)
-// CHECK:       %[[GENERIC:.*]]:2 = linalg.generic
-// CHECK-SAME:    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>]
-// CHECK-SAME:    iterator_types = ["parallel", "reduction"]
-// CHECK-SAME:    ins(%[[INPUT]] : tensor<4x128xf32>)
-// CHECK-SAME:    outs(%[[FILL_VAL]], %[[FILL_IDX]] : tensor<4xf32>, tensor<4xi32>)
-// CHECK:         linalg.index 1
-// CHECK:         arith.index_cast
-// CHECK:         arith.minimumf
-// CHECK:         arith.cmpf olt
-// CHECK:         arith.select
-// CHECK:         linalg.yield
-// CHECK:       return %[[GENERIC]]#0, %[[GENERIC]]#1
-
-// -----
-
-// Integer argmax with sgt predicate.
-module attributes { transform.with_named_sequence } {
-  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
-    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
-    transform.yield
-  }
-}
-
-func.func @arg_compare_argmax_i32(%input: tensor<4x128xi32>,
-                                   %out_val: tensor<4xi32>,
-                                   %out_idx: tensor<4xi32>)
-    -> (tensor<4xi32>, tensor<4xi32>) {
-  %result:2 = iree_linalg_ext.arg_compare
-      dimension(1)
-      ins(%input : tensor<4x128xi32>)
-      outs(%out_val, %out_idx : tensor<4xi32>, tensor<4xi32>) {
-    ^bb0(%a: i32, %b: i32):
-      %cmp = arith.cmpi sgt, %a, %b : i32
-      iree_linalg_ext.yield %cmp : i1
-  } -> tensor<4xi32>, tensor<4xi32>
-  return %result#0, %result#1 : tensor<4xi32>, tensor<4xi32>
-}
-
-// CHECK-LABEL: @arg_compare_argmax_i32
-// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<4x128xi32>
-// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]: tensor<4xi32>
-// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]: tensor<4xi32>
-// CHECK:       %[[MIN_INT:.*]] = arith.constant -2147483648 : i32
-// CHECK:       %[[ZERO:.*]] = arith.constant 0 : i32
-// CHECK:       %[[FILL_VAL:.*]] = linalg.fill ins(%[[MIN_INT]] : i32) outs(%[[OUT_VAL]] : tensor<4xi32>)
-// CHECK:       %[[FILL_IDX:.*]] = linalg.fill ins(%[[ZERO]] : i32) outs(%[[OUT_IDX]] : tensor<4xi32>)
-// CHECK:       %[[GENERIC:.*]]:2 = linalg.generic
-// CHECK-SAME:    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>]
-// CHECK-SAME:    iterator_types = ["parallel", "reduction"]
-// CHECK-SAME:    ins(%[[INPUT]] : tensor<4x128xi32>)
-// CHECK-SAME:    outs(%[[FILL_VAL]], %[[FILL_IDX]] : tensor<4xi32>, tensor<4xi32>)
-// CHECK:         linalg.index 1
-// CHECK:         arith.index_cast
-// CHECK:         arith.maxsi
-// CHECK:         arith.cmpi sgt
-// CHECK:         arith.select
-// CHECK:         linalg.yield
-// CHECK:       return %[[GENERIC]]#0, %[[GENERIC]]#1
-
-// -----
-
-// Unsigned integer argmax with ugt predicate.
-module attributes { transform.with_named_sequence } {
-  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
-    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
-    transform.yield
-  }
-}
-
-func.func @arg_compare_argmax_u32(%input: tensor<4x128xi32>,
-                                   %out_val: tensor<4xi32>,
-                                   %out_idx: tensor<4xi32>)
-    -> (tensor<4xi32>, tensor<4xi32>) {
-  %result:2 = iree_linalg_ext.arg_compare
-      dimension(1)
-      ins(%input : tensor<4x128xi32>)
-      outs(%out_val, %out_idx : tensor<4xi32>, tensor<4xi32>) {
-    ^bb0(%a: i32, %b: i32):
-      %cmp = arith.cmpi ugt, %a, %b : i32
-      iree_linalg_ext.yield %cmp : i1
-  } -> tensor<4xi32>, tensor<4xi32>
-  return %result#0, %result#1 : tensor<4xi32>, tensor<4xi32>
-}
-
-// CHECK-LABEL: @arg_compare_argmax_u32
-// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<4x128xi32>
-// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]: tensor<4xi32>
-// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]: tensor<4xi32>
-// CHECK:       %[[ZERO:.*]] = arith.constant 0 : i32
-// CHECK:       %[[FILL_VAL:.*]] = linalg.fill ins(%[[ZERO]] : i32) outs(%[[OUT_VAL]] : tensor<4xi32>)
-// CHECK:       %[[FILL_IDX:.*]] = linalg.fill ins(%[[ZERO]] : i32) outs(%[[OUT_IDX]] : tensor<4xi32>)
-// CHECK:       %[[GENERIC:.*]]:2 = linalg.generic
-// CHECK-SAME:    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>]
-// CHECK-SAME:    iterator_types = ["parallel", "reduction"]
-// CHECK-SAME:    ins(%[[INPUT]] : tensor<4x128xi32>)
-// CHECK-SAME:    outs(%[[FILL_VAL]], %[[FILL_IDX]] : tensor<4xi32>, tensor<4xi32>)
-// CHECK:         linalg.index 1
-// CHECK:         arith.index_cast
-// CHECK:         arith.maxui
-// CHECK:         arith.cmpi ugt
 // CHECK:         arith.select
 // CHECK:         linalg.yield
 // CHECK:       return %[[GENERIC]]#0, %[[GENERIC]]#1
