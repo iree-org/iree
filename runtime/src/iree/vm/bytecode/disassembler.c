@@ -128,7 +128,7 @@
     } else {                                                                \
       iree_string_view_t type_name = iree_vm_ref_type_name(ref->type);      \
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(               \
-          b, "!%.*s/0x%p", (int)type_name.size, type_name.data, ref->ptr)); \
+          b, "!%.*s/%p", (int)type_name.size, type_name.data, ref->ptr)); \
     }                                                                       \
   } else {                                                                  \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
@@ -266,7 +266,7 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     } else {                                                                  \
       iree_string_view_t type_name = iree_vm_ref_type_name(ref->type);        \
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
-          b, "(!%.*s/0x%p)", (int)type_name.size, type_name.data, ref->ptr)); \
+          b, "(!%.*s/%p)", (int)type_name.size, type_name.data, ref->ptr)); \
     }                                                                         \
   }
 
@@ -695,7 +695,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       iree_vm_buffer_t* buffer = &module->rodata_ref_table[rodata_ordinal];
       EMIT_REF_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " = vm.const.ref.rodata %u  // 0x%p %" PRIhsz "b", rodata_ordinal,
+          b, " = vm.const.ref.rodata %u  // %p %" PRIhsz "b", rodata_ordinal,
           buffer->data.data, buffer->data.data_length));
       break;
     }
