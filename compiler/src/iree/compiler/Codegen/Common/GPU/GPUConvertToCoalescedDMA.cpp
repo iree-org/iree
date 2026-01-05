@@ -563,13 +563,12 @@ private:
   /// Compute tile sizes for subgroup-level distribution.
   /// Returns {tileSizes, numTiledDims}.
   ///
-  /// We prefer to keep the innermost dimension whole (not tiled) to ensure
-  /// contiguous memory access patterns. If tiling the innermost dimension
-  /// would create non-contiguous subviews, we redistribute warps to outer
-  /// dimensions instead.
+  /// We keep the innermost dimension whole (not tiled) to ensure contiguous
+  /// memory access patterns, and greedily redistribute warps to outer
+  /// dimensions.
   std::pair<SmallVector<OpFoldResult>, int64_t>
   computeSubgroupTileSizes(IRRewriter &rewriter, ArrayRef<int64_t> shape,
-                           ArrayRef<int64_t> numWarps, int64_t subgroupSize) {
+                           ArrayRef<int64_t> numWarps) {
     SmallVector<OpFoldResult> tileSizes;
     int64_t numTiledDims = 0;
     int64_t rank = shape.size();
@@ -584,86 +583,29 @@ private:
       }
     }
 
-    // Check if default tiling would split the innermost dimension.
-    // Default mapping: innermost tensor dim → outermost workgroup dim.
-    int64_t innermostWarpDim = numWarps[0];
-    int64_t innermostDimSize = shape[rank - 1];
-    bool preferContiguousSubviews = shouldPreferContiguousSubviews(
-        innermostDimSize, innermostWarpDim, subgroupSize);
+    // Greedily distribute warps to outer dimensions, keeping innermost whole.
+    int64_t remainingWarps = totalWarps;
+    for (int64_t i = 0; i < rank; ++i) {
+      bool isInnermostDim = (i == rank - 1);
 
-    if (preferContiguousSubviews) {
-      // Redistribute all warps to outer dimensions, keeping innermost whole.
-      // We greedily assign warps to each dimension from outermost to innermost.
-      int64_t remainingWarps = totalWarps;
-      for (int64_t i = 0; i < rank; ++i) {
-        bool isInnermostDim = (i == rank - 1);
-
-        if (isInnermostDim) {
-          // Keep innermost dimension whole (tile size = full dimension).
-          tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
-          ++numTiledDims;
-        } else if (remainingWarps > 1 && ShapedType::isStatic(shape[i])) {
-          // Distribute remaining warps to this outer dimension.
-          int64_t warpsForThisDim = std::min(remainingWarps, shape[i]);
-          int64_t tileSize = llvm::divideCeil(shape[i], warpsForThisDim);
-          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-          // Update remaining parallelism for subsequent dimensions.
-          remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
-          ++numTiledDims;
-        } else {
-          tileSizes.push_back(rewriter.getIndexAttr(0));
-        }
-      }
-    } else {
-      // Default behavior: map innermost dims to innermost workgroup dims.
-      for (int64_t i = 0; i < rank; ++i) {
-        // Map dimensions: innermost dims map to innermost workgroup dims.
-        // For 2D: dim 0 (rows) -> wgSize[1], dim 1 (cols) -> wgSize[0].
-        int64_t warpIdx = rank - 1 - i;
-        int64_t warpDim = warpIdx < numWarps.size() ? numWarps[warpIdx] : 1;
-
-        bool isInnermostDim = (i == rank - 1);
-
-        // For innermost dimension: always tile if we need thread-level
-        // distribution, ensuring tile size is at least subgroup_size.
-        if (isInnermostDim && ShapedType::isStatic(shape[i])) {
-          int64_t tileSize =
-              (warpDim > 1) ? llvm::divideCeil(shape[i], warpDim) : shape[i];
-          tileSize = std::clamp(tileSize, subgroupSize, shape[i]);
-          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-          ++numTiledDims;
-        } else if (warpDim > 1 && ShapedType::isStatic(shape[i])) {
-          int64_t tileSize = llvm::divideCeil(shape[i], warpDim);
-          tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-          ++numTiledDims;
-        } else {
-          tileSizes.push_back(rewriter.getIndexAttr(0));
-        }
+      if (isInnermostDim) {
+        // Keep innermost dimension whole (tile size = full dimension).
+        tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
+        ++numTiledDims;
+      } else if (remainingWarps > 1 && ShapedType::isStatic(shape[i])) {
+        // Distribute remaining warps to this outer dimension.
+        int64_t warpsForThisDim = std::min(remainingWarps, shape[i]);
+        int64_t tileSize = llvm::divideCeil(shape[i], warpsForThisDim);
+        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+        // Update remaining parallelism for subsequent dimensions.
+        remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
+        ++numTiledDims;
+      } else {
+        tileSizes.push_back(rewriter.getIndexAttr(0));
       }
     }
 
     return {tileSizes, numTiledDims};
-  }
-
-  /// Check if we should prefer contiguous subviews by keeping innermost
-  /// dimension whole. Returns true if default tiling would split the innermost
-  /// dimension, creating non-contiguous memory access patterns.
-  bool shouldPreferContiguousSubviews(int64_t innermostDimSize,
-                                      int64_t innermostWarpDim,
-                                      int64_t subgroupSize) {
-    if (!ShapedType::isStatic(innermostDimSize))
-      return false;
-
-    // Compute what the default innermost tile size would be.
-    int64_t defaultInnermostTileSize = innermostDimSize;
-    if (innermostWarpDim > 1) {
-      int64_t tileSize = llvm::divideCeil(innermostDimSize, innermostWarpDim);
-      defaultInnermostTileSize =
-          std::clamp(tileSize, subgroupSize, innermostDimSize);
-    }
-
-    // Prefer contiguous if tiling would split the innermost dimension.
-    return defaultInnermostTileSize < innermostDimSize;
   }
 
   /// Tile operation at subgroup level using workgroup_size and subgroup_size
@@ -748,7 +690,7 @@ private:
 
     // Compute tile sizes for subgroup-level distribution.
     auto [tileSizes, numTiledDims] =
-        computeSubgroupTileSizes(rewriter, shape, numWarps, *subgroupSize);
+        computeSubgroupTileSizes(rewriter, shape, numWarps);
 
     if (numTiledDims == 0)
       return failure();
