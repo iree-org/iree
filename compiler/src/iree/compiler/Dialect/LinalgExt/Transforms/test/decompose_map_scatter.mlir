@@ -367,34 +367,64 @@ func.func @map_scatter_with_mask_on_inner_dim(
 
 // -----
 
-func.func @simplify_linearize_delinearize_pair(
-    %input: vector<1x208x2x4x4x4x2x8x16xf16>,
-    %output: memref<?x53248xf16>,
+// A simple linearize→delinearize pair with static dimensions.
+// The pattern matches dimension products: 2*4 = 8 and 8*8 = 64.
+// This results in the delinearize outputs being replaced with new linearize
+// ops that group the matched dimensions.
+func.func @simplify_linearize_delinearize_pair_static(
+    %input: vector<2x4x8x8xf32>,
+    %output: memref<8x64xf32>
+) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index, %idx2: index, %idx3: index):
+      %mask = arith.constant true
+      %linearized = affine.linearize_index disjoint [%idx0, %idx1, %idx2, %idx3] by (2, 4, 8, 8) : index
+      %delinearized:2 = affine.delinearize_index %linearized into (8, 64) : index, index
+      iree_linalg_ext.yield %delinearized#0, %delinearized#1, %mask : index, index, i1
+  } : vector<2x4x8x8xf32> into memref<8x64xf32>
+  return
+}
+// PREPROCESSING-LABEL: func.func @simplify_linearize_delinearize_pair_static(
+//  PREPROCESSING-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: vector<2x4x8x8xf32>
+//  PREPROCESSING-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]: memref<8x64xf32>
+//       PREPROCESSING:   %[[TRUE:.+]] = arith.constant true
+//       PREPROCESSING:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       PREPROCESSING:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[IDX3:.+]]: index):
+//       PREPROCESSING:       %[[LIN_0:.+]] = affine.linearize_index disjoint [%[[IDX0]], %[[IDX1]]] by (2, 4)
+//       PREPROCESSING:       %[[LIN_1:.+]] = affine.linearize_index disjoint [%[[IDX2]], %[[IDX3]]] by (8, 8)
+//       PREPROCESSING:       iree_linalg_ext.yield %[[LIN_0]], %[[LIN_1]], %[[TRUE]]
+
+// -----
+
+// A simple linearize→delinearize pair with dynamic dimensions.
+// The pattern matches:
+//   - %dim_ceildiv_128 * 128 = %dim_aligned_128
+//   - 208 = 208 (pass through)
+//   - 2 * 8 * 16 = 256
+func.func @simplify_linearize_delinearize_pair_dynamic(
+    %input: vector<1x128x208x2x8x16xf32>,
+    %output: memref<?x208x256xf32>,
     %dim: index
 ) {
   %dim_ceildiv_128 = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%dim]
   %dim_aligned_128 = affine.apply affine_map<()[s0] -> ((s0 ceildiv 128) * 128)>()[%dim]
   iree_linalg_ext.map_scatter %input into %output {
-    ^bb0(%idx0: index, %idx1: index, %idx2: index, %idx3: index, %idx4: index, %idx5: index, %idx6: index, %idx7: index, %idx8: index):
+    ^bb0(%idx0: index, %idx1: index, %idx2: index, %idx3: index, %idx4: index, %idx5: index):
       %mask = arith.constant true
-      %linearized_9d = affine.linearize_index disjoint [%idx0, %idx1, %idx2, %idx3, %idx4, %idx5, %idx6, %idx7, %idx8] by (%dim_ceildiv_128, 208, 2, 4, 4, 4, 2, 8, 16) : index
-      %delinearized_4d:4 = affine.delinearize_index %linearized_9d into (%dim_ceildiv_128, 208, 128, 256) : index, index, index, index
-      %linearized_4d = affine.linearize_index disjoint [%delinearized_4d#0, %delinearized_4d#2, %delinearized_4d#1, %delinearized_4d#3] by (%dim_ceildiv_128, 128, 208, 256) : index
-      %delinearized_2d:2 = affine.delinearize_index %linearized_4d into (%dim_aligned_128, 53248) : index, index
-      iree_linalg_ext.yield %delinearized_2d#0, %delinearized_2d#1, %mask : index, index, i1
-  } : vector<1x208x2x4x4x4x2x8x16xf16> into memref<?x53248xf16>
+      %linearized = affine.linearize_index disjoint [%idx0, %idx1, %idx2, %idx3, %idx4, %idx5] by (%dim_ceildiv_128, 128, 208, 2, 8, 16) : index
+      %delinearized:3 = affine.delinearize_index %linearized into (%dim_aligned_128, 208, 256) : index, index, index
+      iree_linalg_ext.yield %delinearized#0, %delinearized#1, %delinearized#2, %mask : index, index, index, i1
+  } : vector<1x128x208x2x8x16xf32> into memref<?x208x256xf32>
   return
 }
-// PREPROCESSING-LABEL: func.func @simplify_linearize_delinearize_pair(
-//  PREPROCESSING-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: vector<1x208x2x4x4x4x2x8x16xf16>
-//  PREPROCESSING-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]: memref<?x53248xf16>
+// PREPROCESSING-LABEL: func.func @simplify_linearize_delinearize_pair_dynamic(
+//  PREPROCESSING-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: vector<1x128x208x2x8x16xf32>
+//  PREPROCESSING-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]: memref<?x208x256xf32>
 //  PREPROCESSING-SAME:     %[[DIM:[a-zA-Z0-9_]+]]: index
 //       PREPROCESSING:   %[[TRUE:.+]] = arith.constant true
 //       PREPROCESSING:   %[[DIM_CEILDIV_128:.+]] = affine.apply {{.*}}()[%[[DIM]]]
 //       PREPROCESSING:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
-//       PREPROCESSING:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[IDX3:.+]]: index, %[[IDX4:.+]]: index, %[[IDX5:.+]]: index, %[[IDX6:.+]]: index, %[[IDX7:.+]]: index, %[[IDX8:.+]]: index):
-//       PREPROCESSING:       %[[LIN_128:.+]] = affine.linearize_index disjoint [%[[IDX2]], %[[IDX3]], %[[IDX4]], %[[IDX5]]] by (2, 4, 4, 4)
-//       PREPROCESSING:       %[[LIN_256:.+]] = affine.linearize_index disjoint [%[[IDX6]], %[[IDX7]], %[[IDX8]]] by (2, 8, 16)
-//       PREPROCESSING:       %[[LIN_0:.+]] = affine.linearize_index disjoint [%[[IDX0]], %[[LIN_128]]] by (%[[DIM_CEILDIV_128]], 128)
-//       PREPROCESSING:       %[[LIN_1:.+]] = affine.linearize_index disjoint [%[[IDX1]], %[[LIN_256]]] by (208, 256)
-//       PREPROCESSING:       iree_linalg_ext.yield %[[LIN_0]], %[[LIN_1]], %[[TRUE]]
+//       PREPROCESSING:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[IDX3:.+]]: index, %[[IDX4:.+]]: index, %[[IDX5:.+]]: index):
+//       PREPROCESSING:       %[[LIN_0:.+]] = affine.linearize_index disjoint [%[[IDX0]], %[[IDX1]]] by (%[[DIM_CEILDIV_128]], 128)
+//       PREPROCESSING:       %[[LIN_1:.+]] = affine.linearize_index disjoint [%[[IDX3]], %[[IDX4]], %[[IDX5]]] by (2, 8, 16)
+//       PREPROCESSING:       iree_linalg_ext.yield %[[LIN_0]], %[[IDX2]], %[[LIN_1]], %[[TRUE]]

@@ -148,8 +148,8 @@ struct SimplifyLinearizeDelinearizePairs final
     SmallVector<OpFoldResult> delinearizeBases = delinearizeOp.getMixedBasis();
     ValueRange linearizeInputs = linearizeOp.getMultiIndex();
 
-    rewriter.setInsertionPoint(delinearizeOp);
     Location loc = delinearizeOp.getLoc();
+    MLIRContext *ctx = rewriter.getContext();
 
     // Structure to store the inputs and bases for new linearize ops.
     struct LinearizeInfo {
@@ -157,9 +157,6 @@ struct SimplifyLinearizeDelinearizePairs final
       SmallVector<OpFoldResult> bases;
     };
     SmallVector<LinearizeInfo> newLinearizeInfos;
-
-    // Some temporary operations that are created during the matching process.
-    SmallVector<Operation *> toErase;
 
     // For each delinearize output dimension, try to match it with a product of
     // one or more linearize dimensions. We build up the product incrementally
@@ -169,41 +166,42 @@ struct SimplifyLinearizeDelinearizePairs final
     for (size_t delinIdx = 0;
          delinIdx < delinearizeBases.size() && linIdx < linearizeBases.size();
          ++delinIdx) {
-      // Get the delinearize basis for this dimension.
-      Value delinearizeBasisVal = getValueOrCreateConstantIndexOp(
-          rewriter, loc, delinearizeBases[delinIdx]);
-      if (delinearizeBasisVal.use_empty()) {
-        toErase.push_back(delinearizeBasisVal.getDefiningOp());
-      }
-
       LinearizeInfo newLinearizeInfo;
-      Value linearizeBasisProduct;
-
+      // Track operands for the AffineMap-based product expression.
+      SmallVector<Value> productOperands;
       // Accumulate dimensions from the linearize op until we find a match.
       while (linIdx < linearizeBases.size()) {
-        Value linearizeSizeVal = getValueOrCreateConstantIndexOp(
-            rewriter, loc, linearizeBases[linIdx]);
-        if (linearizeSizeVal.use_empty()) {
-          toErase.push_back(linearizeSizeVal.getDefiningOp());
-        }
-
         newLinearizeInfo.inputs.push_back(linearizeInputs[linIdx]);
         newLinearizeInfo.bases.push_back(linearizeBases[linIdx]);
-        ++linIdx;
 
-        // Build up the product of basis dimensions as a Value.
-        if (!linearizeBasisProduct) {
-          linearizeBasisProduct = linearizeSizeVal;
-        } else {
-          linearizeBasisProduct = arith::MulIOp::create(
-              rewriter, loc, linearizeBasisProduct, linearizeSizeVal);
-          toErase.push_back(linearizeBasisProduct.getDefiningOp());
+        // Build up the product of basis dimension using affine expressions.
+        AffineExpr productExpr = getAffineConstantExpr(1, ctx);
+        productOperands.clear();
+        for (OpFoldResult basis : newLinearizeInfo.bases) {
+          if (auto attr = dyn_cast<Attribute>(basis)) {
+            // Handle the static basis as a constant expression.
+            int64_t val = cast<IntegerAttr>(attr).getInt();
+            productExpr = productExpr * getAffineConstantExpr(val, ctx);
+          } else {
+            // Handle the dynamic basis as a symbol expression.
+            Value val = cast<Value>(basis);
+            productOperands.push_back(val);
+            productExpr = productExpr *
+                          getAffineSymbolExpr(productOperands.size() - 1, ctx);
+          }
         }
+        ++linIdx;
+        // Create Variable from the product expression.
+        AffineMap productMap =
+            AffineMap::get(0, productOperands.size(), productExpr, ctx);
+        ValueBoundsConstraintSet::Variable productVar(productMap,
+                                                      productOperands);
+        ValueBoundsConstraintSet::Variable delinearizeVar(
+            delinearizeBases[delinIdx]);
 
-        // Check if the delinearize basis matches the product of linearize
-        // bases.
-        FailureOr<bool> areEqual = ValueBoundsConstraintSet::areEqual(
-            delinearizeBasisVal, linearizeBasisProduct);
+        // Check equality.
+        FailureOr<bool> areEqual =
+            ValueBoundsConstraintSet::areEqual(productVar, delinearizeVar);
         if (succeeded(areEqual) && *areEqual) {
           // Match found!
           newLinearizeInfos.push_back(newLinearizeInfo);
@@ -232,12 +230,6 @@ struct SimplifyLinearizeDelinearizePairs final
       return success();
     }
 
-    // When the pattern fails to match, we need to explicitly clean up the
-    // temporary operations that were created during matching. This is necessary
-    // when patterns are applied in a greedy manner.
-    for (auto op : llvm::reverse(toErase)) {
-      rewriter.eraseOp(op);
-    }
     return rewriter.notifyMatchFailure(
         delinearizeOp, "could not match all delinearize outputs");
   }
