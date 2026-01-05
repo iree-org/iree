@@ -7,10 +7,12 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/STLExtras.h"
@@ -780,6 +782,46 @@ MMAAttr::buildUnderlyingOperations(OpBuilder &builder, Location loc,
   return failure();
 }
 
+/// The lane group size for transpose load operations.
+/// 16 lanes work together to perform the transpose.
+constexpr int64_t kTransposeLoadLaneGroupSize = 16;
+
+/// Creates index_hint ops wrapping a set of index values for transpose load.
+/// The values are expected to be ordered with the innermost/fastest-varying
+/// dimension (column) last. Returns the original values if fewer than 2.
+///
+/// Non-final indices get lane_constant<16> hints (uniform across lane groups).
+/// The final index gets lane_increment<16> hint (increments within lane group).
+static SmallVector<Value> createTransposeLoadIndexHint(OpBuilder &builder,
+                                                       Location loc,
+                                                       ValueRange values) {
+  // Need at least 2 dimensions for transpose load pattern
+  if (values.size() < 2) {
+    SmallVector<Value> results;
+    for (Value v : values) {
+      results.push_back(v);
+    }
+    return results;
+  }
+
+  // Create hint attributes
+  auto laneConstantAttr = IREE::GPU::LaneConstantAttr::get(
+      builder.getContext(), kTransposeLoadLaneGroupSize);
+  auto laneIncrementAttr = IREE::GPU::LaneIncrementAttr::get(
+      builder.getContext(), kTransposeLoadLaneGroupSize);
+
+  SmallVector<Value> results;
+  for (auto [idx, value] : llvm::enumerate(values)) {
+    // Last value is the column (lane-varying), others are row (uniform)
+    Attribute hint = (idx == values.size() - 1)
+                         ? static_cast<Attribute>(laneIncrementAttr)
+                         : static_cast<Attribute>(laneConstantAttr);
+    auto hintOp = IREE::Codegen::IndexHintOp::create(builder, loc, value, hint);
+    results.push_back(hintOp.getResult());
+  }
+  return results;
+}
+
 static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     OpBuilder &builder, Location loc, Value laneId,
     ArrayRef<int64_t> permutation, MMASingleSubgroupLayout subgroupLayout,
@@ -817,6 +859,12 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   auto splitLaneId = affine::AffineDelinearizeIndexOp::create(
       builder, loc, laneId, vtidBasis, /*hasOuterBound=*/false);
 
+  // Wrap delinearize results with index_hint ops for transpose load.
+  // The delinearize results are already in the correct order
+  // (innermost/fastest-varying dimension is last).
+  SmallVector<Value> hintedSplitLaneId =
+      createTransposeLoadIndexHint(builder, loc, splitLaneId.getResults());
+
   // Each thread grabs `element` contiguous data, so the vtid needs to be
   // multiplied by `element` to get the next bunch of data.
   // vtid: virtual thread id
@@ -828,7 +876,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   // worsen the generated code quality.
   for (auto [splitResultIdx, element] :
        llvm::zip_equal(dimToVtid, subgroupLayout.element)) {
-    Value vtid = splitLaneId.getResult(splitResultIdx);
+    Value vtid = hintedSplitLaneId[splitResultIdx];
     int64_t vtidLen = vtidBasis[splitResultIdx - 1];
     if (element != 1) {
       vtid = affine::AffineLinearizeIndexOp::create(

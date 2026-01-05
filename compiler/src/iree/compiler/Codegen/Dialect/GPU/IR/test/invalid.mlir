@@ -189,3 +189,4 @@ func.func @vector_multi_mma_with_permutation_of_wrong_size(%lhs: vector<2x3x4xf1
   } : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
   return %0 : vector<2x5x4xf32>
 }
+
