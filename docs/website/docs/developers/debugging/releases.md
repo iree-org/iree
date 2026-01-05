@@ -41,11 +41,10 @@ The Linux releases are done in a manylinux2014 docker container defined in the
 [`manylinux_x86_64.Dockerfile`](https://github.com/iree-org/base-docker-images/blob/main/dockerfiles/manylinux_x86_64.Dockerfile)
 file within the
 [iree-org/base-docker-images repository](https://github.com/iree-org/base-docker-images/).
-At the time of this writing, it has gcc 9.3.1 and Python versions 3.5 - 3.9
-under `/opt/python`. Note that this docker image approximates a 2014 era RHEL
-distro, patched with backported (newer) dev packages. It builds with gcc and
-BFD linker unless if you arrange otherwise. `yum` can be used to get some
-packages.
+At the time of this writing, it has Python versions 3.9 - 3.13 under
+`/opt/python`. Note that this docker image approximates a 2014 era RHEL distro,
+patched with backported (newer) dev packages. It builds with clang by default.
+`yum` can be used to get some packages.
 
 Get a docker shell (see exact docker image in build_package.yml workflow):
 
