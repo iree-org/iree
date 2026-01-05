@@ -953,6 +953,7 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createCSEPass)
       // Resolve swizzling hints before lowering affine ops but after
       // lowering vector (transfer) ops.
+      .addPass(createFlattenSwizzleHintAllocsPass)
       .addPass(createResolveSwizzleHintsPass)
       // Canonicalize and CSE to attempt to deduplicate swizzle computation.
       .addPass(createCanonicalizerPass)
