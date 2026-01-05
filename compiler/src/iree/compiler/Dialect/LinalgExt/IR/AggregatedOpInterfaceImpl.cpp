@@ -1249,4 +1249,214 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
       [](linalg::GenericOp op) -> Value { return op->getResult(0); });
 }
 
+//===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+enum class ArgCompareKind {
+  Custom,
+  FloatArgmax,
+  FloatArgmin,
+  SignedArgmax,
+  SignedArgmin,
+  UnsignedArgmax,
+  UnsignedArgmin
+};
+
+/// Returns the ArgCompareKind for the ArgCompareOp. Returns Custom if the
+/// pattern is not a standard argmax or argmin. Only matches simple "cmp +
+/// yield" patterns with zero index_base.
+/// TODO(Bangtian): Support more complex patterns after plumbing through the
+/// VectorDistribute pipeline.
+static ArgCompareKind getArgCompareKind(ArgCompareOp argCompareOp) {
+  Type elemType = argCompareOp.getInputType().getElementType();
+  bool isFloat = isa<FloatType>(elemType);
+  bool isInt = isa<IntegerType>(elemType);
+  if (!isFloat && !isInt) {
+    return ArgCompareKind::Custom;
+  }
+
+  if (Value indexBase = argCompareOp.getIndexBase()) {
+    if (!isConstantIntValue(indexBase, 0)) {
+      return ArgCompareKind::Custom;
+    }
+  }
+
+  // The argCompareOp verifier ensures the block terminates with a yield, so 2
+  // operations means exactly one comparison op before yield.
+  Block &block = argCompareOp.getRegion().front();
+  if (block.getOperations().size() != 2) {
+    return ArgCompareKind::Custom;
+  }
+
+  // Verify the comparison operands match the block arguments in order.
+  Operation *cmpOp = &block.front();
+  if (cmpOp->getOperand(0) != block.getArgument(0) ||
+      cmpOp->getOperand(1) != block.getArgument(1)) {
+    return ArgCompareKind::Custom;
+  }
+
+  if (isFloat) {
+    auto cmpf = dyn_cast<arith::CmpFOp>(cmpOp);
+    if (!cmpf) {
+      return ArgCompareKind::Custom;
+    }
+    switch (cmpf.getPredicate()) {
+    case arith::CmpFPredicate::OGT:
+      return ArgCompareKind::FloatArgmax;
+    case arith::CmpFPredicate::OLT:
+      return ArgCompareKind::FloatArgmin;
+    default:
+      return ArgCompareKind::Custom;
+    }
+  }
+
+  auto cmpi = dyn_cast<arith::CmpIOp>(cmpOp);
+  if (!cmpi) {
+    return ArgCompareKind::Custom;
+  }
+  switch (cmpi.getPredicate()) {
+  case arith::CmpIPredicate::sgt:
+    return ArgCompareKind::SignedArgmax;
+  case arith::CmpIPredicate::slt:
+    return ArgCompareKind::SignedArgmin;
+  case arith::CmpIPredicate::ugt:
+    return ArgCompareKind::UnsignedArgmax;
+  case arith::CmpIPredicate::ult:
+    return ArgCompareKind::UnsignedArgmin;
+  default:
+    return ArgCompareKind::Custom;
+  }
+}
+
+FailureOr<SmallVector<Value>> ArgCompareOp::decomposeOperation(OpBuilder &b) {
+  ArgCompareKind kind = getArgCompareKind(*this);
+  if (kind == ArgCompareKind::Custom) {
+    return failure();
+  }
+
+  arith::AtomicRMWKind rmwKind;
+  switch (kind) {
+  case ArgCompareKind::Custom:
+    llvm_unreachable("Custom kind should not reach here");
+  case ArgCompareKind::FloatArgmax:
+    rmwKind = arith::AtomicRMWKind::maximumf;
+    break;
+  case ArgCompareKind::FloatArgmin:
+    rmwKind = arith::AtomicRMWKind::minimumf;
+    break;
+  case ArgCompareKind::SignedArgmax:
+    rmwKind = arith::AtomicRMWKind::maxs;
+    break;
+  case ArgCompareKind::SignedArgmin:
+    rmwKind = arith::AtomicRMWKind::mins;
+    break;
+  case ArgCompareKind::UnsignedArgmax:
+    rmwKind = arith::AtomicRMWKind::maxu;
+    break;
+  case ArgCompareKind::UnsignedArgmin:
+    rmwKind = arith::AtomicRMWKind::minu;
+    break;
+  }
+
+  Location loc = getLoc();
+  Value input = getInputValue();
+  Value outVal = outputValue();
+  Value outIdx = outputIndex();
+  int64_t reductionDim = getDimension();
+
+  ShapedType inputType = getInputType();
+  ShapedType outValType = getOutputValueType();
+  ShapedType outIdxType = getOutputIndexType();
+
+  Type elemType = inputType.getElementType();
+  Type idxElemType = outIdxType.getElementType();
+  int64_t rank = inputType.getRank();
+
+  Value identityVal = arith::getIdentityValue(rmwKind, elemType, b, loc);
+  Value zeroIdx =
+      arith::ConstantOp::create(b, loc, b.getIntegerAttr(idxElemType, 0));
+
+  Value filledVal =
+      linalg::FillOp::create(b, loc, identityVal, outVal).getResult(0);
+  Value filledIdx =
+      linalg::FillOp::create(b, loc, zeroIdx, outIdx).getResult(0);
+
+  SmallVector<AffineExpr> inputExprs, outputExprs;
+  for (int64_t i = 0; i < rank; ++i) {
+    inputExprs.push_back(b.getAffineDimExpr(i));
+    if (i != reductionDim) {
+      outputExprs.push_back(b.getAffineDimExpr(i));
+    }
+  }
+
+  MLIRContext *ctx = b.getContext();
+  AffineMap inputMap = AffineMap::get(rank, 0, inputExprs, ctx);
+  AffineMap outputMap = AffineMap::get(rank, 0, outputExprs, ctx);
+  SmallVector<AffineMap> indexingMaps = {inputMap, outputMap, outputMap};
+
+  SmallVector<utils::IteratorType> iteratorTypes(rank,
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[reductionDim] = utils::IteratorType::reduction;
+
+  auto genericOp = linalg::GenericOp::create(
+      b, loc, TypeRange{outValType, outIdxType}, ValueRange{input},
+      ValueRange{filledVal, filledIdx}, indexingMaps, iteratorTypes,
+      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+        Value inputElem = args[0];
+        Value accVal = args[1];
+        Value accIdx = args[2];
+
+        Value idx =
+            linalg::IndexOp::create(nestedBuilder, nestedLoc, reductionDim);
+        Value currentIdx = arith::IndexCastOp::create(nestedBuilder, nestedLoc,
+                                                      idxElemType, idx);
+
+        Value newVal = arith::getReductionOp(rmwKind, nestedBuilder, nestedLoc,
+                                             inputElem, accVal);
+
+        Value cmp;
+        switch (rmwKind) {
+        case arith::AtomicRMWKind::maximumf:
+          cmp = arith::CmpFOp::create(nestedBuilder, nestedLoc,
+                                      arith::CmpFPredicate::OGT, inputElem,
+                                      accVal);
+          break;
+        case arith::AtomicRMWKind::minimumf:
+          cmp = arith::CmpFOp::create(nestedBuilder, nestedLoc,
+                                      arith::CmpFPredicate::OLT, inputElem,
+                                      accVal);
+          break;
+        case arith::AtomicRMWKind::maxs:
+          cmp = arith::CmpIOp::create(nestedBuilder, nestedLoc,
+                                      arith::CmpIPredicate::sgt, inputElem,
+                                      accVal);
+          break;
+        case arith::AtomicRMWKind::mins:
+          cmp = arith::CmpIOp::create(nestedBuilder, nestedLoc,
+                                      arith::CmpIPredicate::slt, inputElem,
+                                      accVal);
+          break;
+        case arith::AtomicRMWKind::maxu:
+          cmp = arith::CmpIOp::create(nestedBuilder, nestedLoc,
+                                      arith::CmpIPredicate::ugt, inputElem,
+                                      accVal);
+          break;
+        case arith::AtomicRMWKind::minu:
+          cmp = arith::CmpIOp::create(nestedBuilder, nestedLoc,
+                                      arith::CmpIPredicate::ult, inputElem,
+                                      accVal);
+          break;
+        default:
+          llvm_unreachable("unexpected rmwKind");
+        }
+        Value newIdx = arith::SelectOp::create(nestedBuilder, nestedLoc, cmp,
+                                               currentIdx, accIdx);
+        linalg::YieldOp::create(nestedBuilder, nestedLoc,
+                                ValueRange{newVal, newIdx});
+      });
+
+  return SmallVector<Value>{genericOp.getResult(0), genericOp.getResult(1)};
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
