@@ -213,9 +213,9 @@ iree_runtime_session_append_bytecode_module_from_memory(
   // make sure all code paths guarantee it has been freed.
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      iree_runtime_instance_vm_instance(session->instance), flatbuffer_data,
-      flatbuffer_allocator, iree_runtime_session_host_allocator(session),
-      &module);
+      iree_runtime_instance_vm_instance(session->instance),
+      IREE_VM_BYTECODE_MODULE_FLAG_NONE, flatbuffer_data, flatbuffer_allocator,
+      iree_runtime_session_host_allocator(session), &module);
   if (iree_status_is_ok(status)) {
     // Append may fail and we still need to clean up the module.
     status = iree_runtime_session_append_module(session, module);
