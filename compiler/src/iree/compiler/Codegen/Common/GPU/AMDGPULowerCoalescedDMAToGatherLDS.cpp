@@ -269,6 +269,14 @@ struct LowerCoalescedGatherDMAPattern final
     numLinearDims = std::max<int64_t>(numLinearDims, 1);
     LDBG() << "  Number of linear dims: " << numLinearDims;
 
+    // Verify all linearized dimensions are static.
+    for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
+      if (ShapedType::isDynamic(destShape[i])) {
+        return rewriter.notifyMatchFailure(
+            dmaOp, "dynamic dimension in linearized portion");
+      }
+    }
+
     // Compute total elements in the linearized portion (last numLinearDims
     // dims).
     int64_t linearSize = 1;
