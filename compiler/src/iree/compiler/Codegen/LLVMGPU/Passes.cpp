@@ -581,6 +581,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // Step 9. Remaining post-bufferization optimizations/lowerings.
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
+  if (forROCDL) {
+    funcPassManager.addPass(createROCDLLoadToTransposeLoadPass());
+  }
   funcPassManager.addPass(createUnrollAnnotatedLoopsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
   if (pipelineOptions.enableReduceSharedMemoryBankConflicts) {

@@ -56,4 +56,29 @@ def ROCDLLowerExecutableTargetPass : InterfacePass<
                 "pass pipeline";
 }
 
+def ROCDLLoadToTransposeLoadPass :
+    InterfacePass<"iree-rocdl-load-to-transpose-load", "mlir::FunctionOpInterface"> {
+  let summary = "Lower vector.transfer_read to amdgpu.transpose_load when profitable";
+  let description = [{
+    This pass analyzes vector.transfer_read operations that are fed by
+    iree_codegen.index_hint operations (with lane_constant and lane_increment
+    attributes) and converts them to amdgpu.transpose_load operations when
+    the access pattern matches the requirements for transpose load instructions.
+
+    The pass performs two main tasks:
+    1. Attempts to transform qualifying vector.transfer_read ops into
+       amdgpu.transpose_load ops based on hints and memory layout
+    2. Removes any remaining iree_codegen.index_hint ops that were not
+       consumed during transformation
+
+    This pass is ROCDL-specific as transpose_load is an AMD GPU feature
+    (available on CDNA architectures like gfx950+).
+  }];
+  let dependentDialects = [
+    "amdgpu::AMDGPUDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 #endif // IREE_CODEGEN_LLVMGPU_ROCDLPASSES

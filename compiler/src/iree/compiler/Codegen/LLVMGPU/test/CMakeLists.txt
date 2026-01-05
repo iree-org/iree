@@ -51,6 +51,7 @@ iree_lit_test_suite(
     "reduction_pipeline_rocm.mlir"
     "reduction_pipeline_softmax_rocm.mlir"
     "reuse_shared_memory_allocs.mlir"
+    "rocdl_load_to_transpose_load.mlir"
     "rocdl_pipeline_test.mlir"
     "sort_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"
