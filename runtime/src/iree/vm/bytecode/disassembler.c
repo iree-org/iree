@@ -116,9 +116,14 @@
       ((reg) & IREE_I32_REGISTER_MASK) + 1));
 #define EMIT_F32_REG_NAME(reg) EMIT_I32_REG_NAME(reg)
 #define EMIT_F64_REG_NAME(reg) EMIT_I64_REG_NAME(reg)
+// Emits %r0 for ref registers (no move info available).
 #define EMIT_REF_REG_NAME(reg)                            \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
       b, "%%r%u", ((reg) & IREE_REF_REGISTER_MASK)));
+// Emits %r0 for retain or %R0 for move (uppercase indicates move semantics).
+#define EMIT_REF_REG_NAME_MOVE(reg, is_move)              \
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
+      b, (is_move) ? "%%R%u" : "%%r%u", ((reg) & IREE_REF_REGISTER_MASK)));
 
 #define EMIT_REG_VALUE(regs, reg)                                           \
   if ((reg) & IREE_REF_REGISTER_TYPE_BIT) {                                 \
@@ -462,14 +467,64 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     break;                                                             \
   }
 
-iree_status_t iree_vm_bytecode_disassemble_op(
+// Prints the function name (`foo` for `@foo` in MLIR) or an equivalent.
+// The |function_ordinal| is either an import or internal function reference
+// within |module|. Resolve status of an import will only be available if
+// |module_state| is not NULL.
+static iree_status_t iree_vm_bytecode_disassembler_print_function_name(
+    iree_vm_bytecode_module_t* module,
+    iree_vm_bytecode_module_state_t* module_state, uint32_t function_ordinal,
+    iree_string_builder_t* b) {
+  const bool is_import = (function_ordinal & 0x80000000u) != 0;
+  if (!is_import) {
+    iree_vm_function_t function = {
+        .module = &module->interface,
+        .linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL,
+        .ordinal = function_ordinal,
+    };
+    iree_string_view_t module_name = iree_vm_module_name(function.module);
+    iree_string_view_t func_name = iree_vm_function_name(&function);
+    if (iree_string_view_is_empty(func_name)) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          b, "%.*s:%u", (int)module_name.size, module_name.data,
+          function.ordinal));
+    } else {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          b, "%.*s.%.*s", (int)module_name.size, module_name.data,
+          (int)func_name.size, func_name.data));
+    }
+    return iree_ok_status();
+  }
+
+  iree_vm_function_t import = {
+      .module = &module->interface,
+      .linkage = IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL,
+      .ordinal = function_ordinal & 0x7FFFFFFFu,
+  };
+  iree_string_view_t import_name = iree_vm_function_name(&import);
+  if (iree_string_view_is_empty(import_name)) {
+    IREE_RETURN_IF_ERROR(
+        iree_string_builder_append_format(b, "import:%u", (int)import.ordinal));
+  } else {
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        b, "%.*s", (int)import_name.size, import_name.data));
+  }
+
+  return iree_ok_status();
+}
+
+// Internal implementation that also returns the next PC.
+static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     iree_vm_bytecode_module_t* module,
     iree_vm_bytecode_module_state_t* module_state, uint16_t function_ordinal,
     iree_vm_source_offset_t pc, const iree_vm_registers_t* regs,
-    iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
+    iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b,
+    iree_vm_source_offset_t* out_next_pc) {
   const uint8_t* IREE_RESTRICT bytecode_data =
       module->bytecode_data.data +
       module->function_descriptor_table[function_ordinal].bytecode_offset;
+  iree_vm_source_offset_t start_pc = pc;
+  (void)start_pc;  // May be unused.
 
   switch (bytecode_data[pc++]) {
     //===------------------------------------------------------------------===//
@@ -1702,33 +1757,8 @@ iree_status_t iree_vm_bytecode_disassemble_op(
         IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " = "));
       }
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.call @"));
-      int is_import = (function_ordinal & 0x80000000u) != 0;
-      iree_vm_function_t function;
-      if (is_import) {
-        const iree_vm_bytecode_import_t* import =
-            &module_state->import_table[function_ordinal & 0x7FFFFFFFu];
-        function = import->function;
-      } else {
-        function.module = &module->interface;
-        function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-        function.ordinal = function_ordinal;
-      }
-      if (function.module) {
-        iree_string_view_t module_name = iree_vm_module_name(function.module);
-        iree_string_view_t func_name = iree_vm_function_name(&function);
-        if (iree_string_view_is_empty(func_name)) {
-          IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-              b, "%.*s:%u", (int)module_name.size, module_name.data,
-              function.ordinal));
-        } else {
-          IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-              b, "%.*s.%.*s", (int)module_name.size, module_name.data,
-              (int)func_name.size, func_name.data));
-        }
-      } else {
-        IREE_RETURN_IF_ERROR(
-            iree_string_builder_append_cstring(b, "{{UNRESOLVED}}"));
-      }
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
+          module, module_state, function_ordinal, b));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       EMIT_OPERAND_REG_LIST(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
@@ -1750,28 +1780,8 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       }
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.call.varadic @"));
-      int is_import = (function_ordinal & 0x80000000u) != 0;
-      iree_vm_function_t function;
-      if (is_import) {
-        const iree_vm_bytecode_import_t* import =
-            &module_state->import_table[function_ordinal & 0x7FFFFFFFu];
-        function = import->function;
-      } else {
-        function.module = &module->interface;
-        function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-        function.ordinal = function_ordinal;
-      }
-      iree_string_view_t module_name = iree_vm_module_name(function.module);
-      iree_string_view_t func_name = iree_vm_function_name(&function);
-      if (iree_string_view_is_empty(func_name)) {
-        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-            b, "%.*s:%u", (int)module_name.size, module_name.data,
-            function.ordinal));
-      } else {
-        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-            b, "%.*s.%.*s", (int)module_name.size, module_name.data,
-            (int)func_name.size, func_name.data));
-      }
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
+          module, module_state, function_ordinal, b));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       EMIT_OPERAND_REG_LIST(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
@@ -1810,23 +1820,21 @@ iree_status_t iree_vm_bytecode_disassemble_op(
             b, "{{INVALID ORDINAL %d}}", function_ordinal));
         break;
       }
-      uint32_t import_ordinal = function_ordinal & 0x7FFFFFFFu;
-      if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
-        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-            b, "{{OUT OF RANGE ORDINAL %u}}", import_ordinal));
-        break;
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
+          module, module_state, function_ordinal, b));
+      if (module_state) {
+        uint32_t import_ordinal = function_ordinal & 0x7FFFFFFFu;
+        if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
+          IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+              b, "{{OUT OF RANGE ORDINAL %u}}", import_ordinal));
+          break;
+        }
+        const iree_vm_bytecode_import_t* import =
+            &module_state->import_table[import_ordinal];
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+            b, import->function.module != NULL ? " // (resolved)"
+                                               : " // (unresolved)"));
       }
-      iree_vm_function_t decl_function;
-      IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
-          &module->interface, IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL,
-          import_ordinal, &decl_function));
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_string(
-          b, iree_vm_function_name(&decl_function)));
-      const iree_vm_bytecode_import_t* import =
-          &module_state->import_table[import_ordinal];
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
-          b, import->function.module != NULL ? " // (resolved)"
-                                             : " // (unresolved)"));
       break;
     }
 
@@ -2728,7 +2736,18 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "unhandled core opcode");
   }
+  if (out_next_pc) *out_next_pc = pc;
   return iree_ok_status();
+}
+
+iree_status_t iree_vm_bytecode_disassemble_op(
+    iree_vm_bytecode_module_t* module,
+    iree_vm_bytecode_module_state_t* module_state, uint16_t function_ordinal,
+    iree_vm_source_offset_t pc, const iree_vm_registers_t* regs,
+    iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
+  return iree_vm_bytecode_disassemble_op_impl(module, module_state,
+                                              function_ordinal, pc, regs,
+                                              format, b, /*out_next_pc=*/NULL);
 }
 
 iree_status_t iree_vm_bytecode_trace_disassembly(
@@ -2810,4 +2829,43 @@ iree_status_t iree_vm_bytecode_trace_disassembly(
 
   iree_string_builder_deinitialize(&b);
   return status;
+}
+
+iree_status_t iree_vm_bytecode_disassemble_function(
+    iree_vm_bytecode_module_t* module,
+    iree_vm_bytecode_module_state_t* module_state, uint16_t function_ordinal,
+    iree_vm_bytecode_disassembly_format_t format,
+    iree_string_builder_t* string_builder) {
+  if (function_ordinal >= module->function_descriptor_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "function ordinal %u out of range (0 < %u < %zu)",
+                            function_ordinal, function_ordinal,
+                            module->function_descriptor_count);
+  }
+
+  const iree_vm_FunctionDescriptor_t* descriptor =
+      &module->function_descriptor_table[function_ordinal];
+  uint32_t bytecode_length = descriptor->bytecode_length;
+
+  // Iterate through bytecode.
+  iree_vm_source_offset_t pc = 0;
+  while (pc < bytecode_length) {
+    // Emit prefix: [module.function+PC]
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        string_builder, "[%08" PRIX64 "]    ", pc));
+
+    // Disassemble the op and get the next PC.
+    iree_vm_source_offset_t next_pc = 0;
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassemble_op_impl(
+        module, module_state, function_ordinal, pc, /*regs=*/NULL, format,
+        string_builder, &next_pc));
+
+    // Append newline.
+    IREE_RETURN_IF_ERROR(
+        iree_string_builder_append_cstring(string_builder, "\n"));
+
+    pc = next_pc;
+  }
+
+  return iree_ok_status();
 }

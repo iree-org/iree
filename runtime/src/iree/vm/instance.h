@@ -86,7 +86,30 @@ IREE_API_EXPORT void iree_vm_instance_unregister_type(
     const iree_vm_ref_type_descriptor_t* descriptor);
 
 // Returns the registered type descriptor for the given type, if found.
+// Returns 0 if the type is not found or if it is a placeholder type.
 IREE_API_EXPORT iree_vm_ref_type_t iree_vm_instance_lookup_type(
+    iree_vm_instance_t* instance, iree_string_view_t full_name);
+
+// Registers a placeholder type with the given name.
+// Placeholder types can be looked up for name-based operations but MUST NOT
+// be used for actual ref operations (retain/release/destroy). They are useful
+// for tooling that needs type name resolution without requiring full runtime
+// type registration (e.g., bytecode disassembly, VMFB-to-C conversion).
+//
+// If a real type with the same name is later registered via
+// iree_vm_instance_register_type it will replace the placeholder while
+// maintaining the same iree_vm_ref_type_t value.
+//
+// The |type_name| string is not copied and must remain valid until the
+// type is unregistered or replaced with a non-placeholder value.
+IREE_API_EXPORT iree_status_t iree_vm_instance_register_type_placeholder(
+    iree_vm_instance_t* instance, iree_string_view_t type_name);
+
+// Looks up a type including placeholders. Returns the type regardless of
+// whether it's a real type or placeholder. Callers MUST NOT use placeholder
+// types for ref operations (retain/release/destroy) - only for name lookup
+// via iree_vm_ref_type_name().
+IREE_API_EXPORT iree_vm_ref_type_t iree_vm_instance_lookup_type_placeholder(
     iree_vm_instance_t* instance, iree_string_view_t full_name);
 
 // Resolves all builtin VM types by looking them up on the instance.

@@ -40,6 +40,7 @@ iree_cc_library(
     "TestSparseInterfaceMethods.cpp"
   DEPS
     ::PassesIncGen
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
     MLIRSCFDialect
