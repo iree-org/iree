@@ -295,6 +295,9 @@ StringRef getTilingLevelName(GPU::TilingLevel level);
 Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                                 Attribute attr);
 
+Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
+                                  Attribute attr); 
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off

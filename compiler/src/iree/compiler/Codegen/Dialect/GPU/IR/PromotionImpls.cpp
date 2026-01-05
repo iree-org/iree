@@ -25,12 +25,31 @@ namespace mlir::iree_compiler::IREE::GPU {
 Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
+  Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
+    tensorType.getElementType());
+  auto copy = linalg::CopyOp::create(builder, loc, v, empty);
+  setLoweringConfig(copy, attr);
+  return copy.getResult(0);
+}
 
+// Helper to insert a swizzle hint and flatten the alloc accordingly.
+Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
+  auto tensorType = cast<RankedTensorType>(v.getType());
+  SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
+  if (tensorType.hasStaticShape()) {
+    int64_t numElements = tensorType.getNumElements();
+    Value empty = tensor::EmptyOp::create(builder, loc, {numElements},
+      tensorType.getElementType());
+    Value swizzled = IREE::Codegen::SwizzleHintOp::create(builder, loc, empty,
+        IREE::Codegen::XORShuffleAttr::get(builder.getContext(), 256, 32, int64_t(), int64_t()));
+    Value expanded = tensor::ExpandShapeOp::create(builder, loc, tensorType, swizzled, {llvm::to_vector(llvm::seq(tensorType.getRank()))});
+    auto copy = linalg::CopyOp::create(builder, loc, v, expanded);
+    setLoweringConfig(copy, attr);
+    return copy.getResult(0);
+  }
   Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
                                         tensorType.getElementType());
-  Value swizzled = IREE::Codegen::SwizzleHintOp::create(builder, loc, empty,
-      IREE::Codegen::XORShuffleAttr::get(builder.getContext(), 256, 32, int64_t(), int64_t()));
-  auto copy = linalg::CopyOp::create(builder, loc, v, swizzled);
+  auto copy = linalg::CopyOp::create(builder, loc, v, empty);
   setLoweringConfig(copy, attr);
   return copy.getResult(0);
 }
@@ -83,6 +102,38 @@ Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
   }
 
   return promoteValue(builder, operand.getOwner()->getLoc(), operand.get(),
+                      attr);
+}
+
+Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
+                           Attribute attr) {
+  llvm::errs() << "swizzlePromotionImpl\n";
+  if (auto producer = operand.get().getDefiningOp<TilingInterface>()) {
+    // Skip promotion of fills.
+    if (isa<linalg::FillOp>(producer)) {
+      return operand.get();
+    }
+    if (auto generic = dyn_cast<linalg::GenericOp>(&*producer)) {
+      if (linalg::isaFillOpInterface(generic)) {
+        return operand.get();
+      }
+    }
+
+    // We only support thread tile size derivation of linalgOp and Im2colOp for
+    // now.
+    if (isa<linalg::LinalgOp, IREE::LinalgExt::Im2colOp>(
+            producer.getOperation())) {
+      setLoweringConfig(producer, attr);
+      return operand.get();
+    }
+  }
+
+  auto tensorType = dyn_cast<RankedTensorType>(operand.get().getType());
+  if (!tensorType) {
+    return operand.get();
+  }
+
+  return swizzlePromoteValue(builder, operand.getOwner()->getLoc(), operand.get(),
                       attr);
 }
 
