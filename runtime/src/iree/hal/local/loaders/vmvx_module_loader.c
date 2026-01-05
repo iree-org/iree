@@ -811,9 +811,9 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
   // we have it) to the module to manage.
   iree_vm_module_t* bytecode_module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      executable_loader->instance, executable_params->executable_data,
-      bytecode_module_allocator, executable_loader->host_allocator,
-      &bytecode_module);
+      executable_loader->instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
+      executable_params->executable_data, bytecode_module_allocator,
+      executable_loader->host_allocator, &bytecode_module);
 
   // Executable takes ownership of the entire context (including the bytecode
   // module, which itself may own the underlying allocation).

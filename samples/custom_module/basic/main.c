@@ -71,7 +71,8 @@ int main(int argc, char** argv) {
   // Note that we let the module retain the file contents for as long as needed.
   iree_vm_module_t* bytecode_module = NULL;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      instance, module_contents->const_buffer,
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
+      module_contents->const_buffer,
       iree_io_file_contents_deallocator(module_contents), allocator,
       &bytecode_module));
 

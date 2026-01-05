@@ -75,7 +75,7 @@ static iree_status_t iree_tooling_load_bytecode_module(
   // The module takes ownership of the file contents (when successful).
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      instance, file_contents->const_buffer,
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, file_contents->const_buffer,
       iree_io_file_contents_deallocator(file_contents), host_allocator,
       &module);
 

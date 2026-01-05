@@ -45,9 +45,9 @@ iree_status_t create_bytecode_module(iree_vm_instance_t* instance,
   const struct iree_file_toc_t* module_file_toc = iree_static_mnist_create();
   iree_const_byte_span_t module_data =
       iree_make_const_byte_span(module_file_toc->data, module_file_toc->size);
-  return iree_vm_bytecode_module_create(instance, module_data,
-                                        iree_allocator_null(),
-                                        iree_allocator_system(), out_module);
+  return iree_vm_bytecode_module_create(
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, module_data,
+      iree_allocator_null(), iree_allocator_system(), out_module);
 }
 
 iree_sample_state_t* setup_sample() {

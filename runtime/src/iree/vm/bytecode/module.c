@@ -87,7 +87,7 @@ static bool iree_vm_bytecode_module_resolve_type(
 // registered.
 static iree_status_t iree_vm_bytecode_module_resolve_types(
     iree_vm_instance_t* instance, iree_vm_TypeDef_vec_t type_defs,
-    iree_vm_type_def_t* type_table) {
+    iree_vm_bytecode_module_flags_t flags, iree_vm_type_def_t* type_table) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
@@ -859,9 +859,9 @@ static iree_status_t iree_vm_bytecode_module_resume_call(
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
-    iree_vm_instance_t* instance, iree_const_byte_span_t archive_contents,
-    iree_allocator_t archive_allocator, iree_allocator_t allocator,
-    iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_vm_bytecode_module_flags_t flags,
+    iree_const_byte_span_t archive_contents, iree_allocator_t archive_allocator,
+    iree_allocator_t allocator, iree_vm_module_t** out_module) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
@@ -927,7 +927,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
 
   module->type_count = iree_vm_TypeDef_vec_len(type_defs);
   iree_status_t resolve_status = iree_vm_bytecode_module_resolve_types(
-      instance, type_defs, module->type_table);
+      instance, type_defs, flags, module->type_table);
   if (!iree_status_is_ok(resolve_status)) {
     iree_allocator_free(allocator, module);
     IREE_TRACE_ZONE_END(z0);

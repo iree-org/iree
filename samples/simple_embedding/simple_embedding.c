@@ -51,8 +51,8 @@ iree_status_t Run() {
 
   iree_vm_module_t* bytecode_module = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-      instance, module_data, iree_allocator_null(), iree_allocator_system(),
-      &bytecode_module));
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, module_data,
+      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* context = NULL;

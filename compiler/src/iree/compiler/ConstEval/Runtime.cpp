@@ -478,8 +478,9 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
   // Bytecode module.
   if (iree_status_is_ok(status)) {
     status = iree_vm_bytecode_module_create(
-        runtime.instance.get(), iree_make_const_byte_span(data, length),
-        iree_allocator_null(), iree_allocator_system(), &main_module);
+        runtime.instance.get(), IREE_VM_BYTECODE_MODULE_FLAG_NONE,
+        iree_make_const_byte_span(data, length), iree_allocator_null(),
+        iree_allocator_system(), &main_module);
   }
 
   // Create context.
