@@ -109,8 +109,9 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
 
   for (int64_t dmaSize : sortedDmaSizes) {
     // Calculate elements per lane for this DMA size.
-    if (dmaSize % elementBits != 0)
+    if (dmaSize % elementBits != 0) {
       continue;
+    }
     int64_t elementsPerLane = dmaSize / elementBits;
 
     // Calculate total elements per transfer (all lanes combined).
@@ -131,8 +132,9 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
       currentOffset += coveredElements;
     }
 
-    if (remainingElements == 0)
+    if (remainingElements == 0) {
       break;
+    }
   }
 
   if (remainingElements != 0) {
