@@ -5,9 +5,7 @@
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -76,9 +74,7 @@ func.func @lower_coalesced_gather_dma_multiple(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -131,9 +127,7 @@ func.func @lower_coalesced_copy_dma_basic(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -173,9 +167,7 @@ func.func @lower_coalesced_copy_dma_1d(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -222,9 +214,7 @@ func.func @lower_coalesced_copy_dma_single_row_2d(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -289,9 +279,7 @@ func.func @lower_coalesced_copy_dma_3d(
 #executable_target_rocm_hsaco_fb_wide = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [256, 256],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [256, 256],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -345,9 +333,7 @@ func.func @lower_coalesced_copy_dma_wide_forall_2d(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -399,9 +385,7 @@ func.func @lower_coalesced_gather_dma_with_indices(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -464,9 +448,7 @@ func.func @gather_iterates_over_dest_shape_not_source(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -518,9 +500,7 @@ func.func @lower_coalesced_dma_multiple_transfers_1d(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -574,9 +554,7 @@ func.func @lower_coalesced_dma_multiple_transfers_2d(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -633,9 +611,7 @@ func.func @lower_coalesced_dma_mixed_sizes_1d(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -703,9 +679,7 @@ func.func @lower_coalesced_dma_mixed_sizes_2d(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -769,9 +743,7 @@ func.func @lower_coalesced_dma_linearized_2_rows_per_transfer(
 #executable_target_rocm_hsaco_fb_3d = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx942", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -837,9 +809,7 @@ func.func @lower_3d_partial_contiguous(
 #executable_target_rocm_hsaco_fb_3d_mixed = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx942", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
@@ -898,9 +868,7 @@ func.func @lower_3d_partial_contiguous_mixed_dma(
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
   arch = "gfx950", features = "", wgp = <
-    compute = fp64|fp32|fp16|int64|int32|int16|int8,
-    storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
-    dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 32],
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
