@@ -120,19 +120,19 @@
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
       b, "%%r%u", ((reg) & IREE_REF_REGISTER_MASK)));
 
-#define EMIT_REG_VALUE(regs, reg)                                           \
-  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) {                                 \
-    iree_vm_ref_t* ref = &(regs)->ref[(reg) & IREE_REF_REGISTER_MASK];      \
-    if (iree_vm_ref_is_null(ref)) {                                         \
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "null"));  \
-    } else {                                                                \
-      iree_string_view_t type_name = iree_vm_ref_type_name(ref->type);      \
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(               \
-          b, "!%.*s/%p", (int)type_name.size, type_name.data, ref->ptr)); \
-    }                                                                       \
-  } else {                                                                  \
-    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
-        b, "%u", ((regs)->i32[(reg) & IREE_I32_REGISTER_MASK])));           \
+#define EMIT_REG_VALUE(regs, reg)                                          \
+  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) {                                \
+    iree_vm_ref_t* ref = &(regs)->ref[(reg) & IREE_REF_REGISTER_MASK];     \
+    if (iree_vm_ref_is_null(ref)) {                                        \
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "null")); \
+    } else {                                                               \
+      iree_string_view_t type_name = iree_vm_ref_type_name(ref->type);     \
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(              \
+          b, "!%.*s/%p", (int)type_name.size, type_name.data, ref->ptr));  \
+    }                                                                      \
+  } else {                                                                 \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                \
+        b, "%u", ((regs)->i32[(reg) & IREE_I32_REGISTER_MASK])));          \
   }
 
 static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
@@ -266,7 +266,7 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     } else {                                                                  \
       iree_string_view_t type_name = iree_vm_ref_type_name(ref->type);        \
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
-          b, "(!%.*s/%p)", (int)type_name.size, type_name.data, ref->ptr)); \
+          b, "(!%.*s/%p)", (int)type_name.size, type_name.data, ref->ptr));   \
     }                                                                         \
   }
 
