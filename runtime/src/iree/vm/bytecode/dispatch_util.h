@@ -79,6 +79,14 @@ typedef struct iree_vm_bytecode_frame_storage_t {
   // will be stored by callees upon return.
   const iree_vm_register_list_t* return_registers;
 
+  // Result status code from function execution.
+  // Initialized to IREE_STATUS_UNKNOWN to indicate the frame has not yet
+  // completed. On successful return, set to IREE_STATUS_OK to signal that the
+  // compiler-guaranteed ref cleanup has run and the frame cleanup loop can be
+  // skipped. Frames that error or get unwound (due to callee errors) retain
+  // the non-OK value, causing cleanup to release any remaining refs.
+  iree_status_code_t result_code;
+
   // Counts of each register type and their relative byte offsets from the head
   // of this struct.
   uint32_t i32_register_count;
