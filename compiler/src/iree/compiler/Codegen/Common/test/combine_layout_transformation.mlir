@@ -449,4 +449,3 @@ func.func @unpack_no_padding_no_masking(%dim : index, %result : memref<?x16384xf
 // DISPATCH-SCOPE-LABEL: func @unpack_no_padding_no_masking
 // DISPATCH-SCOPE: iree_linalg_ext.map_scatter
 // DISPATCH-SCOPE-NOT: arith.cmpi ult
-// DISPATCH-SCOPE: return

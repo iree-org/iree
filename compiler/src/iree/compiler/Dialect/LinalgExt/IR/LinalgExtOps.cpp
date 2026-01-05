@@ -765,7 +765,7 @@ bool MapScatterOp::isIdentity() {
   return true;
 }
 namespace {
-struct FoldIdentityMapScatter
+struct FoldTensorIdentityMapScatter
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
@@ -788,7 +788,7 @@ struct FoldIdentityMapScatter
 
 void MapScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *ctx) {
-  results.add<FoldIdentityMapScatter>(ctx);
+  results.add<FoldTensorIdentityMapScatter>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
