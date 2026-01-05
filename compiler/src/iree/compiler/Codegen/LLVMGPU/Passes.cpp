@@ -1152,6 +1152,7 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     }
   }
   {
+    variantPassManager.addPass(createRemoveIndexHintsPass());
     ReconcileTranslationInfoPassOptions options;
     options.distributeAlong = clSetWorkgroupDistributionAlong;
     variantPassManager.addPass(createReconcileTranslationInfoPass(options));
