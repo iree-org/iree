@@ -41,7 +41,6 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRControlFlowInterfaces
     MLIRDestinationStyleOpInterface
-    MLIRDialectUtils
     MLIRFuncDialect
     MLIRFuncTransforms
     MLIRFunctionInterfaces
