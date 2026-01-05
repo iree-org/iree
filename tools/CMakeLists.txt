@@ -199,6 +199,7 @@ iree_cc_binary(
     iree::base::internal::flatcc::parsing
     iree::io::file_handle
     iree::schemas::bytecode_module_def_c_fbs
+    iree::vm
     iree::vm::bytecode::module
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime

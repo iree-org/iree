@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/bytecode/utils/isa.h"
 

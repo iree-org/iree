@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "iree/vm/bytecode/archive.h"
+#include "iree/vm/bytecode/disassembler.h"
 #include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/bytecode/verifier.h"
 
@@ -27,41 +28,44 @@ static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,
 }
 
 // Resolves a type through either builtin rules or the ref registered types.
-static bool iree_vm_bytecode_module_resolve_type(
+// If |flags| includes IREE_VM_BYTECODE_MODULE_FLAG_ALLOW_PLACEHOLDER_TYPES then
+// unresolved ref types will be registered as placeholder types.
+static iree_status_t iree_vm_bytecode_module_resolve_type(
     iree_vm_instance_t* instance, iree_vm_TypeDef_table_t type_def,
-    iree_vm_type_def_t* out_type) {
+    iree_vm_bytecode_module_flags_t flags, iree_vm_type_def_t* out_type) {
   memset(out_type, 0, sizeof(*out_type));
   flatbuffers_string_t full_name = iree_vm_TypeDef_full_name(type_def);
   if (!flatbuffers_string_len(full_name)) {
-    return false;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "type definition has no name");
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i8")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I8);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i16")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I16);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i32")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i64")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I64);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("f32")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F32);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("f64")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F64);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(
                  full_name, iree_make_cstring_view("!vm.opaque")) == 0) {
     *out_type = iree_vm_make_undefined_type_def();
-    return true;
+    return iree_ok_status();
   } else if (full_name[0] == '!') {
     // Note that we drop the ! prefix:
     iree_string_view_t type_name = {full_name + 1,
@@ -73,13 +77,29 @@ static bool iree_vm_bytecode_module_resolve_type(
       // all we have registered.
       type_name = iree_make_cstring_view("vm.list");
     }
-    iree_vm_ref_type_t type = iree_vm_instance_lookup_type(instance, type_name);
+
+    iree_vm_ref_type_t type = 0;
+    if (iree_any_bit_set(
+            flags, IREE_VM_BYTECODE_MODULE_FLAG_ALLOW_PLACEHOLDER_TYPES)) {
+      // Try lookup including placeholders, register placeholder if not found.
+      type = iree_vm_instance_lookup_type_placeholder(instance, type_name);
+      if (!type) {
+        IREE_RETURN_IF_ERROR(
+            iree_vm_instance_register_type_placeholder(instance, type_name));
+        type = iree_vm_instance_lookup_type_placeholder(instance, type_name);
+      }
+    } else {
+      // Normal path - real types only.
+      type = iree_vm_instance_lookup_type(instance, type_name);
+    }
+
     if (type) {
       *out_type = iree_vm_make_ref_type_def(type);
-      return true;
+      return iree_ok_status();
     }
   }
-  return false;
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "no type registered with name '%s'", full_name);
 }
 
 // Resolves all types through either builtin rules or the ref registered types.
@@ -92,13 +112,9 @@ static iree_status_t iree_vm_bytecode_module_resolve_types(
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
     iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
-    if (!iree_vm_bytecode_module_resolve_type(instance, type_def,
-                                              &type_table[i])) {
-      status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                                "no type registered with name '%s'",
-                                iree_vm_TypeDef_full_name(type_def));
-      break;
-    }
+    status = iree_vm_bytecode_module_resolve_type(instance, type_def, flags,
+                                                  &type_table[i]);
+    if (!iree_status_is_ok(status)) break;
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -1005,4 +1021,19 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
 
   IREE_TRACE_ZONE_END(z0);
   return verify_status;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_disassemble_function(
+    iree_vm_module_t* module, uint16_t function_ordinal,
+    iree_string_builder_t* string_builder) {
+  IREE_ASSERT_ARGUMENT(module);
+  IREE_ASSERT_ARGUMENT(string_builder);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_vm_bytecode_module_t* bytecode_module =
+      (iree_vm_bytecode_module_t*)module;
+  iree_status_t status = iree_vm_bytecode_disassemble_function(
+      bytecode_module, /*module_state=*/NULL, function_ordinal,
+      IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_DEFAULT, string_builder);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
