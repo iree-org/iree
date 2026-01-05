@@ -216,7 +216,7 @@ func.func public @staticize_online_attention_from_cast(%arg0: tensor<?x4096x16xf
 
 // -----
 
-func.func public @fold_identity_map_scatter(
+func.func public @convert_identity_map_scatter_into_copy(
     %arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>
 ) -> tensor<?x?xf32> {
   %true = arith.constant true
@@ -226,8 +226,9 @@ func.func public @fold_identity_map_scatter(
   } : tensor<?x?xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
   return %map_scatter : tensor<?x?xf32>
 }
-//CHECK-LABEL: func public @fold_identity_map_scatter(
+//CHECK-LABEL: func public @convert_identity_map_scatter_into_copy(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-NOT:   iree_linalg_ext.map_scatter
-//      CHECK:   return %[[ARG0]]
+//      CHECK:   %[[COPY:.+]] = linalg.copy ins(%[[ARG0]]{{.*}} outs(%[[ARG1]]
+//      CHECK:   return %[[COPY]]
