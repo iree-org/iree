@@ -178,6 +178,8 @@ void buildGlobalOptimizationPassPipeline(
                            PropagateLinalgTransposePassOptions options;
                            options.enableAggressivePropagation =
                                transformOptions.aggressiveTransposePropagation;
+                           options.enableConvolutionPropagation =
+                               transformOptions.aggressiveTransposePropagation;
                            options.enableAttentionVTranspose =
                                clEnableAttentionVTranspose;
                            options.enableEdgeReshapePropagation =
