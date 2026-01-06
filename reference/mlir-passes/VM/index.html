@@ -2557,6 +2557,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-vm-materialize-ref-discards" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-vm-materialize-ref-discards
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-vm-ordinal-allocation" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-vm-ordinal-allocation
@@ -4787,6 +4796,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-vm-materialize-ref-discards" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-vm-materialize-ref-discards
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-vm-ordinal-allocation" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-vm-ordinal-allocation
@@ -4873,6 +4891,11 @@ invocations (<code>__init</code> and <code>__deinit</code>) and prevents the nee
 linker to need initialization order metadata.</p>
 <h3 id="-iree-vm-hoist-inlined-rodata"><code>-iree-vm-hoist-inlined-rodata</code><a class="headerlink" href="#-iree-vm-hoist-inlined-rodata" title="Permanent link">link</a></h3>
 <p><em>Hoists inline vm.rodata.inline values to module-level constant storage.</em></p>
+<h3 id="-iree-vm-materialize-ref-discards"><code>-iree-vm-materialize-ref-discards</code><a class="headerlink" href="#-iree-vm-materialize-ref-discards" title="Permanent link">link</a></h3>
+<p><em>Inserts vm.discard.refs ops at ref death points.</em></p>
+<p>Analyzes value liveness and inserts explicit vm.discard.refs operations
+at points where ref values are no longer needed. This enables functions
+to be marked as "refs clean" so the runtime can skip cleanup on success.</p>
 <h3 id="-iree-vm-ordinal-allocation"><code>-iree-vm-ordinal-allocation</code><a class="headerlink" href="#-iree-vm-ordinal-allocation" title="Permanent link">link</a></h3>
 <p><em>Assigns module-unique ordinals to function/global/etc symbols within the module.</em></p>
 <p>Assigns per-category ordinals to module-level symbols in the module.
