@@ -49,6 +49,7 @@ iree_compiler_cc_library(
         "PCFTypes.cpp.inc",
     ],
     hdrs = [
+        "PCF.h",
         "PCFAttrInterfaces.h.inc",
         "PCFAttrs.h",
         "PCFAttrs.h.inc",
