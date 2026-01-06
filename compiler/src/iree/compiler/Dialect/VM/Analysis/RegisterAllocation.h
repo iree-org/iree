@@ -148,7 +148,7 @@ public:
 private:
   Register(bool isRef, bool isMove, size_t byteWidth, int ordinal)
       : null_(0), tombstone_(0), isRef_(isRef), isMove_(isMove),
-        byteWidth_(byteWidth), ordinal_(ordinal) {}
+        byteWidth_(byteWidth), reserved_(0), ordinal_(ordinal) {}
 
   union {
     struct {
