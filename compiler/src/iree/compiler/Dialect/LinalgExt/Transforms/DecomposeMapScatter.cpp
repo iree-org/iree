@@ -162,6 +162,8 @@ struct SimplifyLinearizeDelinearizePairs final
     // one or more linearize dimensions. We build up the product incrementally
     // and check for equality using value bounds analysis, which works for both
     // static and dynamic dimensions.
+    // TODO(#23032): Consider separating bounds checking from transformation
+    // patterns into a shared utility for better organization of index analysis.
     size_t linIdx = 0;
     for (size_t delinIdx = 0;
          delinIdx < delinearizeBases.size() && linIdx < linearizeBases.size();
@@ -210,28 +212,27 @@ struct SimplifyLinearizeDelinearizePairs final
       }
     }
 
-    // If we successfully matched all delinearize outputs, replace the op.
-    if (newLinearizeInfos.size() == delinearizeOp.getNumResults()) {
-      SmallVector<Value> newResults;
-      for (const auto &info : newLinearizeInfos) {
-        if (info.inputs.size() == 1) {
-          // If there is a one-to-one match between linearize and delinearize
-          // dimensions, just pass through the linearize input.
-          newResults.push_back(info.inputs[0]);
-        } else {
-          // Otherwise, for a multi-to-one match, create a new linearize op.
-          Value newLinearized = affine::AffineLinearizeIndexOp::create(
-              rewriter, loc, info.inputs, info.bases,
-              /*disjoint=*/true);
-          newResults.push_back(newLinearized);
-        }
-      }
-      rewriter.replaceOp(delinearizeOp, newResults);
-      return success();
+    if (newLinearizeInfos.size() != delinearizeOp.getNumResults()) {
+      return rewriter.notifyMatchFailure(
+          delinearizeOp, "could not match all delinearize outputs");
     }
 
-    return rewriter.notifyMatchFailure(
-        delinearizeOp, "could not match all delinearize outputs");
+    SmallVector<Value> newResults;
+    for (const auto &info : newLinearizeInfos) {
+      if (info.inputs.size() == 1) {
+        // If there is a one-to-one match between linearize and delinearize
+        // dimensions, just pass through the linearize input.
+        newResults.push_back(info.inputs[0]);
+      } else {
+        // Otherwise, for a many-to-one match, create a new linearize op.
+        Value newLinearized = affine::AffineLinearizeIndexOp::create(
+            rewriter, loc, info.inputs, info.bases,
+            /*disjoint=*/true);
+        newResults.push_back(newLinearized);
+      }
+    }
+    rewriter.replaceOp(delinearizeOp, newResults);
+    return success();
   }
 };
 
@@ -549,8 +550,8 @@ struct DecomposeMapScatterPass final
     mlir::FunctionOpInterface funcOp = getOperation();
 
     RewritePatternSet patterns(context);
-    patterns.add<FoldSubViewIntoMapScatter>(context);
-    patterns.add<SimplifyLinearizeDelinearizePairs>(context);
+    patterns.add<FoldSubViewIntoMapScatter, SimplifyLinearizeDelinearizePairs>(
+        context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
