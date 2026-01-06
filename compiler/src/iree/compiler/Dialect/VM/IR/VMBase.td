@@ -146,12 +146,13 @@ def VM_SerializableOpInterface : OpInterface<"VMSerializableOp"> {
 
   let methods = [
     InterfaceMethod<
-      "Encodes the op with the provided bytecode encoder.",
-      "LogicalResult",
+      [{Encodes the op with the provided bytecode encoder.
+        Returns failure() on encoding error.
+        Returns true if bytecode was emitted, false if the op was elided.}],
+      "FailureOr<bool>",
       "encode",
       (ins "SymbolTable &":$syms, "VMFuncEncoder &":$e)
     >,
-    // TODO(benvanik): decoder as a static builder method.
   ];
 }
 
@@ -246,6 +247,44 @@ def VM_ImportInterface :
 
   // Optional documentation metadata for rich doc generation.
   Util_InterfaceDocMetadata docMetadata = ?;
+}
+
+def VM_RefMoveInterface : VM_OpInterface<"RefMoveInterface"> {
+  let description = [{
+    Interface for VM ops that support MOVE semantics on ref operands/results.
+
+    The MOVE bit indicates "last use - runtime can invalidate register."
+    Only operands/results that return true from these methods will have
+    MOVE bits set by the register allocator.
+
+    Default implementation returns false (safe - requires explicit discard).
+    Ops that don't implement this interface will never have MOVE set.
+
+    IMPORTANT: Memory leaks result if this returns true but the runtime
+    doesn't honor the MOVE bit for that operand/result. Every implementation
+    must exactly match the runtime behavior.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      [{Returns true if the ref operand at the given index supports MOVE.
+        When true, the register allocator may set MOVE on last use and the
+        runtime will release/zero the operand register.}],
+      "bool", "isRefOperandMovable",
+      (ins "unsigned":$operandIndex),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/"return false;"
+    >,
+    InterfaceMethod<
+      [{Returns true if the ref result at the given index supports MOVE.
+        When true, the register allocator may set MOVE on the result and the
+        runtime will handle ownership transfer appropriately.}],
+      "bool", "isRefResultMovable",
+      (ins "unsigned":$resultIndex),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/"return false;"
+    >,
+  ];
 }
 
 //===----------------------------------------------------------------------===//

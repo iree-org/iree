@@ -1189,6 +1189,13 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(CORE, ConstRefZero, { VM_VerifyResultRegRefMove(result); });
 
+    VERIFY_OP(CORE, DiscardRefs, { VM_VerifyVariadicOperandsAny(refs); });
+
+    VERIFY_OP(CORE, AssignRef, {
+      VM_VerifyOperandRegRefMove(source);
+      VM_VerifyResultRegRefMove(result);
+    });
+
     VERIFY_OP(CORE, ConstRefRodata, {
       VM_VerifyRodataAttr(rodata);
       VM_VerifyRodataOrdinal(rodata);

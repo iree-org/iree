@@ -815,7 +815,8 @@ def VM_GlobalStoreIndirectF64Op :
 }
 
 def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref", [
-      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>
     ]> {
   let summary = [{Global ref<T> load operation.}];
   let description = [{
@@ -828,9 +829,23 @@ def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref", [
     VM_EncTypeOf<"value">,
     VM_EncResult<"value">,
   ];
+
+  let extraClassDeclaration = [{
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalLoadOp(*this, symbolTable);
+    }
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return false;  // No ref operands.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE (runtime uses retain_or_move).
+    }
+  }];
 }
 
-def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref"> {
+def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref", [
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>
+    ]> {
   let summary = [{Global ref<T> stores operation.}];
   let description = [{
     Stores a ref<T> to a global, retaining it until the global is reset.
@@ -842,10 +857,24 @@ def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref"> {
     VM_EncTypeOf<"value">,
     VM_EncOperand<"value", 0>,
   ];
+
+  let extraClassDeclaration = [{
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalStoreOp(*this, symbolTable);
+    }
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return true;  // value operand supports MOVE (runtime uses retain_or_move).
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+  }];
 }
 
 def VM_GlobalLoadIndirectRefOp :
-    VM_GlobalLoadIndirectOp<VM_AnyRef, "global.load.indirect.ref"> {
+    VM_GlobalLoadIndirectOp<VM_AnyRef, "global.load.indirect.ref", [
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>
+    ]> {
   let summary = [{Global ref<T> load operation.}];
   let description = [{
     Loads the value of a global containing a ref of the given type.
@@ -859,10 +888,21 @@ def VM_GlobalLoadIndirectRefOp :
   ];
 
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return false;  // global operand is a ptr, not a ref.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE (runtime uses retain_or_move).
+    }
+  }];
 }
 
 def VM_GlobalStoreIndirectRefOp :
-    VM_GlobalStoreIndirectOp<VM_AnyRef, "global.store.indirect.ref"> {
+    VM_GlobalStoreIndirectOp<VM_AnyRef, "global.store.indirect.ref", [
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>
+    ]> {
   let summary = [{Global ref<T> stores operation.}];
   let description = [{
     Stores a ref<T> to a global, retaining it until the global is reset.
@@ -876,6 +916,16 @@ def VM_GlobalStoreIndirectRefOp :
   ];
 
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is global (ptr), operand 1 is value (ref).
+      return operandIndex == 1;  // Only value operand supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+  }];
 }
 
 } // OpGroupGlobalOps
@@ -1077,6 +1127,67 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
   ];
 
   let hasFolder = 1;
+}
+
+def VM_DiscardRefsOp : VM_Op<"discard.refs", [
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    MemoryEffects<[MemWrite]>,
+  ]> {
+  let summary = [{Discards reference values, releasing them.}];
+  let description = [{
+    Explicitly releases reference values. This is used by the compiler to insert
+    early releases at ref death points, enabling functions to be marked as
+    "refs clean" so the runtime can skip cleanup on the success path.
+
+    The encode method is implemented manually in C++ to support per-operand
+    elision based on register allocation analysis. Operands that have already
+    been released via a MOVE bit on a preceding use are elided from encoding.
+  }];
+
+  let arguments = (ins
+    Variadic<VM_AnyRef>:$refs
+  );
+
+  let assemblyFormat = [{
+    ($refs^ `:` type($refs))? attr-dict
+  }];
+}
+
+def VM_AssignRefOp : VM_Op<"assign.ref", [
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+  ]> {
+  let summary = [{Assigns a ref value between registers.}];
+  let description = [{
+    Assigns a reference value from one register to another. This is a runtime
+    operation that performs retain/move semantics based on the MOVE bit.
+
+    This operation exists to support efficient ref-to-ref assignments where
+    the source and destination may have the same or different registers. When
+    the source and destination registers are the same, this operation becomes
+    a no-op and is elided during bytecode encoding.
+  }];
+
+  let arguments = (ins
+    VM_AnyRef:$source
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = [{
+    $source attr-dict `:` type($source) `->` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    // RefMoveInterface methods.
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return true;  // Source supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 def VM_RodataOp : VM_Op<"rodata", [
@@ -1844,6 +1955,7 @@ def VM_ListSetF64Op :
 def VM_ListGetRefOp :
     VM_Op<"list.get.ref", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       MemoryEffects<[MemRead]>,
     ]> {
   let summary = [{ref type element accessor.}];
@@ -1873,11 +1985,24 @@ def VM_ListGetRefOp :
   ];
 
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return false;  // list operand does NOT support MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      // Result supports MOVE - like std::move(vec[i]) for shared_ptr.
+      // When MOVE is set, runtime moves ref out of list (list element becomes
+      // null) instead of retaining.
+      return true;
+    }
+  }];
 }
 
 def VM_ListSetRefOp :
     VM_Op<"list.set.ref", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       MemoryEffects<[MemWrite]>,
     ]> {
   let summary = [{ref type element mutator.}];
@@ -1903,6 +2028,17 @@ def VM_ListSetRefOp :
   ];
 
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 = list (no MOVE), operand 2 = value (supports MOVE).
+      // Note: operand 1 = index (not a ref).
+      return operandIndex == 2;  // Only value operand supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+  }];
 }
 
 } // OpGroupListOps
@@ -1983,6 +2119,7 @@ def VM_SelectF64Op : VM_SelectPrimitiveOp<F64, "select.f64", VM_OPC_SelectF64,
 
 def VM_SelectRefOp : VM_PureOp<"select.ref", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     AllTypesMatch<["true_value", "false_value", "result"]>,
   ]> {
   let summary = [{ref<T> select operation.}];
@@ -2015,6 +2152,16 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
   ];
 
   let hasFolder = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is condition (i32), operands 1,2 are refs.
+      return operandIndex > 0;  // true_value and false_value support MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
@@ -2119,6 +2266,7 @@ def VM_SwitchF64Op : VM_SwitchFloatOp<F64, "switch.f64", VM_OPC_SwitchF64,
 
 def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     AllTypesMatch<["default_value", "result"]>,
   ]> {
   let summary = [{ref<T> switch operation.}];
@@ -2157,6 +2305,16 @@ def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
   ];
 
   let hasFolder = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is index (i32), all others are refs.
+      return operandIndex > 0;  // default_value and values all support MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 } // OpGroupConditionalAssignmentOps
@@ -3244,6 +3402,7 @@ def VM_BitcastF64I64Op :
 def VM_CastAnyRefOp :
     VM_PureOp<"cast.any.ref", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     ]> {
   let summary = [{Casts from any ref to a specific ref type.}];
   let description = [{
@@ -3272,14 +3431,28 @@ def VM_CastAnyRefOp :
 
   let hasFolder = 1;
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return true;  // Operand supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 def VM_CastRefAnyOp :
-    VM_PureOp<"cast.ref.any", [VM_AssignmentOp]> {
+    VM_PureOp<"cast.ref.any", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+    ]> {
   let summary = [{Casts from a specific ref to any ref type.}];
   let description = [{
     Performs a compile-time widening cast of a specific `!vm.ref<T>` to an
-    opaque `!vm.ref<?>`.
+    opaque `!vm.ref<?>`. At runtime this is equivalent to a ref assignment
+    since all refs have the same representation. Uses the same encoding as
+    vm.assign.ref.
   }];
 
   let arguments = (ins
@@ -3295,6 +3468,16 @@ def VM_CastRefAnyOp :
 
   let hasFolder = 1;
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    // RefMoveInterface methods.
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return true;  // Operand supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 } // OpGroupCastingAndConversionOps
@@ -3965,6 +4148,7 @@ let opDocGroup = OpGroupControlFlowOps in {
 def VM_BranchOp : VM_Op<"br", [
     DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     Terminator,
   ]> {
   let summary = [{Unconditional branch operation.}];
@@ -4010,6 +4194,15 @@ def VM_BranchOp : VM_Op<"br", [
 
     /// Erase the operand at 'index' from the operand list.
     void eraseOperand(unsigned index);
+
+    /// RefMoveInterface: All ref operands support MOVE (runtime uses retain_or_move).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // All ref operands support MOVE (runtime uses retain_or_move for remapping).
+      return isa<IREE::VM::RefType>(getDestOperands()[operandIndex].getType());
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
   }];
 
   let hasCanonicalizer = 1;
@@ -4019,6 +4212,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     Terminator,
   ]> {
   let summary = [{Conditional branch operation.}];
@@ -4120,6 +4314,18 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
       getFalseDestOperandsMutable().erase(index);
     }
 
+    /// RefMoveInterface: All ref operands support MOVE (runtime uses retain_or_move).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is the condition (i32), all others are branch operands.
+      // All ref branch operands support MOVE (runtime uses retain_or_move).
+      if (operandIndex == 0) return false;  // condition is not a ref
+      Value operand = getOperand(operandIndex);
+      return isa<IREE::VM::RefType>(operand.getType());
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+
   private:
     /// Get the index of the first true destination operand.
     unsigned getTrueDestOperandIndex() { return 1; }
@@ -4137,6 +4343,7 @@ def VM_BranchTableOp : VM_PureOp<"br_table", [
     AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<BranchOpInterface, ["getSuccessorForOperands"]>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     Terminator,
   ]> {
   let summary = [{Branch table operation.}];
@@ -4193,6 +4400,18 @@ def VM_BranchTableOp : VM_PureOp<"br_table", [
     MutableOperandRange getCaseOperandsMutable(unsigned index) {
       return getCaseOperandsMutable()[index];
     }
+
+    /// RefMoveInterface: All ref operands support MOVE (runtime uses retain_or_move).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is the index (i32), all others are branch operands.
+      // All ref branch operands support MOVE (runtime uses retain_or_move).
+      if (operandIndex == 0) return false;  // index is not a ref
+      Value operand = getOperand(operandIndex);
+      return isa<IREE::VM::RefType>(operand.getType());
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
   }];
 }
 
@@ -4200,6 +4419,7 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       CallOpInterface,
     ])> {
   let extraClassDeclaration = [{
@@ -4224,6 +4444,15 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     /// required by the call interface.
     MutableOperandRange getArgOperandsMutable() {
       return getOperandsMutable();
+    }
+
+    /// RefMoveInterface: All ref operands support MOVE (callee handles ownership).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return isa<IREE::VM::RefType>(getOperand(operandIndex).getType());
+    }
+    /// RefMoveInterface: All ref results support MOVE (callee transfers ownership).
+    bool isRefResultMovable(unsigned resultIndex) {
+      return isa<IREE::VM::RefType>(getResult(resultIndex).getType());
     }
   }];
 }
@@ -4341,6 +4570,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     Pure,
     ReturnLike,
     Terminator,
@@ -4375,6 +4605,17 @@ def VM_ReturnOp : VM_Op<"return", [
       build($_builder, $_state, {});
     }]>,
   ];
+
+  let extraClassDeclaration = [{
+    /// RefMoveInterface: All ref operands support MOVE (transferred to caller).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // All ref operands support MOVE (transferred to caller).
+      return isa<IREE::VM::RefType>(getOperand(operandIndex).getType());
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+  }];
 }
 
 def VM_FailOp : VM_Op<"fail", [

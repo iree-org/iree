@@ -1082,6 +1082,24 @@ static iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_ref_release(result);
     });
 
+    DISPATCH_OP(CORE, DiscardRefs, {
+      const iree_vm_register_list_t* reg_list = VM_DecVariadicOperands("refs");
+      for (int i = 0; i < reg_list->size; ++i) {
+        uint16_t reg = reg_list->registers[i];
+        // All registers in this list are refs; unconditionally release.
+        iree_vm_ref_release(&regs_ref[reg & IREE_REF_REGISTER_MASK]);
+      }
+    });
+
+    DISPATCH_OP(CORE, AssignRef, {
+      bool source_is_move;
+      iree_vm_ref_t* source =
+          VM_DecOperandRegRefMove("source", &source_is_move);
+      bool result_is_move;
+      iree_vm_ref_t* result = VM_DecResultRegRefMove("result", &result_is_move);
+      iree_vm_ref_retain_or_move(source_is_move, source, result);
+    });
+
     DISPATCH_OP(CORE, ConstRefRodata, {
       uint32_t rodata_ordinal = VM_DecRodataAttr("rodata");
       IREE_ASSERT(rodata_ordinal < module->rodata_ref_count);
