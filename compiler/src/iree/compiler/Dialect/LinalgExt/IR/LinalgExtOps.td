@@ -316,32 +316,6 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather"> {
       return getOutputType().getRank();
     }
 
-    // Return true if the map_gather op has vector semantics.
-    bool isVectorized() {
-      return isa<VectorType>(getOutputType());
-    }
-
-    // Inline the transformation region of the map_gather op without its
-    // terminator, replacing the block arguments with the passed
-    // `transformBodyIndices`. The `bodyBuilder` function is called with the
-    // cloned index `Value`s that would have been yielded by the terminator of
-    // the inlined transformation body.
-    void inlineMapGatherBody(
-      OpBuilder &b, Location loc, ValueRange transformBodyIndices,
-      function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
-
-    // Return true if the mapGatherOp is an identity transformation, meaning
-    // it is just doing a copy from source to output. This is true if the
-    // mapping from result to source index is identity, and the result shape
-    // matches the source shape (no out-of-bounds access possible).
-    bool isIdentity();
-
-    // Creates a MapGatherOp with an identity mapping in the transformation
-    // body. Expects the types of `source` and `output` to be the same.
-    static MapGatherOp createIdentityMapGather(OpBuilder &builder,
-                                               Location loc, Value source,
-                                               Value output);
-
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
