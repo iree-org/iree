@@ -432,9 +432,8 @@ class Conv2dTestModuleState final {
   // The pseudorandom values are reproducible both across runs and across
   // machines.
   StatusOr<vm::ref<iree_hal_buffer_view_t>> GenerateRandom4dTensor(
-      const vm::ref<iree_hal_device_t> device, int64_t dim0, int64_t dim1,
-      int64_t dim2, int64_t dim3, iree_hal_element_type_t element_type,
-      int32_t seed) {
+      iree_hal_device_t* device, int64_t dim0, int64_t dim1, int64_t dim2,
+      int64_t dim3, iree_hal_element_type_t element_type, int32_t seed) {
     iree_hal_dim_t dims[4] = {
         (iree_hal_dim_t)dim0,
         (iree_hal_dim_t)dim1,
@@ -454,9 +453,8 @@ class Conv2dTestModuleState final {
         seed,
     };
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
-        device.get(), iree_hal_device_allocator(device.get()),
-        IREE_ARRAYSIZE(dims), dims, element_type,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
+        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(dims), dims,
+        element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
         +[](iree_hal_buffer_mapping_t* mapping, void* user_data) {
           callback_state_t callback_state = *(callback_state_t*)user_data;
           iree_byte_span_t span = mapping->contents;
@@ -485,20 +483,20 @@ class Conv2dTestModuleState final {
     return std::move(result_view);
   }
 
-  Status CheckConv2dResults(
-      const vm::ref<iree_hal_device_t> device, int64_t n, int64_t c, int64_t h,
-      int64_t w, int64_t f, int64_t kh, int64_t kw, int64_t sh, int64_t sw,
-      int64_t dh, int64_t dw, const vm::ref<iree_hal_buffer_view_t> input,
-      const vm::ref<iree_hal_buffer_view_t> kernel,
-      const vm::ref<iree_hal_buffer_view_t> acc,
-      const vm::ref<iree_hal_buffer_view_t> actual_result) {
+  Status CheckConv2dResults(iree_hal_device_t* device, int64_t n, int64_t c,
+                            int64_t h, int64_t w, int64_t f, int64_t kh,
+                            int64_t kw, int64_t sh, int64_t sw, int64_t dh,
+                            int64_t dw, iree_hal_buffer_view_t* input,
+                            iree_hal_buffer_view_t* kernel,
+                            iree_hal_buffer_view_t* acc,
+                            iree_hal_buffer_view_t* actual_result) {
     conv2d_results_t results = {};
     IREE_RETURN_IF_ERROR(conv2d_results_initialize(
-        device.get(), (iree_hal_dim_t)n, (iree_hal_dim_t)c, (iree_hal_dim_t)h,
+        device, (iree_hal_dim_t)n, (iree_hal_dim_t)c, (iree_hal_dim_t)h,
         (iree_hal_dim_t)w, (iree_hal_dim_t)f, (iree_hal_dim_t)kh,
         (iree_hal_dim_t)kw, (iree_hal_dim_t)sh, (iree_hal_dim_t)sw,
-        (iree_hal_dim_t)dh, (iree_hal_dim_t)dw, input.get(), kernel.get(),
-        acc.get(), actual_result.get(), host_allocator_, &results));
+        (iree_hal_dim_t)dh, (iree_hal_dim_t)dw, input, kernel, acc,
+        actual_result, host_allocator_, &results));
     iree_status_t status = check_conv2d_results(stderr, &results);
     conv2d_results_deinitialize(&results);
     return status;

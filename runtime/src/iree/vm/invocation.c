@@ -141,8 +141,10 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         p = iree_vm_invoke_align_ptr(p, iree_alignof(iree_vm_ref_t));
-        // TODO(benvanik): see if we can't remove this retain by instead relying
-        // on the caller still owning the list.
+        // NOTE: we assign here (not retain) for zero overhead. C++ native
+        // modules that receive refs via ParamUnpack should use borrowed
+        // pointers (T*) rather than owned refs (ref<T>) to avoid ownership
+        // issues, as ParamUnpack takes ownership and zeros the source.
         IREE_RETURN_IF_ERROR(
             iree_vm_list_get_ref_assign(inputs, arg_i, (iree_vm_ref_t*)p));
         p += sizeof(iree_vm_ref_t);

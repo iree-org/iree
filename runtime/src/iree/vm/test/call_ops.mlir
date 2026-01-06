@@ -132,8 +132,9 @@ vm.module @call_ops {
   }
 
   vm.func @_v_v_fail() attributes {inlining_policy = #util.inline.never} {
-    %c2 = vm.const.i32 2
-    vm.fail %c2
+    // FAILED_PRECONDITION
+    %c9 = vm.const.i32 9
+    vm.fail %c9
   }
 
 }

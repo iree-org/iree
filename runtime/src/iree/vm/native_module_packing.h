@@ -58,6 +58,13 @@ struct remove_cvref {
 
 }  // namespace impl
 
+// Detects if T has a ref_type_descriptor specialization (is a VM ref type).
+template <typename T, typename = void>
+struct is_vm_ref_type : std::false_type {};
+template <typename T>
+struct is_vm_ref_type<T, std::void_t<decltype(ref_type_descriptor<T>::type())>>
+    : std::true_type {};
+
 template <typename T>
 using enable_if_primitive =
     typename std::enable_if<std::is_arithmetic<T>::value ||
@@ -171,7 +178,7 @@ constexpr auto splat_literal(const T& v) {
 //===----------------------------------------------------------------------===//
 // Prototyped here: https://godbolt.org/z/Tvhh7M
 
-template <typename T>
+template <typename T, typename EN = void>
 struct cconv_map;
 
 template <>
@@ -207,6 +214,10 @@ struct cconv_map<opaque_ref> {
 };
 template <typename T>
 struct cconv_map<ref<T>> {
+  static constexpr const auto conv_chars = literal("r");
+};
+template <typename T>
+struct cconv_map<T*, std::enable_if_t<is_vm_ref_type<T>::value>> {
   static constexpr const auto conv_chars = literal("r");
 };
 template <>
@@ -326,6 +337,8 @@ template <typename T>
 struct ParamUnpack<ref<T>>;
 template <typename T>
 struct ParamUnpack<const ref<T>>;
+template <typename T>
+struct ParamUnpack<T*, std::enable_if_t<is_vm_ref_type<T>::value>>;
 template <>
 struct ParamUnpack<iree_string_view_t>;
 #if defined(IREE_HAVE_STD_STRING_VIEW)
@@ -403,7 +416,8 @@ struct ParamUnpack<opaque_ref> {
 };
 
 // A `vm.ref<T>` type, possibly null.
-// Ownership is transferred to the parameter.
+// Takes ownership from args_storage. The ref is already retained/moved by
+// dispatch. We zero the source so cleanup doesn't double-release.
 template <typename T>
 struct ParamUnpack<ref<T>> {
   using storage_type = ref<T>;
@@ -412,7 +426,7 @@ struct ParamUnpack<ref<T>> {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::type()) {
-      out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
+      out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
       status = iree_make_status(
@@ -438,7 +452,7 @@ struct ParamUnpack<const ref<T>> {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::type()) {
-      out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
+      out_param = vm::assign_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
       status = iree_make_status(
@@ -451,6 +465,32 @@ struct ParamUnpack<const ref<T>> {
           iree_vm_ref_type_name(ref_type_descriptor<T>::type()).data);
     } else {
       out_param = {};
+    }
+  }
+};
+
+// A borrowed `T*` pointer to a vm.ref<T>, possibly null.
+// The pointer is valid for the duration of the call. Cleanup releases.
+template <typename T>
+struct ParamUnpack<T*, std::enable_if_t<is_vm_ref_type<T>::value>> {
+  using storage_type = T*;
+  static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    ptr = align_ptr<iree_vm_ref_t>(ptr);
+    auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
+    ptr += sizeof(iree_vm_ref_t);
+    if (reg_ptr->type == ref_type_descriptor<T>::type()) {
+      out_param = reinterpret_cast<T*>(reg_ptr->ptr);
+    } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "parameter contains a reference to the wrong type; "
+          "have %.*s but expected %.*s",
+          (int)iree_vm_ref_type_name(reg_ptr->type).size,
+          iree_vm_ref_type_name(reg_ptr->type).data,
+          (int)iree_vm_ref_type_name(ref_type_descriptor<T>::type()).size,
+          iree_vm_ref_type_name(ref_type_descriptor<T>::type()).data);
+    } else {
+      out_param = nullptr;
     }
   }
 };

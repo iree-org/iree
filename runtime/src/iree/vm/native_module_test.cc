@@ -463,5 +463,449 @@ INSTANTIATE_TEST_SUITE_P(ModuleImpls, VMNativeModuleAlignmentTest,
                          ::testing::Values(ModuleImpl::kC, ModuleImpl::kCpp),
                          ModuleImplName);
 
+//===----------------------------------------------------------------------===//
+// Borrowed pointer (T*) alignment tests - C++ only
+//===----------------------------------------------------------------------===//
+// These tests specifically exercise ParamUnpack<T*> which had a missing
+// alignment bug. They use actual non-null buffers to verify the data is
+// correctly read after alignment.
+
+class VMNativeModuleBorrowedPtrTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
+  }
+
+  virtual void TearDown() { iree_vm_instance_release(instance_); }
+
+  iree_vm_context_t* CreateCppContext() {
+    iree_vm_module_t* module = nullptr;
+    IREE_CHECK_OK(
+        module_cpp_create(instance_, iree_allocator_system(), &module));
+
+    iree_vm_context_t* context = NULL;
+    std::vector<iree_vm_module_t*> modules = {module};
+    IREE_CHECK_OK(iree_vm_context_create_with_modules(
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
+        iree_allocator_system(), &context));
+
+    iree_vm_module_release(module);
+    return context;
+  }
+
+  // Creates a buffer with the given length filled with zeros.
+  vm::ref<iree_vm_buffer_t> CreateBuffer(iree_host_size_t length) {
+    vm::ref<iree_vm_buffer_t> buffer;
+    IREE_CHECK_OK(iree_vm_buffer_create(
+        IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_HOST,
+        length, /*alignment=*/0, iree_allocator_system(), &buffer));
+    return buffer;
+  }
+
+  iree_vm_instance_t* instance_ = nullptr;
+};
+
+// Test borrowed ref after 4 bytes (i32) - needs alignment.
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedI32Ref_NullBuffer) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_i32_ref"),
+      &function));
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 2,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(42);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  iree_vm_ref_t null_ref = iree_vm_ref_null();
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &null_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 42);  // 42 + 0 (null buffer)
+
+  iree_vm_context_release(context);
+}
+
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedI32Ref_WithBuffer) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_i32_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer = CreateBuffer(10);  // 10 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 2,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(42);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  iree_vm_ref_t buffer_ref = iree_vm_buffer_retain_ref(buffer.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 52);  // 42 + 10 (buffer length)
+
+  iree_vm_context_release(context);
+}
+
+// Test borrowed ref after 8 bytes (2x i32) - already aligned.
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedI32x2Ref_WithBuffer) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_i32x2_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer = CreateBuffer(5);  // 5 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 3,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(10);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i32(20);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  iree_vm_ref_t buffer_ref = iree_vm_buffer_retain_ref(buffer.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 35);  // 10 + 20 + 5
+
+  iree_vm_context_release(context);
+}
+
+// Test borrowed ref after 12 bytes (3x i32) - THIS IS THE BUG CASE!
+// The ref needs 8-byte alignment, but 12 bytes is not aligned.
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedI32x3Ref_WithBuffer) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_i32x3_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer = CreateBuffer(7);  // 7 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 4,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(1);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i32(2);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  auto arg2 = iree_vm_value_make_i32(3);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg2));
+  iree_vm_ref_t buffer_ref = iree_vm_buffer_retain_ref(buffer.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 13);  // 1 + 2 + 3 + 7
+
+  iree_vm_context_release(context);
+}
+
+// Test borrowed ref after 16 bytes (4x i32) - already aligned.
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedI32x4Ref_WithBuffer) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_i32x4_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer = CreateBuffer(8);  // 8 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 5,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(1);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i32(2);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  auto arg2 = iree_vm_value_make_i32(3);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg2));
+  auto arg3 = iree_vm_value_make_i32(4);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg3));
+  iree_vm_ref_t buffer_ref = iree_vm_buffer_retain_ref(buffer.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 18);  // 1 + 2 + 3 + 4 + 8
+
+  iree_vm_context_release(context);
+}
+
+// Test borrowed ref after 20 bytes (5x i32) - needs alignment.
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedI32x5Ref_WithBuffer) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_i32x5_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer = CreateBuffer(11);  // 11 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 6,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(1);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i32(2);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  auto arg2 = iree_vm_value_make_i32(3);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg2));
+  auto arg3 = iree_vm_value_make_i32(4);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg3));
+  auto arg4 = iree_vm_value_make_i32(5);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg4));
+  iree_vm_ref_t buffer_ref = iree_vm_buffer_retain_ref(buffer.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 26);  // 1 + 2 + 3 + 4 + 5 + 11
+
+  iree_vm_context_release(context);
+}
+
+// Test borrowed ref/i32/ref pattern with actual buffers.
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedRefI32Ref_WithBuffers) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_ref_i32_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer1 = CreateBuffer(3);   // 3 bytes
+  vm::ref<iree_vm_buffer_t> buffer2 = CreateBuffer(13);  // 13 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 3,
+                                     iree_allocator_system(), &inputs));
+  iree_vm_ref_t buffer1_ref = iree_vm_buffer_retain_ref(buffer1.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer1_ref));
+  auto arg1 = iree_vm_value_make_i32(100);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  iree_vm_ref_t buffer2_ref = iree_vm_buffer_retain_ref(buffer2.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer2_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 116);  // 3 + 100 + 13
+
+  iree_vm_context_release(context);
+}
+
+// Test two consecutive borrowed refs.
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedRefRef_WithBuffers) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_ref_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer1 = CreateBuffer(17);  // 17 bytes
+  vm::ref<iree_vm_buffer_t> buffer2 = CreateBuffer(23);  // 23 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 2,
+                                     iree_allocator_system(), &inputs));
+  iree_vm_ref_t buffer1_ref = iree_vm_buffer_retain_ref(buffer1.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer1_ref));
+  iree_vm_ref_t buffer2_ref = iree_vm_buffer_retain_ref(buffer2.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer2_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 40);  // 17 + 23
+
+  iree_vm_context_release(context);
+}
+
+// Test borrowed ref after i64 (already aligned).
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedI64Ref_WithBuffer) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_i64_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer = CreateBuffer(6);  // 6 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 2,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i64(50);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  iree_vm_ref_t buffer_ref = iree_vm_buffer_retain_ref(buffer.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 56);  // 50 + 6
+
+  iree_vm_context_release(context);
+}
+
+// Test borrowed ref after i32+i64 (tests complex alignment).
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedI32I64Ref_WithBuffer) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_i32_i64_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer = CreateBuffer(4);  // 4 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 3,
+                                     iree_allocator_system(), &inputs));
+  auto arg0 = iree_vm_value_make_i32(10);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg0));
+  auto arg1 = iree_vm_value_make_i64(200);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  iree_vm_ref_t buffer_ref = iree_vm_buffer_retain_ref(buffer.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 214);  // 10 + 200 + 4
+
+  iree_vm_context_release(context);
+}
+
+// Test i64 between two borrowed refs.
+TEST_F(VMNativeModuleBorrowedPtrTest, BorrowedRefI64Ref_WithBuffers) {
+  iree_vm_context_t* context = CreateCppContext();
+
+  iree_vm_function_t function;
+  IREE_ASSERT_OK(iree_vm_context_resolve_function(
+      context, iree_make_cstring_view("module_cpp.borrowed_ref_i64_ref"),
+      &function));
+
+  vm::ref<iree_vm_buffer_t> buffer1 = CreateBuffer(8);   // 8 bytes
+  vm::ref<iree_vm_buffer_t> buffer2 = CreateBuffer(12);  // 12 bytes
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 3,
+                                     iree_allocator_system(), &inputs));
+  iree_vm_ref_t buffer1_ref = iree_vm_buffer_retain_ref(buffer1.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer1_ref));
+  auto arg1 = iree_vm_value_make_i64(500);
+  IREE_ASSERT_OK(iree_vm_list_push_value(inputs.get(), &arg1));
+  iree_vm_ref_t buffer2_ref = iree_vm_buffer_retain_ref(buffer2.get());
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(inputs.get(), &buffer2_ref));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     iree_allocator_system(), &outputs));
+
+  IREE_ASSERT_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.get(), outputs.get(),
+                                iree_allocator_system()));
+
+  iree_vm_value_t result;
+  IREE_ASSERT_OK(iree_vm_list_get_value(outputs.get(), 0, &result));
+  EXPECT_EQ(result.i32, 520);  // 8 + 500 + 12
+
+  iree_vm_context_release(context);
+}
+
 }  // namespace
 }  // namespace iree
