@@ -56,8 +56,8 @@ hal.executable public @coalesced_dma_to_lds {
           // CHECK-COUNT-4: amdgpu.gather_to_lds
           // CHECK-NOT: iree_gpu.coalesced_gather_dma
           iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
-            memref<4x256xf32, #amdgpu.address_space<fat_raw_buffer>>,
-            memref<4x256xf32, #gpu.address_space<workgroup>>, index
+            (memref<4x256xf32, #amdgpu.address_space<fat_raw_buffer>>,
+            memref<4x256xf32, #gpu.address_space<workgroup>>, index) -> ()
         } {mapping = [#gpu.thread<linear_dim_0>]}
         return
       }
@@ -123,8 +123,8 @@ hal.executable public @coalesced_dma_matmul_operand {
           // CHECK-COUNT-8: amdgpu.gather_to_lds {{.*}} : vector<4xf32>
           // CHECK-NOT: iree_gpu.coalesced_gather_dma
           iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
-            memref<32x64xf32, #amdgpu.address_space<fat_raw_buffer>>,
-            memref<32x64xf32, #gpu.address_space<workgroup>>, index
+            (memref<32x64xf32, #amdgpu.address_space<fat_raw_buffer>>,
+            memref<32x64xf32, #gpu.address_space<workgroup>>, index) -> ()
         } {mapping = [#gpu.thread<linear_dim_0>]}
         return
       }
@@ -183,8 +183,8 @@ hal.executable public @coalesced_dma_f16 {
           // CHECK-COUNT-2: amdgpu.gather_to_lds
           // CHECK-NOT: iree_gpu.coalesced_gather_dma
           iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
-            memref<2x128xf16, #amdgpu.address_space<fat_raw_buffer>>,
-            memref<2x128xf16, #gpu.address_space<workgroup>>, index
+            (memref<2x128xf16, #amdgpu.address_space<fat_raw_buffer>>,
+            memref<2x128xf16, #gpu.address_space<workgroup>>, index) -> ()
         } {mapping = [#gpu.thread<linear_dim_0>]}
         return
       }
