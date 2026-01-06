@@ -465,12 +465,6 @@ def get_enabled_jobs(
             file=sys.stderr,
         )
         return all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS
-    if is_llvm_integrate_pr:
-        print(
-            "Running all jobs (excluding schedule-only) because run was triggered by an LLVM integrate pull request event.",
-            file=sys.stderr,
-        )
-        return all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS
 
     if Trailer.SKIP_CI in trailers:
         if (
@@ -512,6 +506,13 @@ def get_enabled_jobs(
             f"Jobs cannot be specified in both '{Trailer.SKIP_JOBS}' and"
             f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}"
         )
+
+    if is_llvm_integrate_pr:
+        print(
+            "Running all jobs (excluding schedule-only) because run was triggered by an LLVM integrate pull request event.",
+            file=sys.stderr,
+        )
+        return (all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS) | extra_jobs
 
     enabled_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS - DEFAULT_SCHEDULE_ONLY_JOBS
 
