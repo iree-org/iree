@@ -406,7 +406,6 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather"> {
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$transformation_region);
   let hasVerifier = 1;
-  let hasCanonicalizer = 1;
   let assemblyFormat = [{
     attr-dict $source `into` $output
     $transformation_region

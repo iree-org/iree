@@ -2967,12 +2967,6 @@ MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
   IREE::LinalgExt::YieldOp::create(builder, loc, yieldOperands);
   return op;
 }
-
-void MapGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                              MLIRContext *context) {
-  // Add canonicalization patterns here when needed.
-}
-
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 
 // clang-format off
