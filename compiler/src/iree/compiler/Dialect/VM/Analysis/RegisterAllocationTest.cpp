@@ -15,6 +15,12 @@ class RegisterAllocationTestPass
     : public PassWrapper<RegisterAllocationTestPass,
                          OperationPass<IREE::VM::FuncOp>> {
 public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(RegisterAllocationTestPass)
+
+  RegisterAllocationTestPass() = default;
+  RegisterAllocationTestPass(const RegisterAllocationTestPass &pass)
+      : PassWrapper(pass) {}
+
   StringRef getArgument() const override {
     return "test-iree-vm-register-allocation";
   }

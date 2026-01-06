@@ -655,7 +655,6 @@ iree_status_t iree_vm_bytecode_function_verify(
   IREE_VM_VERIFY_REG_F32(name##_ordinal);     \
   pc += IREE_REGISTER_ORDINAL_SIZE;
 // Operand ref - rejects MOVE bit (default, for ops that don't support MOVE).
-#if 0
 #define VM_VerifyOperandRegRef(name)                                     \
   IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal);                            \
   IREE_VM_VERIFY_REG_REF(name##_ordinal);                                \
@@ -665,14 +664,6 @@ iree_status_t iree_vm_bytecode_function_verify(
                             "support MOVE");                             \
   }                                                                      \
   pc += IREE_REGISTER_ORDINAL_SIZE;
-#else
-// TODO(benvanik): when we have the compiler upgraded to emit moves correctly we
-// can re-enable this.
-#define VM_VerifyOperandRegRef(name)          \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_REF(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#endif  // 0
 // Operand ref - allows MOVE bit (for ops that support ownership transfer).
 #define VM_VerifyOperandRegRefMove(name)      \
   IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \

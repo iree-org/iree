@@ -105,8 +105,9 @@ struct FuncAnalysis {
   bool isMove(Value ref, Operation *op) {
     assert(isa<IREE::VM::RefType>(ref.getType()));
     assert(valueLiveness.has_value());
-    bool lastUse = valueLiveness.value().isLastValueUse(ref, op);
-    return lastUse && false;
+    // NOTE: EmitC codegen doesn't support MOVE semantics - always use
+    // retain/assign instead of move. The && false disables MOVE intentionally.
+    return valueLiveness.value().isLastValueUse(ref, op) && false;
   }
 
   void cacheLocalRef(int64_t ordinal, Value ref) {
@@ -205,10 +206,10 @@ struct ModuleAnalysis {
   }
 
   void move(mlir::emitc::FuncOp newFunc, IREE::VM::FuncOp oldFunc) {
-    auto ptr = functions.find(oldFunc.getOperation());
-    assert(ptr != functions.end() && "analysis lookup failed");
-    FuncAnalysis analysis = std::move(ptr->second);
-    functions.erase(ptr);
+    // Move to local first - the map insertion below can grow the map and
+    // invalidate references to existing entries.
+    FuncAnalysis analysis = std::move(lookupFunction(oldFunc.getOperation()));
+    functions.erase(oldFunc.getOperation());
     functions[newFunc.getOperation()] = std::move(analysis);
     functionMapping[oldFunc] = newFunc;
   }

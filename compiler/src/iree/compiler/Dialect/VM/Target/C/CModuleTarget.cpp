@@ -79,13 +79,6 @@ canonicalizeModule(IREE::VM::ModuleOp moduleOp,
   modulePasses.addPass(createDropExcludedExportsPass());
   modulePasses.addPass(mlir::createSymbolDCEPass());
 
-  // In the the Bytecode module the order is:
-  // * `createDropCompilerHintsPass()`
-  // * `IREE::VM::createOrdinalAllocationPass()`
-  // Here, we have to reverse the order and run
-  // `createConvertVMToEmitCPass()` inbetween to test the EmitC pass.
-  // Otherwise, the constants get folded by the canonicalizer.
-
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
   // binary output.
@@ -96,6 +89,10 @@ canonicalizeModule(IREE::VM::ModuleOp moduleOp,
   // C target specific pass
   modulePasses.addPass(createConvertVMToEmitCPass());
 
+  // Drop optimization barriers after EmitC conversion. Must be after conversion
+  // so barriers prevent folding during VM-level canonicalization, but the
+  // subsequent canonicalizer only sees EmitC ops (which don't fold VM
+  // constants).
   modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
   modulePasses.addPass(mlir::createCanonicalizerPass());
 

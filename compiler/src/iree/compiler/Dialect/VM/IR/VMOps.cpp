@@ -787,11 +787,45 @@ void ConstRefZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 }
 
 FailureOr<bool> DiscardRefsOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
-  // TODO(benvanik): implement when new register allocator is ready.
-  return false;
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Collect non-elidable operands. An operand is elidable if it was already
+  // released via MOVE on a preceding operation.
+  SmallVector<std::pair<Value, int>> toEncode;
+  for (auto [idx, ref] : llvm::enumerate(getRefs())) {
+    bool elidable = regAlloc && regAlloc->isDiscardOperandElidable(
+                                    getOperation(), static_cast<unsigned>(idx));
+    if (!elidable) {
+      toEncode.push_back({ref, static_cast<int>(idx)});
+    }
+  }
+
+  // Skip entirely if all operands are elidable.
+  if (toEncode.empty()) {
+    return false;
+  }
+
+  // Encode opcode + filtered operands.
+  if (failed(e.encodeOpcode("DiscardRefs",
+                            static_cast<int>(Opcode::DiscardRefs))) ||
+      failed(e.encodeOperands(toEncode))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
 }
 
 FailureOr<bool> AssignRefOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Elide when source and result are the same register.
+  if (regAlloc) {
+    int srcOrdinal = regAlloc->mapValueToRegisterOrdinal(getSource());
+    int dstOrdinal = regAlloc->mapValueToRegisterOrdinal(getResult());
+    if (srcOrdinal == dstOrdinal) {
+      return false;
+    }
+  }
+
   if (failed(
           e.encodeOpcode("AssignRef", static_cast<int>(Opcode::AssignRef))) ||
       failed(e.encodeOperand(getSource(), 0)) ||
@@ -1013,6 +1047,17 @@ ParseResult SwitchRefOp::parse(OpAsmParser &parser, OperationState &result) {
 void SwitchRefOp::print(OpAsmPrinter &p) { printSwitchOp(p, *this); }
 
 FailureOr<bool> CastRefAnyOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Elide when operand and result are the same register.
+  if (regAlloc) {
+    int srcOrdinal = regAlloc->mapValueToRegisterOrdinal(getOperand());
+    int dstOrdinal = regAlloc->mapValueToRegisterOrdinal(getResult());
+    if (srcOrdinal == dstOrdinal) {
+      return false;
+    }
+  }
+
   // Uses same encoding as AssignRef since widening casts are no-ops at runtime.
   if (failed(
           e.encodeOpcode("AssignRef", static_cast<int>(Opcode::AssignRef))) ||

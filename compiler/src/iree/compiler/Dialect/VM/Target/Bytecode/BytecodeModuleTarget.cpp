@@ -174,10 +174,18 @@ canonicalizeModule(IREE::VM::BytecodeTargetOptions bytecodeOptions,
     // TODO(benvanik): run this as part of a fixed-point iteration.
     modulePasses.addPass(mlir::createInlinerPass());
     modulePasses.addPass(mlir::createCSEPass());
+    // TODO(benvanik): re-evaluate whether this canonicalizer pass should exist
+    // in the bytecode target. It may be removing ops (like vm.discard.refs)
+    // that were intentionally inserted by earlier passes.
     modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
   modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
+
+  // Insert explicit discard ops for ref values at their last use points.
+  // Uses edge-based placement: refs dying on control flow edges get discards
+  // inserted on those edges, refs dying mid-block get discards after last use.
+  modulePasses.addPass(IREE::VM::createMaterializeRefDiscardsPass());
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
