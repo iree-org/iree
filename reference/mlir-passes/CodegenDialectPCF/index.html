@@ -8,13 +8,9 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/reference/mlir-dialects/IREECodegen/">
+        <link rel="canonical" href="https://iree.dev/reference/mlir-passes/CodegenDialectPCF/">
       
       
-        <link rel="prev" href="../TensorExt/">
-      
-      
-        <link rel="next" href="../IREEGPU/">
       
       
       <link rel="icon" href="../../../assets/images/IREE_Logo_Icon_Color.svg">
@@ -22,7 +18,7 @@
     
     
       
-        <title>IREECodegen - IREE</title>
+        <title>CodegenDialectPCF - IREE</title>
       
     
     
@@ -78,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#iree_codegen-dialect" class="md-skip">
+        <a href="#-iree-pcf-convert-forall-to-loops" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              IREECodegen
+              CodegenDialectPCF
             
           </span>
         </div>
@@ -269,12 +265,10 @@
         
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="../../" class="md-tabs__link">
           
   
@@ -1122,8 +1116,6 @@
       
   
   
-    
-  
   
   
     
@@ -1144,19 +1136,18 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
         
           
           
@@ -1172,13 +1163,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             Reference
@@ -1209,13 +1200,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1224,7 +1212,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
         
           
-          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1372,13 +1360,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1400,7 +1385,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -1473,8 +1458,6 @@
                 
   
   
-    
-  
   
   
     
@@ -1497,22 +1480,21 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../mlir-dialects/" class="md-nav__link ">
               
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16 16 0 0 0-1.19 1.487 6 6 0 0 0-.446.719 3 3 0 0 0-.249.596.5.5 0 0 0-.033.177v.004a.3.3 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8 8 0 0 1-.434 2.327q-.024-.015-.04-.013c-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.4.4 0 0 0-.03.14.3.3 0 0 0 .01.088c.01.037.022.058.022.058l-.003.007a.14.14 0 0 0-.028.067l-.012.029a7 7 0 0 1-.257.527l-.077.142-.07.115-.022-.014a.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.4 1.4 0 0 1-.32.114 14 14 0 0 0 .248-2.07 5 5 0 0 0-.064-1.057q.004-.016.003-.017l-.005.01a4 4 0 0 0-.104-.458 3.55 3.55 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002q0-.012.002-.022c.02-.098.024-.127-.087-.032l-.057.054-.146.007a1 1 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.6.6 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.1 1.1 0 0 0-.13.348q-.048.022-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.6 1.6 0 0 0-.146.406 2 2 0 0 0-.105.08 3 3 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a2 2 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3 3 0 0 0 .014.33q.031.356.107.605c-.095.13-.103.689-.01.818.073.104.496.35.586.399a.4.4 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32s.415-.023.463-.118c.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.7.7 0 0 1-.201.172c.12.005.24-.051.304-.087a1 1 0 0 0 .07.045l-.05.05a.5.5 0 0 0 .109-.022.3.3 0 0 0 .084.022c.155.012.57-.368.57-.439q-.002-.028-.038-.063c-.042-.045-.12-.1-.207-.177a1 1 0 0 1-.11-.116.7.7 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.05 3.05 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a5 5 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a4 4 0 0 1-.066.193 1 1 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a6 6 0 0 1-.101.237 1 1 0 0 0-.08.017c-.142.036-.088.05-.024.09l.04.027a7 7 0 0 1-.107.214 1 1 0 0 0-.153.025c-.14.036-.087.05-.023.09q.05.03.08.059l-.094.165-.023.036a.6.6 0 0 0-.206.024c-.142.036-.088.05-.024.09a.7.7 0 0 1 .104.079l-.126.18a.5.5 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.9.9 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a1 1 0 0 0-.228.059l-.034-.02a11 11 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3 3 0 0 0-.338-.277 2 2 0 0 0-.242-.166l-.088-.127a12 12 0 0 1-.363-.628 11 11 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.6 5.6 0 0 1-.148-.923 2 2 0 0 1 .004-.242.41.41 0 0 0 .158-.323.41.41 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8l-.027.033-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a4 4 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.7 4.7 0 0 1 .552-.67 3.6 3.6 0 0 1 .54-.435q.048.166.093.276-.029-.145-.052-.282c.107.01.538.066 1.206.393.343.168.609.395.798.595l-.014.006s.123.112.269.403a2.4 2.4 0 0 0-.73.084 3 3 0 0 0-.098-.19.5.5 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.4.4 0 0 0-.104-.073.2.2 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a5 5 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963l-.014-.028.014.021a1.63 1.63 0 0 1-.167-1.03l.008-.002q.07.044.134.126c.128.172.188.349.212.47a.53.53 0 0 0 .067.383 18 18 0 0 1-.72.501c-.23.15-.49.313-.757.47q-.21.121-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.28 1.28 0 0 0 .552 1.38l.012.008q.02.014.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a4 4 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982q.15.08.306.166c2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.1.1 0 0 0-.02-.006v.006a6 6 0 0 1-.647-.05l-.03-.004v-.003l-.001.002a6.3 6.3 0 0 1-1.556-.436 8 8 0 0 1-.745-.362 57 57 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09l.053-.022q.06-.016.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715q.096-.041.2-.067c.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053q.213-.162.334-.305a1 1 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.4.4 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.3 1.3 0 0 1-.166.092 1 1 0 0 0-.055-.116q.241-.145.494-.308c.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.8 1.8 0 0 1 .481.344 2.1 2.1 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18 18 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a7 7 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.6 1.6 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a14 14 0 0 0-.89.994l-.075.095-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09l.012.006zm-.263 2.606q.133.064.303.194h-.005a.5.5 0 0 0-.155.07 1 1 0 0 1-.126-.224zm-4.855 1.57q.198-.002.432.047l.02.005.017.004q.165.041.337.102l.057.021q.287.11.611.248c.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542"/></svg>
@@ -1525,13 +1507,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_4">
             <span class="md-nav__icon md-icon"></span>
             MLIR dialects
@@ -1591,6 +1573,764 @@
           <label class="md-nav__title" for="__nav_4_4_2">
             <span class="md-nav__icon md-icon"></span>
             Core
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Flow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Flow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/HAL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    HAL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Stream/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Stream
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Util
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/VM/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VM
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_3" id="__nav_4_4_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    MLIR extensions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            MLIR extensions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Encoding/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Encoding
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/LinalgExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    LinalgExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/TensorExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    TensorExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_4" id="__nav_4_4_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Codegen/target-specific
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            Codegen/target-specific
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/IREECodegen/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREECodegen
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/IREEGPU/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREEGPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/IREEVectorExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREEVectorExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/VMVX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VMVX
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_5" id="__nav_4_4_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Optional modules
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            Optional modules
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_5_2" id="__nav_4_4_5_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    HAL
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_4_4_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            HAL
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/HALInline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inline
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/HALLoader/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Loader
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_5_3" id="__nav_4_4_5_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    IO
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_4_4_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            IO
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/IOParameters/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Parameters
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16 16 0 0 0-1.19 1.487 6 6 0 0 0-.446.719 3 3 0 0 0-.249.596.5.5 0 0 0-.033.177v.004a.3.3 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8 8 0 0 1-.434 2.327q-.024-.015-.04-.013c-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.4.4 0 0 0-.03.14.3.3 0 0 0 .01.088c.01.037.022.058.022.058l-.003.007a.14.14 0 0 0-.028.067l-.012.029a7 7 0 0 1-.257.527l-.077.142-.07.115-.022-.014a.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.4 1.4 0 0 1-.32.114 14 14 0 0 0 .248-2.07 5 5 0 0 0-.064-1.057q.004-.016.003-.017l-.005.01a4 4 0 0 0-.104-.458 3.55 3.55 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002q0-.012.002-.022c.02-.098.024-.127-.087-.032l-.057.054-.146.007a1 1 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.6.6 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.1 1.1 0 0 0-.13.348q-.048.022-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.6 1.6 0 0 0-.146.406 2 2 0 0 0-.105.08 3 3 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a2 2 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3 3 0 0 0 .014.33q.031.356.107.605c-.095.13-.103.689-.01.818.073.104.496.35.586.399a.4.4 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32s.415-.023.463-.118c.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.7.7 0 0 1-.201.172c.12.005.24-.051.304-.087a1 1 0 0 0 .07.045l-.05.05a.5.5 0 0 0 .109-.022.3.3 0 0 0 .084.022c.155.012.57-.368.57-.439q-.002-.028-.038-.063c-.042-.045-.12-.1-.207-.177a1 1 0 0 1-.11-.116.7.7 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.05 3.05 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a5 5 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a4 4 0 0 1-.066.193 1 1 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a6 6 0 0 1-.101.237 1 1 0 0 0-.08.017c-.142.036-.088.05-.024.09l.04.027a7 7 0 0 1-.107.214 1 1 0 0 0-.153.025c-.14.036-.087.05-.023.09q.05.03.08.059l-.094.165-.023.036a.6.6 0 0 0-.206.024c-.142.036-.088.05-.024.09a.7.7 0 0 1 .104.079l-.126.18a.5.5 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.9.9 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a1 1 0 0 0-.228.059l-.034-.02a11 11 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3 3 0 0 0-.338-.277 2 2 0 0 0-.242-.166l-.088-.127a12 12 0 0 1-.363-.628 11 11 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.6 5.6 0 0 1-.148-.923 2 2 0 0 1 .004-.242.41.41 0 0 0 .158-.323.41.41 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8l-.027.033-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a4 4 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.7 4.7 0 0 1 .552-.67 3.6 3.6 0 0 1 .54-.435q.048.166.093.276-.029-.145-.052-.282c.107.01.538.066 1.206.393.343.168.609.395.798.595l-.014.006s.123.112.269.403a2.4 2.4 0 0 0-.73.084 3 3 0 0 0-.098-.19.5.5 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.4.4 0 0 0-.104-.073.2.2 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a5 5 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963l-.014-.028.014.021a1.63 1.63 0 0 1-.167-1.03l.008-.002q.07.044.134.126c.128.172.188.349.212.47a.53.53 0 0 0 .067.383 18 18 0 0 1-.72.501c-.23.15-.49.313-.757.47q-.21.121-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.28 1.28 0 0 0 .552 1.38l.012.008q.02.014.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a4 4 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982q.15.08.306.166c2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.1.1 0 0 0-.02-.006v.006a6 6 0 0 1-.647-.05l-.03-.004v-.003l-.001.002a6.3 6.3 0 0 1-1.556-.436 8 8 0 0 1-.745-.362 57 57 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09l.053-.022q.06-.016.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715q.096-.041.2-.067c.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053q.213-.162.334-.305a1 1 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.4.4 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.3 1.3 0 0 1-.166.092 1 1 0 0 0-.055-.116q.241-.145.494-.308c.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.8 1.8 0 0 1 .481.344 2.1 2.1 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18 18 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a7 7 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.6 1.6 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a14 14 0 0 0-.89.994l-.075.095-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09l.012.006zm-.263 2.606q.133.064.303.194h-.005a.5.5 0 0 0-.155.07 1 1 0 0 1-.126-.224zm-4.855 1.57q.198-.002.432.047l.02.005.017.004q.165.041.337.102l.057.021q.287.11.611.248c.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542"/></svg>
+  
+  <span class="md-ellipsis">
+    MLIR passes
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            MLIR passes
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5_2" id="__nav_4_5_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Core dialects
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            Core dialects
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1722,1434 +2462,6 @@
       
         
       
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_3" id="__nav_4_4_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    MLIR extensions
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4_3">
-            <span class="md-nav__icon md-icon"></span>
-            MLIR extensions
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../Encoding/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Encoding
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../LinalgExt/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    LinalgExt
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../TensorExt/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    TensorExt
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4_4" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_4" id="__nav_4_4_4_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Codegen/target-specific
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_4_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4_4_4">
-            <span class="md-nav__icon md-icon"></span>
-            Codegen/target-specific
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    IREECodegen
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  <span class="md-ellipsis">
-    IREECodegen
-  </span>
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Operations
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenfusion_barrier-codegenfusionbarrierop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegeninner_tiled-codegeninnertiledop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.inner_tiled (Codegen::InnerTiledOp)
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="iree_codegen.inner_tiled (Codegen::InnerTiledOp)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#motivation-design-choices-and-pitfalls" class="md-nav__link">
-    <span class="md-ellipsis">
-      Motivation, Design Choices, and Pitfalls
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenload_from_buffer-codegenloadfrombufferop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegennull_pointer-codegennullpointerop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.null_pointer (Codegen::NullPointerOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenstore_to_buffer-codegenstoretobufferop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenswizzle_hint-codegenswizzlehintop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#common-usage-linearized-workgroup-counts" class="md-nav__link">
-    <span class="md-ellipsis">
-      Common Usage: Linearized Workgroup Counts
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#attributes_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      Attributes
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Attributes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#denormalfpmathattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DenormalFpMathAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dispatchloweringpasspipelineattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DispatchLoweringPassPipelineAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#compilationinfoattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      CompilationInfoAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#exportconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ExportConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loweringconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LoweringConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loweringconfigtilinglevelattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LoweringConfigTilingLevelAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loweringconfigtilinglevelsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LoweringConfigTilingLevelsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rotaterowsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      RotateRowsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#simpletargetattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      SimpleTargetAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#symbolicukernelproviderattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      SymbolicUKernelProviderAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#translationinfoattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      TranslationInfoAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ukerneldescriptorattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      UKernelDescriptorAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#xorshuffleattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      XORShuffleAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#localmappingattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LocalMappingAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#workgroupmappingattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      WorkgroupMappingAttr
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#types" class="md-nav__link">
-    <span class="md-ellipsis">
-      Types
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Types">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#nullpointertype" class="md-nav__link">
-    <span class="md-ellipsis">
-      NullPointerType
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enums" class="md-nav__link">
-    <span class="md-ellipsis">
-      Enums
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Enums">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#binaryfn" class="md-nav__link">
-    <span class="md-ellipsis">
-      BinaryFn
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="BinaryFn">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#denormalfpmath" class="md-nav__link">
-    <span class="md-ellipsis">
-      DenormalFpMath
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DenormalFpMath">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dispatchloweringpasspipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      DispatchLoweringPassPipeline
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DispatchLoweringPassPipeline">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#elementwisearitygroup" class="md-nav__link">
-    <span class="md-ellipsis">
-      ElementwiseArityGroup
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ElementwiseArityGroup">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_3" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#elementwisecaselimits" class="md-nav__link">
-    <span class="md-ellipsis">
-      ElementwiseCaseLimits
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ElementwiseCaseLimits">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#elementwisekind" class="md-nav__link">
-    <span class="md-ellipsis">
-      ElementwiseKind
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ElementwiseKind">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_5" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iteratortype" class="md-nav__link">
-    <span class="md-ellipsis">
-      IteratorType
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="IteratorType">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_6" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ternaryfn" class="md-nav__link">
-    <span class="md-ellipsis">
-      TernaryFn
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TernaryFn">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#typefn" class="md-nav__link">
-    <span class="md-ellipsis">
-      TypeFn
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TypeFn">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_8" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ukernelargumentkind" class="md-nav__link">
-    <span class="md-ellipsis">
-      UKernelArgumentKind
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="UKernelArgumentKind">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_9" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#unaryfn" class="md-nav__link">
-    <span class="md-ellipsis">
-      UnaryFn
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="UnaryFn">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_10" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#winogradconv2dfmr" class="md-nav__link">
-    <span class="md-ellipsis">
-      WinogradConv2DFmr
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="WinogradConv2DFmr">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_11" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#workgroupid" class="md-nav__link">
-    <span class="md-ellipsis">
-      WorkgroupId
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="WorkgroupId">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_12" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../IREEGPU/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    IREEGPU
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../IREEVectorExt/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    IREEVectorExt
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../VMVX/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    VMVX
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_5" id="__nav_4_4_5_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Optional modules
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4_5">
-            <span class="md-nav__icon md-icon"></span>
-            Optional modules
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../Check/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Check
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_5_2" id="__nav_4_4_5_2_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    HAL
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_4_4_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            HAL
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../HALInline/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Inline
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../HALLoader/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Loader
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_5_3" id="__nav_4_4_5_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    IO
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_4_4_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4_5_3">
-            <span class="md-nav__icon md-icon"></span>
-            IO
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../IOParameters/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Parameters
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-          
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-          
-          
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
-        
-          
-          
-          <div class="md-nav__link md-nav__container">
-            <a href="../../mlir-passes/" class="md-nav__link ">
-              
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16 16 0 0 0-1.19 1.487 6 6 0 0 0-.446.719 3 3 0 0 0-.249.596.5.5 0 0 0-.033.177v.004a.3.3 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8 8 0 0 1-.434 2.327q-.024-.015-.04-.013c-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.4.4 0 0 0-.03.14.3.3 0 0 0 .01.088c.01.037.022.058.022.058l-.003.007a.14.14 0 0 0-.028.067l-.012.029a7 7 0 0 1-.257.527l-.077.142-.07.115-.022-.014a.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.4 1.4 0 0 1-.32.114 14 14 0 0 0 .248-2.07 5 5 0 0 0-.064-1.057q.004-.016.003-.017l-.005.01a4 4 0 0 0-.104-.458 3.55 3.55 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002q0-.012.002-.022c.02-.098.024-.127-.087-.032l-.057.054-.146.007a1 1 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.6.6 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.1 1.1 0 0 0-.13.348q-.048.022-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.6 1.6 0 0 0-.146.406 2 2 0 0 0-.105.08 3 3 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a2 2 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3 3 0 0 0 .014.33q.031.356.107.605c-.095.13-.103.689-.01.818.073.104.496.35.586.399a.4.4 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32s.415-.023.463-.118c.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.7.7 0 0 1-.201.172c.12.005.24-.051.304-.087a1 1 0 0 0 .07.045l-.05.05a.5.5 0 0 0 .109-.022.3.3 0 0 0 .084.022c.155.012.57-.368.57-.439q-.002-.028-.038-.063c-.042-.045-.12-.1-.207-.177a1 1 0 0 1-.11-.116.7.7 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.05 3.05 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a5 5 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a4 4 0 0 1-.066.193 1 1 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a6 6 0 0 1-.101.237 1 1 0 0 0-.08.017c-.142.036-.088.05-.024.09l.04.027a7 7 0 0 1-.107.214 1 1 0 0 0-.153.025c-.14.036-.087.05-.023.09q.05.03.08.059l-.094.165-.023.036a.6.6 0 0 0-.206.024c-.142.036-.088.05-.024.09a.7.7 0 0 1 .104.079l-.126.18a.5.5 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.9.9 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a1 1 0 0 0-.228.059l-.034-.02a11 11 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3 3 0 0 0-.338-.277 2 2 0 0 0-.242-.166l-.088-.127a12 12 0 0 1-.363-.628 11 11 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.6 5.6 0 0 1-.148-.923 2 2 0 0 1 .004-.242.41.41 0 0 0 .158-.323.41.41 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8l-.027.033-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a4 4 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.7 4.7 0 0 1 .552-.67 3.6 3.6 0 0 1 .54-.435q.048.166.093.276-.029-.145-.052-.282c.107.01.538.066 1.206.393.343.168.609.395.798.595l-.014.006s.123.112.269.403a2.4 2.4 0 0 0-.73.084 3 3 0 0 0-.098-.19.5.5 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.4.4 0 0 0-.104-.073.2.2 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a5 5 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963l-.014-.028.014.021a1.63 1.63 0 0 1-.167-1.03l.008-.002q.07.044.134.126c.128.172.188.349.212.47a.53.53 0 0 0 .067.383 18 18 0 0 1-.72.501c-.23.15-.49.313-.757.47q-.21.121-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.28 1.28 0 0 0 .552 1.38l.012.008q.02.014.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a4 4 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982q.15.08.306.166c2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.1.1 0 0 0-.02-.006v.006a6 6 0 0 1-.647-.05l-.03-.004v-.003l-.001.002a6.3 6.3 0 0 1-1.556-.436 8 8 0 0 1-.745-.362 57 57 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09l.053-.022q.06-.016.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715q.096-.041.2-.067c.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053q.213-.162.334-.305a1 1 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.4.4 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.3 1.3 0 0 1-.166.092 1 1 0 0 0-.055-.116q.241-.145.494-.308c.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.8 1.8 0 0 1 .481.344 2.1 2.1 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18 18 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a7 7 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.6 1.6 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a14 14 0 0 0-.89.994l-.075.095-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09l.012.006zm-.263 2.606q.133.064.303.194h-.005a.5.5 0 0 0-.155.07 1 1 0 0 1-.126-.224zm-4.855 1.57q.198-.002.432.047l.02.005.017.004q.165.041.337.102l.057.021q.287.11.611.248c.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542"/></svg>
-  
-  <span class="md-ellipsis">
-    MLIR passes
-  </span>
-  
-
-            </a>
-            
-              
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5">
-            <span class="md-nav__icon md-icon"></span>
-            MLIR passes
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_5_2" id="__nav_4_5_2_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Core dialects
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            Core dialects
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/Flow/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Flow
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/HAL/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    HAL
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/Stream/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Stream
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/Util/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Util
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/VM/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    VM
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
         
       
         
@@ -3196,7 +2508,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/ConstEval/" class="md-nav__link">
+      <a href="../ConstEval/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3217,7 +2529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/DispatchCreation/" class="md-nav__link">
+      <a href="../DispatchCreation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3238,7 +2550,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/GlobalOptimization/" class="md-nav__link">
+      <a href="../GlobalOptimization/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3259,7 +2571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/InputConversion/" class="md-nav__link">
+      <a href="../InputConversion/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3280,7 +2592,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/Preprocessing/" class="md-nav__link">
+      <a href="../Preprocessing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3371,7 +2683,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenCommon/" class="md-nav__link">
+      <a href="../CodegenCommon/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3392,7 +2704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenCommonCPU/" class="md-nav__link">
+      <a href="../CodegenCommonCPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3413,7 +2725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenCommonGPU/" class="md-nav__link">
+      <a href="../CodegenCommonGPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3434,7 +2746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenDialectGPU/" class="md-nav__link">
+      <a href="../CodegenDialectGPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3455,7 +2767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenDialectVectorExt/" class="md-nav__link">
+      <a href="../CodegenDialectVectorExt/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3476,7 +2788,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenLLVMCPU/" class="md-nav__link">
+      <a href="../CodegenLLVMCPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3497,7 +2809,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenLLVMGPU/" class="md-nav__link">
+      <a href="../CodegenLLVMGPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3518,7 +2830,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenSPIRV/" class="md-nav__link">
+      <a href="../CodegenSPIRV/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3539,7 +2851,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenVMVX/" class="md-nav__link">
+      <a href="../CodegenVMVX/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -5236,8 +4548,6 @@
   
   
   
-    
-  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -5246,629 +4556,11 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#operations" class="md-nav__link">
+  <a href="#-iree-pcf-convert-forall-to-loops" class="md-nav__link">
     <span class="md-ellipsis">
-      Operations
+      -iree-pcf-convert-forall-to-loops
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenfusion_barrier-codegenfusionbarrierop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegeninner_tiled-codegeninnertiledop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.inner_tiled (Codegen::InnerTiledOp)
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="iree_codegen.inner_tiled (Codegen::InnerTiledOp)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#motivation-design-choices-and-pitfalls" class="md-nav__link">
-    <span class="md-ellipsis">
-      Motivation, Design Choices, and Pitfalls
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenload_from_buffer-codegenloadfrombufferop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegennull_pointer-codegennullpointerop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.null_pointer (Codegen::NullPointerOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenstore_to_buffer-codegenstoretobufferop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenswizzle_hint-codegenswizzlehintop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#common-usage-linearized-workgroup-counts" class="md-nav__link">
-    <span class="md-ellipsis">
-      Common Usage: Linearized Workgroup Counts
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#attributes_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      Attributes
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Attributes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#denormalfpmathattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DenormalFpMathAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dispatchloweringpasspipelineattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DispatchLoweringPassPipelineAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#compilationinfoattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      CompilationInfoAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#exportconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ExportConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loweringconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LoweringConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loweringconfigtilinglevelattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LoweringConfigTilingLevelAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loweringconfigtilinglevelsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LoweringConfigTilingLevelsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rotaterowsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      RotateRowsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#simpletargetattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      SimpleTargetAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#symbolicukernelproviderattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      SymbolicUKernelProviderAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#translationinfoattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      TranslationInfoAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ukerneldescriptorattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      UKernelDescriptorAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#xorshuffleattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      XORShuffleAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#localmappingattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LocalMappingAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#workgroupmappingattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      WorkgroupMappingAttr
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#types" class="md-nav__link">
-    <span class="md-ellipsis">
-      Types
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Types">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#nullpointertype" class="md-nav__link">
-    <span class="md-ellipsis">
-      NullPointerType
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enums" class="md-nav__link">
-    <span class="md-ellipsis">
-      Enums
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Enums">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#binaryfn" class="md-nav__link">
-    <span class="md-ellipsis">
-      BinaryFn
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="BinaryFn">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#denormalfpmath" class="md-nav__link">
-    <span class="md-ellipsis">
-      DenormalFpMath
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DenormalFpMath">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dispatchloweringpasspipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      DispatchLoweringPassPipeline
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DispatchLoweringPassPipeline">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#elementwisearitygroup" class="md-nav__link">
-    <span class="md-ellipsis">
-      ElementwiseArityGroup
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ElementwiseArityGroup">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_3" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#elementwisecaselimits" class="md-nav__link">
-    <span class="md-ellipsis">
-      ElementwiseCaseLimits
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ElementwiseCaseLimits">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#elementwisekind" class="md-nav__link">
-    <span class="md-ellipsis">
-      ElementwiseKind
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ElementwiseKind">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_5" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iteratortype" class="md-nav__link">
-    <span class="md-ellipsis">
-      IteratorType
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="IteratorType">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_6" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ternaryfn" class="md-nav__link">
-    <span class="md-ellipsis">
-      TernaryFn
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TernaryFn">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#typefn" class="md-nav__link">
-    <span class="md-ellipsis">
-      TypeFn
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TypeFn">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_8" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ukernelargumentkind" class="md-nav__link">
-    <span class="md-ellipsis">
-      UKernelArgumentKind
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="UKernelArgumentKind">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_9" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#unaryfn" class="md-nav__link">
-    <span class="md-ellipsis">
-      UnaryFn
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="UnaryFn">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_10" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#winogradconv2dfmr" class="md-nav__link">
-    <span class="md-ellipsis">
-      WinogradConv2DFmr
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="WinogradConv2DFmr">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_11" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#workgroupid" class="md-nav__link">
-    <span class="md-ellipsis">
-      WorkgroupId
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="WorkgroupId">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_12" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -5887,7 +4579,7 @@
                   
 
   
-    <a href="https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/reference/mlir-passes/CodegenDialectPCF.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
     </a>
@@ -5895,1885 +4587,31 @@
   
 
 
+  <h1>CodegenDialectPCF</h1>
+
 <!-- Autogenerated by mlir-tblgen; don't manually edit -->
 
-<h1 id="iree_codegen-dialect">'iree_codegen' Dialect<a class="headerlink" href="#iree_codegen-dialect" title="Permanent link">link</a></h1>
-<p><em>A dialect for common functionality used by IREE code generation.</em></p>
-<p>This dialect is primarily meant to hold attributes that carry the
-state of the compilation when lowered to scalar code for an
-architecture. Typically, a backend starts by analyzing the entry
-point functions within the <code>hal.executable.variant</code> and deciding
-which compilation pipeline to chose. During this, even the values
-for parameters such as tile sizes, etc. are also decided. The rest
-of the compilation flow does not make any heuristic decisions,
-rather just looks at the values of the decision specified in
-attributes that belong to this dialect. This allows an external
-search to easily override the heuristics that are hard-coded
-within a backend.</p>
-<div class="toc">
-<ul>
-<li><a href="#iree_codegen-dialect">'iree_codegen' Dialect</a><ul>
-<li><a href="#operations">Operations</a><ul>
-<li><a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop">iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)</a></li>
-<li><a href="#iree_codegenfusion_barrier-codegenfusionbarrierop">iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)</a></li>
-<li><a href="#iree_codegeninner_tiled-codegeninnertiledop">iree_codegen.inner_tiled (Codegen::InnerTiledOp)</a><ul>
-<li><a href="#motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls</a></li>
-</ul>
-</li>
-<li><a href="#iree_codegenload_from_buffer-codegenloadfrombufferop">iree_codegen.load_from_buffer (Codegen::LoadFromBufferOp)</a></li>
-<li><a href="#iree_codegennull_pointer-codegennullpointerop">iree_codegen.null_pointer (Codegen::NullPointerOp)</a></li>
-<li><a href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop">iree_codegen.query_tile_sizes (Codegen::QueryTileSizesOp)</a></li>
-<li><a href="#iree_codegenstore_to_buffer-codegenstoretobufferop">iree_codegen.store_to_buffer (Codegen::StoreToBufferOp)</a></li>
-<li><a href="#iree_codegenswizzle_hint-codegenswizzlehintop">iree_codegen.swizzle_hint (Codegen::SwizzleHintOp)</a></li>
-<li><a href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop">iree_codegen.workgroup_count_hint (Codegen::WorkgroupCountHintOp)</a><ul>
-<li><a href="#common-usage-linearized-workgroup-counts">Common Usage: Linearized Workgroup Counts</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a href="#attributes_4">Attributes</a><ul>
-<li><a href="#denormalfpmathattr">DenormalFpMathAttr</a></li>
-<li><a href="#dispatchloweringpasspipelineattr">DispatchLoweringPassPipelineAttr</a></li>
-<li><a href="#compilationinfoattr">CompilationInfoAttr</a></li>
-<li><a href="#exportconfigattr">ExportConfigAttr</a></li>
-<li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
-<li><a href="#loweringconfigtilinglevelattr">LoweringConfigTilingLevelAttr</a></li>
-<li><a href="#loweringconfigtilinglevelsattr">LoweringConfigTilingLevelsAttr</a></li>
-<li><a href="#rotaterowsattr">RotateRowsAttr</a></li>
-<li><a href="#simpletargetattr">SimpleTargetAttr</a></li>
-<li><a href="#symbolicukernelproviderattr">SymbolicUKernelProviderAttr</a></li>
-<li><a href="#translationinfoattr">TranslationInfoAttr</a></li>
-<li><a href="#ukerneldescriptorattr">UKernelDescriptorAttr</a></li>
-<li><a href="#xorshuffleattr">XORShuffleAttr</a></li>
-<li><a href="#localmappingattr">LocalMappingAttr</a></li>
-<li><a href="#workgroupmappingattr">WorkgroupMappingAttr</a></li>
-</ul>
-</li>
-<li><a href="#types">Types</a><ul>
-<li><a href="#nullpointertype">NullPointerType</a></li>
-</ul>
-</li>
-<li><a href="#enums">Enums</a><ul>
-<li><a href="#binaryfn">BinaryFn</a><ul>
-<li><a href="#cases">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#denormalfpmath">DenormalFpMath</a><ul>
-<li><a href="#cases_1">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#dispatchloweringpasspipeline">DispatchLoweringPassPipeline</a><ul>
-<li><a href="#cases_2">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#elementwisearitygroup">ElementwiseArityGroup</a><ul>
-<li><a href="#cases_3">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#elementwisecaselimits">ElementwiseCaseLimits</a><ul>
-<li><a href="#cases_4">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#elementwisekind">ElementwiseKind</a><ul>
-<li><a href="#cases_5">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#iteratortype">IteratorType</a><ul>
-<li><a href="#cases_6">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#ternaryfn">TernaryFn</a><ul>
-<li><a href="#cases_7">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#typefn">TypeFn</a><ul>
-<li><a href="#cases_8">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#ukernelargumentkind">UKernelArgumentKind</a><ul>
-<li><a href="#cases_9">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#unaryfn">UnaryFn</a><ul>
-<li><a href="#cases_10">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#winogradconv2dfmr">WinogradConv2DFmr</a><ul>
-<li><a href="#cases_11">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#workgroupid">WorkgroupId</a><ul>
-<li><a href="#cases_12">Cases:</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</div>
-<h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
-<h3 id="iree_codegenextract_strided_metadata-codegenextractstridedmetadataop"><code>iree_codegen.extract_strided_metadata</code> (Codegen::ExtractStridedMetadataOp)<a class="headerlink" href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" title="Permanent link">link</a></h3>
-<p><em>Extracts a buffer base with offset and strides.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.extract_strided_metadata` $source `:` type($source) `-&gt;` type(results) attr-dict
-</code></pre></div>
-<p>This op is implemented similarly to the upstream MemRef::ExtractStridedMetadataOp
-with the following differences.</p>
-<ol>
-<li>
-<p>It does not fold away static offset/stride information.
-Hence unlike the upstream Op the link between the memref and consumers of the
-metadata is not broken when later passes change this information. A common
-example in IREE of this is buffer binding optimizations.</p>
-</li>
-<li>
-<p>Helper functions getConstifiedMixed{Offset|Strides|Sizes} are not implemented
-as the expectation is you should lower to the upstream op before using those
-functions if you need them.</p>
-</li>
-</ol>
-<p>Copy of MemRef::ExtractStridedMetadataOp description for reference below.
-Extracts a base buffer, offset and strides. This op allows additional layers
-of transformations and foldings to be added as lowering progresses from
-higher-level dialect to lower-level dialects such as the LLVM dialect.</p>
-<p>The op requires a strided memref source operand. If the source operand is not
-a strided memref, then verification fails.</p>
-<p>This operation is also useful for completeness to the existing memref.dim op.
-While accessing strides, offsets and the base pointer independently is not
-available, this is useful for composing with its natural complement op:
-<code>memref.reinterpret_cast</code>.</p>
-<p>Intended Use Cases:</p>
-<p>The main use case is to expose the logic for manipulate memref metadata at a
-higher level than the LLVM dialect.
-This makes lowering more progressive and brings the following benefits:
-  - not all users of MLIR want to lower to LLVM and the information to e.g.
-    lower to library calls---like libxsmm---or to SPIR-V was not available.
-  - foldings and canonicalizations can happen at a higher level in MLIR:
-    before this op existed, lowering to LLVM would create large amounts of
-    LLVMIR. Even when LLVM does a good job at folding the low-level IR from
-    a performance perspective, it is unnecessarily opaque and inefficient to
-    send unkempt IR to LLVM.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>InferTypeOpAdaptor</code>, <code>SameVariadicResultSize</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>ViewLikeOpInterface</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>source</code></td>
-<td>strided memref of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>base_buffer</code></td>
-<td>strided memref of any type values of rank 0</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>offset</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>sizes</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>strides</code></td>
-<td>variadic of index</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_codegenfusion_barrier-codegenfusionbarrierop"><code>iree_codegen.fusion_barrier</code> (Codegen::FusionBarrierOp)<a class="headerlink" href="#iree_codegenfusion_barrier-codegenfusionbarrierop" title="Permanent link">link</a></h3>
-<p><em>Prevents fusion through a tensor value</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.fusion_barrier` attr-dict $source `:` type($result)
-</code></pre></div>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>source</code></td>
-<td>ranked tensor of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_codegeninner_tiled-codegeninnertiledop"><code>iree_codegen.inner_tiled</code> (Codegen::InnerTiledOp)<a class="headerlink" href="#iree_codegeninner_tiled-codegeninnertiledop" title="Permanent link">link</a></h3>
-<p><em>Models an inner-tiled operation that may perform contractions.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.inner_tiled` `ins` `(` $inputs `)` `outs` `(` $outputs `)` attr-dict
-              `:` type($inputs) `into` type($outputs)
-</code></pre></div>
-<p>Represents an operation that updates "inner tiles" (vector slices) of its accumulator
-outputs using inner tiles of its input operands. The way the inner tiles are
-used is determined by the semantics of the <code>kind</code> attribute. These inner tiles
-are the trailing dimensions of the tensor/vector operands that are not present
-in the indexing maps.</p>
-<p>In the case of a matrix-multiply-accumulate (MMA) inner tiled operation,
-the semantics logically match <code>vector.contraction</code>. However, instead of a
-combiner type, it has a intrinsic description that specifies how the inner tiles
-are combined.</p>
-<p>Similar to <code>vector.contract</code>, an iterator type attribute list must be
-specified, where each element of the list represents an iterator over one
-of the outer dimensions. Iteration of inner dimensions is defined solely by
-the intrinsic and may be opaque.</p>
-<p>An indexing map attribute list must be specified with an entry for input and
-output arguments. An indexing map attribute specifies a mapping from each
-outer loop iterator in the iterator type list, to each dimension of each
-operand.</p>
-<p>Example:</p>
-<div class="highlight"><pre><span></span><code>#contraction_accesses = [
- affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
- affine_map&lt;(i, j, k) -&gt; (k, j)&gt;,
- affine_map&lt;(i, j, k) -&gt; (i, j)&gt;
-]
-#contraction_trait = {
-  indexing_maps = #contraction_accesses,
-  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
-  distributed = true,
-  opaque = false
-}
-%3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
-  : vector&lt;2x3x4xf16&gt;, vector&lt;3x5x4xf16&gt; into vector&lt;2x5x4xf32&gt;
-
-// Takes tensors as well, however the inner dimensions must always be
-// static.
-%7 = iree_codegen.inner_tiled ins(%4, %5) outs(%6) #contraction_trait
-  : tensor&lt;?x?x4xf16&gt;, tensor&lt;?x?x4xf16&gt; into tensor&lt;?x?x4xf32&gt;
-</code></pre></div>
-<p>The example above can be logically lowered directly to loops like this
-(ignoring type conversions from tensor to vector needed for the mfma).
-<div class="highlight"><pre><span></span><code>%outer_m = tensor.dim %6, %c0 : index
-%outer_n = tensor.dim %6, %c1 : index
-%outer_k = tensor.dim %4, %c1 : index
-%7 = scf.for %i = %c0 to %outer_m iter_args(%arg0 = %6) {
-  %8 = scf.for %j = %c0 to %outer_n iter_args(%arg1 = %arg0) {
-    %9 = scf.for %k = %c0 to %outer_k iter_args(%arg2 = %arg1) {
-      %lhs = tensor.extract_slice %4 [%i, %k, 0] [1, 1, 4] [1, 1, 1] : tensor&lt;4xf16&gt;
-      %rhs = tensor.extract_slice %5 [%k, %j, 0] [1, 1, 4] [1, 1, 1] : tensor&lt;4xf16&gt;
-      %acc = tensor.extract_slice %arg2 [%i, %j, 0] [1, 1, 4] [1, 1, 1] : tensor&lt;4xf32&gt;
-      %res = amdgpu.mfma %lhs, %rhs, %acc : tensor&lt;4xf32&gt;
-      %ret = tensor.insert_slice %acc into %arg2 [%i, %j, 0] [1, 1, 4] [1, 1, 1] : tensor&lt;?x?x4xf32&gt;
-      scf.yield %ret : tensor&lt;?x?x4xf32&gt;
-    }
-    scf.yield %9 : tensor&lt;?x?x4xf32&gt;
-  }
-  scf.yield %8 : tensor&lt;?x?x4xf32&gt;
-}
-</code></pre></div></p>
-<p>Or alternatively unrolled to a single intrinsic when operating on vectors.
-<div class="highlight"><pre><span></span><code>#contraction_accesses = [
- affine_map&lt;() -&gt; ()&gt;,
- affine_map&lt;() -&gt; ()&gt;,
- affine_map&lt;() -&gt; ()&gt;
-]
-#contraction_trait = {
-  indexing_maps = #contraction_accesses,
-  iterator_types = [],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
-  distributed = true,
-  opaque = false
-}
-%3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
-  : vector&lt;4xf16&gt;, vector&lt;4xf16&gt; into vector&lt;4xf32&gt;
-</code></pre></div></p>
-<p>This operation can represent an intrinsic both in undistributed
-(workgroup/subgroup/warp) and distributed (thread) level. This is indicated
-by the <code>distributed</code> boolean attribute. The same <code>kind</code> attribute may be
-used in both cases.</p>
-<p>The inner-tile shapes of tensor operands (defined as above as the trailing
-dimensions not present in the indexing maps) must agree with the shapes of
-the vector tiles implied by the intrinsic specified in <code>kind</code>. The exact
-criterion depends on the <code>opaque</code> boolean attribute:
-* When <code>opaque = true</code>, the only requirement is that they have the same
-  number of elements.
-* When <code>opaque = false</code>, the shapes must match exactly after omitting any
-  unit-dimensions.</p>
-<p>Note that different <code>kind</code> attributes may adopt different conventions as to
-the intrinsic vector tile formats. Some may use only flattened 1-D vectors,
-and it may be necessary to use <code>opaque = true</code> to accomodate them. Others
-may use higher-rank vectors with shapes reflecting semantics, allowing to
-use <code>opaque = false</code>, which is preferable when possible at all thanks to the
-stricter semantics. However, that is not only a function of the <code>kind</code>
-attribute: using <code>opaque = false</code> also requires the tensor operands to have
-appropriate shapes.</p>
-<p>In some cases, variations on the inner tiled operations can be expressed
-with the permutations attribute. This attribute represents the permutation
-from that intrinsic's "canonical" layout (in the case of matrix multiplication,
-this is row-major storage of the inner tile) to the format of the inner tile
-in the arguments, with a permutation specified for each argument.</p>
-<p>For example, an MMT product of inner dimensions with warp semantics can be
-represented with the following.</p>
-<div class="highlight"><pre><span></span><code>#contraction_accesses = [
- affine_map&lt;(i, j, k) -&gt; (i, k)&gt;,
- affine_map&lt;(i, j, k) -&gt; (k, j)&gt;,
- affine_map&lt;(i, j, k) -&gt; (i, j)&gt;
-]
-#contraction_trait = {
-  indexing_maps = #contraction_accesses,
-  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;],
-  kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
-  permutations = [[0, 1], [1, 0], [0, 1]]
-}
-%7 = iree_codegen.inner_tiled ins(%4, %5) outs(%6) #contraction_trait
-  : tensor&lt;?x?x16x16xf16&gt;, tensor&lt;?x?x16x16xf16&gt; into tensor&lt;?x?x16x16xf32&gt;
-</code></pre></div>
-<h4 id="motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls<a class="headerlink" href="#motivation-design-choices-and-pitfalls" title="Permanent link">link</a></h4>
-<p>This operation grew out of a general representation for matrix multiplication
-intrinsics on GPUs, where the inner tiles would be the tiles of the A, B,
-and C matrices that were computed by an entire GPU workgroup or subgroup. It
-is now used for generalizations of such multiplications. Currently,
-the only usage is for scaled matrix-multiply-accumulate, where block scales
-must be passed in as additional inputs, but it's possible more uses
-will be possible in the future.</p>
-<p>The idea behind this operation is to decouple the layout setting/tiling
-required to target certain intrinsics from the lowering to them. Because
-typically tiling of this sort happens on tensor operands, however the target
-intrinsics operate on vectors, we use this operation to bridge the gap. The
-choice for a shared operation is intended to ease the lowering process and
-allow for different transformations at different stages of the pipeline
-without needing to essentially clone this op.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>InferTypeOpAdaptor</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>DestinationStyleOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TilingInterface</code>, <code>VectorUnrollOpInterface</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>indxing affine maps</td></tr>
-<tr><td><code>iterator_types</code></td><td>::mlir::ArrayAttr</td><td>Iterator type should be an enum.</td></tr>
-<tr><td><code>kind</code></td><td>IREE::Codegen::InnerTileDescAttrInterface</td><td>buffer-like constant attribute values</td></tr>
-<tr><td><code>semantics</code></td><td>IREE::Codegen::InnerTiledSemanticsAttrInterface</td><td>Attribute implementing InnerTiledSemanticsAttrInterface</td></tr>
-<tr><td><code>permutations</code></td><td>::mlir::ArrayAttr</td><td>permutations</td></tr>
-</table>
-
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of ranked tensor or vector of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>outputs</code></td>
-<td>variadic of ranked tensor or vector of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor or vector of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_codegenload_from_buffer-codegenloadfrombufferop"><code>iree_codegen.load_from_buffer</code> (Codegen::LoadFromBufferOp)<a class="headerlink" href="#iree_codegenload_from_buffer-codegenloadfrombufferop" title="Permanent link">link</a></h3>
-<p><em>Loads a tensor from a memref.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.load_from_buffer` $buffer attr-dict `:` type($buffer) `-&gt;` type($tensor)
-</code></pre></div>
-<p>Loads a tensor from a memref with a compatible shape and the same element
-type.</p>
-<p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>buffer</code></td>
-<td>strided memref of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>tensor</code></td>
-<td>ranked tensor of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_codegennull_pointer-codegennullpointerop"><code>iree_codegen.null_pointer</code> (Codegen::NullPointerOp)<a class="headerlink" href="#iree_codegennull_pointer-codegennullpointerop" title="Permanent link">link</a></h3>
-<p><em>Returns a null_pointer value.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.null_pointer` attr-dict
-</code></pre></div>
-<p>This is meant to be used only as arguments to microkernels.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>Pseudo null-pointer type. Lowers to a null pointer.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_codegenquery_tile_sizes-codegenquerytilesizesop"><code>iree_codegen.query_tile_sizes</code> (Codegen::QueryTileSizesOp)<a class="headerlink" href="#iree_codegenquery_tile_sizes-codegenquerytilesizesop" title="Permanent link">link</a></h3>
-<p><em>Yields tile sizes for the specified tensor type.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.query_tile_sizes` attr-dict $tensor_type `-&gt;` type($results)
-</code></pre></div>
-<p>For targets where tile sizes can't be resolved at compile time, this
-operation allows querying the sizes at runtime. Today this only applies
-to VMVX.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>tensor_type</code></td><td>::mlir::TypeAttr</td><td>Tensor type attribute</td></tr>
-</table>
-
-<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>results</code></td>
-<td>variadic of index</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_codegenstore_to_buffer-codegenstoretobufferop"><code>iree_codegen.store_to_buffer</code> (Codegen::StoreToBufferOp)<a class="headerlink" href="#iree_codegenstore_to_buffer-codegenstoretobufferop" title="Permanent link">link</a></h3>
-<p><em>Stores a tensor into a memref.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.store_to_buffer` $tensor `,` $buffer
-              attr-dict `:` type($tensor) `into` type($buffer)
-</code></pre></div>
-<p>Stores a tensor into a memref with a compatible shape and the same element
-type.</p>
-<p>Interfaces: <code>MemoryEffectOpInterface</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>tensor</code></td>
-<td>ranked tensor of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>buffer</code></td>
-<td>strided memref of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_codegenswizzle_hint-codegenswizzlehintop"><code>iree_codegen.swizzle_hint</code> (Codegen::SwizzleHintOp)<a class="headerlink" href="#iree_codegenswizzle_hint-codegenswizzlehintop" title="Permanent link">link</a></h3>
-<p><em>Hint to swizzle accesses according to an access pattern.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.swizzle_hint` $operand `[` $swizzle attr-dict `]` `:` type($result)
-</code></pre></div>
-<p>Optimization hint to swizzle all accesses to the memref or tensor that this takes a
-view of. This only affects reads/writes that immediately consume this operation
-and is best effort. If the desired swizzling is not apparently possible, this
-op will no-op. As a result, it should not be relied on for correctness.</p>
-<p>Any subviews on this operation will cause the swizzle application to fail. The
-expectation is for all view like operations to fold into the accessing ops
-(loads/stores) before this op takes effect.</p>
-<p>Note that this only rewrites direct users. If there are any aliased loads
-or stores of the data from/to the |src| memref of a hintOp, those accesses
-will not be swizzled. This allows reusing an allocation with different
-swizzled access patterns as long as there is no data dependency between
-memory with different layouts. For example:</p>
-<div class="highlight"><pre><span></span><code>%0 = alloc()
-%1 = iree_codegen.swizzle_hint %0, #layout_0
-%2 = iree_codegen.swizzle_hint %0, #layout_1
-{
-   vector.store %1
-   vector.load %1
-     ^
-     |
-    unrelated
-     |
-     v
-   vector.store %2
-   vector.load %2
-}
-</code></pre></div>
-<p>If there is a data dependency between the accesses of %1 and %2, for example
-a value stored to %1 is loaded from %2, this is undefined behavior. Aliasing
-is otherwise perfectly legal.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>swizzle</code></td><td>IREE::Codegen::SwizzleAttrInterface</td><td>swizzling descriptor attributes</td></tr>
-</table>
-
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>operand</code></td>
-<td>tensor or memref of any type values and rank 1</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>tensor or memref of any type values and rank 1</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop"><code>iree_codegen.workgroup_count_hint</code> (Codegen::WorkgroupCountHintOp)<a class="headerlink" href="#iree_codegenworkgroup_count_hint-codegenworkgroupcounthintop" title="Permanent link">link</a></h3>
-<p><em>Hints at the workgroup count to set</em></p>
-<p>Captures a set of values to use as the workgroup count. The backward slice
-starting from this op's operands is cloned into the workgroup count region
-of all transitive callers.</p>
-<p>The sizes are specified in logical order (innermost to outermost), matching
-the workgroup count region's (x, y, z) convention. If fewer than 3 sizes
-are provided, the remaining dimensions default to 1.</p>
-<p>If multiple hints inform the same entry point, the <strong>elementwise maximum</strong>
-across all hints is used as the count along each dimension. For example:</p>
-<div class="highlight"><pre><span></span><code>hal.executable.export @entry_point
-module {
-  func.func @entry_point() {
-    iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
-    iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
-  }
-}
-</code></pre></div>
-<p>resolves to:</p>
-<div class="highlight"><pre><span></span><code>hal.executable.export @entry_point {
-  %wx = arith.maxsi %a, %x
-  %wy = arith.maxsi %b, %y
-  %wz = arith.maxsi %c, %z
-  hal.return %wx, %wy, %wz
-}
-</code></pre></div>
-<h4 id="common-usage-linearized-workgroup-counts">Common Usage: Linearized Workgroup Counts<a class="headerlink" href="#common-usage-linearized-workgroup-counts" title="Permanent link">link</a></h4>
-<p>The most common use case for this operation involves computing a linearized
-(1-D) workgroup count and specifying it as a single size.</p>
-<div class="highlight"><pre><span></span><code>%num_workgroups = arith.ceildivui %total_iterations, %tile_size : index
-iree_codegen.workgroup_count_hint sizes(%num_workgroups)
-</code></pre></div>
-<p>This results in <code>(%num_workgroups, 1, 1)</code> as the final workgroup count.</p>
-<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>static_sizes</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
-</table>
-
-<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>sizes</code></td>
-<td>variadic of index</td>
-</tr>
-</tbody>
-</table>
-<h2 id="attributes_4">Attributes<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h2>
-<h3 id="denormalfpmathattr">DenormalFpMathAttr<a class="headerlink" href="#denormalfpmathattr" title="Permanent link">link</a></h3>
-<p><em>Denormal mode for fp math</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.denormal_fp_math&lt;
-  ::mlir::iree_compiler::IREE::Codegen::DenormalFpMath   # value
-&gt;
-</code></pre></div>
-<p>Enum cases:
-* none (<code>None</code>)
-* preserve-sign (<code>PreserveSign</code>)
-* positive-zero (<code>PositiveZero</code>)</p>
-<h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::Codegen::DenormalFpMath</code></td>
-<td>an enum of type DenormalFpMath</td>
-</tr>
-</tbody>
-</table>
-<h3 id="dispatchloweringpasspipelineattr">DispatchLoweringPassPipelineAttr<a class="headerlink" href="#dispatchloweringpasspipelineattr" title="Permanent link">link</a></h3>
-<p><em>Identifier for pass pipeline use to lower dispatch region</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.&lt;
-  ::mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline</code></td>
-<td>an enum of type DispatchLoweringPassPipeline</td>
-</tr>
-</tbody>
-</table>
-<h3 id="compilationinfoattr">CompilationInfoAttr<a class="headerlink" href="#compilationinfoattr" title="Permanent link">link</a></h3>
-<p><em>Drive lowering of an operation from input dialect.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.compilation_info&lt;
-  LoweringConfigAttrInterface,   # loweringConfig
-  TranslationInfoAttr   # translationInfo
-&gt;
-</code></pre></div>
-<p>Specifies the information that allows controlling the compilation
-of operations like <code>linalg.matmul</code>/<code>linalg.*conv</code> within
-IREE. This information is used to override the defaults used by
-the IREE compiler. If set on the input to the compiler, there is no
-guarantee that the config survives until codegen. Named operations like
-<code>linalg.matmul</code>/<code>linalg.*conv*</code> are more likely to retain their lowering
-configurations.</p>
-<p>TODO: It is expected that the <code>TranslationInfoAttr</code> and the
-<code>LoweringConfigAttr</code> are specified. Currently there is no
-verification that the values of the <code>LoweringConfigAttr</code> fully
-specifies the behaviour of the compilation path chosen with
-<code>TranslationInfoAttr</code>. This could be added in the future.</p>
-<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">loweringConfig</td>
-<td style="text-align: center;"><code>LoweringConfigAttrInterface</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">translationInfo</td>
-<td style="text-align: center;"><code>TranslationInfoAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="exportconfigattr">ExportConfigAttr<a class="headerlink" href="#exportconfigattr" title="Permanent link">link</a></h3>
-<p><em>User defined workgroup size specification.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.export_config&lt;
-  ::llvm::ArrayRef&lt;int64_t&gt;   # workgroup_size
-&gt;
-</code></pre></div>
-<p>Allows setting workgroup size for pre-formed dispatches.</p>
-<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">workgroup_size</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
-<td>Workgroup Size to use</td>
-</tr>
-</tbody>
-</table>
-<h3 id="loweringconfigattr">LoweringConfigAttr<a class="headerlink" href="#loweringconfigattr" title="Permanent link">link</a></h3>
-<p><em>Drive lowering of an operation within dispatch region.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.lowering_config&lt;
-  LoweringConfigTilingLevelsAttr   # tilingLevels
-&gt;
-</code></pre></div>
-<p>Default implementation of a lowering configuration attribute. It includes
-only tiling and optionally vectorization information. The interpretation of
-the tiles sizes are backend dependent.</p>
-<p>TODO: Currently there is no verification that the configuration
-specifies everything needed for a pass-pipeline. The values to set
-for these parameters is dependent on the pass-pipeline
-implementation. In future, each pass pipeline could verify that
-the lowering configuration has all the necessary attributes for
-the pipeline.</p>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">tilingLevels</td>
-<td style="text-align: center;"><code>LoweringConfigTilingLevelsAttr</code></td>
-<td>The lowering config at different levels</td>
-</tr>
-</tbody>
-</table>
-<h3 id="loweringconfigtilinglevelattr">LoweringConfigTilingLevelAttr<a class="headerlink" href="#loweringconfigtilinglevelattr" title="Permanent link">link</a></h3>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">sizes</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
-<td>The tile sizes to use for this level of tiling</td>
-</tr>
-<tr>
-<td style="text-align: center;">interchange</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
-<td>The tile interchange to use for this level of tiling</td>
-</tr>
-<tr>
-<td style="text-align: center;">scalableFlags</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;bool&gt;</code></td>
-<td>The scalable tile flags for this level of tiling</td>
-</tr>
-</tbody>
-</table>
-<h3 id="loweringconfigtilinglevelsattr">LoweringConfigTilingLevelsAttr<a class="headerlink" href="#loweringconfigtilinglevelsattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.lowering_config_levels&lt;
-  ::llvm::ArrayRef&lt;LoweringConfigTilingLevelAttr&gt;   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;LoweringConfigTilingLevelAttr&gt;</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="rotaterowsattr">RotateRowsAttr<a class="headerlink" href="#rotaterowsattr" title="Permanent link">link</a></h3>
-<p><em>An attribute that describes a swizzling pattern for rotating rows.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.rotate_rows&lt;
-  int64_t,   # row_width
-  int64_t   # access_width
-&gt;
-</code></pre></div>
-<p>This attribute rotates accesses of |access_width| within rows of size
-|row_width|. For any given access into logical memref of shape
-<code>memref&lt;...xNx|access_width|x!eltype&gt;</code> where <code>N = row_width / access_width</code>
-at position <code>(i, j, 0)</code> is rotated to <code>(i, (i + j) % N, 0)</code>. For example,</p>
-<div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4
-
-0000 1111 2222 3333 /// 0 1 2 3
-4444 5555 6666 7777 /// 0 1 2 3
-8888 9999 AAAA BBBB /// 0 1 2 3
-CCCC DDDD EEEE FFFF /// 0 1 2 3
-</code></pre></div>
-<p>is swizzled to
-<div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
-7777 4444 5555 6666 /// 3 0 1 2
-BBBB AAAA 8888 9999 /// 2 3 0 1
-FFFF EEEE DDDD CCCC /// 1 2 3 0
-</code></pre></div></p>
-<p>The pattern repeats for subsequent rows.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">row_width</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">access_width</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="simpletargetattr">SimpleTargetAttr<a class="headerlink" href="#simpletargetattr" title="Permanent link">link</a></h3>
-<p><em>Default implementation of TargetInfoAttrInterface</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.simple_target&lt;
-  ::llvm::ArrayRef&lt;int64_t&gt;   # max_workgroup_count
-&gt;
-</code></pre></div>
-<p>Implements the basic information needed to satisfy the
-<code>TargetInfoAttrInterface</code></p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">max_workgroup_count</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
-<td>Maximum allowed workgroup count in [x, y, z]</td>
-</tr>
-</tbody>
-</table>
-<h3 id="symbolicukernelproviderattr">SymbolicUKernelProviderAttr<a class="headerlink" href="#symbolicukernelproviderattr" title="Permanent link">link</a></h3>
-<p><em>An attribute that provides ukernel implementations by looking up the
-    nearest symbol table from the annotation site.</em></p>
-<p>Syntax: <code>#iree_codegen.symbolic_ukernel_provider</code></p>
-<h3 id="translationinfoattr">TranslationInfoAttr<a class="headerlink" href="#translationinfoattr" title="Permanent link">link</a></h3>
-<p><em>Drive dispatch entry point lowering.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.translation_info&lt;
-  IREE::Codegen::DispatchLoweringPassPipelineAttr,   # passPipeline
-  SymbolRefAttr,   # codegenSpec
-  ::llvm::ArrayRef&lt;int64_t&gt;,   # workgroupSize
-  int64_t,   # subgroupSize
-  DictionaryAttr   # configuration
-&gt;
-</code></pre></div>
-<p>Specifies the information that is used to drive the translation of
-an entry point function using Linalg based structured-op
-lowering. During executable translation this is attached to the
-<code>hal.executable.export</code> operation.</p>
-<p>If this operation is already set on the root operation (as part of
-<code>iree_codegen.compilation_info</code>) that drives the compilation of a
-dispatch region (like <code>linalg.matmul</code>/<code>linalg.*conv*</code>), this
-attribute gets propagated to the entry point function.</p>
-<p>The fields are
-- <code>passPipeline</code> : The pass pipeline to use.</p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">passPipeline</td>
-<td style="text-align: center;"><code>IREE::Codegen::DispatchLoweringPassPipelineAttr</code></td>
-<td>Name of the pipeline to be invoked on the translation unit.</td>
-</tr>
-<tr>
-<td style="text-align: center;">codegenSpec</td>
-<td style="text-align: center;"><code>SymbolRefAttr</code></td>
-<td>The symbol pointing to the transform dialect codegen spec to be used</td>
-</tr>
-<tr>
-<td style="text-align: center;">workgroupSize</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
-<td>The workgroup size to use</td>
-</tr>
-<tr>
-<td style="text-align: center;">subgroupSize</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>The subgroup size to use</td>
-</tr>
-<tr>
-<td style="text-align: center;">configuration</td>
-<td style="text-align: center;"><code>DictionaryAttr</code></td>
-<td>Pipeline specific configuration</td>
-</tr>
-</tbody>
-</table>
-<h3 id="ukerneldescriptorattr">UKernelDescriptorAttr<a class="headerlink" href="#ukerneldescriptorattr" title="Permanent link">link</a></h3>
-<p><em>An attribute that specifies the ukernel implementation based on the |ukernel_name| and
-    the integration point based on the |kind|. Example integration points could for example be
-    at the tensor, memref or bitcode level.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.ukernel_descriptor&lt;
-  ::llvm::StringRef,   # ukernel_name
-  ::mlir::iree_compiler::IREE::Codegen::UKernelArgumentKind   # kind
-&gt;
-</code></pre></div>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">ukernel_name</td>
-<td style="text-align: center;"><code>::llvm::StringRef</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">kind</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::Codegen::UKernelArgumentKind</code></td>
-<td>an enum of type UKernelArgumentKind</td>
-</tr>
-</tbody>
-</table>
-<h3 id="xorshuffleattr">XORShuffleAttr<a class="headerlink" href="#xorshuffleattr" title="Permanent link">link</a></h3>
-<p><em>An attribute that describes an XOR-based swizzling pattern.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.xor_shuffle&lt;
-  int64_t,   # row_width
-  int64_t,   # access_width
-  int64_t,   # row_stride
-  int64_t   # per_phase
-&gt;
-</code></pre></div>
-<p>Shuffles accesses of |access_width| within rows of size
-|row_width|. For any given access into logical memref of shape
-<code>memref&lt;...xNx|access_width|x!eltype&gt;</code> where <code>N = row_width / access_width</code>
-at position <code>(i, j, 0)</code> is shuffled to <code>(i, ((i/per_phase) %N) XOR j , 0)</code>. For example,</p>
-<div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4, per_phase = 1
-
-0000 1111 2222 3333 /// 0 1 2 3
-4444 5555 6666 7777 /// 0 1 2 3
-8888 9999 AAAA BBBB /// 0 1 2 3
-CCCC DDDD EEEE FFFF /// 0 1 2 3
-</code></pre></div>
-<p>is swizzled to
-<div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
-7777 4444 5555 6666 /// 1 0 3 2
-BBBB AAAA 8888 9999 /// 2 3 0 1
-FFFF EEEE DDDD CCCC /// 3 2 1 0
-</code></pre></div>
-|access_width| allows to keep the same shuffling accross multiple rows. For example,</p>
-<div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4, per_phase = 2
-
-0000 1111 2222 3333 /// 0 1 2 3
-4444 5555 6666 7777 /// 0 1 2 3
-8888 9999 AAAA BBBB /// 0 1 2 3
-CCCC DDDD EEEE FFFF /// 0 1 2 3
-</code></pre></div>
-<p>is swizzled to
-<div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
-7777 4444 5555 6666 /// 0 1 2 3
-BBBB AAAA 8888 9999 /// 1 0 3 2
-FFFF EEEE DDDD CCCC /// 1 0 3 2
-</code></pre></div></p>
-<p>The pattern repeats for subsequent rows.</p>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">row_width</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">access_width</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">row_stride</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>row stride. Default to row_width</td>
-</tr>
-<tr>
-<td style="text-align: center;">per_phase</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Default to 1</td>
-</tr>
-</tbody>
-</table>
-<h3 id="localmappingattr">LocalMappingAttr<a class="headerlink" href="#localmappingattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.local_mapping&lt;
-  int64_t   # dim
-&gt;
-</code></pre></div>
-<p>Attribute for mapping <code>scf.forall</code> loops to sequential local execution.</p>
-<p>Example:
-<div class="highlight"><pre><span></span><code>  scf.forall (%i, %j) in (4, 8) {
-    // body ... %i, %j
-  } {mapping = [#iree_codegen.local_mapping&lt;1&gt;,
-                #iree_codegen.local_mapping&lt;0&gt;]}
-</code></pre></div></p>
-<p>This forall approximately corresponds to the following loop nest:</p>
-<div class="highlight"><pre><span></span><code>  scf.for %i = 0 to 4 {
-    scf.for %j = 0 to 8 {
-    // body ... %i, %j
-    }
-  }
-</code></pre></div>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">dim</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="workgroupmappingattr">WorkgroupMappingAttr<a class="headerlink" href="#workgroupmappingattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_codegen.workgroup_mapping&lt;
-  ::mlir::iree_compiler::IREE::Codegen::WorkgroupId,   # id
-  int64_t   # delinearizedDim
-&gt;
-</code></pre></div>
-<p>Attribute that eventually will be used to map distributed loop iterations
-to <code>hal.workgroup.id</code>s.</p>
-<p>The <code>x</code>,<code>y</code> and <code>z</code> values for <code>id</code> map to <code>hal.workgroup.id[0]</code>,
-<code>hal.workgroup.id[1]</code> and <code>hal.workgroup.id[2]</code> respectively.</p>
-<p>In addition it is possible to specify if the <code>z</code> dimension is to be
-delinearized on mapping. For example if the list of mapping attributes is
-<code>[workgroup_mapping&lt;z:1&gt;, workgroup_mapping&lt;z:0&gt;]</code>, then the <code>z</code> dimension
-is delinearized to map to <code>workgroup_mapping&lt;z:1&gt;</code> and
-<code>workgroup_mapping&lt;z:0&gt;</code>. In other words if the number of logical parallel
-workers along the <code>z:0</code> dimension is <code>W</code>, then
-<div class="highlight"><pre><span></span><code>workgroup_mapping&lt;z:0&gt; = hal.workgroup.id[1] mod W,
-worgrkoup_mapping&lt;z:1&gt; = hal.workgroup.id[1] div W
-</code></pre></div></p>
-<p>Note: It is expected that this attribute is always used in a list of mapping
-attributes (with a single element being a list of size 1). It is illegal for
-a list to have <code>workgroup_mapping&lt;z:a&gt;</code> without <code>workgroup_mapping&lt;z:b&gt;</code>
-if <code>a &gt; b</code>. In the same way it is illegal to for the list to
-- have <code>workgroup_mapping&lt;y&gt;</code> but not <code>workgroup_mapping&lt;x&gt;</code>
-- have <code>workgroup_mapping&lt;z:*&gt;</code>  but not have <code>workgroup_mapping&lt;x&gt;</code>
-  and <code>workgroup_mapping&lt;y&gt;</code></p>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">id</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::Codegen::WorkgroupId</code></td>
-<td>an enum of type WorkgroupId</td>
-</tr>
-<tr>
-<td style="text-align: center;">delinearizedDim</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h2 id="types">Types<a class="headerlink" href="#types" title="Permanent link">link</a></h2>
-<h3 id="nullpointertype">NullPointerType<a class="headerlink" href="#nullpointertype" title="Permanent link">link</a></h3>
-<p><em>Pseudo null-pointer type. Lowers to a null pointer.</em></p>
-<p>Syntax: <code>!iree_codegen.null_pointer</code></p>
-<p>This is meant to be used only as arguments to microkernels.</p>
-<h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
-<h3 id="binaryfn">BinaryFn<a class="headerlink" href="#binaryfn" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9</em></p>
-<h4 id="cases">Cases:<a class="headerlink" href="#cases" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">add</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>add</td>
-</tr>
-<tr>
-<td style="text-align: center;">sub</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>sub</td>
-</tr>
-<tr>
-<td style="text-align: center;">mul</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>mul</td>
-</tr>
-<tr>
-<td style="text-align: center;">div</td>
-<td style="text-align: center;"><code>3</code></td>
-<td>div</td>
-</tr>
-<tr>
-<td style="text-align: center;">div_unsigned</td>
-<td style="text-align: center;"><code>4</code></td>
-<td>div_unsigned</td>
-</tr>
-<tr>
-<td style="text-align: center;">max_signed</td>
-<td style="text-align: center;"><code>5</code></td>
-<td>max_signed</td>
-</tr>
-<tr>
-<td style="text-align: center;">min_signed</td>
-<td style="text-align: center;"><code>6</code></td>
-<td>min_signed</td>
-</tr>
-<tr>
-<td style="text-align: center;">max_unsigned</td>
-<td style="text-align: center;"><code>7</code></td>
-<td>max_unsigned</td>
-</tr>
-<tr>
-<td style="text-align: center;">min_unsigned</td>
-<td style="text-align: center;"><code>8</code></td>
-<td>min_unsigned</td>
-</tr>
-<tr>
-<td style="text-align: center;">powf</td>
-<td style="text-align: center;"><code>9</code></td>
-<td>powf</td>
-</tr>
-</tbody>
-</table>
-<h3 id="denormalfpmath">DenormalFpMath<a class="headerlink" href="#denormalfpmath" title="Permanent link">link</a></h3>
-<p><em>Denormal mode for fp math</em></p>
-<h4 id="cases_1">Cases:<a class="headerlink" href="#cases_1" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">None</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>none</td>
-</tr>
-<tr>
-<td style="text-align: center;">PreserveSign</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>preserve-sign</td>
-</tr>
-<tr>
-<td style="text-align: center;">PositiveZero</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>positive-zero</td>
-</tr>
-</tbody>
-</table>
-<h3 id="dispatchloweringpasspipeline">DispatchLoweringPassPipeline<a class="headerlink" href="#dispatchloweringpasspipeline" title="Permanent link">link</a></h3>
-<p><em>Identifier for pass pipeline use to lower dispatch region</em></p>
-<h4 id="cases_2">Cases:<a class="headerlink" href="#cases_2" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">CPUDefault</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>CPUDefault</td>
-</tr>
-<tr>
-<td style="text-align: center;">CPUDoubleTilingExpert</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>CPUDoubleTilingExpert</td>
-</tr>
-<tr>
-<td style="text-align: center;">CPUConvTileAndDecomposeExpert</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>CPUConvTileAndDecomposeExpert</td>
-</tr>
-<tr>
-<td style="text-align: center;">Mmt4dTilingExpert</td>
-<td style="text-align: center;"><code>3</code></td>
-<td>Mmt4dTilingExpert</td>
-</tr>
-<tr>
-<td style="text-align: center;">CPUBufferOpsTileAndVectorize</td>
-<td style="text-align: center;"><code>4</code></td>
-<td>CPUBufferOpsTileAndVectorize</td>
-</tr>
-<tr>
-<td style="text-align: center;">CPUDataTiling</td>
-<td style="text-align: center;"><code>5</code></td>
-<td>CPUDataTiling</td>
-</tr>
-<tr>
-<td style="text-align: center;">CPULinalgExtTileAndVectorize</td>
-<td style="text-align: center;"><code>6</code></td>
-<td>CPULinalgExtTileAndVectorize</td>
-</tr>
-<tr>
-<td style="text-align: center;">LLVMGPUDefault</td>
-<td style="text-align: center;"><code>100</code></td>
-<td>LLVMGPUDefault</td>
-</tr>
-<tr>
-<td style="text-align: center;">LLVMGPUBaseLowering</td>
-<td style="text-align: center;"><code>101</code></td>
-<td>LLVMGPUBaseLowering</td>
-</tr>
-<tr>
-<td style="text-align: center;">LLVMGPUDistribute</td>
-<td style="text-align: center;"><code>102</code></td>
-<td>LLVMGPUDistribute</td>
-</tr>
-<tr>
-<td style="text-align: center;">LLVMGPUVectorize</td>
-<td style="text-align: center;"><code>103</code></td>
-<td>LLVMGPUVectorize</td>
-</tr>
-<tr>
-<td style="text-align: center;">LLVMGPUVectorDistribute</td>
-<td style="text-align: center;"><code>104</code></td>
-<td>LLVMGPUVectorDistribute</td>
-</tr>
-<tr>
-<td style="text-align: center;">LLVMGPUWinogradVectorize</td>
-<td style="text-align: center;"><code>105</code></td>
-<td>LLVMGPUWinogradVectorize</td>
-</tr>
-<tr>
-<td style="text-align: center;">LLVMGPUTileAndFuse</td>
-<td style="text-align: center;"><code>106</code></td>
-<td>LLVMGPUTileAndFuse</td>
-</tr>
-<tr>
-<td style="text-align: center;">SPIRVBaseLowering</td>
-<td style="text-align: center;"><code>200</code></td>
-<td>SPIRVBaseLowering</td>
-</tr>
-<tr>
-<td style="text-align: center;">SPIRVBaseDistribute</td>
-<td style="text-align: center;"><code>201</code></td>
-<td>SPIRVBaseDistribute</td>
-</tr>
-<tr>
-<td style="text-align: center;">SPIRVBaseVectorize</td>
-<td style="text-align: center;"><code>202</code></td>
-<td>SPIRVBaseVectorize</td>
-</tr>
-<tr>
-<td style="text-align: center;">SPIRVSubgroupReduce</td>
-<td style="text-align: center;"><code>203</code></td>
-<td>SPIRVSubgroupReduce</td>
-</tr>
-<tr>
-<td style="text-align: center;">SPIRVMatmulPromoteVectorize</td>
-<td style="text-align: center;"><code>204</code></td>
-<td>SPIRVMatmulPromoteVectorize</td>
-</tr>
-<tr>
-<td style="text-align: center;">SPIRVCooperativeMatrixVectorize</td>
-<td style="text-align: center;"><code>205</code></td>
-<td>SPIRVCooperativeMatrixVectorize</td>
-</tr>
-<tr>
-<td style="text-align: center;">SPIRVWinogradVectorize</td>
-<td style="text-align: center;"><code>206</code></td>
-<td>SPIRVWinogradVectorize</td>
-</tr>
-<tr>
-<td style="text-align: center;">VMVXDefault</td>
-<td style="text-align: center;"><code>300</code></td>
-<td>VMVXDefault</td>
-</tr>
-<tr>
-<td style="text-align: center;">TransformDialectCodegen</td>
-<td style="text-align: center;"><code>1000</code></td>
-<td>TransformDialectCodegen</td>
-</tr>
-<tr>
-<td style="text-align: center;">Custom</td>
-<td style="text-align: center;"><code>1001</code></td>
-<td>Custom</td>
-</tr>
-<tr>
-<td style="text-align: center;">None</td>
-<td style="text-align: center;"><code>65535</code></td>
-<td>None</td>
-</tr>
-</tbody>
-</table>
-<h3 id="elementwisearitygroup">ElementwiseArityGroup<a class="headerlink" href="#elementwisearitygroup" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 1, 2, 3</em></p>
-<h4 id="cases_3">Cases:<a class="headerlink" href="#cases_3" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">Unary</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>Unary</td>
-</tr>
-<tr>
-<td style="text-align: center;">Binary</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>Binary</td>
-</tr>
-<tr>
-<td style="text-align: center;">Ternary</td>
-<td style="text-align: center;"><code>3</code></td>
-<td>Ternary</td>
-</tr>
-</tbody>
-</table>
-<h3 id="elementwisecaselimits">ElementwiseCaseLimits<a class="headerlink" href="#elementwisecaselimits" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases:</em></p>
-<h4 id="cases_4">Cases:<a class="headerlink" href="#cases_4" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">LastUnary</td>
-<td style="text-align: center;"><code>13</code></td>
-<td>LastUnary</td>
-</tr>
-<tr>
-<td style="text-align: center;">LastBinary</td>
-<td style="text-align: center;"><code>23</code></td>
-<td>LastBinary</td>
-</tr>
-<tr>
-<td style="text-align: center;">LastTernary</td>
-<td style="text-align: center;"><code>24</code></td>
-<td>LastTernary</td>
-</tr>
-</tbody>
-</table>
-<h3 id="elementwisekind">ElementwiseKind<a class="headerlink" href="#elementwisekind" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23</em></p>
-<h4 id="cases_5">Cases:<a class="headerlink" href="#cases_5" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">exp</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>exp</td>
-</tr>
-<tr>
-<td style="text-align: center;">log</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>log</td>
-</tr>
-<tr>
-<td style="text-align: center;">abs</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>abs</td>
-</tr>
-<tr>
-<td style="text-align: center;">ceil</td>
-<td style="text-align: center;"><code>3</code></td>
-<td>ceil</td>
-</tr>
-<tr>
-<td style="text-align: center;">floor</td>
-<td style="text-align: center;"><code>4</code></td>
-<td>floor</td>
-</tr>
-<tr>
-<td style="text-align: center;">negf</td>
-<td style="text-align: center;"><code>5</code></td>
-<td>negf</td>
-</tr>
-<tr>
-<td style="text-align: center;">reciprocal</td>
-<td style="text-align: center;"><code>6</code></td>
-<td>reciprocal</td>
-</tr>
-<tr>
-<td style="text-align: center;">round</td>
-<td style="text-align: center;"><code>7</code></td>
-<td>round</td>
-</tr>
-<tr>
-<td style="text-align: center;">sqrt</td>
-<td style="text-align: center;"><code>8</code></td>
-<td>sqrt</td>
-</tr>
-<tr>
-<td style="text-align: center;">rsqrt</td>
-<td style="text-align: center;"><code>9</code></td>
-<td>rsqrt</td>
-</tr>
-<tr>
-<td style="text-align: center;">square</td>
-<td style="text-align: center;"><code>10</code></td>
-<td>square</td>
-</tr>
-<tr>
-<td style="text-align: center;">tanh</td>
-<td style="text-align: center;"><code>11</code></td>
-<td>tanh</td>
-</tr>
-<tr>
-<td style="text-align: center;">erf</td>
-<td style="text-align: center;"><code>12</code></td>
-<td>erf</td>
-</tr>
-<tr>
-<td style="text-align: center;">add</td>
-<td style="text-align: center;"><code>13</code></td>
-<td>add</td>
-</tr>
-<tr>
-<td style="text-align: center;">sub</td>
-<td style="text-align: center;"><code>14</code></td>
-<td>sub</td>
-</tr>
-<tr>
-<td style="text-align: center;">mul</td>
-<td style="text-align: center;"><code>15</code></td>
-<td>mul</td>
-</tr>
-<tr>
-<td style="text-align: center;">div</td>
-<td style="text-align: center;"><code>16</code></td>
-<td>div</td>
-</tr>
-<tr>
-<td style="text-align: center;">div_unsigned</td>
-<td style="text-align: center;"><code>17</code></td>
-<td>div_unsigned</td>
-</tr>
-<tr>
-<td style="text-align: center;">max_signed</td>
-<td style="text-align: center;"><code>18</code></td>
-<td>max_signed</td>
-</tr>
-<tr>
-<td style="text-align: center;">min_signed</td>
-<td style="text-align: center;"><code>19</code></td>
-<td>min_signed</td>
-</tr>
-<tr>
-<td style="text-align: center;">max_unsigned</td>
-<td style="text-align: center;"><code>20</code></td>
-<td>max_unsigned</td>
-</tr>
-<tr>
-<td style="text-align: center;">min_unsigned</td>
-<td style="text-align: center;"><code>21</code></td>
-<td>min_unsigned</td>
-</tr>
-<tr>
-<td style="text-align: center;">powf</td>
-<td style="text-align: center;"><code>22</code></td>
-<td>powf</td>
-</tr>
-<tr>
-<td style="text-align: center;">select</td>
-<td style="text-align: center;"><code>23</code></td>
-<td>select</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iteratortype">IteratorType<a class="headerlink" href="#iteratortype" title="Permanent link">link</a></h3>
-<p><em>Iterator type</em></p>
-<h4 id="cases_6">Cases:<a class="headerlink" href="#cases_6" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">parallel</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>parallel</td>
-</tr>
-<tr>
-<td style="text-align: center;">reduction</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>reduction</td>
-</tr>
-</tbody>
-</table>
-<h3 id="ternaryfn">TernaryFn<a class="headerlink" href="#ternaryfn" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 0</em></p>
-<h4 id="cases_7">Cases:<a class="headerlink" href="#cases_7" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">select</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>select</td>
-</tr>
-</tbody>
-</table>
-<h3 id="typefn">TypeFn<a class="headerlink" href="#typefn" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 0, 1</em></p>
-<h4 id="cases_8">Cases:<a class="headerlink" href="#cases_8" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">cast_signed</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>cast_signed</td>
-</tr>
-<tr>
-<td style="text-align: center;">cast_unsigned</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>cast_unsigned</td>
-</tr>
-</tbody>
-</table>
-<h3 id="ukernelargumentkind">UKernelArgumentKind<a class="headerlink" href="#ukernelargumentkind" title="Permanent link">link</a></h3>
-<p><em>Attribute describing the ukernel integration point</em></p>
-<h4 id="cases_9">Cases:<a class="headerlink" href="#cases_9" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">Tensor</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>tensor</td>
-</tr>
-<tr>
-<td style="text-align: center;">Memref</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>memref</td>
-</tr>
-<tr>
-<td style="text-align: center;">Bitcode</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>bitcode</td>
-</tr>
-</tbody>
-</table>
-<h3 id="unaryfn">UnaryFn<a class="headerlink" href="#unaryfn" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12</em></p>
-<h4 id="cases_10">Cases:<a class="headerlink" href="#cases_10" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">exp</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>exp</td>
-</tr>
-<tr>
-<td style="text-align: center;">log</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>log</td>
-</tr>
-<tr>
-<td style="text-align: center;">abs</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>abs</td>
-</tr>
-<tr>
-<td style="text-align: center;">ceil</td>
-<td style="text-align: center;"><code>3</code></td>
-<td>ceil</td>
-</tr>
-<tr>
-<td style="text-align: center;">floor</td>
-<td style="text-align: center;"><code>4</code></td>
-<td>floor</td>
-</tr>
-<tr>
-<td style="text-align: center;">negf</td>
-<td style="text-align: center;"><code>5</code></td>
-<td>negf</td>
-</tr>
-<tr>
-<td style="text-align: center;">reciprocal</td>
-<td style="text-align: center;"><code>6</code></td>
-<td>reciprocal</td>
-</tr>
-<tr>
-<td style="text-align: center;">round</td>
-<td style="text-align: center;"><code>7</code></td>
-<td>round</td>
-</tr>
-<tr>
-<td style="text-align: center;">sqrt</td>
-<td style="text-align: center;"><code>8</code></td>
-<td>sqrt</td>
-</tr>
-<tr>
-<td style="text-align: center;">rsqrt</td>
-<td style="text-align: center;"><code>9</code></td>
-<td>rsqrt</td>
-</tr>
-<tr>
-<td style="text-align: center;">square</td>
-<td style="text-align: center;"><code>10</code></td>
-<td>square</td>
-</tr>
-<tr>
-<td style="text-align: center;">tanh</td>
-<td style="text-align: center;"><code>11</code></td>
-<td>tanh</td>
-</tr>
-<tr>
-<td style="text-align: center;">erf</td>
-<td style="text-align: center;"><code>12</code></td>
-<td>erf</td>
-</tr>
-</tbody>
-</table>
-<h3 id="winogradconv2dfmr">WinogradConv2DFmr<a class="headerlink" href="#winogradconv2dfmr" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 0, 1, 2</em></p>
-<h4 id="cases_11">Cases:<a class="headerlink" href="#cases_11" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">F_2_3</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>F_2_3</td>
-</tr>
-<tr>
-<td style="text-align: center;">F_4_3</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>F_4_3</td>
-</tr>
-<tr>
-<td style="text-align: center;">F_2_5</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>F_2_5</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workgroupid">WorkgroupId<a class="headerlink" href="#workgroupid" title="Permanent link">link</a></h3>
-<p><em>Attribute that map to hal.workgrpoup.ids</em></p>
-<h4 id="cases_12">Cases:<a class="headerlink" href="#cases_12" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">IdX</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>x</td>
-</tr>
-<tr>
-<td style="text-align: center;">IdY</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>y</td>
-</tr>
-<tr>
-<td style="text-align: center;">IdZ</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>z</td>
-</tr>
-</tbody>
-</table>
+<h3 id="-iree-pcf-convert-forall-to-loops"><code>-iree-pcf-convert-forall-to-loops</code><a class="headerlink" href="#-iree-pcf-convert-forall-to-loops" title="Permanent link">link</a></h3>
+<p><em>Converts scf.forall ops to pcf.loop</em></p>
+<p>Test pass for converting <code>scf.forall</code> ops without mapping attributes to
+<code>pcf.loop</code> ops with sequential scope.</p>
+<p>The input is IR containing <code>scf.forall</code> ops with tensor results and
+<code>tensor.parallel_insert_slice</code> terminators. Only forall ops without
+mapping attributes are converted.</p>
+<p>The output replaces each matching <code>scf.forall</code> with a <code>pcf.loop</code>:
+- Iteration bounds come from the forall's upper/lower bounds and steps
+- <code>tensor.parallel_insert_slice</code> ops become <code>pcf.write_slice</code> ops
+- Shared output tensors become tied <code>pcf.sref</code> region arguments
+- The scope is set to <code>#pcf.sequential</code> for sequential execution</p>
+<p>The underlying conversion pattern is exposed separately via
+<code>convertForallToPCF()</code> with callbacks for mapping processor IDs to custom
+execution scopes.</p>
 
 
 
 
 
 
-
-  
-  
 
 
 
