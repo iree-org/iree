@@ -276,10 +276,10 @@ static iree_status_t iree_hal_hip_parse_ccob_header(
     *out_uncompressed_size = header.uncompressed_size;
     *out_file_size = 0;  // Not available in v1
     *out_compressed_data_offset = v1_header_size;
-  } else if (version >= 2) {
+  } else if (version == 2) {
     if (!unsafe_infer_size && ccob_data.data_length < v2_header_size) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "CCOB v2+ data too small for header");
+                              "CCOB v2 data too small for header");
     }
 
     iree_hal_hip_ccob_header_v2_t header;
@@ -292,15 +292,24 @@ static iree_status_t iree_hal_hip_parse_ccob_header(
   } else if (version >= 3) {
     if (!unsafe_infer_size && ccob_data.data_length < v3_header_size) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "CCOB v2+ data too small for header");
+                              "CCOB v3+ data too small for header");
     }
 
     iree_hal_hip_ccob_header_v3_t header;
     memcpy(&header, ccob_data.data, sizeof(header));
 
     *out_method = header.method;
-    *out_uncompressed_size = header.uncompressed_size;
-    *out_file_size = header.file_size;
+    // Note: v3 has 64-bit uncompressed_size but we only support 32-bit
+    if (header.uncompressed_size > UINT32_MAX) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "CCOB v3 uncompressed size exceeds 32-bit limit");
+    }
+    *out_uncompressed_size = (uint32_t)header.uncompressed_size;
+    if (header.file_size > UINT32_MAX) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "CCOB v3 file size exceeds 32-bit limit");
+    }
+    *out_file_size = (uint32_t)header.file_size;
     *out_compressed_data_offset = v3_header_size;
   } else {
     return iree_make_status(IREE_STATUS_INCOMPATIBLE,
