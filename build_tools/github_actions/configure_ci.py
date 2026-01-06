@@ -129,6 +129,11 @@ DEFAULT_SCHEDULE_ONLY_JOBS = frozenset(
     [
         "macos_arm64_clang",
         "macos_x64_clang",
+        "linux_arm64_clang",
+        "linux_x64_clang_byollvm",
+        "linux_x64_clang_debug",
+        "linux_x64_clang_tsan",
+        "linux_x64_gcc",
     ]
 )
 
