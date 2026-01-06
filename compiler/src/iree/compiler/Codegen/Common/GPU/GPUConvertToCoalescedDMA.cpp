@@ -576,19 +576,14 @@ private:
     // Calculate total number of warps available.
     // Note: numWarps may contain 0s for dimensions where wgSize < subgroupSize.
     // We treat 0 as 1 for the purpose of counting total warps.
-    int64_t totalWarps = 1;
-    for (int64_t nw : numWarps) {
-      if (nw > 0) {
-        totalWarps *= nw;
-      }
-    }
+    auto positiveWarps =
+        llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
+    int64_t totalWarps = llvm::product_of(positiveWarps);
 
     // Greedily distribute warps to outer dimensions, keeping innermost whole.
     int64_t remainingWarps = totalWarps;
     for (int64_t i = 0; i < rank; ++i) {
-      bool isInnermostDim = (i == rank - 1);
-
-      if (isInnermostDim) {
+      if (i == rank - 1) {
         // Keep innermost dimension whole (tile size = full dimension).
         tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
         ++numTiledDims;
@@ -601,6 +596,7 @@ private:
         remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
         ++numTiledDims;
       } else {
+        // No parallelism to distribute; skip tiling this dimension.
         tileSizes.push_back(rewriter.getIndexAttr(0));
       }
     }
