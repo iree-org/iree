@@ -857,6 +857,41 @@ public:
   }
 };
 
+// Check if we should force bubbling through a simple elementwise op that
+// follows a compute operation (contraction or convolution). This heuristic
+// enables transpose fusion with the compute op's output indexing map, which is
+// critical for performance.
+//
+// Conditions:
+// - Elementwise has single input with all identity indexing maps.
+// - Producer is a contraction or convolution.
+// - Producer has single use
+static bool
+shouldForceBubbleThroughSimpleElementwise(linalg::GenericOp genericOp) {
+  // Must be unary elementwise with all identity maps.
+  if (genericOp.getNumDpsInputs() != 1) {
+    return false;
+  }
+  if (!llvm::all_of(genericOp.getIndexingMapsArray(),
+                    [](AffineMap map) { return map.isIdentity(); })) {
+    return false;
+  }
+
+  // Check if producer is a compute op (contraction or convolution).
+  auto producer = dyn_cast<OpResult>(genericOp.getDpsInputOperand(0)->get());
+  if (!producer || !producer.hasOneUse()) {
+    return false;
+  }
+
+  auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer.getOwner());
+  if (!producerLinalgOp) {
+    return false;
+  }
+
+  return linalg::isaContractionOpInterface(producerLinalgOp) ||
+         linalg::isaConvolutionOpInterface(producerLinalgOp);
+}
+
 // Bubbles a transpose through the init of a elementwise operation where the
 // transposition of the iteration space only affects a single input operand.
 class BubbleTransposeThroughUnaryElementwiseDpsInit
@@ -898,6 +933,13 @@ public:
     auto invPerm = invertPermutationVector(perm);
 
     auto inputOperand = getSingleTransposedInputOperand(genericOp, invPerm);
+
+    // Special case: force bubbling through simple elementwise after
+    // contractions/convolutions.
+    if (!inputOperand && shouldForceBubbleThroughSimpleElementwise(genericOp)) {
+      inputOperand = genericOp.getDpsInputOperand(0);
+    }
+
     if (!inputOperand ||
         !genericOp.getMatchingIndexingMap(inputOperand).isIdentity()) {
       return rewriter.notifyMatchFailure(

@@ -996,3 +996,57 @@ util.func public @dont_fuse_transpose_through_generic_reduction(%arg0: tensor<4x
 //       CHECK:   %[[GEN:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%{{.*}}, %[[TRANSPOSE]] : tensor<4xf32>, tensor<4x8xf32>)
 //       CHECK:   util.return %[[GEN]]
+
+// -----
+
+// For convolutions followed by elementwise and transpose, bubble the transpose through the elementwise op and fuse with the convolution output.
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1, d2 + d5 * 2, d3 + d6 * 2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d0, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+util.func public @bubble_transpose_through_truncf_and_fuse_with_conv(
+    %arg0: tensor<16x16x225x225xbf16>, %arg1: tensor<16x4x450x450xbf16>) -> tensor<16x2x2x4xbf16> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<16x4x2x2xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<16x4x2x2xf32>) -> tensor<16x4x2x2xf32>
+  %2 = linalg.generic {indexing_maps = [#map, #map1, #map2],  iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%arg1, %arg0 : tensor<16x4x450x450xbf16>, tensor<16x16x225x225xbf16>) outs(%1 : tensor<16x4x2x2xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %6 = arith.extf %in : bf16 to f32
+    %7 = arith.extf %in_0 : bf16 to f32
+    %8 = arith.mulf %6, %7 : f32
+    %9 = arith.addf %8, %out : f32
+    linalg.yield %9 : f32
+  } -> tensor<16x4x2x2xf32>
+  %3 = tensor.empty() : tensor<16x4x2x2xbf16>
+  %4 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%2 : tensor<16x4x2x2xf32>) outs(%3 : tensor<16x4x2x2xbf16>) {
+  ^bb0(%in: f32, %out: bf16):
+    %6 = arith.truncf %in : f32 to bf16
+    linalg.yield %6 : bf16
+  } -> tensor<16x4x2x2xbf16>
+  %5 = tensor.empty() : tensor<16x2x2x4xbf16>
+  %transposed = linalg.transpose ins(%4 : tensor<16x4x2x2xbf16>)
+      outs(%5 : tensor<16x2x2x4xbf16>) permutation = [0, 2, 3, 1]
+  util.return %transposed : tensor<16x2x2x4xbf16>
+}
+
+// With test-bubbling-only, transpose is bubbled through truncf but not yet fused with conv.
+// Expected: Conv(CNHW: 16x4x2x2) → Transpose → Truncf(CHWN: 16x2x2x4)
+// BUBBLE-LABEL: util.func public @bubble_transpose_through_truncf_and_fuse_with_conv
+//       BUBBLE:   linalg.generic
+//       BUBBLE:   } -> tensor<16x4x2x2xf32>
+//       BUBBLE:   linalg.transpose
+//       BUBBLE:   linalg.generic
+//       BUBBLE:   } -> tensor<16x2x2x4xbf16>
+//   BUBBLE-NOT:   linalg.transpose
+
+// With enable-aggressive-propagation-through-conv, transpose is fully fused with conv.
+// CONV-LABEL: util.func public @bubble_transpose_through_truncf_and_fuse_with_conv
+//       CONV:   %[[CONV:.+]] = linalg.generic
+//       CONV:   } -> tensor<16x2x2x4xf32>
+//       CONV:   %[[TRUNCF:.+]] = linalg.generic
+//  CONV-SAME:   ins(%[[CONV]] : tensor<16x2x2x4xf32>)
+//       CONV:   } -> tensor<16x2x2x4xbf16>
+//   CONV-NOT:   linalg.transpose
+//       CONV:   util.return %[[TRUNCF]]
