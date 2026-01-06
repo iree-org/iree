@@ -307,6 +307,17 @@ namespace impl {
 
 using params_ptr_t = uint8_t*;
 
+// Aligns a pointer up to the natural alignment of the given type.
+// Only required for 8-byte types (i64, f64, ref) since i32/f32 are always
+// naturally aligned (the smallest ABI type is 4 bytes).
+template <typename T>
+static inline params_ptr_t align_ptr(params_ptr_t ptr) {
+  if (alignof(T) > sizeof(int32_t)) {
+    return (params_ptr_t)iree_host_align((uintptr_t)ptr, alignof(T));
+  }
+  return ptr;
+}
+
 template <typename T, typename EN = void>
 struct ParamUnpack;
 template <>
@@ -343,14 +354,15 @@ struct Unpacker {
     ApplyLoad<Ts...>(status, ptr, params,
                      std::make_index_sequence<sizeof...(Ts)>());
     IREE_RETURN_IF_ERROR(std::move(status));
+    // Note: we check > instead of != because alignment padding can leave
+    // unused bytes at the end of the buffer.
     params_ptr_t limit = storage.data + storage.data_length;
-    if (IREE_UNLIKELY(ptr != limit)) {
+    if (IREE_UNLIKELY(ptr > limit)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "argument buffer unpacking failure; consumed %" PRIhsz " of %" PRIhsz
-          " bytes",
-          (reinterpret_cast<intptr_t>(ptr) -
-           reinterpret_cast<intptr_t>(storage.data)),
+          "argument buffer unpacking failure; consumed %" PRIhsz
+          " bytes beyond %" PRIhsz " byte buffer",
+          (reinterpret_cast<intptr_t>(ptr) - reinterpret_cast<intptr_t>(limit)),
           storage.data_length);
     }
     return std::move(params);
@@ -373,6 +385,7 @@ template <typename T>
 struct ParamUnpack<T, enable_if_primitive<T>> {
   using storage_type = T;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    ptr = align_ptr<T>(ptr);
     out_param = *reinterpret_cast<const T*>(ptr);
     ptr += sizeof(T);
   }
@@ -383,6 +396,7 @@ template <>
 struct ParamUnpack<opaque_ref> {
   using storage_type = opaque_ref;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    ptr = align_ptr<iree_vm_ref_t>(ptr);
     iree_vm_ref_retain(reinterpret_cast<iree_vm_ref_t*>(ptr), &out_param);
     ptr += sizeof(iree_vm_ref_t);
   }
@@ -394,6 +408,7 @@ template <typename T>
 struct ParamUnpack<ref<T>> {
   using storage_type = ref<T>;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    ptr = align_ptr<iree_vm_ref_t>(ptr);
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::type()) {
@@ -419,6 +434,7 @@ template <typename T>
 struct ParamUnpack<const ref<T>> {
   using storage_type = ref<T>;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    ptr = align_ptr<iree_vm_ref_t>(ptr);
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<T>::type()) {
@@ -445,6 +461,7 @@ template <>
 struct ParamUnpack<iree_string_view_t> {
   using storage_type = iree_string_view_t;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    ptr = align_ptr<iree_vm_ref_t>(ptr);
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::type()) {
@@ -474,6 +491,7 @@ template <>
 struct ParamUnpack<std::string_view> {
   using storage_type = std::string_view;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
+    ptr = align_ptr<iree_vm_ref_t>(ptr);
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
     if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::type()) {
@@ -557,6 +575,7 @@ struct ParamUnpack<iree::span<U>, enable_if_primitive<U>> {
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     iree_host_size_t count = *reinterpret_cast<const int32_t*>(ptr);
     ptr += sizeof(int32_t);
+    ptr = align_ptr<element_type>(ptr);
     out_param =
         iree::span<U>(reinterpret_cast<const element_type*>(ptr), count);
     ptr += sizeof(element_type) * count;
@@ -573,9 +592,21 @@ namespace impl {
 
 using result_ptr_t = uint8_t*;
 
+// Aligns a result pointer up to the natural alignment of the given type.
+// Only required for 8-byte types (i64, f64, ref) since i32/f32 are always
+// naturally aligned (the smallest ABI type is 4 bytes).
+template <typename T>
+static inline result_ptr_t align_result_ptr(result_ptr_t ptr) {
+  if (alignof(T) > sizeof(int32_t)) {
+    return (result_ptr_t)iree_host_align((uintptr_t)ptr, alignof(T));
+  }
+  return ptr;
+}
+
 template <typename T>
 struct ResultPack {
   static void Store(result_ptr_t& ptr, T value) {
+    ptr = align_result_ptr<T>(ptr);
     *reinterpret_cast<T*>(ptr) = value;
     ptr += sizeof(T);
   }
@@ -584,6 +615,7 @@ struct ResultPack {
 template <>
 struct ResultPack<opaque_ref> {
   static void Store(result_ptr_t& ptr, opaque_ref value) {
+    ptr = align_result_ptr<iree_vm_ref_t>(ptr);
     iree_vm_ref_move(value.get(), reinterpret_cast<iree_vm_ref_t*>(ptr));
     ptr += sizeof(iree_vm_ref_t);
   }
@@ -592,6 +624,7 @@ struct ResultPack<opaque_ref> {
 template <typename T>
 struct ResultPack<ref<T>> {
   static void Store(result_ptr_t& ptr, ref<T> value) {
+    ptr = align_result_ptr<iree_vm_ref_t>(ptr);
     iree_vm_ref_wrap_assign(value.get(), value.type(),
                             reinterpret_cast<iree_vm_ref_t*>(ptr));
     value.release();

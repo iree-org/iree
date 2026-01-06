@@ -175,6 +175,45 @@ void memset(OpBuilder builder, Location location, Value dest, int ch,
                       builder.getIndexAttr(1)}));
 }
 
+Value alignTo(OpBuilder builder, Location location, Value size,
+              size_t alignment) {
+  auto ctx = builder.getContext();
+  Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+  Value alignValue = emitc::LiteralOp::create(builder, location, hostSizeType,
+                                              std::to_string(alignment));
+  return emitc::CallOpaqueOp::create(
+             builder,
+             /*location=*/location,
+             /*type=*/hostSizeType,
+             /*callee=*/"iree_host_align",
+             /*operands=*/ArrayRef<Value>{size, alignValue})
+      .getResult(0);
+}
+
+Value alignPtr(OpBuilder builder, Location location, Value ptr,
+               size_t alignment) {
+  auto ctx = builder.getContext();
+  Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+  Type uintptrType = emitc::OpaqueType::get(ctx, "uintptr_t");
+  Type bytePtrType = emitc::PointerType::get(builder.getIntegerType(8, false));
+
+  // Cast ptr to uintptr_t.
+  Value ptrAsInt =
+      emitc::CastOp::create(builder, location, uintptrType, ptr).getResult();
+
+  // Align.
+  Value alignValue = emitc::LiteralOp::create(builder, location, hostSizeType,
+                                              std::to_string(alignment));
+  Value aligned = emitc::CallOpaqueOp::create(
+                      builder, location, uintptrType, "iree_host_align",
+                      ArrayRef<Value>{ptrAsInt, alignValue})
+                      .getResult(0);
+
+  // Cast back to uint8_t*.
+  return emitc::CastOp::create(builder, location, bytePtrType, aligned)
+      .getResult();
+}
+
 Value arrayElement(OpBuilder builder, Location location, size_t index,
                    TypedValue<emitc::PointerType> operand) {
   auto ctx = builder.getContext();
