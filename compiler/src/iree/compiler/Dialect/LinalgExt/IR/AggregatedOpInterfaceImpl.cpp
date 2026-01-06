@@ -1295,8 +1295,15 @@ FailureOr<SmallVector<Value>> ArgCompareOp::decomposeOperation(OpBuilder &b) {
 
         Value idx =
             linalg::IndexOp::create(nestedBuilder, nestedLoc, reductionDim);
-        Value currentIdx = arith::IndexCastOp::create(nestedBuilder, nestedLoc,
-                                                      idxElemType, idx);
+        // Add index_base offset if provided (index_base is of type index).
+        if (Value indexBase = getIndexBase()) {
+          idx = arith::AddIOp::create(nestedBuilder, nestedLoc, idx, indexBase);
+        }
+        Value currentIdx = idx;
+        if (!isa<IndexType>(idxElemType)) {
+          currentIdx = arith::IndexCastOp::create(nestedBuilder, nestedLoc,
+                                                  idxElemType, idx);
+        }
 
         // Inline the comparator region. The region takes (candidateValue,
         // currentBestValue) and yields an i1 indicating if the candidate

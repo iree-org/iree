@@ -540,3 +540,85 @@ func.func @arg_compare(%input: tensor<4x128xf32>,
 // CHECK:         arith.select
 // CHECK:         linalg.yield
 // CHECK:       return %[[GENERIC]]#0, %[[GENERIC]]#1
+
+// -----
+
+// Test arg_compare with index_base offset.
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
+    transform.yield
+  }
+}
+
+func.func @arg_compare_with_index_base(%input: tensor<4x128xf32>,
+                                        %out_val: tensor<4xf32>,
+                                        %out_idx: tensor<4xi32>,
+                                        %index_base: index)
+    -> (tensor<4xf32>, tensor<4xi32>) {
+  %result:2 = iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : tensor<4x128xf32>)
+      outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>)
+      index_base(%index_base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xf32>, tensor<4xi32>
+  return %result#0, %result#1 : tensor<4xf32>, tensor<4xi32>
+}
+
+// CHECK-LABEL: @arg_compare_with_index_base
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<4x128xf32>
+// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]: tensor<4xf32>
+// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]: tensor<4xi32>
+// CHECK-SAME:    %[[INDEX_BASE:[a-zA-Z0-9]+]]: index
+// CHECK:       %[[GENERIC:.*]]:2 = linalg.generic
+// CHECK:         %[[IDX:.*]] = linalg.index 1
+// CHECK:         %[[IDX_WITH_BASE:.*]] = arith.addi %[[IDX]], %[[INDEX_BASE]]
+// CHECK:         arith.index_cast %[[IDX_WITH_BASE]]
+// CHECK:         arith.cmpf ogt
+// CHECK:         arith.select
+// CHECK:         arith.select
+// CHECK:         linalg.yield
+// CHECK:       return %[[GENERIC]]#0, %[[GENERIC]]#1
+
+// -----
+
+// Test arg_compare with index type output (no index_cast needed).
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
+    transform.yield
+  }
+}
+
+func.func @arg_compare_index_output(%input: tensor<4x128xf32>,
+                                     %out_val: tensor<4xf32>,
+                                     %out_idx: tensor<4xindex>)
+    -> (tensor<4xf32>, tensor<4xindex>) {
+  %result:2 = iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : tensor<4x128xf32>)
+      outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xf32>, tensor<4xindex>
+  return %result#0, %result#1 : tensor<4xf32>, tensor<4xindex>
+}
+
+// CHECK-LABEL: @arg_compare_index_output
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<4x128xf32>
+// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]: tensor<4xf32>
+// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]: tensor<4xindex>
+// CHECK:       %[[GENERIC:.*]]:2 = linalg.generic
+// CHECK:         %[[IDX:.*]] = linalg.index 1
+// CHECK-NOT:     arith.index_cast
+// CHECK:         arith.cmpf ogt
+// CHECK:         arith.select
+// CHECK:         arith.select
+// CHECK:         linalg.yield
+// CHECK:       return %[[GENERIC]]#0, %[[GENERIC]]#1
