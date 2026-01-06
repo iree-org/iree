@@ -466,6 +466,16 @@ int64_t WorkgroupMappingAttr::getRelativeIndex() const {
 }
 
 //===----------------------------------------------------------------------===//
+// iree_codegen.local_mapping
+//===----------------------------------------------------------------------===//
+
+int64_t LocalMappingAttr::getMappingId() const { return getDim(); }
+
+bool LocalMappingAttr::isLinearMapping() const { return true; }
+
+int64_t LocalMappingAttr::getRelativeIndex() const { return getDim(); }
+
+//===----------------------------------------------------------------------===//
 // iree_codegen.simple_target
 //===----------------------------------------------------------------------===//
 

@@ -185,6 +185,43 @@ def WorkgroupMappingAttr :
 }
 
 //===---------------------------------------------------------------------===//
+// IREE Codegen local mapping attribute
+//===---------------------------------------------------------------------===//
+
+def LocalMappingAttr :
+    AttrDef<IREECodegen_Dialect, "LocalMapping", [
+      DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>]> {
+  let mnemonic = "local_mapping";
+
+  let parameters = (ins
+    "int64_t":$dim
+  );
+  let assemblyFormat = "`<` $dim `>`";
+
+  let description = [{
+    Attribute for mapping `scf.forall` loops to sequential local execution.
+
+    Example:
+    ```mlir
+      scf.forall (%i, %j) in (4, 8) {
+        // body ... %i, %j
+      } {mapping = [#iree_codegen.local_mapping<1>,
+                    #iree_codegen.local_mapping<0>]}
+    ```
+
+    This forall approximately corresponds to the following loop nest:
+
+    ```mlir
+      scf.for %i = 0 to 4 {
+        scf.for %j = 0 to 8 {
+        // body ... %i, %j
+        }
+      }
+    ```
+  }];
+}
+
+//===---------------------------------------------------------------------===//
 // iree_codegen.simple_target
 //===---------------------------------------------------------------------===//
 
