@@ -138,16 +138,16 @@ hal.executable private @i4_dequant_matvec {
 //     RDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //     RDNA3-DAG:   %[[C32:.+]] = arith.constant 32 : index
 //     RDNA3-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//     RDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4x1x1x1x1x4xf16>
-//         RDNA3:   %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<4x1x1x1x1x4xf16>)
-//         RDNA3:   %{{.*}} = arith.extui %{{.*}} : vector<4x1x1x1x1x4xi4> to vector<4x1x1x1x1x4xi32>
-//         RDNA3:   %{{.*}} = arith.uitofp %{{.*}} : vector<4x1x1x1x1x4xi32> to vector<4x1x1x1x1x4xf16>
-//         RDNA3:   %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x4xf16>
-//         RDNA3:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x4xf16>
-//         RDNA3:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x4xf16>
-//         RDNA3:   %{{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x4xf16>
+//     RDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4x1x1x1x1x1x1x1x4xf16>
+//         RDNA3:   %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<4x1x1x1x1x1x1x1x4xf16>)
+//         RDNA3:   %{{.*}} = arith.extui %{{.*}} : vector<4x1x1x1x1x1x1x1x4xi4> to vector<4x1x1x1x1x1x1x1x4xi32>
+//         RDNA3:   %{{.*}} = arith.uitofp %{{.*}} : vector<4x1x1x1x1x1x1x1x4xi32> to vector<4x1x1x1x1x1x1x1x4xf16>
+//         RDNA3:   %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x1x1x1x4xf16>
+//         RDNA3:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x1x1x1x4xf16>
+//         RDNA3:   %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x1x1x1x4xf16>
+//         RDNA3:   %{{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x1x1x1x4xf16>
 
-//         RDNA3:   %{{.*}} = vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<4x1x1x1x1x4xf16> to vector<4x1x1xf16>
+//         RDNA3:   %{{.*}} = vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 2, 4, 5, 7, 8] : vector<4x1x1x1x1x1x1x1x4xf16> to vector<4x1x1xf16>
 
 // -----
 
@@ -253,12 +253,12 @@ hal.executable private @matvec_fp16 {
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 //      CHECK-DAG:   %[[C4096:.+]] = arith.constant 4096 : index
-//      CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8x1x1x1x1x8xf16>
-//          CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C512]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<8x1x1x1x1x8xf16>)
-//          CHECK:     {{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<8x1x1x1x1x8xf16>
-//          CHECK:     {{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<8x1x1x1x1x8xf16>
+//      CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x8x1x1x1x1x1x1x8xf16>
+//          CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C512]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<1x8x1x1x1x1x1x1x8xf16>)
+//          CHECK:     {{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x8x1x1x1x1x1x1x8xf16>
+//          CHECK:     {{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<1x8x1x1x1x1x1x1x8xf16>
 
-//          CHECK: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<8x1x1x1x1x8xf16> to vector<8x1x1xf16>
+//          CHECK: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [2, 5, 8] : vector<1x8x1x1x1x1x1x1x8xf16> to vector<1x8x1x1x1x1xf16>
 
 // -----
 
@@ -306,12 +306,12 @@ hal.executable private @matvec_fp16 {
 //      RDNA3-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      RDNA3-DAG:   %[[C256:.+]] = arith.constant 256 : index
 //      RDNA3-DAG:   %[[C4096:.+]] = arith.constant 4096 : index
-//      RDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4x1x1x1x1x8xf16>
-//          RDNA3:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C256]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<4x1x1x1x1x8xf16>)
-//          RDNA3:     {{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x8xf16>
-//          RDNA3:     {{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x8xf16>
+//      RDNA3-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x4x1x1x1x1x1x1x8xf16>
+//          RDNA3:   scf.for %{{.+}} = %[[C0]] to %[[C4096]] step %[[C256]] iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<1x4x1x1x1x1x1x1x8xf16>)
+//          RDNA3:     {{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x4x1x1x1x1x1x1x8xf16>
+//          RDNA3:     {{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<1x4x1x1x1x1x1x1x8xf16>
 
-//          RDNA3: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<4x1x1x1x1x8xf16> to vector<4x1x1xf16>
+//          RDNA3: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [2, 5, 8] : vector<1x4x1x1x1x1x1x1x8xf16> to vector<1x4x1x1x1x1xf16>
 
 // -----
 
