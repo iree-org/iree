@@ -22,6 +22,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/InliningUtils.h"
 
@@ -153,9 +154,19 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
   LogicalResult matchAndRewrite(DimOp op,
                                 PatternRewriter &rewriter) const override {
     Value source = op.getSource();
-    while (auto assumeAlignmentOp =
-               source.getDefiningOp<memref::AssumeAlignmentOp>()) {
-      source = assumeAlignmentOp.getViewSource();
+    // Trace through view-like ops that preserve shape (e.g., assume_alignment,
+    // fat_raw_buffer_cast). This allows resolving dims through chains of
+    // such ops back to the original ShapeAwareOpInterface source.
+    while (auto viewLikeOp = dyn_cast_if_present<ViewLikeOpInterface>(
+               source.getDefiningOp())) {
+      Value viewSource = viewLikeOp.getViewSource();
+      auto sourceType = dyn_cast<ShapedType>(viewSource.getType());
+      auto resultType = dyn_cast<ShapedType>(source.getType());
+      if (!sourceType || !resultType ||
+          sourceType.getShape() != resultType.getShape()) {
+        break;
+      }
+      source = viewSource;
     }
     auto shapeAwareOp =
         dyn_cast_if_present<ShapeAwareOpInterface>(source.getDefiningOp());
