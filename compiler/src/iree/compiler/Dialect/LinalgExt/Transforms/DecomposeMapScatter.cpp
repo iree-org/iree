@@ -201,11 +201,9 @@ struct SimplifyLinearizeDelinearizePairs final
         ValueBoundsConstraintSet::Variable delinearizeVar(
             delinearizeBases[delinIdx]);
 
-        // Check equality.
         FailureOr<bool> areEqual =
             ValueBoundsConstraintSet::areEqual(productVar, delinearizeVar);
         if (succeeded(areEqual) && *areEqual) {
-          // Match found!
           newLinearizeInfos.push_back(newLinearizeInfo);
           break;
         }
