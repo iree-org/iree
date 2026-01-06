@@ -52,8 +52,6 @@ public:
 
   // Creates a string with the given string contents (including zeros).
   flatbuffers_string_ref_t createString(StringRef value) {
-    if (value.empty())
-      return 0;
     return flatbuffers_string_create(*this, value.data(), value.size());
   }
 
