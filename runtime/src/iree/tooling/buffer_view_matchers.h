@@ -53,6 +53,7 @@ typedef struct {
   float f16_threshold;
   float f32_threshold;
   double f64_threshold;
+  float bf16_threshold;
 } iree_hal_buffer_equality_t;
 
 // Variant type storing known HAL buffer elements.
@@ -122,6 +123,14 @@ static inline iree_hal_buffer_element_t iree_hal_make_buffer_element_f64(
   iree_hal_buffer_element_t element;
   element.type = IREE_HAL_ELEMENT_TYPE_FLOAT_64;
   element.f64 = value;
+  return element;
+}
+
+static inline iree_hal_buffer_element_t iree_hal_make_buffer_element_bf16(
+    float value) {
+  iree_hal_buffer_element_t element;
+  element.type = IREE_HAL_ELEMENT_TYPE_BFLOAT_16;
+  element.i16 = iree_math_f32_to_bf16(value);
   return element;
 }
 
