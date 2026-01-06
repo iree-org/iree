@@ -57,6 +57,28 @@ func.func @identity_map_scatter_tensor(
 
 // -----
 
+func.func @identity_map_scatter_tensor(
+    %input: vector<4x16xf32>, %output: tensor<?x?xf32>
+) -> tensor<?x?xf32> {
+  %res = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : vector<4x16xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
+  return %res : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func.func @identity_map_scatter_tensor(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//   CHECK-DAG:   %[[CST_TRUE:.+]] = arith.constant dense<true> : vector<64xi1>
+//   CHECK-DAG:   %[[FLAT_OUTPUT:.+]] = tensor.collapse_shape %[[OUTPUT]] {{.*}} tensor<?x?xf32> into tensor<?xf32>
+//       CHECK:   %[[SCATTER:.+]] = vector.scatter
+//       CHECK:   %[[RESULT:.+]] = tensor.expand_shape %[[SCATTER]] {{.*}} : tensor<?xf32> into tensor<?x?xf32>
+//       CHECK:   return %[[RESULT]] : tensor<?x?xf32>
+
+// -----
+
 // This test checks all index and mask computations for the `map_scatter` to `vector.scatter` path.
 // Other tests shouldn't check this to avoid maintenance burden.
 

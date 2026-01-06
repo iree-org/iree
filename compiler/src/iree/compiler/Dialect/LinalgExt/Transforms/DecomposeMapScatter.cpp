@@ -166,16 +166,13 @@ performIndexAndMaskVectorization(MapScatterOp mapScatterOp,
   rewriter.setInsertionPoint(mapScatterOp);
   Value flatOutput;
   SmallVector<Value> strides;
-  SmallVector<OpFoldResult> outputSizes;
+  SmallVector<OpFoldResult> outputSizes =
+      getDims(rewriter, loc, mapScatterOp.getOutput());
   if (mapScatterOp.hasPureBufferSemantics()) {
-    outputSizes =
-        memref::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
     flatOutput = createFlatOutputBuffer(rewriter, loc, mapScatterOp.getOutput(),
                                         outputSizes, strides);
   } else {
     // For tensor outputs, create a flat output buffer as an empty tensor.
-    outputSizes =
-        tensor::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
     auto outputType = cast<TensorType>(mapScatterOp.getOutputType());
     SmallVector<ReassociationIndices> reassociations;
     reassociations.push_back(
@@ -388,9 +385,11 @@ static LogicalResult decomposeToScatter(MapScatterOp mapScatterOp,
   SmallVector<ReassociationIndices> reassociations;
   reassociations.push_back(llvm::to_vector(
       llvm::seq<int64_t>(mapScatterOp.getOutputType().getRank())));
-  auto expandOp =
-      tensor::ExpandShapeOp::create(rewriter, loc, mapScatterOp.getOutputType(),
-                                    scatterOp.getResult(), reassociations);
+  SmallVector<OpFoldResult> outputSizes =
+      tensor::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
+  auto expandOp = tensor::ExpandShapeOp::create(
+      rewriter, loc, mapScatterOp.getOutputType(), scatterOp.getResult(),
+      reassociations, outputSizes);
   rewriter.replaceOp(mapScatterOp, expandOp.getResult());
   return success();
 }
