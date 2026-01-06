@@ -18,6 +18,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -708,6 +709,102 @@ void MapScatterOp::insertTransformationAtStart(
     }
   }
   transformBody.eraseArguments(0, oldSourceIndices.size());
+}
+
+//===----------------------------------------------------------------------===//
+// MapGatherOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult MapGatherOp::verify() {
+  if (getSourceType().getElementType() != getOutputType().getElementType()) {
+    return emitOpError("expected source and output element types to match");
+  }
+  if (getOutputType().getRank() == 0) {
+    return emitOpError("expected output type to have non-zero rank");
+  }
+  Region &transformRegion = getTransformationRegion();
+  Block &transformBody = transformRegion.getBlocks().front();
+  if (transformBody.getNumArguments() != getOutputRank()) {
+    return emitOpError("expected number of block arguments to be equal "
+                       "to the output rank");
+  }
+  if (!llvm::all_of(transformBody.getArgumentTypes(),
+                    llvm::IsaPred<IndexType>)) {
+    return emitOpError("expected block arguments to be index types");
+  }
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  if (yieldOp->getNumOperands() != getSourceRank() + 1) {
+    return yieldOp.emitOpError(
+        "expected transformation_region to yield a "
+        "value for each source dimension and a padding value");
+  }
+  for (int operandIdx = 0; operandIdx < getSourceRank(); ++operandIdx) {
+    if (!isa<IndexType>(yieldOp.getOperandTypes()[operandIdx])) {
+      return yieldOp.emitOpError("expected yielded indices to be index types");
+    }
+  }
+  Type paddingType = yieldOp.getOperandTypes()[getSourceRank()];
+  Type elementType = getSourceType().getElementType();
+  if (paddingType != elementType) {
+    return yieldOp.emitOpError("expected yielded padding value type to match "
+                               "source element type");
+  }
+  return success();
+}
+
+Value MapGatherOp::getSourceIndex(int64_t position) {
+  // It shouldn't be possible to return the padding value, the last operand of
+  // the yield, through this function as that's not an index. Therefore, this
+  // assert here.
+  assert(position < getSourceRank() &&
+         "The source index position being requested should be smaller than the "
+         "source rank.");
+  Block &body = getTransformationRegion().front();
+  auto yield = cast<IREE::LinalgExt::YieldOp>(body.getTerminator());
+  return yield.getOperand(position);
+}
+
+Value MapGatherOp::getResultIndex(int64_t position) {
+  Block &body = getTransformationRegion().front();
+  return body.getArguments()[position];
+}
+
+Value MapGatherOp::getPaddingValue() {
+  Block &body = getTransformationRegion().front();
+  auto yield = cast<IREE::LinalgExt::YieldOp>(body.getTerminator());
+  return yield.getOperand(yield.getNumOperands() - 1);
+}
+
+void MapGatherOp::insertTransformationAtStart(
+    OpBuilder &builder,
+    function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+        transformationBuilder,
+    int64_t numResultIndices) {
+  Block &transformBody = getTransformationRegion().front();
+  SmallVector<BlockArgument> oldResultIndices(transformBody.getArguments());
+  SmallVector<Type> indexTypes(numResultIndices, builder.getIndexType());
+  SmallVector<Location> locs(numResultIndices, getLoc());
+
+  // Create the new block arguments for the new result indices, and transform
+  // them using the callback.
+  transformBody.addArguments(indexTypes, locs);
+  SmallVector<BlockArgument> newResultIndices(
+      transformBody.getArguments().take_back(numResultIndices));
+  SmallVector<Value> newOldResultIndices =
+      transformationBuilder(newResultIndices);
+  assert(newOldResultIndices.size() == oldResultIndices.size() &&
+         "transformation callback should return same number of indices as old "
+         "result indices");
+
+  // Replace all of the uses of the old result indices with the newly produced
+  // result indices.
+  for (auto [oldResultIdx, newOldResultIdx] :
+       llvm::zip_equal(oldResultIndices, newOldResultIndices)) {
+    oldResultIdx.replaceAllUsesWith(newOldResultIdx);
+  }
+
+  // Erase the old result index arguments.
+  transformBody.eraseArguments(0, oldResultIndices.size());
 }
 
 void MapScatterOp::inlineMapScatterBody(
@@ -2840,6 +2937,7 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(GatherOp)
 DEFINE_OP_GET_EFFECTS(MapScatterOp)
+DEFINE_OP_GET_EFFECTS(MapGatherOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
@@ -2855,6 +2953,144 @@ DEFINE_OP_GET_EFFECTS(OnlineAttentionOp)
 DEFINE_OP_GET_EFFECTS(ExpReductionOp)
 DEFINE_OP_GET_EFFECTS(Im2colOp)
 DEFINE_OP_GET_EFFECTS(CustomOp)
+
+void MapGatherOp::inlineMapGatherBody(
+    OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+    function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
+  Block &transformBody = getTransformationRegion().front();
+
+  IRMapping bvm;
+  for (auto [arg, index] :
+       llvm::zip_equal(transformBody.getArguments(), transformBodyIndices)) {
+    bvm.map(arg, index);
+  }
+
+  for (Operation &op : transformBody.without_terminator()) {
+    b.clone(op, bvm);
+  }
+
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  SmallVector<Value> clonedIndices;
+  for (Value operand : yieldOp.getOperands()) {
+    clonedIndices.push_back(bvm.lookup(operand));
+  }
+
+  bodyBuilder(b, loc, clonedIndices);
+}
+
+bool MapGatherOp::isIdentity() {
+  if (getSourceType() != getOutputType())
+    return false;
+
+  Block &body = getTransformationRegion().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(body.getTerminator());
+
+  // Check if all yielded indices match the block arguments.
+  for (auto [idx, arg] : llvm::enumerate(body.getArguments())) {
+    if (yieldOp.getOperand(idx) != arg)
+      return false;
+  }
+
+  return true;
+}
+
+MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
+                                                 Location loc, Value source,
+                                                 Value output) {
+  assert(source.getType() == output.getType() &&
+         "source and output types must match for identity map_gather");
+
+  auto sourceType = cast<ShapedType>(source.getType());
+  auto op = builder.create<MapGatherOp>(
+      loc,
+      sourceType.getRank() == 0 ? TypeRange{} : TypeRange{output.getType()},
+      source, output);
+
+  Block *body = builder.createBlock(&op.getTransformationRegion());
+  SmallVector<Location> locs(sourceType.getRank(), loc);
+  SmallVector<Type> indexTypes(sourceType.getRank(), builder.getIndexType());
+  body->addArguments(indexTypes, locs);
+
+  builder.setInsertionPointToStart(body);
+  SmallVector<Value> yieldOperands(body->getArguments().begin(),
+                                   body->getArguments().end());
+  // Add padding value (zeros).
+  Type elemType = sourceType.getElementType();
+  TypedAttr zeroAttr = cast<TypedAttr>(builder.getZeroAttr(elemType));
+  Value paddingValue = builder.create<arith::ConstantOp>(loc, zeroAttr);
+  yieldOperands.push_back(paddingValue);
+
+  builder.create<IREE::LinalgExt::YieldOp>(loc, yieldOperands);
+
+  return op;
+}
+
+LogicalResult MapGatherOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets.assign(offsets.begin(), offsets.end());
+  resultSizes.assign(sizes.begin(), sizes.end());
+  return success();
+}
+
+SmallVector<utils::IteratorType> MapGatherOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+SmallVector<Range> MapGatherOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  Value output = getOutput();
+  SmallVector<Range> domain;
+  SmallVector<OpFoldResult> outputShape =
+      tensor::getMixedSizes(builder, loc, output);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  for (OpFoldResult size : outputShape) {
+    domain.push_back(Range{zero, size, one});
+  }
+  return domain;
+}
+
+FailureOr<TilingResult>
+MapGatherOp::getTiledImplementation(OpBuilder &builder,
+                                    ArrayRef<OpFoldResult> offsets,
+                                    ArrayRef<OpFoldResult> sizes) {
+  // For now, return failure - full tiling implementation would go here.
+  return failure();
+}
+
+FailureOr<TilingResult> MapGatherOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &builder, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> operandOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> operandSizes) {
+  // For now, return failure - full tiling implementation would go here.
+  return failure();
+}
+
+LogicalResult MapGatherOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &builder, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> operandOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> operandSizes,
+    SmallVectorImpl<OpFoldResult> &resultOffsets,
+    SmallVectorImpl<OpFoldResult> &resultSizes) {
+  // For now, return failure - full tiling implementation would go here.
+  return failure();
+}
+
+LogicalResult MapGatherOp::generateScalarImplementation(OpBuilder &b,
+                                                        Location loc,
+                                                        ValueRange ivs) {
+  // For now, return failure - full scalar implementation would go here.
+  return failure();
+}
+
+void MapGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                              MLIRContext *context) {
+  // Add canonicalization patterns here when needed.
+}
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 
