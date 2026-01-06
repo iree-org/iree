@@ -277,6 +277,12 @@ enum iree_io_file_mapping_flag_bits_t {
   //
   // Implemented by MAP_PRIVATE, where available.
   IREE_IO_FILE_MAPPING_FLAG_PRIVATE = 1ull << 3,
+
+  // Hint the OS to use large pages, but do not require it like
+  // IREE_IO_FILE_MAPPING_FLAG_LARGE_PAGES does. On linux, this is implemented
+  // by the "transparent huge pages" feature, madvise(MADV_HUGEPAGE), and is
+  // more widely enabled than MAP_HUGETLB.
+  IREE_IO_FILE_MAPPING_FLAG_TRANSPARENT_LARGE_PAGES = 1ull << 4,
 };
 
 // A mapped file view into host memory.
