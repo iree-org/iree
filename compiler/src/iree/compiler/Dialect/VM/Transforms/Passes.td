@@ -136,4 +136,17 @@ def SinkDefiningOpsPass :
   }];
 }
 
+def MaterializeRefDiscardsPass :
+    Pass<"iree-vm-materialize-ref-discards", "IREE::VM::ModuleOp"> {
+  let summary = "Inserts vm.discard.refs ops at ref death points.";
+  let description = [{
+    Analyzes value liveness and inserts explicit vm.discard.refs operations
+    at points where ref values are no longer needed. This enables functions
+    to be marked as "refs clean" so the runtime can skip cleanup on success.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::VM::VMDialect"
+  ];
+}
+
 #endif  // IREE_DIALECT_VM_PASSES

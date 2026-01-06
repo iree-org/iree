@@ -23,6 +23,7 @@ iree_cc_library(
     "DropUnusedCalls.cpp"
     "GlobalInitialization.cpp"
     "HoistInlinedRodata.cpp"
+    "MaterializeRefDiscards.cpp"
     "OrdinalAllocation.cpp"
     "Passes.cpp"
     "ReifyRodataTables.cpp"
@@ -35,7 +36,9 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithTransforms
+    MLIRControlFlowInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
@@ -54,6 +57,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Conversion::MemRefToUtil
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Dialect::VM::Analysis::ValueLiveness
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::ArithToVM
     iree::compiler::Dialect::VM::Conversion::MathToVM

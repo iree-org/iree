@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "drop_unused_calls.mlir"
     "global_initialization.mlir"
     "hoist_inlined_rodata.mlir"
+    "materialize_ref_discards.mlir"
     "ordinal_allocation.mlir"
     "reify_rodata_tables.mlir"
     "resolve_rodata_loads.mlir"
