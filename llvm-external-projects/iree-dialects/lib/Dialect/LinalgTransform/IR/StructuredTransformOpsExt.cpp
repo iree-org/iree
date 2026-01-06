@@ -190,7 +190,7 @@ static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
       operation->getResultTypes(), operation->getAttrs());
   modelOpState.addRegion();
   Operation *modelOp = rewriter.create(modelOpState);
-  auto g1 = llvm::make_scope_exit([&]() { rewriter.eraseOp(modelOp); });
+  auto g1 = llvm::scope_exit([&]() { rewriter.eraseOp(modelOp); });
   linalg::LinalgOp linalgOp = dyn_cast<linalg::LinalgOp>(operation);
   linalg::LinalgOp linalgModelOp = dyn_cast<linalg::LinalgOp>(modelOp);
   if (linalgOp && linalgModelOp)

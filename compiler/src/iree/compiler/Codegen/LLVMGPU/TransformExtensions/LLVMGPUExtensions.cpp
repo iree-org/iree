@@ -581,7 +581,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   vector::BroadcastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
   vector::ExtractOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
   ErrorCheckingTrackingListener listener(state, *this);
-  auto checkErrors = llvm::make_scope_exit([&]() {
+  auto checkErrors = llvm::scope_exit([&]() {
     // The TrackingListener API makes checking for errors mandatory. It is safe
     // to drop payload ops during this transform, so we can ignore all errors.
     (void)listener.checkAndResetError();
@@ -1388,7 +1388,7 @@ transform_dialect::EliminateGpuBarriersOp::applyToOne(
   RewritePatternSet patterns(target.getContext());
   patterns.insert<BarrierElimination>(getContext());
   ErrorCheckingTrackingListener listener(state, *this);
-  auto checkErrors = llvm::make_scope_exit([&]() {
+  auto checkErrors = llvm::scope_exit([&]() {
     // The TrackingListener API makes checking for errors mandatory. It is safe
     // to drop payload ops during this transform, so we can ignore all errors.
     (void)listener.checkAndResetError();

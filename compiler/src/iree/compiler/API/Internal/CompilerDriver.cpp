@@ -983,7 +983,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   if (!session.globalInit.usesCommandLine) {
     session.binder.applyOptimizationDefaults();
   }
-  auto resetDefaults = llvm::make_scope_exit([&]() {
+  auto resetDefaults = llvm::scope_exit([&]() {
     if (!session.globalInit.usesCommandLine) {
       session.binder.restoreOptimizationDefaults();
     }
