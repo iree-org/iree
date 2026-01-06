@@ -7,9 +7,6 @@
 name: CI - Linux arm64 clang
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/ci_linux_arm64_clang.yml"
   schedule:
     # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
     - cron: "15 9 * * 1-5"
