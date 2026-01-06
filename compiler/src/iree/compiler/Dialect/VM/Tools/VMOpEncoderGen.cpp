@@ -45,7 +45,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
     Operator op(def);
     tblgen::DialectNamespaceEmitter emitter(os, op.getDialect());
     os << formatv(
-        "LogicalResult {0}::encode(SymbolTable &syms, VMFuncEncoder &e) {{\n",
+        "FailureOr<bool> {0}::encode(SymbolTable &syms, VMFuncEncoder &e) {{\n",
         op.getCppClassName());
 
     for (auto &pair : prefixOpcodes) {
@@ -93,7 +93,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
     os << "    return emitOpError() << \"failed to encode (internal)\";\n";
     os << "  }\n";
 
-    os << "  return success();\n";
+    os << "  return true;\n";
     os << "}\n\n";
   }
 

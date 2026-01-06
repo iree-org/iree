@@ -753,6 +753,29 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
 
+    DISASM_OP(CORE, DiscardRefs) {
+      const iree_vm_register_list_t* reg_list =
+          VM_ParseVariadicOperands("refs");
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, "vm.discard.refs "));
+      EMIT_OPERAND_REG_LIST(reg_list);
+      break;
+    }
+
+    DISASM_OP(CORE, AssignRef) {
+      bool source_is_move;
+      uint16_t source_reg =
+          VM_ParseOperandRegRefMove("source", &source_is_move);
+      bool result_is_move;
+      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.assign.ref "));
+      EMIT_REF_REG_NAME_MOVE(source_reg, source_is_move);
+      EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_reg]);
+      break;
+    }
+
     DISASM_OP(CORE, ConstRefRodata) {
       uint32_t rodata_ordinal = VM_ParseRodataAttr("rodata");
       bool result_is_move;

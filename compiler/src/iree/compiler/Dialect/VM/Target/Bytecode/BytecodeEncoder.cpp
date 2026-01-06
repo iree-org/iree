@@ -249,6 +249,23 @@ public:
     return success();
   }
 
+  LogicalResult
+  encodeOperands(ArrayRef<std::pair<Value, int>> valuesWithIndices) override {
+    if (failed(ensureAlignment(2)) ||
+        failed(writeUint16(valuesWithIndices.size()))) {
+      return failure();
+    }
+    for (auto [value, operandIndex] : valuesWithIndices) {
+      uint16_t reg =
+          registerAllocation_->mapUseToRegister(value, currentOp_, operandIndex)
+              .encode();
+      if (failed(writeUint16(reg))) {
+        return failure();
+      }
+    }
+    return success();
+  }
+
   LogicalResult encodeResult(Value value) override {
     uint16_t reg = registerAllocation_->mapToRegister(value).encode();
     return writeUint16(reg);
@@ -276,6 +293,10 @@ public:
   }
 
   size_t getOffset() const { return bytecode_.size(); }
+
+  const RegisterAllocation *getRegisterAllocation() const override {
+    return registerAllocation_;
+  }
 
   LogicalResult ensureAlignment(size_t alignment) {
     size_t paddedSize = (bytecode_.size() + (alignment - 1)) & ~(alignment - 1);
@@ -383,20 +404,25 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     for (auto &op : block.getOperations()) {
       auto serializableOp = dyn_cast<IREE::VM::VMSerializableOp>(op);
       if (!serializableOp) {
-        if (op.hasTrait<OpTrait::IREE::VM::AssignmentOp>()) {
-          // Assignment ops are ok to not be serializable.
-          continue;
-        }
         op.emitOpError() << "is not serializable";
         return std::nullopt;
       }
-      sourceMap.locations.push_back(
-          {static_cast<int32_t>(encoder.getOffset()), op.getLoc()});
-      if (failed(encoder.beginOp(&op)) ||
-          failed(serializableOp.encode(symbolTable, encoder)) ||
-          failed(encoder.endOp(&op))) {
+      const int32_t bytecodeOffset = static_cast<int32_t>(encoder.getOffset());
+      if (failed(encoder.beginOp(&op))) {
         op.emitOpError() << "failed to encode";
         return std::nullopt;
+      }
+      auto encodeResult = serializableOp.encode(symbolTable, encoder);
+      if (failed(encodeResult)) {
+        op.emitOpError() << "failed to encode";
+        return std::nullopt;
+      }
+      if (failed(encoder.endOp(&op))) {
+        op.emitOpError() << "failed to encode";
+        return std::nullopt;
+      }
+      if (*encodeResult) {
+        sourceMap.locations.push_back({bytecodeOffset, op.getLoc()});
       }
     }
 
