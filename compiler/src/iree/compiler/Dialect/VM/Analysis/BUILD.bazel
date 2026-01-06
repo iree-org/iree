@@ -17,12 +17,30 @@ iree_compiler_cc_library(
     srcs = [
         "RegisterAllocation.cpp",
         "RegisterAllocationTest.cpp",
-        "ValueLiveness.cpp",
         "ValueLivenessTest.cpp",
     ],
     hdrs = [
         "RegisterAllocation.h",
         "TestPasses.h",
+    ],
+    deps = [
+        ":ValueLiveness",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "ValueLiveness",
+    srcs = [
+        "ValueLiveness.cpp",
+    ],
+    hdrs = [
         "ValueLiveness.h",
     ],
     deps = [
@@ -31,7 +49,6 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
     ],
 )
