@@ -549,7 +549,7 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
   // FIXME: this is a workaround for the fact that this inf loops due to the
   // creation of `affine::AffineDelinearizeIndexOp` but still returns failure.
   SmallVector<Operation *> createdOps;
-  auto scope = llvm::make_scope_exit([&]() {
+  auto scope = llvm::scope_exit([&]() {
     for (Operation *op : createdOps) {
       if (op->use_empty()) {
         rewriter.eraseOp(op);
