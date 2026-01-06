@@ -290,7 +290,7 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
   // Construct target triple (e.g., "hip-amdgcn-amd-amdhsa--gfx942")
   // For now, use the device name directly as the target
   // TODO: map device name to proper LLVM triple
-  char target_triple_str[256];
+  char target_triple_str[512];
   snprintf(target_triple_str, sizeof(target_triple_str),
            "hipv4-amdgcn-amd-amdhsa--%s", props.gcnArchName);
   char* col = strstr(target_triple_str, ":");

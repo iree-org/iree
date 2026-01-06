@@ -15,8 +15,10 @@ if(NOT EXISTS "${HIP_API_HEADERS_ROOT}/hip/hip_version.h")
 endif()
 
 set(ADDITIONAL_HIP_LIBS)
+set(ADDITIONAL_HIP_DEFINES)
 if (IREE_HAL_DRIVER_ENABLE_ZSTD)
   set(ADDITIONAL_HIP_LIBS zstd)
+  set(ADDITIONAL_HIP_DEFINES IREE_HAL_HIP_ENABLE_ZSTD=1)
 endif()
 
 iree_cc_library(
@@ -26,6 +28,8 @@ iree_cc_library(
     "api.h"
   COPTS
     ${IREE_HIP_DRIVER_COPTS}
+  DEFINES
+    ${ADDITIONAL_HIP_DEFINES}
   SRCS
     "api.h"
     "cleanup_thread.c"
