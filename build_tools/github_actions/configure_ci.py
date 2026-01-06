@@ -195,17 +195,6 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
 
 PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
 
-# Patterns to detect "LLVM integration" PRs, i.e. changes that update the
-# third_party/llvm-project submodule. This should only include PRs
-# intended to be merged and should exclude test/draft PRs as well as
-# PRs that include temporary patches to the submodule during review.
-# See also: https://github.com/iree-org/iree/issues/12268
-LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate|bump.+llvm", re.IGNORECASE)
-LLVM_INTEGRATE_BRANCH_PATTERN = re.compile(
-    "integrates/llvm|bump-llvm|llvm-bump|integrate-llvm", re.IGNORECASE
-)
-LLVM_INTEGRATE_LABEL = "llvm-integrate"
-
 
 def skip_path(path: str) -> bool:
     return any(fnmatch.fnmatch(path, pattern) for pattern in SKIP_PATH_PATTERNS)
@@ -443,7 +432,6 @@ def get_enabled_jobs(
     all_jobs: Set[str],
     *,
     is_pr: bool,
-    is_llvm_integrate_pr: bool,
     modified_paths: Optional[Iterable[str]],
 ) -> Set[str]:
     """Returns the CI jobs to run.
@@ -452,7 +440,6 @@ def get_enabled_jobs(
       trailers: trailers from PR description.
       all_jobs: all known supported jobs.
       is_pr: whether this is for pull requests or not.
-      is_llvm_integrate_pr:  whether this is for an LLVM integrate PR or not.
       modified_paths: the paths of the files changed. These paths are
         relative to the repo root directory.
 
@@ -462,12 +449,6 @@ def get_enabled_jobs(
     if not is_pr:
         print(
             "Running default postsubmit jobs (excluding schedule-only jobs).",
-            file=sys.stderr,
-        )
-        return all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS
-    if is_llvm_integrate_pr:
-        print(
-            "Running all jobs (excluding schedule-only) because run was triggered by an LLVM integrate pull request event.",
             file=sys.stderr,
         )
         return all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS
@@ -538,11 +519,6 @@ def get_enabled_jobs(
 def main():
     is_pr = os.environ["GITHUB_EVENT_NAME"] == "pull_request"
     trailers, labels = get_trailers_and_labels(is_pr)
-    is_llvm_integrate_pr = bool(
-        LLVM_INTEGRATE_TITLE_PATTERN.search(os.environ.get("PR_TITLE", ""))
-        or LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get("PR_BRANCH", ""))
-        or LLVM_INTEGRATE_LABEL in labels
-    )
     repo = os.environ["GITHUB_REPOSITORY"]
     workflow_ref = os.environ["GITHUB_WORKFLOW_REF"]
     workflow_file = parse_path_from_workflow_ref(repo=repo, workflow_ref=workflow_ref)
@@ -555,7 +531,6 @@ def main():
             all_jobs,
             modified_paths=get_modified_paths(base_ref),
             is_pr=is_pr,
-            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
     except ValueError as e:
         print(e)
