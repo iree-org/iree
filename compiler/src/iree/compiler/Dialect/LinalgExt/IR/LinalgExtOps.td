@@ -382,15 +382,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
   }];
 }
 
-def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
-    [DeclareOpInterfaceMethods<TilingInterface,
-        ["getIterationDomain",
-         "getLoopIteratorTypes",
-         "getResultTilePosition",
-         "getTiledImplementation",
-         "getIterationDomainTileFromOperandTiles",
-         "getTiledImplementationFromOperandTiles",
-         "generateScalarImplementation"]>]> {
+def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather"> {
   let summary = [{Gather with a mapping from result indices to source indices.}];
   let description = [{
     Takes two operands, `source` and `output`, and reads every element from
@@ -406,10 +398,6 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
     block is terminated by an iree_linalg_ext.yield op, which yields one index
     for each dimension in the `source`, and an additional padding value which
     represents the value to use if the computed source indices are out of bounds.
-
-    This operation has padding semantics (as opposed to map_scatter's masking
-    semantics), and has gather semantics (fuses with consumers, as opposed to
-    map_scatter's scatter semantics which fuses with producers).
   }];
   let arguments = (ins
       AnyShaped:$source,
@@ -439,32 +427,10 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
       return getOutputType().getRank();
     }
 
-    // Return the source index at the provided position.
-    Value getSourceIndex(int64_t position);
-
-    // Return the result index at the provided position.
-    Value getResultIndex(int64_t position);
-
-    // Returns the padding value.
-    Value getPaddingValue();
-
     // Return true if the map_gather op has vector semantics.
     bool isVectorized() {
       return isa<VectorType>(getOutputType());
     }
-
-    // Helper to apply transformations to the result index block arguments of
-    // the transformation body, and replace the uses of the previous result
-    // indices with the values returned by `transformationBuilder`. The argument
-    // to `transformationBuilder` function will be an ArrayRef of the new block
-    // arguments, the number of which is determined by `numResultIndices`. The
-    // `transformationBuilder` should return the replacements for the old block
-    // arguments.
-    void insertTransformationAtStart(
-        OpBuilder &builder,
-        function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
-            transformationBuilder,
-        int64_t numResultIndices);
 
     // Inline the transformation region of the map_gather op without its
     // terminator, replacing the block arguments with the passed
