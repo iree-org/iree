@@ -77,9 +77,14 @@
 #define VM_ParseOperandRegF64(name) \
   OP_I16(0);                        \
   pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseOperandRegRef(name, out_is_move)                    \
-  OP_I16(0) & IREE_REF_REGISTER_MASK;                               \
-  *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
+// Base macros - no MOVE bit decoding (for ops that don't support MOVE).
+#define VM_ParseOperandRegRef(name)   \
+  OP_I16(0) & IREE_REF_REGISTER_MASK; \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+// Parse ref operand with MOVE bit.
+#define VM_ParseOperandRegRefMove(name, out_is_move)       \
+  OP_I16(0) & IREE_REF_REGISTER_MASK;                      \
+  *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
   pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseVariadicOperands(name) \
   VM_DecVariadicOperandsImpl(bytecode_data, &pc)
@@ -95,17 +100,23 @@
 #define VM_ParseResultRegF64(name) \
   OP_I16(0);                       \
   pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseResultRegRef(name, out_is_move)                     \
-  OP_I16(0) & IREE_REF_REGISTER_MASK;                               \
-  *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
+// Base macros - no MOVE bit decoding (for ops that don't support MOVE).
+#define VM_ParseResultRegRef(name)    \
+  OP_I16(0) & IREE_REF_REGISTER_MASK; \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+// Parse ref result with MOVE bit.
+#define VM_ParseResultRegRefMove(name, out_is_move)        \
+  OP_I16(0) & IREE_REF_REGISTER_MASK;                      \
+  *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
   pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseVariadicResults(name) VM_ParseVariadicOperands(name)
 
-#define EMIT_REG_NAME(reg)                  \
-  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) { \
-    EMIT_REF_REG_NAME(reg);                 \
-  } else {                                  \
-    EMIT_I32_REG_NAME(reg);                 \
+// Emits register name, extracting move bit from raw register value for refs.
+#define EMIT_REG_NAME(reg)                                           \
+  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) {                          \
+    EMIT_REF_REG_NAME_MOVE(reg, (reg) & IREE_REF_REGISTER_MOVE_BIT); \
+  } else {                                                           \
+    EMIT_I32_REG_NAME(reg);                                          \
   }
 #define EMIT_I32_REG_NAME(reg)                            \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
@@ -636,8 +647,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       uint32_t global = VM_ParseGlobalAttr("global");
       const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("value", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("value", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.global.load.ref .refs[%u]", global));
       EMIT_OPTIONAL_VALUE_REF(&module_state->global_ref_table[global]);
@@ -650,10 +661,10 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       uint32_t global = VM_ParseGlobalAttr("global");
       const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
       bool value_is_move;
-      uint16_t value_reg = VM_ParseOperandRegRef("value", &value_is_move);
+      uint16_t value_reg = VM_ParseOperandRegRefMove("value", &value_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.global.store.ref "));
-      EMIT_REF_REG_NAME(value_reg);
+      EMIT_REF_REG_NAME_MOVE(value_reg, value_is_move);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[value_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, ", .refs[%u] : !", global));
@@ -665,8 +676,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       uint16_t global_reg = VM_ParseOperandRegI32("global");
       const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("value", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("value", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, " = vm.global.load.indirect.ref .refs["));
       EMIT_I32_REG_NAME(global_reg);
@@ -683,10 +694,10 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       uint16_t global_reg = VM_ParseOperandRegI32("global");
       const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
       bool value_is_move;
-      uint16_t value_reg = VM_ParseOperandRegRef("value", &value_is_move);
+      uint16_t value_reg = VM_ParseOperandRegRefMove("value", &value_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, "vm.global.store.indirect.ref "));
-      EMIT_REF_REG_NAME(value_reg);
+      EMIT_REF_REG_NAME_MOVE(value_reg, value_is_move);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(b, ", .refs["));
       EMIT_I32_REG_NAME(global_reg);
@@ -735,8 +746,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ConstRefZero) {
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
+      uint16_t result_reg = VM_ParseResultRegRef("result");
       EMIT_REF_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.const.ref.zero"));
@@ -746,9 +756,9 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     DISASM_OP(CORE, ConstRefRodata) {
       uint32_t rodata_ordinal = VM_ParseRodataAttr("rodata");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("value", &result_is_move);
+      uint16_t result_reg = VM_ParseResultRegRefMove("value", &result_is_move);
       iree_vm_buffer_t* buffer = &module->rodata_ref_table[rodata_ordinal];
-      EMIT_REF_REG_NAME(result_reg);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.const.ref.rodata %u  // 0x%p %" PRIhsz "b", rodata_ordinal,
           buffer->data.data, buffer->data.data_length));
@@ -763,8 +773,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.alloc "));
       EMIT_I64_REG_NAME(length_reg);
@@ -776,14 +786,13 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferClone) {
-      bool source_is_move;
-      uint16_t source_reg = VM_ParseOperandRegRef("source", &source_is_move);
+      uint16_t source_reg = VM_ParseOperandRegRef("source");
       uint16_t offset_reg = VM_ParseOperandRegI64("offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.clone "));
       EMIT_REF_REG_NAME(source_reg);
@@ -801,8 +810,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferLength) {
-      bool buffer_is_move;
-      uint16_t buffer_reg = VM_ParseOperandRegRef("buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("buffer");
       uint16_t result_reg = VM_ParseResultRegI64("result");
       EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -813,13 +821,9 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferCopy) {
-      bool source_buffer_is_move;
-      uint16_t source_buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &source_buffer_is_move);
+      uint16_t source_buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t source_offset_reg = VM_ParseOperandRegI64("source_offset");
-      bool target_buffer_is_move;
-      uint16_t target_buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &target_buffer_is_move);
+      uint16_t target_buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t target_offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       IREE_RETURN_IF_ERROR(
@@ -842,13 +846,9 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferCompare) {
-      bool lhs_buffer_is_move;
-      uint16_t lhs_buffer_reg =
-          VM_ParseOperandRegRef("lhs_buffer", &lhs_buffer_is_move);
+      uint16_t lhs_buffer_reg = VM_ParseOperandRegRef("lhs_buffer");
       uint16_t lhs_offset_reg = VM_ParseOperandRegI64("lhs_offset");
-      bool rhs_buffer_is_move;
-      uint16_t rhs_buffer_reg =
-          VM_ParseOperandRegRef("rhs_buffer", &rhs_buffer_is_move);
+      uint16_t rhs_buffer_reg = VM_ParseOperandRegRef("rhs_buffer");
       uint16_t rhs_offset_reg = VM_ParseOperandRegI64("rhs_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t result_reg = VM_ParseResultRegI32("result");
@@ -873,9 +873,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferFillI8) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
@@ -895,9 +893,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferFillI16) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
@@ -917,9 +913,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferFillI32) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
@@ -940,9 +934,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferFillI64) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegI64("value");
@@ -963,9 +955,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferLoadI8U) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
@@ -979,9 +969,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferLoadI8S) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
@@ -995,9 +983,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferLoadI16U) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
@@ -1011,9 +997,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferLoadI16S) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
@@ -1027,9 +1011,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferLoadI32) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
@@ -1043,9 +1025,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferLoadI64) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegI64("result");
       EMIT_I64_REG_NAME(result_reg);
@@ -1060,9 +1040,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferStoreI8) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
@@ -1078,9 +1056,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferStoreI16) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
@@ -1096,9 +1072,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferStoreI32) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegI32("value");
       IREE_RETURN_IF_ERROR(
@@ -1114,9 +1088,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, BufferStoreI64) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegI64("value");
       IREE_RETURN_IF_ERROR(
@@ -1133,9 +1105,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, BufferHash) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t result_reg = VM_ParseResultRegI64("result");
@@ -1162,8 +1132,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
           VM_ParseTypeOf("element_type");
       uint16_t initial_capacity_reg = VM_ParseOperandRegI32("initial_capacity");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.alloc "));
       EMIT_I32_REG_NAME(initial_capacity_reg);
@@ -1176,8 +1146,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListReserve) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t minimum_capacity_reg = VM_ParseOperandRegI32("minimum_capacity");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.reserve "));
@@ -1190,8 +1159,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListSize) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -1202,8 +1170,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListResize) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t new_size_reg = VM_ParseOperandRegI32("new_size");
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.resize "));
@@ -1216,8 +1183,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListGetI32) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
@@ -1232,8 +1198,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListSetI32) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       uint16_t raw_value_reg = VM_ParseOperandRegI32("raw_value");
       IREE_RETURN_IF_ERROR(
@@ -1250,8 +1215,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListGetI64) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       uint16_t result_reg = VM_ParseResultRegI64("result");
       EMIT_I64_REG_NAME(result_reg);
@@ -1266,8 +1230,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListSetI64) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       uint16_t value_reg = VM_ParseOperandRegI64("value");
       IREE_RETURN_IF_ERROR(
@@ -1284,13 +1247,12 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListGetRef) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       const iree_vm_type_def_t type_def = VM_ParseTypeOf("result");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.get.ref "));
       EMIT_REF_REG_NAME(list_reg);
@@ -1303,11 +1265,11 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, ListSetRef) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       bool operand_is_move;
-      uint16_t operand_reg = VM_ParseOperandRegRef("value", &operand_is_move);
+      uint16_t operand_reg =
+          VM_ParseOperandRegRefMove("value", &operand_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.set.ref "));
       EMIT_REF_REG_NAME(list_reg);
@@ -1316,7 +1278,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       EMIT_I32_REG_NAME(index_reg);
       EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(operand_reg);
+      EMIT_REF_REG_NAME_MOVE(operand_reg, operand_is_move);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
       break;
     }
@@ -1368,22 +1330,22 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       const iree_vm_type_def_t type_def = VM_ParseTypeOf("true_value");
       bool true_value_is_move;
       uint16_t true_value_reg =
-          VM_ParseOperandRegRef("true_value", &true_value_is_move);
+          VM_ParseOperandRegRefMove("true_value", &true_value_is_move);
       bool false_value_is_move;
       uint16_t false_value_reg =
-          VM_ParseOperandRegRef("false_value", &false_value_is_move);
+          VM_ParseOperandRegRefMove("false_value", &false_value_is_move);
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.select.ref "));
       EMIT_I32_REG_NAME(condition_reg);
       EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " ? "));
-      EMIT_REF_REG_NAME(true_value_reg);
+      EMIT_REF_REG_NAME_MOVE(true_value_reg, true_value_is_move);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[true_value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
-      EMIT_REF_REG_NAME(false_value_reg);
+      EMIT_REF_REG_NAME_MOVE(false_value_reg, false_value_is_move);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[false_value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " -> !"));
       EMIT_TYPE_NAME(type_def);
@@ -1430,12 +1392,12 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       bool default_is_move;
       uint16_t default_value_reg =
-          VM_ParseOperandRegRef("default_value", &default_is_move);
+          VM_ParseOperandRegRefMove("default_value", &default_is_move);
       const iree_vm_register_list_t* value_reg_list =
           VM_ParseVariadicOperands("values");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.switch.ref "));
       EMIT_I32_REG_NAME(index_reg);
@@ -1443,7 +1405,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "["));
       EMIT_OPERAND_REG_LIST(value_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "] else "));
-      EMIT_REF_REG_NAME(default_value_reg);
+      EMIT_REF_REG_NAME_MOVE(default_value_reg, default_is_move);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[default_value_reg]);
       break;
     }
@@ -1534,14 +1496,15 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
 
     DISASM_OP(CORE, CastAnyRef) {
       bool operand_is_move;
-      uint16_t operand_reg = VM_ParseOperandRegRef("operand", &operand_is_move);
+      uint16_t operand_reg =
+          VM_ParseOperandRegRefMove("operand", &operand_is_move);
       const iree_vm_type_def_t type_def = VM_ParseTypeOf("result");
       bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
-      EMIT_REF_REG_NAME(result_reg);
+      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
+      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.any.ref "));
-      EMIT_REF_REG_NAME(operand_reg);
+      EMIT_REF_REG_NAME_MOVE(operand_reg, operand_is_move);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " : !vm.ref<?> -> "));
@@ -1635,10 +1598,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(CORE, CmpEQRef) {
-      bool lhs_is_move;
-      uint16_t lhs_reg = VM_ParseOperandRegRef("lhs", &lhs_is_move);
-      bool rhs_is_move;
-      uint16_t rhs_reg = VM_ParseOperandRegRef("rhs", &rhs_is_move);
+      uint16_t lhs_reg = VM_ParseOperandRegRef("lhs");
+      uint16_t rhs_reg = VM_ParseOperandRegRef("rhs");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -1651,10 +1612,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, CmpNERef) {
-      bool lhs_is_move;
-      uint16_t lhs_reg = VM_ParseOperandRegRef("lhs", &lhs_is_move);
-      bool rhs_is_move;
-      uint16_t rhs_reg = VM_ParseOperandRegRef("rhs", &rhs_is_move);
+      uint16_t lhs_reg = VM_ParseOperandRegRef("lhs");
+      uint16_t rhs_reg = VM_ParseOperandRegRef("rhs");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -1667,8 +1626,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
     DISASM_OP(CORE, CmpNZRef) {
-      bool operand_is_move;
-      uint16_t operand_reg = VM_ParseOperandRegRef("operand", &operand_is_move);
+      uint16_t operand_reg = VM_ParseOperandRegRef("operand");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -1995,8 +1953,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     //===----------------------------------------------------------------===//
 
     DISASM_OP(EXT_F32, ListGetF32) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       uint16_t result_reg = VM_ParseResultRegF32("result");
       EMIT_F32_REG_NAME(result_reg);
@@ -2011,8 +1968,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(EXT_F32, ListSetF32) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       uint16_t raw_value_reg = VM_ParseOperandRegF32("raw_value");
       IREE_RETURN_IF_ERROR(
@@ -2244,9 +2200,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     //===----------------------------------------------------------------===//
 
     DISASM_OP(EXT_F32, BufferFillF32) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegF32("value");
@@ -2267,9 +2221,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(EXT_F32, BufferLoadF32) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegF32("result");
       EMIT_F32_REG_NAME(result_reg);
@@ -2284,9 +2236,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(EXT_F32, BufferStoreF32) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegF32("value");
       IREE_RETURN_IF_ERROR(
@@ -2390,8 +2340,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     //===----------------------------------------------------------------===//
 
     DISASM_OP(EXT_F64, ListGetF64) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       uint16_t result_reg = VM_ParseResultRegF64("result");
       EMIT_F64_REG_NAME(result_reg);
@@ -2406,8 +2355,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(EXT_F64, ListSetF64) {
-      bool list_is_move;
-      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t list_reg = VM_ParseOperandRegRef("list");
       uint16_t index_reg = VM_ParseOperandRegI32("index");
       uint16_t raw_value_reg = VM_ParseOperandRegF64("raw_value");
       IREE_RETURN_IF_ERROR(
@@ -2669,9 +2617,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     //===----------------------------------------------------------------===//
 
     DISASM_OP(EXT_F64, BufferFillF64) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
       uint16_t value_reg = VM_ParseOperandRegF64("value");
@@ -2692,9 +2638,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(EXT_F64, BufferLoadF64) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
       uint16_t result_reg = VM_ParseResultRegF64("result");
       EMIT_F64_REG_NAME(result_reg);
@@ -2709,9 +2653,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     }
 
     DISASM_OP(EXT_F64, BufferStoreF64) {
-      bool buffer_is_move;
-      uint16_t buffer_reg =
-          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
       uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
       uint16_t value_reg = VM_ParseOperandRegF64("value");
       IREE_RETURN_IF_ERROR(

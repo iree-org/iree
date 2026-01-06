@@ -399,10 +399,24 @@ class CheckModuleState final {
     return OkStatus();
   }
 
-  Status ExpectAllTrue(vm::ref<iree_hal_device_t> device,
-                       vm::ref<iree_hal_buffer_view_t> operand) {
-    IREE_RETURN_IF_ERROR(TransferToHost(device.get(), operand));
-    auto* view = operand.get();
+  Status ExpectAllTrue(iree_hal_device_t* device,
+                       iree_hal_buffer_view_t* operand_ptr) {
+    // Transfer to host if needed, creating a new owned ref.
+    vm::ref<iree_hal_buffer_view_t> transferred;
+    iree_hal_buffer_view_t* view = operand_ptr;
+    iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(operand_ptr);
+    if (!iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) ||
+        !iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
+                           IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED)) {
+      IREE_ASSIGN_OR_RETURN(
+          auto target_views,
+          TransferBuffersToHost(
+              device, iree::span<const vm::ref<iree_hal_buffer_view_t>>(
+                          {vm::retain_ref(operand_ptr)})));
+      transferred = std::move(target_views[0]);
+      view = transferred.get();
+    }
     iree_hal_element_type_t element_type =
         iree_hal_buffer_view_element_type(view);
     iree_hal_buffer_t* buf = iree_hal_buffer_view_buffer(view);
@@ -417,12 +431,25 @@ class CheckModuleState final {
     return OkStatus();
   }
 
-  Status ExpectEq(vm::ref<iree_hal_device_t> device,
-                  vm::ref<iree_hal_buffer_view_t> lhs_ref,
-                  vm::ref<iree_hal_buffer_view_t> rhs_ref) {
-    IREE_RETURN_IF_ERROR(TransferToHost(device.get(), lhs_ref, rhs_ref));
-    auto* lhs = lhs_ref.get();
-    auto* rhs = rhs_ref.get();
+  Status ExpectEq(iree_hal_device_t* device, iree_hal_buffer_view_t* lhs_ptr,
+                  iree_hal_buffer_view_t* rhs_ptr) {
+    // Transfer to host if needed, creating new owned refs.
+    vm::ref<iree_hal_buffer_view_t> lhs_transferred, rhs_transferred;
+    iree_hal_buffer_view_t* lhs = lhs_ptr;
+    iree_hal_buffer_view_t* rhs = rhs_ptr;
+    IREE_ASSIGN_OR_RETURN(
+        auto target_views,
+        TransferBuffersToHost(
+            device, iree::span<const vm::ref<iree_hal_buffer_view_t>>(
+                        {vm::retain_ref(lhs_ptr), vm::retain_ref(rhs_ptr)})));
+    if (target_views[0].get() != lhs_ptr) {
+      lhs_transferred = std::move(target_views[0]);
+      lhs = lhs_transferred.get();
+    }
+    if (target_views[1].get() != rhs_ptr) {
+      rhs_transferred = std::move(target_views[1]);
+      rhs = rhs_transferred.get();
+    }
 
     iree_device_size_t lhs_size = iree_hal_buffer_view_byte_length(lhs);
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
@@ -498,13 +525,27 @@ class CheckModuleState final {
     return OkStatus();
   }
 
-  Status ExpectAlmostEq(vm::ref<iree_hal_device_t> device,
-                        vm::ref<iree_hal_buffer_view_t> lhs_ref,
-                        vm::ref<iree_hal_buffer_view_t> rhs_ref, float atol,
+  Status ExpectAlmostEq(iree_hal_device_t* device,
+                        iree_hal_buffer_view_t* lhs_ptr,
+                        iree_hal_buffer_view_t* rhs_ptr, float atol,
                         float rtol) {
-    IREE_RETURN_IF_ERROR(TransferToHost(device.get(), lhs_ref, rhs_ref));
-    auto* lhs = lhs_ref.get();
-    auto* rhs = rhs_ref.get();
+    // Transfer to host if needed, creating new owned refs.
+    vm::ref<iree_hal_buffer_view_t> lhs_transferred, rhs_transferred;
+    iree_hal_buffer_view_t* lhs = lhs_ptr;
+    iree_hal_buffer_view_t* rhs = rhs_ptr;
+    IREE_ASSIGN_OR_RETURN(
+        auto target_views,
+        TransferBuffersToHost(
+            device, iree::span<const vm::ref<iree_hal_buffer_view_t>>(
+                        {vm::retain_ref(lhs_ptr), vm::retain_ref(rhs_ptr)})));
+    if (target_views[0].get() != lhs_ptr) {
+      lhs_transferred = std::move(target_views[0]);
+      lhs = lhs_transferred.get();
+    }
+    if (target_views[1].get() != rhs_ptr) {
+      rhs_transferred = std::move(target_views[1]);
+      rhs = rhs_transferred.get();
+    }
 
     iree_device_size_t lhs_size = iree_hal_buffer_view_byte_length(lhs);
     size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
