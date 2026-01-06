@@ -560,6 +560,50 @@ struct GPUConvertToCoalescedDMAPass final
   }
 
 private:
+  /// Compute tile sizes for subgroup-level distribution.
+  /// Returns {tileSizes, numTiledDims}.
+  ///
+  /// We keep the innermost dimension whole (not tiled) to ensure contiguous
+  /// memory access patterns, and greedily redistribute warps to outer
+  /// dimensions.
+  std::pair<SmallVector<OpFoldResult>, int64_t>
+  computeSubgroupTileSizes(IRRewriter &rewriter, ArrayRef<int64_t> shape,
+                           ArrayRef<int64_t> numWarps) {
+    SmallVector<OpFoldResult> tileSizes;
+    int64_t numTiledDims = 0;
+    int64_t rank = shape.size();
+
+    // Calculate total number of warps available.
+    // Note: numWarps may contain 0s for dimensions where wgSize < subgroupSize.
+    // We treat 0 as 1 for the purpose of counting total warps.
+    auto positiveWarps =
+        llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
+    int64_t totalWarps = llvm::product_of(positiveWarps);
+
+    // Greedily distribute warps to outer dimensions, keeping innermost whole.
+    int64_t remainingWarps = totalWarps;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (i == rank - 1) {
+        // Keep innermost dimension whole (tile size = full dimension).
+        tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
+        ++numTiledDims;
+      } else if (remainingWarps > 1 && ShapedType::isStatic(shape[i])) {
+        // Distribute remaining warps to this outer dimension.
+        int64_t warpsForThisDim = std::min(remainingWarps, shape[i]);
+        int64_t tileSize = llvm::divideCeil(shape[i], warpsForThisDim);
+        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+        // Update remaining parallelism for subsequent dimensions.
+        remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
+        ++numTiledDims;
+      } else {
+        // No parallelism to distribute; skip tiling this dimension.
+        tileSizes.push_back(rewriter.getIndexAttr(0));
+      }
+    }
+
+    return {tileSizes, numTiledDims};
+  }
+
   /// Tile operation at subgroup level using workgroup_size and subgroup_size
   /// from translation_info.
   template <typename OpTy>
@@ -640,40 +684,10 @@ private:
       return failure();
     }
 
-    // Compute tile sizes: divide the shape by number of warps.
-    // This distributes the work across warps in each dimension.
-    SmallVector<OpFoldResult> tileSizes;
-    int64_t numTiledDims = 0;
-    for (int64_t i = 0; i < rank; ++i) {
-      // Map dimensions: innermost dims map to innermost workgroup dims.
-      // For 2D: dim 0 (rows) -> wgSize[1], dim 1 (cols) -> wgSize[0].
-      int64_t warpDim =
-          (rank - 1 - i) < numWarps.size() ? numWarps[rank - 1 - i] : 1;
+    // Compute tile sizes for subgroup-level distribution.
+    auto [tileSizes, numTiledDims] =
+        computeSubgroupTileSizes(rewriter, shape, numWarps);
 
-      bool isInnermostDim = (i == rank - 1);
-
-      // For innermost dimension: always tile if we need thread-level
-      // distribution, ensuring tile size is at least subgroup_size (but not
-      // exceeding the dimension size).
-      if (isInnermostDim && ShapedType::isStatic(shape[i])) {
-        int64_t tileSize =
-            (warpDim > 1) ? llvm::divideCeil(shape[i], warpDim) : shape[i];
-        // Ensure tile size is at least subgroup_size, but cap at dimension
-        // size.
-        tileSize = std::clamp(tileSize, *subgroupSize, shape[i]);
-        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-        ++numTiledDims;
-      } else if (warpDim > 1 && ShapedType::isStatic(shape[i])) {
-        // For other dimensions: only tile if warpDim > 1.
-        int64_t tileSize = llvm::divideCeil(shape[i], warpDim);
-        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-        ++numTiledDims;
-      } else {
-        tileSizes.push_back(rewriter.getIndexAttr(0));
-      }
-    }
-
-    // Check if we have any non-zero tile sizes.
     if (numTiledDims == 0)
       return failure();
 
