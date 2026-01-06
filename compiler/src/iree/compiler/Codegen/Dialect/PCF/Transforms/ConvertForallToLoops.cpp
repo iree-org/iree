@@ -33,11 +33,12 @@ namespace mlir::iree_compiler::IREE::PCF {
 
 namespace {
 
-/// Returns true if the forall op has LocalMappingAttr mapping attributes.
-static bool hasLocalMapping(scf::ForallOp forallOp) {
+/// Returns true if the forall op has LocalMappingAttr mapping attributes,
+/// or the mapping is empty/not present.
+static bool hasEmptyOrLocalMapping(scf::ForallOp forallOp) {
   std::optional<ArrayAttr> mapping = forallOp.getMapping();
   if (!mapping || mapping->empty()) {
-    return false;
+    return true;
   }
   return llvm::all_of(mapping.value(),
                       llvm::IsaPred<IREE::Codegen::LocalMappingAttr>);
@@ -51,12 +52,11 @@ struct ConvertForallToLoopsPass final
 void ConvertForallToLoopsPass::runOnOperation() {
   SmallVector<scf::ForallOp> opsToConvert;
   getOperation()->walk([&](scf::ForallOp forallOp) {
-    std::optional<ArrayAttr> mapping = forallOp.getMapping();
     // Empty mapping, no mapping, and local mapping all map to `pcf.sequential`.
     // If it is a local mapping, then the lowering pattern will automatically
     // handle any mapping permutation based on the mapping attribute's relative
     // id.
-    if (!mapping || mapping->empty() || hasLocalMapping(forallOp)) {
+    if (hasEmptyOrLocalMapping(forallOp)) {
       opsToConvert.push_back(forallOp);
     }
   });
@@ -107,7 +107,7 @@ getProcessorIdPermutation(scf::ForallOp forallOp) {
   return perm;
 }
 
-LogicalResult matchForallConversion(scf::ForallOp forallOp) {
+static LogicalResult matchForallConversion(scf::ForallOp forallOp) {
   scf::InParallelOp terminator = forallOp.getTerminator();
   for (Operation &op : terminator.getBody()->getOperations()) {
     // Bail on terminator ops other than parallel insert slice since we don't
@@ -145,10 +145,10 @@ LogicalResult matchForallConversion(scf::ForallOp forallOp) {
   return success();
 }
 
-PCF::LoopOp convertForallToPCFImpl(RewriterBase &rewriter,
-                                   scf::ForallOp forallOp,
-                                   PCF::ScopeAttrInterface scope,
-                                   int64_t numIds) {
+static PCF::LoopOp convertForallToPCFImpl(RewriterBase &rewriter,
+                                          scf::ForallOp forallOp,
+                                          PCF::ScopeAttrInterface scope,
+                                          int64_t numIds) {
   assert(succeeded(matchForallConversion(forallOp)) &&
          "converting unsupported forall op");
 
@@ -166,8 +166,8 @@ PCF::LoopOp convertForallToPCFImpl(RewriterBase &rewriter,
   applyPermutationToVector(mixedLbs, invPerm);
   SmallVector<OpFoldResult> mixedStep = forallOp.getMixedStep();
   applyPermutationToVector(mixedStep, invPerm);
-  // Permute the ivs of the body back to the original order by permuting the
-  // uses before we move it over to the new op.
+  // Permute the ivs of the body to match the original mapping order by
+  // permuting the uses before we move it over to the new op.
   permuteValues(rewriter, forallOp.getLoc(), forallOp.getInductionVars(), perm);
 
   scf::InParallelOp terminator = forallOp.getTerminator();
