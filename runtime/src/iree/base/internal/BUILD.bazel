@@ -336,6 +336,28 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "unicode",
+    srcs = [
+        "unicode.c",
+        "unicode_tables.c",
+    ],
+    hdrs = ["unicode.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "unicode_test",
+    srcs = ["unicode_test.cc"],
+    deps = [
+        ":unicode",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "wait_handle",
     srcs = [
         "wait_handle.c",
