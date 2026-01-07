@@ -360,6 +360,30 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    unicode
+  HDRS
+    "unicode.h"
+  SRCS
+    "unicode.c"
+    "unicode_tables.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    unicode_test
+  SRCS
+    "unicode_test.cc"
+  DEPS
+    ::unicode
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     wait_handle
   HDRS
     "wait_handle.h"
