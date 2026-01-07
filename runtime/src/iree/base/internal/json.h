@@ -129,6 +129,38 @@ iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
                                         void* user_data);
 
 //===----------------------------------------------------------------------===//
+// JSONL (JSON Lines) Operations
+//===----------------------------------------------------------------------===//
+// JSONL is a newline-delimited format where each line is a valid JSON value.
+// See https://jsonlines.org/ for the specification.
+
+// 1-based line number for JSONL error reporting.
+typedef iree_host_size_t iree_json_line_number_t;
+
+// Callback for JSONL line enumeration.
+// |line_number| is the 1-based physical line number (for error messages).
+// |index| is the 0-based entry index (counting only non-empty lines).
+// |value| is the raw value span (may be any JSON type).
+// Return iree_ok_status() to continue, or any error status to abort.
+// To stop early without error, use iree_status_from_code(IREE_STATUS_CANCELLED)
+// (not iree_make_status which may allocate).
+typedef iree_status_t(IREE_API_PTR* iree_json_line_visitor_fn_t)(
+    void* user_data, iree_json_line_number_t line_number,
+    iree_host_size_t index, iree_string_view_t value);
+
+// Enumerates JSON values in a JSONL (newline-delimited JSON) input.
+// Each non-empty line is parsed as a complete JSON value.
+// Empty lines and lines containing only whitespace are skipped.
+// The visitor receives both the 1-based physical line number (for error
+// reporting) and the 0-based entry index (for array-like access).
+// Returning IREE_STATUS_CANCELLED from the visitor stops enumeration early
+// (not treated as an error). Use iree_status_from_code(IREE_STATUS_CANCELLED)
+// to avoid allocation.
+iree_status_t iree_json_enumerate_lines(iree_string_view_t input,
+                                        iree_json_line_visitor_fn_t visitor,
+                                        void* user_data);
+
+//===----------------------------------------------------------------------===//
 // String Unescaping
 //===----------------------------------------------------------------------===//
 

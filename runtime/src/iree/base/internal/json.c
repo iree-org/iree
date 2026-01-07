@@ -427,6 +427,67 @@ iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
 }
 
 //===----------------------------------------------------------------------===//
+// JSONL (JSON Lines) Operations
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_json_enumerate_lines(iree_string_view_t input,
+                                        iree_json_line_visitor_fn_t visitor,
+                                        void* user_data) {
+  iree_json_line_number_t line_number = 0;  // Will be 1-based after increment.
+  iree_host_size_t index = 0;               // 0-based entry index.
+  while (!iree_string_view_is_empty(input)) {
+    ++line_number;
+
+    // Find the end of the current line.
+    iree_string_view_t line;
+    iree_host_size_t newline_pos = iree_string_view_find_char(input, '\n', 0);
+    if (newline_pos == IREE_STRING_VIEW_NPOS) {
+      // Last line (no trailing newline).
+      line = input;
+      input = iree_string_view_empty();
+    } else {
+      line = iree_string_view_substr(input, 0, newline_pos);
+      input =
+          iree_string_view_substr(input, newline_pos + 1, IREE_HOST_SIZE_MAX);
+    }
+
+    // Strip trailing CR for CRLF line endings (Windows).
+    if (line.size > 0 && line.data[line.size - 1] == '\r') {
+      line = iree_string_view_substr(line, 0, line.size - 1);
+    }
+
+    // Skip empty lines and whitespace-only lines.
+    line = iree_string_view_trim(line);
+    if (iree_string_view_is_empty(line)) {
+      continue;
+    }
+
+    // Parse the JSON value on this line.
+    iree_string_view_t value = iree_string_view_empty();
+    IREE_RETURN_IF_ERROR(iree_json_consume_value(&line, &value),
+                         "line %" PRIhsz, line_number);
+
+    // Verify no trailing content after the value (except whitespace).
+    line = iree_string_view_trim(line);
+    if (!iree_string_view_is_empty(line)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "line %" PRIhsz ": trailing content after value",
+                              line_number);
+    }
+
+    // Emit the value.
+    iree_status_t status = visitor(user_data, line_number, index, value);
+    if (iree_status_is_cancelled(status)) {
+      iree_status_ignore(status);
+      break;
+    }
+    IREE_RETURN_IF_ERROR(status);
+    ++index;
+  }
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
 // String Unescaping
 //===----------------------------------------------------------------------===//
 

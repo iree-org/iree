@@ -639,6 +639,181 @@ TEST(JsonEnumerateArrayTest, WhitespaceBeforeClose) {
 }
 
 //===----------------------------------------------------------------------===//
+// JSONL (JSON Lines) Tests
+//===----------------------------------------------------------------------===//
+
+struct LineEntry {
+  iree_json_line_number_t line_number;
+  iree_host_size_t index;
+  std::string value;
+};
+
+static iree_status_t CollectLineEntries(void* user_data,
+                                        iree_json_line_number_t line_number,
+                                        iree_host_size_t index,
+                                        iree_string_view_t value) {
+  auto* entries = static_cast<std::vector<LineEntry>*>(user_data);
+  entries->push_back({line_number, index, std::string(value.data, value.size)});
+  return iree_ok_status();
+}
+
+static iree_status_t StopAfterTwoLines(void* user_data,
+                                       iree_json_line_number_t line_number,
+                                       iree_host_size_t index,
+                                       iree_string_view_t value) {
+  auto* count = static_cast<int*>(user_data);
+  (*count)++;
+  if (*count >= 2) {
+    return iree_status_from_code(IREE_STATUS_CANCELLED);
+  }
+  return iree_ok_status();
+}
+
+TEST(JsonEnumerateLinesTest, Empty) {
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(
+      iree_json_enumerate_lines(IREE_SV(""), CollectLineEntries, &entries));
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(JsonEnumerateLinesTest, SingleLine) {
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("{\"key\": 123}"),
+                                           CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 1);
+  EXPECT_EQ(entries[0].line_number, 1);  // 1-based.
+  EXPECT_EQ(entries[0].index, 0);        // 0-based.
+  EXPECT_EQ(entries[0].value, "{\"key\": 123}");
+}
+
+TEST(JsonEnumerateLinesTest, MultipleLines) {
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(
+      iree_json_enumerate_lines(IREE_SV("{\"a\": 1}\n{\"b\": 2}\n{\"c\": 3}"),
+                                CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+  EXPECT_EQ(entries[0].line_number, 1);
+  EXPECT_EQ(entries[0].index, 0);
+  EXPECT_EQ(entries[0].value, "{\"a\": 1}");
+  EXPECT_EQ(entries[1].line_number, 2);
+  EXPECT_EQ(entries[1].index, 1);
+  EXPECT_EQ(entries[1].value, "{\"b\": 2}");
+  EXPECT_EQ(entries[2].line_number, 3);
+  EXPECT_EQ(entries[2].index, 2);
+  EXPECT_EQ(entries[2].value, "{\"c\": 3}");
+}
+
+TEST(JsonEnumerateLinesTest, MixedValueTypes) {
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(
+      iree_json_enumerate_lines(IREE_SV("123\n\"hello\"\ntrue\nnull\n[1, 2]"),
+                                CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 5);
+  EXPECT_EQ(entries[0].value, "123");
+  EXPECT_EQ(entries[1].value, "hello");
+  EXPECT_EQ(entries[2].value, "true");
+  EXPECT_EQ(entries[3].value, "null");
+  EXPECT_EQ(entries[4].value, "[1, 2]");
+}
+
+TEST(JsonEnumerateLinesTest, EmptyLinesSkipped) {
+  std::vector<LineEntry> entries;
+  // Input: "1\n\n2\n\n\n3" has values on lines 1, 3, 6.
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("1\n\n2\n\n\n3"),
+                                           CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+  EXPECT_EQ(entries[0].line_number, 1);
+  EXPECT_EQ(entries[0].index, 0);
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].line_number, 3);
+  EXPECT_EQ(entries[1].index, 1);
+  EXPECT_EQ(entries[1].value, "2");
+  EXPECT_EQ(entries[2].line_number, 6);
+  EXPECT_EQ(entries[2].index, 2);
+  EXPECT_EQ(entries[2].value, "3");
+}
+
+TEST(JsonEnumerateLinesTest, WhitespaceOnlyLinesSkipped) {
+  std::vector<LineEntry> entries;
+  // Input: "1\n   \n2\n\t\n3" has values on lines 1, 3, 5.
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("1\n   \n2\n\t\n3"),
+                                           CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+  EXPECT_EQ(entries[0].line_number, 1);
+  EXPECT_EQ(entries[1].line_number, 3);
+  EXPECT_EQ(entries[2].line_number, 5);
+}
+
+TEST(JsonEnumerateLinesTest, LeadingTrailingWhitespaceOnLines) {
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("  1  \n\t2\t\n  3"),
+                                           CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].value, "2");
+  EXPECT_EQ(entries[2].value, "3");
+}
+
+TEST(JsonEnumerateLinesTest, TrailingNewline) {
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("1\n2\n"),
+                                           CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].value, "2");
+}
+
+TEST(JsonEnumerateLinesTest, CRLFLineEndings) {
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("1\r\n2\r\n3"),
+                                           CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+  EXPECT_EQ(entries[0].line_number, 1);
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].line_number, 2);
+  EXPECT_EQ(entries[1].value, "2");
+  EXPECT_EQ(entries[2].line_number, 3);
+  EXPECT_EQ(entries[2].value, "3");
+}
+
+TEST(JsonEnumerateLinesTest, MixedLineEndings) {
+  std::vector<LineEntry> entries;
+  // Mix of LF, CRLF, and LF again.
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("1\n2\r\n3\n4"),
+                                           CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 4);
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].value, "2");
+  EXPECT_EQ(entries[2].value, "3");
+  EXPECT_EQ(entries[3].value, "4");
+}
+
+TEST(JsonEnumerateLinesTest, TrailingContentOnLine) {
+  std::vector<LineEntry> entries;
+  // After parsing "123", there's " extra" remaining on the line.
+  iree_status_t status = iree_json_enumerate_lines(
+      IREE_SV("123 extra\n456"), CollectLineEntries, &entries);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonEnumerateLinesTest, EarlyTermination) {
+  int count = 0;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("1\n2\n3\n4"),
+                                           StopAfterTwoLines, &count));
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JsonEnumerateLinesTest, InvalidJson) {
+  std::vector<LineEntry> entries;
+  iree_status_t status = iree_json_enumerate_lines(
+      IREE_SV("{\"valid\": 1}\ninvalid json\n{\"also\": 2}"),
+      CollectLineEntries, &entries);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+//===----------------------------------------------------------------------===//
 // Unescape String Tests
 //===----------------------------------------------------------------------===//
 
