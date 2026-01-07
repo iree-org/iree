@@ -945,10 +945,125 @@ static iree_status_t iree_vm_bytecode_call_import_yieldable(
         break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64:
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
         memcpy(&regs.i32[dst_reg], p, sizeof(int64_t));
         p += sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
+        iree_vm_ref_move((iree_vm_ref_t*)p,
+                         &regs.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
+        p += sizeof(iree_vm_ref_t);
+        break;
+    }
+  }
+
+  return iree_ok_status();
+}
+
+// Issues a variadic yieldable import call that supports deferral with results.
+// Combines variadic argument handling with yieldable begin/resume semantics.
+// Uses frame->return_registers to track begin vs resume state:
+//   - NULL: Fresh call, will call begin_call and set return_registers
+//   - Non-NULL: Resume, will call resume_call
+// On DEFERRED: returns DEFERRED (PC should be set to re-execute instruction).
+// On OK: copies results to dst_reg_list, clears return_registers, returns OK.
+static iree_status_t iree_vm_bytecode_call_import_variadic_yieldable(
+    iree_vm_stack_t* stack, iree_vm_stack_frame_t* caller_frame,
+    const iree_vm_bytecode_module_state_t* module_state,
+    uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
+    iree_vm_registers_t* out_caller_registers) {
+  // Get frame storage to check/set return_registers for begin/resume tracking.
+  // NOTE: We must use the passed-in caller_frame, not
+  // iree_vm_stack_current_frame, because on resume the native import's frame is
+  // still on top of the stack.
+  iree_vm_bytecode_frame_storage_t* frame_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          caller_frame);
+
+  // Prepare |call| by looking up the import information.
+  const iree_vm_bytecode_import_t* import = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
+                                                      import_ordinal, &import));
+
+  iree_vm_function_call_t call;
+  memset(&call, 0, sizeof(call));
+  call.function = import->function;
+
+  // Allocate result buffer (fresh each call via alloca).
+  call.results.data_length = import->result_buffer_size;
+  call.results.data = iree_alloca(call.results.data_length);
+  memset(call.results.data, 0, call.results.data_length);
+
+  iree_status_t call_status = iree_ok_status();
+  if (frame_storage->return_registers == NULL) {
+    // Fresh call: compute variadic argument size and marshal, then begin_call.
+    frame_storage->return_registers = dst_reg_list;
+
+    IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
+        import->arguments, segment_size_list, &call.arguments.data_length));
+    call.arguments.data = iree_alloca(call.arguments.data_length);
+    memset(call.arguments.data, 0, call.arguments.data_length);
+    iree_vm_bytecode_populate_import_cconv_arguments(
+        import->arguments, caller_registers, segment_size_list, src_reg_list,
+        call.arguments);
+
+    call_status = call.function.module->begin_call(call.function.module->self,
+                                                   stack, call);
+
+    // Release refs in argument buffer regardless of call status.
+    iree_vm_bytecode_release_import_cconv_arguments(
+        import->arguments, segment_size_list, call.arguments);
+  } else {
+    // Resume: import already has arguments, just need results buffer.
+    call_status = call.function.module->resume_call(call.function.module->self,
+                                                    stack, call.results);
+  }
+
+  if (iree_status_is_deferred(call_status)) {
+    // Still waiting - return_registers stays set for next resume.
+    return call_status;
+  } else if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
+    frame_storage->return_registers = NULL;  // Clear on error.
+    return iree_status_annotate(
+        call_status, iree_make_cstring_view("while calling variadic import"));
+  }
+
+  // Call completed. Update output registers.
+  // The bytecode frame doesn't move during import calls, so we use
+  // caller_frame.
+  *out_caller_registers = iree_vm_bytecode_get_register_storage(caller_frame);
+
+  // Get dst_reg_list from return_registers.
+  dst_reg_list = frame_storage->return_registers;
+  frame_storage->return_registers = NULL;  // Clear for next call.
+
+  // Marshal outputs from the ABI results buffer to registers.
+  iree_vm_registers_t regs = *out_caller_registers;
+  uint8_t* IREE_RESTRICT p = call.results.data;
+  iree_string_view_t cconv_results = import->results;
+  for (iree_host_size_t i = 0; i < cconv_results.size && i < dst_reg_list->size;
+       ++i) {
+    uint16_t dst_reg = dst_reg_list->registers[i];
+    switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
+        memcpy(&regs.i32[dst_reg], p, sizeof(int32_t));
+        p += sizeof(int32_t);
+        break;
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
+        memcpy(&regs.i32[dst_reg], p, sizeof(int64_t));
+        p += sizeof(int64_t);
+        break;
+      case IREE_VM_CCONV_TYPE_REF:
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
         iree_vm_ref_move((iree_vm_ref_t*)p,
                          &regs.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
         p += sizeof(iree_vm_ref_t);
@@ -2109,6 +2224,49 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
 
       // Restore dispatch state (may have changed during call/enter).
+      regs_i32 = regs.i32;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
+      regs_ref = regs.ref;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
+      pc = current_frame->pc;
+    });
+
+    IREE_VM_ISA_DISPATCH_OP(CORE, CallVariadicYieldable, {
+      // Variadic yieldable call that may return DEFERRED.
+      // Only supports imports (variadic calls to internal functions not
+      // supported).
+      // Save instruction start for DEFERRED resume (pc already advanced past
+      // opcode by dispatch macro).
+      iree_vm_source_offset_t instruction_pc = pc - 1;
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_size_list);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(resume_pc);
+      IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
+
+      int is_import = iree_vm_isa_function_ordinal_is_import(function_ordinal);
+      if (IREE_UNLIKELY(!is_import)) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "variadic yieldable calls only supported for imports");
+      }
+
+      // Call variadic import (handles begin/resume via return_registers).
+      iree_status_t call_status =
+          iree_vm_bytecode_call_import_variadic_yieldable(
+              stack, current_frame, module_state, function_ordinal, regs,
+              segment_size_list, src_reg_list, dst_reg_list, &regs);
+      if (iree_status_is_deferred(call_status)) {
+        // Import yielded - set PC to re-execute this instruction on resume.
+        current_frame->pc = instruction_pc;
+        return call_status;
+      }
+      IREE_RETURN_IF_ERROR(call_status);
+      // Call completed - results already in dst_reg_list.
+      // Update frame PC to resume block.
+      current_frame->pc = resume_pc + IREE_VM_BLOCK_MARKER_SIZE;
+
+      // Restore dispatch state (may have changed during call).
       regs_i32 = regs.i32;
       IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
       regs_ref = regs.ref;

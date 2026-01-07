@@ -1686,6 +1686,27 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       break;
     }
 
+    IREE_VM_ISA_EMIT_OP(CORE, CallVariadicYieldable) {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      // TODO(benvanik): print segment sizes.
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_size_list);
+      (void)segment_size_list;
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
+      IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(resume_pc);
+      IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+          b, "vm.call.variadic.yieldable @"));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
+          module, module_state, function_ordinal, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_format(b, ") -> ^%08X(", resume_pc));
+      IREE_VM_ISA_EMIT_RESULT_REG_LIST(dst_reg_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
+      break;
+    }
+
     IREE_VM_ISA_EMIT_OP(CORE, Return) {
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.return "));

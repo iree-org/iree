@@ -120,3 +120,33 @@ vm.module @module_sequence {
     vm.return %1 : i32
   }
 }
+
+// -----
+
+// Tests that vm.call.variadic to a yieldable import is converted to
+// vm.call.variadic.yieldable.
+
+vm.module @module_variadic {
+  vm.import private @yieldable_variadic(%arg: i32 ...) -> i32 attributes {vm.yield}
+  vm.import private @normal_variadic(%arg: i32 ...) -> i32
+
+  // CHECK-LABEL: @call_yieldable_variadic
+  vm.func @call_yieldable_variadic(%arg0: i32, %arg1: i32) -> i32 {
+    // CHECK: vm.call.variadic.yieldable @yieldable_variadic(%arg0, %arg1)
+    // CHECK-SAME: {segment_sizes = dense<2> : vector<1xi16>, segment_types = [i32]}
+    // CHECK-SAME: : (i32, i32) -> ^bb1 (i32)
+    // CHECK-NEXT: ^bb1(%[[RESULT:.*]]: i32):
+    // CHECK-NEXT: vm.return %[[RESULT]] : i32
+    %0 = vm.call.variadic @yieldable_variadic([%arg0, %arg1]) : (i32 ...) -> i32
+    vm.return %0 : i32
+  }
+
+  // CHECK-LABEL: @call_normal_variadic
+  vm.func @call_normal_variadic(%arg0: i32, %arg1: i32) -> i32 {
+    // CHECK: %[[RESULT:.*]] = vm.call.variadic @normal_variadic([%arg0, %arg1])
+    // CHECK-SAME: : (i32 ...) -> i32
+    // CHECK-NEXT: vm.return %[[RESULT]] : i32
+    %0 = vm.call.variadic @normal_variadic([%arg0, %arg1]) : (i32 ...) -> i32
+    vm.return %0 : i32
+  }
+}

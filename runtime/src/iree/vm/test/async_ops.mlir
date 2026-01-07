@@ -107,6 +107,10 @@ vm.module @async_ops {
   // Yields yield_count times, returns arg + yield_count.
   vm.import private @yieldable_test.yield_n(%arg : i32, %yield_count : i32) -> i32 attributes {vm.yield}
 
+  // yield_variadic_sum(args: i32..., yield_count: i32) -> i32
+  // Sums all variadic i32 args, yields yield_count times, returns sum + yield_count.
+  vm.import private @yieldable_test.yield_variadic_sum(%args : i32 ..., %yield_count : i32) -> i32 attributes {vm.yield}
+
   // Test: call yieldable import with 3 yields.
   // Expected: 3 DEFERRED returns, then OK with result = arg + 3
   vm.export @call_yieldable_import_yields_3 attributes {emitc.exclude}
@@ -207,6 +211,66 @@ vm.module @async_ops {
     %c10 = vm.const.i32 10
     vm.call.yieldable @yieldable_test.yield_n(%arg0, %c10) : (i32, i32) -> ^resume(i32)
   ^resume(%result : i32):
+    vm.return %result : i32
+  }
+
+  //===--------------------------------------------------------------------===//
+  // vm.call.variadic.yieldable with imported functions
+  //===--------------------------------------------------------------------===//
+
+  // Test: call variadic yieldable import with 2 args and 3 yields.
+  // Expected: 3 DEFERRED returns, then OK with result = (arg0 + arg1) + 3
+  vm.export @call_variadic_yieldable_2args attributes {emitc.exclude}
+  vm.func @call_variadic_yieldable_2args(%arg0 : i32, %arg1 : i32) -> i32 {
+    %c3 = vm.const.i32 3
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%arg0, %arg1, %c3) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^resume(i32)
+  ^resume(%result : i32):
+    vm.return %result : i32
+  }
+
+  // Test: call variadic yieldable import with 0 yields (synchronous).
+  // Expected: immediate OK with result = arg0 + arg1 + arg2
+  vm.export @call_variadic_yieldable_0yields attributes {emitc.exclude}
+  vm.func @call_variadic_yieldable_0yields(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
+    %c0 = vm.const.i32 0
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%arg0, %arg1, %arg2, %c0) {segment_sizes = dense<[3, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32, i32) -> ^resume(i32)
+  ^resume(%result : i32):
+    vm.return %result : i32
+  }
+
+  // Test: call variadic yieldable import with single arg.
+  // Expected: 2 yields, result = arg0 + 2
+  vm.export @call_variadic_yieldable_1arg attributes {emitc.exclude}
+  vm.func @call_variadic_yieldable_1arg(%arg0 : i32) -> i32 {
+    %c2 = vm.const.i32 2
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%arg0, %c2) {segment_sizes = dense<[1, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32) -> ^resume(i32)
+  ^resume(%result : i32):
+    vm.return %result : i32
+  }
+
+  // Test: call variadic yieldable import with empty variadic list.
+  // Expected: 1 yield, result = 0 + 1 = 1
+  vm.export @call_variadic_yieldable_empty attributes {emitc.exclude}
+  vm.func @call_variadic_yieldable_empty() -> i32 {
+    %c1 = vm.const.i32 1
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%c1) {segment_sizes = dense<[0, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32) -> ^resume(i32)
+  ^resume(%result : i32):
+    vm.return %result : i32
+  }
+
+  // Test: two sequential variadic yieldable calls.
+  // Expected: 2 yields from first + 1 yield from second = 3 yields total
+  // Result: ((arg0 + arg1) + 2) + (arg2) + 1 = arg0 + arg1 + arg2 + 3
+  vm.export @call_variadic_yieldable_sequential attributes {emitc.exclude}
+  vm.func @call_variadic_yieldable_sequential(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
+    %c1 = vm.const.i32 1
+    %c2 = vm.const.i32 2
+    // First variadic yieldable: sum(arg0, arg1) + 2 yields
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%arg0, %arg1, %c2) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^after_first(i32)
+  ^after_first(%v1 : i32):
+    // Second variadic yieldable: sum(v1, arg2) + 1 yield
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%v1, %arg2, %c1) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^done(i32)
+  ^done(%result : i32):
     vm.return %result : i32
   }
 }

@@ -1497,6 +1497,57 @@ LogicalResult CallYieldableOp::verify() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// vm.call.variadic.yieldable
+//===----------------------------------------------------------------------===//
+
+void CallVariadicYieldableOp::setDest(Block *block) {
+  return getOperation()->setSuccessor(block, 0);
+}
+
+SuccessorOperands
+CallVariadicYieldableOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  // Results are produced by the callee at runtime and passed to the successor
+  // block arguments. Use produced operand count to tell MLIR about this.
+  unsigned producedCount = getResultTypes().size();
+  return SuccessorOperands(producedCount,
+                           MutableOperandRange(getOperation(), 0, 0));
+}
+
+void CallVariadicYieldableOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // Yieldable calls always have side effects (the yield itself).
+  effects.emplace_back(MemoryEffects::Read::get());
+  effects.emplace_back(MemoryEffects::Write::get());
+}
+
+LogicalResult CallVariadicYieldableOp::verify() {
+  // Verify that the result types count matches the destination block arguments.
+  Block *destBlock = getDest();
+  size_t resultCount = getResultTypes().size();
+  size_t destArgCount = destBlock->getNumArguments();
+  if (resultCount != destArgCount) {
+    return emitOpError() << "result type count (" << resultCount
+                         << ") must match successor block argument count ("
+                         << destArgCount << ")";
+  }
+
+  // Verify result types match destination block argument types.
+  for (auto [i, pair] : llvm::enumerate(
+           llvm::zip_equal(getResultTypes(), destBlock->getArguments()))) {
+    Type resultType = cast<TypeAttr>(std::get<0>(pair)).getValue();
+    Type argType = std::get<1>(pair).getType();
+    if (resultType != argType) {
+      return emitOpError() << "result type #" << i << " (" << resultType
+                           << ") must match successor block argument type ("
+                           << argType << ")";
+    }
+  }
+
+  return success();
+}
+
 SuccessorOperands CondBranchOp::getSuccessorOperands(unsigned index) {
   assert(index < getNumSuccessors() && "invalid successor index");
   return index == trueIndex ? SuccessorOperands(getTrueDestOperandsMutable())
