@@ -31,9 +31,9 @@ public:
     IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
-    // Collect calls to convert and variadic calls to error on.
+    // Collect calls to convert.
     SmallVector<IREE::VM::CallOp> callsToConvert;
-    SmallVector<IREE::VM::CallVariadicOp> variadicCallErrors;
+    SmallVector<IREE::VM::CallVariadicOp> variadicCallsToConvert;
     moduleOp.walk([&](Operation *op) {
       llvm::TypeSwitch<Operation *>(op)
           .Case<IREE::VM::CallOp>([&](auto callOp) {
@@ -46,23 +46,22 @@ public:
             Operation *calleeOp =
                 symbolTable.lookup(callVariadicOp.getCallee());
             if (isCalleeYieldable(calleeOp)) {
-              variadicCallErrors.push_back(callVariadicOp);
+              variadicCallsToConvert.push_back(callVariadicOp);
             }
           });
     });
 
-    // Error on variadic calls to yieldable functions (not supported).
-    for (IREE::VM::CallVariadicOp callOp : variadicCallErrors) {
-      callOp.emitError("vm.call.variadic to yieldable function not supported; "
-                       "vm.call.yieldable does not support variadic arguments");
-    }
-    if (!variadicCallErrors.empty()) {
-      return signalPassFailure();
-    }
-
     // Convert each call.
     for (IREE::VM::CallOp callOp : callsToConvert) {
       if (failed(convertCallToYieldable(callOp))) {
+        signalPassFailure();
+        return;
+      }
+    }
+
+    // Convert each variadic call.
+    for (IREE::VM::CallVariadicOp callOp : variadicCallsToConvert) {
+      if (failed(convertCallVariadicToYieldable(callOp))) {
         signalPassFailure();
         return;
       }
@@ -94,6 +93,45 @@ private:
     IREE::VM::CallYieldableOp::create(
         builder, loc, builder.getAttr<FlatSymbolRefAttr>(callOp.getCallee()),
         callOp.getOperands(), resumeBlock, resultTypes);
+    callOp.erase();
+
+    return success();
+  }
+
+  LogicalResult
+  convertCallVariadicToYieldable(IREE::VM::CallVariadicOp callOp) {
+    OpBuilder builder(callOp);
+    Location loc = callOp.getLoc();
+
+    // Split block after the call to create resume block.
+    Block *currentBlock = callOp->getBlock();
+    Block *resumeBlock = currentBlock->splitBlock(callOp->getNextNode());
+
+    // Add block arguments for call results.
+    auto resultTypes = llvm::to_vector(callOp.getResultTypes());
+    SmallVector<Location> argLocs(resultTypes.size(), loc);
+    resumeBlock->addArguments(resultTypes, argLocs);
+
+    // Replace uses of call results with block arguments.
+    for (auto [result, blockArg] :
+         llvm::zip_equal(callOp.getResults(), resumeBlock->getArguments())) {
+      result.replaceAllUsesWith(blockArg);
+    }
+
+    // Extract segment info.
+    SmallVector<int16_t> segmentSizes;
+    for (auto val : callOp.getSegmentSizes())
+      segmentSizes.push_back(val.getSExtValue());
+    SmallVector<Type> segmentTypes;
+    for (auto typeAttr : callOp.getSegmentTypes())
+      segmentTypes.push_back(cast<TypeAttr>(typeAttr).getValue());
+
+    // Create the vm.call.variadic.yieldable op and erase the original call.
+    builder.setInsertionPoint(callOp);
+    IREE::VM::CallVariadicYieldableOp::create(
+        builder, loc, builder.getAttr<FlatSymbolRefAttr>(callOp.getCallee()),
+        segmentSizes, segmentTypes, callOp.getOperands(), resumeBlock,
+        resultTypes);
     callOp.erase();
 
     return success();

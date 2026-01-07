@@ -23,6 +23,67 @@ typedef struct yieldable_test_module_state_t {
   int32_t accumulator;
 } yieldable_test_module_state_t;
 
+// Shim for yield_variadic_sum: (i32..., i32 yield_count) -> i32
+// Sums all variadic i32 args, yields yield_count times, returns sum +
+// yield_count.
+static iree_status_t yieldable_test_module_yield_variadic_sum_shim(
+    iree_vm_stack_t* stack, iree_vm_native_function_flags_t flags,
+    iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
+    void* target_fn, void* module, void* module_state_ptr) {
+  yieldable_test_module_state_t* state =
+      (yieldable_test_module_state_t*)module_state_ptr;
+
+  if (flags == IREE_VM_NATIVE_FUNCTION_CALL_BEGIN) {
+    // Parse variadic arguments.
+    // Layout: [segment_count: i32] [values: i32 * segment_count] [yield_count:
+    // i32]
+    const uint8_t* p = args_storage.data;
+    int32_t segment_count = *(const int32_t*)p;
+    p += sizeof(int32_t);
+
+    // Sum all variadic values.
+    int32_t sum = 0;
+    for (int32_t i = 0; i < segment_count; ++i) {
+      sum += *(const int32_t*)p;
+      p += sizeof(int32_t);
+    }
+
+    int32_t yield_count = *(const int32_t*)p;
+
+    // Initialize state.
+    state->yield_count = yield_count;
+    state->accumulator = sum;
+
+    if (state->yield_count > 0) {
+      state->accumulator += 1;
+      state->yield_count -= 1;
+      return iree_status_from_code(IREE_STATUS_DEFERRED);
+    }
+    // yield_count == 0: return immediately.
+    typedef struct {
+      int32_t ret;
+    } results_t;
+    results_t* results = (results_t*)rets_storage.data;
+    results->ret = state->accumulator;
+    return iree_ok_status();
+  }
+
+  // RESUME path.
+  if (state->yield_count > 0) {
+    state->accumulator += 1;
+    state->yield_count -= 1;
+    return iree_status_from_code(IREE_STATUS_DEFERRED);
+  }
+
+  // Done yielding, return result.
+  typedef struct {
+    int32_t ret;
+  } results_t;
+  results_t* results = (results_t*)rets_storage.data;
+  results->ret = state->accumulator;
+  return iree_ok_status();
+}
+
 // Shim for yield_n: (i32 arg, i32 yield_count) -> i32
 // Yields yield_count times, returns arg + yield_count.
 static iree_status_t yieldable_test_module_yield_n_shim(
@@ -98,9 +159,15 @@ static const iree_vm_native_export_descriptor_t
         // yield_n(arg: i32, yield_count: i32) -> i32
         // Signature: "0ii_i" = version 0, (i32, i32) -> i32
         {IREE_SV("yield_n"), IREE_SV("0ii_i"), 0, NULL},
+        // yield_variadic_sum(args: i32..., yield_count: i32) -> i32
+        // Signature: "0CiDi_i" = version 0, variadic i32, i32, returns i32
+        {IREE_SV("yield_variadic_sum"), IREE_SV("0CiDi_i"), 0, NULL},
 };
 static const iree_vm_native_function_ptr_t yieldable_test_module_funcs_[] = {
     {(iree_vm_native_function_shim_t)yieldable_test_module_yield_n_shim, NULL},
+    {(iree_vm_native_function_shim_t)
+         yieldable_test_module_yield_variadic_sum_shim,
+     NULL},
 };
 static_assert(IREE_ARRAYSIZE(yieldable_test_module_funcs_) ==
                   IREE_ARRAYSIZE(yieldable_test_module_exports_),

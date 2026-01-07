@@ -4695,6 +4695,131 @@ def VM_CallYieldableOp : VM_Op<"call.yieldable", [
   let hasVerifier = 1;
 }
 
+def VM_CallVariadicYieldableOp : VM_Op<"call.variadic.yieldable", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+    CallOpInterface,
+    Terminator,
+    Util_YieldPoint,
+    VM_MayFail,
+  ]> {
+  let summary = [{Variadic call operation that may yield.}];
+  let description = [{
+    Calls a variadic VM import function that may yield. If the call yields,
+    execution resumes at the specified successor block with the call results
+    as block arguments. If the call completes synchronously, control branches
+    to the successor with the results.
+
+    Variadic arguments must be specified with a total count in the segment_sizes
+    attribute. Only imports are supported (not internal functions).
+
+    ```
+    ^bb0:
+      vm.call.variadic.yieldable @import(%a, %b, %c) {segment_sizes = dense<[1, 2]> : vector<2xi16>}
+        : (i32, i32, i32) -> ^resume(i32)
+    ^resume(%result : i32):
+      vm.return %result
+    ```
+  }];
+
+  let arguments = (ins
+    VM_FuncRefAttr:$callee,
+    SignlessIntElementsAttr<16>:$segment_sizes,
+    TypeArrayAttr:$segment_types,
+    Variadic<VM_AnyType>:$operands,
+    TypeArrayAttr:$result_types,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let successors = (successor
+    AnySuccessor:$dest
+  );
+
+  let assemblyFormat = [{
+    $callee `(` $operands `)` attr-dict `:` `(` type($operands) `)`
+    `->` $dest custom<ResultTypeList>($result_types)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CallVariadicYieldable>,
+    VM_EncFuncAttr<"callee">,
+    VM_EncPrimitiveArrayAttr<"segment_sizes", 16>,
+    VM_EncVariadicOperands<"operands">,
+    VM_EncBranchTarget<"dest">,
+    VM_EncBlockArgResults<"dest">,
+  ];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "FlatSymbolRefAttr":$callee,
+      "ArrayRef<int16_t>":$segmentSizes,
+      "ArrayRef<Type>":$segmentTypes,
+      "ValueRange":$operands,
+      "Block *":$dest,
+      "ArrayRef<Type>":$resultTypes),
+    [{
+      $_state.addAttribute("callee", callee);
+      $_state.addAttribute("segment_sizes",
+          DenseIntElementsAttr::get(
+              VectorType::get({static_cast<int64_t>(segmentSizes.size())},
+                              $_builder.getIntegerType(16)),
+              segmentSizes));
+      $_state.addAttribute("segment_types", $_builder.getArrayAttr(
+          llvm::map_to_vector(segmentTypes, [&](Type type) {
+              return cast<Attribute>(TypeAttr::get(type));
+          })));
+      $_state.addOperands(operands);
+      $_state.addAttribute("result_types",
+          $_builder.getTypeArrayAttr(resultTypes));
+      $_state.addSuccessors(dest);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return getOperands();
+    }
+    MutableOperandRange getArgOperandsMutable() {
+      return getOperandsMutable();
+    }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+    }
+
+    /// Get the result types of the call.
+    SmallVector<Type> getResultTypesVec() {
+      SmallVector<Type> types;
+      for (auto typeAttr : getResultTypes())
+        types.push_back(cast<TypeAttr>(typeAttr).getValue());
+      return types;
+    }
+
+    void setDest(Block *block);
+
+    /// RefMoveInterface: ref operands support MOVE (callee handles ownership).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return isa<IREE::VM::RefType>(getOperands()[operandIndex].getType());
+    }
+    /// RefMoveInterface: ref results support MOVE (callee transfers ownership).
+    bool isRefResultMovable(unsigned resultIndex) {
+      return isa<IREE::VM::RefType>(getResultTypesVec()[resultIndex]);
+    }
+  }];
+
+  let hasVerifier = 1;
+}
+
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     DeclareOpInterfaceMethods<VM_RefMoveInterface>,
