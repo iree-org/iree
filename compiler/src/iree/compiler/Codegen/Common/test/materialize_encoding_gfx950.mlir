@@ -631,3 +631,58 @@ func.func @scaled_matmul_lowering_f4_f4_f8_f8_f32_MFMA_SCALE_F32_32x32x64_B32(
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]], #[[MAP3]], #[[MAP4]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
 // CHECK-SAME:    kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+#map2 = affine_map<(d0, d1) -> (d0)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 16]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1 : i64, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 16]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2 : i64, op_type =  matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 16]>
+func.func @matvec_lowering_f16f16f32_gfx950(
+    %lhs: tensor<16x16xf16, #encoding_lhs>,
+    %rhs: tensor<16xf16, #encoding_rhs>,
+    %init: tensor<16xf32, #encoding_result>
+) -> tensor<16xf32, #encoding_result> {
+  %result = linalg.matvec
+    ins(%lhs, %rhs : tensor<16x16xf16, #encoding_lhs>, tensor<16xf16, #encoding_rhs>)
+    outs(%init : tensor<16xf32, #encoding_result>)
+    -> tensor<16xf32, #encoding_result>
+  return %result : tensor<16xf32, #encoding_result>
+}
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK:     func.func @matvec_lowering_f16f16f32_gfx950(
+// CHECK-SAME:  %[[LHS:.+]]: tensor<1x1x4x16x8xf16>
+// CHECK-SAME:  %[[RHS:.+]]: tensor<1x4x16x8xf16>
+// CHECK-SAME:  %[[INIT:.+]]: tensor<1x4x16x4xf32>
+// CHECK:       %[[MATVEC:.+]] = iree_codegen.inner_tiled
+// CHECK-SAME:    ins(%[[LHS]], %[[RHS]])
+// CHECK-SAME:    outs(%[[INIT]])
+// CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
+// CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F16, operands_interleaving_intrinsics_k = [0, 1]>
+// CHECK:       return %[[MATVEC]]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
+#map2 = affine_map<(d0, d1) -> (d0)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [15, 20]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [15, 20]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [15, 20]>
+
+func.func @vecmat_lowering_f32f32f32_gfx950(
+    %lhs: tensor<20xf32, #encoding_lhs>,
+    %rhs: tensor<20x15xf32, #encoding_rhs>,
+    %init: tensor<15xf32, #encoding_result>
+) -> tensor<15xf32, #encoding_result> {
+  %result = linalg.vecmat
+    ins(%lhs, %rhs: tensor<20xf32, #encoding_lhs>, tensor<20x15xf32, #encoding_rhs>)
+    outs(%init: tensor<15xf32, #encoding_result>) -> tensor<15xf32, #encoding_result>
+  return %result : tensor<15xf32, #encoding_result>
+}
+

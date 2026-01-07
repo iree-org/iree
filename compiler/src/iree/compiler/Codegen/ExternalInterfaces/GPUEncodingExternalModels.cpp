@@ -439,25 +439,72 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
     return nullptr;
   }
 
+  // Determine which dimensions exist in the operation by checking all operands.
+  // For matvec, the result might not have K, but the inputs do.
+  bool hasBatch = false;
+  bool hasM = false;
+  bool hasN = false;
+  bool hasK = false;
+  for (IREE::Encoding::EncodingAttr encoding : operandEncodings) {
+    FailureOr<Codegen::EncodingContractionLikeDimInfo> dimInfo =
+        Codegen::getEncodingContractionLikeDims(encoding);
+    assert(succeeded(dimInfo) &&
+           "expected contraction-like encoding on all operands");
+    hasBatch |= dimInfo->batchDim.shouldHaveDim;
+    hasM |= dimInfo->mDim.shouldHaveDim;
+    hasN |= dimInfo->nDim.shouldHaveDim;
+    hasK |= dimInfo->kDim.shouldHaveDim;
+  }
+
   SmallVector<AffineExpr> lhsExprs, rhsExprs, accExprs;
-  Codegen::EncodingContractionLikeDimInfo cDimInfo =
-      Codegen::getEncodingContractionLikeDims(resultEncoding).value();
   int numDims = 0;
   AffineExpr bExpr = builder.getAffineDimExpr(numDims);
-  if (cDimInfo.batchDim.operandIdx.has_value()) {
+  if (hasBatch) {
     lhsExprs.push_back(bExpr);
     rhsExprs.push_back(bExpr);
     accExprs.push_back(bExpr);
     ++numDims;
   }
-  AffineExpr mExpr = builder.getAffineDimExpr(numDims++);
-  AffineExpr nExpr = builder.getAffineDimExpr(numDims++);
-  AffineExpr kExpr = builder.getAffineDimExpr(numDims++);
 
-  // The outer dims are all in row-major order after relayout.
-  lhsExprs.append({mExpr, kExpr});
-  rhsExprs.append({nExpr, kExpr});
-  accExprs.append({mExpr, nExpr});
+  // Create dimension expressions for all dimensions that exist in the
+  // operation.
+  AffineExpr mExpr, nExpr, kExpr;
+  if (hasM) {
+    mExpr = builder.getAffineDimExpr(numDims++);
+  }
+  if (hasN) {
+    nExpr = builder.getAffineDimExpr(numDims++);
+  }
+  if (hasK) {
+    kExpr = builder.getAffineDimExpr(numDims++);
+  }
+
+  // Build indexing maps by checking which dimensions are present in each
+  // operand. We need to query each operand's encoding separately to get its
+  // dimension mapping. For matvec example with maps
+  // [(d0, d1) -> (d0, d1), (d0, d1) -> (d1), (d0, d1) -> (d0)]:
+  auto addDimsForOperand = [&](SmallVectorImpl<AffineExpr> &exprs,
+                               IREE::Encoding::EncodingAttr encoding) {
+    FailureOr<Codegen::EncodingContractionLikeDimInfo> dimInfo =
+        Codegen::getEncodingContractionLikeDims(encoding);
+    if (dimInfo->mDim.operandIdx.has_value() && mExpr) {
+      exprs.push_back(mExpr);
+    }
+    if (dimInfo->nDim.operandIdx.has_value() && nExpr) {
+      exprs.push_back(nExpr);
+    }
+    if (dimInfo->kDim.operandIdx.has_value() && kExpr) {
+      exprs.push_back(kExpr);
+    }
+  };
+
+  // Build indexing map for each operand based on its own encoding.
+  addDimsForOperand(lhsExprs, operandEncodings[0]);
+  addDimsForOperand(rhsExprs, operandEncodings[1]);
+  // For matmul: operandEncodings = [LHS, RHS, ACC].
+  // For scaled_matmul: operandEncodings = [LHS, RHS, LHS_SCALES, RHS_SCALES,
+  // ACC].
+  addDimsForOperand(accExprs, operandEncodings.back());
   SmallVector<AffineMap> indexingMaps;
   MLIRContext *ctx = builder.getContext();
   Location loc = linalgOp.getLoc();
@@ -477,15 +524,16 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
   }
   case IREE::Encoding::EncodingOpType::scaled_matmul: {
     SmallVector<AffineExpr> lhsScalesExprs, rhsScalesExprs;
-    if (cDimInfo.batchDim.operandIdx.has_value()) {
+    if (hasBatch) {
       lhsScalesExprs.push_back(bExpr);
       rhsScalesExprs.push_back(bExpr);
     }
     AffineExpr kbExpr = builder.getAffineDimExpr(numDims++);
     lhsExprs.append({kbExpr});
     rhsExprs.append({kbExpr});
-    lhsScalesExprs.append({mExpr, kExpr});
-    rhsScalesExprs.append({nExpr, kExpr});
+    // LHS scales (operand 2) and RHS scales (operand 3)
+    addDimsForOperand(lhsScalesExprs, operandEncodings[2]);
+    addDimsForOperand(rhsScalesExprs, operandEncodings[3]);
     indexingMaps.push_back(AffineMap::get(numDims, 0, lhsExprs, ctx));
     indexingMaps.push_back(AffineMap::get(numDims, 0, rhsExprs, ctx));
     indexingMaps.push_back(AffineMap::get(numDims, 0, lhsScalesExprs, ctx));
