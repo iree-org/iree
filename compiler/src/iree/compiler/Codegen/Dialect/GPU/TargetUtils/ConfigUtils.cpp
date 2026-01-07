@@ -863,7 +863,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // load DMA here when possible.
     promotionList.append({2, 3});
     Attribute swizzleOperand = IREE::GPU::SwizzleOperandAttr::get(context, useGlobalDma);
-    promotionArray = {swizzleOperand, swizzleOperand, swizzleOperand, swizzleOperand};
+    Attribute emptyAttr = IREE::GPU::SwizzleOperandAttr::get(context, Attribute());
+    promotionArray = {swizzleOperand, swizzleOperand, emptyAttr, emptyAttr};
+    // promotionArray = {};
     // promotionTypes = ArrayRef<Attribute>{};
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad

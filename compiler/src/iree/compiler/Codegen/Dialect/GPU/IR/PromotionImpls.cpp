@@ -23,6 +23,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 /// Helper to insert copy with the specified attr.
 Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
+  llvm::errs() << "promoteValue\n";
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
   Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
@@ -34,6 +35,7 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
 
 // Helper to insert a swizzle hint and flatten the alloc accordingly.
 Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
+  llvm::errs() << "swizzlePromoteValue\n";
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
   if (tensorType.hasStaticShape()) {
@@ -44,13 +46,17 @@ Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v, Attribute a
         IREE::Codegen::XORShuffleAttr::get(builder.getContext(), 256, 32, int64_t(), int64_t()));
     Value expanded = tensor::ExpandShapeOp::create(builder, loc, tensorType, swizzled, {llvm::to_vector(llvm::seq(tensorType.getRank()))});
     auto copy = linalg::CopyOp::create(builder, loc, v, expanded);
-    setLoweringConfig(copy, attr);
+    if (attr) {
+      setLoweringConfig(copy, attr);
+    }
     return copy.getResult(0);
   }
   Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
                                         tensorType.getElementType());
   auto copy = linalg::CopyOp::create(builder, loc, v, empty);
-  setLoweringConfig(copy, attr);
+  if (attr) {
+    setLoweringConfig(copy, attr);
+  }
   return copy.getResult(0);
 }
 
@@ -76,6 +82,7 @@ Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v, Attribute a
 ///     lowering_config = #iree_gpu.derived_thread_config}
 Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr) {
+  llvm::errs() << "defaultPromotionImpl\n";
   if (auto producer = operand.get().getDefiningOp<TilingInterface>()) {
     // Skip promotion of fills.
     if (isa<linalg::FillOp>(producer)) {
@@ -132,7 +139,8 @@ Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
   if (!tensorType) {
     return operand.get();
   }
-
+  llvm::errs() << "swizzlePromoteValue\n";
+  llvm::errs() << attr << "\n";
   return swizzlePromoteValue(builder, operand.getOwner()->getLoc(), operand.get(),
                       attr);
 }
@@ -142,6 +150,7 @@ Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
 /// dispatch input if possible.
 Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                                 Attribute attr) {
+  llvm::errs() << "cacheSwizzlePromotionImpl\n";
   Value promotedValue = defaultPromotionImpl(builder, operand, attr);
   OpOperand *bufferCastOperand = nullptr;
   // We only support looking through copies and Im2Col for now.

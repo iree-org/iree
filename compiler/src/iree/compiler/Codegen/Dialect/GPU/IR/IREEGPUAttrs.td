@@ -160,9 +160,9 @@ def IREEGPU_SwizzleOperand :
     %4 = linalg.matmul ins(%3, ...)
     ```
   }];
-  let assemblyFormat = "`<` $copy_config `>`";
+  let assemblyFormat = "`<` struct(params) `>`";
   let parameters = (ins
-    "Attribute":$copy_config
+    OptionalParameter<"Attribute">:$copy_config
   );
 }
 
