@@ -23,6 +23,7 @@ BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
 BUILD_TYPE="${IREE_BUILD_TYPE:-RelWithDebInfo}"
 RISCV_PLATFORM="${IREE_TARGET_PLATFORM:-linux}"
 RISCV_ARCH="${IREE_TARGET_ARCH:-riscv_64}"
+RISCV_TOOLCHAIN_PREFIX="${RISCV_TOOLCHAIN_PREFIX:-}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 
 source build_tools/cmake/setup_build.sh
@@ -39,6 +40,7 @@ args=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}"
+  "-DRISCV_TOOLCHAIN_PREFIX=${RISCV_TOOLCHAIN_PREFIX}"
   "-DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT}"
   "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
   "-DRISCV_CPU=${RISCV_PLATFORM_ARCH}"
@@ -48,17 +50,13 @@ args=(
   "-DIREE_BUILD_ALL_CHECK_TEST_MODULES=OFF"
 )
 
-if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
-  args+=(
-    -DRISCV_TOOLCHAIN_PREFIX="riscv64-unknown-linux-gnu-"
-  )
-elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
+if [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
-    -DRISCV_TOOLCHAIN_PREFIX="riscv32-unknown-elf"
+    -DRISCV_TOOLCHAIN_TRIPLE="riscv32-unknown-elf"
   )
-else
+elif [[ "${RISCV_PLATFORM}" != "linux" ]]; then
   echo "riscv config for ${RISCV_PLATFORM_ARCH} not supported yet"
   return -1
 fi
