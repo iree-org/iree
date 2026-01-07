@@ -192,7 +192,7 @@ util.func @pingpong_dt_medium_f4E2M1FN(
           : !rhs_scale_copy_vec_ty, !rhs_scale_buffer_collapse_ty, !rhs_scale_shared_ty
 
         // There are (8 + 1) gather_to_lds instructions above.
-        rocdl.s.waitcnt 9
+        amdgpu.memory_counter_wait load(9)
         rocdl.s.barrier
 
         // Copy LHS from global memory to LDS.
@@ -222,7 +222,7 @@ util.func @pingpong_dt_medium_f4E2M1FN(
           : !lhs_scale_copy_vec_ty, !lhs_scale_buffer_collapse_ty, !lhs_scale_shared_ty
 
         // There are (4 + 1) gather_to_lds instructions above.
-        rocdl.s.waitcnt 5
+        amdgpu.memory_counter_wait load(5)
         rocdl.s.barrier
 
 
