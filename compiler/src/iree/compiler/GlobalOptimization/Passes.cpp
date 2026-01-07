@@ -29,6 +29,11 @@ static llvm::cl::opt<bool> clEnableTransposePropagation(
     llvm::cl::desc(
         "Enables propagation of transpose ops to improve fusion chances."),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clEnableConvolutionPropagation(
+    "iree-global-opt-propagate-transposes-through-conv",
+    llvm::cl::desc(
+        "Enables propagation of transpose ops through convolutions."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableAttentionVTranspose(
     "iree-global-opt-enable-attention-v-transpose",
     llvm::cl::desc("Enables transposition of v operand of attention ops,"),
@@ -178,6 +183,8 @@ void buildGlobalOptimizationPassPipeline(
                            PropagateLinalgTransposePassOptions options;
                            options.enableAggressivePropagation =
                                transformOptions.aggressiveTransposePropagation;
+                           options.enableConvolutionPropagation =
+                               clEnableConvolutionPropagation;
                            options.enableAttentionVTranspose =
                                clEnableAttentionVTranspose;
                            options.enableEdgeReshapePropagation =
