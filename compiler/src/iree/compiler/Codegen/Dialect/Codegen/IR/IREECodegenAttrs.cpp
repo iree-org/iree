@@ -872,4 +872,30 @@ void setUKernelDescriptor(Operation *op,
   op->setAttr(kUKernelDescriptorName, descriptor);
 }
 
+//===----------------------------------------------------------------------===//
+// iree_codegen.workgroup_scope
+//===----------------------------------------------------------------------===//
+
+// Custom parser/printer to make the <> optional. It will either parse/print as
+//   #iree_codegen.workgroup_scope<linearize>
+// or without the <>.
+//   #iree_codegen.workgroup_scope
+Attribute IREE::Codegen::WorkgroupScopeAttr::parse(AsmParser &parser, Type) {
+  bool linearize = false;
+  if (succeeded(parser.parseOptionalLess())) {
+    if (failed(parser.parseKeyword("linearize")) ||
+        failed(parser.parseGreater())) {
+      return {};
+    }
+    linearize = true;
+  }
+  return WorkgroupScopeAttr::get(parser.getContext(), linearize);
+}
+
+void IREE::Codegen::WorkgroupScopeAttr::print(AsmPrinter &printer) const {
+  if (getLinearize()) {
+    printer << "<" << "linearize" << ">";
+  }
+}
+
 } // namespace mlir::iree_compiler

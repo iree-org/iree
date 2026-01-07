@@ -664,4 +664,25 @@ def DenormalFpMathAttr :
   }];
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.workgroup_scope
+//===---------------------------------------------------------------------===//
+
+def WorkgroupScopeAttr : AttrDef<IREECodegen_Dialect, "WorkgroupScope", []> {
+  let mnemonic = "workgroup_scope";
+  let summary = [{
+    Attribute representing parallel execution across workgroups.
+  }];
+  let description = [{
+    Parallel scope that maps to workgroup execution.
+
+    If |linearize| is set to true, workgroup ids are linearized into a single
+    id which is then typically delinearized based on the problem space.
+  }];
+  let parameters = (ins "bool":$linearize);
+  let hasCustomAssemblyFormat = 1;
+
+  // Interface is registered as an external model to avoid HAL dep.
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
