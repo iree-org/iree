@@ -986,15 +986,15 @@ def IREEGPU_LaneIncrementAttr : AttrDef<IREEGPU_Dialect, "LaneIncrement"> {
   let summary = "Index increments by 1 within groups of N lanes";
   let description = [{
     This attribute is intended to be attached to the iree_codegen.index_hint op,
-    on which it indicates that the index value increments by 1 within groups
-    of N consecutive lanes. For example, with group_size=16 and a base value B,
-    lane i has value B + (i % 16).
+    on which it indicates that the index value increments by `step` within
+    groups of N consecutive lanes. For example, with group_size=16 and a base
+    value B, lane i has value `B + (i % 16) * step`.
 
     This hint is used to guide optimizations like transpose load lowering,
     where the column index must increment by 1 across consecutive lanes.
   }];
-  let parameters = (ins "int64_t":$group_size);
-  let assemblyFormat = "`<` $group_size `>`";
+  let parameters = (ins "int64_t":$group_size, "int64_t":$step);
+  let hasCustomAssemblyFormat = 1;
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

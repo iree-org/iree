@@ -85,22 +85,11 @@ func.func @fusion_barrier(%arg0: tensor<?xf32>) -> tensor<?xf32> {
 
 // -----
 
-func.func @index_hint_lane_constant(%idx: index) -> index {
-  %hinted = iree_codegen.index_hint %idx(#iree_gpu.lane_constant<16>) : index
+func.func @index_hint(%idx: index) -> index {
+  %hinted = iree_codegen.index_hint %idx([]) : index
   return %hinted : index
 }
-// CHECK-LABEL: func.func @index_hint_lane_constant(
+// CHECK-LABEL: func.func @index_hint(
 // CHECK-SAME:    %[[IDX:[a-zA-Z0-9_]+]]: index
-// CHECK:         %[[HINT:.+]] = iree_codegen.index_hint %[[IDX]](#iree_gpu.lane_constant<16>) : index
-// CHECK:         return %[[HINT]]
-
-// -----
-
-func.func @index_hint_lane_increment(%idx: index) -> index {
-  %hinted = iree_codegen.index_hint %idx(#iree_gpu.lane_increment<16>) : index
-  return %hinted : index
-}
-// CHECK-LABEL: func.func @index_hint_lane_increment(
-// CHECK-SAME:    %[[IDX:[a-zA-Z0-9_]+]]: index
-// CHECK:         %[[HINT:.+]] = iree_codegen.index_hint %[[IDX]](#iree_gpu.lane_increment<16>) : index
+// CHECK:         %[[HINT:.+]] = iree_codegen.index_hint %[[IDX]]([]) : index
 // CHECK:         return %[[HINT]]
