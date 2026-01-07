@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "convert_forall_to_loops.mlir",
+            "fuse_consumers.mlir",
         ],
         include = ["*.mlir"],
     ),

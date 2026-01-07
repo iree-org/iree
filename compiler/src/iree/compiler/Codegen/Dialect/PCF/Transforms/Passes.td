@@ -32,4 +32,30 @@ def ConvertForallToLoopsPass : Pass<"iree-pcf-convert-forall-to-loops", ""> {
   let dependentDialects = ["::mlir::iree_compiler::IREE::PCF::PCFDialect"];
 }
 
+def FuseConsumersPass : Pass<"iree-pcf-fuse-consumers", ""> {
+  let summary = "Fuses all consumers of pcf.generic/loop ops";
+  let description = [{
+    Test pass for fusing consumer operations into `pcf.generic` and `pcf.loop`
+    ops.
+
+    The input is IR containing PCF parallel ops with external consumers that
+    implement `TilingInterface` or are `tensor.extract_slice` ops.
+
+    The pass greedily fuses each tilable consumer into the producer PCF op by
+    cloning the consumer into the PCF region, tiling it to match the iteration
+    space, and replacing the external use with a new `pcf.write_slice`.
+
+    Supported fusion scenarios:
+    - Multiple `pcf.write_slice` producers for a single consumer value
+    - Fusion along multiple operands with a single `pcf.write_slice` per operand
+    - `tensor.extract_slice` by adding a condition based on the slice bounds.
+
+    The underlying fusion patterns are exposed via `matchTilableConsumer()` and
+    `fuseTilableConsumer()` for use in custom pipelines.
+  }];
+  let dependentDialects = ["::mlir::arith::ArithDialect",
+                           "::mlir::affine::AffineDialect",
+                           "::mlir::iree_compiler::IREE::PCF::PCFDialect"];
+}
+
 #endif // IREE_CODEGEN_DIALECT_PCF_TRANSFORMS_PASSES
