@@ -136,6 +136,35 @@ util.func private @workgroup_ids(%d0: index, %d1: index) {
 
 // -----
 
+// Test non-linearized workgroup scope with 4 IDs. The 4th dimension is padded
+// with 0 for ID and 1 for count since workgroup ids are natively only up to 3d.
+util.func private @workgroup_ids_4d(%d0: index, %d1: index, %d2: index, %d3: index) {
+  pcf.loop scope(#iree_codegen.workgroup_scope) count(%d0, %d1, %d2, %d3)
+    execute[%n0: index, %n1: index, %n2: index, %n3: index] {
+    util.optimization_barrier %n0, %n1, %n2, %n3 : index, index, index, index
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @workgroup_ids_4d
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:   %[[ARG2:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:   %[[ARG3:[A-Za-z0-9_]+]]: index
+//   CHECK-DAG:   %[[WGCX:.+]] = hal.interface.workgroup.count[0] : index
+//   CHECK-DAG:   %[[WGCY:.+]] = hal.interface.workgroup.count[1] : index
+//   CHECK-DAG:   %[[WGCZ:.+]] = hal.interface.workgroup.count[2] : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[WGIX:.+]] = hal.interface.workgroup.id[0] : index
+//   CHECK-DAG:   %[[WGIY:.+]] = hal.interface.workgroup.id[1] : index
+//   CHECK-DAG:   %[[WGIZ:.+]] = hal.interface.workgroup.id[2] : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   scf.forall (%[[ID0:.+]], %[[ID1:.+]], %[[ID2:.+]], %[[ID3:.+]]) = (%[[C0]], %[[WGIZ]], %[[WGIY]], %[[WGIX]]) to (%[[ARG3]], %[[ARG2]], %[[ARG1]], %[[ARG0]]) step (%[[C1]], %[[WGCZ]], %[[WGCY]], %[[WGCX]])
+//  CHECK-NEXT:     util.optimization_barrier %[[ID3]], %[[ID2]], %[[ID1]], %[[ID0]]
+
+// -----
+
 util.func private @linearize_workgroup_ids(%d0: index, %d1: index, %d2: index, %d3: index) {
   pcf.loop scope(#iree_codegen.workgroup_scope<linearize>) count(%d0, %d1, %d2, %d3)
     execute[%n0: index, %n1: index, %n2: index, %n3: index] {
