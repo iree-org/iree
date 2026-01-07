@@ -86,7 +86,7 @@ static bool isDefaultOrStrided(Attribute layout) {
 }
 
 // State that tracks floating point ranges and flags.
-struct StridedLayoutState : public DFX::AbstractState {
+struct StridedLayoutState : DFX::AbstractState {
   bool isValidState() const override { return isValid; }
   bool isAtFixpoint() const override { return !isValid || isFinalized; }
 
@@ -230,6 +230,11 @@ public:
 private:
   void initializeValue(Value value, DFX::Solver &solver) override;
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override;
+  ChangeStatus updateOpResult(OpResult result, StridedLayoutState &newState,
+                              DFX::Solver &solver);
+  ChangeStatus updateBlockArgument(BlockArgument value,
+                                   StridedLayoutState &newState,
+                                   DFX::Solver &solver);
 };
 const char StridedLayoutValueElement::ID = 0;
 
@@ -241,124 +246,91 @@ void StridedLayoutValueElement::initializeValue(Value value,
   }
 }
 
-ChangeStatus StridedLayoutValueElement::updateValue(Value value,
-                                                    DFX::Solver &solver) {
-  StridedLayoutState newState = getState();
-
-  if (auto result = llvm::dyn_cast<OpResult>(value)) {
-    llvm::TypeSwitch<Operation *, void>(result.getOwner())
-        .Case([&](PCF::AllocOp allocOp) {
-          PCF::ShapedRefType resultType = allocOp.getResultType();
-          FailureOr<Attribute> memSpace =
-              resultType.getScope().getAllocMemSpace(allocOp.getContext());
-          if (failed(memSpace)) {
-            allocOp->emitOpError("failed to get memory space for allocation");
-            newState.invalidate();
-            return;
-          }
-          newState.setAssumed(MemRefType::get(
-              resultType.getShape(), resultType.getElementType(),
-              MemRefLayoutAttrInterface{}, memSpace.value()));
-          newState.indicateOptimisticFixpoint();
-        })
-        .Case([&](RegionBranchOpInterface regionOp) {
-          // For region branch ops get the result layout from the union of
-          // return sites.
-          if (solver.getExplorer().walkReturnOperands(
-                  regionOp.getOperation(), [&](OperandRange returnOperands) {
-                    auto returnOperand =
-                        returnOperands[result.getResultNumber()];
-                    auto returnState =
-                        solver.getElementFor<StridedLayoutValueElement>(
-                            *this, Position::forValue(returnOperand),
-                            DFX::Resolution::REQUIRED);
-                    newState ^= returnState;
-                    return WalkResult::advance();
-                  }) == TraversalResult::INCOMPLETE) {
-            newState.indicatePessimisticFixpoint();
-            return;
-          }
-        })
-        .Case([&](CallOpInterface callOp) {
-          // Give up pessimistically on indirect calls.
-          if (isa<Value>(callOp.getCallableForCallee())) {
-            newState.indicatePessimisticFixpoint();
-            return;
-          }
-          auto targetSymbol =
-              cast<SymbolRefAttr>(callOp.getCallableForCallee());
-          auto callableOp = solver.getExplorer()
-                                .getSymbolTables()
-                                .lookupNearestSymbolFrom<CallableOpInterface>(
-                                    callOp, targetSymbol);
-          assert(callableOp && "call target not found");
-          // For region branch ops get the result layout from the union of
-          // return sites.
-          if (solver.getExplorer().walkReturnOperands(
-                  callableOp, [&](OperandRange returnOperands) {
-                    auto returnOperand =
-                        returnOperands[result.getResultNumber()];
-                    auto returnState =
-                        solver.getElementFor<StridedLayoutValueElement>(
-                            *this, Position::forValue(returnOperand),
-                            DFX::Resolution::REQUIRED);
-                    newState ^= returnState;
-                    return WalkResult::advance();
-                  }) == TraversalResult::INCOMPLETE) {
-            newState.indicatePessimisticFixpoint();
-            return;
-          }
-        })
-        .Case([&](Util::OptimizationBarrierOp barrierOp) {
-          auto returnState = solver.getElementFor<StridedLayoutValueElement>(
-              *this,
-              Position::forValue(
-                  barrierOp.getOperand(result.getResultNumber())),
-              DFX::Resolution::REQUIRED);
-          newState ^= returnState;
-        });
-  } else if (auto bbArg = llvm::dyn_cast<BlockArgument>(value)) {
-    bool didUpdate = false;
-    if (bbArg.getParentBlock()->isEntryBlock()) {
-      didUpdate =
-          llvm::TypeSwitch<Operation *, bool>(bbArg.getOwner()->getParentOp())
-              .Case<PCF::GenericOp>([&](PCF::GenericOp genericOp) {
-                if (genericOp.isRegionRefArg(bbArg)) {
-                  auto resultType = dyn_cast<MemRefType>(
-                      genericOp.getTiedResult(bbArg).getType());
-                  if (!resultType ||
-                      !isDefaultOrStrided(resultType.getLayout())) {
-                    genericOp->emitOpError(
-                        "unexpected non-strided or default memref result type ")
-                        << resultType;
-                    newState.invalidate();
-                  } else {
-                    newState.setAssumed(resultType);
-                    newState.indicateOptimisticFixpoint();
-                  }
-                } else {
-                  // pcf.sref arguments must either be result tied or
-                  // initialized per the verifier.
-                  assert(genericOp.isInitializedArg(bbArg) &&
-                         "unexpected non-initialized arg");
-                  auto yield = cast<PCF::YieldOp>(
-                      genericOp.getInitializer().front().getTerminator());
-                  auto initializerState =
+ChangeStatus StridedLayoutValueElement::updateOpResult(
+    OpResult result, StridedLayoutState &newState, DFX::Solver &solver) {
+  llvm::TypeSwitch<Operation *, void>(result.getOwner())
+      .Case([&](PCF::AllocOp allocOp) {
+        PCF::ShapedRefType resultType = allocOp.getResultType();
+        FailureOr<Attribute> memSpace =
+            resultType.getScope().getAllocMemSpace(allocOp.getContext());
+        if (failed(memSpace)) {
+          allocOp->emitOpError("failed to get memory space for allocation");
+          newState.invalidate();
+          return;
+        }
+        newState.setAssumed(
+            MemRefType::get(resultType.getShape(), resultType.getElementType(),
+                            MemRefLayoutAttrInterface{}, memSpace.value()));
+        newState.indicateOptimisticFixpoint();
+      })
+      .Case([&](RegionBranchOpInterface regionOp) {
+        // For region branch ops get the result layout from the union of
+        // return sites.
+        if (solver.getExplorer().walkReturnOperands(
+                regionOp.getOperation(), [&](OperandRange returnOperands) {
+                  auto returnOperand = returnOperands[result.getResultNumber()];
+                  auto returnState =
                       solver.getElementFor<StridedLayoutValueElement>(
-                          *this,
-                          Position::forValue(
-                              yield->getOperand(bbArg.getArgNumber())),
+                          *this, Position::forValue(returnOperand),
                           DFX::Resolution::REQUIRED);
-                  newState ^= initializerState;
-                }
-                return true;
-              })
-              .Case<PCF::LoopOp>([&](PCF::LoopOp loopOp) {
-                auto resultType =
-                    dyn_cast<MemRefType>(loopOp.getTiedResult(bbArg).getType());
+                  newState ^= returnState;
+                  return WalkResult::advance();
+                }) == TraversalResult::INCOMPLETE) {
+          newState.indicatePessimisticFixpoint();
+          return;
+        }
+      })
+      .Case([&](CallOpInterface callOp) {
+        // Give up pessimistically on indirect calls.
+        if (isa<Value>(callOp.getCallableForCallee())) {
+          newState.indicatePessimisticFixpoint();
+          return;
+        }
+        auto targetSymbol = cast<SymbolRefAttr>(callOp.getCallableForCallee());
+        auto callableOp = solver.getExplorer()
+                              .getSymbolTables()
+                              .lookupNearestSymbolFrom<CallableOpInterface>(
+                                  callOp, targetSymbol);
+        assert(callableOp && "call target not found");
+        // For region branch ops get the result layout from the union of
+        // return sites.
+        if (solver.getExplorer().walkReturnOperands(
+                callableOp, [&](OperandRange returnOperands) {
+                  auto returnOperand = returnOperands[result.getResultNumber()];
+                  auto returnState =
+                      solver.getElementFor<StridedLayoutValueElement>(
+                          *this, Position::forValue(returnOperand),
+                          DFX::Resolution::REQUIRED);
+                  newState ^= returnState;
+                  return WalkResult::advance();
+                }) == TraversalResult::INCOMPLETE) {
+          newState.indicatePessimisticFixpoint();
+          return;
+        }
+      })
+      .Case([&](Util::OptimizationBarrierOp barrierOp) {
+        auto returnState = solver.getElementFor<StridedLayoutValueElement>(
+            *this,
+            Position::forValue(barrierOp.getOperand(result.getResultNumber())),
+            DFX::Resolution::REQUIRED);
+        newState ^= returnState;
+      });
+  return DFX::clampStateAndIndicateChange(getState(), newState);
+}
+
+ChangeStatus StridedLayoutValueElement::updateBlockArgument(
+    BlockArgument bbArg, StridedLayoutState &newState, DFX::Solver &solver) {
+  bool didUpdate = false;
+  if (bbArg.getParentBlock()->isEntryBlock()) {
+    didUpdate =
+        llvm::TypeSwitch<Operation *, bool>(bbArg.getOwner()->getParentOp())
+            .Case([&](PCF::GenericOp genericOp) {
+              if (genericOp.isRegionRefArg(bbArg)) {
+                auto resultType = dyn_cast<MemRefType>(
+                    genericOp.getTiedResult(bbArg).getType());
                 if (!resultType ||
                     !isDefaultOrStrided(resultType.getLayout())) {
-                  loopOp->emitOpError(
+                  genericOp->emitOpError(
                       "unexpected non-strided or default memref result type ")
                       << resultType;
                   newState.invalidate();
@@ -366,25 +338,65 @@ ChangeStatus StridedLayoutValueElement::updateValue(Value value,
                   newState.setAssumed(resultType);
                   newState.indicateOptimisticFixpoint();
                 }
-                return true;
-              })
-              .Default([&](Operation *) { return false; });
-    }
-    if (!didUpdate) {
-      solver.getExplorer().walkIncomingBranchOperands(
-          bbArg.getOwner(),
-          [&](Block *sourceBlock, OperandRange operands, size_t offset) {
-            auto bbArgState = solver.getElementFor<StridedLayoutValueElement>(
-                *this,
-                Position::forValue(operands[bbArg.getArgNumber() + offset]),
-                DFX::Resolution::REQUIRED);
-            newState ^= bbArgState;
-            return WalkResult::advance();
-          });
-    }
+              } else {
+                // pcf.sref arguments must either be result tied or
+                // initialized per the verifier.
+                assert(genericOp.isInitializedArg(bbArg) &&
+                       "unexpected non-initialized arg");
+                auto yield = cast<PCF::YieldOp>(
+                    genericOp.getInitializer().front().getTerminator());
+                auto initializerState =
+                    solver.getElementFor<StridedLayoutValueElement>(
+                        *this,
+                        Position::forValue(
+                            yield->getOperand(bbArg.getArgNumber())),
+                        DFX::Resolution::REQUIRED);
+                newState ^= initializerState;
+              }
+              return true;
+            })
+            .Case([&](PCF::LoopOp loopOp) {
+              auto resultType =
+                  dyn_cast<MemRefType>(loopOp.getTiedResult(bbArg).getType());
+              if (!resultType || !isDefaultOrStrided(resultType.getLayout())) {
+                loopOp->emitOpError(
+                    "unexpected non-strided or default memref result type ")
+                    << resultType;
+                newState.invalidate();
+              } else {
+                newState.setAssumed(resultType);
+                newState.indicateOptimisticFixpoint();
+              }
+              return true;
+            })
+            .Default([&](Operation *) { return false; });
+  }
+  if (!didUpdate) {
+    solver.getExplorer().walkIncomingBranchOperands(
+        bbArg.getOwner(),
+        [&](Block *sourceBlock, OperandRange operands, size_t offset) {
+          auto bbArgState = solver.getElementFor<StridedLayoutValueElement>(
+              *this,
+              Position::forValue(operands[bbArg.getArgNumber() + offset]),
+              DFX::Resolution::REQUIRED);
+          newState ^= bbArgState;
+          return WalkResult::advance();
+        });
+  }
+  return DFX::clampStateAndIndicateChange(getState(), newState);
+}
+
+ChangeStatus StridedLayoutValueElement::updateValue(Value value,
+                                                    DFX::Solver &solver) {
+  StridedLayoutState newState = getState();
+
+  // Handle op results.
+  if (auto result = dyn_cast<OpResult>(value)) {
+    return updateOpResult(result, newState, solver);
   }
 
-  return DFX::clampStateAndIndicateChange(getState(), newState);
+  // Else it is a block argument.
+  return updateBlockArgument(cast<BlockArgument>(value), newState, solver);
 }
 
 const std::string
@@ -568,8 +580,7 @@ struct ConvertGenericOp final : OpConversionPattern<PCF::GenericOp> {
   LogicalResult
   matchAndRewrite(PCF::GenericOp genericOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (llvm::any_of(genericOp.getResultTypes(),
-                     [](Type t) { return !isa<MemRefType>(t); })) {
+    if (!llvm::all_of(genericOp.getResultTypes(), llvm::IsaPred<MemRefType>)) {
       return rewriter.notifyMatchFailure(
           genericOp, "expected all parallel op results to be of memref type");
     }
@@ -846,7 +857,7 @@ struct ConvertOptimizationBarrier final
 
 /// Converts the operand and result types of the CallOp, used together with the
 /// FuncOpSignatureConversion.
-struct ConvertFuncOp final : public OpConversionPattern<func::FuncOp> {
+struct ConvertFuncOp final : OpConversionPattern<func::FuncOp> {
   ConvertFuncOp(TypeConverter &typeConverter, MLIRContext *context,
                 SRefLayoutAnalysis &mapping)
       : OpConversionPattern(typeConverter, context), mapping(mapping) {}
@@ -880,7 +891,7 @@ private:
   SRefLayoutAnalysis &mapping;
 };
 
-class ConvertReturnOp final : public OpConversionPattern<func::ReturnOp> {
+struct ConvertReturnOp final : OpConversionPattern<func::ReturnOp> {
 public:
   ConvertReturnOp(TypeConverter &typeConverter, MLIRContext *context,
                   SRefLayoutAnalysis &mapping)
@@ -1031,7 +1042,7 @@ struct ConvertWhileOp final : OpConversionPattern<scf::WhileOp> {
 };
 
 void ConvertSRefToMemRefPass::runOnOperation() {
-  auto *context = &getContext();
+  MLIRContext *context = &getContext();
 
   SRefLayoutAnalysis analysis(getOperation());
   if (failed(analysis.run())) {
