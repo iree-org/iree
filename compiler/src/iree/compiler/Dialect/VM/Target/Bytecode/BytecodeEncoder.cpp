@@ -431,7 +431,7 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
       return std::nullopt;
     }
 
-    // From isa.h: IREE_VM_PC_BLOCK_MAX
+    // From isa.h: IREE_VM_ISA_PC_BLOCK_MAX
     static const size_t kVMMaxBlockSize = 0x00FFFFFFu;
     size_t blockLength = encoder.getOffset() - blockStart;
     if (blockLength > kVMMaxBlockSize) {
