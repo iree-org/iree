@@ -31,6 +31,7 @@ iree_lit_test_suite(
     "convert_hal_descriptor_type_to_gpu_address_space.mlir"
     "convert_to_destination_passing_style.mlir"
     "convert_unsupported_float_arith.mlir"
+    "convert_workgroup_forall_to_pcf.mlir"
     "convolution_to_igemm.mlir"
     "convolutions.mlir"
     "decompose_affine_ops.mlir"
