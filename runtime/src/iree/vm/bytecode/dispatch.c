@@ -1545,8 +1545,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
       const uint32_t index = (uint32_t)index_i32;
-      // TODO(benvanik): use result_is_move with a _retain_or_move.
-      IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_retain(list, index, result));
+      IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_retain_or_move(
+          list, index, result_is_move, result));
       if (result->type != IREE_VM_REF_TYPE_NULL &&
           (iree_vm_type_def_is_value(type_def) ||
            result->type != iree_vm_type_def_as_ref(type_def))) {

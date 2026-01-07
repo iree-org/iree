@@ -235,6 +235,44 @@ TEST_F(VMListTest, UsageRef) {
   iree_vm_list_release(list);
 }
 
+TEST_F(VMListTest, GetRefRetainOrMove) {
+  iree_vm_type_def_t element_type = iree_vm_make_ref_type_def(test_a_type());
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/1,
+                                     iree_allocator_system(), &list));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 1));
+
+  // Retain path keeps the element intact.
+  {
+    iree_vm_ref_t ref_a = MakeRef<A>(1.0f);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, 0, &ref_a));
+    iree_vm_ref_t retained{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_retain_or_move(
+        list, 0, /*is_move=*/false, &retained));
+    EXPECT_TRUE(test_a_isa(retained));
+    iree_vm_ref_release(&retained);
+    iree_vm_ref_t still_there{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(list, 0, &still_there));
+    EXPECT_TRUE(test_a_isa(still_there));
+  }
+
+  // Move path transfers ownership and clears the element.
+  {
+    iree_vm_ref_t ref_a = MakeRef<A>(2.0f);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, 0, &ref_a));
+    iree_vm_ref_t moved{0};
+    IREE_ASSERT_OK(
+        iree_vm_list_get_ref_retain_or_move(list, 0, /*is_move=*/true, &moved));
+    EXPECT_TRUE(test_a_isa(moved));
+    iree_vm_ref_release(&moved);
+    iree_vm_ref_t cleared{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(list, 0, &cleared));
+    EXPECT_EQ(IREE_VM_REF_TYPE_NULL, cleared.type);
+  }
+
+  iree_vm_list_release(list);
+}
+
 // Tests simple variant list usage, mainly just for demonstration.
 // Stores any heterogeneous element type, equivalent to `!vm.list<?>`.
 TEST_F(VMListTest, UsageVariant) {
