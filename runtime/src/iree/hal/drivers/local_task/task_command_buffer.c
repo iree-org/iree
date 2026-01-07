@@ -759,7 +759,8 @@ static iree_status_t iree_hal_task_cmd_dispatch_tile(
   };
   uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
   dispatch_state.constants = (uint32_t*)cmd_ptr;
-  cmd_ptr += cmd->constant_count * sizeof(*dispatch_state.constants);
+  cmd_ptr +=
+      iree_host_align(cmd->constant_count * sizeof(uint32_t), iree_max_align_t);
   dispatch_state.binding_ptrs = (void**)cmd_ptr;
   cmd_ptr += cmd->binding_count * sizeof(*dispatch_state.binding_ptrs);
   dispatch_state.binding_lengths = (size_t*)cmd_ptr;
@@ -808,7 +809,9 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
 
   iree_hal_task_cmd_dispatch_t* cmd = NULL;
   iree_host_size_t total_cmd_size =
-      sizeof(*cmd) + dispatch_attrs.constant_count * sizeof(uint32_t) +
+      sizeof(*cmd) +
+      iree_host_align(dispatch_attrs.constant_count * sizeof(uint32_t),
+                      iree_max_align_t) +
       dispatch_attrs.binding_count * sizeof(void*) +
       dispatch_attrs.binding_count * sizeof(size_t);
   IREE_RETURN_IF_ERROR(iree_arena_allocate(&command_buffer->arena,
@@ -871,7 +874,8 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
   uint32_t* constants_ptr = (uint32_t*)cmd_ptr;
   memcpy(constants_ptr, constants.data,
          dispatch_attrs.constant_count * sizeof(*constants_ptr));
-  cmd_ptr += dispatch_attrs.constant_count * sizeof(*constants_ptr);
+  cmd_ptr += iree_host_align(dispatch_attrs.constant_count * sizeof(uint32_t),
+                             iree_max_align_t);
 
   // Produce the dense binding list based on the declared bindings used.
   //

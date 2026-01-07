@@ -87,9 +87,6 @@ static void iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
   const iree_vm_bytecode_frame_storage_t* stack_storage =
       (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(frame);
 
-  // TODO(benvanik): enable when compiler produces proper programs.
-  // For now we always take the error path to clean things up.
-#if 0
   // On success paths (result_code == OK), the compiler guarantees all refs
   // are explicitly released. Skip the cleanup loop.
   if (IREE_LIKELY(stack_storage->result_code == IREE_STATUS_OK)) {
@@ -119,7 +116,6 @@ static void iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
 #endif  // IREE_VM_REF_DEBUG_CLEAN
     return;
   }
-#endif  // 0
 
   // Error/unwind path: release all remaining refs. This handles:
   // - Frames that explicitly errored (vm.fail, import failures)
