@@ -31,6 +31,7 @@ iree_cc_library(
     "ConvertForallToLoops.cpp"
     "FuseConsumers.cpp"
     "FusePCFWrites.cpp"
+    "LowerStructuralPCF.cpp"
     "Passes.cpp"
     "Transforms.cpp"
   DEPS
