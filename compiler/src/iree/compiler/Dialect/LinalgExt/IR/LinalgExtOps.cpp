@@ -625,6 +625,90 @@ LogicalResult MapGatherOp::verify() {
   return success();
 }
 
+Value MapGatherOp::getSourceIndex(int64_t position) {
+  assert(position < getSourceRank() &&
+         "The source index position being requested should be smaller than the "
+         "source rank.");
+  Block &body = getTransformationRegion().front();
+  auto yield = cast<IREE::LinalgExt::YieldOp>(body.getTerminator());
+  return yield.getOperand(position);
+}
+
+Value MapGatherOp::getOutputIndex(int64_t position) {
+  Block &body = getTransformationRegion().front();
+  return body.getArguments()[position];
+}
+
+Value MapGatherOp::getPaddingValue() {
+  Block &body = getTransformationRegion().front();
+  auto yield = cast<IREE::LinalgExt::YieldOp>(body.getTerminator());
+  return yield.getOperand(yield.getNumOperands() - 1);
+}
+
+void MapGatherOp::insertTransformationAtStart(
+    OpBuilder &builder,
+    function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+        transformationBuilder,
+    int64_t numOutputIndices) {
+  Block &transformBody = getTransformationRegion().front();
+  SmallVector<BlockArgument> oldOutputIndices(transformBody.getArguments());
+  SmallVector<Type> indexTypes(numOutputIndices, builder.getIndexType());
+  SmallVector<Location> locs(numOutputIndices, getLoc());
+
+  // Create the new block arguments for the new output indices, and transform
+  // them using the callback.
+  SmallVector<BlockArgument> newOutputIndices(
+      transformBody.addArguments(indexTypes, locs));
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPointToStart(&transformBody);
+  SmallVector<Value> newOutputIndicesTransformed(
+      transformationBuilder(newOutputIndices));
+
+  // Replace the old output indices with the results of the transformation on
+  // the new output indices.
+  assert(oldOutputIndices.size() == newOutputIndicesTransformed.size() &&
+         "expected transformation to produce the same number of Values as the "
+         "previous number of output indices.");
+  for (auto [oldIdx, newIdx] :
+       llvm::zip_equal(oldOutputIndices, newOutputIndicesTransformed)) {
+    SmallVector<OpOperand *> uses(llvm::make_pointer_range(oldIdx.getUses()));
+    for (OpOperand *use : uses) {
+      use->set(newIdx);
+    }
+  }
+  transformBody.eraseArguments(0, oldOutputIndices.size());
+}
+
+void MapGatherOp::inlineMapGatherBody(
+    OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+    function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
+  Block &transformBlock = getTransformationRegion().front();
+  IRMapping mapping;
+  // Map the induction variables of the loop nest to the block arguments of the
+  // transformation body. The induction variables are the indices looping over
+  // the elements of output operand.
+  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
+    mapping.map(arg, transformBodyIndices[idx]);
+  }
+  // Clone the operations within the transformation body to the current
+  // insertion point, and map their results to the new cloned operations'
+  // results.
+  for (Operation &op : transformBlock.without_terminator()) {
+    Operation *clonedOp = b.clone(op, mapping);
+    for (auto [result, clonedResult] :
+         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
+      mapping.map(result, clonedResult);
+    }
+  }
+
+  // Get the cloned values that were yielded by the transformation body to pass
+  // to the bodyBuilder.
+  SmallVector<Value> mappedYieldedValues = llvm::map_to_vector(
+      transformBlock.getTerminator()->getOperands(),
+      [&](Value operand) -> Value { return mapping.lookupOrDefault(operand); });
+  bodyBuilder(b, loc, mappedYieldedValues);
+}
+
 //===----------------------------------------------------------------------===//
 // MapScatterOp
 //===----------------------------------------------------------------------===//

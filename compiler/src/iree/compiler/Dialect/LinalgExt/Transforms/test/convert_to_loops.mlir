@@ -1703,3 +1703,47 @@ func.func @map_scatter_memref(
 // CHECK-NEXT:       %[[INPUT_ELEM:.+]] = memref.load %[[INPUT]][%[[IV]]]
 // CHECK-NEXT:       memref.store %[[INPUT_ELEM]], %[[OUTPUT]]
 // CHECK-SAME:         [%[[OUT_IDX]]#0, %[[OUT_IDX]]#1] : memref<?x?xf32>
+
+// -----
+
+func.func @map_gather_memref(
+  %source: memref<?x?xf32>, %output: memref<?xf32>
+) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim0 = memref.dim %source, %c0 : memref<?x?xf32>
+  %dim1 = memref.dim %source, %c1 : memref<?x?xf32>
+  iree_linalg_ext.map_gather %source into %output {
+    ^bb0(%idx0: index):
+      %src_idx:2 = affine.delinearize_index %idx0 into (%dim0, %dim1) : index, index
+      %pad = arith.constant 0.0 : f32
+      iree_linalg_ext.yield %src_idx#0, %src_idx#1, %pad : index, index, f32
+  } : memref<?x?xf32> into memref<?xf32>
+  return
+}
+//      CHECK: func @map_gather_memref
+// CHECK-SAME:    %[[SOURCE:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.{{0+}}e+00 : f32
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[SRC_D0:.+]] = memref.dim %[[SOURCE]], %[[C0]]
+//  CHECK-DAG:   %[[SRC_D1:.+]] = memref.dim %[[SOURCE]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_D0:.+]] = memref.dim %[[OUTPUT]], %[[C0]]
+//      CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[OUT_D0]] step %[[C1]]
+//      CHECK:     %[[SRC_IDX:.+]]:2 = affine.delinearize_index %[[IV]] into (%[[SRC_D0]], %[[SRC_D1]]) : index, index
+//      CHECK:     %[[BOUND_D0:.+]] = memref.dim %[[SOURCE]], %[[C0]]
+//      CHECK:     %[[GE_ZERO_0:.+]] = arith.cmpi sge, %[[SRC_IDX]]#0, %[[C0]] : index
+//      CHECK:     %[[LT_DIM_0:.+]] = arith.cmpi slt, %[[SRC_IDX]]#0, %[[BOUND_D0]] : index
+//      CHECK:     %[[IN_BOUNDS_0:.+]] = arith.andi %[[GE_ZERO_0]], %[[LT_DIM_0]]
+//      CHECK:     %[[BOUND_D1:.+]] = memref.dim %[[SOURCE]], %[[C1]]
+//      CHECK:     %[[GE_ZERO_1:.+]] = arith.cmpi sge, %[[SRC_IDX]]#1, %[[C0]] : index
+//      CHECK:     %[[LT_DIM_1:.+]] = arith.cmpi slt, %[[SRC_IDX]]#1, %[[BOUND_D1]] : index
+//      CHECK:     %[[IN_BOUNDS_1:.+]] = arith.andi %[[GE_ZERO_1]], %[[LT_DIM_1]]
+//      CHECK:     %[[IN_BOUNDS:.+]] = arith.andi %[[IN_BOUNDS_0]], %[[IN_BOUNDS_1]]
+//      CHECK:     scf.if %[[IN_BOUNDS]] {
+//      CHECK:       %[[SOURCE_ELEM:.+]] = memref.load %[[SOURCE]]
+// CHECK-SAME:         [%[[SRC_IDX]]#0, %[[SRC_IDX]]#1] : memref<?x?xf32>
+//      CHECK:       memref.store %[[SOURCE_ELEM]], %[[OUTPUT]][%[[IV]]]
+//      CHECK:     } else {
+//      CHECK:       memref.store %[[PAD]], %[[OUTPUT]][%[[IV]]]
