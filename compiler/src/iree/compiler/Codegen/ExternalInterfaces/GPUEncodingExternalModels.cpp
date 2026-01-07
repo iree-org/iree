@@ -440,7 +440,6 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
   }
 
   // Determine which dimensions exist in the operation by checking all operands.
-  // For matvec, the result might not have K, but the inputs do.
   bool hasBatch = false;
   bool hasM = false;
   bool hasN = false;
