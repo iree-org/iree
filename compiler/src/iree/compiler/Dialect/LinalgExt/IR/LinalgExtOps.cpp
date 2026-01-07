@@ -765,6 +765,8 @@ bool MapScatterOp::isIdentity() {
   return true;
 }
 namespace {
+/// Convert an identity map_scatter to a copy operation. We keep the copy to
+/// preserve DPS semantics.
 struct ConvertIdentityMapScatterToCopy
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
   using Base::Base;

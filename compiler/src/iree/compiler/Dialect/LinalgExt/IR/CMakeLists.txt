@@ -65,6 +65,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTilingInterface
+    MLIRValueBoundsOpInterface
     MLIRViewLikeInterface
     iree::compiler::Dialect::LinalgExt::Utils
   PUBLIC
