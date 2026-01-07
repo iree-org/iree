@@ -196,9 +196,9 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
     if (!mma) {
       continue;
     }
-    // Depending on the type of data-tiled layout attribute, read the
-    // appropriate kind of MMA-like intrinsic and check that it's supported by
-    // the target.
+    // Check that the mma attribute matches the opType (e.g., DataTiledMMAAttr
+    // for matmul, DataTiledScaledMMAAttr for scaled_matmul). Also, check that
+    // the intrinsic is supported by the target.
     if (opType == IREE::Encoding::EncodingOpType::matmul) {
       auto dtMma = dyn_cast<GPU::DataTiledMMAAttr>(mma);
       if (!dtMma) {
