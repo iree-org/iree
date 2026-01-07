@@ -193,7 +193,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
 /// linalg.generic with explicit index tracking and selection logic.
 ///
 /// Example:
-/// ```
+/// ```mlir
 /// %result:2 = iree_linalg_ext.arg_compare dimension(1)
 ///     ins(%input : tensor<4x128xf32>)
 ///     outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>) {
@@ -203,7 +203,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
 /// } -> tensor<4xf32>, tensor<4xi32>
 /// ```
 /// Becomes:
-/// ```
+/// ```mlir
 /// %result:2 = linalg.generic {
 ///     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
 ///                      affine_map<(d0, d1) -> (d0)>,

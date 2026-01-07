@@ -272,8 +272,43 @@ func.func @arg_compare_index_output(%input: tensor<4x128xf32>,
 // CHECK-SAME:   outs(%[[OUT_VAL]], %[[OUT_IDX]] : tensor<4xf32>, tensor<4xindex>)
 // CHECK:        ^bb0(%[[IN:.+]]: f32, %[[ACC_VAL:.+]]: f32, %[[ACC_IDX:.+]]: index):
 // CHECK:          %[[IDX:.+]] = linalg.index 1 : index
-// CHECK-NOT:      arith.index_cast
 // CHECK:          %[[CMP:.+]] = arith.cmpf ogt, %[[IN]], %[[ACC_VAL]] : f32
 // CHECK:          %[[NEW_VAL:.+]] = arith.select %[[CMP]], %[[IN]], %[[ACC_VAL]] : f32
 // CHECK:          %[[NEW_IDX:.+]] = arith.select %[[CMP]], %[[IDX]], %[[ACC_IDX]] : index
 // CHECK:          linalg.yield %[[NEW_VAL]], %[[NEW_IDX]] : f32, index
+
+// -----
+
+func.func @arg_compare_argmin_i32(%input: tensor<4x128xi32>,
+                                  %out_val: tensor<4xi32>,
+                                  %out_idx: tensor<4xi64>)
+    -> (tensor<4xi32>, tensor<4xi64>) {
+  %result:2 = iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%input : tensor<4x128xi32>)
+      outs(%out_val, %out_idx : tensor<4xi32>, tensor<4xi64>) {
+    ^bb0(%a: i32, %b: i32):
+      %cmp = arith.cmpi slt, %a, %b : i32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xi32>, tensor<4xi64>
+  return %result#0, %result#1 : tensor<4xi32>, tensor<4xi64>
+}
+
+// CHECK-DAG:  #[[$MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:  #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-LABEL: func.func @arg_compare_argmin_i32
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9_]+]]: tensor<4x128xi32>
+// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9_]+]]: tensor<4xi32>
+// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9_]+]]: tensor<4xi64>
+// CHECK:        linalg.generic
+// CHECK-SAME:   indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP1]]]
+// CHECK-SAME:   iterator_types = ["parallel", "reduction"]
+// CHECK-SAME:   ins(%[[INPUT]] : tensor<4x128xi32>)
+// CHECK-SAME:   outs(%[[OUT_VAL]], %[[OUT_IDX]] : tensor<4xi32>, tensor<4xi64>)
+// CHECK:        ^bb0(%[[IN:.+]]: i32, %[[ACC_VAL:.+]]: i32, %[[ACC_IDX:.+]]: i64):
+// CHECK:          %[[IDX:.+]] = linalg.index 1 : index
+// CHECK:          %[[IDX_CAST:.+]] = arith.index_cast %[[IDX]] : index to i64
+// CHECK:          %[[CMP:.+]] = arith.cmpi slt, %[[IN]], %[[ACC_VAL]] : i32
+// CHECK:          %[[NEW_VAL:.+]] = arith.select %[[CMP]], %[[IN]], %[[ACC_VAL]] : i32
+// CHECK:          %[[NEW_IDX:.+]] = arith.select %[[CMP]], %[[IDX_CAST]], %[[ACC_IDX]] : i64
+// CHECK:          linalg.yield %[[NEW_VAL]], %[[NEW_IDX]] : i32, i64

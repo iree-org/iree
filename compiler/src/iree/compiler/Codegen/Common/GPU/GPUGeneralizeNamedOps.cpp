@@ -71,15 +71,17 @@ struct GPUGeneralizeNamedOpsPass final
       return signalPassFailure();
     }
 
+    // Generalize LinalgExt ops.
     SmallVector<IREE::LinalgExt::ArgCompareOp> argCompareOps;
     funcOp.walk(
         [&](IREE::LinalgExt::ArgCompareOp op) { argCompareOps.push_back(op); });
 
     IRRewriter rewriter(&getContext());
-    for (auto argCompareOp : argCompareOps) {
+    for (IREE::LinalgExt::ArgCompareOp argCompareOp : argCompareOps) {
       rewriter.setInsertionPoint(argCompareOp);
       if (failed(IREE::LinalgExt::generalizeArgCompareOp(rewriter,
                                                          argCompareOp))) {
+        argCompareOp->emitOpError("failed to generalize operation");
         return signalPassFailure();
       }
     }
