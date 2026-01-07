@@ -20,6 +20,16 @@ namespace mlir::iree_compiler {
 class VMRegisterAllocation {
 public:
   virtual ~VMRegisterAllocation() = default;
+
+  // Returns true if the operand at |operandIndex| of the given discard op can
+  // be elided because it was already released via MOVE on a preceding op.
+  virtual bool isDiscardOperandElidable(Operation *op,
+                                        unsigned operandIndex) const = 0;
+
+  // Maps an SSA |value| to its allocated register ordinal.
+  // Returns a packed ordinal (matching the VM register encoding) such that
+  // ref registers have the type bit set.
+  virtual int mapValueToRegisterOrdinal(Value value) const = 0;
 };
 
 // Interface for encoding of VM operations within functions.

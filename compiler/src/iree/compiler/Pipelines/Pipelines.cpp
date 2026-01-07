@@ -418,7 +418,6 @@ void buildIREEVMTransformPassPipeline(
     if (hooks.beforePhase)
       hooks.beforePhase(IREEVMPipelinePhase::VM, passManager);
     IREE::VM::buildVMTransformPassPipeline(passManager, vmTargetOptions);
-    passManager.addPass(IREE::Util::createDropCompilerHintsPass());
     if (hooks.afterPhase)
       hooks.afterPhase(IREEVMPipelinePhase::VM, passManager);
     IREE_TRACE_ADD_END_FRAME_PASS(passManager, "VM");
