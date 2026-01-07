@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "convert_forall_to_loops.mlir"
     "fuse_consumers.mlir"
+    "fuse_pcf_writes.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -20,6 +20,7 @@ iree_lit_test_suite(
         [
             "convert_forall_to_loops.mlir",
             "fuse_consumers.mlir",
+            "fuse_pcf_writes.mlir",
         ],
         include = ["*.mlir"],
     ),
