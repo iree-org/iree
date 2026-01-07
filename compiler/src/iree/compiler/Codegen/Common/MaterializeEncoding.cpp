@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -315,8 +316,9 @@ struct MaterializeDeviceEncodingPass final
   using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    vector::VectorDialect, IREE::Encoding::IREEEncodingDialect,
+    registry.insert<amdgpu::AMDGPUDialect, arith::ArithDialect,
+                    tensor::TensorDialect, vector::VectorDialect,
+                    IREE::Encoding::IREEEncodingDialect,
                     IREE::Codegen::IREECodegenDialect,
                     IREE::CPU::IREECPUDialect, IREE::GPU::IREEGPUDialect>();
   }
