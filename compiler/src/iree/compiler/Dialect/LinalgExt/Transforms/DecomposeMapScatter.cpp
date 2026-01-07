@@ -16,6 +16,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-decompose-map-scatter"
@@ -101,6 +102,134 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
     rewriter.modifyOpInPlace(subViewOp, [&]() {
       mapScatterOp.getOutputMutable().assign(subViewSource);
     });
+    return success();
+  }
+};
+
+/// Simplify linearize→delinearize pairs where dimension products match.
+///
+/// When a delinearize directly consumes a linearize, we can group linearize
+/// dimensions and match them to delinearize dimensions when their products
+/// are equal. This breaks down the original operations into smaller chunks that
+/// will avoid long multiply-add and divide-remainder chains when these
+/// linearize→delinearize are further lowered.
+///
+/// This optimization currently handles one-to-one matches (a single linearize
+/// dimension matches a single delinearize dimension) and many-to-one matches
+/// (multiple linearize dimensions grouped together match a single delinearize
+/// dimension).
+///
+/// Example:
+///   %lin = affine.linearize_index [%a, %b, %c, %d, %e] by (%dyn0, 64, 4, 8, 8)
+///   %delin:3 = affine.delinearize_index %lin into (%dyn1, 256, 64)
+///
+/// If %dyn0 == %dyn1, 64*4 == 256, and 8*8 == 64, then we can simplify to:
+///   %delin#0 = %a  (direct passthrough)
+///   %delin#1 = affine.linearize_index [%b, %c] by (64, 4)
+///   %delin#2 = affine.linearize_index [%d, %e] by (8, 8)
+struct SimplifyLinearizeDelinearizePairs final
+    : OpRewritePattern<affine::AffineDelinearizeIndexOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(affine::AffineDelinearizeIndexOp delinearizeOp,
+                                PatternRewriter &rewriter) const override {
+    // Find the linearize op that produces the input to this delinearize.
+    auto linearizeOp = delinearizeOp.getLinearIndex()
+                           .getDefiningOp<affine::AffineLinearizeIndexOp>();
+    if (!linearizeOp) {
+      return rewriter.notifyMatchFailure(
+          delinearizeOp, "delinearize op does not consume a linearize op");
+    }
+    // We only handle disjoint linearizations.
+    if (!linearizeOp.getDisjoint()) {
+      return rewriter.notifyMatchFailure(delinearizeOp,
+                                         "linearize op is not disjoint");
+    }
+    SmallVector<OpFoldResult> linearizeBases = linearizeOp.getMixedBasis();
+    SmallVector<OpFoldResult> delinearizeBases = delinearizeOp.getMixedBasis();
+    ValueRange linearizeInputs = linearizeOp.getMultiIndex();
+
+    Location loc = delinearizeOp.getLoc();
+    MLIRContext *ctx = rewriter.getContext();
+
+    // Structure to store the inputs and bases for new linearize ops.
+    struct LinearizeInfo {
+      SmallVector<Value> inputs;
+      SmallVector<OpFoldResult> bases;
+    };
+    SmallVector<LinearizeInfo> newLinearizeInfos;
+
+    // For each delinearize output dimension, try to match it with a product of
+    // one or more linearize dimensions. We build up the product incrementally
+    // and check for equality using value bounds analysis, which works for both
+    // static and dynamic dimensions.
+    // TODO(#23032): Consider separating bounds checking from transformation
+    // patterns into a shared utility for better organization of index analysis.
+    size_t linIdx = 0;
+    for (size_t delinIdx = 0;
+         delinIdx < delinearizeBases.size() && linIdx < linearizeBases.size();
+         ++delinIdx) {
+      LinearizeInfo newLinearizeInfo;
+      // Track operands for the AffineMap-based product expression.
+      SmallVector<Value> productOperands;
+      // Accumulate dimensions from the linearize op until we find a match.
+      while (linIdx < linearizeBases.size()) {
+        newLinearizeInfo.inputs.push_back(linearizeInputs[linIdx]);
+        newLinearizeInfo.bases.push_back(linearizeBases[linIdx]);
+
+        // Build up the product of basis dimension using affine expressions.
+        AffineExpr productExpr = getAffineConstantExpr(1, ctx);
+        productOperands.clear();
+        for (OpFoldResult basis : newLinearizeInfo.bases) {
+          if (auto attr = dyn_cast<Attribute>(basis)) {
+            // Handle the static basis as a constant expression.
+            int64_t val = cast<IntegerAttr>(attr).getInt();
+            productExpr = productExpr * getAffineConstantExpr(val, ctx);
+          } else {
+            // Handle the dynamic basis as a symbol expression.
+            Value val = cast<Value>(basis);
+            productOperands.push_back(val);
+            productExpr = productExpr *
+                          getAffineSymbolExpr(productOperands.size() - 1, ctx);
+          }
+        }
+        ++linIdx;
+        // Create Variable from the product expression.
+        AffineMap productMap =
+            AffineMap::get(0, productOperands.size(), productExpr, ctx);
+        ValueBoundsConstraintSet::Variable productVar(productMap,
+                                                      productOperands);
+        ValueBoundsConstraintSet::Variable delinearizeVar(
+            delinearizeBases[delinIdx]);
+
+        FailureOr<bool> areEqual =
+            ValueBoundsConstraintSet::areEqual(productVar, delinearizeVar);
+        if (succeeded(areEqual) && *areEqual) {
+          newLinearizeInfos.push_back(newLinearizeInfo);
+          break;
+        }
+      }
+    }
+
+    if (newLinearizeInfos.size() != delinearizeOp.getNumResults()) {
+      return rewriter.notifyMatchFailure(
+          delinearizeOp, "could not match all delinearize outputs");
+    }
+
+    SmallVector<Value> newResults;
+    for (const auto &info : newLinearizeInfos) {
+      if (info.inputs.size() == 1) {
+        // If there is a one-to-one match between linearize and delinearize
+        // dimensions, just pass through the linearize input.
+        newResults.push_back(info.inputs[0]);
+      } else {
+        // Otherwise, for a many-to-one match, create a new linearize op.
+        Value newLinearized = affine::AffineLinearizeIndexOp::create(
+            rewriter, loc, info.inputs, info.bases,
+            /*disjoint=*/true);
+        newResults.push_back(newLinearized);
+      }
+    }
+    rewriter.replaceOp(delinearizeOp, newResults);
     return success();
   }
 };
@@ -419,7 +548,8 @@ struct DecomposeMapScatterPass final
     mlir::FunctionOpInterface funcOp = getOperation();
 
     RewritePatternSet patterns(context);
-    patterns.add<FoldSubViewIntoMapScatter>(context);
+    patterns.add<FoldSubViewIntoMapScatter, SimplifyLinearizeDelinearizePairs>(
+        context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
