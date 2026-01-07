@@ -126,9 +126,10 @@ LogicalResult LiveIntervals::build(IREE::VM::FuncOp funcOp) {
   for (const auto &interval : intervals_) {
     sortedByStart_.push_back(&interval);
   }
-  llvm::sort(sortedByStart_, [](const LiveInterval *a, const LiveInterval *b) {
-    return a->start < b->start;
-  });
+  llvm::stable_sort(sortedByStart_,
+                    [](const LiveInterval *a, const LiveInterval *b) {
+                      return a->start < b->start;
+                    });
 
   LLVM_DEBUG({
     llvm::dbgs() << "=== Live Intervals for " << funcOp.getName() << " ===\n";
