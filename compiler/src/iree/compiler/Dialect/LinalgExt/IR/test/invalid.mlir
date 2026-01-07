@@ -555,6 +555,8 @@ func.func @map_scatter_wrong_mask_type(
 
 // -----
 
+// This test uses generic format, because the custom parser would otherwise
+// insert a terminator due to the SingleBlockImplicitTerminator trait.
 func.func @map_scatter_no_terminator(
     %input: memref<4xf32>, %output: memref<4xf32>
 ){
