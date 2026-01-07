@@ -1817,3 +1817,89 @@ func.func @index_op_invalid_dim(%arg0 : tensor<?xindex>) -> tensor<?xindex> {
   } -> tensor<?xindex>
   return %0 : tensor<?xindex>
 }
+
+// -----
+
+func.func @map_gather_mixed_element_types(
+    %source: memref<4xf16>, %output: memref<4xf32>
+) {
+  %cst = arith.constant 0.0 : f16
+  // expected-error@+1 {{expected source and output element types to match}}
+  iree_linalg_ext.map_gather %source into %output {
+  ^bb0(%idx0: index):
+    %pad = arith.constant 0.0 : f16
+    iree_linalg_ext.yield %idx0, %pad : index, f16
+  } : memref<4xf16> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_gather_wrong_num_arguments(
+    %source: memref<4xf32>, %output: memref<4xf32>
+) {
+  // expected-error@+1 {{expected number of block arguments to be equal to the output rank}}
+  iree_linalg_ext.map_gather %source into %output {
+  ^bb0(%idx0: index, %idx1: index):
+    %pad = arith.constant 0.0 : f32
+    iree_linalg_ext.yield %idx0, %pad : index, f32
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_gather_wrong_argument_types(
+    %source: memref<4xf32>, %output: memref<4xf32>
+) {
+  // expected-error@+1 {{expected block arguments to be index types}}
+  iree_linalg_ext.map_gather %source into %output {
+  ^bb0(%idx0: i64):
+    %pad = arith.constant 0.0 : f32
+    %idx_cast = arith.index_cast %idx0 : i64 to index
+    iree_linalg_ext.yield %idx_cast, %pad : index, f32
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_gather_wrong_yielded_index_types(
+    %source: memref<4xf32>, %output: memref<4xf32>
+) {
+  iree_linalg_ext.map_gather %source into %output {
+  ^bb0(%idx0: index):
+    %pad = arith.constant 0.0 : f32
+    %idx_cast = arith.index_cast %idx0 : index to i64
+    // expected-error@+1 {{expected yielded indices to be index types}}
+    iree_linalg_ext.yield %idx_cast, %pad : i64, f32
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_gather_wrong_padding_type(
+    %source: memref<4xf32>, %output: memref<4xf32>
+) {
+  iree_linalg_ext.map_gather %source into %output {
+  ^bb0(%idx0: index):
+    %pad = arith.constant 0.0 : f16
+    // expected-error@+1 {{expected yielded padding value type to match source element type}}
+    iree_linalg_ext.yield %idx0, %pad : index, f16
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_gather_wrong_num_yielded_values(
+    %source: memref<4xf32>, %output: memref<4xf32>
+) {
+  iree_linalg_ext.map_gather %source into %output {
+  ^bb0(%idx0: index):
+    // expected-error@+1 {{expected transformation_region to yield a value for each source dimension and a padding value}}
+    iree_linalg_ext.yield %idx0 : index
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
