@@ -599,6 +599,20 @@ LogicalResult emulateNarrowType(
 
   MLIRContext *ctx = root->getContext();
 
+  // Resolve memref.dim ops before emulation. This is needed because the
+  // emulation linearizes memrefs, changing their rank and shape semantics.
+  // Any memref.dim on a narrow-type memref must be traced back to its source
+  // dynamic dimensions before we can safely emulate.
+  {
+    RewritePatternSet dimPatterns(ctx);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(dimPatterns);
+    GreedyRewriteConfig config;
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Disabled);
+    if (failed(applyPatternsGreedily(root, std::move(dimPatterns), config))) {
+      return root->emitOpError("failed to resolve shaped type result dims");
+    }
+  }
+
   arith::NarrowTypeEmulationConverter typeConverter(kLoadStoreEmulateBitwidth);
   memref::populateMemRefNarrowTypeEmulationConversions(typeConverter);
 
