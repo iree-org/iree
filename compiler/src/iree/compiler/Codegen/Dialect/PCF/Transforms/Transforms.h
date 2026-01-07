@@ -121,6 +121,14 @@ fuseExtractSliceIntoProducerGeneric(RewriterBase &rewriter,
                                     PCF::GenericOp genericOp,
                                     tensor::ExtractSliceOp extractSliceOp);
 
+// Composes a pcf.write_slice with a tensor.parallel_insert_slice from an
+// scf.forall terminator. The write_slice's destination must be produced by the
+// forall op, and the parallel_insert_slice must be inserting into that result.
+// Returns the newly created write_slice op on success.
+FailureOr<PCF::WriteSliceOp>
+composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
+                                    PCF::WriteSliceOp writeSliceOp);
+
 } // namespace mlir::iree_compiler::IREE::PCF
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_PCF_TRANSFORMS_TRANSFORMS_H_
