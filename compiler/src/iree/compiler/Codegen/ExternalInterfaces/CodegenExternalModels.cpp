@@ -1,4 +1,4 @@
-// Copyright 2025 The IREE Authors
+// Copyright 2026 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -45,11 +45,11 @@ struct WorkgroupScopeAttrModel final
                       ? arith::ConstantIndexOp::create(builder, loc, 1)
                       : Value();
       Value linearizedCount = counts[0];
-      for (int64_t i = 1, e = counts.size(); i < e; ++i) {
+      for (Value &count : llvm::drop_begin(counts)) {
         linearizedCount =
-            arith::MulIOp::create(builder, loc, linearizedCount, counts[i])
+            arith::MulIOp::create(builder, loc, linearizedCount, count)
                 .getResult();
-        counts[i] = one;
+        count = one;
       }
       counts.front() = linearizedCount;
       counts.resize(numIds > 3 ? 3 : numIds);
@@ -63,6 +63,7 @@ struct WorkgroupScopeAttrModel final
 
     return counts;
   }
+
   SmallVector<Value> getWorkerIDs(Attribute attr, OpBuilder &builder,
                                   Location loc, int64_t numIds) const {
     auto workgroupScopeAttr = cast<Codegen::WorkgroupScopeAttr>(attr);
@@ -102,9 +103,7 @@ struct WorkgroupScopeAttrModel final
           builder, loc, reverseIds, dynamicCounts);
 
       ids.front() = linearizeOp.getResult();
-      for (int64_t i = 1, e = ids.size(); i < e; ++i) {
-        ids[i] = one;
-      }
+      llvm::fill(llvm::drop_begin(ids), one);
     }
 
     return ids;
