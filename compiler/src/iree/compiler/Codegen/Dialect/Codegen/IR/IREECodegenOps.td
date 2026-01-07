@@ -604,15 +604,15 @@ def IREECodegen_IndexHintOp : Op<IREECodegen_Dialect, "index_hint", [Pure]> {
 
     Example:
     ```mlir
-    %row = iree_codegen.index_hint %idx {hint = #iree_gpu.lane_constant<16>} : index
-    %col = iree_codegen.index_hint %idx {hint = #iree_gpu.lane_increment<16>} : index
+    %row = iree_codegen.index_hint %idx(#iree_gpu.lane_constant<16>) : index
+    %col = iree_codegen.index_hint %idx(#iree_gpu.lane_increment<16>) : index
     ```
   }];
 
   let arguments = (ins Index:$input, AnyAttr:$hint);
   let results = (outs Index:$result);
 
-  let assemblyFormat = "$input ` ` `{` `hint` `=` $hint `}` attr-dict `:` type($input)";
+  let assemblyFormat = "$input `(` $hint `)` attr-dict `:` type($input)";
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS

@@ -968,9 +968,10 @@ def IREEGPU_LaneConstantAttr : AttrDef<IREEGPU_Dialect, "LaneConstant"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
   let summary = "Index is constant within groups of N lanes";
   let description = [{
-    This attribute indicates that an index value is constant (uniform) across
-    groups of N consecutive lanes. For example, with group_size=16, lanes 0-15
-    all have the same value, lanes 16-31 all have the same value, etc.
+    This attribute is intended to be attached to the iree_codegen.index_hint op,
+    on which it attribute indicates that the index value is constant (uniform)
+    across groups of N consecutive lanes. For example, with group_size=16, lanes
+    0-15 all have the same value, lanes 16-31 all have the same value, etc.
 
     This hint is used to guide optimizations like transpose load lowering,
     where row indices must be uniform within a 16-lane group.
@@ -984,7 +985,8 @@ def IREEGPU_LaneIncrementAttr : AttrDef<IREEGPU_Dialect, "LaneIncrement"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
   let summary = "Index increments by 1 within groups of N lanes";
   let description = [{
-    This attribute indicates that an index value increments by 1 within groups
+    This attribute is intended to be attached to the iree_codegen.index_hint op,
+    on which it indicates that the index value increments by 1 within groups
     of N consecutive lanes. For example, with group_size=16 and a base value B,
     lane i has value B + (i % 16).
 

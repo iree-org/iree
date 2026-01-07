@@ -86,34 +86,21 @@ func.func @fusion_barrier(%arg0: tensor<?xf32>) -> tensor<?xf32> {
 // -----
 
 func.func @index_hint_lane_constant(%idx: index) -> index {
-  %hinted = iree_codegen.index_hint %idx {hint = #iree_gpu.lane_constant<16>} : index
+  %hinted = iree_codegen.index_hint %idx(#iree_gpu.lane_constant<16>) : index
   return %hinted : index
 }
 // CHECK-LABEL: func.func @index_hint_lane_constant(
 // CHECK-SAME:    %[[IDX:[a-zA-Z0-9_]+]]: index
-// CHECK:         %[[HINT:.+]] = iree_codegen.index_hint %[[IDX]] {hint = #iree_gpu.lane_constant<16>} : index
+// CHECK:         %[[HINT:.+]] = iree_codegen.index_hint %[[IDX]](#iree_gpu.lane_constant<16>) : index
 // CHECK:         return %[[HINT]]
 
 // -----
 
 func.func @index_hint_lane_increment(%idx: index) -> index {
-  %hinted = iree_codegen.index_hint %idx {hint = #iree_gpu.lane_increment<16>} : index
+  %hinted = iree_codegen.index_hint %idx(#iree_gpu.lane_increment<16>) : index
   return %hinted : index
 }
 // CHECK-LABEL: func.func @index_hint_lane_increment(
 // CHECK-SAME:    %[[IDX:[a-zA-Z0-9_]+]]: index
-// CHECK:         %[[HINT:.+]] = iree_codegen.index_hint %[[IDX]] {hint = #iree_gpu.lane_increment<16>} : index
+// CHECK:         %[[HINT:.+]] = iree_codegen.index_hint %[[IDX]](#iree_gpu.lane_increment<16>) : index
 // CHECK:         return %[[HINT]]
-
-// -----
-
-func.func @index_hint_multiple(%idx0: index, %idx1: index, %idx2: index) -> (index, index, index) {
-  %row0 = iree_codegen.index_hint %idx0 {hint = #iree_gpu.lane_constant<16>} : index
-  %row1 = iree_codegen.index_hint %idx1 {hint = #iree_gpu.lane_constant<16>} : index
-  %col = iree_codegen.index_hint %idx2 {hint = #iree_gpu.lane_increment<16>} : index
-  return %row0, %row1, %col : index, index, index
-}
-// CHECK-LABEL: func.func @index_hint_multiple(
-// CHECK:         iree_codegen.index_hint {{.*}} {hint = #iree_gpu.lane_constant<16>} : index
-// CHECK:         iree_codegen.index_hint {{.*}} {hint = #iree_gpu.lane_constant<16>} : index
-// CHECK:         iree_codegen.index_hint {{.*}} {hint = #iree_gpu.lane_increment<16>} : index
