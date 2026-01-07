@@ -3337,10 +3337,8 @@ void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
       nonRootOpVecTileSizes[op] =
           getVecTileSizesForNonRootPackOp(entryPointFn, packOp);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-      SizesAndScalableFlags sizesAndFlags =
+      std::tie(nonRootOpVecTileSizes[op], nonRootOpScalableFlags[op]) =
           getVecTileSizesForNonRootUnPackOp(unpackOp);
-      nonRootOpVecTileSizes[op] = sizesAndFlags.first;
-      nonRootOpScalableFlags[op] = sizesAndFlags.second;
     } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       nonRootOpVecTileSizes[op] =
           getVecTileSizesForNonRootGenericOp(entryPointFn, genericOp);
