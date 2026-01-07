@@ -4582,6 +4582,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#-iree-pcf-lower-structural-pcf" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-pcf-lower-structural-pcf
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4655,6 +4664,23 @@ body, composing the slice parameters:
 of the inner parallel loop rather than after the entire forall completes.</p>
 <p>The underlying pattern is exposed via <code>composeWriteSliceWithParallelInsert()</code>
 for use in custom pipelines.</p>
+<h3 id="-iree-pcf-lower-structural-pcf"><code>-iree-pcf-lower-structural-pcf</code><a class="headerlink" href="#-iree-pcf-lower-structural-pcf" title="Permanent link">link</a></h3>
+<p><em>Lowers pcf.generic/loop to scf.execute_region/forall</em></p>
+<p>Lowers structured PCF parallel ops to SCF and CF ops. This is the final
+step of PCF lowering, converting the abstract parallel constructs to
+concrete control flow that can be further lowered to target-specific code.</p>
+<p>The input is expected to be IR where PCF ops no longer have tied results
+(after <code>iree-pcf-convert-sref-to-memref</code>). The scope attribute on each op
+determines how worker IDs and counts are materialized.</p>
+<p>Op conversions:
+- <code>pcf.generic</code> -&gt; <code>scf.execute_region</code> with worker IDs from scope
+- <code>pcf.loop</code> -&gt; serialized <code>scf.forall</code> with iteration bounds from count operands
+- <code>pcf.return</code> -&gt; <code>scf.yield</code> (in generic) or <code>scf.forall.in_parallel</code> (in loop)
+- <code>pcf.branch_cond_return</code> -&gt; <code>cf.cond_br</code> to a return block</p>
+<p>If <code>sync_on_return</code> is set on a parallel op, a barrier (determined by the
+scope) is inserted after the lowered op. This attribute is introduced when
+converting sref to memref to retain the required synchronization semantics
+of any tied results.</p>
 
 
 
