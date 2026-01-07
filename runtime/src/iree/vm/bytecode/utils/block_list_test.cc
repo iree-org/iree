@@ -268,7 +268,7 @@ TEST(BlockListTest, OverMaxPC) {
 
   iree_vm_bytecode_block_t* block = NULL;
   EXPECT_THAT(Status(iree_vm_bytecode_block_list_insert(
-                  &block_list, IREE_VM_PC_BLOCK_MAX + 1, &block)),
+                  &block_list, IREE_VM_ISA_PC_BLOCK_MAX + 1, &block)),
               StatusIs(StatusCode::kOutOfRange));
 
   iree_vm_bytecode_block_list_deinitialize(&block_list, allocator);

@@ -10,145 +10,75 @@
 
 #include "iree/vm/ops.h"
 
-#define BEGIN_DISASM_PREFIX(op_name, ext) \
-  case IREE_VM_OP_CORE_##op_name: {       \
+// ISA decoding policy for the disassembler.
+// NOTE: the disassembler is a debugging tool and assumes verified bytecode.
+#define IREE_VM_ISA_BYTECODE_DATA bytecode_data
+#define IREE_VM_ISA_PC pc
+#define IREE_VM_ISA_REQUIRE(bytes) ((void)0)
+#define IREE_VM_ISA_LOOKUP_TYPE(type_id, out_type)             \
+  do {                                                         \
+    (out_type) = iree_vm_map_type(module, (int32_t)(type_id)); \
+  } while (0)
+#include "iree/vm/bytecode/utils/isa_decoder.inl"
+
+#define IREE_VM_ISA_BEGIN_DISASM_PREFIX(op_name, ext) \
+  case IREE_VM_OP_CORE_##op_name: {                   \
     switch (bytecode_data[pc++]) {
-#define END_DISASM_PREFIX()                            \
+#define IREE_VM_ISA_END_DISASM_PREFIX()                \
   default:                                             \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED, \
                             "unhandled ext opcode");   \
     }                                                  \
     break;                                             \
     }
-#define UNHANDLED_DISASM_PREFIX(op_name, ext)                      \
+#define IREE_VM_ISA_UNHANDLED_DISASM_PREFIX(op_name, ext)          \
   case IREE_VM_OP_CORE_##op_name: {                                \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,             \
                             "unhandled dispatch extension " #ext); \
   }
 
-#define DISASM_OP(ext, op_name) case IREE_VM_OP_##ext##_##op_name:
-
-#define VM_ParseConstI8(name) \
-  OP_I8(0);                   \
-  ++pc;
-#define VM_ParseConstI16(name) \
-  OP_I16(0);                   \
-  pc += 2;
-#define VM_ParseConstI32(name) \
-  OP_I32(0);                   \
-  pc += 4;
-#define VM_ParseConstI64(name) \
-  OP_I64(0);                   \
-  pc += 8;
-#define VM_ParseConstF32(name) \
-  OP_F32(0);                   \
-  pc += 4;
-#define VM_ParseConstF64(name) \
-  OP_F64(0);                   \
-  pc += 8;
-#define VM_ParseOpcode(opcode) VM_ParseConstI8(#opcode)
-#define VM_ParseFuncAttr(name) VM_ParseConstI32(name)
-#define VM_ParseGlobalAttr(name) VM_ParseConstI32(name)
-#define VM_ParseRodataAttr(name) VM_ParseConstI32(name)
-#define VM_ParseType(name)             \
-  iree_vm_map_type(module, OP_I32(0)); \
-  pc += 4;
-#define VM_ParseTypeOf(name) VM_ParseType(name)
-#define VM_ParseAttrI32(name) VM_ParseConstI32(name)
-#define VM_ParseAttrI64(name) VM_ParseConstI64(name)
-#define VM_ParseAttrF32(name) VM_ParseConstF32(name)
-#define VM_ParseAttrF64(name) VM_ParseConstF64(name)
-#define VM_ParseStrAttr(name, out_str)                   \
-  (out_str)->size = (iree_host_size_t)OP_I16(0);         \
-  (out_str)->data = (const char*)&bytecode_data[pc + 2]; \
-  pc += 2 + (out_str)->size;
-#define VM_ParseBranchTarget(block_name) VM_ParseConstI32(name)
-#define VM_ParseBranchOperands(operands_name) \
-  VM_DecBranchOperandsImpl(bytecode_data, &pc)
-#define VM_ParseOperandRegI32(name) \
-  OP_I16(0);                        \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseOperandRegI64(name) \
-  OP_I16(0);                        \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseOperandRegF32(name) \
-  OP_I16(0);                        \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseOperandRegF64(name) \
-  OP_I16(0);                        \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-// Base macros - no MOVE bit decoding (for ops that don't support MOVE).
-#define VM_ParseOperandRegRef(name)   \
-  OP_I16(0) & IREE_REF_REGISTER_MASK; \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-// Parse ref operand with MOVE bit.
-#define VM_ParseOperandRegRefMove(name, out_is_move)       \
-  OP_I16(0) & IREE_REF_REGISTER_MASK;                      \
-  *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseVariadicOperands(name) \
-  VM_DecVariadicOperandsImpl(bytecode_data, &pc)
-#define VM_ParseResultRegI32(name) \
-  OP_I16(0);                       \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseResultRegI64(name) \
-  OP_I16(0);                       \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseResultRegF32(name) \
-  OP_I16(0);                       \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseResultRegF64(name) \
-  OP_I16(0);                       \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-// Base macros - no MOVE bit decoding (for ops that don't support MOVE).
-#define VM_ParseResultRegRef(name)    \
-  OP_I16(0) & IREE_REF_REGISTER_MASK; \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-// Parse ref result with MOVE bit.
-#define VM_ParseResultRegRefMove(name, out_is_move)        \
-  OP_I16(0) & IREE_REF_REGISTER_MASK;                      \
-  *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_ParseVariadicResults(name) VM_ParseVariadicOperands(name)
+#define IREE_VM_ISA_EMIT_OP(ext, op_name) case IREE_VM_OP_##ext##_##op_name:
 
 // Emits register name, extracting move bit from raw register value for refs.
-#define EMIT_REG_NAME(reg)                                           \
-  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) {                          \
-    EMIT_REF_REG_NAME_MOVE(reg, (reg) & IREE_REF_REGISTER_MOVE_BIT); \
-  } else {                                                           \
-    EMIT_I32_REG_NAME(reg);                                          \
+#define IREE_VM_ISA_EMIT_REG_NAME(reg)                   \
+  if ((reg) & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {       \
+    IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(                  \
+        reg, (reg) & IREE_VM_ISA_REF_REGISTER_MOVE_BIT); \
+  } else {                                               \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(reg);                  \
   }
-#define EMIT_I32_REG_NAME(reg)                            \
+#define IREE_VM_ISA_EMIT_I32_REG_NAME(reg)                \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%i%u", ((reg) & IREE_I32_REGISTER_MASK)));
-#define EMIT_I64_REG_NAME(reg)                            \
-  IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%i%u:%u", ((reg) & IREE_I32_REGISTER_MASK),    \
-      ((reg) & IREE_I32_REGISTER_MASK) + 1));
-#define EMIT_F32_REG_NAME(reg) EMIT_I32_REG_NAME(reg)
-#define EMIT_F64_REG_NAME(reg) EMIT_I64_REG_NAME(reg)
+      b, "%%i%u", ((reg) & IREE_VM_ISA_I32_REGISTER_MASK)));
+#define IREE_VM_ISA_EMIT_I64_REG_NAME(reg)                    \
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(     \
+      b, "%%i%u:%u", ((reg) & IREE_VM_ISA_I32_REGISTER_MASK), \
+      ((reg) & IREE_VM_ISA_I32_REGISTER_MASK) + 1));
+#define IREE_VM_ISA_EMIT_F32_REG_NAME(reg) IREE_VM_ISA_EMIT_I32_REG_NAME(reg)
+#define IREE_VM_ISA_EMIT_F64_REG_NAME(reg) IREE_VM_ISA_EMIT_I64_REG_NAME(reg)
 // Emits %r0 for ref registers (no move info available).
-#define EMIT_REF_REG_NAME(reg)                            \
+#define IREE_VM_ISA_EMIT_REF_REG_NAME(reg)                \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%r%u", ((reg) & IREE_REF_REGISTER_MASK)));
+      b, "%%r%u", ((reg) & IREE_VM_ISA_REF_REGISTER_MASK)));
 // Emits %r0 for retain or %R0 for move (uppercase indicates move semantics).
-#define EMIT_REF_REG_NAME_MOVE(reg, is_move)              \
+#define IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(reg, is_move)  \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, (is_move) ? "%%R%u" : "%%r%u", ((reg) & IREE_REF_REGISTER_MASK)));
+      b, (is_move) ? "%%R%u" : "%%r%u",                   \
+      ((reg) & IREE_VM_ISA_REF_REGISTER_MASK)));
 
-#define EMIT_REG_VALUE(regs, reg)                                           \
-  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) {                                 \
-    iree_vm_ref_t* ref = &(regs)->ref[(reg) & IREE_REF_REGISTER_MASK];      \
-    if (iree_vm_ref_is_null(ref)) {                                         \
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "null"));  \
-    } else {                                                                \
-      iree_string_view_t type_name = iree_vm_ref_type_name(ref->type);      \
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(               \
-          b, "!%.*s/0x%p", (int)type_name.size, type_name.data, ref->ptr)); \
-    }                                                                       \
-  } else {                                                                  \
-    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
-        b, "%u", ((regs)->i32[(reg) & IREE_I32_REGISTER_MASK])));           \
+#define IREE_VM_ISA_EMIT_REG_VALUE(regs, reg)                                 \
+  if ((reg) & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {                            \
+    iree_vm_ref_t* ref = &(regs)->ref[(reg) & IREE_VM_ISA_REF_REGISTER_MASK]; \
+    if (iree_vm_ref_is_null(ref)) {                                           \
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "null"));    \
+    } else {                                                                  \
+      iree_string_view_t type_name = iree_vm_ref_type_name(ref->type);        \
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
+          b, "!%.*s/%p", (int)type_name.size, type_name.data, ref->ptr));     \
+    }                                                                         \
+  } else {                                                                    \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                   \
+        b, "%u", ((regs)->i32[(reg) & IREE_VM_ISA_I32_REGISTER_MASK])));      \
   }
 
 static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
@@ -188,8 +118,8 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
     return iree_string_builder_append_cstring(b, "*");
   }
 }
-#define EMIT_TYPE_NAME(type_def) \
-  IREE_RETURN_IF_ERROR(          \
+#define IREE_VM_ISA_EMIT_TYPE_NAME(type_def) \
+  IREE_RETURN_IF_ERROR(                      \
       iree_vm_bytecode_disassembler_emit_type_name(type_def, b))
 
 static iree_status_t iree_vm_bytecode_disassembler_emit_operand_list(
@@ -202,16 +132,16 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_operand_list(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
     }
     uint16_t reg = list->registers[i];
-    EMIT_REG_NAME(reg);
+    IREE_VM_ISA_EMIT_REG_NAME(reg);
     if (include_values) {
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
-      EMIT_REG_VALUE(regs, reg);
+      IREE_VM_ISA_EMIT_REG_VALUE(regs, reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
     }
   }
   return iree_ok_status();
 }
-#define EMIT_OPERAND_REG_LIST(reg_list)                                 \
+#define IREE_VM_ISA_EMIT_OPERAND_REG_LIST(reg_list)                     \
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_operand_list( \
       regs, reg_list, format, b))
 static iree_status_t iree_vm_bytecode_disassembler_emit_result_list(
@@ -222,12 +152,12 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_result_list(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
     }
     uint16_t reg = list->registers[i];
-    EMIT_REG_NAME(reg);
+    IREE_VM_ISA_EMIT_REG_NAME(reg);
   }
   return iree_ok_status();
 }
-#define EMIT_RESULT_REG_LIST(reg_list) \
-  IREE_RETURN_IF_ERROR(                \
+#define IREE_VM_ISA_EMIT_RESULT_REG_LIST(reg_list) \
+  IREE_RETURN_IF_ERROR(                            \
       iree_vm_bytecode_disassembler_emit_result_list(reg_list, format, b))
 static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     const iree_vm_registers_t* regs,
@@ -239,42 +169,42 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     if (i > 0) {
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
     }
-    EMIT_REG_NAME(remap_list->pairs[i].src_reg);
+    IREE_VM_ISA_EMIT_REG_NAME(remap_list->pairs[i].src_reg);
     if (include_values) {
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
-      EMIT_REG_VALUE(regs, remap_list->pairs[i].src_reg);
+      IREE_VM_ISA_EMIT_REG_VALUE(regs, remap_list->pairs[i].src_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
     }
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "->"));
-    EMIT_REG_NAME(remap_list->pairs[i].dst_reg);
+    IREE_VM_ISA_EMIT_REG_NAME(remap_list->pairs[i].dst_reg);
   }
   return iree_ok_status();
 }
-#define EMIT_REMAP_LIST(remap_list)                                   \
+#define IREE_VM_ISA_EMIT_REMAP_LIST(remap_list)                       \
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_remap_list( \
       regs, remap_list, format, b))
 
-#define EMIT_OPTIONAL_VALUE_I32(expr)                                          \
+#define IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(expr)                              \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) {  \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(b, "(%" PRId32 ")", \
                                                            (int32_t)(expr)));  \
   }
-#define EMIT_OPTIONAL_VALUE_I64(expr)                                         \
+#define IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(expr)                             \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                   \
         b, "(%" PRId64 ")", *(int64_t*)&(expr)));                             \
   }
-#define EMIT_OPTIONAL_VALUE_F32(expr)                                         \
+#define IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(expr)                             \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
     IREE_RETURN_IF_ERROR(                                                     \
         iree_string_builder_append_format(b, "(%f)", *(float*)&(expr)));      \
   }
-#define EMIT_OPTIONAL_VALUE_F64(expr)                                         \
+#define IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(expr)                             \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
     IREE_RETURN_IF_ERROR(                                                     \
         iree_string_builder_append_format(b, "(%f)", *(double*)&(expr)));     \
   }
-#define EMIT_OPTIONAL_VALUE_REF(expr)                                         \
+#define IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(expr)                             \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
     iree_vm_ref_t* ref = (expr);                                              \
     if (iree_vm_ref_is_null(ref)) {                                           \
@@ -282,199 +212,199 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     } else {                                                                  \
       iree_string_view_t type_name = iree_vm_ref_type_name(ref->type);        \
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
-          b, "(!%.*s/0x%p)", (int)type_name.size, type_name.data, ref->ptr)); \
+          b, "(!%.*s/%p)", (int)type_name.size, type_name.data, ref->ptr));   \
     }                                                                         \
   }
 
-#define DISASM_OP_CORE_UNARY_I32(op_name, op_mnemonic)                \
-  DISASM_OP(CORE, op_name) {                                          \
-    uint16_t operand_reg = VM_ParseOperandRegI32("operand");          \
-    uint16_t result_reg = VM_ParseResultRegI32("result");             \
-    EMIT_I32_REG_NAME(result_reg);                                    \
+#define IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(op_name, op_mnemonic)      \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                \
+    IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);                      \
+    IREE_VM_ISA_DECODE_RESULT_I32(result_reg);                        \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);                        \
     IREE_RETURN_IF_ERROR(                                             \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic)); \
-    EMIT_I32_REG_NAME(operand_reg);                                   \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);                  \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);                       \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);      \
     break;                                                            \
   }
 
-#define DISASM_OP_CORE_BINARY_I32(op_name, op_mnemonic)                \
-  DISASM_OP(CORE, op_name) {                                           \
-    uint16_t lhs_reg = VM_ParseOperandRegI32("lhs");                   \
-    uint16_t rhs_reg = VM_ParseOperandRegI32("rhs");                   \
-    uint16_t result_reg = VM_ParseResultRegI32("result");              \
-    EMIT_I32_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(op_name, op_mnemonic)      \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                 \
+    IREE_VM_ISA_DECODE_OPERAND_I32(lhs_reg);                           \
+    IREE_VM_ISA_DECODE_OPERAND_I32(rhs_reg);                           \
+    IREE_VM_ISA_DECODE_RESULT_I32(result_reg);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_I32_REG_NAME(lhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[lhs_reg]);                       \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(lhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[lhs_reg]);           \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I32_REG_NAME(rhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[rhs_reg]);                       \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(rhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[rhs_reg]);           \
     break;                                                             \
   }
 
-#define DISASM_OP_CORE_TERNARY_I32(op_name, op_mnemonic)               \
-  DISASM_OP(CORE, op_name) {                                           \
-    uint16_t a_reg = VM_ParseOperandRegI32("a");                       \
-    uint16_t b_reg = VM_ParseOperandRegI32("b");                       \
-    uint16_t c_reg = VM_ParseOperandRegI32("c");                       \
-    uint16_t result_reg = VM_ParseResultRegI32("result");              \
-    EMIT_I32_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_CORE_TERNARY_I32(op_name, op_mnemonic)     \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                 \
+    IREE_VM_ISA_DECODE_OPERAND_I32(a_reg);                             \
+    IREE_VM_ISA_DECODE_OPERAND_I32(b_reg);                             \
+    IREE_VM_ISA_DECODE_OPERAND_I32(c_reg);                             \
+    IREE_VM_ISA_DECODE_RESULT_I32(result_reg);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_I32_REG_NAME(a_reg);                                          \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[a_reg]);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(a_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[a_reg]);             \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I32_REG_NAME(b_reg);                                          \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[b_reg]);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(b_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[b_reg]);             \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I32_REG_NAME(c_reg);                                          \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[c_reg]);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(c_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[c_reg]);             \
     break;                                                             \
   }
 
-#define DISASM_OP_CORE_UNARY_I64(op_name, op_mnemonic)                \
-  DISASM_OP(CORE, op_name) {                                          \
-    uint16_t operand_reg = VM_ParseOperandRegI64("operand");          \
-    uint16_t result_reg = VM_ParseResultRegI64("result");             \
-    EMIT_I64_REG_NAME(result_reg);                                    \
+#define IREE_VM_ISA_EMIT_OP_CORE_UNARY_I64(op_name, op_mnemonic)      \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                \
+    IREE_VM_ISA_DECODE_OPERAND_I64(operand_reg);                      \
+    IREE_VM_ISA_DECODE_RESULT_I64(result_reg);                        \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);                        \
     IREE_RETURN_IF_ERROR(                                             \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic)); \
-    EMIT_I64_REG_NAME(operand_reg);                                   \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);                  \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(operand_reg);                       \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);      \
     break;                                                            \
   }
 
-#define DISASM_OP_CORE_BINARY_I64(op_name, op_mnemonic)                \
-  DISASM_OP(CORE, op_name) {                                           \
-    uint16_t lhs_reg = VM_ParseOperandRegI64("lhs");                   \
-    uint16_t rhs_reg = VM_ParseOperandRegI64("rhs");                   \
-    uint16_t result_reg = VM_ParseResultRegI64("result");              \
-    EMIT_I64_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(op_name, op_mnemonic)      \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                 \
+    IREE_VM_ISA_DECODE_OPERAND_I64(lhs_reg);                           \
+    IREE_VM_ISA_DECODE_OPERAND_I64(rhs_reg);                           \
+    IREE_VM_ISA_DECODE_RESULT_I64(result_reg);                         \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_I64_REG_NAME(lhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[lhs_reg]);                       \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(lhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[lhs_reg]);           \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I64_REG_NAME(rhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[rhs_reg]);                       \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(rhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[rhs_reg]);           \
     break;                                                             \
   }
 
-#define DISASM_OP_CORE_TERNARY_I64(op_name, op_mnemonic)               \
-  DISASM_OP(CORE, op_name) {                                           \
-    uint16_t a_reg = VM_ParseOperandRegI64("a");                       \
-    uint16_t b_reg = VM_ParseOperandRegI64("b");                       \
-    uint16_t c_reg = VM_ParseOperandRegI64("c");                       \
-    uint16_t result_reg = VM_ParseResultRegI64("result");              \
-    EMIT_I64_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_CORE_TERNARY_I64(op_name, op_mnemonic)     \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                 \
+    IREE_VM_ISA_DECODE_OPERAND_I64(a_reg);                             \
+    IREE_VM_ISA_DECODE_OPERAND_I64(b_reg);                             \
+    IREE_VM_ISA_DECODE_OPERAND_I64(c_reg);                             \
+    IREE_VM_ISA_DECODE_RESULT_I64(result_reg);                         \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_I64_REG_NAME(a_reg);                                          \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[a_reg]);                         \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(a_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[a_reg]);             \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I64_REG_NAME(b_reg);                                          \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[b_reg]);                         \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(b_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[b_reg]);             \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I64_REG_NAME(c_reg);                                          \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[c_reg]);                         \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(c_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[c_reg]);             \
     break;                                                             \
   }
 
-#define DISASM_OP_EXT_F32_UNARY_F32(op_name, op_mnemonic)             \
-  DISASM_OP(EXT_F32, op_name) {                                       \
-    uint16_t operand_reg = VM_ParseOperandRegF32("operand");          \
-    uint16_t result_reg = VM_ParseResultRegF32("result");             \
-    EMIT_F32_REG_NAME(result_reg);                                    \
+#define IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(op_name, op_mnemonic)   \
+  IREE_VM_ISA_EMIT_OP(EXT_F32, op_name) {                             \
+    IREE_VM_ISA_DECODE_OPERAND_F32(operand_reg);                      \
+    IREE_VM_ISA_DECODE_RESULT_F32(result_reg);                        \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);                        \
     IREE_RETURN_IF_ERROR(                                             \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic)); \
-    EMIT_F32_REG_NAME(operand_reg);                                   \
-    EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);                  \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(operand_reg);                       \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);      \
     break;                                                            \
   }
 
-#define DISASM_OP_EXT_F32_BINARY_F32(op_name, op_mnemonic)             \
-  DISASM_OP(EXT_F32, op_name) {                                        \
-    uint16_t lhs_reg = VM_ParseOperandRegF32("lhs");                   \
-    uint16_t rhs_reg = VM_ParseOperandRegF32("rhs");                   \
-    uint16_t result_reg = VM_ParseResultRegF32("result");              \
-    EMIT_F32_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(op_name, op_mnemonic)   \
+  IREE_VM_ISA_EMIT_OP(EXT_F32, op_name) {                              \
+    IREE_VM_ISA_DECODE_OPERAND_F32(lhs_reg);                           \
+    IREE_VM_ISA_DECODE_OPERAND_F32(rhs_reg);                           \
+    IREE_VM_ISA_DECODE_RESULT_F32(result_reg);                         \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_F32_REG_NAME(lhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_F32(regs->i32[lhs_reg]);                       \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(lhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[lhs_reg]);           \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_F32_REG_NAME(rhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_F32(regs->i32[rhs_reg]);                       \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(rhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[rhs_reg]);           \
     break;                                                             \
   }
 
-#define DISASM_OP_EXT_F32_TERNARY_F32(op_name, op_mnemonic)            \
-  DISASM_OP(EXT_F32, op_name) {                                        \
-    uint16_t a_reg = VM_ParseOperandRegF32("a");                       \
-    uint16_t b_reg = VM_ParseOperandRegF32("b");                       \
-    uint16_t c_reg = VM_ParseOperandRegF32("c");                       \
-    uint16_t result_reg = VM_ParseResultRegF32("result");              \
-    EMIT_F32_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_EXT_F32_TERNARY_F32(op_name, op_mnemonic)  \
+  IREE_VM_ISA_EMIT_OP(EXT_F32, op_name) {                              \
+    IREE_VM_ISA_DECODE_OPERAND_F32(a_reg);                             \
+    IREE_VM_ISA_DECODE_OPERAND_F32(b_reg);                             \
+    IREE_VM_ISA_DECODE_OPERAND_F32(c_reg);                             \
+    IREE_VM_ISA_DECODE_RESULT_F32(result_reg);                         \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_F32_REG_NAME(a_reg);                                          \
-    EMIT_OPTIONAL_VALUE_F32(regs->i32[a_reg]);                         \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(a_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[a_reg]);             \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_F32_REG_NAME(b_reg);                                          \
-    EMIT_OPTIONAL_VALUE_F32(regs->i32[b_reg]);                         \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(b_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[b_reg]);             \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_F32_REG_NAME(c_reg);                                          \
-    EMIT_OPTIONAL_VALUE_F32(regs->i32[c_reg]);                         \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(c_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[c_reg]);             \
     break;                                                             \
   }
 
-#define DISASM_OP_EXT_F64_UNARY_F64(op_name, op_mnemonic)             \
-  DISASM_OP(EXT_F64, op_name) {                                       \
-    uint16_t operand_reg = VM_ParseOperandRegF64("operand");          \
-    uint16_t result_reg = VM_ParseResultRegF64("result");             \
-    EMIT_F64_REG_NAME(result_reg);                                    \
+#define IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(op_name, op_mnemonic)   \
+  IREE_VM_ISA_EMIT_OP(EXT_F64, op_name) {                             \
+    IREE_VM_ISA_DECODE_OPERAND_F64(operand_reg);                      \
+    IREE_VM_ISA_DECODE_RESULT_F64(result_reg);                        \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);                        \
     IREE_RETURN_IF_ERROR(                                             \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic)); \
-    EMIT_F64_REG_NAME(operand_reg);                                   \
-    EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);                  \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(operand_reg);                       \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);      \
     break;                                                            \
   }
 
-#define DISASM_OP_EXT_F64_BINARY_F64(op_name, op_mnemonic)             \
-  DISASM_OP(EXT_F64, op_name) {                                        \
-    uint16_t lhs_reg = VM_ParseOperandRegF64("lhs");                   \
-    uint16_t rhs_reg = VM_ParseOperandRegF64("rhs");                   \
-    uint16_t result_reg = VM_ParseResultRegF64("result");              \
-    EMIT_F64_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(op_name, op_mnemonic)   \
+  IREE_VM_ISA_EMIT_OP(EXT_F64, op_name) {                              \
+    IREE_VM_ISA_DECODE_OPERAND_F64(lhs_reg);                           \
+    IREE_VM_ISA_DECODE_OPERAND_F64(rhs_reg);                           \
+    IREE_VM_ISA_DECODE_RESULT_F64(result_reg);                         \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_F64_REG_NAME(lhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_F64(regs->i32[lhs_reg]);                       \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(lhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[lhs_reg]);           \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_F64_REG_NAME(rhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_F64(regs->i32[rhs_reg]);                       \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(rhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[rhs_reg]);           \
     break;                                                             \
   }
 
-#define DISASM_OP_EXT_F64_TERNARY_F64(op_name, op_mnemonic)            \
-  DISASM_OP(EXT_F64, op_name) {                                        \
-    uint16_t a_reg = VM_ParseOperandRegF64("a");                       \
-    uint16_t b_reg = VM_ParseOperandRegF64("b");                       \
-    uint16_t c_reg = VM_ParseOperandRegF64("c");                       \
-    uint16_t result_reg = VM_ParseResultRegF64("result");              \
-    EMIT_F64_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_EXT_F64_TERNARY_F64(op_name, op_mnemonic)  \
+  IREE_VM_ISA_EMIT_OP(EXT_F64, op_name) {                              \
+    IREE_VM_ISA_DECODE_OPERAND_F64(a_reg);                             \
+    IREE_VM_ISA_DECODE_OPERAND_F64(b_reg);                             \
+    IREE_VM_ISA_DECODE_OPERAND_F64(c_reg);                             \
+    IREE_VM_ISA_DECODE_RESULT_F64(result_reg);                         \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_F64_REG_NAME(a_reg);                                          \
-    EMIT_OPTIONAL_VALUE_F64(regs->i32[a_reg]);                         \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(a_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[a_reg]);             \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_F64_REG_NAME(b_reg);                                          \
-    EMIT_OPTIONAL_VALUE_F64(regs->i32[b_reg]);                         \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(b_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[b_reg]);             \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_F64_REG_NAME(c_reg);                                          \
-    EMIT_OPTIONAL_VALUE_F64(regs->i32[c_reg]);                         \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(c_reg);                              \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[c_reg]);             \
     break;                                                             \
   }
 
@@ -486,7 +416,8 @@ static iree_status_t iree_vm_bytecode_disassembler_print_function_name(
     iree_vm_bytecode_module_t* module,
     iree_vm_bytecode_module_state_t* module_state, uint32_t function_ordinal,
     iree_string_builder_t* b) {
-  const bool is_import = (function_ordinal & 0x80000000u) != 0;
+  const bool is_import =
+      iree_vm_isa_function_ordinal_is_import(function_ordinal);
   if (!is_import) {
     iree_vm_function_t function = {
         .module = &module->interface,
@@ -510,7 +441,7 @@ static iree_status_t iree_vm_bytecode_disassembler_print_function_name(
   iree_vm_function_t import = {
       .module = &module->interface,
       .linkage = IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL,
-      .ordinal = function_ordinal & 0x7FFFFFFFu,
+      .ordinal = iree_vm_isa_function_ordinal_as_import(function_ordinal),
   };
   iree_string_view_t import_name = iree_vm_function_name(&import);
   if (iree_string_view_is_empty(import_name)) {
@@ -542,168 +473,166 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Globals
     //===------------------------------------------------------------------===//
 
-    DISASM_OP(CORE, GlobalLoadI32) {
-      uint32_t byte_offset = VM_ParseGlobalAttr("global");
-      uint16_t value_reg = VM_ParseResultRegI32("value");
-      EMIT_I32_REG_NAME(value_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadI32) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DECODE_RESULT_I32(value_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.global.load.i32 .rwdata[%u]", byte_offset));
-      EMIT_OPTIONAL_VALUE_I32(
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(
           vm_global_load_i32(module_state->rwdata_storage.data, byte_offset));
       break;
     }
 
-    DISASM_OP(CORE, GlobalStoreI32) {
-      uint32_t byte_offset = VM_ParseGlobalAttr("global");
-      uint16_t value_reg = VM_ParseOperandRegI32("value");
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalStoreI32) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, "vm.global.store.i32 "));
-      EMIT_I32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
       break;
     }
 
-    DISASM_OP(CORE, GlobalLoadIndirectI32) {
-      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
-      uint16_t value_reg = VM_ParseResultRegI32("value");
-      EMIT_I32_REG_NAME(value_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadIndirectI32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(value_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, " = vm.global.load.indirect.i32 .rwdata["));
-      EMIT_I32_REG_NAME(byte_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
-      EMIT_OPTIONAL_VALUE_I32(vm_global_load_i32(
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(vm_global_load_i32(
           module_state->rwdata_storage.data, regs->i32[byte_offset_reg]));
       break;
     }
 
-    DISASM_OP(CORE, GlobalStoreIndirectI32) {
-      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
-      uint16_t value_reg = VM_ParseOperandRegI32("value");
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalStoreIndirectI32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, "vm.global.store.indirect.i32 "));
-      EMIT_I32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", .rwdata["));
-      EMIT_I32_REG_NAME(byte_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
       break;
     }
 
-    DISASM_OP(CORE, GlobalLoadI64) {
-      uint32_t byte_offset = VM_ParseGlobalAttr("global");
-      uint16_t value_reg = VM_ParseResultRegI64("value");
-      EMIT_I32_REG_NAME(value_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadI64) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DECODE_RESULT_I64(value_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.global.load.i64 .rwdata[%u]", byte_offset));
-      EMIT_OPTIONAL_VALUE_I64(module_state->rwdata_storage.data[byte_offset]);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(
+          module_state->rwdata_storage.data[byte_offset]);
       break;
     }
 
-    DISASM_OP(CORE, GlobalStoreI64) {
-      uint32_t byte_offset = VM_ParseGlobalAttr("global");
-      uint16_t value_reg = VM_ParseOperandRegI64("value");
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalStoreI64) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, "vm.global.store.i64 "));
-      EMIT_I64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
       break;
     }
 
-    DISASM_OP(CORE, GlobalLoadIndirectI64) {
-      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
-      uint16_t value_reg = VM_ParseResultRegI64("value");
-      EMIT_I64_REG_NAME(value_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadIndirectI64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(value_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, " = vm.global.load.indirect.i64 .rwdata["));
-      EMIT_I32_REG_NAME(byte_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
-      EMIT_OPTIONAL_VALUE_I64(
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(
           module_state->rwdata_storage.data[regs->i32[byte_offset_reg]]);
       break;
     }
 
-    DISASM_OP(CORE, GlobalStoreIndirectI64) {
-      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
-      uint16_t value_reg = VM_ParseOperandRegI64("value");
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalStoreIndirectI64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, "vm.global.store.indirect.i64 "));
-      EMIT_I64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", .rwdata["));
-      EMIT_I32_REG_NAME(byte_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
       break;
     }
 
-    DISASM_OP(CORE, GlobalLoadRef) {
-      uint32_t global = VM_ParseGlobalAttr("global");
-      const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("value", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadRef) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(global);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(value_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.global.load.ref .refs[%u]", global));
-      EMIT_OPTIONAL_VALUE_REF(&module_state->global_ref_table[global]);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(
+          &module_state->global_ref_table[global]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : !"));
-      EMIT_TYPE_NAME(type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
       break;
     }
 
-    DISASM_OP(CORE, GlobalStoreRef) {
-      uint32_t global = VM_ParseGlobalAttr("global");
-      const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
-      bool value_is_move;
-      uint16_t value_reg = VM_ParseOperandRegRefMove("value", &value_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalStoreRef) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(global);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.global.store.ref "));
-      EMIT_REF_REG_NAME_MOVE(value_reg, value_is_move);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[value_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[value_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, ", .refs[%u] : !", global));
-      EMIT_TYPE_NAME(type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
       break;
     }
 
-    DISASM_OP(CORE, GlobalLoadIndirectRef) {
-      uint16_t global_reg = VM_ParseOperandRegI32("global");
-      const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("value", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadIndirectRef) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(global_reg);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(value_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, " = vm.global.load.indirect.ref .refs["));
-      EMIT_I32_REG_NAME(global_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[global_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(global_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[global_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
-      EMIT_OPTIONAL_VALUE_REF(
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(
           &module_state->global_ref_table[regs->i32[global_reg]]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : !"));
-      EMIT_TYPE_NAME(type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
       break;
     }
 
-    DISASM_OP(CORE, GlobalStoreIndirectRef) {
-      uint16_t global_reg = VM_ParseOperandRegI32("global");
-      const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
-      bool value_is_move;
-      uint16_t value_reg = VM_ParseOperandRegRefMove("value", &value_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, GlobalStoreIndirectRef) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(global_reg);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, "vm.global.store.indirect.ref "));
-      EMIT_REF_REG_NAME_MOVE(value_reg, value_is_move);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[value_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(b, ", .refs["));
-      EMIT_I32_REG_NAME(global_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[global_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(global_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[global_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(b, "] : !"));
-      EMIT_TYPE_NAME(type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
       break;
     }
 
@@ -711,79 +640,74 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Constants
     //===------------------------------------------------------------------===//
 
-    DISASM_OP(CORE, ConstI32) {
-      int32_t value = VM_ParseAttrI32("value");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ConstI32) {
+      IREE_VM_ISA_DECODE_ATTR_I32(value);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.const.i32 %d  // 0x%08X", value, value));
       break;
     }
 
-    DISASM_OP(CORE, ConstI32Zero) {
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ConstI32Zero) {
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.const.i32.zero"));
       break;
     }
 
-    DISASM_OP(CORE, ConstI64) {
-      int64_t value = VM_ParseAttrI64("value");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ConstI64) {
+      IREE_VM_ISA_DECODE_ATTR_I64(value);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.const.i64 %" PRId64 "  // 0x%016" PRIX64 "", value, value));
       break;
     }
 
-    DISASM_OP(CORE, ConstI64Zero) {
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ConstI64Zero) {
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.const.i64.zero"));
       break;
     }
 
-    DISASM_OP(CORE, ConstRefZero) {
-      uint16_t result_reg = VM_ParseResultRegRef("result");
-      EMIT_REF_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ConstRefZero) {
+      IREE_VM_ISA_DECODE_RESULT_REF(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.const.ref.zero"));
       break;
     }
 
-    DISASM_OP(CORE, DiscardRefs) {
-      const iree_vm_register_list_t* reg_list =
-          VM_ParseVariadicOperands("refs");
+    IREE_VM_ISA_EMIT_OP(CORE, DiscardRefs) {
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(reg_list);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.discard.refs "));
-      EMIT_OPERAND_REG_LIST(reg_list);
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(reg_list);
       break;
     }
 
-    DISASM_OP(CORE, AssignRef) {
-      bool source_is_move;
-      uint16_t source_reg =
-          VM_ParseOperandRegRefMove("source", &source_is_move);
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, AssignRef) {
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(source_reg);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.assign.ref "));
-      EMIT_REF_REG_NAME_MOVE(source_reg, source_is_move);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(source_reg, source_reg_is_move);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_reg]);
       break;
     }
 
-    DISASM_OP(CORE, ConstRefRodata) {
-      uint32_t rodata_ordinal = VM_ParseRodataAttr("rodata");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("value", &result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, ConstRefRodata) {
+      IREE_VM_ISA_DECODE_RODATA_ATTR(rodata_ordinal);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(value_reg);
       iree_vm_buffer_t* buffer = &module->rodata_ref_table[rodata_ordinal];
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " = vm.const.ref.rodata %u  // 0x%p %" PRIhsz "b", rodata_ordinal,
+          b, " = vm.const.ref.rodata %u  // %p %" PRIhsz "b", rodata_ordinal,
           buffer->data.data, buffer->data.data_length));
       break;
     }
@@ -792,357 +716,355 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Buffers
     //===------------------------------------------------------------------===//
 
-    DISASM_OP(CORE, BufferAlloc) {
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferAlloc) {
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(alignment_reg);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.alloc "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(alignment_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(alignment_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferClone) {
-      uint16_t source_reg = VM_ParseOperandRegRef("source");
-      uint16_t offset_reg = VM_ParseOperandRegI64("offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferClone) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(alignment_reg);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.clone "));
-      EMIT_REF_REG_NAME(source_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(source_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(alignment_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(alignment_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferLength) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("buffer");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferLength) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.length "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferCopy) {
-      uint16_t source_buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t source_offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t target_buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t target_offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferCopy) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.copy "));
-      EMIT_REF_REG_NAME(source_buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(source_buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[source_buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(source_offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[source_offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(source_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[source_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(target_buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[target_buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(target_buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[target_buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(target_offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[target_offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(target_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[target_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferCompare) {
-      uint16_t lhs_buffer_reg = VM_ParseOperandRegRef("lhs_buffer");
-      uint16_t lhs_offset_reg = VM_ParseOperandRegI64("lhs_offset");
-      uint16_t rhs_buffer_reg = VM_ParseOperandRegRef("rhs_buffer");
-      uint16_t rhs_offset_reg = VM_ParseOperandRegI64("rhs_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferCompare) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(lhs_buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(lhs_offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_REF(rhs_buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(rhs_offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.compare "));
-      EMIT_REF_REG_NAME(lhs_buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[lhs_buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(lhs_buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[lhs_buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(lhs_offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[lhs_offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(lhs_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[lhs_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(rhs_buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[rhs_buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(rhs_buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[rhs_buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(rhs_offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[rhs_offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(rhs_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[rhs_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferFillI8) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t value_reg = VM_ParseOperandRegI32("value");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferFillI8) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.i8 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I32((uint8_t)regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32((uint8_t)regs->i32[value_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferFillI16) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t value_reg = VM_ParseOperandRegI32("value");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferFillI16) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.i16 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I32((uint16_t)regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32((uint16_t)regs->i32[value_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferFillI32) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t value_reg = VM_ParseOperandRegI32("value");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferFillI32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.i32 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferFillI64) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t value_reg = VM_ParseOperandRegI64("value");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferFillI64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.i64 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferLoadI8U) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferLoadI8U) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.load.i8.u "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferLoadI8S) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferLoadI8S) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.load.i8.s "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferLoadI16U) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferLoadI16U) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.load.i16.u "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferLoadI16S) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferLoadI16S) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.load.i16.s "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferLoadI32) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferLoadI32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.load.i32 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferLoadI64) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferLoadI64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.load.i64 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferStoreI8) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t value_reg = VM_ParseOperandRegI32("value");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferStoreI8) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.i8 "));
-      EMIT_I32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I32((uint8_t)regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32((uint8_t)regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferStoreI16) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t value_reg = VM_ParseOperandRegI32("value");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferStoreI16) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.i16 "));
-      EMIT_I32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I32((uint16_t)regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32((uint16_t)regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferStoreI32) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t value_reg = VM_ParseOperandRegI32("value");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferStoreI32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.i32 "));
-      EMIT_I32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
-    DISASM_OP(CORE, BufferStoreI64) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t value_reg = VM_ParseOperandRegI64("value");
+    IREE_VM_ISA_EMIT_OP(CORE, BufferStoreI64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.i64 "));
-      EMIT_I64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
-    DISASM_OP(CORE, BufferHash) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, BufferHash) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.hash "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       break;
     }
 
@@ -1150,159 +1072,154 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Lists
     //===------------------------------------------------------------------===//
 
-    DISASM_OP(CORE, ListAlloc) {
-      const iree_vm_type_def_t element_type_def =
-          VM_ParseTypeOf("element_type");
-      uint16_t initial_capacity_reg = VM_ParseOperandRegI32("initial_capacity");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, ListAlloc) {
+      IREE_VM_ISA_DECODE_TYPE_OF(element_type_def);
+      IREE_VM_ISA_DECODE_OPERAND_I32(initial_capacity_reg);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.alloc "));
-      EMIT_I32_REG_NAME(initial_capacity_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[initial_capacity_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(initial_capacity_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[initial_capacity_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " : !vm.list<"));
-      EMIT_TYPE_NAME(element_type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME(element_type_def);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ">"));
       break;
     }
 
-    DISASM_OP(CORE, ListReserve) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t minimum_capacity_reg = VM_ParseOperandRegI32("minimum_capacity");
+    IREE_VM_ISA_EMIT_OP(CORE, ListReserve) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(minimum_capacity_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.reserve "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(minimum_capacity_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[minimum_capacity_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(minimum_capacity_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[minimum_capacity_reg]);
       break;
     }
 
-    DISASM_OP(CORE, ListSize) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ListSize) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.size "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       break;
     }
 
-    DISASM_OP(CORE, ListResize) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t new_size_reg = VM_ParseOperandRegI32("new_size");
+    IREE_VM_ISA_EMIT_OP(CORE, ListResize) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(new_size_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.resize "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(new_size_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[new_size_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(new_size_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[new_size_reg]);
       break;
     }
 
-    DISASM_OP(CORE, ListGetI32) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ListGetI32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.get.i32 "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       break;
     }
 
-    DISASM_OP(CORE, ListSetI32) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      uint16_t raw_value_reg = VM_ParseOperandRegI32("raw_value");
+    IREE_VM_ISA_EMIT_OP(CORE, ListSetI32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(raw_value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.set.i32 "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(raw_value_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[raw_value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(raw_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[raw_value_reg]);
       break;
     }
 
-    DISASM_OP(CORE, ListGetI64) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ListGetI64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.get.i64 "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       break;
     }
 
-    DISASM_OP(CORE, ListSetI64) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      uint16_t value_reg = VM_ParseOperandRegI64("value");
+    IREE_VM_ISA_EMIT_OP(CORE, ListSetI64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.set.i64 "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
       break;
     }
 
-    DISASM_OP(CORE, ListGetRef) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      const iree_vm_type_def_t type_def = VM_ParseTypeOf("result");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, ListGetRef) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.get.ref "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
-      EMIT_TYPE_NAME(type_def);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
       break;
     }
 
-    DISASM_OP(CORE, ListSetRef) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      bool operand_is_move;
-      uint16_t operand_reg =
-          VM_ParseOperandRegRefMove("value", &operand_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, ListSetRef) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.set.ref "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME_MOVE(operand_reg, operand_is_move);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[value_reg]);
       break;
     }
 
@@ -1310,126 +1227,120 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Conditional assignment
     //===------------------------------------------------------------------===//
 
-    DISASM_OP(CORE, SelectI32) {
-      uint16_t condition_reg = VM_ParseOperandRegI32("condition");
-      uint16_t true_value_reg = VM_ParseOperandRegI32("true_value");
-      uint16_t false_value_reg = VM_ParseOperandRegI32("false_value");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, SelectI32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(true_value_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(false_value_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.select.i32 "));
-      EMIT_I32_REG_NAME(condition_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " ? "));
-      EMIT_I32_REG_NAME(true_value_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[true_value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(true_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[true_value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
-      EMIT_I32_REG_NAME(false_value_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[false_value_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(false_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[false_value_reg]);
       break;
     }
 
-    DISASM_OP(CORE, SelectI64) {
-      uint16_t condition_reg = VM_ParseOperandRegI32("condition");
-      uint16_t true_value_reg = VM_ParseOperandRegI64("true_value");
-      uint16_t false_value_reg = VM_ParseOperandRegI64("false_value");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, SelectI64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(true_value_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(false_value_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.select.i64 "));
-      EMIT_I32_REG_NAME(condition_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " ? "));
-      EMIT_I64_REG_NAME(true_value_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[true_value_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(true_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[true_value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
-      EMIT_I64_REG_NAME(false_value_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[false_value_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(false_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[false_value_reg]);
       break;
     }
 
-    DISASM_OP(CORE, SelectRef) {
-      uint16_t condition_reg = VM_ParseOperandRegI32("condition");
-      const iree_vm_type_def_t type_def = VM_ParseTypeOf("true_value");
-      bool true_value_is_move;
-      uint16_t true_value_reg =
-          VM_ParseOperandRegRefMove("true_value", &true_value_is_move);
-      bool false_value_is_move;
-      uint16_t false_value_reg =
-          VM_ParseOperandRegRefMove("false_value", &false_value_is_move);
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, SelectRef) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition_reg);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(true_value_reg);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(false_value_reg);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.select.ref "));
-      EMIT_I32_REG_NAME(condition_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " ? "));
-      EMIT_REF_REG_NAME_MOVE(true_value_reg, true_value_is_move);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[true_value_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(true_value_reg,
+                                         true_value_reg_is_move);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[true_value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
-      EMIT_REF_REG_NAME_MOVE(false_value_reg, false_value_is_move);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[false_value_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(false_value_reg,
+                                         false_value_reg_is_move);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[false_value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " -> !"));
-      EMIT_TYPE_NAME(type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
       break;
     }
 
-    DISASM_OP(CORE, SwitchI32) {
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      int32_t default_value = VM_ParseOperandRegI32("default_value");
-      const iree_vm_register_list_t* value_reg_list =
-          VM_ParseVariadicOperands("values");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, SwitchI32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(default_value_reg);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.switch.i32 "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "["));
-      EMIT_OPERAND_REG_LIST(value_reg_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, "] else %u", default_value));
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(value_reg_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "] else "));
+      IREE_VM_ISA_EMIT_I32_REG_NAME(default_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[default_value_reg]);
       break;
     }
 
-    DISASM_OP(CORE, SwitchI64) {
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      int64_t default_value = VM_ParseOperandRegI64("default_value");
-      const iree_vm_register_list_t* value_reg_list =
-          VM_ParseVariadicOperands("values");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, SwitchI64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(default_value_reg);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.switch.i64 "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "["));
-      EMIT_OPERAND_REG_LIST(value_reg_list);
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, "] else %" PRId64, default_value));
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(value_reg_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "] else "));
+      IREE_VM_ISA_EMIT_I64_REG_NAME(default_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[default_value_reg]);
       break;
     }
 
-    DISASM_OP(CORE, SwitchRef) {
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      bool default_is_move;
-      uint16_t default_value_reg =
-          VM_ParseOperandRegRefMove("default_value", &default_is_move);
-      const iree_vm_register_list_t* value_reg_list =
-          VM_ParseVariadicOperands("values");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, SwitchRef) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(default_value_reg);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.switch.ref "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "["));
-      EMIT_OPERAND_REG_LIST(value_reg_list);
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(value_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "] else "));
-      EMIT_REF_REG_NAME_MOVE(default_value_reg, default_is_move);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[default_value_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(default_value_reg,
+                                         default_value_reg_is_move);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[default_value_reg]);
       break;
     }
 
@@ -1437,101 +1348,98 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-    DISASM_OP_CORE_BINARY_I32(AddI32, "vm.add.i32");
-    DISASM_OP_CORE_BINARY_I32(SubI32, "vm.sub.i32");
-    DISASM_OP_CORE_BINARY_I32(MulI32, "vm.mul.i32");
-    DISASM_OP_CORE_BINARY_I32(DivI32S, "vm.div.i32.s");
-    DISASM_OP_CORE_BINARY_I32(DivI32U, "vm.div.i32.u");
-    DISASM_OP_CORE_BINARY_I32(RemI32S, "vm.rem.i32.s");
-    DISASM_OP_CORE_BINARY_I32(RemI32U, "vm.rem.i32.u");
-    DISASM_OP_CORE_TERNARY_I32(FMAI32, "vm.fma.i32");
-    DISASM_OP_CORE_UNARY_I32(AbsI32, "vm.abs.i32");
-    DISASM_OP_CORE_BINARY_I32(MinI32S, "vm.min.i32.s");
-    DISASM_OP_CORE_BINARY_I32(MinI32U, "vm.min.i32.u");
-    DISASM_OP_CORE_BINARY_I32(MaxI32S, "vm.max.i32.s");
-    DISASM_OP_CORE_BINARY_I32(MaxI32U, "vm.max.i32.u");
-    DISASM_OP_CORE_UNARY_I32(NotI32, "vm.not.i32");
-    DISASM_OP_CORE_BINARY_I32(AndI32, "vm.and.i32");
-    DISASM_OP_CORE_BINARY_I32(OrI32, "vm.or.i32");
-    DISASM_OP_CORE_BINARY_I32(XorI32, "vm.xor.i32");
-    DISASM_OP_CORE_UNARY_I32(CtlzI32, "vm.ctlz.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(AddI32, "vm.add.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(SubI32, "vm.sub.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(MulI32, "vm.mul.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(DivI32S, "vm.div.i32.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(DivI32U, "vm.div.i32.u");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(RemI32S, "vm.rem.i32.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(RemI32U, "vm.rem.i32.u");
+    IREE_VM_ISA_EMIT_OP_CORE_TERNARY_I32(FMAI32, "vm.fma.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(AbsI32, "vm.abs.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(MinI32S, "vm.min.i32.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(MinI32U, "vm.min.i32.u");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(MaxI32S, "vm.max.i32.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(MaxI32U, "vm.max.i32.u");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(NotI32, "vm.not.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(AndI32, "vm.and.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(OrI32, "vm.or.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(XorI32, "vm.xor.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(CtlzI32, "vm.ctlz.i32");
 
-    DISASM_OP_CORE_BINARY_I64(AddI64, "vm.add.i64");
-    DISASM_OP_CORE_BINARY_I64(SubI64, "vm.sub.i64");
-    DISASM_OP_CORE_BINARY_I64(MulI64, "vm.mul.i64");
-    DISASM_OP_CORE_BINARY_I64(DivI64S, "vm.div.i64.s");
-    DISASM_OP_CORE_BINARY_I64(DivI64U, "vm.div.i64.u");
-    DISASM_OP_CORE_BINARY_I64(RemI64S, "vm.rem.i64.s");
-    DISASM_OP_CORE_BINARY_I64(RemI64U, "vm.rem.i64.u");
-    DISASM_OP_CORE_TERNARY_I64(FMAI64, "vm.fma.i64");
-    DISASM_OP_CORE_UNARY_I64(AbsI64, "vm.abs.i64");
-    DISASM_OP_CORE_BINARY_I64(MinI64S, "vm.min.i64.s");
-    DISASM_OP_CORE_BINARY_I64(MinI64U, "vm.min.i64.u");
-    DISASM_OP_CORE_BINARY_I64(MaxI64S, "vm.max.i64.s");
-    DISASM_OP_CORE_BINARY_I64(MaxI64U, "vm.max.i64.u");
-    DISASM_OP_CORE_UNARY_I64(NotI64, "vm.not.i64");
-    DISASM_OP_CORE_BINARY_I64(AndI64, "vm.and.i64");
-    DISASM_OP_CORE_BINARY_I64(OrI64, "vm.or.i64");
-    DISASM_OP_CORE_BINARY_I64(XorI64, "vm.xor.i64");
-    DISASM_OP_CORE_UNARY_I64(CtlzI64, "vm.ctlz.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(AddI64, "vm.add.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(SubI64, "vm.sub.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(MulI64, "vm.mul.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(DivI64S, "vm.div.i64.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(DivI64U, "vm.div.i64.u");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(RemI64S, "vm.rem.i64.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(RemI64U, "vm.rem.i64.u");
+    IREE_VM_ISA_EMIT_OP_CORE_TERNARY_I64(FMAI64, "vm.fma.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I64(AbsI64, "vm.abs.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(MinI64S, "vm.min.i64.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(MinI64U, "vm.min.i64.u");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(MaxI64S, "vm.max.i64.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(MaxI64U, "vm.max.i64.u");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I64(NotI64, "vm.not.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(AndI64, "vm.and.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(OrI64, "vm.or.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I64(XorI64, "vm.xor.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I64(CtlzI64, "vm.ctlz.i64");
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
-    DISASM_OP_CORE_UNARY_I32(TruncI32I8, "vm.trunc.i32.i8");
-    DISASM_OP_CORE_UNARY_I32(TruncI32I16, "vm.trunc.i32.i16");
-    DISASM_OP_CORE_UNARY_I32(ExtI8I32S, "vm.ext.i8.i32.s");
-    DISASM_OP_CORE_UNARY_I32(ExtI8I32U, "vm.ext.i8.i32.u");
-    DISASM_OP_CORE_UNARY_I32(ExtI16I32S, "vm.ext.i16.i32.s");
-    DISASM_OP_CORE_UNARY_I32(ExtI16I32U, "vm.ext.i16.i32.u");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(TruncI32I8, "vm.trunc.i32.i8");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(TruncI32I16, "vm.trunc.i32.i16");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(ExtI8I32S, "vm.ext.i8.i32.s");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(ExtI8I32U, "vm.ext.i8.i32.u");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(ExtI16I32S, "vm.ext.i16.i32.s");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(ExtI16I32U, "vm.ext.i16.i32.u");
 
-    DISASM_OP(CORE, TruncI64I32) {
-      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, TruncI64I32) {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.trunc.i64.i32 "));
-      EMIT_I64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(CORE, ExtI32I64S) {
-      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ExtI32I64S) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.ext.i32.i64.s "));
-      EMIT_I32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(CORE, ExtI32I64U) {
-      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ExtI32I64U) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.ext.i32.i64.u "));
-      EMIT_I32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
 
-    DISASM_OP(CORE, CastAnyRef) {
-      bool operand_is_move;
-      uint16_t operand_reg =
-          VM_ParseOperandRegRefMove("operand", &operand_is_move);
-      const iree_vm_type_def_t type_def = VM_ParseTypeOf("result");
-      bool result_is_move;
-      uint16_t result_reg = VM_ParseResultRegRefMove("result", &result_is_move);
-      EMIT_REF_REG_NAME_MOVE(result_reg, result_is_move);
+    IREE_VM_ISA_EMIT_OP(CORE, CastAnyRef) {
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(operand_reg);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.any.ref "));
-      EMIT_REF_REG_NAME_MOVE(operand_reg, operand_is_move);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(operand_reg, operand_reg_is_move);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " : !vm.ref<?> -> "));
-      EMIT_TYPE_NAME(type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
       break;
     }
 
@@ -1539,123 +1447,123 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//
 
-#define DISASM_OP_CORE_SHIFT_I32(op_name, op_mnemonic)                 \
-  DISASM_OP(CORE, op_name) {                                           \
-    uint16_t operand_reg = VM_ParseOperandRegI32("operand");           \
-    uint16_t amount_reg = VM_ParseOperandRegI32("amount");             \
-    uint16_t result_reg = VM_ParseResultRegI32("result");              \
-    EMIT_I32_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_CORE_SHIFT_I32(op_name, op_mnemonic)       \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                 \
+    IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);                       \
+    IREE_VM_ISA_DECODE_OPERAND_I32(amount_reg);                        \
+    IREE_VM_ISA_DECODE_RESULT_I32(result_reg);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_I32_REG_NAME(operand_reg);                                    \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);                   \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);                        \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);       \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I32_REG_NAME(amount_reg);                                     \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[amount_reg]);                    \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(amount_reg);                         \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[amount_reg]);        \
     break;                                                             \
   }
 
-    DISASM_OP_CORE_SHIFT_I32(ShlI32, "vm.shl.i32");
-    DISASM_OP_CORE_SHIFT_I32(ShrI32S, "vm.shr.i32.s");
-    DISASM_OP_CORE_SHIFT_I32(ShrI32U, "vm.shr.i32.u");
+    IREE_VM_ISA_EMIT_OP_CORE_SHIFT_I32(ShlI32, "vm.shl.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_SHIFT_I32(ShrI32S, "vm.shr.i32.s");
+    IREE_VM_ISA_EMIT_OP_CORE_SHIFT_I32(ShrI32U, "vm.shr.i32.u");
 
-#define DISASM_OP_CORE_SHIFT_I64(op_name, op_mnemonic)                 \
-  DISASM_OP(CORE, op_name) {                                           \
-    uint16_t operand_reg = VM_ParseOperandRegI64("operand");           \
-    uint16_t amount_reg = VM_ParseOperandRegI32("amount");             \
-    uint16_t result_reg = VM_ParseResultRegI64("result");              \
-    EMIT_I64_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_CORE_SHIFT_I64(op_name, op_mnemonic)       \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                 \
+    IREE_VM_ISA_DECODE_OPERAND_I64(operand_reg);                       \
+    IREE_VM_ISA_DECODE_OPERAND_I32(amount_reg);                        \
+    IREE_VM_ISA_DECODE_RESULT_I64(result_reg);                         \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_I64_REG_NAME(operand_reg);                                    \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);                   \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(operand_reg);                        \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);       \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I32_REG_NAME(amount_reg);                                     \
-    EMIT_OPTIONAL_VALUE_I32(regs->i32[amount_reg]);                    \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(amount_reg);                         \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[amount_reg]);        \
     break;                                                             \
   }
 
-    DISASM_OP_CORE_SHIFT_I64(ShlI64, "vm.shl.i64");
-    DISASM_OP_CORE_SHIFT_I64(ShrI64S, "vm.shr.i64.s");
-    DISASM_OP_CORE_SHIFT_I64(ShrI64U, "vm.shr.i64.u");
+    IREE_VM_ISA_EMIT_OP_CORE_SHIFT_I64(ShlI64, "vm.shl.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_SHIFT_I64(ShrI64S, "vm.shr.i64.s");
+    IREE_VM_ISA_EMIT_OP_CORE_SHIFT_I64(ShrI64U, "vm.shr.i64.u");
 
     //===------------------------------------------------------------------===//
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-    DISASM_OP_CORE_BINARY_I32(CmpEQI32, "vm.cmp.eq.i32");
-    DISASM_OP_CORE_BINARY_I32(CmpNEI32, "vm.cmp.ne.i32");
-    DISASM_OP_CORE_BINARY_I32(CmpLTI32S, "vm.cmp.lt.i32.s");
-    DISASM_OP_CORE_BINARY_I32(CmpLTI32U, "vm.cmp.lt.i32.u");
-    DISASM_OP_CORE_UNARY_I32(CmpNZI32, "vm.cmp.nz.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(CmpEQI32, "vm.cmp.eq.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(CmpNEI32, "vm.cmp.ne.i32");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(CmpLTI32S, "vm.cmp.lt.i32.s");
+    IREE_VM_ISA_EMIT_OP_CORE_BINARY_I32(CmpLTI32U, "vm.cmp.lt.i32.u");
+    IREE_VM_ISA_EMIT_OP_CORE_UNARY_I32(CmpNZI32, "vm.cmp.nz.i32");
 
-#define DISASM_OP_CORE_CMP_I64(op_name, op_mnemonic)                   \
-  DISASM_OP(CORE, op_name) {                                           \
-    uint16_t lhs_reg = VM_ParseOperandRegI64("lhs");                   \
-    uint16_t rhs_reg = VM_ParseOperandRegI64("rhs");                   \
-    uint16_t result_reg = VM_ParseResultRegI32("result");              \
-    EMIT_I32_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_CORE_CMP_I64(op_name, op_mnemonic)         \
+  IREE_VM_ISA_EMIT_OP(CORE, op_name) {                                 \
+    IREE_VM_ISA_DECODE_OPERAND_I64(lhs_reg);                           \
+    IREE_VM_ISA_DECODE_OPERAND_I64(rhs_reg);                           \
+    IREE_VM_ISA_DECODE_RESULT_I32(result_reg);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_I64_REG_NAME(lhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[lhs_reg]);                       \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(lhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[lhs_reg]);           \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_I64_REG_NAME(rhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_I64(regs->i32[rhs_reg]);                       \
+    IREE_VM_ISA_EMIT_I64_REG_NAME(rhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[rhs_reg]);           \
     break;                                                             \
   }
 
-    DISASM_OP_CORE_CMP_I64(CmpEQI64, "vm.cmp.eq.i64");
-    DISASM_OP_CORE_CMP_I64(CmpNEI64, "vm.cmp.ne.i64");
-    DISASM_OP_CORE_CMP_I64(CmpLTI64S, "vm.cmp.lt.i64.s");
-    DISASM_OP_CORE_CMP_I64(CmpLTI64U, "vm.cmp.lt.i64.u");
-    DISASM_OP(CORE, CmpNZI64) {
-      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP_CORE_CMP_I64(CmpEQI64, "vm.cmp.eq.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_CMP_I64(CmpNEI64, "vm.cmp.ne.i64");
+    IREE_VM_ISA_EMIT_OP_CORE_CMP_I64(CmpLTI64S, "vm.cmp.lt.i64.s");
+    IREE_VM_ISA_EMIT_OP_CORE_CMP_I64(CmpLTI64U, "vm.cmp.lt.i64.u");
+    IREE_VM_ISA_EMIT_OP(CORE, CmpNZI64) {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cmp.nz.i64 "));
-      EMIT_I64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
       break;
     }
 
-    DISASM_OP(CORE, CmpEQRef) {
-      uint16_t lhs_reg = VM_ParseOperandRegRef("lhs");
-      uint16_t rhs_reg = VM_ParseOperandRegRef("rhs");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, CmpEQRef) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(lhs_reg);
+      IREE_VM_ISA_DECODE_OPERAND_REF(rhs_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cmp.eq.ref "));
-      EMIT_REF_REG_NAME(lhs_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[lhs_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(lhs_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[lhs_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(rhs_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[rhs_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(rhs_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[rhs_reg]);
       break;
     }
-    DISASM_OP(CORE, CmpNERef) {
-      uint16_t lhs_reg = VM_ParseOperandRegRef("lhs");
-      uint16_t rhs_reg = VM_ParseOperandRegRef("rhs");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, CmpNERef) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(lhs_reg);
+      IREE_VM_ISA_DECODE_OPERAND_REF(rhs_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cmp.ne.ref "));
-      EMIT_REF_REG_NAME(lhs_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[lhs_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(lhs_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[lhs_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(rhs_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[rhs_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(rhs_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[rhs_reg]);
       break;
     }
-    DISASM_OP(CORE, CmpNZRef) {
-      uint16_t operand_reg = VM_ParseOperandRegRef("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, CmpNZRef) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cmp.nz.ref "));
-      EMIT_REF_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
       break;
     }
 
@@ -1663,100 +1571,91 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Control flow
     //===------------------------------------------------------------------===//
 
-    DISASM_OP(CORE, Block) {
+    IREE_VM_ISA_EMIT_OP(CORE, Block) {
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_string(b, IREE_SV("<block>")));
       break;
     }
 
-    DISASM_OP(CORE, Branch) {
-      int32_t block_pc = VM_ParseBranchTarget("dest");
-      const iree_vm_register_remap_list_t* remap_list =
-          VM_ParseBranchOperands("operands");
+    IREE_VM_ISA_EMIT_OP(CORE, Branch) {
+      IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, "vm.br ^%08X(", block_pc));
-      EMIT_REMAP_LIST(remap_list);
+      IREE_VM_ISA_EMIT_REMAP_LIST(remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
 
-    DISASM_OP(CORE, CondBranch) {
-      uint16_t condition_reg = VM_ParseOperandRegI32("condition");
-      int32_t true_block_pc = VM_ParseBranchTarget("true_dest");
-      const iree_vm_register_remap_list_t* true_remap_list =
-          VM_ParseBranchOperands("true_operands");
-      int32_t false_block_pc = VM_ParseBranchTarget("false_dest");
-      const iree_vm_register_remap_list_t* false_remap_list =
-          VM_ParseBranchOperands("false_operands");
+    IREE_VM_ISA_EMIT_OP(CORE, CondBranch) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition_reg);
+      IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(true_block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(true_remap_list);
+      IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(false_block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(false_remap_list);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.cond_br "));
-      EMIT_I32_REG_NAME(condition_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, ", ^%08X(", true_block_pc));
-      EMIT_REMAP_LIST(true_remap_list);
+      IREE_VM_ISA_EMIT_REMAP_LIST(true_remap_list);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, "), ^%08X(", false_block_pc));
-      EMIT_REMAP_LIST(false_remap_list);
+      IREE_VM_ISA_EMIT_REMAP_LIST(false_remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
 
-    DISASM_OP(CORE, BranchTable) {
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
+    IREE_VM_ISA_EMIT_OP(CORE, BranchTable) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.br_table "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
-      int32_t default_block_pc = VM_ParseBranchTarget("default_dest");
-      const iree_vm_register_remap_list_t* default_remap_list =
-          VM_ParseBranchOperands("default_operands");
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(default_block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(default_remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " { default: ^%08X(", default_block_pc));
-      EMIT_REMAP_LIST(default_remap_list);
-      uint16_t table_size = VM_ParseConstI16(table_size);
+      IREE_VM_ISA_EMIT_REMAP_LIST(default_remap_list);
+      IREE_VM_ISA_DECODE_CONST_I16(table_size);
       for (uint16_t i = 0; i < table_size; ++i) {
-        int32_t case_block_pc = VM_ParseBranchTarget("case_dest");
-        const iree_vm_register_remap_list_t* case_remap_list =
-            VM_ParseBranchOperands("case_operands");
+        IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(case_block_pc);
+        IREE_VM_ISA_DECODE_BRANCH_OPERANDS(case_remap_list);
         IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
             b, "), %u: ^%08X(", i, case_block_pc));
-        EMIT_REMAP_LIST(case_remap_list);
+        IREE_VM_ISA_EMIT_REMAP_LIST(case_remap_list);
       }
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ") }"));
       break;
     }
 
-    DISASM_OP(CORE, Call) {
-      int32_t function_ordinal = VM_ParseFuncAttr("callee");
-      const iree_vm_register_list_t* src_reg_list =
-          VM_ParseVariadicOperands("operands");
-      const iree_vm_register_list_t* dst_reg_list =
-          VM_ParseVariadicResults("results");
+    IREE_VM_ISA_EMIT_OP(CORE, Call) {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
+      IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
       if (dst_reg_list->size > 0) {
-        EMIT_RESULT_REG_LIST(dst_reg_list);
+        IREE_VM_ISA_EMIT_RESULT_REG_LIST(dst_reg_list);
         IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " = "));
       }
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.call @"));
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
           module, module_state, function_ordinal, b));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
-      EMIT_OPERAND_REG_LIST(src_reg_list);
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
 
-    DISASM_OP(CORE, CallVariadic) {
-      int32_t function_ordinal = VM_ParseFuncAttr("callee");
+    IREE_VM_ISA_EMIT_OP(CORE, CallVariadic) {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
       // TODO(benvanik): print segment sizes.
-      // const iree_vm_register_list_t* segment_size_list =
-      VM_ParseVariadicOperands("segment_sizes");
-      const iree_vm_register_list_t* src_reg_list =
-          VM_ParseVariadicOperands("operands");
-      const iree_vm_register_list_t* dst_reg_list =
-          VM_ParseVariadicResults("results");
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_size_list);
+      (void)segment_size_list;
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
+      IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
       if (dst_reg_list->size > 0) {
-        EMIT_RESULT_REG_LIST(dst_reg_list);
+        IREE_VM_ISA_EMIT_RESULT_REG_LIST(dst_reg_list);
         IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " = "));
       }
       IREE_RETURN_IF_ERROR(
@@ -1764,38 +1663,36 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
           module, module_state, function_ordinal, b));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
-      EMIT_OPERAND_REG_LIST(src_reg_list);
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
 
-    DISASM_OP(CORE, Return) {
-      const iree_vm_register_list_t* src_reg_list =
-          VM_ParseVariadicOperands("operands");
+    IREE_VM_ISA_EMIT_OP(CORE, Return) {
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.return "));
-      EMIT_OPERAND_REG_LIST(src_reg_list);
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
       break;
     }
 
-    DISASM_OP(CORE, Fail) {
-      uint16_t status_code_reg = VM_ParseOperandRegI32("status");
-      iree_string_view_t message;
-      VM_ParseStrAttr("message", &message);
+    IREE_VM_ISA_EMIT_OP(CORE, Fail) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(status_code_reg);
+      IREE_VM_ISA_DECODE_STRING_ATTR(message);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.fail "));
-      EMIT_I32_REG_NAME(status_code_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[status_code_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(status_code_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[status_code_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, ", \"%.*s\"", (int)message.size, message.data));
       break;
     }
 
-    DISASM_OP(CORE, ImportResolved) {
-      int32_t function_ordinal = VM_ParseFuncAttr("import");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(CORE, ImportResolved) {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.import.exists @"));
-      int is_import = (function_ordinal & 0x80000000u) != 0;
+      int is_import = iree_vm_isa_function_ordinal_is_import(function_ordinal);
       if (IREE_UNLIKELY(!is_import)) {
         IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
             b, "{{INVALID ORDINAL %d}}", function_ordinal));
@@ -1804,7 +1701,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
           module, module_state, function_ordinal, b));
       if (module_state) {
-        uint32_t import_ordinal = function_ordinal & 0x7FFFFFFFu;
+        uint32_t import_ordinal =
+            iree_vm_isa_function_ordinal_as_import(function_ordinal);
         if (IREE_UNLIKELY(import_ordinal >= module_state->import_count)) {
           IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
               b, "{{OUT OF RANGE ORDINAL %u}}", import_ordinal));
@@ -1823,13 +1721,12 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Async/fiber ops
     //===------------------------------------------------------------------===//
 
-    DISASM_OP(CORE, Yield) {
-      int32_t block_pc = VM_DecBranchTarget("dest");
-      const iree_vm_register_remap_list_t* remap_list =
-          VM_ParseBranchOperands("operands");
+    IREE_VM_ISA_EMIT_OP(CORE, Yield) {
+      IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, "vm.yield ^%08X(", block_pc));
-      EMIT_REMAP_LIST(remap_list);
+      IREE_VM_ISA_EMIT_REMAP_LIST(remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
@@ -1838,53 +1735,47 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // Debugging
     //===------------------------------------------------------------------===//
 
-    DISASM_OP(CORE, Trace) {
-      iree_string_view_t event_name;
-      VM_ParseStrAttr("event_name", &event_name);
-      const iree_vm_register_list_t* src_reg_list =
-          VM_ParseVariadicOperands("operands");
+    IREE_VM_ISA_EMIT_OP(CORE, Trace) {
+      IREE_VM_ISA_DECODE_STRING_ATTR(event_name);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, "vm.trace \"%.*s\"(", (int)event_name.size, event_name.data));
-      EMIT_OPERAND_REG_LIST(src_reg_list);
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
 
-    DISASM_OP(CORE, Print) {
-      iree_string_view_t event_name;
-      VM_ParseStrAttr("event_name", &event_name);
-      const iree_vm_register_list_t* src_reg_list =
-          VM_ParseVariadicOperands("operands");
+    IREE_VM_ISA_EMIT_OP(CORE, Print) {
+      IREE_VM_ISA_DECODE_STRING_ATTR(event_name);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, "vm.print \"%.*s\"(", (int)event_name.size, event_name.data));
-      EMIT_OPERAND_REG_LIST(src_reg_list);
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
 
-    DISASM_OP(CORE, Break) {
-      int32_t block_pc = VM_DecBranchTarget("dest");
-      const iree_vm_register_remap_list_t* remap_list =
-          VM_ParseBranchOperands("operands");
+    IREE_VM_ISA_EMIT_OP(CORE, Break) {
+      IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, "vm.break ^%08X(", block_pc));
-      EMIT_REMAP_LIST(remap_list);
+      IREE_VM_ISA_EMIT_REMAP_LIST(remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
 
-    DISASM_OP(CORE, CondBreak) {
-      uint16_t condition_reg = VM_ParseOperandRegI32("condition");
-      int32_t block_pc = VM_ParseBranchTarget("dest");
-      const iree_vm_register_remap_list_t* remap_list =
-          VM_ParseBranchOperands("operands");
+    IREE_VM_ISA_EMIT_OP(CORE, CondBreak) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition_reg);
+      IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.cond_break "));
-      EMIT_I32_REG_NAME(condition_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, ", ^%08X(", block_pc));
-      EMIT_REMAP_LIST(remap_list);
+      IREE_VM_ISA_EMIT_REMAP_LIST(remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
@@ -1894,58 +1785,59 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     //===------------------------------------------------------------------===//
 
 #if IREE_VM_EXT_F32_ENABLE
-    BEGIN_DISASM_PREFIX(PrefixExtF32, EXT_F32)
+    IREE_VM_ISA_BEGIN_DISASM_PREFIX(PrefixExtF32, EXT_F32)
 
     //===----------------------------------------------------------------===//
     // ExtF32: Globals
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F32, GlobalLoadF32) {
-      uint32_t byte_offset = VM_ParseGlobalAttr("global");
-      uint16_t value_reg = VM_ParseResultRegF32("value");
-      EMIT_F32_REG_NAME(value_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, GlobalLoadF32) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DECODE_RESULT_F32(value_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.global.load.f32 .rwdata[%u]", byte_offset));
-      EMIT_OPTIONAL_VALUE_F32(module_state->rwdata_storage.data[byte_offset]);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(
+          module_state->rwdata_storage.data[byte_offset]);
       break;
     }
 
-    DISASM_OP(EXT_F32, GlobalStoreF32) {
-      uint32_t byte_offset = VM_ParseGlobalAttr("global");
-      uint16_t value_reg = VM_ParseOperandRegF32("value");
+    IREE_VM_ISA_EMIT_OP(EXT_F32, GlobalStoreF32) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, "vm.global.store.f32 "));
-      EMIT_F32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
       break;
     }
 
-    DISASM_OP(EXT_F32, GlobalLoadIndirectF32) {
-      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
-      uint16_t value_reg = VM_ParseResultRegI32("value");
-      EMIT_F32_REG_NAME(value_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, GlobalLoadIndirectF32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(value_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, " = vm.global.load.indirect.f32 .rwdata["));
-      EMIT_I32_REG_NAME(byte_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
-      EMIT_OPTIONAL_VALUE_F32(
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(
           module_state->rwdata_storage.data[regs->i32[byte_offset_reg]]);
       break;
     }
 
-    DISASM_OP(EXT_F32, GlobalStoreIndirectF32) {
-      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
-      uint16_t value_reg = VM_ParseOperandRegF32("value");
+    IREE_VM_ISA_EMIT_OP(EXT_F32, GlobalStoreIndirectF32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, "vm.global.store.indirect.f32 "));
-      EMIT_F32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", .rwdata["));
-      EMIT_I32_REG_NAME(byte_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
       break;
     }
@@ -1954,18 +1846,18 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF32: Constants
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F32, ConstF32) {
-      float value = VM_ParseAttrF32("value");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, ConstF32) {
+      IREE_VM_ISA_DECODE_ATTR_F32(value);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, " = vm.const.f32 %f", value));
       break;
     }
 
-    DISASM_OP(EXT_F32, ConstF32Zero) {
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, ConstF32Zero) {
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.const.f32.zero"));
       break;
@@ -1975,35 +1867,35 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF32: Lists
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F32, ListGetF32) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, ListGetF32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.get.f32 "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       break;
     }
 
-    DISASM_OP(EXT_F32, ListSetF32) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      uint16_t raw_value_reg = VM_ParseOperandRegF32("raw_value");
+    IREE_VM_ISA_EMIT_OP(EXT_F32, ListSetF32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F32(raw_value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.set.f32 "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_F32_REG_NAME(raw_value_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[raw_value_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(raw_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[raw_value_reg]);
       break;
     }
 
@@ -2011,40 +1903,40 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF32: Conditional assignment
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F32, SelectF32) {
-      uint16_t condition_reg = VM_ParseOperandRegI32("condition");
-      uint16_t true_value_reg = VM_ParseOperandRegF32("true_value");
-      uint16_t false_value_reg = VM_ParseOperandRegF32("false_value");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, SelectF32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F32(true_value_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F32(false_value_reg);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.select.f32 "));
-      EMIT_I32_REG_NAME(condition_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " ? "));
-      EMIT_F32_REG_NAME(true_value_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[true_value_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(true_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[true_value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
-      EMIT_F32_REG_NAME(false_value_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[false_value_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(false_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[false_value_reg]);
       break;
     }
 
-    DISASM_OP(EXT_F32, SwitchF32) {
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      float default_value = VM_ParseOperandRegF32("default_value");
-      const iree_vm_register_list_t* value_reg_list =
-          VM_ParseVariadicOperands("values");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, SwitchF32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F32(default_value_reg);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.switch.f32 "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "["));
-      EMIT_OPERAND_REG_LIST(value_reg_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, "] else %f", default_value));
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(value_reg_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "] else "));
+      IREE_VM_ISA_EMIT_F32_REG_NAME(default_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[default_value_reg]);
       break;
     }
 
@@ -2052,130 +1944,130 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF32: Native floating-point arithmetic
     //===----------------------------------------------------------------===//
 
-    DISASM_OP_EXT_F32_BINARY_F32(AddF32, "vm.add.f32");
-    DISASM_OP_EXT_F32_BINARY_F32(SubF32, "vm.sub.f32");
-    DISASM_OP_EXT_F32_BINARY_F32(MulF32, "vm.mul.f32");
-    DISASM_OP_EXT_F32_BINARY_F32(DivF32, "vm.div.f32");
-    DISASM_OP_EXT_F32_BINARY_F32(RemF32, "vm.rem.f32");
-    DISASM_OP_EXT_F32_TERNARY_F32(FMAF32, "vm.fma.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(AbsF32, "vm.abs.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(NegF32, "vm.neg.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(CeilF32, "vm.ceil.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(FloorF32, "vm.floor.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(RoundF32, "vm.round.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(RoundF32Even, "vm.round.f32.even");
-    DISASM_OP_EXT_F32_BINARY_F32(MinF32, "vm.min.f32");
-    DISASM_OP_EXT_F32_BINARY_F32(MaxF32, "vm.max.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(AddF32, "vm.add.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(SubF32, "vm.sub.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(MulF32, "vm.mul.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(DivF32, "vm.div.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(RemF32, "vm.rem.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_TERNARY_F32(FMAF32, "vm.fma.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(AbsF32, "vm.abs.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(NegF32, "vm.neg.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(CeilF32, "vm.ceil.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(FloorF32, "vm.floor.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(RoundF32, "vm.round.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(RoundF32Even, "vm.round.f32.even");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(MinF32, "vm.min.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(MaxF32, "vm.max.f32");
 
-    DISASM_OP_EXT_F32_UNARY_F32(AtanF32, "vm.atan.f32");
-    DISASM_OP_EXT_F32_BINARY_F32(Atan2F32, "vm.atan2.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(CosF32, "vm.cos.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(SinF32, "vm.sin.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(ExpF32, "vm.exp.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(Exp2F32, "vm.exp2.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(ExpM1F32, "vm.expm1.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(LogF32, "vm.log.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(Log10F32, "vm.log10.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(Log1pF32, "vm.log1p.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(Log2F32, "vm.log2.f32");
-    DISASM_OP_EXT_F32_BINARY_F32(PowF32, "vm.pow.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(RsqrtF32, "vm.rsqrt.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(SqrtF32, "vm.sqrt.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(TanhF32, "vm.tanh.f32");
-    DISASM_OP_EXT_F32_UNARY_F32(ErfF32, "vm.erf.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(AtanF32, "vm.atan.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(Atan2F32, "vm.atan2.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(CosF32, "vm.cos.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(SinF32, "vm.sin.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(ExpF32, "vm.exp.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(Exp2F32, "vm.exp2.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(ExpM1F32, "vm.expm1.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(LogF32, "vm.log.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(Log10F32, "vm.log10.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(Log1pF32, "vm.log1p.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(Log2F32, "vm.log2.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(PowF32, "vm.pow.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(RsqrtF32, "vm.rsqrt.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(SqrtF32, "vm.sqrt.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(TanhF32, "vm.tanh.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(ErfF32, "vm.erf.f32");
 
     //===----------------------------------------------------------------===//
     // ExtF32: Casting and type conversion/emulation
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F32, CastSI32F32) {
-      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, CastSI32F32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.si32.f32 "));
-      EMIT_I32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F32, CastSI64F32) {
-      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, CastSI64F32) {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.si64.f32 "));
-      EMIT_I64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F32, CastUI32F32) {
-      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, CastUI32F32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.ui32.f32 "));
-      EMIT_I32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F32, CastF32SI32) {
-      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, CastF32SI32) {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.f32.si32 "));
-      EMIT_F32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F32, CastF32SI64) {
-      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, CastF32SI64) {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.f32.si64 "));
-      EMIT_F32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F32, CastF32UI32) {
-      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, CastF32UI32) {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.f32.ui32 "));
-      EMIT_F32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F32, CastF32UI64) {
-      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, CastF32UI64) {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.f32.ui64 "));
-      EMIT_F32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F32, BitcastI32F32) {
-      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, BitcastI32F32) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.bitcast.i32.f32 "));
-      EMIT_I32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F32, BitcastF32I32) {
-      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, BitcastF32I32) {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.bitcast.f32.i32 "));
-      EMIT_F32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;
     }
 
@@ -2183,38 +2075,38 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF32: Comparison ops
     //===----------------------------------------------------------------===//
 
-#define DISASM_OP_EXT_F32_CMP_F32(op_name, op_mnemonic)                \
-  DISASM_OP(EXT_F32, op_name) {                                        \
-    uint16_t lhs_reg = VM_ParseOperandRegF32("lhs");                   \
-    uint16_t rhs_reg = VM_ParseOperandRegF32("rhs");                   \
-    uint16_t result_reg = VM_ParseResultRegI32("result");              \
-    EMIT_I32_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(op_name, op_mnemonic)      \
+  IREE_VM_ISA_EMIT_OP(EXT_F32, op_name) {                              \
+    IREE_VM_ISA_DECODE_OPERAND_F32(lhs_reg);                           \
+    IREE_VM_ISA_DECODE_OPERAND_F32(rhs_reg);                           \
+    IREE_VM_ISA_DECODE_RESULT_I32(result_reg);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_F32_REG_NAME(lhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_F32(regs->i32[lhs_reg]);                       \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(lhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[lhs_reg]);           \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_F32_REG_NAME(rhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_F32(regs->i32[rhs_reg]);                       \
+    IREE_VM_ISA_EMIT_F32_REG_NAME(rhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[rhs_reg]);           \
     break;                                                             \
   }
 
-    DISASM_OP_EXT_F32_CMP_F32(CmpEQF32O, "vm.cmp.eq.f32.o");
-    DISASM_OP_EXT_F32_CMP_F32(CmpEQF32U, "vm.cmp.eq.f32.u");
-    DISASM_OP_EXT_F32_CMP_F32(CmpNEF32O, "vm.cmp.ne.f32.o");
-    DISASM_OP_EXT_F32_CMP_F32(CmpNEF32U, "vm.cmp.ne.f32.u");
-    DISASM_OP_EXT_F32_CMP_F32(CmpLTF32O, "vm.cmp.lt.f32.o");
-    DISASM_OP_EXT_F32_CMP_F32(CmpLTF32U, "vm.cmp.lt.f32.u");
-    DISASM_OP_EXT_F32_CMP_F32(CmpLTEF32O, "vm.cmp.lte.f32.o");
-    DISASM_OP_EXT_F32_CMP_F32(CmpLTEF32U, "vm.cmp.lte.f32.u");
-    DISASM_OP(EXT_F32, CmpNaNF32) {
-      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(CmpEQF32O, "vm.cmp.eq.f32.o");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(CmpEQF32U, "vm.cmp.eq.f32.u");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(CmpNEF32O, "vm.cmp.ne.f32.o");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(CmpNEF32U, "vm.cmp.ne.f32.u");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(CmpLTF32O, "vm.cmp.lt.f32.o");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(CmpLTF32U, "vm.cmp.lt.f32.u");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(CmpLTEF32O, "vm.cmp.lte.f32.o");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_CMP_F32(CmpLTEF32U, "vm.cmp.lte.f32.u");
+    IREE_VM_ISA_EMIT_OP(EXT_F32, CmpNaNF32) {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cmp.nan.f32 "));
-      EMIT_F32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;
     }
 
@@ -2222,117 +2114,118 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF32: Buffers
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F32, BufferFillF32) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t value_reg = VM_ParseOperandRegF32("value");
+    IREE_VM_ISA_EMIT_OP(EXT_F32, BufferFillF32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.f32 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_F32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
       break;
     }
 
-    DISASM_OP(EXT_F32, BufferLoadF32) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F32, BufferLoadF32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.load.f32 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
-    DISASM_OP(EXT_F32, BufferStoreF32) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t value_reg = VM_ParseOperandRegF32("value");
+    IREE_VM_ISA_EMIT_OP(EXT_F32, BufferStoreF32) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.f32 "));
-      EMIT_F32_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
-    END_DISASM_PREFIX()
+    IREE_VM_ISA_END_DISASM_PREFIX()
 #else
-    UNHANDLED_DISASM_PREFIX(PrefixExtF32, EXT_F32)
+    IREE_VM_ISA_UNHANDLED_DISASM_PREFIX(PrefixExtF32, EXT_F32)
 #endif  // IREE_VM_EXT_F32_ENABLE
 
 #if IREE_VM_EXT_F64_ENABLE
-    BEGIN_DISASM_PREFIX(PrefixExtF64, EXT_F64)
+    IREE_VM_ISA_BEGIN_DISASM_PREFIX(PrefixExtF64, EXT_F64)
 
     //===----------------------------------------------------------------===//
     // ExtF64: Globals
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F64, GlobalLoadF64) {
-      uint32_t byte_offset = VM_ParseGlobalAttr("global");
-      uint16_t value_reg = VM_ParseResultRegF64("value");
-      EMIT_F64_REG_NAME(value_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, GlobalLoadF64) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DECODE_RESULT_F64(value_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.global.load.f64 .rwdata[%u]", byte_offset));
-      EMIT_OPTIONAL_VALUE_F64(module_state->rwdata_storage.data[byte_offset]);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(
+          module_state->rwdata_storage.data[byte_offset]);
       break;
     }
 
-    DISASM_OP(EXT_F64, GlobalStoreF64) {
-      uint32_t byte_offset = VM_ParseGlobalAttr("global");
-      uint16_t value_reg = VM_ParseOperandRegF64("value");
+    IREE_VM_ISA_EMIT_OP(EXT_F64, GlobalStoreF64) {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, "vm.global.store.f64 "));
-      EMIT_F64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
       break;
     }
 
-    DISASM_OP(EXT_F64, GlobalLoadIndirectF64) {
-      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
-      uint16_t value_reg = VM_ParseResultRegI32("value");
-      EMIT_F64_REG_NAME(value_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, GlobalLoadIndirectF64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(value_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, " = vm.global.load.indirect.f64 .rwdata["));
-      EMIT_I32_REG_NAME(byte_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
-      EMIT_OPTIONAL_VALUE_F64(
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(
           module_state->rwdata_storage.data[regs->i32[byte_offset_reg]]);
       break;
     }
 
-    DISASM_OP(EXT_F64, GlobalStoreIndirectF64) {
-      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
-      uint16_t value_reg = VM_ParseOperandRegF64("value");
+    IREE_VM_ISA_EMIT_OP(EXT_F64, GlobalStoreIndirectF64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
           b, "vm.global.store.indirect.f64 "));
-      EMIT_F64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", .rwdata["));
-      EMIT_I32_REG_NAME(byte_offset_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
       break;
     }
@@ -2341,18 +2234,18 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF64: Constants
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F64, ConstF64) {
-      double value = VM_ParseAttrF64("value");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, ConstF64) {
+      IREE_VM_ISA_DECODE_ATTR_F64(value);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_format(b, " = vm.const.f64 %f", value));
       break;
     }
 
-    DISASM_OP(EXT_F64, ConstF64Zero) {
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, ConstF64Zero) {
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.const.f64.zero"));
       break;
@@ -2362,35 +2255,35 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF64: Lists
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F64, ListGetF64) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, ListGetF64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.list.get.f64 "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       break;
     }
 
-    DISASM_OP(EXT_F64, ListSetF64) {
-      uint16_t list_reg = VM_ParseOperandRegRef("list");
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      uint16_t raw_value_reg = VM_ParseOperandRegF64("raw_value");
+    IREE_VM_ISA_EMIT_OP(EXT_F64, ListSetF64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F64(raw_value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.list.set.f64 "));
-      EMIT_REF_REG_NAME(list_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(list_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_F64_REG_NAME(raw_value_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[raw_value_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(raw_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[raw_value_reg]);
       break;
     }
 
@@ -2398,40 +2291,40 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF64: Conditional assignment
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F64, SelectF64) {
-      uint16_t condition_reg = VM_ParseOperandRegI32("condition");
-      uint16_t true_value_reg = VM_ParseOperandRegF64("true_value");
-      uint16_t false_value_reg = VM_ParseOperandRegF64("false_value");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, SelectF64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F64(true_value_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F64(false_value_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.select.f64 "));
-      EMIT_I32_REG_NAME(condition_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " ? "));
-      EMIT_F64_REG_NAME(true_value_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[true_value_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(true_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[true_value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
-      EMIT_F64_REG_NAME(false_value_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[false_value_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(false_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[false_value_reg]);
       break;
     }
 
-    DISASM_OP(EXT_F64, SwitchF64) {
-      uint16_t index_reg = VM_ParseOperandRegI32("index");
-      double default_value = VM_ParseOperandRegF64("default_value");
-      const iree_vm_register_list_t* value_reg_list =
-          VM_ParseVariadicOperands("values");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, SwitchF64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F64(default_value_reg);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.switch.f64 "));
-      EMIT_I32_REG_NAME(index_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "["));
-      EMIT_OPERAND_REG_LIST(value_reg_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, "] else %f", default_value));
+      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(value_reg_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "] else "));
+      IREE_VM_ISA_EMIT_F64_REG_NAME(default_value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[default_value_reg]);
       break;
     }
 
@@ -2439,160 +2332,160 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF64: Native floating-point arithmetic
     //===----------------------------------------------------------------===//
 
-    DISASM_OP_EXT_F64_BINARY_F64(AddF64, "vm.add.f64");
-    DISASM_OP_EXT_F64_BINARY_F64(SubF64, "vm.sub.f64");
-    DISASM_OP_EXT_F64_BINARY_F64(MulF64, "vm.mul.f64");
-    DISASM_OP_EXT_F64_BINARY_F64(DivF64, "vm.div.f64");
-    DISASM_OP_EXT_F64_BINARY_F64(RemF64, "vm.rem.f64");
-    DISASM_OP_EXT_F64_TERNARY_F64(FMAF64, "vm.fma.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(AbsF64, "vm.abs.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(NegF64, "vm.neg.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(CeilF64, "vm.ceil.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(FloorF64, "vm.floor.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(RoundF64, "vm.round.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(RoundF64Even, "vm.round.f64.even");
-    DISASM_OP_EXT_F64_BINARY_F64(MinF64, "vm.min.f64");
-    DISASM_OP_EXT_F64_BINARY_F64(MaxF64, "vm.max.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(AddF64, "vm.add.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(SubF64, "vm.sub.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(MulF64, "vm.mul.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(DivF64, "vm.div.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(RemF64, "vm.rem.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_TERNARY_F64(FMAF64, "vm.fma.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(AbsF64, "vm.abs.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(NegF64, "vm.neg.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(CeilF64, "vm.ceil.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(FloorF64, "vm.floor.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(RoundF64, "vm.round.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(RoundF64Even, "vm.round.f64.even");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(MinF64, "vm.min.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(MaxF64, "vm.max.f64");
 
-    DISASM_OP_EXT_F64_UNARY_F64(AtanF64, "vm.atan.f64");
-    DISASM_OP_EXT_F64_BINARY_F64(Atan2F64, "vm.atan2.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(CosF64, "vm.cos.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(SinF64, "vm.sin.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(ExpF64, "vm.exp.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(Exp2F64, "vm.exp2.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(ExpM1F64, "vm.expm1.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(LogF64, "vm.log.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(Log10F64, "vm.log10.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(Log1pF64, "vm.log1p.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(Log2F64, "vm.log2.f64");
-    DISASM_OP_EXT_F64_BINARY_F64(PowF64, "vm.pow.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(RsqrtF64, "vm.rsqrt.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(SqrtF64, "vm.sqrt.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(TanhF64, "vm.tanh.f64");
-    DISASM_OP_EXT_F64_UNARY_F64(ErfF64, "vm.erf.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(AtanF64, "vm.atan.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(Atan2F64, "vm.atan2.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(CosF64, "vm.cos.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(SinF64, "vm.sin.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(ExpF64, "vm.exp.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(Exp2F64, "vm.exp2.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(ExpM1F64, "vm.expm1.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(LogF64, "vm.log.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(Log10F64, "vm.log10.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(Log1pF64, "vm.log1p.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(Log2F64, "vm.log2.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(PowF64, "vm.pow.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(RsqrtF64, "vm.rsqrt.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(SqrtF64, "vm.sqrt.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(TanhF64, "vm.tanh.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(ErfF64, "vm.erf.f64");
 
     //===----------------------------------------------------------------===//
     // ExtF64: Casting and type conversion/emulation
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F64, TruncF64F32) {
-      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
-      uint16_t result_reg = VM_ParseResultRegF32("result");
-      EMIT_F32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, TruncF64F32) {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.trunc.f64.f32 "));
-      EMIT_F64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, ExtF32F64) {
-      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, ExtF32F64) {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.ext.f32.f64 "));
-      EMIT_F32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, CastSI32F64) {
-      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CastSI32F64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.si32.f64 "));
-      EMIT_I32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, CastUI32F64) {
-      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CastUI32F64) {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.ui32.f64 "));
-      EMIT_I32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, CastF64SI32) {
-      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CastF64SI32) {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.f64.si32 "));
-      EMIT_F64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, CastF64UI32) {
-      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CastF64UI32) {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.f64.ui32 "));
-      EMIT_F64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, CastSI64F64) {
-      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CastSI64F64) {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.si64.f64 "));
-      EMIT_I64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, CastUI64F64) {
-      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CastUI64F64) {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.ui64.f64 "));
-      EMIT_I64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, CastF64SI64) {
-      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CastF64SI64) {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.f64.si64 "));
-      EMIT_F64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, CastF64UI64) {
-      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CastF64UI64) {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cast.f64.ui64 "));
-      EMIT_F64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, BitcastI64F64) {
-      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, BitcastI64F64) {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.bitcast.i64.f64 "));
-      EMIT_I32_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
       break;
     }
-    DISASM_OP(EXT_F64, BitcastF64I64) {
-      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
-      uint16_t result_reg = VM_ParseResultRegI64("result");
-      EMIT_I64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, BitcastF64I64) {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.bitcast.f64.i64 "));
-      EMIT_F64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
       break;
     }
 
@@ -2600,38 +2493,38 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF64: Comparison ops
     //===----------------------------------------------------------------===//
 
-#define DISASM_OP_EXT_F64_CMP_F64(op_name, op_mnemonic)                \
-  DISASM_OP(EXT_F64, op_name) {                                        \
-    uint16_t lhs_reg = VM_ParseOperandRegF64("lhs");                   \
-    uint16_t rhs_reg = VM_ParseOperandRegF64("rhs");                   \
-    uint16_t result_reg = VM_ParseResultRegI32("result");              \
-    EMIT_I32_REG_NAME(result_reg);                                     \
+#define IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(op_name, op_mnemonic)      \
+  IREE_VM_ISA_EMIT_OP(EXT_F64, op_name) {                              \
+    IREE_VM_ISA_DECODE_OPERAND_F64(lhs_reg);                           \
+    IREE_VM_ISA_DECODE_OPERAND_F64(rhs_reg);                           \
+    IREE_VM_ISA_DECODE_RESULT_I32(result_reg);                         \
+    IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);                         \
     IREE_RETURN_IF_ERROR(                                              \
         iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
-    EMIT_F64_REG_NAME(lhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_F64(regs->i32[lhs_reg]);                       \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(lhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[lhs_reg]);           \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
-    EMIT_F64_REG_NAME(rhs_reg);                                        \
-    EMIT_OPTIONAL_VALUE_F64(regs->i32[rhs_reg]);                       \
+    IREE_VM_ISA_EMIT_F64_REG_NAME(rhs_reg);                            \
+    IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[rhs_reg]);           \
     break;                                                             \
   }
 
-    DISASM_OP_EXT_F64_CMP_F64(CmpEQF64O, "vm.cmp.eq.f64.o");
-    DISASM_OP_EXT_F64_CMP_F64(CmpEQF64U, "vm.cmp.eq.f64.u");
-    DISASM_OP_EXT_F64_CMP_F64(CmpNEF64O, "vm.cmp.ne.f64.o");
-    DISASM_OP_EXT_F64_CMP_F64(CmpNEF64U, "vm.cmp.ne.f64.u");
-    DISASM_OP_EXT_F64_CMP_F64(CmpLTF64O, "vm.cmp.lt.f64.o");
-    DISASM_OP_EXT_F64_CMP_F64(CmpLTF64U, "vm.cmp.lt.f64.u");
-    DISASM_OP_EXT_F64_CMP_F64(CmpLTEF64O, "vm.cmp.lte.f64.o");
-    DISASM_OP_EXT_F64_CMP_F64(CmpLTEF64U, "vm.cmp.lte.f64.u");
-    DISASM_OP(EXT_F64, CmpNaNF64) {
-      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
-      uint16_t result_reg = VM_ParseResultRegI32("result");
-      EMIT_I32_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(CmpEQF64O, "vm.cmp.eq.f64.o");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(CmpEQF64U, "vm.cmp.eq.f64.u");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(CmpNEF64O, "vm.cmp.ne.f64.o");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(CmpNEF64U, "vm.cmp.ne.f64.u");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(CmpLTF64O, "vm.cmp.lt.f64.o");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(CmpLTF64U, "vm.cmp.lt.f64.u");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(CmpLTEF64O, "vm.cmp.lte.f64.o");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_CMP_F64(CmpLTEF64U, "vm.cmp.lte.f64.u");
+    IREE_VM_ISA_EMIT_OP(EXT_F64, CmpNaNF64) {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand_reg);
+      IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
+      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.cmp.nan.f64 "));
-      EMIT_F64_REG_NAME(operand_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
       break;
     }
 
@@ -2639,62 +2532,62 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     // ExtF64: Buffers
     //===----------------------------------------------------------------===//
 
-    DISASM_OP(EXT_F64, BufferFillF64) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t length_reg = VM_ParseOperandRegI64("length");
-      uint16_t value_reg = VM_ParseOperandRegF64("value");
+    IREE_VM_ISA_EMIT_OP(EXT_F64, BufferFillF64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.fill.f64 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(length_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(length_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_F64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
       break;
     }
 
-    DISASM_OP(EXT_F64, BufferLoadF64) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("source_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
-      uint16_t result_reg = VM_ParseResultRegF64("result");
-      EMIT_F64_REG_NAME(result_reg);
+    IREE_VM_ISA_EMIT_OP(EXT_F64, BufferLoadF64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.load.f64 "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
-    DISASM_OP(EXT_F64, BufferStoreF64) {
-      uint16_t buffer_reg = VM_ParseOperandRegRef("target_buffer");
-      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
-      uint16_t value_reg = VM_ParseOperandRegF64("value");
+    IREE_VM_ISA_EMIT_OP(EXT_F64, BufferStoreF64) {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer_reg);
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.buffer.store.f64 "));
-      EMIT_F64_REG_NAME(value_reg);
-      EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
+      IREE_VM_ISA_EMIT_F64_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_REF_REG_NAME(buffer_reg);
-      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
-      EMIT_I64_REG_NAME(offset_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(offset_reg);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
       break;
     }
 
-    END_DISASM_PREFIX()
+    IREE_VM_ISA_END_DISASM_PREFIX()
 #else
-    UNHANDLED_DISASM_PREFIX(PrefixExtF64, EXT_F64)
+    IREE_VM_ISA_UNHANDLED_DISASM_PREFIX(PrefixExtF64, EXT_F64)
 #endif  // IREE_VM_EXT_F64_ENABLE
 
     default:
