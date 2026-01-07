@@ -3213,7 +3213,7 @@ private:
   /// help fusion. Dynamic sizes are replaced with 0 to indicate that tiling
   /// size is unknown. Note: the method is designed for fusion cases in
   /// data-tiling, like `matmul->generic->unpack`.
-  SmallVector<int64_t>
+  SizesAndScalableFlags
   getVecTileSizesForNonRootUnPackOp(linalg::UnPackOp unpackOp);
 
   /// Returns tile sizes for a non-root `GenericOp`.
@@ -3239,6 +3239,10 @@ private:
   // Store the vector parallel tile sizes preferred by non-root operations.
   // Operation -> (global loop dimension index -> tile size)
   llvm::SmallDenseMap<Operation *, SmallVector<int64_t>> nonRootOpVecTileSizes;
+
+  // Store the vector parallel scalable flags preferred by non-root operations.
+  // Operation -> (global loop dimension index -> scalable flag)
+  llvm::SmallDenseMap<Operation *, SmallVector<bool>> nonRootOpScalableFlags;
 };
 
 std::unique_ptr<MultiLoweringConfigGenerator>
@@ -3333,7 +3337,8 @@ void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
       nonRootOpVecTileSizes[op] =
           getVecTileSizesForNonRootPackOp(entryPointFn, packOp);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-      nonRootOpVecTileSizes[op] = getVecTileSizesForNonRootUnPackOp(unpackOp);
+      std::tie(nonRootOpVecTileSizes[op], nonRootOpScalableFlags[op]) =
+          getVecTileSizesForNonRootUnPackOp(unpackOp);
     } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       nonRootOpVecTileSizes[op] =
           getVecTileSizesForNonRootGenericOp(entryPointFn, genericOp);
@@ -3358,10 +3363,22 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
           updater(globalTileSizes[level][globalDimIdx], size);
     }
   };
+  auto adjustScalableFlags = [&](Operation *op, ArrayRef<bool> scalableFlags,
+                                 IREE::CPU::TilingLevel level,
+                                 llvm::function_ref<bool(bool, bool)> updater) {
+    for (auto [pos, flag] : llvm::enumerate(scalableFlags)) {
+      int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
+      if (!flag || !llvm::is_contained(rootOpGlobalDims, globalDimIdx)) {
+        continue;
+      }
+      globalScalableTileFlags[level][globalDimIdx] =
+          updater(globalScalableTileFlags[level][globalDimIdx], flag);
+    }
+  };
   auto align = [](int64_t oldSize, int64_t newSize) {
     return llvm::alignTo(oldSize, newSize);
   };
-  auto overwrite = [](int64_t oldSize, int64_t newSize) { return newSize; };
+  auto overwrite = [](auto oldVal, auto newVal) { return newVal; };
   // Adjust root op tiling sizes with non-root op.
   for (auto &[op, vecTileSize] : nonRootOpVecTileSizes) {
     if (isa<linalg::PackOp>(op)) {
@@ -3371,11 +3388,11 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
       adjust(op, vecTileSize, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
              overwrite);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-      // For unpack op, just overwrite the vector parallel tile size.
-      // However, dimension tracking is expected be broken in the case of
-      // `generic -> unpack`, since only the unpacked dimensions are propagated.
-      // To correct this, use the generic op result indexing map to update the
-      // tracking.
+      // For unpack op, just overwrite the vector parallel tile size and the
+      // scalable flag. However, dimension tracking is expected be broken in the
+      // case of `generic -> unpack`, since only the unpacked dimensions are
+      // propagated. To correct this, use the generic op result indexing map to
+      // update the tracking.
       //
       // Example: If the generic op result has an affine map
       //          (d0, d1, d2, d3) -> (d0, d1, d2, d3),
@@ -3387,17 +3404,23 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
       AffineMap indexingMap = linalgOp.getIndexingMapMatchingResult(
           cast<OpResult>(unpackOp.getSource()));
       SmallVector<int64_t> adjustedTileSize(linalgOp.getNumLoops(), 0);
-      for (auto [expr, tileSize] : llvm::zip_equal(
+      SmallVector<bool> adjustedScalableFlags(linalgOp.getNumLoops(), false);
+      SmallVector<bool> scalableFlags = nonRootOpScalableFlags.lookup(op);
+      for (auto [expr, tileSize, flag] : llvm::zip_equal(
                indexingMap.getResults().take_back(vecTileSize.size()),
-               vecTileSize)) {
+               vecTileSize, scalableFlags)) {
         auto dimExpr = dyn_cast<AffineDimExpr>(expr);
         if (!dimExpr) {
           continue;
         }
         adjustedTileSize[dimExpr.getPosition()] = tileSize;
+        adjustedScalableFlags[dimExpr.getPosition()] = flag;
       }
       adjust(linalgOp.getOperation(), adjustedTileSize,
              IREE::CPU::TilingLevel::VectorCommonParallelTiles, overwrite);
+      adjustScalableFlags(linalgOp.getOperation(), adjustedScalableFlags,
+                          IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+                          overwrite);
     }
   }
 
@@ -3582,16 +3605,22 @@ MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
   return vecTileSizes;
 }
 
-SmallVector<int64_t>
+SizesAndScalableFlags
 MultiLoweringConfigGenerator::getVecTileSizesForNonRootUnPackOp(
     linalg::UnPackOp unpackOp) {
+  // If we have static or scalable inner tile sizes, return these.
+  if (auto sizesAndScalableFlags =
+          getScalableTileSizesAndFlags(unpackOp.getMixedTiles())) {
+    return *sizesAndScalableFlags;
+  }
+  // In case we have dynamic inner tile sizes, zero these out.
   SmallVector<int64_t> vecTileSizes(unpackOp.getStaticInnerTiles());
   for (auto &size : vecTileSizes) {
     if (ShapedType::isDynamic(size)) {
       size = 0;
     }
   }
-  return vecTileSizes;
+  return {vecTileSizes, SmallVector<bool>(vecTileSizes.size(), false)};
 }
 
 SmallVector<int64_t>
