@@ -4564,6 +4564,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#-iree-pcf-fuse-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-pcf-fuse-consumers
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4606,6 +4615,21 @@ mapping attributes are converted.</p>
 <p>The underlying conversion pattern is exposed separately via
 <code>convertForallToPCF()</code> with callbacks for mapping processor IDs to custom
 execution scopes.</p>
+<h3 id="-iree-pcf-fuse-consumers"><code>-iree-pcf-fuse-consumers</code><a class="headerlink" href="#-iree-pcf-fuse-consumers" title="Permanent link">link</a></h3>
+<p><em>Fuses all consumers of pcf.generic/loop ops</em></p>
+<p>Test pass for fusing consumer operations into <code>pcf.generic</code> and <code>pcf.loop</code>
+ops.</p>
+<p>The input is IR containing PCF parallel ops with external consumers that
+implement <code>TilingInterface</code> or are <code>tensor.extract_slice</code> ops.</p>
+<p>The pass greedily fuses each tilable consumer into the producer PCF op by
+cloning the consumer into the PCF region, tiling it to match the iteration
+space, and replacing the external use with a new <code>pcf.write_slice</code>.</p>
+<p>Supported fusion scenarios:
+- Multiple <code>pcf.write_slice</code> producers for a single consumer value
+- Fusion along multiple operands with a single <code>pcf.write_slice</code> per operand
+- <code>tensor.extract_slice</code> by adding a condition based on the slice bounds.</p>
+<p>The underlying fusion patterns are exposed via <code>matchTilableConsumer()</code> and
+<code>fuseTilableConsumer()</code> for use in custom pipelines.</p>
 
 
 
