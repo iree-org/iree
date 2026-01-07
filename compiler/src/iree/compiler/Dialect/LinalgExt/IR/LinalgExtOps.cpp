@@ -636,10 +636,11 @@ LogicalResult MapScatterOp::verify() {
                     llvm::IsaPred<IndexType>)) {
     return emitOpError("expected block arguments to be index types");
   }
-  if (!transformBody.mightHaveTerminator() ||
-      !isa<IREE::LinalgExt::YieldOp>(transformBody.getTerminator())) {
-    return emitOpError("expected transformation_region to have a terminator");
-  }
+  return success();
+}
+
+LogicalResult MapScatterOp::verifyRegions() {
+  Block &transformBody = getTransformationRegion().getBlocks().front();
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
   if (yieldOp->getNumOperands() != getOutputRank() + 1) {
     return yieldOp.emitOpError("expected transformation_region to yield a "
