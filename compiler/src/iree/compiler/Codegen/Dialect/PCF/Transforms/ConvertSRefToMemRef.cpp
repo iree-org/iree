@@ -85,7 +85,8 @@ static bool isDefaultOrStrided(Attribute layout) {
          isa<StridedLayoutAttr>(layout);
 }
 
-// State that tracks floating point ranges and flags.
+// State that tracks memref layouts per value. Lattice description is below
+// next to the state fields.
 struct StridedLayoutState : DFX::AbstractState {
   bool isValidState() const override { return isValid; }
   bool isAtFixpoint() const override { return !isValid || isFinalized; }
@@ -199,8 +200,26 @@ struct StridedLayoutState : DFX::AbstractState {
   }
 
 private:
+  // Assumed state for the value. Since shape consistency is already carried on
+  // the !pcf.sref type, only the layout and memory space is relevant for the
+  // analysis. The state starts uninitialized and is progressively unioned with
+  // all producers under the following cases:
+  // 1. If this state is uninitialized, take the incoming state.
+  // 2. If the incoming state is uninitialized, do nothing.
+  // 3. Else update the state with the minimally dynamic layout covering both
+  //    this and the incoming state.
+  // The lattice first initializes all values and then moves towards the least
+  // dynamic fixed point that satisfies all incoming memref types.
   MemRefType assumed = MemRefType();
+  // Indicates whether the state is at a fixed point. Only set for values that
+  // have a locally determined type (e.g. allocs and tied args).
   bool isFinalized = false;
+  // Indicates whether the state is valid. Invalid states are irrecoverable
+  // and result in a conversion failure. This happens on:
+  // 1. Irreconcilable memref layouts (e.g. different ranks).
+  // 2. Non-strided layouts.
+  // 3. Conflicting memory spaces.
+  // 4. Failure to converge to a fixed point.
   bool isValid = true;
 };
 
@@ -574,6 +593,29 @@ static void castIfMismatched(OpBuilder &b, Location loc,
   }
 }
 
+/// Convert all result tied values of a `pcf.generic`, e.g.
+///
+/// ```
+///   %src = ... : memref<?x?xi32, strided<[?, 1]>, 3>
+///   %0 = pcf.generic
+///     execute(%ref = %src : (!pcf.sref<?x?xi32>)
+///                         -> (memref<?x?xi32, strided<[?, 1]>, 3>) {
+///     // some use %ref : !pcf.sref<?x?xi32, #pcf.test_scope>
+///   }
+/// ```
+///
+/// Becomes:
+///
+/// ```
+///   %0 = pcf.generic execute {
+///     // some use %src : memref<?x?xi32, strided<[?, 1]>, 3>
+///   }
+/// ```
+///
+/// Additionally the initializer region is inlined into the main body of the
+/// pcf.generic as a part of this pattern as all allocations are resolved as a
+/// part of this pass.
+/// TODO(qedawkins): separate initializer handling out of this pass.
 struct ConvertGenericOp final : OpConversionPattern<PCF::GenericOp> {
   using Base::Base;
 
@@ -643,6 +685,24 @@ struct ConvertGenericOp final : OpConversionPattern<PCF::GenericOp> {
   }
 };
 
+/// Convert all result tied values of a `pcf.loop`, e.g.
+///
+/// ```
+///   %src = ... : memref<?x?xi32, strided<[?, 1]>, 3>
+///   %0 = pcf.loop
+///     execute(%ref = %src : (!pcf.sref<?x?xi32>)
+///                         -> (memref<?x?xi32, strided<[?, 1]>, 3>) {
+///     // some use %ref : !pcf.sref<?x?xi32, #pcf.test_scope>
+///   }
+/// ```
+///
+/// Becomes:
+///
+/// ```
+///   %0 = pcf.loop execute {
+///     // some use %src : memref<?x?xi32, strided<[?, 1]>, 3>
+///   }
+/// ```
 struct ConvertLoopOp final : OpConversionPattern<PCF::LoopOp> {
   using Base::Base;
 
@@ -696,6 +756,11 @@ struct ConvertLoopOp final : OpConversionPattern<PCF::LoopOp> {
   }
 };
 
+/// Converts a `pcf.write_slice` to a write to the analysis yielded memref
+/// destination. The flavor of write is determined by the input type:
+/// 1. Tensor types are written using `iree_codegen.store_to_buffer`.
+/// 2. Vector types are written using `vector.transfer_write`.
+/// 3. Memref types are written with a `memref.copy`.
 struct ConvertWriteSliceOp final : OpConversionPattern<PCF::WriteSliceOp> {
   using Base::Base;
 
@@ -736,6 +801,10 @@ struct ConvertWriteSliceOp final : OpConversionPattern<PCF::WriteSliceOp> {
   }
 };
 
+/// Converts a `pcf.read_slice` to a read from the analysis yielded memref
+/// source. The flavor of read is determined by the result type:
+/// 1. Tensor types are read using `iree_codegen.load_from_buffer`.
+/// 2. Vector types are read using `vector.transfer_read`.
 struct ConvertReadSliceOp final : OpConversionPattern<PCF::ReadSliceOp> {
   using Base::Base;
 
@@ -775,6 +844,10 @@ struct ConvertReadSliceOp final : OpConversionPattern<PCF::ReadSliceOp> {
   }
 };
 
+/// `pcf.get_memref` always returns a maximally dynamic memref and relies on
+/// propagation patterns after this pass to update everything. As a result
+/// this conversion pattern simply creates a `memref.cast` +
+/// `memref.memory_space_cast` + `memref.subview`.
 struct ConvertGetMemrefOp final : OpConversionPattern<PCF::GetMemrefOp> {
   using Base::Base;
 
@@ -812,6 +885,10 @@ struct ConvertGetMemrefOp final : OpConversionPattern<PCF::GetMemrefOp> {
   }
 };
 
+/// Converts `pcf.alloc` to a `memref.alloc` with the requested memref type.
+/// The memory space was determined during the analysis using the scope and
+/// the alignment is set based on the preferred allocation alignment, also per
+/// the scope.
 struct ConvertAllocOp final : OpConversionPattern<PCF::AllocOp> {
   using Base::Base;
 
@@ -825,9 +902,9 @@ struct ConvertAllocOp final : OpConversionPattern<PCF::AllocOp> {
                                          "failed to convert alloc type");
     }
 
-    // TODO: This pattern is a hack. We should be directly allocating memory as
-    // a global here. Instead we rely on dubious hoisting patterns to make this
-    // work as intended.
+    // TODO(qedawkins): This pattern is a hack. We should be directly allocating
+    // memory as a global here. Instead we rely on dubious hoisting patterns to
+    // make this work as intended.
     IntegerAttr alignment =
         allocOp.getResultType().getScope().getPreferredAllocAlignment(
             rewriter.getContext());
@@ -854,6 +931,10 @@ struct ConvertOptimizationBarrier final
 //===----------------------------------------------------------------------===//
 // Control Flow Conversion Patterns
 //===----------------------------------------------------------------------===//
+
+/// The type conversions required for this pass need additional casts inserted
+/// across control flow boundaries in some cases. As a result we can't use the
+/// standard provided conversion patterns for the Func dialect.
 
 /// Converts the operand and result types of the CallOp, used together with the
 /// FuncOpSignatureConversion.
@@ -968,6 +1049,10 @@ private:
 //===----------------------------------------------------------------------===//
 // SCF Conversion Pattern overrides
 //===----------------------------------------------------------------------===//
+
+/// The type conversions required for this pass need additional casts inserted
+/// across control flow boundaries in some cases. As a result we can't use the
+/// standard provided conversion patterns for the SCF dialect.
 
 struct ConvertForOp final : OpConversionPattern<scf::ForOp> {
   using Base::Base;
