@@ -354,15 +354,37 @@ struct DistributeTransferReadWithSingleRead final
       return rewriter.notifyMatchFailure(
           readOp, "warp or thread tiles have overlapping strides");
     }
+
+    auto calculateStrides = [](ArrayRef<int64_t> sizes,
+                               int64_t baseStride) -> SmallVector<int64_t> {
+      auto suffixProduct = mlir::computeSuffixProduct(sizes);
+      return llvm::to_vector(
+          llvm::map_range(suffixProduct, [baseStride](int64_t stride) {
+            return baseStride * stride;
+          }));
+    };
+
+    auto printRange = [](llvm::Twine name, ArrayRef<int64_t> range) {
+      llvm::dbgs() << name << ": ";
+      llvm::interleaveComma(range, llvm::dbgs());
+      llvm::dbgs() << "\n";
+    };
+
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> expandedMemShape;
-    expandedMemShape.reserve(distShape.size() + memRank);
+    int64_t newNumDimensions = distShape.size() + memRank;
+    expandedMemShape.reserve(newNumDimensions);
     SmallVector<OpFoldResult> outputShapes;
+    outputShapes.reserve(newNumDimensions);
     SmallVector<Value> newIndices;
-    newIndices.reserve(distShape.size() + memRank);
+    newIndices.reserve(newNumDimensions);
+    SmallVector<int64_t> transposePermutation;
+    transposePermutation.reserve(newNumDimensions);
+    auto [memStrides, _] = memrefTy.getStridesAndOffset();
+    printRange("Original strides", memStrides);
     ImplicitLocOpBuilder builder{readOp->getLoc(), rewriter};
-    // TODO: Do we also need to put the static sizes into `outputShapes`?
     for (int i = 0; i < memRank; ++i) {
+      int64_t dimStride = memStrides[i];
       if (i < memRank - rank) {
         // Handle the dimensions of the memref that are not distributed.
         expandedMemShape.push_back(memrefTy.getDimSize(i));
@@ -375,6 +397,7 @@ struct DistributeTransferReadWithSingleRead final
           outputShapes.push_back(builder.getIndexAttr(memrefTy.getDimSize(i)));
         }
         newIndices.push_back(readOp.getIndices()[i]);
+        transposePermutation.push_back(i);
         continue;
       }
       // Handle dimensions that are distributed.
@@ -397,28 +420,45 @@ struct DistributeTransferReadWithSingleRead final
           builder, readOp.getIndices()[i], {}, basis,
           /*hasOuterBound=*/true);
       newIndices.push_back(delinearizeOp->getResult(0));
+      SmallVector<int64_t> distributedStrides =
+          calculateStrides(undistributedPackedShape, dimStride);
+      expandedMemShape.append(undistributedPackedShape);
+      llvm::for_each(undistributedPackedShape, [&](int64_t size) {
+        outputShapes.push_back(builder.getIndexAttr(size));
+      });
     }
-    // Append the undistributed, packed shape as the inner shape of the new
-    // memref.
-    expandedMemShape.append(vectorLayout.getUndistributedPackedShape());
-    llvm::for_each(vectorLayout.getUndistributedPackedShape(),
-                   [&](int64_t size) {
-                     outputShapes.push_back(builder.getIndexAttr(size));
-                   });
+    printRange("expandedShape", expandedMemShape);
     auto expandedMemTy =
         MemRefType::get(expandedMemShape, memrefTy.getElementType());
-    // TODO: These strides are probably wrong and only work for all-static
-    // memrefs.
+    // TODO: Do we even need to calculate the strides or can we just take them
+    // from the memref?
     SmallVector<OpFoldResult> strides(llvm::map_range(
         expandedMemTy.getStridesAndOffset().first,
         [&](int64_t stride) { return builder.getIndexAttr(stride); }));
     expandedMemTy.dump();
+    printRange("expandedMemStrides", expandedMemTy.getStridesAndOffset().first);
     auto expandedMem = memref::ReinterpretCastOp::create(
         builder, expandedMemTy, readOp.getBase(), builder.getIndexAttr(0),
         outputShapes, strides);
     expandedMem->dump();
 
-    // Construct the remaining indices and the permutation map.
+    unsigned start = memRank - rank;
+    for (unsigned dim = 0; dim < 6; ++dim) {
+      for (unsigned r = 0; r < rank; ++r) {
+        transposePermutation.push_back(start + r * 6);
+      }
+      ++start;
+    }
+    printRange("Transpose Permutation", transposePermutation);
+    auto transposeMap = AffineMap::getPermutationMap(transposePermutation,
+                                                     builder.getContext());
+    transposeMap.dump();
+    auto transposeMem = memref::TransposeOp::create(
+        builder, expandedMem, AffineMapAttr::get(transposeMap));
+    transposeMem->dump();
+
+    // Construct the remaining indices and the permutation map for the new
+    // transfer_read.
     auto zeroIndex = arith::ConstantIndexOp::create(builder, 0);
     SmallVector<unsigned> targets;
     unsigned targetIndex = memRank;
@@ -452,8 +492,8 @@ struct DistributeTransferReadWithSingleRead final
     newVectorTy.dump();
     SmallVector<bool> inBounds(3 * rank, true);
     auto newRead = vector::TransferReadOp::create(
-        builder, newVectorTy, expandedMem, newIndices, std::nullopt, newPermMap,
-        inBounds);
+        builder, newVectorTy, transposeMem, newIndices, std::nullopt,
+        newPermMap, inBounds);
     newRead->dump();
     replaceOpWithDistributedValues(rewriter, readOp, newRead->getResults());
     return success();
