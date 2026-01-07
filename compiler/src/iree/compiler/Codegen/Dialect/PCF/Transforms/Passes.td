@@ -135,4 +135,23 @@ def ConvertSRefToMemRefPass : Pass<"iree-pcf-convert-sref-to-memref", ""> {
                            "::mlir::vector::VectorDialect"];
 }
 
+def ResolveTokensPass : Pass<"iree-pcf-resolve-tokens", ""> {
+  let summary = "Resolves synchronization scopes on `pcf.sref` types.";
+  let description = [{
+    Resolves synchronization scopes attached to `pcf.sref` types by expanding
+    them to their concrete representations. This pass should run before
+    `iree-pcf-convert-sref-to-memref`.
+
+    The input is IR containing `pcf.sref` types with sync scope attributes.
+    The pass expands `pcf.sref<..., sync_scope>` types into a `pcf.sref`
+    without sync scope plus any concrete types required by the sync scope
+    attribute. For shaped refs with `sync_on_return` scope, the parent
+    `pcf.generic` or `pcf.loop` op has its `sync_on_return` flag set to true,
+    ensuring a barrier is inserted when the op is lowered.
+
+    Write operations (`pcf.write_slice`) are updated to enqueue writes through
+    the sync scope's interface methods.
+  }];
+}
+
 #endif // IREE_CODEGEN_DIALECT_PCF_TRANSFORMS_PASSES
