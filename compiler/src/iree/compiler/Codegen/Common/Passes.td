@@ -123,6 +123,26 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def ConvertWorkgroupForallToPCFPass
+    : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
+  let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
+  let description = [{
+    Converts `scf.forall` ops with `#iree_codegen.workgroup_mapping` attributes
+    to `pcf.loop` ops with workgroup scope.
+
+    The input is IR containing `scf.forall` ops mapped to workgroups via
+    `#iree_codegen.workgroup_mapping<x/y/z>` attributes. The pass linearizes
+    all workgroup IDs down to a single dimension to handle cases where multiple
+    foralls have incompatible delinearization bases.
+
+    The output replaces each matching forall with a `pcf.loop` using
+    `#iree_codegen.workgroup_scope<linearize>` scope. Additionally, an
+    `iree_codegen.workgroup_count_hint` is inserted before each loop to
+    communicate the required workgroup count to the export's count region.
+  }];
+  let dependentDialects = ["iree_compiler::IREE::PCF::PCFDialect"];
+}
+
 def CombineLayoutTransformationPass :
     InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =

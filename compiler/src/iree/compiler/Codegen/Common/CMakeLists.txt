@@ -81,6 +81,7 @@ iree_cc_library(
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "ConvertUnsupportedFloatArithPass.cpp"
+    "ConvertWorkgroupForallToPCF.cpp"
     "ConvolutionToIGEMM.cpp"
     "DecomposeAffineOpsPass.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
