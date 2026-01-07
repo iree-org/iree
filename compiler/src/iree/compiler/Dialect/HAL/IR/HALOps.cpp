@@ -1538,7 +1538,7 @@ static LogicalResult verifyDeviceQueueFences(Operation *queueOp,
                                              Value waitFence,
                                              Value signalFence) {
   if (waitFence == signalFence &&
-      !isa<IREE::Util::NullOp>(waitFence.getDefiningOp())) {
+      !isa_and_present<IREE::Util::NullOp>(waitFence.getDefiningOp())) {
     return queueOp->emitOpError() << "device queue operations cannot wait and "
                                      "signal on the same fence.";
   }
