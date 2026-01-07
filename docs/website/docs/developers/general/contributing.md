@@ -447,6 +447,12 @@ runs.
     ci-exactly: linux_x64_bazel
     ```
 
+* Opt in to the Linux arm64 build:
+
+    ``` text
+    ci-extra: linux_arm64_clang
+    ```
+
 * Opt in to the Windows compiler build and test workflow:
 
     ``` text
@@ -457,6 +463,12 @@ runs.
 
     ``` text
     ci-extra: macos_arm64_clang, macos_x64_clang
+    ```
+
+* Other opt in builds:
+
+    ``` text
+    ci-extra: linux_x64_clang_byollvm, linux_x64_clang_debug, linux_x64_clang_tsan
     ```
 
 For example, this PR opted in to running the `build_test_all_windows` job

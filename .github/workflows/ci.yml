@@ -235,6 +235,24 @@ jobs:
     uses: ./.github/workflows/ci_linux_x64_clang.yml
     secrets: inherit
 
+  linux_x64_gcc:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_gcc')
+    uses: ./.github/workflows/ci_linux_x64_gcc.yml
+    secrets: inherit
+
+  linux_arm64_clang:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_arm64_clang')
+    uses: ./.github/workflows/ci_linux_arm64_clang.yml
+    secrets: inherit
+
+  linux_x64_clang_debug:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_debug')
+    uses: ./.github/workflows/ci_linux_x64_clang_debug.yml
+    secrets: inherit
+
   linux_x64_clang_asan:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
@@ -245,6 +263,18 @@ jobs:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_ubsan')
     uses: ./.github/workflows/ci_linux_x64_clang_ubsan.yml
+    secrets: inherit
+
+  linux_x64_clang_tsan:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_tsan')
+    uses: ./.github/workflows/ci_linux_x64_clang_tsan.yml
+    secrets: inherit
+
+  linux_x64_clang_byollvm:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_byollvm')
+    uses: ./.github/workflows/ci_linux_x64_clang_byollvm.yml
     secrets: inherit
 
   macos_arm64_clang:
@@ -281,8 +311,13 @@ jobs:
       # Full project builds.
       - linux_x64_bazel
       - linux_x64_clang
+      - linux_x64_gcc
+      - linux_arm64_clang
+      - linux_x64_clang_debug
       - linux_x64_clang_asan
       - linux_x64_clang_ubsan
+      - linux_x64_clang_tsan
+      - linux_x64_clang_byollvm
       - macos_arm64_clang
       - macos_x64_clang
       - windows_x64_msvc

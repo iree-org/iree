@@ -129,6 +129,11 @@ DEFAULT_SCHEDULE_ONLY_JOBS = frozenset(
     [
         "macos_arm64_clang",
         "macos_x64_clang",
+        "linux_arm64_clang",
+        "linux_x64_clang_byollvm",
+        "linux_x64_clang_debug",
+        "linux_x64_clang_tsan",
+        "linux_x64_gcc",
     ]
 )
 
@@ -136,11 +141,55 @@ DEFAULT_SCHEDULE_ONLY_JOBS = frozenset(
 # Each tuple consists of the CI job name and a list of file paths to match.
 # The file paths should be specified using Unix shell-style wildcards. Sample:
 #   ("test_nvidia_a100", ["compiler/plugins/target/CUDA/*"]),
-# Note: these jobs should also be included in DEFAULT_POSTSUBMIT_ONLY_JOBS.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     (
+        "linux_arm64_clang",
+        [".github/workflows/ci_linux_arm64_clang.yml"],
+    ),
+    (
+        "linux_x64_bazel",
+        [".github/workflows/ci_linux_x64_bazel.yml"],
+    ),
+    (
+        "linux_x64_clang_asan",
+        [".github/workflows/ci_linux_x64_clang_asan.yml"],
+    ),
+    (
+        "linux_x64_clang_byollvm",
+        [".github/workflows/ci_linux_x64_clang_byollvm.yml"],
+    ),
+    (
+        "linux_x64_clang_debug",
+        [".github/workflows/ci_linux_x64_clang_debug.yml"],
+    ),
+    (
+        "linux_x64_clang_tsan",
+        [".github/workflows/ci_linux_x64_clang_tsan.yml"],
+    ),
+    (
+        "linux_x64_clang",
+        [".github/workflows/ci_linux_x64_clang.yml"],
+    ),
+    (
+        "linux_x64_gcc",
+        [".github/workflows/ci_linux_x64_gcc.yml"],
+    ),
+    (
+        "macos_arm64_clang",
+        [".github/workflows/ci_macos_arm64_clang.yml"],
+    ),
+    (
+        "macos_x64_clang",
+        [".github/workflows/ci_macos_x64_clang.yml"],
+    ),
+    (
         "windows_x64_msvc",
-        ["*win32*", "*windows*", "*msvc*"],
+        [
+            "*win32*",
+            "*windows*",
+            "*msvc*",
+            ".github/worklflows/ci_windows_x64_msvc.yml",
+        ],
     ),
 ]
 

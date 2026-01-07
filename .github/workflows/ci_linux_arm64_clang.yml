@@ -7,21 +7,12 @@
 name: CI - Linux arm64 clang
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/ci_linux_arm64_clang.yml"
   schedule:
     # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
     - cron: "15 9 * * 1-5"
   workflow_dispatch:
+  workflow_call:
 
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit). The workflow name is prepended to avoid conflicts between
-  # different workflows.
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
 
 jobs:
   linux_arm64_clang:
