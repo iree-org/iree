@@ -882,7 +882,7 @@ void setUKernelDescriptor(Operation *op,
 //   #iree_codegen.workgroup_scope
 Attribute IREE::Codegen::WorkgroupScopeAttr::parse(AsmParser &parser, Type) {
   bool linearize = false;
-  if (parser.parseOptionalLess().succeeded()) {
+  if (succeeded(parser.parseOptionalLess())) {
     if (failed(parser.parseKeyword("linearize")) ||
         failed(parser.parseGreater())) {
       return {};

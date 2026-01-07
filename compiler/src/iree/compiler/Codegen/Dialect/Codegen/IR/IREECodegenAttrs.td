@@ -670,8 +670,9 @@ def DenormalFpMathAttr :
 
 def WorkgroupScopeAttr : AttrDef<IREECodegen_Dialect, "WorkgroupScope", []> {
   let mnemonic = "workgroup_scope";
-  let summary =
-      [{Attribute representing parallel execution across workgroups.}];
+  let summary = [{
+    Attribute representing parallel execution across workgroups.
+  }];
   let description = [{
     Parallel scope that maps to workgroup execution.
 
