@@ -2428,9 +2428,9 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   // indices are not root operations.
   llvm::SmallDenseSet<Operation *, 4> genericToSkip;
   for (Operation *op : llvm::reverse(computeOps)) {
-    if (!isa<linalg::GenericOp, linalg::FillOp, IREE::LinalgExt::ScatterOp,
-             IREE::LinalgExt::MapScatterOp, linalg::PackOp, linalg::UnPackOp>(
-            op)) {
+    if (!isa<linalg::CopyOp, linalg::GenericOp, linalg::FillOp,
+             IREE::LinalgExt::ScatterOp, IREE::LinalgExt::MapScatterOp,
+             linalg::PackOp, linalg::UnPackOp>(op)) {
       rootOperation = op;
       break;
     }
@@ -2483,7 +2483,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   if (!rootOperation) {
     for (Operation *op : llvm::reverse(computeOps)) {
       if (isa<IREE::LinalgExt::ScatterOp, IREE::LinalgExt::MapScatterOp,
-              linalg::FillOp>(op)) {
+              linalg::CopyOp, linalg::FillOp>(op)) {
         rootOperation = op;
         break;
       }
