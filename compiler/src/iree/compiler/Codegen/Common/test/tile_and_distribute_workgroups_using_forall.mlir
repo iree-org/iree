@@ -1429,3 +1429,61 @@ func.func @arg_compare_fold_broadcast(
 //   CHECK-NOT:     linalg.broadcast
 //       CHECK:     scf.forall {{.*}} shared_outs(%{{.*}} = %[[INIT_F16]], %{{.*}} = %[[INIT_I32]])
 //       CHECK:       iree_linalg_ext.arg_compare
+
+// -----
+
+// This test verifies that when folding extract_slice of fill through a block
+// argument, the lowering_config attribute is preserved on the new fill
+// operations. This is necessary so that subsequent passes (e.g., tile and
+// distribute) can properly handle the newly created fill ops.
+#config_fill_fold = #iree_codegen.lowering_config<tile_sizes = [[1, 8]]>
+func.func @fold_fill_through_block_arg(%arg0 : tensor<4x16x128xf16>) -> (tensor<4x16xf16>, tensor<4x16xi32>) {
+  %cst = arith.constant 0xFC00 : f16
+  %c0_i32 = arith.constant 0 : i32
+  %c0 = arith.constant 0 : index
+  %empty_f16 = tensor.empty() : tensor<4x16xf16>
+  %empty_i32 = tensor.empty() : tensor<4x16xi32>
+  %fill_f16 = linalg.fill {lowering_config = #config_fill_fold}
+      ins(%cst : f16) outs(%empty_f16 : tensor<4x16xf16>) -> tensor<4x16xf16>
+  %fill_i32 = linalg.fill {lowering_config = #config_fill_fold}
+      ins(%c0_i32 : i32) outs(%empty_i32 : tensor<4x16xi32>) -> tensor<4x16xi32>
+  %result:2 = scf.forall (%iv0, %iv1) = (0, 0) to (4, 16) step (1, 8)
+      shared_outs(%out_f16 = %fill_f16, %out_i32 = %fill_i32) -> (tensor<4x16xf16>, tensor<4x16xi32>) {
+    %in_slice = tensor.extract_slice %arg0[%iv0, %iv1, 0] [1, 8, 128] [1, 1, 1]
+        : tensor<4x16x128xf16> to tensor<1x8x128xf16>
+    %slice_f16 = tensor.extract_slice %out_f16[%iv0, %iv1] [1, 8] [1, 1]
+        : tensor<4x16xf16> to tensor<1x8xf16>
+    %slice_i32 = tensor.extract_slice %out_i32[%iv0, %iv1] [1, 8] [1, 1]
+        : tensor<4x16xi32> to tensor<1x8xi32>
+    %compare:2 = iree_linalg_ext.arg_compare {lowering_config = #config_fill_fold}
+        dimension(2) ins(%in_slice : tensor<1x8x128xf16>)
+        outs(%slice_f16, %slice_i32 : tensor<1x8xf16>, tensor<1x8xi32>)
+        index_base(%c0 : index) {
+      ^bb0(%lhs: f16, %rhs: f16):
+        %cmp = arith.cmpf ogt, %lhs, %rhs : f16
+        iree_linalg_ext.yield %cmp : i1
+    } -> tensor<1x8xf16>, tensor<1x8xi32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %compare#0 into %out_f16[%iv0, %iv1] [1, 8] [1, 1]
+          : tensor<1x8xf16> into tensor<4x16xf16>
+      tensor.parallel_insert_slice %compare#1 into %out_i32[%iv0, %iv1] [1, 8] [1, 1]
+          : tensor<1x8xi32> into tensor<4x16xi32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  return %result#0, %result#1 : tensor<4x16xf16>, tensor<4x16xi32>
+}
+
+// CHECK-LABEL: func.func @fold_fill_through_block_arg
+//   CHECK-DAG:   %[[CST_F16:.+]] = arith.constant 0xFC00 : f16
+//   CHECK-DAG:   %[[CST_I32:.+]] = arith.constant 0 : i32
+//   CHECK-DAG:   %[[EMPTY_F16:.+]] = tensor.empty() : tensor<4x16xf16>
+//   CHECK-DAG:   %[[EMPTY_I32:.+]] = tensor.empty() : tensor<4x16xi32>
+//       CHECK:   scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (4, 16) step (1, 8)
+//  CHECK-SAME:       shared_outs(%[[OUT_F16:.+]] = %[[EMPTY_F16]], %[[OUT_I32:.+]] = %[[EMPTY_I32]])
+//       CHECK:     %[[SLICE_F16:.+]] = tensor.extract_slice %[[OUT_F16]][%[[IV0]], %[[IV1]]] [1, 8] [1, 1]
+//       CHECK:     %[[FILLED_F16:.+]] = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = {{\[\[}}1, 8]]>} ins(%[[CST_F16]] : f16) outs(%[[SLICE_F16]] : tensor<1x8xf16>)
+//       CHECK:     %[[SLICE_I32:.+]] = tensor.extract_slice %[[OUT_I32]][%[[IV0]], %[[IV1]]] [1, 8] [1, 1]
+//       CHECK:     %[[FILLED_I32:.+]] = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = {{\[\[}}1, 8]]>} ins(%[[CST_I32]] : i32) outs(%[[SLICE_I32]] : tensor<1x8xi32>)
+//       CHECK:     scf.forall
+//  CHECK-SAME:         shared_outs({{.*}} = %[[FILLED_F16]], {{.*}} = %[[FILLED_I32]])
+//       CHECK:       iree_linalg_ext.arg_compare
