@@ -595,9 +595,6 @@ LogicalResult MapGatherOp::verify() {
   if (getSourceType().getElementType() != getOutputType().getElementType()) {
     return emitOpError("expected source and output element types to match");
   }
-  if (getOutputType().getRank() == 0) {
-    return emitOpError("expected output type to have non-zero rank");
-  }
   Region &transformRegion = getTransformationRegion();
   Block &transformBody = transformRegion.getBlocks().front();
   if (transformBody.getNumArguments() != getOutputRank()) {
