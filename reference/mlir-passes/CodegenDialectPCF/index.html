@@ -4573,6 +4573,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#-iree-pcf-fuse-pcf-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-pcf-fuse-pcf-writes
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4630,6 +4639,22 @@ space, and replacing the external use with a new <code>pcf.write_slice</code>.</
 - <code>tensor.extract_slice</code> by adding a condition based on the slice bounds.</p>
 <p>The underlying fusion patterns are exposed via <code>matchTilableConsumer()</code> and
 <code>fuseTilableConsumer()</code> for use in custom pipelines.</p>
+<h3 id="-iree-pcf-fuse-pcf-writes"><code>-iree-pcf-fuse-pcf-writes</code><a class="headerlink" href="#-iree-pcf-fuse-pcf-writes" title="Permanent link">link</a></h3>
+<p><em>Consolidates pcf.write_slice ops in loop bodies</em></p>
+<p>Test pass for composing <code>pcf.write_slice</code> operations with nested
+<code>scf.forall</code> producers.</p>
+<p>The input is IR containing <code>pcf.write_slice</code> ops where the source value is
+produced by an <code>scf.forall</code> with <code>tensor.parallel_insert_slice</code> in its
+terminator.</p>
+<p>The pass moves each matching <code>pcf.write_slice</code> inside the <code>scf.forall</code>
+body, composing the slice parameters:
+- New offsets: <code>write_offset + insert_offset * write_stride</code>
+- New sizes: from the <code>parallel_insert_slice</code>
+- New strides: <code>write_stride * insert_stride</code></p>
+<p>This enables further lowering by ensuring writes happen at the granularity
+of the inner parallel loop rather than after the entire forall completes.</p>
+<p>The underlying pattern is exposed via <code>composeWriteSliceWithParallelInsert()</code>
+for use in custom pipelines.</p>
 
 
 
