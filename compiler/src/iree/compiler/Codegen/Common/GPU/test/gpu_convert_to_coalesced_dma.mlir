@@ -200,3 +200,64 @@ func.func @copy_prefer_contiguous_subview(%source: tensor<64x128xf32>, %init: te
 
   return %result : tensor<64x128xf32>
 }
+
+// -----
+
+// Test: Small innermost dimension with tensor.empty() output CAN be linearized.
+// When output comes from tensor.empty(), we can use total elements instead of
+// innermost dimension for the size check, enabling coalesced DMA.
+
+#gpu_target_linearize = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32]
+>>
+
+#exec_target_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_linearize}>
+#translation_linearize = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @copy_small_innermost_linearized
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>
+func.func @copy_small_innermost_linearized(%source: tensor<128x16xf32>) -> tensor<128x16xf32>
+  attributes {hal.executable.target = #exec_target_linearize, translation_info = #translation_linearize} {
+  %empty = tensor.empty() : tensor<128x16xf32>
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<128x16xf32>)
+    outs(%empty : tensor<128x16xf32>) -> tensor<128x16xf32>
+
+  // Innermost dimension (16) < minElementsPerTransfer (64), but since output is
+  // tensor.empty(), we use total elements (2048) for the check, which passes.
+  // With 4 warps (256/64), rows are tiled to 32 (128/4), columns kept whole at 16.
+
+  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<128x16xf32>
+
+  // Warp-level forall: step (32, 16) distributes 128 rows across 4 warps
+  // CHECK: %[[WARP_RESULT:.+]] = scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (128, 16) step (32, 16)
+  // CHECK-SAME: shared_outs(%[[INIT_TILE:.+]] = %[[EMPTY]]) -> (tensor<128x16xf32>) {
+  // CHECK:   %[[SLICE_SRC:.+]] = tensor.extract_slice %[[SRC]][%[[IV0]], 0] [32, 16] [1, 1]
+  // CHECK-SAME:   : tensor<128x16xf32> to tensor<32x16xf32>
+  // CHECK:   %[[SLICE_DST:.+]] = tensor.extract_slice %[[INIT_TILE]][%[[IV0]], 0] [32, 16] [1, 1]
+  // CHECK-SAME:   : tensor<128x16xf32> to tensor<32x16xf32>
+
+  // Thread-level forall with 64 lanes
+  // CHECK:   %[[THREAD_RESULT:.+]] = scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK-SAME:   shared_outs(%[[THREAD_INIT:.+]] = %[[SLICE_DST]]) -> (tensor<32x16xf32>) {
+  // CHECK:     scf.forall.in_parallel {
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[SLICE_SRC]] into %[[THREAD_INIT]] lane(%[[LANE]])
+  // CHECK-SAME:       : tensor<32x16xf32>, tensor<32x16xf32>, index
+  // CHECK:     }
+  // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
+
+  // CHECK:   scf.forall.in_parallel {
+  // CHECK:     tensor.parallel_insert_slice %[[THREAD_RESULT]] into %[[INIT_TILE]][%[[IV0]], 0] [32, 16] [1, 1]
+  // CHECK-SAME:     : tensor<32x16xf32> into tensor<128x16xf32>
+  // CHECK:   }
+  // CHECK: }
+
+  // CHECK: return %[[WARP_RESULT]]
+  // CHECK-NOT: linalg.copy
+
+  return %result : tensor<128x16xf32>
+}

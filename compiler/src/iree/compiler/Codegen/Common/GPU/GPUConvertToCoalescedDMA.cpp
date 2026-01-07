@@ -58,11 +58,24 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   return mapping;
 }
 
+/// Compute total static elements in the shape. Returns 0 if any dimension
+/// is dynamic.
+static int64_t getTotalStaticElements(ArrayRef<int64_t> shape) {
+  int64_t total = 1;
+  for (int64_t dim : shape) {
+    if (ShapedType::isDynamic(dim))
+      return 0;
+    total *= dim;
+  }
+  return total;
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
 computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
-                            RankedTensorType outputType) {
+                            RankedTensorType outputType,
+                            bool canLinearize = false) {
   // Check that this operation has the use_global_load_dma config.
   auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
   if (!dmaConfig) {
@@ -81,11 +94,9 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     return {};
   }
 
-  // Skip coalesced DMA if the innermost dimension is smaller than the minimum
-  // transfer size. The minimum transfer size is subgroupSize *
-  // minElementsPerLane.
+  ArrayRef<int64_t> shape = outputType.getShape();
   int64_t rank = outputType.getRank();
-  int64_t innermostDim = outputType.getShape()[rank - 1];
+  int64_t innermostDim = shape[rank - 1];
   if (ShapedType::isDynamic(innermostDim)) {
     return {};
   }
@@ -116,13 +127,62 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
         std::min(minElementsPerTransfer, elementsPerTransfer);
   }
 
-  // If no valid DMA size found or innermost dim is too small, skip.
-  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-      innermostDim < minElementsPerTransfer) {
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
     return {};
   }
 
+  // Check if we have enough elements for coalesced DMA.
+  // For copies that can be linearized (destination from tensor.empty),
+  // check total elements. Otherwise check innermost dimension.
+  if (canLinearize) {
+    int64_t totalElements = getTotalStaticElements(shape);
+    if (totalElements < minElementsPerTransfer) {
+      return {};
+    }
+  } else {
+    if (innermostDim < minElementsPerTransfer) {
+      return {};
+    }
+  }
+
   return {builder.getIndexAttr(*subgroupSize)};
+}
+
+/// Check if a value ultimately comes from tensor.empty(), tracing through
+/// extract_slices and block arguments from scf.forall shared_outs.
+static bool comesFromTensorEmpty(Value value) {
+  // Direct tensor.empty.
+  if (value.getDefiningOp<tensor::EmptyOp>())
+    return true;
+
+  // Trace through extract_slice.
+  if (auto extractSlice = value.getDefiningOp<tensor::ExtractSliceOp>())
+    return comesFromTensorEmpty(extractSlice.getSource());
+
+  // Trace through forall shared_outs block arguments.
+  if (auto blockArg = dyn_cast<BlockArgument>(value)) {
+    if (auto forallOp =
+            dyn_cast<scf::ForallOp>(blockArg.getOwner()->getParentOp())) {
+      // Check if this is a shared_outs argument (after the induction
+      // variables).
+      unsigned numIVs = forallOp.getInductionVars().size();
+      unsigned argIndex = blockArg.getArgNumber();
+      if (argIndex >= numIVs) {
+        unsigned sharedOutIndex = argIndex - numIVs;
+        if (sharedOutIndex < forallOp.getOutputs().size())
+          return comesFromTensorEmpty(forallOp.getOutputs()[sharedOutIndex]);
+      }
+    }
+  }
+
+  return false;
+}
+
+/// Check if the copy's output comes from tensor.empty(), indicating the
+/// destination can be linearized for DMA (fresh allocation, no aliasing).
+static bool canLinearizeCopy(linalg::CopyOp copyOp) {
+  Value output = copyOp.getOutputs()[0];
+  return comesFromTensorEmpty(output);
 }
 
 /// Check if the given forall op has warp mapping.
@@ -365,7 +425,8 @@ protected:
   computeThreadNumThreads(OpBuilder &builder,
                           linalg::CopyOp copyOp) const override {
     auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
-    return computeThreadNumThreadsImpl(builder, copyOp, outputType);
+    return computeThreadNumThreadsImpl(builder, copyOp, outputType,
+                                       canLinearizeCopy(copyOp));
   }
 };
 
@@ -563,9 +624,10 @@ private:
   /// Compute tile sizes for subgroup-level distribution.
   /// Returns {tileSizes, numTiledDims}.
   ///
-  /// We keep the innermost dimension whole (not tiled) to ensure contiguous
-  /// memory access patterns, and greedily redistribute warps to outer
-  /// dimensions.
+  /// For multi-dim tensors: keep innermost dimension whole to ensure contiguous
+  /// memory access, and distribute warps to outer dimensions.
+  /// For 1D tensors (e.g., flattened copies): distribute warps across the
+  /// single dimension.
   std::pair<SmallVector<OpFoldResult>, int64_t>
   computeSubgroupTileSizes(IRRewriter &rewriter, ArrayRef<int64_t> shape,
                            ArrayRef<int64_t> numWarps) {
@@ -583,7 +645,24 @@ private:
       }
     }
 
-    // Greedily distribute warps to outer dimensions, keeping innermost whole.
+    // For 1D tensors (e.g., flattened copies), distribute the single dimension
+    // across warps.
+    if (rank == 1) {
+      int64_t dim = shape[0];
+      if (ShapedType::isStatic(dim) && totalWarps > 1) {
+        int64_t warpsToUse = std::min(totalWarps, dim);
+        int64_t tileSize = llvm::divideCeil(dim, warpsToUse);
+        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+        ++numTiledDims;
+      } else {
+        tileSizes.push_back(rewriter.getIndexAttr(dim));
+        ++numTiledDims;
+      }
+      return {tileSizes, numTiledDims};
+    }
+
+    // For multi-dim tensors, greedily distribute warps to outer dimensions,
+    // keeping innermost whole.
     int64_t remainingWarps = totalWarps;
     for (int64_t i = 0; i < rank; ++i) {
       bool isInnermostDim = (i == rank - 1);
@@ -682,10 +761,28 @@ private:
           std::min(minElementsPerTransfer, elementsPerTransfer);
     }
 
-    // If no valid DMA size found or innermost dim is too small, skip.
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim < minElementsPerTransfer) {
+    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
       return failure();
+    }
+
+    // Check if we have enough elements for coalesced DMA.
+    // For copies with tensor.empty() output, the downstream pass can linearize
+    // all dimensions, so we check total elements instead of just innermost.
+    // For other cases, we require innermost >= minElementsPerTransfer.
+    bool canLinearize = false;
+    if constexpr (std::is_same_v<OpTy, linalg::CopyOp>) {
+      canLinearize = canLinearizeCopy(op);
+    }
+
+    if (canLinearize) {
+      int64_t totalElements = getTotalStaticElements(shape);
+      if (totalElements < minElementsPerTransfer) {
+        return failure();
+      }
+    } else {
+      if (innermostDim < minElementsPerTransfer) {
+        return failure();
+      }
     }
 
     // Compute tile sizes for subgroup-level distribution.
@@ -710,10 +807,11 @@ private:
 
   LogicalResult applySubgroupTiling(FunctionOpInterface funcOp) {
     MLIRContext *context = &getContext();
-    SmallVector<Operation *> opsToTile;
+    IRRewriter rewriter(context);
 
     // Collect all ops with iree_gpu.use_global_load_dma lowering config.
     // Skip ops that are already inside a warp-mapped forall.
+    SmallVector<Operation *> opsToTile;
     funcOp->walk([&](Operation *op) {
       if (isa<linalg::CopyOp, IREE::LinalgExt::GatherOp>(op)) {
         auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
@@ -727,7 +825,6 @@ private:
     });
 
     // Apply subgroup-level tiling to each op.
-    IRRewriter rewriter(context);
     for (Operation *op : opsToTile) {
       FailureOr<scf::SCFTilingResult> tilingResult =
           TypeSwitch<Operation *, FailureOr<scf::SCFTilingResult>>(op)
