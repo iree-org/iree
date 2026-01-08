@@ -51,6 +51,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
     iree::compiler::plugins::target::ROCM::builtins::mlir_ukernel::iree_mlir_ukernel_patterns_amdgpu

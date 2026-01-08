@@ -44,7 +44,7 @@ def ApplyBuiltinPDLPatternsDriverPass : Pass<"iree-rocm-apply-builtin-pdl-patter
            /*defaultValue=*/"false", "Enable MLIR-tensor-based ukernels">
   ];
   let dependentDialects = [
-    // ROCDL, GPU, and Vector dialect dependencies are to make sure these dialects are loaded when parsing
+    // ROCDL, GPU, Vector, and AMDGPU dialect dependencies are to make sure these dialects are loaded when parsing
     // the ukernels that contain them. The pass itself does not depend directly on these dialects.
     "iree_compiler::IREE::HAL::HALDialect",
     "iree_compiler::IREE::ROCM::ROCMDialect",
@@ -54,6 +54,7 @@ def ApplyBuiltinPDLPatternsDriverPass : Pass<"iree-rocm-apply-builtin-pdl-patter
     "mlir::pdl_interp::PDLInterpDialect",
     "mlir::vector::VectorDialect",
     "ROCDL::ROCDLDialect",
+    "mlir::amdgpu::AMDGPUDialect",
   ];
 }
 
