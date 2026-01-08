@@ -4,14 +4,24 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Zero-copy JSON parsing utilities.
+// Zero-copy JSON/JSONC parsing utilities.
 //
 // This is a minimal JSON parser designed for parsing configuration files and
 // metadata. It operates on string views without allocation and returns spans
 // into the original input. For string values containing escape sequences, use
 // iree_json_unescape_string() to decode them into a caller-provided buffer.
 //
-// The parser implements RFC 8259 (JSON) with the following constraints:
+// The parser accepts both RFC 8259 (JSON) and JSONC (JSON with Comments):
+// - Single-line comments: // comment to end of line
+// - Multi-line comments: /* comment block */ (may span lines in JSONL)
+// - Trailing commas: [1, 2,] and {"a": 1,}
+// - UTF-8 BOM at start of input (automatically skipped)
+//
+// Safety:
+// - Maximum nesting depth of 128 levels (IREE_JSON_MAX_DEPTH) to prevent DoS
+// - Override with -DIREE_JSON_MAX_DEPTH=N at compile time if needed
+//
+// Constraints:
 // - No streaming support (entire input must be in memory)
 // - String values are returned raw (with escape sequences)
 // - Number parsing is basic (use iree_json_parse_* helpers for conversion)

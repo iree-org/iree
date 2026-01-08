@@ -17,8 +17,69 @@
 //===----------------------------------------------------------------------===//
 
 // Forward declaration for mutual recursion.
-static iree_status_t iree_json_consume_value_impl(
-    iree_string_view_t* str, iree_string_view_t* out_value);
+static iree_status_t iree_json_consume_value_impl(iree_string_view_t* str,
+                                                  iree_string_view_t* out_value,
+                                                  iree_host_size_t depth);
+
+// Maximum nesting depth for JSON structures (objects/arrays).
+// This prevents stack overflow from adversarial inputs.
+#ifndef IREE_JSON_MAX_DEPTH
+#define IREE_JSON_MAX_DEPTH 128
+#endif
+
+// Skips UTF-8 BOM (Byte Order Mark) if present at the start of input.
+// BOM is 0xEF 0xBB 0xBF and is commonly added by Windows text editors.
+static void iree_json_skip_bom(iree_string_view_t* str) {
+  if (str->size >= 3 && (uint8_t)str->data[0] == 0xEF &&
+      (uint8_t)str->data[1] == 0xBB && (uint8_t)str->data[2] == 0xBF) {
+    *str = iree_string_view_substr(*str, 3, IREE_HOST_SIZE_MAX);
+  }
+}
+
+// Skips whitespace and JSONC-style comments (// and /* */).
+// This allows parsing both strict JSON and JSONC (JSON with Comments).
+static iree_status_t iree_json_skip_whitespace_and_comments(
+    iree_string_view_t* str) {
+  while (str->size > 0) {
+    // Skip leading whitespace.
+    *str = iree_string_view_trim(*str);
+    if (str->size == 0) return iree_ok_status();
+
+    // Check for single-line comment: //
+    if (str->size >= 2 && str->data[0] == '/' && str->data[1] == '/') {
+      // Find end of line.
+      iree_host_size_t i = 2;
+      while (i < str->size && str->data[i] != '\n') ++i;
+      // Skip past newline if present.
+      if (i < str->size && str->data[i] == '\n') ++i;
+      *str = iree_string_view_substr(*str, i, IREE_HOST_SIZE_MAX);
+      continue;
+    }
+
+    // Check for multi-line comment: /* */
+    if (str->size >= 2 && str->data[0] == '/' && str->data[1] == '*') {
+      iree_host_size_t i = 2;
+      bool found_end = false;
+      while (i + 1 < str->size) {
+        if (str->data[i] == '*' && str->data[i + 1] == '/') {
+          *str = iree_string_view_substr(*str, i + 2, IREE_HOST_SIZE_MAX);
+          found_end = true;
+          break;
+        }
+        ++i;
+      }
+      if (!found_end) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "unterminated /* */ comment");
+      }
+      continue;
+    }
+
+    // No comment found, done skipping.
+    break;
+  }
+  return iree_ok_status();
+}
 
 iree_status_t iree_json_consume_keyword(iree_string_view_t* str,
                                         iree_string_view_t keyword,
@@ -175,21 +236,27 @@ iree_status_t iree_json_consume_string(iree_string_view_t* str,
   return iree_ok_status();
 }
 
-iree_status_t iree_json_consume_object(iree_string_view_t* str,
-                                       iree_string_view_t* out_value) {
+static iree_status_t iree_json_consume_object_impl(
+    iree_string_view_t* str, iree_string_view_t* out_value,
+    iree_host_size_t depth) {
+  if (depth >= IREE_JSON_MAX_DEPTH) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "JSON nesting depth exceeds maximum of %d",
+                            (int)IREE_JSON_MAX_DEPTH);
+  }
   *out_value = iree_string_view_empty();
   const char* start = str->data;
   if (!iree_string_view_consume_prefix(str, IREE_SV("{"))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing object {");
   }
-  *str = iree_string_view_trim(*str);
+  IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
   while (!iree_string_view_is_empty(*str)) {
     // Check for end of object.
     if (iree_string_view_starts_with(*str, IREE_SV("}"))) break;
     // Try to parse key string.
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_json_consume_string(str, &key));
-    *str = iree_string_view_trim(*str);
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
     // Expect : separator.
     if (!iree_string_view_consume_prefix(str, IREE_SV(":"))) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -197,73 +264,79 @@ iree_status_t iree_json_consume_object(iree_string_view_t* str,
     }
     // Scan ahead to get the value span.
     iree_string_view_t value = iree_string_view_empty();
-    IREE_RETURN_IF_ERROR(iree_json_consume_value_impl(str, &value));
-    // Trim after value to handle whitespace before comma or closing brace.
-    *str = iree_string_view_trim(*str);
-    // If there's a comma then we expect another member.
-    if (!iree_string_view_consume_prefix(str, IREE_SV(","))) {
-      // No comma - must be end of object (trailing commas are invalid JSON).
-      break;
-    }
-    *str = iree_string_view_trim(*str);
-    // After comma, must have another member (not closing brace).
-    if (iree_string_view_starts_with(*str, IREE_SV("}"))) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "trailing comma in object");
-    }
+    IREE_RETURN_IF_ERROR(iree_json_consume_value_impl(str, &value, depth + 1));
+    // Skip whitespace/comments before comma or closing brace.
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
+    // If there's a comma then continue to next member (trailing commas
+    // allowed).
+    if (!iree_string_view_consume_prefix(str, IREE_SV(","))) break;
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
   }
-  // Save end pointer BEFORE consuming `}` (consume_prefix returns empty view
-  // with NULL data when string becomes empty).
-  const char* end = str->data + 1;
-  if (!iree_string_view_consume_prefix(str, IREE_SV("}"))) {
+  // Verify closing brace before computing end pointer (str->data may be NULL).
+  if (!iree_string_view_starts_with(*str, IREE_SV("}"))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing object }");
   }
+  const char* end = str->data + 1;
+  iree_string_view_consume_prefix(str, IREE_SV("}"));
+  *out_value = iree_make_string_view(start, end - start);
+  return iree_ok_status();
+}
+
+iree_status_t iree_json_consume_object(iree_string_view_t* str,
+                                       iree_string_view_t* out_value) {
+  iree_json_skip_bom(str);
+  return iree_json_consume_object_impl(str, out_value, /*depth=*/0);
+}
+
+static iree_status_t iree_json_consume_array_impl(iree_string_view_t* str,
+                                                  iree_string_view_t* out_value,
+                                                  iree_host_size_t depth) {
+  if (depth >= IREE_JSON_MAX_DEPTH) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "JSON nesting depth exceeds maximum of %d",
+                            (int)IREE_JSON_MAX_DEPTH);
+  }
+  *out_value = iree_string_view_empty();
+  const char* start = str->data;
+  if (!iree_string_view_consume_prefix(str, IREE_SV("["))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array [");
+  }
+  IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
+  while (!iree_string_view_is_empty(*str)) {
+    // Check for end of array.
+    if (iree_string_view_starts_with(*str, IREE_SV("]"))) break;
+    // Get the array element.
+    iree_string_view_t value = iree_string_view_empty();
+    IREE_RETURN_IF_ERROR(iree_json_consume_value_impl(str, &value, depth + 1));
+    // Skip whitespace/comments before comma or closing bracket.
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
+    // If there's a comma then continue to next element (trailing commas
+    // allowed).
+    if (!iree_string_view_consume_prefix(str, IREE_SV(","))) break;
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
+  }
+  // Verify closing bracket before computing end pointer (str->data may be
+  // NULL).
+  if (!iree_string_view_starts_with(*str, IREE_SV("]"))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array ]");
+  }
+  const char* end = str->data + 1;
+  iree_string_view_consume_prefix(str, IREE_SV("]"));
   *out_value = iree_make_string_view(start, end - start);
   return iree_ok_status();
 }
 
 iree_status_t iree_json_consume_array(iree_string_view_t* str,
                                       iree_string_view_t* out_value) {
-  *out_value = iree_string_view_empty();
-  const char* start = str->data;
-  if (!iree_string_view_consume_prefix(str, IREE_SV("["))) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array [");
-  }
-  *str = iree_string_view_trim(*str);
-  while (!iree_string_view_is_empty(*str)) {
-    // Check for end of array.
-    if (iree_string_view_starts_with(*str, IREE_SV("]"))) break;
-    // Get the array element.
-    iree_string_view_t value = iree_string_view_empty();
-    IREE_RETURN_IF_ERROR(iree_json_consume_value_impl(str, &value));
-    // Trim after value to handle whitespace before comma or closing bracket.
-    *str = iree_string_view_trim(*str);
-    // If there's a comma then we expect another element.
-    if (!iree_string_view_consume_prefix(str, IREE_SV(","))) {
-      // No comma - must be end of array (trailing commas are invalid JSON).
-      break;
-    }
-    *str = iree_string_view_trim(*str);
-    // After comma, must have another element (not closing bracket).
-    if (iree_string_view_starts_with(*str, IREE_SV("]"))) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "trailing comma in array");
-    }
-  }
-  // Save end pointer BEFORE consuming `]` (consume_prefix returns empty view
-  // with NULL data when string becomes empty).
-  const char* end = str->data + 1;
-  if (!iree_string_view_consume_prefix(str, IREE_SV("]"))) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array ]");
-  }
-  *out_value = iree_make_string_view(start, end - start);
-  return iree_ok_status();
+  iree_json_skip_bom(str);
+  return iree_json_consume_array_impl(str, out_value, /*depth=*/0);
 }
 
-static iree_status_t iree_json_consume_value_impl(
-    iree_string_view_t* str, iree_string_view_t* out_value) {
+static iree_status_t iree_json_consume_value_impl(iree_string_view_t* str,
+                                                  iree_string_view_t* out_value,
+                                                  iree_host_size_t depth) {
   *out_value = iree_string_view_empty();
-  *str = iree_string_view_trim(*str);
+  IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
   if (str->size == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "expected JSON value");
@@ -272,9 +345,9 @@ static iree_status_t iree_json_consume_value_impl(
     case '"':
       return iree_json_consume_string(str, out_value);
     case '{':
-      return iree_json_consume_object(str, out_value);
+      return iree_json_consume_object_impl(str, out_value, depth);
     case '[':
-      return iree_json_consume_array(str, out_value);
+      return iree_json_consume_array_impl(str, out_value, depth);
     case 't':
       return iree_json_consume_keyword(str, IREE_SV("true"), out_value);
     case 'f':
@@ -288,7 +361,8 @@ static iree_status_t iree_json_consume_value_impl(
 
 iree_status_t iree_json_consume_value(iree_string_view_t* str,
                                       iree_string_view_t* out_value) {
-  return iree_json_consume_value_impl(str, out_value);
+  iree_json_skip_bom(str);
+  return iree_json_consume_value_impl(str, out_value, /*depth=*/0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -302,7 +376,7 @@ iree_status_t iree_json_enumerate_object(iree_string_view_t object_value,
   if (!iree_string_view_consume_prefix(&str, IREE_SV("{"))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing object {");
   }
-  str = iree_string_view_trim(str);
+  IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
   bool cancelled = false;
   while (!iree_string_view_is_empty(str)) {
     // Check for end of object.
@@ -310,7 +384,7 @@ iree_status_t iree_json_enumerate_object(iree_string_view_t object_value,
     // Try to parse key string.
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_json_consume_string(&str, &key));
-    str = iree_string_view_trim(str);
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
     // Expect : separator.
     if (!iree_string_view_consume_prefix(&str, IREE_SV(":"))) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -327,19 +401,12 @@ iree_status_t iree_json_enumerate_object(iree_string_view_t object_value,
       break;
     }
     IREE_RETURN_IF_ERROR(status);
-    // Trim after value to handle whitespace before comma or closing brace.
-    str = iree_string_view_trim(str);
-    // If there's a comma then we expect another member.
-    if (!iree_string_view_consume_prefix(&str, IREE_SV(","))) {
-      // No comma - must be end of object.
-      break;
-    }
-    str = iree_string_view_trim(str);
-    // After comma, must have another member (trailing commas are invalid).
-    if (iree_string_view_starts_with(str, IREE_SV("}"))) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "trailing comma in object");
-    }
+    // Skip whitespace/comments before comma or closing brace.
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+    // If there's a comma then continue to next member (trailing commas
+    // allowed).
+    if (!iree_string_view_consume_prefix(&str, IREE_SV(","))) break;
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
   }
   // Verify closing brace (unless cancelled early).
   if (!cancelled && !iree_string_view_starts_with(str, IREE_SV("}"))) {
@@ -387,7 +454,7 @@ iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
   if (!iree_string_view_consume_prefix(&str, IREE_SV("["))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array [");
   }
-  str = iree_string_view_trim(str);
+  IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
   iree_host_size_t index = 0;
   bool cancelled = false;
   while (!iree_string_view_is_empty(str)) {
@@ -405,19 +472,12 @@ iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
     }
     IREE_RETURN_IF_ERROR(status);
     ++index;
-    // Trim after value to handle whitespace before comma or closing bracket.
-    str = iree_string_view_trim(str);
-    // If there's a comma then we expect another element.
-    if (!iree_string_view_consume_prefix(&str, IREE_SV(","))) {
-      // No comma - must be end of array.
-      break;
-    }
-    str = iree_string_view_trim(str);
-    // After comma, must have another element (trailing commas are invalid).
-    if (iree_string_view_starts_with(str, IREE_SV("]"))) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "trailing comma in array");
-    }
+    // Skip whitespace/comments before comma or closing bracket.
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+    // If there's a comma then continue to next element (trailing commas
+    // allowed).
+    if (!iree_string_view_consume_prefix(&str, IREE_SV(","))) break;
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
   }
   // Verify closing bracket (unless cancelled early).
   if (!cancelled && !iree_string_view_starts_with(str, IREE_SV("]"))) {
@@ -430,53 +490,107 @@ iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
 // JSONL (JSON Lines) Operations
 //===----------------------------------------------------------------------===//
 
-iree_status_t iree_json_enumerate_lines(iree_string_view_t input,
-                                        iree_json_line_visitor_fn_t visitor,
-                                        void* user_data) {
-  iree_json_line_number_t line_number = 0;  // Will be 1-based after increment.
-  iree_host_size_t index = 0;               // 0-based entry index.
-  while (!iree_string_view_is_empty(input)) {
-    ++line_number;
-
-    // Find the end of the current line.
-    iree_string_view_t line;
-    iree_host_size_t newline_pos = iree_string_view_find_char(input, '\n', 0);
-    if (newline_pos == IREE_STRING_VIEW_NPOS) {
-      // Last line (no trailing newline).
-      line = input;
-      input = iree_string_view_empty();
-    } else {
-      line = iree_string_view_substr(input, 0, newline_pos);
-      input =
-          iree_string_view_substr(input, newline_pos + 1, IREE_HOST_SIZE_MAX);
+// Skips whitespace and comments, tracking newlines for line number reporting.
+// Updates |line_number| to reflect any newlines encountered.
+// Handles LF, CRLF, and CR-only line endings.
+static iree_status_t iree_json_skip_whitespace_and_comments_tracking_lines(
+    iree_string_view_t* str, iree_json_line_number_t* line_number) {
+  while (str->size > 0) {
+    // Count and skip whitespace characters, tracking newlines.
+    while (str->size > 0) {
+      char c = str->data[0];
+      if (c == ' ' || c == '\t') {
+        *str = iree_string_view_remove_prefix(*str, 1);
+      } else if (c == '\n') {
+        *str = iree_string_view_remove_prefix(*str, 1);
+        ++(*line_number);
+      } else if (c == '\r') {
+        // Handle CRLF as single newline, or CR-only as newline.
+        *str = iree_string_view_remove_prefix(*str, 1);
+        if (str->size > 0 && str->data[0] == '\n') {
+          *str = iree_string_view_remove_prefix(*str, 1);
+        }
+        ++(*line_number);
+      } else {
+        break;
+      }
     }
+    if (str->size == 0) return iree_ok_status();
 
-    // Strip trailing CR for CRLF line endings (Windows).
-    if (line.size > 0 && line.data[line.size - 1] == '\r') {
-      line = iree_string_view_substr(line, 0, line.size - 1);
-    }
-
-    // Skip empty lines and whitespace-only lines.
-    line = iree_string_view_trim(line);
-    if (iree_string_view_is_empty(line)) {
+    // Check for single-line comment: //
+    if (str->size >= 2 && str->data[0] == '/' && str->data[1] == '/') {
+      // Skip to end of line (but don't skip the newline itself - let the
+      // whitespace loop handle it to track line numbers).
+      iree_host_size_t i = 2;
+      while (i < str->size && str->data[i] != '\n') ++i;
+      *str = iree_string_view_remove_prefix(*str, i);
       continue;
     }
 
-    // Parse the JSON value on this line.
-    iree_string_view_t value = iree_string_view_empty();
-    IREE_RETURN_IF_ERROR(iree_json_consume_value(&line, &value),
-                         "line %" PRIhsz, line_number);
+    // Check for multi-line comment: /* */
+    if (str->size >= 2 && str->data[0] == '/' && str->data[1] == '*') {
+      iree_host_size_t i = 2;
+      bool found_end = false;
+      while (i + 1 < str->size) {
+        if (str->data[i] == '\n') {
+          ++(*line_number);
+        }
+        if (str->data[i] == '*' && str->data[i + 1] == '/') {
+          *str = iree_string_view_remove_prefix(*str, i + 2);
+          found_end = true;
+          break;
+        }
+        ++i;
+      }
+      if (!found_end) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "unterminated /* */ comment");
+      }
+      continue;
+    }
 
-    // Verify no trailing content after the value (except whitespace).
-    line = iree_string_view_trim(line);
-    if (!iree_string_view_is_empty(line)) {
+    // No comment found, done skipping.
+    break;
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_json_enumerate_lines(iree_string_view_t input,
+                                        iree_json_line_visitor_fn_t visitor,
+                                        void* user_data) {
+  // Skip UTF-8 BOM if present at start of file.
+  iree_json_skip_bom(&input);
+  iree_json_line_number_t line_number = 1;  // 1-based line numbers.
+  iree_host_size_t index = 0;               // 0-based entry index.
+
+  while (!iree_string_view_is_empty(input)) {
+    // Skip whitespace and comments (may span multiple lines).
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments_tracking_lines(
+        &input, &line_number));
+    if (iree_string_view_is_empty(input)) break;
+
+    // Record the line number where the value starts.
+    iree_json_line_number_t value_line = line_number;
+
+    // Parse the JSON value.
+    iree_string_view_t value = iree_string_view_empty();
+    IREE_RETURN_IF_ERROR(iree_json_consume_value(&input, &value),
+                         "line %" PRIhsz, value_line);
+
+    // Skip any trailing whitespace/comments. In JSONL, each value should be on
+    // its own line, so we require that we either hit EOF or advance to a new
+    // line after each value.
+    iree_json_line_number_t post_value_line = line_number;
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments_tracking_lines(
+        &input, &line_number));
+    if (!iree_string_view_is_empty(input) && line_number == post_value_line) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "line %" PRIhsz ": trailing content after value",
-                              line_number);
+                              "line %" PRIhsz ": multiple values on same line",
+                              value_line);
     }
 
     // Emit the value.
-    iree_status_t status = visitor(user_data, line_number, index, value);
+    iree_status_t status = visitor(user_data, value_line, index, value);
     if (iree_status_is_cancelled(status)) {
       iree_status_ignore(status);
       break;

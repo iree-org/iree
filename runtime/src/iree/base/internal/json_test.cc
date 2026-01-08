@@ -268,12 +268,11 @@ TEST(JsonConsumeObjectTest, MissingBrace) {
 }
 
 TEST(JsonConsumeObjectTest, TrailingComma) {
-  // Trailing commas are invalid JSON per RFC 8259.
+  // JSONC allows trailing commas.
   iree_string_view_t str = IREE_SV("{\"key\": 123,}");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_object(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+  EXPECT_TRUE(iree_string_view_equal(value, IREE_SV("{\"key\": 123,}")));
 }
 
 TEST(JsonConsumeObjectTest, WhitespaceBeforeClosingBrace) {
@@ -290,6 +289,39 @@ TEST(JsonConsumeObjectTest, WhitespaceAfterComma) {
   iree_string_view_t value;
   IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
   EXPECT_SV_EQ(value, IREE_SV("{\"a\": 1,  \"b\": 2}"));
+}
+
+TEST(JsonConsumeObjectTest, SingleLineComment) {
+  // JSONC single-line comments should be skipped.
+  iree_string_view_t str = IREE_SV("{// comment\n\"key\": 123}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{// comment\n\"key\": 123}"));
+}
+
+TEST(JsonConsumeObjectTest, MultiLineComment) {
+  // JSONC multi-line comments should be skipped.
+  iree_string_view_t str = IREE_SV("{/* comment */\"key\": 123}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{/* comment */\"key\": 123}"));
+}
+
+TEST(JsonConsumeObjectTest, CommentAfterColon) {
+  // Comments allowed after the colon before the value.
+  iree_string_view_t str = IREE_SV("{\"key\":/* value */ 123}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{\"key\":/* value */ 123}"));
+}
+
+TEST(JsonConsumeObjectTest, UnterminatedComment) {
+  // Unterminated multi-line comments should error.
+  iree_string_view_t str = IREE_SV("{/* unterminated \"key\": 123}");
+  iree_string_view_t value;
+  iree_status_t status = iree_json_consume_object(&str, &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
 }
 
 //===----------------------------------------------------------------------===//
@@ -340,12 +372,11 @@ TEST(JsonConsumeArrayTest, MissingBracket) {
 }
 
 TEST(JsonConsumeArrayTest, TrailingComma) {
-  // Trailing commas are invalid JSON per RFC 8259.
+  // JSONC allows trailing commas.
   iree_string_view_t str = IREE_SV("[1, 2,]");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_array(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+  EXPECT_TRUE(iree_string_view_equal(value, IREE_SV("[1, 2,]")));
 }
 
 TEST(JsonConsumeArrayTest, WhitespaceBeforeClosingBracket) {
@@ -362,6 +393,30 @@ TEST(JsonConsumeArrayTest, WhitespaceAfterComma) {
   iree_string_view_t value;
   IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
   EXPECT_SV_EQ(value, IREE_SV("[1,  2,  3]"));
+}
+
+TEST(JsonConsumeArrayTest, SingleLineComment) {
+  // JSONC single-line comments should be skipped.
+  iree_string_view_t str = IREE_SV("[// comment\n1, 2]");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("[// comment\n1, 2]"));
+}
+
+TEST(JsonConsumeArrayTest, MultiLineComment) {
+  // JSONC multi-line comments should be skipped.
+  iree_string_view_t str = IREE_SV("[/* comment */1, 2]");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("[/* comment */1, 2]"));
+}
+
+TEST(JsonConsumeArrayTest, CommentBetweenElements) {
+  // Comments allowed between elements.
+  iree_string_view_t str = IREE_SV("[1,/* mid */2]");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("[1,/* mid */2]"));
 }
 
 //===----------------------------------------------------------------------===//
@@ -412,6 +467,22 @@ TEST(JsonConsumeValueTest, True) {
 
 TEST(JsonConsumeValueTest, WithLeadingWhitespace) {
   iree_string_view_t str = IREE_SV("  \n\t123");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_value(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("123"));
+}
+
+TEST(JsonConsumeValueTest, CommentBeforeValue) {
+  // JSONC comments before a value should be skipped.
+  iree_string_view_t str = IREE_SV("/* comment */ 123");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_value(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("123"));
+}
+
+TEST(JsonConsumeValueTest, SingleLineCommentBeforeValue) {
+  // JSONC single-line comments before a value should be skipped.
+  iree_string_view_t str = IREE_SV("// comment\n123");
   iree_string_view_t value;
   IREE_ASSERT_OK(iree_json_consume_value(&str, &value));
   EXPECT_SV_EQ(value, IREE_SV("123"));
@@ -510,11 +581,13 @@ TEST(JsonEnumerateObjectTest, EarlyTermination) {
 }
 
 TEST(JsonEnumerateObjectTest, TrailingComma) {
+  // JSONC allows trailing commas.
   std::vector<ObjectEntry> entries;
-  iree_status_t status = iree_json_enumerate_object(
-      IREE_SV("{\"key\": 123,}"), CollectObjectEntries, &entries);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_ASSERT_OK(iree_json_enumerate_object(IREE_SV("{\"key\": 123,}"),
+                                            CollectObjectEntries, &entries));
+  ASSERT_EQ(entries.size(), 1);
+  EXPECT_EQ(entries[0].key, "key");
+  EXPECT_EQ(entries[0].value, "123");
 }
 
 TEST(JsonEnumerateObjectTest, WhitespaceBeforeClose) {
@@ -622,11 +695,13 @@ TEST(JsonEnumerateArrayTest, EarlyTermination) {
 }
 
 TEST(JsonEnumerateArrayTest, TrailingComma) {
+  // JSONC allows trailing commas.
   std::vector<ArrayEntry> entries;
-  iree_status_t status = iree_json_enumerate_array(
-      IREE_SV("[1, 2,]"), CollectArrayEntries, &entries);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_ASSERT_OK(iree_json_enumerate_array(IREE_SV("[1, 2,]"),
+                                           CollectArrayEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].value, "2");
 }
 
 TEST(JsonEnumerateArrayTest, WhitespaceBeforeClose) {
@@ -811,6 +886,29 @@ TEST(JsonEnumerateLinesTest, InvalidJson) {
       CollectLineEntries, &entries);
   EXPECT_TRUE(iree_status_is_invalid_argument(status));
   iree_status_ignore(status);
+}
+
+TEST(JsonEnumerateLinesTest, CommentLinesSkipped) {
+  // Lines that are only comments should be skipped like empty lines.
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(
+      IREE_SV("// comment line\n123\n/* another comment */\n456"),
+      CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].line_number, 2);
+  EXPECT_EQ(entries[0].value, "123");
+  EXPECT_EQ(entries[1].line_number, 4);
+  EXPECT_EQ(entries[1].value, "456");
+}
+
+TEST(JsonEnumerateLinesTest, TrailingComment) {
+  // Comments after a value on the same line are allowed.
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(
+      IREE_SV("123 // trailing comment\n456"), CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].value, "123");
+  EXPECT_EQ(entries[1].value, "456");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1075,6 +1173,346 @@ TEST(JsonParseDoubleTest, NegativeExponent) {
   double value;
   IREE_ASSERT_OK(iree_json_parse_double(IREE_SV("1e-5"), &value));
   EXPECT_DOUBLE_EQ(value, 1e-5);
+}
+
+//===----------------------------------------------------------------------===//
+// UTF-8 BOM Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonBOMTest, ConsumeValueWithBOM) {
+  // UTF-8 BOM: 0xEF 0xBB 0xBF followed by JSON.
+  const char bom_json[] = "\xEF\xBB\xBF{\"key\": 123}";
+  iree_string_view_t str =
+      iree_make_string_view(bom_json, sizeof(bom_json) - 1);
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_value(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{\"key\": 123}"));
+}
+
+TEST(JsonBOMTest, ConsumeObjectWithBOM) {
+  const char bom_json[] = "\xEF\xBB\xBF{\"key\": 123}";
+  iree_string_view_t str =
+      iree_make_string_view(bom_json, sizeof(bom_json) - 1);
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{\"key\": 123}"));
+}
+
+TEST(JsonBOMTest, ConsumeArrayWithBOM) {
+  const char bom_json[] = "\xEF\xBB\xBF[1, 2, 3]";
+  iree_string_view_t str =
+      iree_make_string_view(bom_json, sizeof(bom_json) - 1);
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("[1, 2, 3]"));
+}
+
+TEST(JsonBOMTest, EnumerateLinesWithBOM) {
+  const char bom_jsonl[] = "\xEF\xBB\xBF{\"a\": 1}\n{\"b\": 2}";
+  iree_string_view_t input =
+      iree_make_string_view(bom_jsonl, sizeof(bom_jsonl) - 1);
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(
+      iree_json_enumerate_lines(input, CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].value, "{\"a\": 1}");
+  EXPECT_EQ(entries[1].value, "{\"b\": 2}");
+}
+
+TEST(JsonBOMTest, BOMWithWhitespace) {
+  // BOM followed by whitespace then JSON.
+  const char bom_json[] = "\xEF\xBB\xBF  \n  {\"key\": 1}";
+  iree_string_view_t str =
+      iree_make_string_view(bom_json, sizeof(bom_json) - 1);
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_value(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{\"key\": 1}"));
+}
+
+//===----------------------------------------------------------------------===//
+// Recursion Depth Limit Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonDepthTest, DeeplyNestedArrays) {
+  // Build a deeply nested array: [[[[...]]]]
+  // Default depth limit is 128, so 130 levels should fail.
+  std::string deep_json;
+  for (int i = 0; i < 130; ++i) deep_json += "[";
+  deep_json += "1";
+  for (int i = 0; i < 130; ++i) deep_json += "]";
+
+  iree_string_view_t str =
+      iree_make_string_view(deep_json.data(), deep_json.size());
+  iree_string_view_t value;
+  iree_status_t status = iree_json_consume_value(&str, &value);
+  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonDepthTest, DeeplyNestedObjects) {
+  // Build deeply nested objects: {"a":{"a":{"a":...}}}
+  std::string deep_json;
+  for (int i = 0; i < 130; ++i) deep_json += "{\"a\":";
+  deep_json += "1";
+  for (int i = 0; i < 130; ++i) deep_json += "}";
+
+  iree_string_view_t str =
+      iree_make_string_view(deep_json.data(), deep_json.size());
+  iree_string_view_t value;
+  iree_status_t status = iree_json_consume_value(&str, &value);
+  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonDepthTest, MixedNestedStructures) {
+  // Mix of arrays and objects.
+  std::string deep_json;
+  for (int i = 0; i < 130; ++i) {
+    deep_json += (i % 2 == 0) ? "[{\"a\":" : "{\"b\":[";
+  }
+  deep_json += "1";
+  for (int i = 129; i >= 0; --i) {
+    deep_json += (i % 2 == 0) ? "}]" : "]}";
+  }
+
+  iree_string_view_t str =
+      iree_make_string_view(deep_json.data(), deep_json.size());
+  iree_string_view_t value;
+  iree_status_t status = iree_json_consume_value(&str, &value);
+  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonDepthTest, AcceptableDepth) {
+  // 50 levels of nesting should be fine (well under 128 limit).
+  std::string json;
+  for (int i = 0; i < 50; ++i) json += "[";
+  json += "1";
+  for (int i = 0; i < 50; ++i) json += "]";
+
+  iree_string_view_t str = iree_make_string_view(json.data(), json.size());
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_value(&str, &value));
+}
+
+//===----------------------------------------------------------------------===//
+// Multi-line Block Comment Tests (JSONL)
+//===----------------------------------------------------------------------===//
+
+TEST(JsonEnumerateLinesTest, MultiLineBlockComment) {
+  // Block comment spanning multiple lines.
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(
+      IREE_SV("/* This is a\nmulti-line\ncomment */\n123\n456"),
+      CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  // After 3-line comment and newline, values are on lines 4 and 5.
+  EXPECT_EQ(entries[0].line_number, 4);
+  EXPECT_EQ(entries[0].value, "123");
+  EXPECT_EQ(entries[1].line_number, 5);
+  EXPECT_EQ(entries[1].value, "456");
+}
+
+TEST(JsonEnumerateLinesTest, MultiLineBlockCommentBetweenValues) {
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(
+      IREE_SV("123\n/* comment\nspanning\nlines */\n456"), CollectLineEntries,
+      &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].line_number, 1);
+  EXPECT_EQ(entries[0].value, "123");
+  EXPECT_EQ(entries[1].line_number, 5);
+  EXPECT_EQ(entries[1].value, "456");
+}
+
+TEST(JsonEnumerateLinesTest, MultiLineBlockCommentOnSameLine) {
+  // Block comment that starts and ends on same line as value.
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(
+      iree_json_enumerate_lines(IREE_SV("/* comment */ 123 /* another */\n456"),
+                                CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].value, "123");
+  EXPECT_EQ(entries[1].value, "456");
+}
+
+TEST(JsonEnumerateLinesTest, UnterminatedMultiLineComment) {
+  std::vector<LineEntry> entries;
+  iree_status_t status = iree_json_enumerate_lines(
+      IREE_SV("/* unterminated\ncomment\n123"), CollectLineEntries, &entries);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonEnumerateLinesTest, MultipleValuesOnSameLine) {
+  // JSONL requires one value per line - multiple values should fail.
+  std::vector<LineEntry> entries;
+  iree_status_t status = iree_json_enumerate_lines(
+      IREE_SV("123 456\n789"), CollectLineEntries, &entries);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonEnumerateLinesTest, MultipleValuesWithCommentBetween) {
+  // Even with a comment between, multiple values on same line should fail.
+  std::vector<LineEntry> entries;
+  iree_status_t status = iree_json_enumerate_lines(
+      IREE_SV("123 /* comment */ 456"), CollectLineEntries, &entries);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonEnumerateLinesTest, CROnlyLineEndings) {
+  // Old Mac-style CR-only line endings should work.
+  std::vector<LineEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_lines(IREE_SV("1\r2\r3"),
+                                           CollectLineEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+  EXPECT_EQ(entries[0].line_number, 1);
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].line_number, 2);
+  EXPECT_EQ(entries[1].value, "2");
+  EXPECT_EQ(entries[2].line_number, 3);
+  EXPECT_EQ(entries[2].value, "3");
+}
+
+//===----------------------------------------------------------------------===//
+// Empty Containers with Comments Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonConsumeObjectTest, EmptyWithComment) {
+  iree_string_view_t str = IREE_SV("{/* empty */}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{/* empty */}"));
+}
+
+TEST(JsonConsumeObjectTest, EmptyWithSingleLineComment) {
+  iree_string_view_t str = IREE_SV("{// comment\n}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{// comment\n}"));
+}
+
+TEST(JsonConsumeArrayTest, EmptyWithComment) {
+  iree_string_view_t str = IREE_SV("[/* empty */]");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("[/* empty */]"));
+}
+
+TEST(JsonConsumeArrayTest, EmptyWithSingleLineComment) {
+  iree_string_view_t str = IREE_SV("[// comment\n]");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("[// comment\n]"));
+}
+
+//===----------------------------------------------------------------------===//
+// Comments in Various Positions Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonConsumeObjectTest, CommentBeforeColon) {
+  // Comment between key and colon.
+  iree_string_view_t str = IREE_SV("{\"key\"/* comment */: 123}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{\"key\"/* comment */: 123}"));
+}
+
+TEST(JsonConsumeObjectTest, CommentsEverywhere) {
+  // Comments in all allowed positions.
+  iree_string_view_t str =
+      IREE_SV("{ /* 1 */ \"key\" /* 2 */ : /* 3 */ 123 /* 4 */ }");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+}
+
+TEST(JsonConsumeArrayTest, CommentsEverywhere) {
+  // Comments in all allowed positions.
+  iree_string_view_t str = IREE_SV("[ /* 1 */ 1 /* 2 */ , /* 3 */ 2 /* 4 */ ]");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+}
+
+TEST(JsonConsumeObjectTest, NestedWithComments) {
+  // Comments inside nested structures.
+  iree_string_view_t str =
+      IREE_SV("{\"outer\": {/* inner comment */\"inner\": [1,/* mid */2]}}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+}
+
+TEST(JsonEnumerateObjectTest, CommentsInEntries) {
+  std::vector<ObjectEntry> entries;
+  IREE_ASSERT_OK(
+      iree_json_enumerate_object(IREE_SV("{\"a\"/* c1 */: 1,/* c2 */\"b\": 2}"),
+                                 CollectObjectEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].key, "a");
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].key, "b");
+  EXPECT_EQ(entries[1].value, "2");
+}
+
+TEST(JsonEnumerateArrayTest, CommentsInElements) {
+  std::vector<ArrayEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_array(
+      IREE_SV("[/* c1 */1,/* c2 */2/* c3 */]"), CollectArrayEntries, &entries));
+  ASSERT_EQ(entries.size(), 2);
+  EXPECT_EQ(entries[0].value, "1");
+  EXPECT_EQ(entries[1].value, "2");
+}
+
+//===----------------------------------------------------------------------===//
+// Multiple Trailing Commas Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonConsumeObjectTest, MultipleTrailingCommas) {
+  // Multiple trailing commas - after first trailing comma we hit }, so ok.
+  iree_string_view_t str = IREE_SV("{\"key\": 123,}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+}
+
+TEST(JsonConsumeArrayTest, MultipleTrailingCommas) {
+  // Multiple trailing commas - similar behavior.
+  iree_string_view_t str = IREE_SV("[1, 2,]");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_array(&str, &value));
+}
+
+//===----------------------------------------------------------------------===//
+// Edge Cases for Whitespace and Comments
+//===----------------------------------------------------------------------===//
+
+TEST(JsonConsumeValueTest, MultipleCommentsBeforeValue) {
+  iree_string_view_t str = IREE_SV("// c1\n/* c2 */\n// c3\n123");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_value(&str, &value));
+  EXPECT_SV_EQ(value, IREE_SV("123"));
+}
+
+TEST(JsonConsumeValueTest, CommentOnly) {
+  // Input with only comments should fail (no value).
+  iree_string_view_t str = IREE_SV("// just a comment\n/* another */");
+  iree_string_view_t value;
+  iree_status_t status = iree_json_consume_value(&str, &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonConsumeObjectTest, CommentInsideString) {
+  // Comment syntax inside a string should be treated as literal characters.
+  iree_string_view_t str = IREE_SV("{\"key\": \"/* not a comment */\"}");
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_consume_object(&str, &value));
+
+  // Verify the string value is preserved.
+  iree_string_view_t str_value;
+  IREE_ASSERT_OK(
+      iree_json_lookup_object_value(value, IREE_SV("key"), &str_value));
+  EXPECT_SV_EQ(str_value, IREE_SV("/* not a comment */"));
 }
 
 }  // namespace
