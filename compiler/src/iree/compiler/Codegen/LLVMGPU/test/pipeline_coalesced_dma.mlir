@@ -7,7 +7,7 @@
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx942", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp64|fp32|fp16|int64|int32|int16|int8,
     storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
     dot = dp4xi8toi32, mma = [], subgroup_size_choices = [64, 64],
@@ -73,7 +73,7 @@ hal.executable public @coalesced_dma_to_lds {
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx942", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp64|fp32|fp16|int64|int32|int16|int8,
     storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
     dot = dp4xi8toi32, mma = [], subgroup_size_choices = [64, 64],
@@ -138,7 +138,7 @@ hal.executable public @coalesced_dma_matmul_operand {
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx942", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp64|fp32|fp16|int64|int32|int16|int8,
     storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
     dot = dp4xi8toi32, mma = [], subgroup_size_choices = [64, 64],
@@ -205,7 +205,7 @@ hal.executable public @coalesced_dma_f16 {
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx942", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp64|fp32|fp16|int64|int32|int16|int8,
     storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
     dot = dp4xi8toi32, mma = [], subgroup_size_choices = [64, 64],
@@ -289,7 +289,7 @@ hal.executable public @coalesced_dma_multi_transfer {
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx942", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp64|fp32|fp16|int64|int32|int16|int8,
     storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic,
     dot = dp4xi8toi32, mma = [], subgroup_size_choices = [64, 64],

@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -124,8 +125,18 @@ Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
   if (promotedValue.has_value()) {
     return promotedValue.value();
   }
+
+  // Global load DMA requires the source to come from global memory. If the
+  // source comes from tensor.pad, the data is not in global memory, so fall
+  // back to derived thread config.
+  Attribute effectiveAttr = attr;
+  if (isa<UseGlobalLoadDMAAttr>(attr) &&
+      operand.get().getDefiningOp<tensor::PadOp>()) {
+    effectiveAttr = DerivedThreadConfigAttr::get(builder.getContext());
+  }
+
   return promoteValue(builder, operand.getOwner()->getLoc(), operand.get(),
-                      attr);
+                      effectiveAttr);
 }
 
 /// Inserts a `linalg.copy` directly before the given operation on the
