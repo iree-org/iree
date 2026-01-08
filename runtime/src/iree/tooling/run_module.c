@@ -6,6 +6,7 @@
 
 #include "iree/tooling/run_module.h"
 
+#include "iree/base/allocator_stats.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
@@ -396,6 +397,12 @@ iree_status_t iree_tooling_run_module_with_data(
     int* out_exit_code) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_allocator_with_stats_t host_allocator_with_stats;
+  if (FLAG_print_statistics) {
+    host_allocator =
+        iree_allocator_stats_init(&host_allocator_with_stats, host_allocator);
+  }
+
   // Setup the VM context with all required modules and get the function to run.
   // This also returns the HAL device and allocator (if any) for I/O handling.
   iree_vm_context_t* context = NULL;
@@ -424,13 +431,21 @@ iree_status_t iree_tooling_run_module_with_data(
 
   // Print statistics after we've released the inputs/outputs and the context
   // which may be holding on to resources like constants/variables.
-  if (device_allocator && FLAG_print_statistics) {
+  if (FLAG_print_statistics) {
     IREE_IGNORE_ERROR(
-        iree_hal_allocator_statistics_fprint(stderr, device_allocator));
+        iree_allocator_statistics_fprint(stderr, &host_allocator_with_stats));
+    if (device_allocator) {
+      IREE_IGNORE_ERROR(
+          iree_hal_allocator_statistics_fprint(stderr, device_allocator));
+    }
   }
 
   iree_hal_allocator_release(device_allocator);
   iree_hal_device_release(device);
+
+  if (FLAG_print_statistics) {
+    iree_allocator_stats_deinit(&host_allocator_with_stats);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;

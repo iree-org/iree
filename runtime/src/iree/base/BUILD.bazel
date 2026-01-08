@@ -56,6 +56,29 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "base_stats",
+    srcs = [
+        "allocator_stats.c",
+    ],
+    hdrs = ["allocator_stats.h"],
+    deps = [
+        ":base",
+        "//runtime/src/iree/base/internal:synchronization",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "base_stats_test",
+    srcs = ["allocator_stats_test.cc"],
+    deps = [
+        ":base",
+        ":base_stats",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_test(
     name = "bitfield_test",
     srcs = ["bitfield_test.cc"],

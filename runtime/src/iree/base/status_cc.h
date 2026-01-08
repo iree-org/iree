@@ -20,8 +20,8 @@
 #include <type_traits>
 #include <utility>
 
-#include "iree/base/api.h"
 #include "iree/base/attributes.h"
+#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 
 namespace iree {

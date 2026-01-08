@@ -251,6 +251,7 @@ iree_cc_library(
     ::function_util
     ::instrument_util
     iree::base
+    iree::base::base_stats
     iree::base::internal::flags
     iree::hal
     iree::io::stream
