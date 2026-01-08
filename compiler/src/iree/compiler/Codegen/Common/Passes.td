@@ -881,6 +881,21 @@ def RematerializeParallelOpsPass :
   let summary = "Pass to rematerialize and merge parallel ops into consumers.";
 }
 
+def RemoveIndexHintsPass :
+    InterfacePass<"iree-codegen-remove-index-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Remove iree_codegen.index_hint operations";
+  let description = [{
+    This pass removes all iree_codegen.index_hint operations by replacing
+    them with their input values (pass-through semantics).
+
+    Index hints are used to convey optimization information to downstream
+    passes and should be cleaned up once that information has been consumed.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect"
+  ];
+}
+
 def RemoveSingleIterationLoopPass :
     InterfacePass<"iree-codegen-remove-single-iteration-loop", "mlir::FunctionOpInterface"> {
   let summary = "Remove distributed loop with single iteration.";

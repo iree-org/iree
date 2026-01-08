@@ -140,6 +140,7 @@ iree_cc_library(
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
     "RematerializeParallelOps.cpp"
+    "RemoveIndexHints.cpp"
     "RemoveSingleIterationLoop.cpp"
     "ReplaceSlowMinMaxOps.cpp"
     "ReshapePatterns.cpp"
