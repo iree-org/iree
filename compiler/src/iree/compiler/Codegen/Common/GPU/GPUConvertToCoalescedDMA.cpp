@@ -70,6 +70,21 @@ static int64_t getTotalStaticElements(ArrayRef<int64_t> shape) {
   return total;
 }
 
+/// Check if we have enough elements for coalesced DMA.
+/// When canLinearize is true (destination from tensor.empty), we check total
+/// elements since the downstream pass can linearize all dimensions. Otherwise,
+/// we check only the innermost dimension.
+static bool hasEnoughElementsForDMA(ArrayRef<int64_t> shape,
+                                    int64_t minElementsPerTransfer,
+                                    bool canLinearize) {
+  int64_t innermostDim = shape.back();
+  if (canLinearize) {
+    int64_t totalElements = getTotalStaticElements(shape);
+    return totalElements >= minElementsPerTransfer;
+  }
+  return innermostDim >= minElementsPerTransfer;
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
@@ -131,18 +146,8 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     return {};
   }
 
-  // Check if we have enough elements for coalesced DMA.
-  // For copies that can be linearized (destination from tensor.empty),
-  // check total elements. Otherwise check innermost dimension.
-  if (canLinearize) {
-    int64_t totalElements = getTotalStaticElements(shape);
-    if (totalElements < minElementsPerTransfer) {
-      return {};
-    }
-  } else {
-    if (innermostDim < minElementsPerTransfer) {
-      return {};
-    }
+  if (!hasEnoughElementsForDMA(shape, minElementsPerTransfer, canLinearize)) {
+    return {};
   }
 
   return {builder.getIndexAttr(*subgroupSize)};
@@ -649,7 +654,10 @@ private:
     // across warps.
     if (rank == 1) {
       int64_t dim = shape[0];
-      if (ShapedType::isStatic(dim) && totalWarps > 1) {
+      // Dynamic dimensions should have been rejected earlier in tileAtSubgroupLevel.
+      assert(ShapedType::isStatic(dim) &&
+             "dynamic dimensions should be handled before tile size computation");
+      if (totalWarps > 1) {
         int64_t warpsToUse = std::min(totalWarps, dim);
         int64_t tileSize = llvm::divideCeil(dim, warpsToUse);
         tileSizes.push_back(rewriter.getIndexAttr(tileSize));
@@ -766,23 +774,16 @@ private:
     }
 
     // Check if we have enough elements for coalesced DMA.
-    // For copies with tensor.empty() output, the downstream pass can linearize
-    // all dimensions, so we check total elements instead of just innermost.
-    // For other cases, we require innermost >= minElementsPerTransfer.
+    // Linearization is currently only supported for linalg::CopyOp when the
+    // output comes from tensor.empty(). This could be extended to other ops
+    // (e.g., GatherOp) in the future if similar conditions can be identified.
     bool canLinearize = false;
     if constexpr (std::is_same_v<OpTy, linalg::CopyOp>) {
       canLinearize = canLinearizeCopy(op);
     }
 
-    if (canLinearize) {
-      int64_t totalElements = getTotalStaticElements(shape);
-      if (totalElements < minElementsPerTransfer) {
-        return failure();
-      }
-    } else {
-      if (innermostDim < minElementsPerTransfer) {
-        return failure();
-      }
+    if (!hasEnoughElementsForDMA(shape, minElementsPerTransfer, canLinearize)) {
+      return failure();
     }
 
     // Compute tile sizes for subgroup-level distribution.
