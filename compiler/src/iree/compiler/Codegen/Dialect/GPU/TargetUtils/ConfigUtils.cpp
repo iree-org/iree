@@ -408,6 +408,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     problem.gemmSize = GemmSize::MediumGemm;
   }
   LDBG() << "This config is " << problem.gemmSize;
+  llvm::errs() << "This config is " << problem.gemmSize;
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
       getContractionHeuristicSeeds(problem, isGemm, scaled);
   assert(maybeSeeds.has_value() && "expected seeds to be found");
@@ -573,6 +574,8 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   }
   return splitReductionTripCnt;
 }
+
+// static int64_t getSwizzleSizes()
 
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
@@ -786,6 +789,13 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "Schedule: " << schedule;
+  llvm::errs() << "sechedule" << schedule << "\n";
+  for (auto i : schedule->kSizes) {
+    llvm::errs() << "kSize: " << i << "\n";
+  }
+  for (auto i : schedule->kTileSizes) {
+    llvm::errs() << "kTileSize: " << i << "\n";
+  }
 
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
@@ -862,11 +872,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // compilation doesn't support it. Once this is fixed, we should use global
     // load DMA here when possible.
     promotionList.append({2, 3});
-    Attribute swizzleOperand = IREE::GPU::SwizzleOperandAttr::get(context, useGlobalDma);
-    Attribute emptyAttr = IREE::GPU::SwizzleOperandAttr::get(context, Attribute());
-    promotionArray = {swizzleOperand, swizzleOperand, emptyAttr, emptyAttr};
-    // promotionArray = {};
-    // promotionTypes = ArrayRef<Attribute>{};
+    // This specific row width seems to be best for bank conflict avoidance in
+    // scaled matmuls.
+    int64_t rowWidth = 2 * llvm::product_of(schedule->kSizes);
+    int64_t accessWidth = schedule->kSizes.back();
+    auto configAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
+    Attribute swizzleOperand = IREE::GPU::SwizzleOperandAttr::get(context,
+        configAttr, rowWidth, accessWidth);
+    promotionArray = {swizzleOperand, swizzleOperand, configAttr, configAttr};
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
                                            ? ArrayRef<Attribute>(promotionArray)

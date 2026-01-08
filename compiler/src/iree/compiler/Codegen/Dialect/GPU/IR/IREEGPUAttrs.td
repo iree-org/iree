@@ -162,7 +162,9 @@ def IREEGPU_SwizzleOperand :
   }];
   let assemblyFormat = "`<` struct(params) `>`";
   let parameters = (ins
-    OptionalParameter<"Attribute">:$copy_config
+    "Attribute":$copy_config,
+    AttrParameter<"int64_t", "">:$row_width,
+    AttrParameter<"int64_t", "">:$access_width
   );
 }
 

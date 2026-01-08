@@ -34,7 +34,7 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
 }
 
 // Helper to insert a swizzle hint and flatten the alloc accordingly.
-Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
+Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr, int64_t rowWidth, int64_t accessWidth) {
   llvm::errs() << "swizzlePromoteValue\n";
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
@@ -43,7 +43,7 @@ Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v, Attribute a
     Value empty = tensor::EmptyOp::create(builder, loc, {numElements},
       tensorType.getElementType());
     Value swizzled = IREE::Codegen::SwizzleHintOp::create(builder, loc, empty,
-        IREE::Codegen::XORShuffleAttr::get(builder.getContext(), 256, 32, int64_t(), int64_t()));
+        IREE::Codegen::XORShuffleAttr::get(builder.getContext(), rowWidth, accessWidth, int64_t(), int64_t()));
     Value expanded = tensor::ExpandShapeOp::create(builder, loc, tensorType, swizzled, {llvm::to_vector(llvm::seq(tensorType.getRank()))});
     auto copy = linalg::CopyOp::create(builder, loc, v, expanded);
     if (attr) {
@@ -113,7 +113,7 @@ Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
 }
 
 Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
-                           Attribute attr) {
+                           Attribute attr, int64_t rowWidth, int64_t accessWidth) {
   llvm::errs() << "swizzlePromotionImpl\n";
   if (auto producer = operand.get().getDefiningOp<TilingInterface>()) {
     // Skip promotion of fills.
@@ -142,7 +142,7 @@ Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
   llvm::errs() << "swizzlePromoteValue\n";
   llvm::errs() << attr << "\n";
   return swizzlePromoteValue(builder, operand.getOwner()->getLoc(), operand.get(),
-                      attr);
+                      attr, rowWidth, accessWidth);
 }
 
 /// Inserts a `linalg.copy` directly before the given operation on the
