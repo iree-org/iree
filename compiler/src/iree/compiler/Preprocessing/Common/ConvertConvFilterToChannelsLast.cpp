@@ -105,7 +105,8 @@ struct ConvertHwcfToFhwc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   }
 };
 
-struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
+/// Transpose the generic form filter layout of `CHWF` or `CFHW` to `FHWC`.
+struct ConvertGenericFilterToFhwc : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
@@ -160,15 +161,15 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return positions;
     };
 
-    // Only transpose when the input channel is the last dimension of conv
-    // input.
-    SmallVector<int64_t> cInputPos =
-        getDimPositions(convolutionDims->inputChannel, inputMap);
-    if (cInputPos.back() != inputShape.size() - 1) {
+    // Don't transpose when the input is in batch-last layout (e.g., CHWN).
+    SmallVector<int64_t> batchInputPos =
+        getDimPositions(convolutionDims->batch, inputMap);
+    if (!batchInputPos.empty() &&
+        batchInputPos.back() == inputShape.size() - 1) {
       return failure();
     }
 
-    // Only transpose when the filter is `CHWF` layout.
+    // Only transpose when the filter is CHWF or CFHW layout.
     SmallVector<int64_t> fFilterPos =
         getDimPositions(convolutionDims->outputChannel, filterMap);
     SmallVector<int64_t> cFilterPos =
@@ -177,8 +178,11 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
         getDimPositions(convolutionDims->filterLoop, filterMap);
     int64_t fPos = fFilterPos.back();
     int64_t cPos = cFilterPos.back();
-    int64_t kPos = kFilterPos.back();
-    if (cPos > kPos || fPos != filterShape.size() - 1) {
+
+    bool isChwf =
+        (cPos < kFilterPos.front()) && (fPos == filterShape.size() - 1);
+    bool isCfhw = (cPos < fFilterPos.front()) && (fPos < kFilterPos.front());
+    if (!isChwf && !isCfhw) {
       return failure();
     }
 
@@ -206,10 +210,22 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
-    // Swap the input and output channel dimension.
-    SmallVector<int64_t> perm =
-        llvm::to_vector(llvm::seq<int64_t>(0, filterShape.size()));
-    std::swap(perm[cPos], perm[fPos]);
+    // Build permutation to convert to FHWC layout (or GFHWC for grouped conv).
+    llvm::SmallDenseSet<int64_t> processedDims;
+    processedDims.insert(cFilterPos.begin(), cFilterPos.end());
+    processedDims.insert(fFilterPos.begin(), fFilterPos.end());
+    processedDims.insert(kFilterPos.begin(), kFilterPos.end());
+    // First add dimensions that are not C, F, H, W, (e.g., G for grouped conv).
+    SmallVector<int64_t> perm;
+    for (int64_t i = 0; i < filterShape.size(); ++i) {
+      if (!processedDims.contains(i)) {
+        perm.push_back(i);
+      }
+    }
+    // Then append dimensions in the order of F, H, W, C.
+    perm.append(fFilterPos.begin(), fFilterPos.end());
+    perm.append(kFilterPos.begin(), kFilterPos.end());
+    perm.append(cFilterPos.begin(), cFilterPos.end());
 
     Location loc = linalgOp.getLoc();
 
@@ -274,7 +290,7 @@ public:
       patterns.add<ConvertHwcfToHwfc>(context);
     } else if (filterLayout == "fhwc") {
       LDBG() << "Converting filter layout to fhwc.";
-      patterns.add<ConvertHwcfToFhwc, ConvertGenericChwfToFhwc>(context);
+      patterns.add<ConvertHwcfToFhwc, ConvertGenericFilterToFhwc>(context);
     } else {
       LDBG() << "convert-filter-to-channels-last pass didn't apply since an "
                 "unsupported layout is given. Please use hwfc or fhwc as pass "
