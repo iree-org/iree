@@ -359,24 +359,6 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
   allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), workgroupSpace);
-  // if (isa<Float4E2M1FNType>(memRefType.getElementType())) {
-  //   auto flatAllocType = MemRefType::get(ArrayRef<int64_t>{memRefType.getNumElements()}, memRefType.getElementType(), AffineMap(), workgroupSpace);
-  //   Value flatAlloc = memref::AllocOp::create(builder, loc, flatAllocType);
-  //   Value swizzled = iree_compiler::IREE::Codegen::SwizzleHintOp::create(builder, loc, flatAlloc,
-  //                                                                         iree_compiler::IREE::Codegen::XORShuffleAttr::get(builder.getContext(), 256, 32, int64_t(), int64_t()));
-  //   ReassociationIndices reassoc = llvm::to_vector(llvm::seq(allocType.getRank()));
-  //   Value expanded = memref::ExpandShapeOp::create(builder, loc, allocType.getShape(), swizzled, {reassoc});
-  //   return expanded;
-  // }
-  // if (isa<Float8E8M0FNUType>(memRefType.getElementType())) {
-  //   auto flatAllocType = MemRefType::get(ArrayRef<int64_t>{memRefType.getNumElements()}, memRefType.getElementType(), AffineMap(), workgroupSpace);
-  //   Value flatAlloc = memref::AllocOp::create(builder, loc, flatAllocType);
-  //   Value swizzled = iree_compiler::IREE::Codegen::SwizzleHintOp::create(builder, loc, flatAlloc,
-  //                                                                        iree_compiler::IREE::Codegen::XORShuffleAttr::get(builder.getContext(), 8, 4, int64_t(), int64_t()));
-  //   ReassociationIndices reassoc = llvm::to_vector(llvm::seq(allocType.getRank()));
-  //   Value expanded = memref::ExpandShapeOp::create(builder, loc, allocType.getShape(), swizzled, {reassoc});
-  //   return expanded;
-  // }
   return memref::AllocOp::create(builder, loc, allocType, dynamicSizes)
       .getResult();
 }
@@ -598,8 +580,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Step 9. Remaining post-bufferization optimizations/lowerings.
-  funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
+  // Resolve swizzling hints before lowering affine ops but after
+  // lowering vector (transfer) ops.
+  funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createUnrollAnnotatedLoopsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
@@ -953,9 +937,6 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createPropagateConstantOffsetsPass)
       // Propagating constants introduces CSE opportunities.
       .addPass(createCSEPass)
-      // Resolve swizzling hints before lowering affine ops but after
-      // lowering vector (transfer) ops.
-      // .addPass(createFlattenSwizzleHintAllocsPass)
       .addPass(createResolveSwizzleHintsPass)
       // Canonicalize and CSE to attempt to deduplicate swizzle computation.
       .addPass(createCanonicalizerPass)
