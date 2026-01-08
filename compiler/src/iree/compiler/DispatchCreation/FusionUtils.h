@@ -12,7 +12,6 @@
 
 #include <cstdint>
 
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -45,8 +44,5 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
 std::optional<std::pair<OpResult, SmallVector<Operation *>>>
 getProducerDispatchValueAndOpChain(Value operand,
                                    bool enableAggressiveFusion = false);
-
-/// Indicates whether the given linalg op represents a transpose.
-bool isaTransposeOpInterface(linalg::LinalgOp linalgOp);
 
 } // namespace mlir::iree_compiler::DispatchCreation

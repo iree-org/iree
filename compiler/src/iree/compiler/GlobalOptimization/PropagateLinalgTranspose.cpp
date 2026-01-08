@@ -16,9 +16,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -109,8 +107,7 @@ static bool isReshapeBlockingFusion(Operation *producer, Operation *consumer) {
 // single input.
 static void specializeGenericTransposeOp(RewriterBase &rewriter,
                                          linalg::GenericOp genericOp) {
-  if (!mlir::iree_compiler::DispatchCreation::isaTransposeOpInterface(
-          genericOp)) {
+  if (!IREE::LinalgExt::isaTransposeOpInterface(genericOp)) {
     return;
   }
 

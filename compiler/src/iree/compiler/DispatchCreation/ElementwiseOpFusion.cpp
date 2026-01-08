@@ -77,9 +77,7 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
     // Check if the producerOp is fusible.
     // Allow bit extend ops or transpose ops.
     bool isBitExtend = IREE::LinalgExt::isBitExtendOp(producerOp);
-    bool isTranspose =
-        mlir::iree_compiler::DispatchCreation::isaTransposeOpInterface(
-            producerOp);
+    bool isTranspose = IREE::LinalgExt::isaTransposeOpInterface(producerOp);
     if (producerOp.getNumResults() != 1 || !isElementwise(producerOp) ||
         (!isBitExtend && !isTranspose)) {
       return rewriter.notifyMatchFailure(producerOp,
