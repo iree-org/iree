@@ -1961,6 +1961,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_codegenindex_hint-codegenindexhintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.index_hint (Codegen::IndexHintOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_codegeninner_tiled-codegeninnertiledop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_codegen.inner_tiled (Codegen::InnerTiledOp)
@@ -2059,7 +2068,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_4" class="md-nav__link">
+  <a href="#attributes_5" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5274,6 +5283,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_codegenindex_hint-codegenindexhintop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_codegen.index_hint (Codegen::IndexHintOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_codegeninner_tiled-codegeninnertiledop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_codegen.inner_tiled (Codegen::InnerTiledOp)
@@ -5372,7 +5390,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_4" class="md-nav__link">
+  <a href="#attributes_5" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5916,6 +5934,7 @@ within a backend.</p>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop">iree_codegen.extract_strided_metadata (Codegen::ExtractStridedMetadataOp)</a></li>
 <li><a href="#iree_codegenfusion_barrier-codegenfusionbarrierop">iree_codegen.fusion_barrier (Codegen::FusionBarrierOp)</a></li>
+<li><a href="#iree_codegenindex_hint-codegenindexhintop">iree_codegen.index_hint (Codegen::IndexHintOp)</a></li>
 <li><a href="#iree_codegeninner_tiled-codegeninnertiledop">iree_codegen.inner_tiled (Codegen::InnerTiledOp)</a><ul>
 <li><a href="#motivation-design-choices-and-pitfalls">Motivation, Design Choices, and Pitfalls</a></li>
 </ul>
@@ -5931,7 +5950,7 @@ within a backend.</p>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_4">Attributes</a><ul>
+<li><a href="#attributes_5">Attributes</a><ul>
 <li><a href="#denormalfpmathattr">DenormalFpMathAttr</a></li>
 <li><a href="#dispatchloweringpasspipelineattr">DispatchLoweringPassPipelineAttr</a></li>
 <li><a href="#compilationinfoattr">CompilationInfoAttr</a></li>
@@ -6137,6 +6156,61 @@ This makes lowering more progressive and brings the following benefits:
 </tr>
 </tbody>
 </table>
+<h3 id="iree_codegenindex_hint-codegenindexhintop"><code>iree_codegen.index_hint</code> (Codegen::IndexHintOp)<a class="headerlink" href="#iree_codegenindex_hint-codegenindexhintop" title="Permanent link">link</a></h3>
+<p><em>Compiler hint providing semantic information about an index</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.index_hint` $input `(` $hint `)` attr-dict `:` type($input)
+</code></pre></div>
+<p>Pure pass-through operation that annotates an index value with semantic
+information about how it varies across parallel workers (e.g., GPU lanes).</p>
+<p>The hint attribute describes the index behavior. Common hints include:
+- <code>#iree_gpu.lane_constant&lt;N&gt;</code>: Index is uniform within groups of N lanes
+- <code>#iree_gpu.lane_increment&lt;N&gt;</code>: Index increments by 1 within groups of N lanes</p>
+<p>This operation is always safe to remove (replace with input). It exists
+purely to guide optimization passes.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>%row = iree_codegen.index_hint %idx(#iree_gpu.lane_constant&lt;16&gt;) : index
+%col = iree_codegen.index_hint %idx(#iree_gpu.lane_increment&lt;16&gt;) : index
+</code></pre></div></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>hint</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
+</table>
+
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>input</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_codegeninner_tiled-codegeninnertiledop"><code>iree_codegen.inner_tiled</code> (Codegen::InnerTiledOp)<a class="headerlink" href="#iree_codegeninner_tiled-codegeninnertiledop" title="Permanent link">link</a></h3>
 <p><em>Models an inner-tiled operation that may perform contractions.</em></p>
 <p>Syntax:</p>
@@ -6276,7 +6350,7 @@ without needing to essentially clone this op.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>InferTypeOpAdaptor</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>DestinationStyleOpInterface</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TilingInterface</code>, <code>VectorUnrollOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>indxing affine maps</td></tr>
@@ -6286,7 +6360,7 @@ without needing to essentially clone this op.</p>
 <tr><td><code>permutations</code></td><td>::mlir::ArrayAttr</td><td>permutations</td></tr>
 </table>
 
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6305,7 +6379,7 @@ without needing to essentially clone this op.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6328,7 +6402,7 @@ without needing to essentially clone this op.</p>
 <p>Loads a tensor from a memref with a compatible shape and the same element
 type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6343,7 +6417,7 @@ type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6367,7 +6441,7 @@ type.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6393,13 +6467,13 @@ to VMVX.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>tensor_type</code></td><td>::mlir::TypeAttr</td><td>Tensor type attribute</td></tr>
 </table>
 
-<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
+<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6423,7 +6497,7 @@ to VMVX.</p>
 <p>Stores a tensor into a memref with a compatible shape and the same element
 type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6480,13 +6554,13 @@ is otherwise perfectly legal.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>swizzle</code></td><td>IREE::Codegen::SwizzleAttrInterface</td><td>swizzling descriptor attributes</td></tr>
 </table>
 
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6501,7 +6575,7 @@ is otherwise perfectly legal.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
+<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6549,13 +6623,13 @@ module {
 iree_codegen.workgroup_count_hint sizes(%num_workgroups)
 </code></pre></div>
 <p>This results in <code>(%num_workgroups, 1, 1)</code> as the final workgroup count.</p>
-<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>static_sizes</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
+<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6570,7 +6644,7 @@ iree_codegen.workgroup_count_hint sizes(%num_workgroups)
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_4">Attributes<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h2>
+<h2 id="attributes_5">Attributes<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h2>
 <h3 id="denormalfpmathattr">DenormalFpMathAttr<a class="headerlink" href="#denormalfpmathattr" title="Permanent link">link</a></h3>
 <p><em>Denormal mode for fp math</em></p>
 <p>Syntax:</p>

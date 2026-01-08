@@ -2147,9 +2147,27 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#laneconstantattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LaneConstantAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#laneidattr" class="md-nav__link">
     <span class="md-ellipsis">
       LaneIdAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#laneincrementattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LaneIncrementAttr
     </span>
   </a>
   
@@ -5418,9 +5436,27 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#laneconstantattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LaneConstantAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#laneidattr" class="md-nav__link">
     <span class="md-ellipsis">
       LaneIdAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#laneincrementattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LaneIncrementAttr
     </span>
   </a>
   
@@ -5888,7 +5924,9 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#gpupaddingresolverattr">GPUPaddingResolverAttr</a></li>
 <li><a href="#gpupipelineoptionsattr">GPUPipelineOptionsAttr</a></li>
 <li><a href="#innertiledsemanticsattr">InnerTiledSemanticsAttr</a></li>
+<li><a href="#laneconstantattr">LaneConstantAttr</a></li>
 <li><a href="#laneidattr">LaneIdAttr</a></li>
+<li><a href="#laneincrementattr">LaneIncrementAttr</a></li>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
 <li><a href="#mmaattr">MMAAttr</a></li>
 <li><a href="#mmaintrinsicattr">MMAIntrinsicAttr</a></li>
@@ -6755,6 +6793,36 @@ lowerings while the mma_layout's typically stay constant. This includes:
 </tr>
 </tbody>
 </table>
+<h3 id="laneconstantattr">LaneConstantAttr<a class="headerlink" href="#laneconstantattr" title="Permanent link">link</a></h3>
+<p><em>Index is constant within groups of N lanes</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.lane_constant&lt;
+  int64_t   # group_size
+&gt;
+</code></pre></div>
+<p>This attribute is intended to be attached to the iree_codegen.index_hint op,
+on which it attribute indicates that the index value is constant (uniform)
+across groups of N consecutive lanes. For example, with group_size=16, lanes
+0-15 all have the same value, lanes 16-31 all have the same value, etc.</p>
+<p>This hint is used to guide optimizations like transpose load lowering,
+where row indices must be uniform within a 16-lane group.</p>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">group_size</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="laneidattr">LaneIdAttr<a class="headerlink" href="#laneidattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.lane_id&lt;
@@ -6762,7 +6830,7 @@ lowerings while the mma_layout's typically stay constant. This includes:
 &gt;
 </code></pre></div>
 <p>An attribute for mapping scf.forall ops to subgroup lanes.</p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6779,6 +6847,36 @@ lowerings while the mma_layout's typically stay constant. This includes:
 </tr>
 </tbody>
 </table>
+<h3 id="laneincrementattr">LaneIncrementAttr<a class="headerlink" href="#laneincrementattr" title="Permanent link">link</a></h3>
+<p><em>Index increments by 1 within groups of N lanes</em></p>
+<p>This attribute is intended to be attached to the iree_codegen.index_hint op,
+on which it indicates that the index value increments by <code>step</code> within
+groups of N consecutive lanes. For example, with group_size=16 and a base
+value B, lane i has value <code>B + (i % 16) * step</code>.</p>
+<p>This hint is used to guide optimizations like transpose load lowering,
+where the column index must increment by 1 across consecutive lanes.</p>
+<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">group_size</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">step</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="loweringconfigattr">LoweringConfigAttr<a class="headerlink" href="#loweringconfigattr" title="Permanent link">link</a></h3>
 <p><em>Drive lowering of an operation for gpu compilation.</em></p>
 <p>Syntax:</p>
@@ -6789,7 +6887,7 @@ lowerings while the mma_layout's typically stay constant. This includes:
 <p>GPU specific implementation of a lowering config. This carries just a
 dictionary attribute to store any relevant fields. This is the simplest
 form of a lowering config, offering flexibility at the cost of structure.</p>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6825,7 +6923,7 @@ See IREEGPUEnums.td for the definition of the intrinsics.</p>
 column major. This is equivalent to instead computing:</p>
 <div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
 </code></pre></div>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6854,7 +6952,7 @@ column major. This is equivalent to instead computing:</p>
   ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6877,7 +6975,7 @@ column major. This is equivalent to instead computing:</p>
   ::llvm::ArrayRef&lt;MMAAttr&gt;   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
+<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6913,7 +7011,7 @@ swizzle inserted if possible. For example,</p>
 %2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
 %3 = linalg.matmul ins(%2, ...)
 </code></pre></div>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
+<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6937,7 +7035,7 @@ swizzle inserted if possible. For example,</p>
   ::mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
+<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6972,7 +7070,7 @@ always a f32 exponent / f8E8M0).</p>
 on the attribute, not in the intrinsic enum, since these scaled
 operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
 <p>This intrinsic takes its four parameters as (lhs, lhs_scale, rhs, rhs_scale).</p>
-<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
+<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7015,7 +7113,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
   ::llvm::ArrayRef&lt;ScaledMMAAttr&gt;   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
+<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7039,7 +7137,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
   ::mlir::iree_compiler::IREE::GPU::StorageBitwidths   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
+<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7063,7 +7161,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
   ::mlir::iree_compiler::IREE::GPU::SubgroupOps   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
+<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7098,7 +7196,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
   streaming multiprocessor
 * An optional TargetChipAttr describing GPU features for the final chip
   or product, e.g., wgp count</p>
-<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
+<h5 id="parameters_22">Parameters:<a class="headerlink" href="#parameters_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7145,7 +7243,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
 Here a GPU chip means the hardware functionality scope where the whole
 software compute grid is scheduled onto. A chip typically contains many
 AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
-<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
+<h5 id="parameters_23">Parameters:<a class="headerlink" href="#parameters_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7209,7 +7307,7 @@ processor (WGP) level. Here a GPU workgroup processor means the basic
 hardware functionality unit where a software workgroup is scheduled onto;
 that is, a compute unit for AMD GPUs or a streaming multiprocessor for
 NVIDIA GPUs.</p>
-<h5 id="parameters_22">Parameters:<a class="headerlink" href="#parameters_22" title="Permanent link">link</a></h5>
+<h5 id="parameters_24">Parameters:<a class="headerlink" href="#parameters_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7324,7 +7422,7 @@ in a chained-matmul operation.</p>
 is perfomed as below:</p>
 <div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
 </code></pre></div>
-<h5 id="parameters_23">Parameters:<a class="headerlink" href="#parameters_23" title="Permanent link">link</a></h5>
+<h5 id="parameters_25">Parameters:<a class="headerlink" href="#parameters_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7353,7 +7451,7 @@ is perfomed as below:</p>
   ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_24">Parameters:<a class="headerlink" href="#parameters_24" title="Permanent link">link</a></h5>
+<h5 id="parameters_26">Parameters:<a class="headerlink" href="#parameters_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
