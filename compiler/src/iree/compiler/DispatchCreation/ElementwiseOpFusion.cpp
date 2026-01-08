@@ -16,7 +16,6 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
-#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -79,7 +78,8 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
     // Allow bit extend ops or transpose ops.
     bool isBitExtend = IREE::LinalgExt::isBitExtendOp(producerOp);
     bool isTranspose =
-        iree_compiler::GlobalOptimization::isaTransposeOpInterface(producerOp);
+        mlir::iree_compiler::DispatchCreation::isaTransposeOpInterface(
+            producerOp);
     if (producerOp.getNumResults() != 1 || !isElementwise(producerOp) ||
         (!isBitExtend && !isTranspose)) {
       return rewriter.notifyMatchFailure(producerOp,

@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -104,28 +105,11 @@ static bool isReshapeBlockingFusion(Operation *producer, Operation *consumer) {
 // Transpose specialization
 //===----------------------------------------------------------------------===//
 
-// Indicates whether the given linalg op represents a transpose. In particular,
-// it requires a single input where the indexing maps are full permutations and
-// non-equal.
-bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
-    return false;
-
-  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
-    return false;
-  auto mapRange = linalgOp.getIndexingMapsArray();
-  if (mapRange.size() != 2 || !mapRange.front().isPermutation() ||
-      !mapRange.back().isPermutation() || mapRange.front() == mapRange.back()) {
-    return false;
-  }
-  return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
-}
-
 // Specializes linalg.generic op to linalg.transpose if it is transposing a
 // single input.
 static void specializeGenericTransposeOp(RewriterBase &rewriter,
                                          linalg::GenericOp genericOp) {
-  if (!mlir::iree_compiler::GlobalOptimization::isaTransposeOpInterface(
+  if (!mlir::iree_compiler::DispatchCreation::isaTransposeOpInterface(
           genericOp)) {
     return;
   }
