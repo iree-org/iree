@@ -620,7 +620,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
     bool isGemm, bool scaled, int64_t splitReductionTripCnt,
-    bool CpromoteIfPadding,
+    bool CPromoteIfPadding,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -799,7 +799,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs, isGemm,
       /*mustBeAligned=*/true,
-      /*doCPromotion=*/couldNeedPadding && CpromoteIfPadding, scaled,
+      /*doCPromotion=*/couldNeedPadding && CPromoteIfPadding, scaled,
       splitReductionTripCnt);
 
   // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
@@ -811,7 +811,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     mustBeAligned = false;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
-        /*doCPromotion=*/CpromoteIfPadding, scaled, splitReductionTripCnt);
+        /*doCPromotion=*/CPromoteIfPadding, scaled, splitReductionTripCnt);
   }
 
   if (!schedule) {
@@ -892,20 +892,17 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
   SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
   SmallVector<int64_t> promotionList = {0, 1};
-  bool mustCpromote = (!mustBeAligned || couldNeedPadding) && CpromoteIfPadding;
-  if (mustCpromote) {
-    promotionList.push_back(2);
-  }
   if (scaled) {
     // TODO(#22119): We don't use global load DMA for scaled matmuls, because
     // compilation doesn't support it. Once this is fixed, we should use global
     // load DMA here when possible.
     promotionArray = {};
-    if (mustCpromote) {
-      promotionList.append({3, 4});
-    } else {
-      promotionList.append({2, 3});
-    }
+    promotionList.append({2, 3});
+  }
+  if ((!mustBeAligned || couldNeedPadding) && CPromoteIfPadding) {
+    // If needed then add C operand which would be operand 2 or 4 for unscaled
+    // and scaled GEMM respectively.
+    promotionList.push_back(promotionList.size());
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
                                            ? ArrayRef<Attribute>(promotionArray)
