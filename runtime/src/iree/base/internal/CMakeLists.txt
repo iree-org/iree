@@ -240,6 +240,30 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    json
+  HDRS
+    "json.h"
+  SRCS
+    "json.c"
+  DEPS
+    ::unicode
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    json_test
+  SRCS
+    "json_test.cc"
+  DEPS
+    ::json
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     memory
   HDRS
     "memory.h"
