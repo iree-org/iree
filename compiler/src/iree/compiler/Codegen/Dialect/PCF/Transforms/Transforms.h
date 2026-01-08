@@ -52,12 +52,6 @@ struct ConsumerFusionParams {
   // In the first case, slices[0] is the most dominant slice (and thus the
   // insertion point for the fused op).
   SmallVector<PCF::WriteSliceOp> slices;
-
-  void clear() {
-    operands.clear();
-    results.clear();
-    slices.clear();
-  }
 };
 
 // Helpers to match a consumer as fusable into a producer. There are two
@@ -68,8 +62,8 @@ struct ConsumerFusionParams {
 //   1. The tilable |target| consumes multiple results of the producer but only
 //      a single writing op constructs each consumed result.
 // Populates |params| with the matched information needed to perform a fusion
-// upon success. On failure |params| is cleared and a different tilable consumer
-// may be matched against.
+// upon success. On failure |params| may be partially populated. It is the
+// caller's responsibility to pass an empty struct on subsequent matches.
 //
 // Note that currently multiple producers split across block/region boundaries
 // is unsupported. We need to guarantee the existence of a point in

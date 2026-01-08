@@ -44,8 +44,10 @@ struct FuseIntoGenericOp : public OpRewritePattern<IREE::PCF::GenericOp> {
     TilingInterface fusionTarget;
     for (Operation *user : genericOp->getUsers()) {
       fusionTarget = dyn_cast<TilingInterface>(user);
+      ConsumerFusionParams tempParams;
       if (fusionTarget && succeeded(matchTilableConsumer(
-                              rewriter, genericOp, fusionTarget, params))) {
+                              rewriter, genericOp, fusionTarget, tempParams))) {
+        std::swap(params, tempParams);
         break;
       }
       fusionTarget = TilingInterface();
@@ -67,8 +69,10 @@ struct FuseIntoLoopOp : public OpRewritePattern<IREE::PCF::LoopOp> {
     TilingInterface fusionTarget;
     for (Operation *user : loopOp->getUsers()) {
       fusionTarget = dyn_cast<TilingInterface>(user);
+      ConsumerFusionParams tempParams;
       if (fusionTarget && succeeded(matchTilableConsumer(
-                              rewriter, loopOp, fusionTarget, params))) {
+                              rewriter, loopOp, fusionTarget, tempParams))) {
+        std::swap(params, tempParams);
         break;
       }
       fusionTarget = TilingInterface();
@@ -878,22 +882,14 @@ LogicalResult matchTilableConsumer(RewriterBase &rewriter,
                                    PCF::GenericOp producerOp,
                                    TilingInterface target,
                                    ConsumerFusionParams &params) {
-  if (failed(matchTilableConsumerImpl(rewriter, producerOp, target, params))) {
-    params.clear();
-    return failure();
-  }
-  return success();
+  return matchTilableConsumerImpl(rewriter, producerOp, target, params);
 }
 
 LogicalResult matchTilableConsumer(RewriterBase &rewriter,
                                    PCF::LoopOp producerOp,
                                    TilingInterface target,
                                    ConsumerFusionParams &params) {
-  if (failed(matchTilableConsumerImpl(rewriter, producerOp, target, params))) {
-    params.clear();
-    return failure();
-  }
-  return success();
+  return matchTilableConsumerImpl(rewriter, producerOp, target, params);
 }
 
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::GenericOp producerOp,
