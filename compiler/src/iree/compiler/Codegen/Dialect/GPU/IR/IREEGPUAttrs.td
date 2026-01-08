@@ -959,4 +959,42 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Lane Index Hint Attributes
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_LaneConstantAttr : AttrDef<IREEGPU_Dialect, "LaneConstant"> {
+  let mnemonic = "lane_constant";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let summary = "Index is constant within groups of N lanes";
+  let description = [{
+    This attribute is intended to be attached to the iree_codegen.index_hint op,
+    on which it attribute indicates that the index value is constant (uniform)
+    across groups of N consecutive lanes. For example, with group_size=16, lanes
+    0-15 all have the same value, lanes 16-31 all have the same value, etc.
+
+    This hint is used to guide optimizations like transpose load lowering,
+    where row indices must be uniform within a 16-lane group.
+  }];
+  let parameters = (ins "int64_t":$group_size);
+  let assemblyFormat = "`<` $group_size `>`";
+}
+
+def IREEGPU_LaneIncrementAttr : AttrDef<IREEGPU_Dialect, "LaneIncrement"> {
+  let mnemonic = "lane_increment";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let summary = "Index increments by 1 within groups of N lanes";
+  let description = [{
+    This attribute is intended to be attached to the iree_codegen.index_hint op,
+    on which it indicates that the index value increments by `step` within
+    groups of N consecutive lanes. For example, with group_size=16 and a base
+    value B, lane i has value `B + (i % 16) * step`.
+
+    This hint is used to guide optimizations like transpose load lowering,
+    where the column index must increment by 1 across consecutive lanes.
+  }];
+  let parameters = (ins "int64_t":$group_size, "int64_t":$step);
+  let hasCustomAssemblyFormat = 1;
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
