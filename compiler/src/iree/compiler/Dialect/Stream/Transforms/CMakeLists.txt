@@ -15,6 +15,7 @@ iree_cc_library(
     Transforms
   HDRS
     "Passes.h"
+    "Utils.h"
   SRCS
     "AnnotateAffinities.cpp"
     "AnnotateConstantTransientSize.cpp"
@@ -50,6 +51,7 @@ iree_cc_library(
     "SpecializeEncodings.cpp"
     "SyncInitializers.cpp"
     "UnifyEncodingForGlobals.cpp"
+    "Utils.cpp"
     "VerifyAffinities.cpp"
     "VerifyAsyncAccessRanges.cpp"
     "VerifyLowerings.cpp"

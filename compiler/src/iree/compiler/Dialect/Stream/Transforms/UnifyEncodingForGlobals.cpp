@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Stream/Transforms/Utils.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -28,29 +29,6 @@ namespace mlir::iree_compiler::IREE::Stream {
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
 
 namespace {
-
-/// Returns a stably sorted list of dialect interfaces of T for all dialects
-/// used within the given module.
-template <typename T>
-SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
-  SmallPtrSet<const T *, 4> resultSet;
-  for (Dialect *dialect : moduleOp.getContext()->getLoadedDialects()) {
-    const T *dialectInterface = dialect->getRegisteredInterface<T>();
-    if (!dialectInterface)
-      continue;
-    resultSet.insert(dialectInterface);
-  }
-
-  // NOTE: to ensure deterministic output we sort the result so that imports are
-  // always added in a consistent order.
-  auto results = llvm::to_vector_of<const T *>(resultSet);
-  llvm::sort(
-      results, +[](const T *a, const T *b) {
-        return a->getDialect()->getNamespace().compare(
-                   b->getDialect()->getNamespace()) < 0;
-      });
-  return results;
-}
 
 //===----------------------------------------------------------------------===//
 // Analysis.
