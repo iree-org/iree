@@ -28,4 +28,24 @@ def VectorExtFoldUnitExtentDimsPass :
   ];
 }
 
+def GreedySLPVectorizerPass : Pass<"iree-greedy-slp-vectorizer"> {
+  let summary = "SLP Vectorizer Pass";
+  let description = [{
+    This pass implements the SLP (Superword Level Parallelism) vectorizer.
+    It detects consecutive operations that can be put together into vector
+    operations. The pass works bi-directionaly, starting from reads or stores,
+    in search of scalars to combine.
+
+    This is greedy vectorizer, it doesn't have any cost model (yet) and it tries
+    to create vector ops if we have at least 2 potential ops.
+  }];
+  let dependentDialects = ["::mlir::vector::VectorDialect"];
+
+  let options = [
+    Option<"maxVectorBitwidth", "max-vector-bitwidth", "unsigned",
+      /*default=*/"std::numeric_limits<unsigned>::max()",
+      "Maximum supported vector bitwidth">,
+  ];
+}
+
 #endif // IREE_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_PASSES
