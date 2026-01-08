@@ -646,7 +646,51 @@ struct UnifyEncodingForGlobalsPass
     // Apply all tensor encoding updates in one shot.
     applyTensorEncodingUpdates(tensorEncodingUpdates);
 
-    // TODO(#22485): Update executables.
+    // Collect dispatch ops that need executable updates. Only include those
+    // with recognizable entry points (executable exists with proper binding
+    // subspans).
+    // TODO(hanchung): This currently does not work with if export op is not
+    // Stream op. E.g., it could be authored by external users. We need to
+    // filter such global out or re-encode before the dispatch op properly.
+    SymbolTable symbolTable(moduleOp);
+    SmallVector<TensorDispatchOp> dispatchOpsForExecutableUpdate;
+    for (auto &[op, operandUpdates] : tensorEncodingUpdates) {
+      auto dispatchOp = dyn_cast<TensorDispatchOp>(op);
+      if (!dispatchOp) {
+        continue;
+      }
+      if (!recognizeDispatchEntryPoints(moduleOp, symbolTable, dispatchOp)) {
+        LDBG() << "  Skipping executable update for dispatch (entry points not "
+                  "recognized): "
+               << dispatchOp;
+        continue;
+      }
+      dispatchOpsForExecutableUpdate.push_back(dispatchOp);
+    }
+
+    // Sort by affinity string for deterministic executable duplication order.
+    llvm::sort(dispatchOpsForExecutableUpdate,
+               [](TensorDispatchOp a, TensorDispatchOp b) {
+                 std::string aStr, bStr;
+                 llvm::raw_string_ostream aStream(aStr), bStream(bStr);
+                 if (auto aAffinity = a.getAffinityAttr())
+                   aStream << aAffinity;
+                 if (auto bAffinity = b.getAffinityAttr())
+                   bStream << bAffinity;
+                 return aStr < bStr;
+               });
+
+    // Duplicate executables for dispatch ops that have different binding
+    // layouts. This handles the case where the same executable is used by
+    // dispatch sites with different unified encodings (e.g., multi-device).
+    if (!dispatchOpsForExecutableUpdate.empty()) {
+      if (failed(duplicateExecutablesPerLayoutVariant(
+              moduleOp, symbolTable, dispatchOpsForExecutableUpdate))) {
+        moduleOp.emitError("failed to duplicate executables for unified "
+                           "encoding variants");
+        return signalPassFailure();
+      }
+    }
   }
 };
 
