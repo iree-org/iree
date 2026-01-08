@@ -18,10 +18,30 @@ util.func private @asyncConstant(%arg0: index) -> !stream.resource<transient> {
 
 // -----
 
+// CHECK-LABEL: @asyncConstantWithAwait
+// CHECK-SAME: (%[[AWAIT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+util.func private @asyncConstantWithAwait(%await: !stream.timepoint, %size: index) -> !stream.resource<transient> {
+  // CHECK: = stream.async.constant await(%[[AWAIT]]) : !stream.resource<transient>{%[[SIZE]]} = dense<5> : tensor<8xi32>
+  %0 = stream.async.constant await(%await) : !stream.resource<transient>{%size} = dense<5> : tensor<8xi32>
+  util.return %0 : !stream.resource<transient>
+}
+
+// -----
+
 // CHECK-LABEL: @asyncSplat
 util.func private @asyncSplat(%arg0: index, %arg1: i32) -> !stream.resource<*> {
   // CHECK: = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
   %0 = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @asyncSplatWithAwait
+// CHECK-SAME: (%[[AWAIT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index, %[[VALUE:.+]]: i32)
+util.func private @asyncSplatWithAwait(%await: !stream.timepoint, %size: index, %value: i32) -> !stream.resource<*> {
+  // CHECK: = stream.async.splat await(%[[AWAIT]]) %[[VALUE]] : i32 -> !stream.resource<*>{%[[SIZE]]}
+  %0 = stream.async.splat await(%await) %value : i32 -> !stream.resource<*>{%size}
   util.return %0 : !stream.resource<*>
 }
 

@@ -102,11 +102,24 @@ struct ExecutePartitionBuilder {
         operandSizes.push_back(operandSize);
     }
 
+    // Collect await timepoints from all ops being partitioned and join them.
+    // In the common case this is empty but sometimes we fold in ops that may
+    // already be semi-timeline-aware and need to ensure we preserve the
+    // ordering constraints.
+    SmallVector<Value> awaitTimepoints;
+    for (auto *op : partition->ops) {
+      if (auto timelineOp = dyn_cast<IREE::Stream::TimelineOpInterface>(op)) {
+        llvm::append_range(awaitTimepoints, timelineOp.getAwaitTimepoints());
+      }
+    }
+    Value awaitTimepoint =
+        IREE::Stream::joinTimepoints(fusedLoc, awaitTimepoints, parentBuilder);
+
     // TODO(benvanik): tie operands, or leave to canonicalization.
     SmallVector<int64_t> tiedOperands;
     executeOp = IREE::Stream::AsyncExecuteOp::create(
-        parentBuilder, fusedLoc, resultTypes, resultSizes,
-        /*awaitTimepoint=*/Value{}, operands, operandSizes, tiedOperands);
+        parentBuilder, fusedLoc, resultTypes, resultSizes, awaitTimepoint,
+        operands, operandSizes, tiedOperands);
     if (partition->affinity) {
       executeOp.setAffinityAttr(partition->affinity);
     }
@@ -161,6 +174,13 @@ struct ExecutePartitionBuilder {
       if (affinityOp.getAffinityAttr() == partition->affinity) {
         affinityOp.setAffinityAttr(nullptr);
       }
+    }
+
+    // Strip await timepoints from timeline ops - the execute region handles
+    // awaits at the region level, not per-op.
+    if (auto timelineOp =
+            dyn_cast<IREE::Stream::TimelineOpInterface>(clonedOp)) {
+      timelineOp.setAwaitTimepoint(nullptr);
     }
 
     return true;

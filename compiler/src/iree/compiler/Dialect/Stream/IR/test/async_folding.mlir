@@ -651,3 +651,37 @@ util.func private @ElideUnusedAsyncConcurrentOp(%arg0: !stream.resource<*>, %arg
   } => !stream.timepoint
   util.return %0#0, %0#1 : !stream.resource<*>, !stream.timepoint
 }
+
+// -----
+
+// Verifies that splat constants with await timepoints are converted to
+// stream.async.splat ops.
+
+// CHECK-LABEL: @ConvertSplatConstantToSplatWithAwait
+util.func private @ConvertSplatConstantToSplatWithAwait(%await: !stream.timepoint, %size: index) -> !stream.resource<transient> {
+  // CHECK-DAG: %[[SPLAT_VALUE:.+]] = arith.constant 5 : i32
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat await(%arg0) %[[SPLAT_VALUE]] : i32 -> !stream.resource<transient>{%arg1}
+  %0 = stream.async.constant await(%await) : !stream.resource<transient>{%size} = dense<5> : tensor<8xi32>
+  // CHECK-NEXT: util.return %[[SPLAT]]
+  util.return %0 : !stream.resource<transient>
+}
+
+// -----
+
+// Verifies that slicing a splat propagates the await and folds the slice away.
+
+// CHECK-LABEL: @PropagateSplatAwaitThroughSlice
+util.func private @PropagateSplatAwaitThroughSlice(%await: !stream.timepoint) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK-DAG: %[[SLICE_SIZE:.+]] = arith.constant 64 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  // CHECK-DAG: %[[SPLAT_VALUE:.+]] = arith.constant 123 : i32
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[RESULT:.+]] = stream.async.splat await(%arg0) %[[SPLAT_VALUE]] : i32 -> !stream.resource<*>{%[[SLICE_SIZE]]}
+  %0 = stream.async.splat await(%await) %c123_i32 : i32 -> !stream.resource<*>{%c128}
+  // CHECK-NOT: stream.async.slice
+  %1 = stream.async.slice %0[%c0 to %c64] : !stream.resource<*>{%c128} -> !stream.resource<*>{%c64}
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
+}
