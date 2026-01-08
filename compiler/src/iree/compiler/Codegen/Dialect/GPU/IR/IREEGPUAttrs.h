@@ -296,7 +296,8 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                                 Attribute attr);
 
 Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
-                                  Attribute attr, int64_t rowWidth, int64_t accessWidth); 
+                           Attribute attr, int64_t rowWidth,
+                           int64_t accessWidth);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

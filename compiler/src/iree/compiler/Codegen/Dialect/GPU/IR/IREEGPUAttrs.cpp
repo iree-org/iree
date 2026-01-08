@@ -2275,9 +2275,10 @@ Value PromoteWithCacheSwizzleAttr::promoteOperand(
   return cacheSwizzlePromotionImpl(builder, operand, getCopyConfig());
 }
 
-Value SwizzleOperandAttr::promoteOperand(
-  mlir::OpBuilder &builder, mlir::OpOperand &operand) const {
-  return swizzlePromotionImpl(builder, operand, getCopyConfig(), getRowWidth(), getAccessWidth());
+Value SwizzleOperandAttr::promoteOperand(mlir::OpBuilder &builder,
+                                         mlir::OpOperand &operand) const {
+  return swizzlePromotionImpl(builder, operand, getCopyConfig(), getRowWidth(),
+                              getAccessWidth());
 }
 
 // Value SwizzleOperandAttr::promoteOperand(

@@ -854,10 +854,6 @@ def RemoveSingleIterationLoopPass :
 def FlattenSwizzleHintAllocsPass :
     InterfacePass<"iree-codegen-flatten-swizzle-hint-allocs", "mlir::FunctionOpInterface"> {
   let summary = "Flattens allocations associated with iree_codegen.swizzle_hint ops";
-  let dependentDialects = [
-    "arith::ArithDialect",
-    "memref::MemRefDialect",
-  ];
 }
 
 def ResolveSwizzleHintsPass :

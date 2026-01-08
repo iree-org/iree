@@ -24,32 +24,38 @@ struct FlattenSwizzleHintAllocsPass final
 };
 } // namespace
 
-static void flattenSwizzleHintAllocs(RewriterBase &rewriter, IREE::Codegen::SwizzleHintOp hintOp) {
-    auto allocOp = hintOp.getOperand().getDefiningOp<memref::AllocOp>();
-    if (!allocOp) {
-        return;
-    }
-    if (!allocOp->hasOneUse()) {
-        return;
-    }
-    auto resultType = allocOp.getType();
-    if (resultType.getRank() == 1) {
-        return;
-    }
-    auto newResultShape = SmallVector<int64_t>({resultType.getNumElements()});
-    MemRefType newResultType = MemRefType::get(newResultShape, resultType.getElementType(),
-    AffineMap(), resultType.getMemorySpace());
-    rewriter.setInsertionPoint(hintOp);
-    ReassociationIndices reassoc = llvm::to_vector(llvm::seq(resultType.getRank()));
-    auto newAllocOp = memref::AllocOp::create(rewriter, hintOp.getLoc(), newResultType);
-    auto newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(rewriter, hintOp.getLoc(), newAllocOp.getResult(), hintOp.getSwizzle());
-    auto expandShape = memref::ExpandShapeOp::create(rewriter, hintOp.getLoc(), resultType.getShape(), newSwizzleHintOp, {reassoc});
-    rewriter.replaceAllUsesWith(hintOp, expandShape);
+static void flattenSwizzleHintAllocs(RewriterBase &rewriter,
+                                     IREE::Codegen::SwizzleHintOp hintOp) {
+  auto allocOp = hintOp.getOperand().getDefiningOp<memref::AllocOp>();
+  if (!allocOp) {
+    return;
+  }
+  if (!allocOp->hasOneUse()) {
+    return;
+  }
+  auto resultType = allocOp.getType();
+  if (resultType.getRank() == 1) {
+    return;
+  }
+  auto newResultShape = SmallVector<int64_t>({resultType.getNumElements()});
+  MemRefType newResultType =
+      MemRefType::get(newResultShape, resultType.getElementType(), AffineMap(),
+                      resultType.getMemorySpace());
+  rewriter.setInsertionPoint(hintOp);
+  ReassociationIndices reassoc =
+      llvm::to_vector(llvm::seq(resultType.getRank()));
+  auto newAllocOp =
+      memref::AllocOp::create(rewriter, hintOp.getLoc(), newResultType);
+  auto newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(
+      rewriter, hintOp.getLoc(), newAllocOp.getResult(), hintOp.getSwizzle());
+  auto expandShape = memref::ExpandShapeOp::create(rewriter, hintOp.getLoc(),
+                                                   resultType.getShape(),
+                                                   newSwizzleHintOp, {reassoc});
+  rewriter.replaceAllUsesWith(hintOp, expandShape);
 }
 
 void FlattenSwizzleHintAllocsPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
-
   // Collect all swizzle hint ops that operate on allocations.
   // Flatten all allocs of rank > 1.
   SmallVector<IREE::Codegen::SwizzleHintOp> hintOps;
@@ -63,4 +69,3 @@ void FlattenSwizzleHintAllocsPass::runOnOperation() {
 }
 
 } // namespace mlir::iree_compiler
-

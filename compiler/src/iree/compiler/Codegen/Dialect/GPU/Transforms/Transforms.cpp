@@ -97,28 +97,19 @@ getEquivalentMappingConsumerLoopNest(scf::ForallOp producer,
 
 static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
                                                      scf::ForallOp forallOp) {
-  llvm::errs() << "createSharedAllocDestination\n";
-  llvm::errs() << "forallOp: " << forallOp << "\n";
   if (forallOp->getNumResults() != 1) {
     return failure();
   }
 
-  llvm::errs() << "forallOp.getDpsInits()[0]: " << forallOp.getDpsInits()[0] << "\n";
   // Skip swizzle hint ops.
-  auto getEmptyOpSkipIrrelevant = [](Value value) -> tensor::EmptyOp {
-    Operation *op = value.getDefiningOp();
-    while (op && isa<IREE::Codegen::SwizzleHintOp/*, tensor::ExpandShapeOp, tensor::ExtractSliceOp*/>(op)) {
-        op->print(llvm::errs()), llvm::errs() << "\n";
-        op = op->getOperand(0).getDefiningOp();
-    }
-    op->print(llvm::errs()), llvm::errs() << "\n";
-    return dyn_cast<tensor::EmptyOp>(op);
-  };
+  Operation* destination = forallOp.getDpsInits()[0].getDefiningOp();
+  if (auto swizzleOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(destination)) {
+    destination = swizzleOp->getOperand(0).getDefiningOp();
+  }
 
-  // auto empty = forallOp.getDpsInits()[0].getDefiningOp<tensor::EmptyOp>();
-  auto empty = getEmptyOpSkipIrrelevant(forallOp.getDpsInits()[0]);
   // Fail if the destination is not a `tensor.empty` op and cannot be trivially
   // converted to a `bufferization.alloc_tensor`.
+  auto empty = dyn_cast<tensor::EmptyOp>(destination);
   if (!empty) {
     return failure();
   }
@@ -134,7 +125,7 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
       empty.getDynamicSizes(),
       /*copy=*/Value(), /*size_hint=*/Value(),
       /*memory_space=*/sharedMemoryAddrSpace);
-  allocTensor->print(llvm::errs()), llvm::errs() << "\n";
+  // If the original `tensor.empty` has a swizzle hint, apply it to the new allocation.
   if (auto swizzleHintOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
     auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(rewriter, empty->getLoc(), allocTensor.getResult(), swizzleHintOp.getSwizzle());
     return newSwizzle.getResult();
@@ -2210,7 +2201,7 @@ private:
 
 } // namespace
 
-void populateReorderSwizzleHintOpPattern(RewritePatternSet &patterns) {
+void populateFoldSwizzleHintOpPatterns(RewritePatternSet &patterns) {
   // patterns.insert<ReorderSwizzleHintOp>(patterns.getContext());
   patterns.insert<FoldSwizzleHintOpWithReshapeOp<tensor::ExpandShapeOp>>(patterns.getContext());
   patterns.insert<FoldSwizzleHintOpWithReshapeOp<tensor::CollapseShapeOp>>(patterns.getContext());

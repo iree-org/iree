@@ -62,7 +62,6 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
 
 void GPUApplyTilingLevelPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
-  llvm::errs() << "GPUApplyTilingLevelPass: tiling level: " << IREE::GPU::stringifyEnum(tilingLevel) << "\n";
   if (!llvm::is_contained({IREE::GPU::TilingLevel::Reduction,
                            IREE::GPU::TilingLevel::Thread,
                            IREE::GPU::TilingLevel::Subgroup,
@@ -108,7 +107,7 @@ void GPUApplyTilingLevelPass::runOnOperation() {
   // Apply cleanup patterns.
   {
     RewritePatternSet patterns(context);
-    IREE::GPU::populateReorderSwizzleHintOpPattern(patterns);
+    IREE::GPU::populateFoldSwizzleHintOpPatterns(patterns);
     // Merge consecutive insert/extract slice ops to simplify later loop
     // hoisting patterns.
     tensor::populateFoldTensorEmptyPatterns(patterns);

@@ -131,10 +131,8 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
         rewriter, hintLoc,
         hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
                                           newBaseOffset, hintOp.getOperand()));
-    auto newStore = vector::StoreOp::create(rewriter, store.getLoc(), subVec, store.getBase(),
+    vector::StoreOp::create(rewriter, store.getLoc(), subVec, store.getBase(),
                             newOffset);
-    llvm::errs() << "newStore: ";
-    newStore->print(llvm::errs()), llvm::errs() << "\n";
   }
   rewriter.eraseOp(store);
 }
@@ -169,10 +167,6 @@ static void resolveHintOp(RewriterBase &rewriter,
   SmallVector<amdgpu::GatherToLDSOp> gatherToLDSOps;
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   for (Operation *user : hintOp->getUsers()) {
-    if (auto expandShapeOp = dyn_cast<memref::ExpandShapeOp>(user)) {
-      user = *expandShapeOp->getUsers().begin();
-      user->print(llvm::errs()), llvm::errs() << "\n";
-    }
     if (auto load = dyn_cast<vector::LoadOp>(user)) {
       VectorType loadType = load.getVectorType();
       // Guard on zero rank loads and loads not divisible by the access width.

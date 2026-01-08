@@ -866,7 +866,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
   SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
   SmallVector<int64_t> promotionList = {0, 1};
-  
+
   if (scaled) {
     // TODO(#22119): We don't use global load DMA for scaled matmuls, because
     // compilation doesn't support it. Once this is fixed, we should use global
@@ -877,8 +877,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     int64_t rowWidth = 2 * llvm::product_of(schedule->kSizes);
     int64_t accessWidth = schedule->kSizes.back();
     auto configAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
-    Attribute swizzleOperand = IREE::GPU::SwizzleOperandAttr::get(context,
-        configAttr, rowWidth, accessWidth);
+    Attribute swizzleOperand = IREE::GPU::SwizzleOperandAttr::get(
+        context, configAttr, rowWidth, accessWidth);
     promotionArray = {swizzleOperand, swizzleOperand, configAttr, configAttr};
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
