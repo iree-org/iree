@@ -19,7 +19,7 @@ on:
 
 jobs:
   test_mi355x:
-    runs-on: linux-mi35x-1gpu-ossci-iree-org
+    runs-on: linux-mi35x-1gpu-ossci-iree-org.test
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
