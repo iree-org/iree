@@ -492,8 +492,13 @@ MapGatherOp::getTiledImplementation(OpBuilder &builder,
   // compose the tiling offsets with the index transformation of the
   // map_gather op, because the space of the transformation output indices
   // is now local to the new output tile.
-  Operation *tiledOp = mlir::clone(builder, getOperation(), getResultTypes(),
-                                   {getSource(), outputSlice->getResult(0)});
+  Value tiledOutput = outputSlice->getResult(0);
+  SmallVector<Type> resultTypes;
+  if (getNumResults()) {
+    resultTypes.push_back(tiledOutput.getType());
+  }
+  Operation *tiledOp = mlir::clone(builder, getOperation(), resultTypes,
+                                   {getSource(), tiledOutput});
   auto tiledMapGatherOp = cast<MapGatherOp>(tiledOp);
   auto indexTransformBuilder =
       [&](ArrayRef<BlockArgument> outputIndices) -> SmallVector<Value> {
@@ -518,6 +523,13 @@ LogicalResult MapGatherOp::getResultTilePosition(
   resultOffsets.assign(offsets.begin(), offsets.end());
   resultSizes.assign(sizes.begin(), sizes.end());
   return success();
+}
+
+FailureOr<TilingResult>
+MapGatherOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                     ArrayRef<OpFoldResult> offsets,
+                                     ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
 }
 
 LogicalResult MapGatherOp::getIterationDomainTileFromOperandTiles(
@@ -551,68 +563,6 @@ FailureOr<TilingResult> MapGatherOp::getTiledImplementationFromOperandTiles(
     return failure();
   }
   return getTiledImplementation(b, mappedOffsets, mappedSizes);
-}
-
-/// The body of the transformation_region is inlined, and the yielded indices
-/// are used to read values from the source and write to the output. Bounds
-/// checking is performed on the source indices, and the padding value is used
-/// if the indices are out of bounds.
-LogicalResult MapGatherOp::generateScalarImplementation(OpBuilder &b,
-                                                        Location loc,
-                                                        ValueRange ivs) {
-  // The scalar implementation is currently only implemented for buffer
-  // semantics.
-  if (!hasPureBufferSemantics()) {
-    return failure();
-  }
-
-  auto bodyBuilder = [&](OpBuilder nestedBuilder, Location nestedLoc,
-                         ArrayRef<Value> yieldedValues) {
-    // The last yielded Value is the padding, the rest are source indices.
-    Value paddingValue = yieldedValues.back();
-    ArrayRef<Value> loadIndices = yieldedValues.drop_back();
-
-    // Check bounds for each source dimension.
-    Value inBounds;
-    for (auto [dim, idx] : llvm::enumerate(loadIndices)) {
-      Value zero = arith::ConstantIndexOp::create(nestedBuilder, nestedLoc, 0);
-      Value dimSize =
-          memref::DimOp::create(nestedBuilder, nestedLoc, getSource(), dim);
-
-      // Check: idx >= 0
-      Value geZero = arith::CmpIOp::create(
-          nestedBuilder, nestedLoc, arith::CmpIPredicate::sge, idx, zero);
-      // Check: idx < dimSize
-      Value ltDim = arith::CmpIOp::create(
-          nestedBuilder, nestedLoc, arith::CmpIPredicate::slt, idx, dimSize);
-      // Combine: idx >= 0 && idx < dimSize
-      Value dimInBounds =
-          arith::AndIOp::create(nestedBuilder, nestedLoc, geZero, ltDim);
-
-      if (inBounds) {
-        inBounds = arith::AndIOp::create(nestedBuilder, nestedLoc, inBounds,
-                                         dimInBounds);
-      } else {
-        inBounds = dimInBounds;
-      }
-    }
-
-    // Create if-else: if in bounds, load from source; else use padding.
-    auto thenBuilder = [&](OpBuilder &ifBuilder, Location ifLoc) {
-      Value loaded =
-          memref::LoadOp::create(ifBuilder, ifLoc, getSource(), loadIndices);
-      memref::StoreOp::create(ifBuilder, ifLoc, loaded, getOutput(), ivs);
-      scf::YieldOp::create(ifBuilder, ifLoc);
-    };
-    auto elseBuilder = [&](OpBuilder &ifBuilder, Location ifLoc) {
-      memref::StoreOp::create(ifBuilder, ifLoc, paddingValue, getOutput(), ivs);
-      scf::YieldOp::create(ifBuilder, ifLoc);
-    };
-    scf::IfOp::create(nestedBuilder, nestedLoc, inBounds, thenBuilder,
-                      elseBuilder);
-  };
-  inlineMapGatherBody(b, loc, ivs, bodyBuilder);
-  return success();
 }
 
 //===----------------------------------------------------------------------===//

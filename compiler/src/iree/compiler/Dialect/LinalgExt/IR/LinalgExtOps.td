@@ -278,9 +278,9 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation",
+         "generateResultTileValue",
          "getIterationDomainTileFromOperandTiles",
-         "getTiledImplementationFromOperandTiles",
-         "generateScalarImplementation"]>]> {
+         "getTiledImplementationFromOperandTiles"]>]> {
   let summary = [{Gather with a mapping from result indices to source indices.}];
   let description = [{
     Takes two operands, `source` and `output`, and reads every element from
@@ -324,15 +324,6 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
       return getOutputType().getRank();
     }
 
-    // Return the source index at the provided position.
-    Value getSourceIndex(int64_t position);
-
-    // Return the output index at the provided position.
-    Value getOutputIndex(int64_t position);
-
-    // Returns the padding value.
-    Value getPaddingValue();
-
     // Helper to apply transformations to the output index block arguments of
     // the transformation body, and replace the uses of the previous output
     // indices with the values returned by `transformationBuilder`. The argument
@@ -345,15 +336,6 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
         function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
             transformationBuilder,
         int64_t numOutputIndices);
-
-    // Inline the transformation region of the map_gather op without its
-    // terminator, replacing the block arguments with the passed
-    // `transformBodyIndices`. The `bodyBuilder` function is called with the
-    // cloned `Value`s that would have been yielded by the terminator of
-    // the inlined transformation body (source indices and padding value).
-    void inlineMapGatherBody(
-      OpBuilder &b, Location loc, ValueRange transformBodyIndices,
-      function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
