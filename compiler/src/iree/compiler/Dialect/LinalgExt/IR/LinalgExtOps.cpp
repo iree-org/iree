@@ -674,6 +674,11 @@ LogicalResult MapScatterOp::verify() {
                     llvm::IsaPred<IndexType>)) {
     return emitOpError("expected block arguments to be index types");
   }
+  return success();
+}
+
+LogicalResult MapScatterOp::verifyRegions() {
+  Block &transformBody = getTransformationRegion().getBlocks().front();
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
   if (yieldOp->getNumOperands() != getOutputRank() + 1) {
     return yieldOp.emitOpError("expected transformation_region to yield a "
