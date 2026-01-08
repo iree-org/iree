@@ -52,6 +52,9 @@ Value createGenericElementwiseCastOp(
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                                Type accETy, ArrayRef<bool> is_reduction);
 
+// Indicates whether the given linalg op represents a transpose.
+bool isaTransposeOpInterface(linalg::LinalgOp linalgOp);
+
 } // namespace mlir::iree_compiler::GlobalOptimization
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_

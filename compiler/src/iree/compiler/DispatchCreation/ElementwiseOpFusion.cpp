@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -60,7 +61,7 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
-    // Check if extractOp is inside a generic op
+    // Check if extractOp is inside a generic op.
     auto consumerOp =
         dyn_cast_if_present<linalg::GenericOp>(extractOp->getParentOp());
     if (!consumerOp) {
@@ -74,9 +75,13 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
           consumerOp, "expected extract operand to be a generic op");
     }
 
-    // Check if the producerOp is fusible
+    // Check if the producerOp is fusible.
+    // Allow bit extend ops or transpose ops.
+    bool isBitExtend = IREE::LinalgExt::isBitExtendOp(producerOp);
+    bool isTranspose =
+        iree_compiler::GlobalOptimization::isaTransposeOpInterface(producerOp);
     if (producerOp.getNumResults() != 1 || !isElementwise(producerOp) ||
-        !IREE::LinalgExt::isBitExtendOp(producerOp)) {
+        (!isBitExtend && !isTranspose)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }

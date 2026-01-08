@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -106,7 +107,7 @@ static bool isReshapeBlockingFusion(Operation *producer, Operation *consumer) {
 // Indicates whether the given linalg op represents a transpose. In particular,
 // it requires a single input where the indexing maps are full permutations and
 // non-equal.
-static bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
+bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
   if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
     return false;
 
