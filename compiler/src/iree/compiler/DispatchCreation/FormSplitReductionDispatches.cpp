@@ -208,7 +208,7 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
   RewritePatternSet patterns(context);
   linalg::populateSwapExtractSliceWithFillPatterns(patterns);
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-  populateFoldExtractSliceOfBroadcastPattern(patterns);
+  // populateFoldExtractSliceOfBroadcastPattern(patterns);
   GreedyRewriteConfig config;
   config.setMaxIterations(GreedyRewriteConfig::kNoLimit).enableFolding(true);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {

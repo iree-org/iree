@@ -197,6 +197,12 @@ void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
 /// broadcast input when the extract_slice undoes the broadcast.
 void populateFoldExtractSliceOfBroadcastPattern(RewritePatternSet &patterns);
 
+/// Populate pattern to fold `tensor.extract_slice` of a `linalg.fill` through
+/// a forall's block argument. Creates a smaller tensor.empty and linalg.fill
+/// inside the loop body.
+void populateFoldExtractSliceOfFillThroughBlockArgPattern(
+    RewritePatternSet &patterns);
+
 /// Populate pattern to convert `tensor.extract_slice(tensor.collapse_shape)` to
 /// `tensor.collapse_shape(tensor.extract_slice)`.
 void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns);
