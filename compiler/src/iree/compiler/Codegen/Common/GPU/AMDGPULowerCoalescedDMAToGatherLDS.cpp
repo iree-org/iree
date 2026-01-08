@@ -426,10 +426,17 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
       return;
     }
 
-    // dma_sizes is optional - if not specified, skip the size validation.
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
+    // dma_sizes is mandatory - if not specified, we cannot lower.
+    DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes();
+    if (!dmaSizesAttr || dmaSizesAttr.empty()) {
+      LDBG() << "No DMA sizes specified in target, skipping pass";
+      return;
+    }
+    ArrayRef<int64_t> dmaSizes = dmaSizesAttr.asArrayRef();
+    // Require dma_sizes to contain 128 bits or higher.
+    if (llvm::none_of(dmaSizes, [](int64_t size) { return size >= 128; })) {
+      LDBG() << "No DMA size >= 128 bits in target, skipping pass";
+      return;
     }
 
     MLIRContext *context = &getContext();

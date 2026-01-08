@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
@@ -136,6 +137,10 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   // Get DMA sizes from target to compute minimum transfer size.
   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
   if (!target) {
+    return {};
+  }
+
+  if (!IREE::GPU::targetSupportsGlobalLoadDMA(target)) {
     return {};
   }
 

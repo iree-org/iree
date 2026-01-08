@@ -116,11 +116,6 @@ static llvm::cl::opt<bool> clGPUPadConvolution(
     llvm::cl::desc("enable pre-padding for convolutions in igemm path"),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool>
-    clUseDirectLoad("iree-llvmgpu-use-direct-load",
-                    llvm::cl::desc("Use global load DMA for direct load ops."),
-                    llvm::cl::Hidden, llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clDirectConvolution(
     "iree-codegen-llvmgpu-use-direct-convolution",
     llvm::cl::desc("Use direct convolution in tile and fuse pipeline"),
@@ -1445,12 +1440,12 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  auto setMatmulConfig = [&entryPoint, &op](int64_t tileX, int64_t tileY,
-                                            int64_t tileK,
-                                            ArrayRef<int64_t> workgroupSize,
-                                            ArrayRef<int32_t> subgroupSizes,
-                                            unsigned softwarePipelineDepth,
-                                            CodeGenPipeline pipeline) {
+  auto setMatmulConfig = [&entryPoint, &op,
+                          &target](int64_t tileX, int64_t tileY, int64_t tileK,
+                                   ArrayRef<int64_t> workgroupSize,
+                                   ArrayRef<int32_t> subgroupSizes,
+                                   unsigned softwarePipelineDepth,
+                                   CodeGenPipeline pipeline) {
     TileSizesListType tileSizes;
     unsigned numParallelLoops = op.getNumParallelLoops();
     unsigned numReductionLoops = op.getNumReductionLoops();
@@ -1508,7 +1503,8 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       SmallVector<NamedAttribute, 1> pipelineAttrs;
       auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
           context, /*prefetch_num_stages=*/0,
-          /*no_reduce_shared_memory_bank_conflicts=*/true,
+          /*no_reduce_shared_memory_bank_conflicts=*/
+          IREE::GPU::targetSupportsGlobalLoadDMA(target),
           /*use_igemm_convolution=*/false,
           /*reorder_workgroups_strategy=*/std::nullopt);
       pipelineAttrs.emplace_back(
@@ -2267,8 +2263,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     return success();
   }
   if (clGPUUseTileAndFuseMatmul) {
-    if (succeeded(IREE::GPU::setMatmulLoweringConfig(
-            target, entryPointFn, computeOp, clUseDirectLoad))) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
+                                                     computeOp))) {
       LDBG() << "Tile and fuse matmul config";
       return success();
     }
@@ -2282,8 +2278,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   }
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
-            target, entryPointFn, computeOp, clUseDirectLoad,
-            clGPUPadConvolution))) {
+            target, entryPointFn, computeOp, clGPUPadConvolution))) {
       LDBG() << "Tile and fuse IGEMM config";
       return success();
     }

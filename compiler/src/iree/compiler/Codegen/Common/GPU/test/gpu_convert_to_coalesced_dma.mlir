@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-convert-to-coalesced-dma,canonicalize))" %s --split-input-file | FileCheck %s
 
-#gpu_target_copy = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_copy = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [32],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -53,7 +53,7 @@ func.func @copy(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tenso
 
 // -----
 
-#gpu_target_gather = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_gather = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -110,7 +110,7 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
 // Negative test: Skip coalesced DMA when innermost dimension < subgroup size. This is to ensure we do not go down
 // the slow path (which is not implemented yet).
 
-#gpu_target_small_inner = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_small_inner = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -183,7 +183,7 @@ func.func @copy_not_aligned_to_dma(%source_buffer: memref<320xbf16, #amdgpu.addr
 // - Instead, we should tile rows to 16 (64/4) and keep columns whole (128)
 // This ensures subviews are contiguous in memory.
 
-#gpu_target_contiguous = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_contiguous = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -450,4 +450,38 @@ func.func @copy_with_extract_slice_input(%large_source: tensor<256x128xf32>) -> 
   // CHECK-NOT: linalg.copy
 
   return %result : tensor<64x128xf32>
+}
+
+// -----
+
+// Negative test: RDNA cards should NOT use coalesced DMA.
+// This tests that even with dma_sizes attribute present, RDNA targets
+// (gfx10xx, gfx11xx, gfx12xx) should not enable global load DMA.
+
+#gpu_target_rdna3 = #iree_gpu.target<arch = "gfx1100", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [32, 64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_rdna3 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_rdna3}>
+#translation_rdna3 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @copy_rdna3_no_dma
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x512xf32>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x512xf32>
+func.func @copy_rdna3_no_dma(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tensor<64x512xf32>
+  attributes {hal.executable.target = #exec_target_rdna3, translation_info = #translation_rdna3} {
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<64x512xf32>)
+    outs(%init : tensor<64x512xf32>) -> tensor<64x512xf32>
+
+  // RDNA3 (gfx1100) should NOT use coalesced DMA even though dma_sizes is set.
+  // Global load DMA is only supported on CDNA4+ (gfx950+) architectures.
+  // CHECK: linalg.copy
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<64x512xf32>
 }
