@@ -430,6 +430,12 @@ struct DistributeTransferReadWithSingleRead final
                                          "non-nested transfer_read layout");
     }
 
+    // Fall back to the simpler pattern for 0-d vectors, which will only create
+    // a single transfer_read anyway.
+    if (vectorLayout.getRank() == 0) {
+      return rewriter.notifyMatchFailure(readOp, "0-d vector not supported");
+    }
+
     if (readOp.getMask()) {
       // TODO(sommerlukas): Can we support masks here?
       return rewriter.notifyMatchFailure(readOp, "masks not supported");
