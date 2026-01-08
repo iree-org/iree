@@ -529,12 +529,19 @@ struct DistributeTransferReadWithSingleRead final
 
     // Create a memref.reinterpret_cast operation to reinterpret the original
     // memref to the new, distributed shape.
+
+    // Collect the size operands. For static dimensions, this is just an
+    // attribute. For dynamic dimensions, we need to create a `memref.dim`
+    // operation.
     SmallVector<OpFoldResult> outputShapes(llvm::map_range(
         llvm::enumerate(expandedMemShape),
-        [&builder, &readOp](auto dimAndShape) -> OpFoldResult {
+        [&builder, &readOp,
+         undistributedDims](auto dimAndShape) -> OpFoldResult {
           size_t dim = dimAndShape.index();
           int64_t shape = dimAndShape.value();
           if (shape == ShapedType::kDynamic) {
+            assert(dim < undistributedDims &&
+                   "distributed dimensions should be static");
             Value constIndex = arith::ConstantIndexOp::create(builder, dim);
             return memref::DimOp::create(builder, readOp.getBase(), constIndex)
                 ->getResult(0);
@@ -542,11 +549,25 @@ struct DistributeTransferReadWithSingleRead final
           return builder.getIndexAttr(shape);
         }));
 
-    // TODO(sommerlukas): Handle dynamic strides.
-    SmallVector<OpFoldResult> strides(
-        llvm::map_range(expandedStrides, [&](int64_t stride) {
+    // Collect the stride operands. For static dimensions, this is just an
+    // attribute. For dynamic dimensions, we need to extract it from the
+    // original memref via a `memref.extract_strided_metadata` operation.
+    SmallVector<OpFoldResult> strides(llvm::map_range(
+        llvm::enumerate(expandedStrides),
+        [&builder, &readOp,
+         undistributedDims](auto dimAndShape) -> OpFoldResult {
+          size_t dim = dimAndShape.index();
+          int64_t stride = dimAndShape.value();
+          if (stride == ShapedType::kDynamic) {
+            assert(dim < undistributedDims &&
+                   "distributed dimensions should be static");
+            auto extractMetadata = memref::ExtractStridedMetadataOp::create(
+                builder, readOp.getBase());
+            return extractMetadata.getStrides()[dim];
+          }
           return builder.getIndexAttr(stride);
         }));
+
     auto expandedMem = memref::ReinterpretCastOp::create(
         builder, expandedMemTy, readOp.getBase(), builder.getIndexAttr(0),
         outputShapes, strides);
