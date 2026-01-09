@@ -78,23 +78,36 @@ static llvm::cl::opt<int>
                           llvm::cl::desc("default distribution tile size"),
                           llvm::cl::init(64));
 
-static llvm::cl::opt<int> clNarrowMatmulTileBytes(
-    "iree-llvmcpu-narrow-matmul-tile-bytes",
+static llvm::cl::opt<int> clMatmulTileBytes(
+    "iree-llvmcpu-matmul-tile-bytes",
     llvm::cl::desc(
-        "target distribution tile size for wide matrix operand of narrow "
-        "matmuls, expressed in bytes. Currently only used in data-tiled "
-        "matmuls (mmt4d). Since this is only used for narrow matmuls, which "
-        "traverse their wide matrix operand once, there is no reuse here and "
-        "this doesn't have to be sized to fit in some CPU cache. This is more "
-        "about distributing work to threads."),
-    llvm::cl::init(64 * 1024));
+        "target distribution tile size for matrix operands of general matmuls, "
+        "expressed in bytes. Currently only used in data-tiled matmuls "
+        "(mmt4d). The default value 0 lets the compiler choose some vaguely "
+        "reasonable size based on the target architecture, however that is "
+        "insufficient information, thus it is expected that users who care "
+        "about performance will provide a value more suitable for their target "
+        "CPU. Note that in case multiple worker threads are used, they will "
+        "each use tiles of that size. One may therefore need to pass a smaller "
+        "value when aiming to use multiple worker threads. This should "
+        "typically be sized between L2 and L3 data cache size, where L2 is the "
+        "last core-local cache, however this could vary from one CPU to "
+        "another. Use a smaller value to help L1/L2 cache locality on CPUs "
+        "with simpler prefetching. Use a smaller value to help scaling to "
+        "higher numbers of worker threads. Use a larger value to utilize more "
+        "L3 cache. Use a larger value to hide more dispatch overhead."),
+    llvm::cl::init(0));
 
-static llvm::cl::opt<int> clGeneralMatmulTileBytes(
-    "iree-llvmcpu-general-matmul-tile-bytes",
-    llvm::cl::desc("target distribution tile size for matrix operands of "
-                   "general matmuls, expressed in bytes. Currently only used "
-                   "in data-tiled matmuls (mmt4d)."),
-    llvm::cl::init(64 * 1024));
+static llvm::cl::opt<float> clMatmulTileUndercountWholeMatrix(
+    "iree-llvmcpu-matmul-tile-undercount-whole-matrix",
+    llvm::cl::desc(
+        "It is worth going a little over the iree-llvmcpu-matmul-tile-bytes "
+        "limit when that allows fitting a whole matrix in one tile, since this "
+        "allows repeated traversals. This factor controls by how much we are "
+        "willing to underaccount tile bytes for that purpose. For example, "
+        "a value of 0.5 means that we would go as high as 2x the limit if that "
+        "allowed fitting all matrix operands in one tile each."),
+    llvm::cl::init(0.5f));
 
 static llvm::cl::opt<bool> clDisableVectorPeeling(
     "iree-llvmcpu-disable-vector-peeling",
@@ -1975,25 +1988,67 @@ static bool adjustVectorSizesForScalableVectorization(
   return false;
 }
 
+static SmallVector<std::pair<int, int>> getDivisorPairs(int n) {
+  SmallVector<std::pair<int, int>> divisorPairs;
+  for (int i = 1; i * i <= n; ++i) {
+    int j = n / i;
+    if (i * j == n) {
+      divisorPairs.push_back({i, j});
+      if (j != i) {
+        divisorPairs.push_back({j, i});
+      }
+    }
+  }
+  llvm::sort(divisorPairs, [](auto p, auto q) { return p.first < q.first; });
+  return divisorPairs;
+}
+
+static int getMatmulTileBytes(Operation *op) {
+  if (clMatmulTileBytes) {
+    return clMatmulTileBytes;
+  }
+  IREE::HAL::ExecutableTargetAttr target =
+      IREE::HAL::ExecutableTargetAttr::lookup(op);
+  // Generally we want to return a value that is between L2 and L3 cache sizes.
+  // We don't have that information at compile time, so we have to make a
+  // reasonable guess.
+  if (target) {
+    auto config = target.getConfiguration();
+    if (config) {
+      if (isX86_64(config) && hasFeature(config, "+avx512f")) {
+        // Recent or server X86.  This value was manually tuned in benchmarks on
+        // EPYC 9575F on single-threaded bf16 matmuls.
+        return 4 * 1024 * 1024;
+      }
+      if (isAArch64(config) &&
+          (hasFeature(config, "+sve") || hasFeature(config, "+i8mm"))) {
+        // Recent Arm64. Value set from looking up some recent SoC specs.
+        return 4 * 1024 * 1024;
+      }
+    }
+  }
+  // Default, low-ish value.
+  return 1 * 1024 * 1024;
+}
 static IREE::Codegen::LoweringConfigAttrInterface
 getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
-  DistributionHeuristicConfig distConfig;
-  distConfig.allowIncompleteTile = true;
-  distConfig.minTileSizes.resize(op.getNumLoops(), 0);
-  distConfig.maxTileSizes.resize(op.getNumLoops(), 0);
-
   Value lhs = op.getDpsInputs()[0];
   Value rhs = op.getDpsInputs()[1];
+  Value acc = op.getDpsInits()[0];
+
   ShapedType lhsType = cast<ShapedType>(lhs.getType());
   ShapedType rhsType = cast<ShapedType>(rhs.getType());
+  ShapedType accType = cast<ShapedType>(acc.getType());
+  int lhsTypeBits = lhsType.getElementTypeBitWidth();
+  int rhsTypeBits = rhsType.getElementTypeBitWidth();
+  int accTypeBits = accType.getElementTypeBitWidth();
+
+  SmallVector<int64_t> distTileSizes(op.getNumLoops(), 0);
   int mmt4dDimBase = 0;
   if (isa<linalg::BatchMmt4DOp>(op)) {
     mmt4dDimBase = 1;
-    distConfig.minTileSizes[0] = 1;
-    distConfig.maxTileSizes[0] = 1; // Force batch dimension tile size 1.
+    distTileSizes[0] = 1;
   }
-  distConfig.minTileSizes[mmt4dDimBase + 0] = 1;
-  distConfig.minTileSizes[mmt4dDimBase + 1] = 1;
   auto lhsShape = lhsType.getShape();
   auto rhsShape = rhsType.getShape();
   int64_t M1 = lhsShape[mmt4dDimBase + 0];
@@ -2002,34 +2057,62 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   int64_t M0 = lhsShape[mmt4dDimBase + 2];
   int64_t N0 = rhsShape[mmt4dDimBase + 2];
   int64_t K0 = lhsShape[mmt4dDimBase + 3];
-  // Unfortunately we have to compute some tile size at compile-time, even
-  // though that can't be done meaningfully in general, unless specializing the
-  // compilation to fine details of the runtime workload including number of
-  // threads and cache sizes. Another thing that we need to know and can't
-  // really know at compile time is the values of dynamic sizes. Here we have to
-  // guess a reasonable default for the reduction dimension size.
-  int64_t reductionSize = ShapedType::isDynamic(K1) ? 1024 : K0 * K1;
-  auto getMatmulTileSize = [](int64_t targetTileBytes, int bitWidth,
-                              int64_t reductionSize, int64_t tile0Size) {
-    int64_t targetRhsTileElems = targetTileBytes * 8 / bitWidth;
-    int64_t targetRhsTileNSize = targetRhsTileElems / reductionSize;
-    int64_t tileSize = llvm::divideCeil(targetRhsTileNSize, tile0Size);
-    tileSize = std::max(tileSize, int64_t{1});
-    return tileSize;
-  };
-  int64_t tileBytes =
-      (M1 == 1 || N1 == 1) ? clNarrowMatmulTileBytes : clGeneralMatmulTileBytes;
-  distConfig.maxTileSizes[mmt4dDimBase + 0] =
-      M1 == 1 ? 1
-              : getMatmulTileSize(tileBytes, lhsType.getElementTypeBitWidth(),
-                                  reductionSize, M0);
-  distConfig.maxTileSizes[mmt4dDimBase + 1] =
-      N1 == 1 ? 1
-              : getMatmulTileSize(tileBytes, rhsType.getElementTypeBitWidth(),
-                                  reductionSize, N0);
 
-  SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(op, distConfig);
+  auto divisorPairsOfM1 = getDivisorPairs(M1);
+  auto divisorPairsOfN1 = getDivisorPairs(N1);
+
+  int64_t M = M0 * M1;
+  int64_t N = N0 * N1;
+  // Helper to associate a cost to a candidate pair or tile sizes along the M
+  // and N dimensions.
+  auto evalTraversalCost = [=](int64_t numTilesM,
+                               int64_t numTilesN) -> int64_t {
+    // The cost model is a lower bound on the amount of data
+    // that will need to be loaded over the entire matmul. Note that each matrix
+    // (LHS, RHS) is traversed a number of times equal to the number of tiles
+    // of the opposite (RHS, LHS) matrix.
+    return numTilesN * M + numTilesM * N;
+  };
+
+  int64_t selectedTileM = 1;
+  int64_t selectedTileN = 1;
+  int64_t selectedCost = evalTraversalCost(M1, N1);
+  const int matmulTileBytes = getMatmulTileBytes(op);
+
+  // Iterate over all candidate tile shapes, which are the divisors of (M1, N1).
+  for (auto [tileM, numTilesM] : divisorPairsOfM1) {
+    for (auto [tileN, numTilesN] : divisorPairsOfN1) {
+      // Compute candidate tile size in bytes.
+      int64_t lhsBytes = tileM * M0 * K1 * K0 * lhsTypeBits / 8;
+      int64_t rhsBytes = tileN * N0 * K1 * K0 * rhsTypeBits / 8;
+      int64_t accBytes = tileM * N0 * tileN * M0 * accTypeBits / 8;
+      // Adjust the tile size to favor fitting whole matrices in one tile.
+      if (numTilesM == 1) {
+        lhsBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      if (numTilesN == 1) {
+        rhsBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      if (numTilesM == 1 && numTilesN == 1) {
+        accBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      // Filter out too-large tiles.
+      if (lhsBytes + rhsBytes + accBytes > matmulTileBytes) {
+        continue;
+      }
+      // Evaluate the cost model and retain the better candidate.
+      int64_t candidateCost = evalTraversalCost(numTilesM, numTilesN);
+      if (candidateCost < selectedCost) {
+        selectedCost = candidateCost;
+        selectedTileM = tileM;
+        selectedTileN = tileN;
+      }
+    }
+  }
+  // Finally store the preferred tile shape.
+  distTileSizes[mmt4dDimBase + 0] = selectedTileM;
+  distTileSizes[mmt4dDimBase + 1] = selectedTileN;
+
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> vecTileSizes(numLoops, 1);
   assert(vecTileSizes.size() == mmt4dDimBase + 6);
