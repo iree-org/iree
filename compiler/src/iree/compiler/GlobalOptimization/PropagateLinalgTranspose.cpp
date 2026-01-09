@@ -589,6 +589,52 @@ private:
   bool enableEdgeReshapePropagation = true;
 };
 
+// Sinks a transpose through a tensor.pad.
+class SinkTransposeThroughPad : public OpRewritePattern<tensor::PadOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(padOp)) {
+      return failure();
+    }
+    Value source = padOp.getSource();
+    auto transposeOp = source.getDefiningOp<linalg::TransposeOp>();
+    if (!transposeOp) {
+      return failure();
+    }
+
+    Block &block = padOp.getRegion().front();
+    if (llvm::any_of(block.getArguments(), [](BlockArgument blockArg) {
+          return blockArg.getNumUses();
+        })) {
+      return failure();
+    }
+
+    auto invPerm = invertPermutationVector(transposeOp.getPermutation());
+    SmallVector<OpFoldResult> lowSizes = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highSizes = padOp.getMixedHighPad();
+    applyPermutationToVector(lowSizes, invPerm);
+    applyPermutationToVector(highSizes, invPerm);
+
+    RankedTensorType oldPaddedType = cast<RankedTensorType>(padOp.getType());
+    RankedTensorType newPaddedType = oldPaddedType.clone(
+        applyPermutation(oldPaddedType.getShape(), invPerm));
+
+    auto newPadOp = tensor::PadOp::create(
+        rewriter, padOp.getLoc(), newPaddedType, transposeOp.getInput(),
+        lowSizes, highSizes, padOp.getNofold());
+    rewriter.cloneRegionBefore(padOp.getRegion(), newPadOp.getRegion(),
+                               newPadOp.getRegion().begin());
+
+    Value newTransposeOp =
+        createTranspose(rewriter, newPadOp, transposeOp.getPermutation());
+    rewriter.replaceOp(padOp, newTransposeOp);
+    return success();
+  }
+};
+
 // Fuses a transpose with the input of a linalg.generic op or contraction op.
 // Contraction ops are generalized and then treated as a generic. For example,
 //
@@ -1292,6 +1338,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(
         context, enableEdgeReshapePropagation);
+    sinkingPatterns.insert<SinkTransposeThroughPad>(context);
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
         context, enableAggressivePropagation, enableConvolutionPropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);
