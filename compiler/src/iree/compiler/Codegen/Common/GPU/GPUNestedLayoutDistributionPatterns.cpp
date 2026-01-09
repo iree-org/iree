@@ -560,8 +560,7 @@ struct DistributeTransferReadToSingleRead final
     // operation.
     SmallVector<OpFoldResult> outputShapes(llvm::map_range(
         llvm::enumerate(expandedMemShape),
-        [&builder, &readOp,
-         undistributedDims](auto dimAndShape) -> OpFoldResult {
+        [&](auto dimAndShape) -> OpFoldResult {
           size_t dim = dimAndShape.index();
           int64_t shape = dimAndShape.value();
           if (shape == ShapedType::kDynamic) {
@@ -579,8 +578,7 @@ struct DistributeTransferReadToSingleRead final
     // original memref via a `memref.extract_strided_metadata` operation.
     SmallVector<OpFoldResult> strides(llvm::map_range(
         llvm::enumerate(expandedStrides),
-        [&builder, &readOp,
-         undistributedDims](auto dimAndShape) -> OpFoldResult {
+        [&](auto dimAndShape) -> OpFoldResult {
           size_t dim = dimAndShape.index();
           int64_t stride = dimAndShape.value();
           if (stride == ShapedType::kDynamic) {
