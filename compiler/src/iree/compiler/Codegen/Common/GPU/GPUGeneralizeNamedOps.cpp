@@ -13,8 +13,6 @@
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -69,21 +67,6 @@ struct GPUGeneralizeNamedOpsPass final
 
     if (failed(generalizeCandidates(&getContext(), namedOpCandidates))) {
       return signalPassFailure();
-    }
-
-    // Generalize LinalgExt ops.
-    SmallVector<IREE::LinalgExt::ArgCompareOp> argCompareOps;
-    funcOp.walk(
-        [&](IREE::LinalgExt::ArgCompareOp op) { argCompareOps.push_back(op); });
-
-    IRRewriter rewriter(&getContext());
-    for (IREE::LinalgExt::ArgCompareOp argCompareOp : argCompareOps) {
-      rewriter.setInsertionPoint(argCompareOp);
-      if (failed(IREE::LinalgExt::generalizeArgCompareOp(rewriter,
-                                                         argCompareOp))) {
-        argCompareOp->emitOpError("failed to generalize operation");
-        return signalPassFailure();
-      }
     }
   }
 };
