@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
@@ -560,14 +561,144 @@ static void updateTensorDispatchOp(TensorDispatchOp dispatchOp,
   }
 }
 
+// Inserts a re-encode op before the given op if the source encoding doesn't
+// match the new (unified) encoding. Returns the re-encoded value, or the
+// original source if no re-encoding is needed.
+static Value maybeInsertReencode(IRRewriter &rewriter, Operation *op,
+                                 Value source, Type sourceEncodingType,
+                                 ValueRange sourceEncodingDims,
+                                 Value sourceSize, Attribute newEncoding,
+                                 AffinityAttr affinityAttr) {
+  auto expectedType = cast<RankedTensorType>(sourceEncodingType);
+  Attribute expectedEncoding = expectedType.getEncoding();
+
+  // No re-encode needed if encodings match.
+  if (expectedEncoding == newEncoding) {
+    return source;
+  }
+
+  LDBG() << "  Inserting re-encode: " << newEncoding << " -> "
+         << expectedEncoding;
+
+  // Build the source type (with unified encoding).
+  RankedTensorType unifiedType = expectedType.cloneWithEncoding(newEncoding);
+
+  // Compute sizes for unified encoding.
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(op);
+  Value unifiedSize = TensorSizeOfOp::create(
+      rewriter, op->getLoc(), rewriter.getIndexType(),
+      TypeAttr::get(unifiedType), sourceEncodingDims, affinityAttr);
+
+  // Insert the re-encode op: unified -> expected.
+  auto reencodeOp = TensorEncodeOp::create(
+      rewriter, op->getLoc(), source.getType(), source,
+      TypeAttr::get(unifiedType),
+      /*source_encoding_dims=*/sourceEncodingDims, unifiedSize,
+      TypeAttr::get(expectedType),
+      /*result_encoding_dims=*/sourceEncodingDims, sourceSize, affinityAttr);
+
+  LDBG() << "    Created: " << reencodeOp;
+  return reencodeOp.getResult();
+}
+
+// Updates TensorCloneOp by inserting re-encode if needed.
+static void updateTensorCloneOp(TensorCloneOp cloneOp,
+                                const OperandEncodingUpdates &operandUpdates,
+                                IRRewriter &rewriter) {
+  if (!operandUpdates.contains(0)) {
+    return;
+  }
+  Attribute newEncoding = operandUpdates.lookup(0);
+  Value reencoded = maybeInsertReencode(
+      rewriter, cloneOp, cloneOp.getSource(), cloneOp.getSourceEncoding(),
+      cloneOp.getSourceEncodingDims(), cloneOp.getSourceSize(), newEncoding,
+      cloneOp.getAffinityAttr());
+  if (reencoded != cloneOp.getSource()) {
+    rewriter.modifyOpInPlace(
+        cloneOp, [&] { cloneOp.getSourceMutable().set(reencoded); });
+  }
+}
+
+// Updates TensorEncodeOp by updating the source_encoding attribute.
+static void updateTensorEncodeOp(TensorEncodeOp encodeOp,
+                                 const OperandEncodingUpdates &operandUpdates,
+                                 IRRewriter &rewriter) {
+  int operandNumber = encodeOp.getSourceMutable().getOperandNumber();
+  if (!operandUpdates.contains(operandNumber)) {
+    return;
+  }
+  Attribute newEncoding = operandUpdates.lookup(operandNumber);
+  auto oldSourceType = cast<RankedTensorType>(encodeOp.getSourceEncoding());
+  RankedTensorType newSourceType = oldSourceType.cloneWithEncoding(newEncoding);
+  rewriter.modifyOpInPlace(encodeOp, [&] {
+    encodeOp.setSourceEncodingAttr(TypeAttr::get(newSourceType));
+  });
+  LDBG() << "  Updated TensorEncodeOp source encoding to " << newEncoding;
+}
+
+// Updates TensorUpdateOp by inserting re-encode if needed.
+static void updateTensorUpdateOp(TensorUpdateOp updateOp,
+                                 const OperandEncodingUpdates &operandUpdates,
+                                 IRRewriter &rewriter) {
+  // Handle target operand.
+  int operandNumber = updateOp.getTargetMutable().getOperandNumber();
+  if (operandUpdates.contains(operandNumber)) {
+    Attribute newEncoding = operandUpdates.lookup(operandNumber);
+    Value reencoded = maybeInsertReencode(
+        rewriter, updateOp, updateOp.getTarget(), updateOp.getTargetEncoding(),
+        updateOp.getTargetEncodingDims(), updateOp.getTargetSize(), newEncoding,
+        updateOp.getAffinityAttr());
+    if (reencoded != updateOp.getTarget()) {
+      rewriter.modifyOpInPlace(
+          updateOp, [&] { updateOp.getTargetMutable().set(reencoded); });
+    }
+  }
+
+  // Handle update operand.
+  unsigned updateOperandNum = updateOp.getUpdateMutable().getOperandNumber();
+  if (operandUpdates.contains(updateOperandNum)) {
+    Attribute newEncoding = operandUpdates.lookup(updateOperandNum);
+    Value reencoded = maybeInsertReencode(
+        rewriter, updateOp, updateOp.getUpdate(), updateOp.getUpdateEncoding(),
+        updateOp.getUpdateEncodingDims(), updateOp.getUpdateSize(), newEncoding,
+        updateOp.getAffinityAttr());
+    if (reencoded != updateOp.getUpdate()) {
+      rewriter.modifyOpInPlace(
+          updateOp, [&] { updateOp.getUpdateMutable().set(reencoded); });
+    }
+  }
+}
+
 // Applies all cached encoding updates to tensor ops.
 static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
   for (auto &[op, operandUpdates] : updates) {
+    // Copy to local variable to allow capture in C++17 lambdas.
+    const OperandEncodingUpdates &opUpdates = operandUpdates;
     IRRewriter rewriter(op->getContext());
-    // TODO: Handle other TensorPhaseOp ops (TensorFillOp, etc.) via TypeSwitch.
-    if (auto dispatchOp = dyn_cast<TensorDispatchOp>(op)) {
-      updateTensorDispatchOp(dispatchOp, operandUpdates, rewriter);
-    }
+    TypeSwitch<Operation *>(op)
+        .Case<TensorDispatchOp>([&](auto dispatchOp) {
+          updateTensorDispatchOp(dispatchOp, opUpdates, rewriter);
+        })
+        .Case<TensorCloneOp>([&](auto cloneOp) {
+          updateTensorCloneOp(cloneOp, opUpdates, rewriter);
+        })
+        .Case<TensorEncodeOp>([&](auto encodeOp) {
+          updateTensorEncodeOp(encodeOp, opUpdates, rewriter);
+        })
+        .Case<TensorUpdateOp>([&](auto updateOp) {
+          updateTensorUpdateOp(updateOp, opUpdates, rewriter);
+        })
+        .Case<TensorSizeOfOp, TensorEmptyOp, TensorConstantOp, TensorSplatOp,
+              TensorFillOp, TensorSliceOp, TensorLoadOp, TensorStoreOp>(
+            [&](auto) {
+              assert(false && "unexpected tensor op needing encoding update");
+            })
+        .Default([](Operation *op) {
+          LDBG() << "  Unhandled op: " << op->getName()
+                 << ", maybe it is a new tensor op?";
+          assert(false);
+        });
   }
 }
 
@@ -604,7 +735,36 @@ static void collectUpdatesForStreamTensorOps(Explorer &explorer,
         return WalkResult::advance();
       }
 
-      // TODO: Handle other tensor phase ops (TensorFillOp, etc.)
+      // Handle TensorCloneOp - may need re-encode insertion.
+      if (auto cloneOp = dyn_cast<TensorCloneOp>(user)) {
+        LDBG() << "      Found TensorCloneOp";
+        updates[user][operand.getOperandNumber()] = newEncoding;
+        // Continue tracing through the clone's result.
+        worklist.push_back(cloneOp.getResult());
+        return WalkResult::advance();
+      }
+
+      // Handle TensorEncodeOp - may need re-encode insertion.
+      if (auto encodeOp = dyn_cast<TensorEncodeOp>(user)) {
+        LDBG() << "      Found TensorEncodeOp";
+        updates[user][operand.getOperandNumber()] = newEncoding;
+        // Don't continue tracing - encode produces a different encoding.
+        return WalkResult::advance();
+      }
+
+      // Handle TensorUpdateOp - may need re-encode insertion.
+      if (auto updateOp = dyn_cast<TensorUpdateOp>(user)) {
+        LDBG() << "      Found TensorUpdateOp";
+        updates[user][operand.getOperandNumber()] = newEncoding;
+        // Continue tracing through the update's result if the encoded global
+        // flows to the target operand.
+        if (operand.getOperandNumber() == 0) {
+          worklist.push_back(updateOp.getResult());
+        }
+        return WalkResult::advance();
+      }
+
+      // Handle TensorDispatchOp - update operand encodings.
       auto dispatchOp = dyn_cast<IREE::Stream::TensorDispatchOp>(user);
       if (!dispatchOp) {
         return WalkResult::advance();
