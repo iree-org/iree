@@ -1333,8 +1333,8 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   }
   state.addRegion();
   if (!argAttrs.empty() || !resAttrs.empty()) {
-    assert(type.getNumInputs() == argAttrs.size());
-    assert(type.getNumResults() == resAttrs.size());
+    assert(argAttrs.empty() || (type.getNumInputs() == argAttrs.size()));
+    assert(resAttrs.empty() || (type.getNumResults() == resAttrs.size()));
     call_interface_impl::addArgAndResultAttrs(
         builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
         builder.getStringAttr("res_attrs"));
