@@ -467,18 +467,6 @@ struct DistributeTransferReadWithSingleRead final
           readOp, "permutation map is not minor identity map");
     }
 
-    // We require the subgroup and thread strides to be all zeros or ones.
-    auto allZeroOrUnitStride = [](ArrayRef<int64_t> strides) {
-      return llvm::all_of(
-          strides, [](int64_t stride) { return stride == 0 || stride == 1; });
-    };
-    if (!allZeroOrUnitStride(vectorLayout.getThreadStrides()) ||
-        !allZeroOrUnitStride(vectorLayout.getSubgroupStrides())) {
-      // TODO(sommerlukas): Can we support strides >1?
-      return rewriter.notifyMatchFailure(
-          readOp, "thread or subgroup stride is not all unit");
-    }
-
     SmallVector<Value> warpIndices, threadIndices;
     if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
                                             vectorLayout, warpIndices,
