@@ -330,6 +330,10 @@ void buildIREEVMTransformPassPipeline(
         dispatchCreationOptions.enableSplitReduction;
     dispatchTransformOptions.enableAggressiveReshapeMovement =
         dispatchCreationOptions.enableAggressiveReshapeMovement;
+    dispatchTransformOptions.enablePadHandling =
+        dispatchCreationOptions.enablePadHandling;
+    dispatchTransformOptions.enableFusePaddingIntoLinalgConsumerOps =
+        dispatchCreationOptions.enableFusePaddingIntoLinalgConsumerOps;
     dispatchTransformOptions.constExprMaxSizeIncreaseThreshold =
         pipelineOptions.constExprMaxSizeIncreaseThreshold;
     dispatchTransformOptions.constExprHoisting =
