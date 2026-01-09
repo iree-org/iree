@@ -860,15 +860,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // TODO(#22119): We don't use global load DMA for scaled matmuls, because
     // compilation doesn't support it. Once this is fixed, we should use global
     // load DMA here when possible.
+    promotionArray = {};
     promotionList.append({2, 3});
-    // This specific row width seems to be best for bank conflict avoidance in
-    // scaled matmuls.
-    int64_t rowWidth = 2 * llvm::product_of(schedule->kSizes);
-    int64_t accessWidth = schedule->kSizes.back();
-    auto configAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
-    Attribute swizzleOperand = IREE::GPU::SwizzleOperandAttr::get(
-        context, configAttr, rowWidth, accessWidth);
-    promotionArray = {swizzleOperand, swizzleOperand, configAttr, configAttr};
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
                                            ? ArrayRef<Attribute>(promotionArray)
