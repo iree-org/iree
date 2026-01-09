@@ -34,6 +34,12 @@
 
 #define DEBUG_TYPE "iree-gpu-config-utils"
 
+llvm::cl::opt<bool> clGPUTestCpromotion(
+    "iree-codegen-test-c-promtion",
+    llvm::cl::desc("C promote in specific case of elemetwise operations that "
+                   "codegen cant yet support without it if also doing padding"),
+    llvm::cl::init(true));
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
@@ -574,6 +580,34 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
+/// Helper to check if a linalg operation has elementwise users that have
+/// additional operands beyond the result of the linalg operation.
+/// This function a workaround until we have map_gather op that
+/// can allow us to codegen without c promotion for such elementwise ops
+/// we will track progress of this in
+/// https://github.com/iree-org/iree/issues/23038
+static bool checkForElementwiseUsersWithNewOperands(linalg::LinalgOp linalgOp) {
+  // Iterate through all users of the linalg operation's results
+  for (OpResult result : linalgOp->getResults()) {
+    for (Operation *user : result.getUsers()) {
+      // All elementwise operations are expected to be linalg at this stage.
+      auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
+      if (!linalgUser) {
+        continue;
+      }
+      // Check if the linalg user has operands other than the result from
+      // linalgOp.
+      for (Value operand : linalgUser.getDpsInputs()) {
+        // If the operand is not from this linalg operation, return true.
+        if (operand.getDefiningOp() != linalgOp.getOperation()) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -586,6 +620,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
     bool isGemm, bool scaled, int64_t splitReductionTripCnt,
+    bool CPromoteIfPadding,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -764,7 +799,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs, isGemm,
       /*mustBeAligned=*/true,
-      /*doCPromotion=*/false, scaled, splitReductionTripCnt);
+      /*doCPromotion=*/couldNeedPadding && CPromoteIfPadding, scaled,
+      splitReductionTripCnt);
 
   // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
   // the GEMM is accumulating (i.e., doesn't have a zero fill dpsInit) as that
@@ -775,7 +811,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     mustBeAligned = false;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
-        /*doCPromotion=*/false, scaled, splitReductionTripCnt);
+        /*doCPromotion=*/CPromoteIfPadding, scaled, splitReductionTripCnt);
   }
 
   if (!schedule) {
@@ -862,6 +898,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // load DMA here when possible.
     promotionArray = {};
     promotionList.append({2, 3});
+  }
+  if ((!mustBeAligned || couldNeedPadding) && CPromoteIfPadding) {
+    // If needed then add C operand which would be operand 2 or 4 for unscaled
+    // and scaled GEMM respectively.
+    promotionList.push_back(promotionList.size());
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
                                            ? ArrayRef<Attribute>(promotionArray)
@@ -971,11 +1012,16 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   SmallVector<int64_t> igemmLoopBounds =
       igemmGenericConvDetails->igemmLoopBounds;
   SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
+  bool CPromoteIfPadding = false;
+  if (clGPUTestCpromotion) {
+    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp);
+  }
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
           useDirectLoad, /*isGemm=*/false,
-          /*scaled=*/false, splitReductionTripCnt, convToIgemmInfo);
+          /*scaled=*/false, splitReductionTripCnt,
+          /*CPromoteIfPadding=*/CPromoteIfPadding, convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -1018,11 +1064,14 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
 
   LDBG() << "Matmul TileAndFuse Config";
-
+  bool CPromoteIfPadding = false;
+  if (clGPUTestCpromotion) {
+    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp);
+  }
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-          /*scaled=*/false, splitReductionTripCnt);
+          /*scaled=*/false, splitReductionTripCnt, CPromoteIfPadding);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -1032,7 +1081,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     useDirectLoad = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-        /*scaled=*/true, splitReductionTripCnt);
+        /*scaled=*/true, splitReductionTripCnt, CPromoteIfPadding);
   }
 
   if (failed(configAndWgSize)) {
