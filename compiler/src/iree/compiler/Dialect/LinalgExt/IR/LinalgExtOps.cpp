@@ -625,6 +625,37 @@ LogicalResult MapGatherOp::verify() {
   return success();
 }
 
+void MapGatherOp::insertTransformationAtStart(
+    OpBuilder &builder,
+    function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+        transformationBuilder,
+    int64_t numOutputIndices) {
+  Block &transformBody = getTransformationRegion().front();
+  SmallVector<BlockArgument> oldOutputIndices(transformBody.getArguments());
+  SmallVector<Type> indexTypes(numOutputIndices, builder.getIndexType());
+  SmallVector<Location> locs(numOutputIndices, getLoc());
+
+  // Create the new block arguments for the new output indices, and transform
+  // them using the callback.
+  SmallVector<BlockArgument> newOutputIndices(
+      transformBody.addArguments(indexTypes, locs));
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPointToStart(&transformBody);
+  SmallVector<Value> newOutputIndicesTransformed(
+      transformationBuilder(newOutputIndices));
+
+  // Replace the old output indices with the results of the transformation on
+  // the new output indices.
+  assert(oldOutputIndices.size() == newOutputIndicesTransformed.size() &&
+         "expected transformation to produce the same number of Values as the "
+         "previous number of output indices.");
+  for (auto [oldIdx, newIdx] :
+       llvm::zip_equal(oldOutputIndices, newOutputIndicesTransformed)) {
+    oldIdx.replaceAllUsesWith(newIdx);
+  }
+  transformBody.eraseArguments(0, oldOutputIndices.size());
+}
+
 //===----------------------------------------------------------------------===//
 // MapScatterOp
 //===----------------------------------------------------------------------===//

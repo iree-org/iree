@@ -272,7 +272,15 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
   let hasCanonicalizer = 1;
 }
 
-def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather"> {
+def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
+    [DeclareOpInterfaceMethods<TilingInterface,
+        ["getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition",
+         "getTiledImplementation",
+         "generateResultTileValue",
+         "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles"]>]> {
   let summary = [{Gather with a mapping from result indices to source indices.}];
   let description = [{
     Takes two operands, `source` and `output`, and reads every element from
@@ -315,6 +323,19 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather"> {
     int64_t getOutputRank() {
       return getOutputType().getRank();
     }
+
+    // Helper to apply transformations to the output index block arguments of
+    // the transformation body, and replace the uses of the previous output
+    // indices with the values returned by `transformationBuilder`. The argument
+    // to `transformationBuilder` function will be an ArrayRef of the new block
+    // arguments, the number of which is determined by `numOutputIndices`. The
+    // `transformationBuilder` should return the replacements for the old block
+    // arguments.
+    void insertTransformationAtStart(
+        OpBuilder &builder,
+        function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+            transformationBuilder,
+        int64_t numOutputIndices);
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
