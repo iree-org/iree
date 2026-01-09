@@ -153,41 +153,50 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   return {builder.getIndexAttr(*subgroupSize)};
 }
 
-/// Check if a value ultimately comes from tensor.empty(), tracing through
-/// extract_slices and block arguments from scf.forall shared_outs.
-static bool comesFromTensorEmpty(Value value) {
-  // Direct tensor.empty.
-  if (value.getDefiningOp<tensor::EmptyOp>())
+/// Check if an extract_slice preserves contiguity for linearization.
+/// The slice must have unit strides. For rank > 1, the innermost dimension
+/// must be fully taken to ensure contiguous memory layout.
+static bool isContiguousSlice(tensor::ExtractSliceOp extractSlice) {
+  if (!extractSlice.hasUnitStride())
+    return false;
+
+  auto sourceType = extractSlice.getSourceType();
+  int64_t rank = sourceType.getRank();
+
+  // 1D slices are always contiguous with unit stride.
+  if (rank <= 1)
     return true;
 
-  // Trace through extract_slice.
-  if (auto extractSlice = value.getDefiningOp<tensor::ExtractSliceOp>())
-    return comesFromTensorEmpty(extractSlice.getSource());
+  // For higher ranks, innermost dimension must be fully taken.
+  ArrayRef<int64_t> sourceShape = sourceType.getShape();
+  SmallVector<OpFoldResult> sizes = extractSlice.getMixedSizes();
 
-  // Trace through forall shared_outs block arguments.
-  if (auto blockArg = dyn_cast<BlockArgument>(value)) {
-    if (auto forallOp =
-            dyn_cast<scf::ForallOp>(blockArg.getOwner()->getParentOp())) {
-      // Check if this is a shared_outs argument (after the induction
-      // variables).
-      unsigned numIVs = forallOp.getInductionVars().size();
-      unsigned argIndex = blockArg.getArgNumber();
-      if (argIndex >= numIVs) {
-        unsigned sharedOutIndex = argIndex - numIVs;
-        if (sharedOutIndex < forallOp.getOutputs().size())
-          return comesFromTensorEmpty(forallOp.getOutputs()[sharedOutIndex]);
-      }
-    }
-  }
+  int64_t innermostSourceDim = sourceShape[rank - 1];
+  if (ShapedType::isDynamic(innermostSourceDim))
+    return false;
 
-  return false;
+  std::optional<int64_t> innermostSliceSize =
+      getConstantIntValue(sizes[rank - 1]);
+  return innermostSliceSize && *innermostSliceSize == innermostSourceDim;
 }
 
-/// Check if the copy's output comes from tensor.empty(), indicating the
-/// destination can be linearized for DMA (fresh allocation, no aliasing).
+/// Check if the copy's output can be linearized for DMA.
+/// Returns true if output is:
+/// - Direct tensor.empty (before subgroup tiling), or
+/// - Contiguous extract_slice (after subgroup tiling from tensor.empty)
 static bool canLinearizeCopy(linalg::CopyOp copyOp) {
   Value output = copyOp.getOutputs()[0];
-  return comesFromTensorEmpty(output);
+
+  // Direct tensor.empty (before subgroup tiling).
+  if (output.getDefiningOp<tensor::EmptyOp>())
+    return true;
+
+  // Contiguous extract_slice (after subgroup tiling).
+  // Subgroup tiling already verified the original output was tensor.empty.
+  if (auto extractSlice = output.getDefiningOp<tensor::ExtractSliceOp>())
+    return isContiguousSlice(extractSlice);
+
+  return false;
 }
 
 /// Check if the given forall op has warp mapping.
@@ -774,9 +783,11 @@ private:
     }
 
     // Check if we have enough elements for coalesced DMA.
-    // Linearization is currently only supported for linalg::CopyOp when the
-    // output comes from tensor.empty(). This could be extended to other ops
-    // (e.g., GatherOp) in the future if similar conditions can be identified.
+    // Linearization (using total elements instead of innermost dim for size
+    // check) is only supported for linalg::CopyOp because it requires the
+    // destination to be a fresh allocation (tensor.empty) with no aliasing.
+    // GatherOp doesn't support linearization since its output may alias with
+    // existing data.
     bool canLinearize = false;
     if constexpr (std::is_same_v<OpTy, linalg::CopyOp>) {
       canLinearize = canLinearizeCopy(op);

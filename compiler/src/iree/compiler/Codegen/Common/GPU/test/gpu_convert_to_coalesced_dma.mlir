@@ -321,3 +321,41 @@ func.func @copy_1d_tensor(%source: tensor<2048xf32>) -> tensor<2048xf32>
 
   return %result : tensor<2048xf32>
 }
+
+// -----
+
+// Negative test: Small innermost dimension with non-tensor.empty output should
+// NOT be linearized. The copy should remain unchanged because:
+// 1. Innermost dim (16) < minElementsPerTransfer (64)
+// 2. Output is a function argument, not tensor.empty, so we can't linearize
+
+#gpu_target_no_linearize = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32]
+>>
+
+#exec_target_no_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_no_linearize}>
+#translation_no_linearize = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @copy_small_innermost_no_linearize
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: tensor<128x16xf32>
+func.func @copy_small_innermost_no_linearize(%source: tensor<128x16xf32>, %dest: tensor<128x16xf32>) -> tensor<128x16xf32>
+  attributes {hal.executable.target = #exec_target_no_linearize, translation_info = #translation_no_linearize} {
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<128x16xf32>)
+    outs(%dest : tensor<128x16xf32>) -> tensor<128x16xf32>
+
+  // Innermost dimension (16) < minElementsPerTransfer (64), and output is not
+  // tensor.empty(), so linearization is not possible. The copy should remain.
+
+  // CHECK: %[[RESULT:.+]] = linalg.copy
+  // CHECK-SAME: ins(%[[SRC]] : tensor<128x16xf32>)
+  // CHECK-SAME: outs(%[[DST]] : tensor<128x16xf32>)
+  // CHECK: return %[[RESULT]]
+
+  return %result : tensor<128x16xf32>
+}
