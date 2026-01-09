@@ -5701,13 +5701,11 @@ store_to_buffer op.</p>
 <h3 id="-iree-codegen-gpu-fuse-and-hoist-parallel-loops"><code>-iree-codegen-gpu-fuse-and-hoist-parallel-loops</code><a class="headerlink" href="#-iree-codegen-gpu-fuse-and-hoist-parallel-loops" title="Permanent link">link</a></h3>
 <p><em>Greedily fuses and hoists parallel loops.</em></p>
 <h3 id="-iree-codegen-gpu-generalize-named-ops"><code>-iree-codegen-gpu-generalize-named-ops</code><a class="headerlink" href="#-iree-codegen-gpu-generalize-named-ops" title="Permanent link">link</a></h3>
-<p><em>Convert named Linalg and LinalgExt ops to linalg.generic ops</em></p>
-<p>Convert a subset of named Linalg and LinalgExt ops to linalg.generics. The
-subset does not contain all named ops. The rule-of-thumb is that named ops
-whose operand maps are projections are in the subset. For example convolutions
-and pooling ops are not generalized by this pass, but matmuls are.</p>
-<p>LinalgExt ops like <code>iree_linalg_ext.arg_compare</code> are also generalized by this
-pass.</p>
+<p><em>Convert named Linalg ops to linalg.generic ops</em></p>
+<p>Convert a subset of named Linalg ops to linalg.generics. The subset does not
+contain all named ops. The rule-of-thumb is that named ops whose operand
+maps are projections are in the subset. For example convolutions and pooling ops
+are not generalized by this pass, but matmuls are.</p>
 <h3 id="-iree-codegen-gpu-greedily-distribute-to-threads"><code>-iree-codegen-gpu-greedily-distribute-to-threads</code><a class="headerlink" href="#-iree-codegen-gpu-greedily-distribute-to-threads" title="Permanent link">link</a></h3>
 <p><em>Greedily distributes all remaining tilable ops to threads</em></p>
 <h3 id="-iree-codegen-gpu-infer-memory-space"><code>-iree-codegen-gpu-infer-memory-space</code><a class="headerlink" href="#-iree-codegen-gpu-infer-memory-space" title="Permanent link">link</a></h3>
