@@ -2184,7 +2184,6 @@ private:
 } // namespace
 
 void populateFoldSwizzleHintOpPatterns(RewritePatternSet &patterns) {
-  // patterns.insert<ReorderSwizzleHintOp>(patterns.getContext());
   patterns.insert<FoldSwizzleHintOpWithReshapeOp<tensor::ExpandShapeOp>>(
       patterns.getContext());
   patterns.insert<FoldSwizzleHintOpWithReshapeOp<tensor::CollapseShapeOp>>(

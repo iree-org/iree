@@ -408,7 +408,6 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     problem.gemmSize = GemmSize::MediumGemm;
   }
   LDBG() << "This config is " << problem.gemmSize;
-  llvm::errs() << "This config is " << problem.gemmSize;
   std::optional<GPUMMAHeuristicSeeds> maybeSeeds =
       getContractionHeuristicSeeds(problem, isGemm, scaled);
   assert(maybeSeeds.has_value() && "expected seeds to be found");
@@ -789,13 +788,6 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "Schedule: " << schedule;
-  llvm::errs() << "sechedule" << schedule << "\n";
-  for (auto i : schedule->kSizes) {
-    llvm::errs() << "kSize: " << i << "\n";
-  }
-  for (auto i : schedule->kTileSizes) {
-    llvm::errs() << "kTileSize: " << i << "\n";
-  }
 
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);

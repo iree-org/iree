@@ -580,10 +580,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Step 9. Remaining post-bufferization optimizations/lowerings.
-  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
-  // Resolve swizzling hints before lowering affine ops but after
-  // lowering vector (transfer) ops.
   funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createUnrollAnnotatedLoopsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
@@ -937,6 +935,8 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createPropagateConstantOffsetsPass)
       // Propagating constants introduces CSE opportunities.
       .addPass(createCSEPass)
+      // Resolve swizzling hints before lowering affine ops but after
+      // lowering vector (transfer) ops.
       .addPass(createResolveSwizzleHintsPass)
       // Canonicalize and CSE to attempt to deduplicate swizzle computation.
       .addPass(createCanonicalizerPass)
