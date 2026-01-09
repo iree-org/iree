@@ -58,11 +58,39 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   return mapping;
 }
 
+/// Compute total static elements in the shape. Returns 0 if any dimension
+/// is dynamic.
+static int64_t getTotalStaticElements(ArrayRef<int64_t> shape) {
+  int64_t total = 1;
+  for (int64_t dim : shape) {
+    if (ShapedType::isDynamic(dim))
+      return 0;
+    total *= dim;
+  }
+  return total;
+}
+
+/// Check if we have enough elements for coalesced DMA.
+/// When canLinearize is true (destination from tensor.empty), we check total
+/// elements since the downstream pass can linearize all dimensions. Otherwise,
+/// we check only the innermost dimension.
+static bool hasEnoughElementsForDMA(ArrayRef<int64_t> shape,
+                                    int64_t minElementsPerTransfer,
+                                    bool canLinearize) {
+  int64_t innermostDim = shape.back();
+  if (canLinearize) {
+    int64_t totalElements = getTotalStaticElements(shape);
+    return totalElements >= minElementsPerTransfer;
+  }
+  return innermostDim >= minElementsPerTransfer;
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
 computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
-                            RankedTensorType outputType) {
+                            RankedTensorType outputType,
+                            bool canLinearize = false) {
   // Check that this operation has the use_global_load_dma config.
   auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
   if (!dmaConfig) {
@@ -81,11 +109,9 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     return {};
   }
 
-  // Skip coalesced DMA if the innermost dimension is smaller than the minimum
-  // transfer size. The minimum transfer size is subgroupSize *
-  // minElementsPerLane.
+  ArrayRef<int64_t> shape = outputType.getShape();
   int64_t rank = outputType.getRank();
-  int64_t innermostDim = outputType.getShape()[rank - 1];
+  int64_t innermostDim = shape[rank - 1];
   if (ShapedType::isDynamic(innermostDim)) {
     return {};
   }
@@ -116,13 +142,61 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
         std::min(minElementsPerTransfer, elementsPerTransfer);
   }
 
-  // If no valid DMA size found or innermost dim is too small, skip.
-  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-      innermostDim < minElementsPerTransfer) {
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
+    return {};
+  }
+
+  if (!hasEnoughElementsForDMA(shape, minElementsPerTransfer, canLinearize)) {
     return {};
   }
 
   return {builder.getIndexAttr(*subgroupSize)};
+}
+
+/// Check if an extract_slice preserves contiguity for linearization.
+/// The slice must have unit strides. For rank > 1, the innermost dimension
+/// must be fully taken to ensure contiguous memory layout.
+static bool isContiguousSlice(tensor::ExtractSliceOp extractSlice) {
+  if (!extractSlice.hasUnitStride())
+    return false;
+
+  auto sourceType = extractSlice.getSourceType();
+  int64_t rank = sourceType.getRank();
+
+  // 1D slices are always contiguous with unit stride.
+  if (rank <= 1)
+    return true;
+
+  // For higher ranks, innermost dimension must be fully taken.
+  ArrayRef<int64_t> sourceShape = sourceType.getShape();
+  SmallVector<OpFoldResult> sizes = extractSlice.getMixedSizes();
+
+  int64_t innermostSourceDim = sourceShape[rank - 1];
+  if (ShapedType::isDynamic(innermostSourceDim))
+    return false;
+
+  std::optional<int64_t> innermostSliceSize =
+      getConstantIntValue(sizes[rank - 1]);
+  return innermostSliceSize && *innermostSliceSize == innermostSourceDim;
+}
+
+/// Check if the copy's output can be linearized for DMA.
+/// Returns true if output is:
+/// - Direct tensor.empty (before subgroup tiling), or
+/// - Contiguous extract_slice (after subgroup tiling from tensor.empty)
+static bool canLinearizeCopy(linalg::CopyOp copyOp) {
+  Value output = copyOp.getOutputs()[0];
+
+  // Direct tensor.empty (before subgroup tiling).
+  if (output.getDefiningOp<tensor::EmptyOp>())
+    return true;
+
+  // Contiguous extract_slice (after subgroup tiling).
+  // Subgroup tiling already verified the original output was tensor.empty.
+  if (auto extractSlice = output.getDefiningOp<tensor::ExtractSliceOp>())
+    return isContiguousSlice(extractSlice);
+
+  return false;
 }
 
 /// Check if the given forall op has warp mapping.
@@ -365,7 +439,8 @@ protected:
   computeThreadNumThreads(OpBuilder &builder,
                           linalg::CopyOp copyOp) const override {
     auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
-    return computeThreadNumThreadsImpl(builder, copyOp, outputType);
+    return computeThreadNumThreadsImpl(builder, copyOp, outputType,
+                                       canLinearizeCopy(copyOp));
   }
 };
 
@@ -563,9 +638,10 @@ private:
   /// Compute tile sizes for subgroup-level distribution.
   /// Returns {tileSizes, numTiledDims}.
   ///
-  /// We keep the innermost dimension whole (not tiled) to ensure contiguous
-  /// memory access patterns, and greedily redistribute warps to outer
-  /// dimensions.
+  /// For multi-dim tensors: keep innermost dimension whole to ensure contiguous
+  /// memory access, and distribute warps to outer dimensions.
+  /// For 1D tensors (e.g., flattened copies): distribute warps across the
+  /// single dimension.
   std::pair<SmallVector<OpFoldResult>, int64_t>
   computeSubgroupTileSizes(IRRewriter &rewriter, ArrayRef<int64_t> shape,
                            ArrayRef<int64_t> numWarps) {
@@ -576,14 +652,41 @@ private:
     // Calculate total number of warps available.
     // Note: numWarps may contain 0s for dimensions where wgSize < subgroupSize.
     // We treat 0 as 1 for the purpose of counting total warps.
-    auto positiveWarps =
-        llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
-    int64_t totalWarps = llvm::product_of(positiveWarps);
+    int64_t totalWarps = 1;
+    for (int64_t nw : numWarps) {
+      if (nw > 0) {
+        totalWarps *= nw;
+      }
+    }
 
-    // Greedily distribute warps to outer dimensions, keeping innermost whole.
+    // For 1D tensors (e.g., flattened copies), distribute the single dimension
+    // across warps.
+    if (rank == 1) {
+      int64_t dim = shape[0];
+      // Dynamic dimensions should have been rejected earlier in
+      // tileAtSubgroupLevel.
+      assert(
+          ShapedType::isStatic(dim) &&
+          "dynamic dimensions should be handled before tile size computation");
+      if (totalWarps > 1) {
+        int64_t warpsToUse = std::min(totalWarps, dim);
+        int64_t tileSize = llvm::divideCeil(dim, warpsToUse);
+        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+        ++numTiledDims;
+      } else {
+        tileSizes.push_back(rewriter.getIndexAttr(dim));
+        ++numTiledDims;
+      }
+      return {tileSizes, numTiledDims};
+    }
+
+    // For multi-dim tensors, greedily distribute warps to outer dimensions,
+    // keeping innermost whole.
     int64_t remainingWarps = totalWarps;
     for (int64_t i = 0; i < rank; ++i) {
-      if (i == rank - 1) {
+      bool isInnermostDim = (i == rank - 1);
+
+      if (isInnermostDim) {
         // Keep innermost dimension whole (tile size = full dimension).
         tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
         ++numTiledDims;
@@ -596,7 +699,6 @@ private:
         remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
         ++numTiledDims;
       } else {
-        // No parallelism to distribute; skip tiling this dimension.
         tileSizes.push_back(rewriter.getIndexAttr(0));
       }
     }
@@ -678,9 +780,22 @@ private:
           std::min(minElementsPerTransfer, elementsPerTransfer);
     }
 
-    // If no valid DMA size found or innermost dim is too small, skip.
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim < minElementsPerTransfer) {
+    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
+      return failure();
+    }
+
+    // Check if we have enough elements for coalesced DMA.
+    // Linearization (using total elements instead of innermost dim for size
+    // check) is only supported for linalg::CopyOp because it requires the
+    // destination to be a fresh allocation (tensor.empty) with no aliasing.
+    // GatherOp doesn't support linearization since its output may alias with
+    // existing data.
+    bool canLinearize = false;
+    if constexpr (std::is_same_v<OpTy, linalg::CopyOp>) {
+      canLinearize = canLinearizeCopy(op);
+    }
+
+    if (!hasEnoughElementsForDMA(shape, minElementsPerTransfer, canLinearize)) {
       return failure();
     }
 
@@ -706,10 +821,11 @@ private:
 
   LogicalResult applySubgroupTiling(FunctionOpInterface funcOp) {
     MLIRContext *context = &getContext();
-    SmallVector<Operation *> opsToTile;
+    IRRewriter rewriter(context);
 
     // Collect all ops with iree_gpu.use_global_load_dma lowering config.
     // Skip ops that are already inside a warp-mapped forall.
+    SmallVector<Operation *> opsToTile;
     funcOp->walk([&](Operation *op) {
       if (isa<linalg::CopyOp, IREE::LinalgExt::GatherOp>(op)) {
         auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
@@ -723,7 +839,6 @@ private:
     });
 
     // Apply subgroup-level tiling to each op.
-    IRRewriter rewriter(context);
     for (Operation *op : opsToTile) {
       FailureOr<scf::SCFTilingResult> tilingResult =
           TypeSwitch<Operation *, FailureOr<scf::SCFTilingResult>>(op)
