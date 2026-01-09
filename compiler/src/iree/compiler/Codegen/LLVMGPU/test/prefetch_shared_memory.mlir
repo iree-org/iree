@@ -400,3 +400,91 @@ func.func @prefetch_nested_loop(%arg0: memref<128xf32>) {
   }
   return
 }
+
+// -----
+
+// Test case for gather_to_lds with two operands (A and B) - async copy mode.
+// This pattern matches matmul-style access:
+// - gather_to_lds for operand A (global -> LDS, async)
+// - gather_to_lds for operand B (global -> LDS, async)
+// - transfer_read A from LDS to register
+// - transfer_read B from LDS to register
+// - compute (arith.mulf + arith.addf)
+// No gpu.barrier needed - vmcnt tracks in-flight memory operations.
+
+// CHECK-ALL-LABEL: @prefetch_gather_to_lds_two_operands
+func.func @prefetch_gather_to_lds_two_operands(
+    %A_global: memref<128x128xf32>,
+    %B_global: memref<128x128xf32>,
+    %C_global: memref<128xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  // LDS allocations for A and B tiles
+  %A_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %B_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    // Load stage: async gather from global to LDS for both operands
+    amdgpu.gather_to_lds %A_global[%c0, %k], %A_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    amdgpu.gather_to_lds %B_global[%k, %c0], %B_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+
+    // Compute stage: read from LDS and accumulate
+    %a_val = vector.transfer_read %A_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %b_val = vector.transfer_read %B_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %prod = arith.mulf %a_val, %b_val : vector<1xf32>
+    %sum = arith.addf %prod, %acc : vector<1xf32>
+
+    scf.yield %sum : vector<1xf32>
+  }
+
+  vector.transfer_write %result, %C_global[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}
+
+// -----
+
+// Test case: gather_to_lds inside scf.if should NOT be pipelined.
+// The pass should leave the loop unchanged because we don't support
+// pipelining gather_to_lds operations inside conditional blocks.
+// The loop structure should remain: scf.for with scf.if inside.
+
+// CHECK-ALL-LABEL: @gather_to_lds_inside_if_not_pipelined
+// CHECK-ALL: scf.for
+// CHECK-ALL:   scf.if
+// CHECK-ALL:     amdgpu.gather_to_lds
+// CHECK-ALL:   vector.transfer_read
+// CHECK-ALL:   arith.addf
+// CHECK-ALL:   scf.yield
+func.func @gather_to_lds_inside_if_not_pipelined(
+    %global: memref<128x128xf32>,
+    %output: memref<128xf32>,
+    %bound: index) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  %lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    // Conditional gather - should prevent pipelining
+    %in_bounds = arith.cmpi slt, %k, %bound : index
+    scf.if %in_bounds {
+      amdgpu.gather_to_lds %global[%c0, %k], %lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    }
+
+    // Compute stage
+    %val = vector.transfer_read %lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %sum = arith.addf %val, %acc : vector<1xf32>
+
+    scf.yield %sum : vector<1xf32>
+  }
+
+  vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}
