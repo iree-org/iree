@@ -448,15 +448,21 @@ struct DistributeTransferReadWithSingleRead final
                                          "distribution expects memrefs");
     }
 
-    // We require the memref to be static in the last `vectorRank` dimensions.
+    // We require the memref to static shape and stride in the last `vectorRank`
+    // dimensions and also have static offset.
     int64_t vectorRank = vectorLayout.getRank();
     int64_t memRank = memrefTy.getRank();
     int64_t undistributedDims = memRank - vectorRank;
-    if (llvm::any_of(
-            llvm::seq(undistributedDims, memRank),
-            [&memrefTy](int64_t dim) { return memrefTy.isDynamicDim(dim); })) {
-      return rewriter.notifyMatchFailure(readOp,
-                                         "memref type has dynamic shape");
+    auto memMetadata = memrefTy.getStridesAndOffset();
+    SmallVector<int64_t> memStrides = std::get<0>(memMetadata);
+    int64_t memOffset = std::get<1>(memMetadata);
+    if (memOffset == ShapedType::kDynamic ||
+        llvm::any_of(llvm::seq(undistributedDims, memRank), [&](int64_t dim) {
+          return memrefTy.isDynamicDim(dim) ||
+                 (memStrides[dim] == ShapedType::kDynamic);
+        })) {
+      return rewriter.notifyMatchFailure(
+          readOp, "memref type has dynamic shape, stride or offset");
     }
 
     // We require the permutation map to be a minor identity map.
@@ -489,7 +495,6 @@ struct DistributeTransferReadWithSingleRead final
     appendFirstN(expandedMemShape, memrefTy.getShape(), undistributedDims);
     appendFirstNOperands(expandedReadIndices, readOp.getIndices().take_front(),
                          undistributedDims);
-    auto [memStrides, memOffset] = memrefTy.getStridesAndOffset();
     appendFirstN(expandedStrides, memStrides, undistributedDims);
 
     // Calculate the information for the dimensions of the memref that are going
@@ -535,7 +540,7 @@ struct DistributeTransferReadWithSingleRead final
           int64_t shape = dimAndShape.value();
           if (shape == ShapedType::kDynamic) {
             assert(dim < undistributedDims &&
-                   "distributed dimensions should be static");
+                   "distributed dimensions should be static for sizes");
             Value constIndex = arith::ConstantIndexOp::create(builder, dim);
             return memref::DimOp::create(builder, readOp.getBase(), constIndex)
                 ->getResult(0);
@@ -554,7 +559,7 @@ struct DistributeTransferReadWithSingleRead final
           int64_t stride = dimAndShape.value();
           if (stride == ShapedType::kDynamic) {
             assert(dim < undistributedDims &&
-                   "distributed dimensions should be static");
+                   "distributed dimensions should be static for strides");
             auto extractMetadata = memref::ExtractStridedMetadataOp::create(
                 builder, readOp.getBase());
             return extractMetadata.getStrides()[dim];
