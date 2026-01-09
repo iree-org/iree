@@ -18,7 +18,6 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-combine-layout-transformation"
 
@@ -377,41 +376,38 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                              Value ub) -> bool {
     using presburger::BoundType;
 
-    // Materialize diff = ub - lb and ask for a constant upper bound on diff.
+    // Model diff = ub - lb  as an affine map (d0, d1) -> (d0 - d1)
+    // and ask for a constant upper bound on diff.
     // If we can prove UB(diff) <= 0, then diff <= 0 => ub - lb <= 0 => lb >=
     // ub.
-    Value diff = arith::SubIOp::create(rewriter, loc, ub, lb);
+    MLIRContext *ctx = rewriter.getContext();
+    auto diffMap = AffineMap::get(
+        /*dimCount=*/2, /*symbolCount=*/0,
+        {getAffineDimExpr(0, ctx) - getAffineDimExpr(1, ctx)}, ctx);
 
     auto ubConstantBound = ValueBoundsConstraintSet::computeConstantBound(
-        BoundType::UB, ValueBoundsConstraintSet::Variable(diff),
+        BoundType::UB,
+        ValueBoundsConstraintSet::Variable(diffMap, ValueRange{ub, lb}),
         /*stopCondition=*/stopConditionFn,
         /*addConservativeSemiAffineBounds=*/true);
 
     return succeeded(ubConstantBound) && *ubConstantBound <= 0;
   };
 
-  // Prove v == 0 by proving both:
-  //   LB(v) == 0  and  UB(v) == 0
+  // Prove v == 0:
   //
   // This is intentionally strict (see stopConditionFn): if ValueBounds cannot
-  // prove either bound, it returns failure and we treat v as "not provably
+  // prove v == 0 exactly, it returns failure and we treat v as "not provably
   // zero".
   auto proveEqZero = [&](Value v) -> bool {
     using presburger::BoundType;
 
-    // Query constant upper bound of v.
-    FailureOr<int64_t> ub = ValueBoundsConstraintSet::computeConstantBound(
-        BoundType::UB, ValueBoundsConstraintSet::Variable(v),
+    FailureOr<int64_t> eq = ValueBoundsConstraintSet::computeConstantBound(
+        BoundType::EQ, ValueBoundsConstraintSet::Variable(v),
         /*stopCondition=*/stopConditionFn,
         /*addConservativeSemiAffineBounds=*/true);
 
-    // Query constant lower bound of v.
-    FailureOr<int64_t> lb = ValueBoundsConstraintSet::computeConstantBound(
-        BoundType::LB, ValueBoundsConstraintSet::Variable(v),
-        /*stopCondition=*/stopConditionFn,
-        /*addConservativeSemiAffineBounds=*/true);
-
-    return succeeded(ub) && succeeded(lb) && *ub == 0 && *lb == 0;
+    return succeeded(eq) && *eq == 0;
   };
 
   auto isProvablyZeroOfr = [&](OpFoldResult ofr) -> bool {
@@ -475,9 +471,8 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                                    ubs, distConfigs, innerLoopBuilder);
     }
 
-    // If the pad amount is provably zero, skip generating loops.
-    // This reduces IR bloat and avoids degenerate scf.forall bounds for
-    // padding.
+    // Fast-path: if the pad amount is trivially/provably zero, skip generating
+    // loops.
     if (isProvablyZeroOfr(high)) {
       continue;
     }
@@ -694,16 +689,29 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   // IR. This improves pattern matching and makes it easier for subsequent
   // rewrites/proofs to recognize identity/no-op cases.
   {
-    RewritePatternSet dimResolve(ctx);
-    memref::populateResolveRankedShapedTypeResultDimsPatterns(dimResolve);
-    if (failed(applyPatternsGreedily(funcOp, std::move(dimResolve)))) {
-      return failure();
+    RewritePatternSet patterns(ctx);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+
+    // TODO(phemashekar): This collects canonicalization patterns for all
+    // ops/dialects present in the function IR. Identify the minimal required
+    // subset for the ValueBounds-driven proofs and switch to an explicit
+    // pattern list.
+    DenseSet<Dialect *> dialectsInIR;
+    DenseSet<OperationName> opsInIR;
+    funcOp->walk([&](Operation *op) {
+      dialectsInIR.insert(op->getDialect());
+      opsInIR.insert(op->getName());
+    });
+
+    for (Dialect *dialect : dialectsInIR) {
+      dialect->getCanonicalizationPatterns(patterns);
     }
 
-    PassManager pm(ctx);
-    pm.addPass(createCanonicalizerPass());
-    pm.addPass(createCSEPass());
-    if (failed(pm.run(funcOp))) {
+    for (OperationName opName : opsInIR) {
+      opName.getCanonicalizationPatterns(patterns, ctx);
+    }
+
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return failure();
     }
   }
