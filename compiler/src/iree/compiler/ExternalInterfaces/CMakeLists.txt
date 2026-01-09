@@ -43,6 +43,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRValueBoundsOpInterface
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
