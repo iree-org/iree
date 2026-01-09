@@ -8,14 +8,27 @@
 #define IREE_COMPILER_UTILS_EQUIVALENCEUTILS_H_
 
 #include "llvm/ADT/SetVector.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
 
 namespace mlir {
 class Block;
 class IRMapping;
+class OpBuilder;
 } // namespace mlir
 
 namespace mlir::iree_compiler {
+
+// Returns the runtime value of vscale. This is temporary until #21317 is
+// resolved.
+unsigned getVscaleValue();
+
+// If the given operation is a `vector.vscale`, generates the constant value for
+// it, maps the original op in bvm and adds the operation to the vector of
+// vscale ops. Otherwise, it's a noop. This is temporary until #21317 is
+// resolved.
+void mapVscaleOpToConstant(Operation &op, OpBuilder &builder, IRMapping &bvm,
+                           SmallVector<Operation *> &vscaleOps);
 
 // Recursively compares two regions for structural equivalence.
 //

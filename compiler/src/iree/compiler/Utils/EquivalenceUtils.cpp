@@ -7,6 +7,9 @@
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Support/CommandLine.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Operation.h"
@@ -14,6 +17,23 @@
 #include "mlir/IR/SymbolTable.h"
 
 namespace mlir::iree_compiler {
+
+static llvm::cl::opt<int> clVscaleValue(
+    "iree-util-vscale-value",
+    llvm::cl::desc("The value of vscale, this is a temporary flag #21317"),
+    llvm::cl::init(1));
+
+unsigned getVscaleValue() { return clVscaleValue; }
+
+void mapVscaleOpToConstant(Operation &op, OpBuilder &builder, IRMapping &bvm,
+                           SmallVector<Operation *> &vscaleOps) {
+  if (isa<vector::VectorScaleOp>(op)) {
+    vscaleOps.push_back(&op);
+    auto newCstVscaleOp =
+        builder.create<arith::ConstantIndexOp>(op.getLoc(), clVscaleValue);
+    bvm.map(op.getResult(0), newCstVscaleOp->getResult(0));
+  }
+}
 
 OperationEquivalenceCache::OperationEquivalenceCache(MLIRContext *context)
     : functionRefName(StringAttr::get(context, "function_ref")),

@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors --iree-util-vscale-value=2 %s | FileCheck %s --check-prefix=CHECK-SCALABLE
 
 // CHECK-LABEL: @tensorSizeOfUnalignedPackedI1
 util.func public @tensorSizeOfUnalignedPackedI1() -> index {
@@ -248,3 +249,23 @@ util.func public @sizeof_multi_encoding_layouts(%arg0: index, %arg1: index) -> i
 // CHECK-DAG:     %[[RES_0_1:.+]] = arith.maxui %[[SIZE0]], %[[SIZE1]]
 // CHECK-DAG:     %[[RES:.+]] = arith.maxui %[[RES_0_1]], %[[SIZE2]]
 // CHECK:         return %[[RES]]
+
+// -----
+
+// Tests that the correct size could be inferred with scalable encoding.
+// Tests the workaround until #21317 and #21590 are resolved.
+#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {
+    innerDimsPos = [0, 1], innerTileSizes = [8, 1], outerDimsPerm = [0, 1], scalableTiles = [true, false]}}>]>
+util.func public @sizeof_scalable_layout() -> index {
+    %size = stream.tensor.sizeof tensor<24x8xf32, #encoding> : index
+    util.return %size : index
+}
+// CHECK-LABEL: @sizeof_scalable_layout
+// CHECK:        %[[C768:.+]] = arith.constant 768 : index
+// CHECK-NEXT:    util.return %[[C768]]
+
+// CHECK-SCALABLE-LABEL: @sizeof_scalable_layout
+// Since we have vscale=2, the packed layout is effectively <2x8x16x1xf32>.
+// Therefore, the calculated size is 2*8*16*1*4(f32)=1024.
+// CHECK-SCALABLE:         %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK-SCALABLE-NEXT:    util.return %[[C1024]]
