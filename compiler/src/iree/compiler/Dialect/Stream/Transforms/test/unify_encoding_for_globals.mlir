@@ -262,38 +262,28 @@ stream.executable private @ex {
 util.func public @multi_device_with_executable_duplication(%arg0: index) {
   %encoded_a_v1 = util.global.load immutable @encoded_a_v1 : !stream.resource<constant>
   %encoded_a_v1_size = util.global.load immutable @encoded_a_v1_size : index
-  %operand_a_0 = stream.async.clone on(#hal.device.affinity<@device_a>)
-    %encoded_a_v1 : !stream.resource<constant>{%encoded_a_v1_size}
-    -> !stream.resource<*>{%encoded_a_v1_size}
   %encoded_a_v2 = util.global.load immutable @encoded_a_v2 : !stream.resource<constant>
   %encoded_a_v2_size = util.global.load immutable @encoded_a_v2_size : index
-  %operand_a_1 = stream.async.clone on(#hal.device.affinity<@device_a>)
-    %encoded_a_v2 : !stream.resource<constant>{%encoded_a_v2_size}
-    -> !stream.resource<*>{%encoded_a_v2_size}
   // CHECK: stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_A]]>) @[[$EX]]::@dispatch
   // CHECK-SAME: tensor<4096x4096xf32, #iree_encoding.specialized<123>>
   // CHECK-SAME: tensor<4096x4096xf32, #iree_encoding.specialized<123>>
   %dispatch_a = stream.tensor.dispatch on(#hal.device.affinity<@device_a>)
-    @ex::@dispatch(%operand_a_0, %operand_a_1) : (tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%encoded_a_v1_size},
-                                                  tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%encoded_a_v2_size}
+    @ex::@dispatch(%encoded_a_v1, %encoded_a_v2)
+    : (tensor<4096x4096xf32, #encoding1> in !stream.resource<constant>{%encoded_a_v1_size},
+       tensor<4096x4096xf32, #encoding2> in !stream.resource<constant>{%encoded_a_v2_size}
     ) -> tensor<4096x4096xf32> in !stream.resource<*>{%arg0}
 
   %encoded_b_v1 = util.global.load immutable @encoded_b_v1 : !stream.resource<constant>
   %encoded_b_v1_size = util.global.load immutable @encoded_b_v1_size : index
-  %operand_b_0 = stream.async.clone on(#hal.device.affinity<@device_b>)
-    %encoded_b_v1 : !stream.resource<constant>{%encoded_b_v1_size}
-    -> !stream.resource<*>{%encoded_b_v1_size}
   %encoded_b_v2 = util.global.load immutable @encoded_b_v2 : !stream.resource<constant>
   %encoded_b_v2_size = util.global.load immutable @encoded_b_v2_size : index
-  %operand_b_1 = stream.async.clone on(#hal.device.affinity<@device_b>)
-    %encoded_b_v2 : !stream.resource<constant>{%encoded_b_v2_size}
-    -> !stream.resource<*>{%encoded_b_v2_size}
   // CHECK: stream.tensor.dispatch on(#hal.device.affinity<@[[$DEVICE_B]]>) @[[$EX_DUP]]::@dispatch
   // CHECK-SAME: tensor<4096x4096xf32, #iree_encoding.specialized<456>>
   // CHECK-SAME: tensor<4096x4096xf32, #iree_encoding.specialized<456>>
   %dispatch_b = stream.tensor.dispatch on(#hal.device.affinity<@device_b>)
-    @ex::@dispatch(%operand_b_0, %operand_b_1) : (tensor<4096x4096xf32, #encoding1> in !stream.resource<*>{%encoded_b_v1_size},
-                                                  tensor<4096x4096xf32, #encoding2> in !stream.resource<*>{%encoded_b_v2_size}
+    @ex::@dispatch(%encoded_b_v1, %encoded_b_v2)
+    : (tensor<4096x4096xf32, #encoding1> in !stream.resource<constant>{%encoded_b_v1_size},
+       tensor<4096x4096xf32, #encoding2> in !stream.resource<constant>{%encoded_b_v2_size}
     ) -> tensor<4096x4096xf32> in !stream.resource<*>{%arg0}
 
   util.return

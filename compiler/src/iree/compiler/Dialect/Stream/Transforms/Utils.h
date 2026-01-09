@@ -50,9 +50,27 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 /// operand encodings and result encodings. If a result is tied to an operand,
 /// the result encoding is skipped because it shares the same binding with the
 /// tied operand.
+///
+/// Example 1:
+///
+///   %0 = stream.tensor.dispatch ...(%arg0, %c4)
+///     : (tensor<4x?xf32, #encoding> in !resource, index)
+///     -> tensor<4x?xf32, #encoding> in !resource
+///
+/// The above dispatch op does not have tied operands. Thus, it returns
+///   |#resolved_encoding, whatever_without_encoding, #resolved_encoding|
+///
+/// Example 2:
+///
+///   %0 = stream.tensor.dispatch ...(%arg0, %c4) : tensor<4x?xf32, #encoding>
+///     -> tensor<4x?xf32, #encoding> in %arg0
+///
+/// The above dispatch op ties the result to the first operand. Thus, the result
+/// encoding is stripped. It returns
+///   |#resolved_encoding, whatever_without_encoding|
 SmallVector<Attribute> getBindingLayoutAttrs(TensorDispatchOp dispatchOp);
 
-/// Returns true iff all the entry points are recognized by the pass:
+/// Returns true iff all the entry points are recognized:
 ///   - The corresponding executable is a stream.executable op.
 ///   - The function arguments, where the types are !stream.binding_type, are
 ///     only used by stream.binding.subspan ops. Furthermore, the result type of
