@@ -2124,8 +2124,8 @@ struct FoldSwizzleHintOpWithExtractSliceOp
                                             sliceOp.getType().getEncoding());
     auto newEmptyOp =
         tensor::EmptyOp::create(rewriter, loc, tensorType, sliceOp.getSizes());
-    auto newSwizzleHintOp = rewriter.create<IREE::Codegen::SwizzleHintOp>(
-        loc, newEmptyOp, swizzleHintOp.getSwizzle());
+    auto newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(
+        rewriter, loc, newEmptyOp, swizzleHintOp.getSwizzle());
     rewriter.replaceOp(sliceOp, newSwizzleHintOp.getResult());
     return success();
   }
@@ -2175,8 +2175,8 @@ struct FoldSwizzleHintOpWithReshapeOp : public OpRewritePattern<ReshapeOp> {
     Value emptyTensor =
         tensor::EmptyOp::create(rewriter, loc, resultShapes[0],
                                 reshapeOp.getResultType().getElementType());
-    Value newSwizzleHintOp = rewriter.create<IREE::Codegen::SwizzleHintOp>(
-        loc, emptyTensor, swizzleHintOp.getSwizzle());
+    Value newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(
+        rewriter, loc, emptyTensor, swizzleHintOp.getSwizzle());
     if (newSwizzleHintOp.getType() != reshapeOp.getResultType()) {
       rewriter.replaceOpWithNewOp<tensor::CastOp>(
           reshapeOp, reshapeOp.getResultType(), newSwizzleHintOp);
