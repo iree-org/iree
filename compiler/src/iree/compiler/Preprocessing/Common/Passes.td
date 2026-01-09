@@ -172,13 +172,4 @@ def GeneralizeLinalgMatMulPass :
   ];
 }
 
-def SinkTransposeThroughPadPass :
-    InterfacePass<"iree-preprocessing-sink-transpose-through-pad", "mlir::FunctionOpInterface"> {
-  let summary = "Sink linalg transpose ops through tensor pad ops";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-    "mlir::tensor::TensorDialect",
-  ];
-}
-
 #endif  // IREE_PREPROCESSING_COMMON_PASSES

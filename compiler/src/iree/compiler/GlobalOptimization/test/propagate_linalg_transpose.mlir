@@ -1040,6 +1040,7 @@ util.func public @bubble_transpose_through_truncf_and_fuse_with_conv(
 //       BUBBLE:   linalg.generic
 //       BUBBLE:   } -> tensor<16x2x2x4xbf16>
 //   BUBBLE-NOT:   linalg.transpose
+//       BUBBLE:   util.return
 
 // With enable-aggressive-propagation-through-conv, transpose is fully fused with conv.
 // CONV-LABEL: util.func public @bubble_transpose_through_truncf_and_fuse_with_conv
@@ -1050,3 +1051,41 @@ util.func public @bubble_transpose_through_truncf_and_fuse_with_conv(
 //       CONV:   } -> tensor<16x2x2x4xbf16>
 //   CONV-NOT:   linalg.transpose
 //       CONV:   util.return %[[TRUNCF]]
+
+// -----
+
+util.func public @sink_transpose_through_pad(%arg0: tensor<16x64x64x128xf16>) -> tensor<16x128x66x66xf16> {
+  %cst = arith.constant 0.000000e+00 : f16
+  %empty = tensor.empty() : tensor<16x128x64x64xf16>
+  %transposed = linalg.transpose ins(%arg0 : tensor<16x64x64x128xf16>) outs(%empty : tensor<16x128x64x64xf16>) permutation = [0, 3, 1, 2]
+  %padded = tensor.pad %transposed low[0, 0, 1, 1] high[0, 0, 1, 1] {
+  ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
+    tensor.yield %cst : f16
+  } : tensor<16x128x64x64xf16> to tensor<16x128x66x66xf16>
+  util.return %padded : tensor<16x128x66x66xf16>
+}
+// SINK-LABEL: util.func public @sink_transpose_through_pad
+//       SINK:   %[[PAD:.+]] = tensor.pad
+//       SINK:   %[[TRANSPOSE:.+]] = linalg.transpose
+//  SINK-SAME:     ins(%[[PAD]]
+//       SINK:   util.return %[[TRANSPOSE]]
+
+// -----
+
+util.func public @sink_transpose_through_expand_shape_and_pad(%arg0: tensor<16x2x48x32x288xbf16>) -> tensor<16x3x96x4x48x32xbf16> {
+  %cst = arith.constant 0.000000e+00 : bf16
+  %empty = tensor.empty() : tensor<16x288x2x48x32xbf16>
+  %transposed = linalg.transpose ins(%arg0 : tensor<16x2x48x32x288xbf16>) outs(%empty : tensor<16x288x2x48x32xbf16>) permutation = [0, 4, 1, 2, 3]
+  %expanded = tensor.expand_shape %transposed [[0], [1, 2], [3], [4], [5]] output_shape [16, 3, 96, 2, 48, 32] : tensor<16x288x2x48x32xbf16> into tensor<16x3x96x2x48x32xbf16>
+  %padded = tensor.pad %expanded low[0, 0, 0, 1, 0, 0] high[0, 0, 0, 1, 0, 0] {
+  ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index):
+    tensor.yield %cst : bf16
+  } : tensor<16x3x96x2x48x32xbf16> to tensor<16x3x96x4x48x32xbf16>
+  util.return %padded : tensor<16x3x96x4x48x32xbf16>
+}
+// SINK-LABEL: util.func public @sink_transpose_through_expand_shape_and_pad
+//       SINK:   %[[EXPAND:.+]] = tensor.expand_shape %arg0
+//       SINK:   %[[PAD:.+]] = tensor.pad %[[EXPAND]]
+//       SINK:   %[[TRANSPOSE:.+]] = linalg.transpose
+//  SINK-SAME:     ins(%[[PAD]]
+//       SINK:   util.return %[[TRANSPOSE]]
