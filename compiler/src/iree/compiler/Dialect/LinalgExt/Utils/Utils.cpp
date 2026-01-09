@@ -1030,4 +1030,21 @@ bool isPureBatchMatmul(Operation *op) {
                               batchMatmulOp.getIndexingMaps());
 }
 
+// Indicates whether the given linalg op represents a transpose. In particular,
+// it requires a single input where the indexing maps are full permutations and
+// non-equal.
+bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
+  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
+    return false;
+
+  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
+    return false;
+  auto mapRange = linalgOp.getIndexingMapsArray();
+  if (mapRange.size() != 2 || !mapRange.front().isPermutation() ||
+      !mapRange.back().isPermutation() || mapRange.front() == mapRange.back()) {
+    return false;
+  }
+  return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
