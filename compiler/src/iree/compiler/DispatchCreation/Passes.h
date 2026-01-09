@@ -56,6 +56,18 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
           "shapes across reduction ops)"),
       llvm::cl::init(false),
   };
+  Option<bool> enablePadHandling{
+      *this,
+      "pad-handling",
+      llvm::cl::desc("Enable native handling of tensor.pad operations"),
+      llvm::cl::init(false),
+  };
+  Option<bool> enableFusePaddingIntoLinalgConsumerOps{
+      *this,
+      "fuse-padding-into-linalg-consumer-ops",
+      llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
+      llvm::cl::init(false),
+  };
   Option<bool> constExprHoisting{
       *this,
       "const-expr-hoisting",
