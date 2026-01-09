@@ -224,7 +224,6 @@ class GlobalInitializationPass
       // initial value/initializer and avoid the work entirely.
       return success();
     }
-    globalOp.setGlobalMutable(true);
     return storePrimitiveGlobal(globalOp.getLoc(), globalOp.getGlobalName(),
                                 value, builder);
   }
