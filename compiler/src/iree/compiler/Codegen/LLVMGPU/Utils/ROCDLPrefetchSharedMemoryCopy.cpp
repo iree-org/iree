@@ -782,17 +782,156 @@ static bool hasGatherToLDS(scf::ForOp forOp) {
   return found;
 }
 
+/// Trace back from a value through subviews/expand_shapes/casts to find
+/// the root allocation.
+static Value traceToAllocation(Value base) {
+  while (true) {
+    if (auto subview = base.getDefiningOp<memref::SubViewOp>()) {
+      base = subview.getSource();
+    } else if (auto expand = base.getDefiningOp<memref::ExpandShapeOp>()) {
+      base = expand.getSrc();
+    } else if (auto cast = base.getDefiningOp<memref::CastOp>()) {
+      base = cast.getSource();
+    } else {
+      break;
+    }
+  }
+  return base;
+}
+
+/// Check if a view-like operation can be moved inside the target loop.
+/// Returns true if ALL uses of the operation are inside the loop.
+static bool canMoveInsideLoop(Operation *viewOp, scf::ForOp forOp) {
+  for (Operation *user : viewOp->getUsers()) {
+    // If the user is a view-like op, recursively check if it can be moved
+    if (isa<memref::SubViewOp, memref::ExpandShapeOp, memref::CastOp>(user)) {
+      if (!canMoveInsideLoop(user, forOp))
+        return false;
+    } else if (!forOp->isAncestor(user)) {
+      // Non-view user outside the loop - can't move
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Collect view-like operations (subview, expand_shape, cast) that are
+/// derived from the allocation and are outside the target loop.
+static void collectViewOpsToMove(memref::AllocOp alloc, scf::ForOp forOp,
+                                 SmallVectorImpl<Operation *> &viewOps) {
+  SmallVector<Operation *> worklist;
+
+  // Start with direct users of the allocation
+  for (Operation *user : alloc->getUsers()) {
+    if (isa<memref::SubViewOp, memref::ExpandShapeOp, memref::CastOp>(user) &&
+        !forOp->isAncestor(user)) {
+      worklist.push_back(user);
+    }
+  }
+
+  // Transitively collect all view-like ops outside the loop
+  while (!worklist.empty()) {
+    Operation *op = worklist.pop_back_val();
+    viewOps.push_back(op);
+
+    for (Operation *user : op->getUsers()) {
+      if (isa<memref::SubViewOp, memref::ExpandShapeOp, memref::CastOp>(user) &&
+          !forOp->isAncestor(user)) {
+        worklist.push_back(user);
+      }
+    }
+  }
+}
+
+/// Move view-like operations inside the target loop as a preparation step
+/// for multi-buffering. Returns failure if any view op has uses outside
+/// the loop (can't be moved).
+static LogicalResult moveViewOpsInsideLoop(memref::AllocOp alloc,
+                                           scf::ForOp forOp) {
+  SmallVector<Operation *> viewOps;
+  collectViewOpsToMove(alloc, forOp, viewOps);
+
+  if (viewOps.empty()) {
+    return success();
+  }
+
+  // Check if all view ops can be moved (all their uses are inside the loop)
+  for (Operation *viewOp : viewOps) {
+    if (!canMoveInsideLoop(viewOp, forOp)) {
+      LDBG() << "Cannot move view op inside loop (has uses outside): "
+             << *viewOp;
+      return failure();
+    }
+  }
+
+  // Move all view ops to the start of the loop body
+  // We need to move them in order (allocation users first, then derived)
+  // so that operands are available when moved
+  Block *loopBody = forOp.getBody();
+  Operation *insertPt = &loopBody->front();
+
+  for (Operation *viewOp : viewOps) {
+    viewOp->moveBefore(insertPt);
+    LDBG() << "Moved view op inside loop: " << *viewOp;
+  }
+
+  return success();
+}
+
+/// After multiBuffer runs, expand_shape ops may have incorrect result types
+/// because their input changed from contiguous to strided layout.
+/// This function rebuilds them with correct types.
+static LogicalResult fixupExpandShapeTypes(scf::ForOp forOp) {
+  IRRewriter rewriter(forOp->getContext());
+  SmallVector<memref::ExpandShapeOp> toFix;
+
+  forOp->walk([&](memref::ExpandShapeOp expand) {
+    MemRefType srcType = expand.getSrcType();
+    MemRefType resultType = expand.getResultType();
+
+    // Check if the result type needs updating (source is strided but result
+    // isn't)
+    if (!srcType.getLayout().isIdentity() &&
+        resultType.getLayout().isIdentity()) {
+      toFix.push_back(expand);
+    }
+  });
+
+  for (memref::ExpandShapeOp expand : toFix) {
+    MemRefType srcType = expand.getSrcType();
+    ArrayRef<int64_t> resultShape = expand.getResultType().getShape();
+
+    auto maybeResultType = memref::ExpandShapeOp::computeExpandedType(
+        srcType, resultShape, expand.getReassociationIndices());
+
+    if (failed(maybeResultType)) {
+      LDBG() << "Failed to compute expanded type for fixup: " << expand;
+      return failure();
+    }
+
+    rewriter.setInsertionPoint(expand);
+    auto newExpand = rewriter.create<memref::ExpandShapeOp>(
+        expand.getLoc(), *maybeResultType, expand.getSrc(),
+        expand.getReassociation(), expand.getOutputShape(),
+        expand.getStaticOutputShape());
+
+    rewriter.replaceOp(expand, newExpand.getResult());
+    LDBG() << "Fixed up expand_shape type: " << newExpand;
+  }
+
+  return success();
+}
+
 /// Multi-buffer LDS allocations used by gather_to_lds operations.
-/// Only used in async copy mode.
+/// First tries to move view-like operations inside the loop, then calls
+/// upstream multiBuffer.
 static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
                                                unsigned numBuffers) {
   SetVector<memref::AllocOp> sharedAllocs;
 
+  // Find all LDS allocations used by gather_to_lds, tracing through subviews
   forOp->walk([&](amdgpu::GatherToLDSOp gatherOp) {
-    Value base = gatherOp.getDst();
-    while (auto subview = base.getDefiningOp<memref::SubViewOp>())
-      base = subview.getSource();
-
+    Value base = traceToAllocation(gatherOp.getDst());
     if (auto alloc = base.getDefiningOp<memref::AllocOp>()) {
       if (hasSharedMemoryAddressSpace(alloc.getType()))
         sharedAllocs.insert(alloc);
@@ -805,14 +944,29 @@ static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
   }
 
   for (memref::AllocOp alloc : sharedAllocs) {
-    if (failed(memref::multiBuffer(alloc, numBuffers,
-                                   /*skipOverrideAnalysis=*/true))) {
-      alloc.emitError("failed to multi-buffer LDS for async copy pipelining");
+    // Step 1: Try to move view-like ops inside the loop
+    if (failed(moveViewOpsInsideLoop(alloc, forOp))) {
+      LDBG() << "Cannot prepare allocation for multi-buffering: " << *alloc;
       return failure();
     }
-    LDBG() << "Multi-buffered LDS allocation with " << numBuffers
-           << " buffers: " << *alloc;
+
+    // Step 2: Call upstream multiBuffer - should now work since all users
+    // are inside the loop
+    if (failed(memref::multiBuffer(alloc, numBuffers,
+                                   /*skipOverrideAnalysis=*/true))) {
+      LDBG() << "Failed to multi-buffer allocation: " << *alloc;
+      return failure();
+    }
+
+    LDBG() << "Successfully multi-buffered: " << *alloc;
   }
+
+  // Step 3: Fix up expand_shape types that may have become stale after
+  // multiBuffer replaced allocations with strided subviews
+  if (failed(fixupExpandShapeTypes(forOp))) {
+    return failure();
+  }
+
   return success();
 }
 
