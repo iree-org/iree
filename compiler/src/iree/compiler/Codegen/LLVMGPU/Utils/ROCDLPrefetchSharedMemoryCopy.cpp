@@ -782,17 +782,89 @@ static bool hasGatherToLDS(scf::ForOp forOp) {
   return found;
 }
 
+/// Trace back from a value through subviews/expand_shapes/casts to find
+/// the root allocation.
+static Value traceToAllocation(Value base) {
+  while (true) {
+    if (auto subview = base.getDefiningOp<memref::SubViewOp>()) {
+      base = subview.getSource();
+    } else if (auto expand = base.getDefiningOp<memref::ExpandShapeOp>()) {
+      base = expand.getSrc();
+    } else if (auto cast = base.getDefiningOp<memref::CastOp>()) {
+      base = cast.getSource();
+    } else {
+      break;
+    }
+  }
+  return base;
+}
+
+/// Collect all intermediate operations (subviews, expand_shapes, casts)
+/// between a value and its root allocation.
+static SmallVector<Operation *> collectIntermediates(Value val) {
+  SmallVector<Operation *> intermediates;
+  while (true) {
+    if (auto subview = val.getDefiningOp<memref::SubViewOp>()) {
+      intermediates.push_back(subview);
+      val = subview.getSource();
+    } else if (auto expand = val.getDefiningOp<memref::ExpandShapeOp>()) {
+      intermediates.push_back(expand);
+      val = expand.getSrc();
+    } else if (auto cast = val.getDefiningOp<memref::CastOp>()) {
+      intermediates.push_back(cast);
+      val = cast.getSource();
+    } else {
+      break;
+    }
+  }
+  return intermediates;
+}
+
+/// Replace the uses of `oldOp` with the given `val` and for subview uses
+/// propagate the type change. Based on MLIR's replaceUsesAndPropagateType.
+static void replaceUsesAndPropagateType(RewriterBase &rewriter,
+                                        Operation *oldOp, Value val,
+                                        scf::ForOp forOp) {
+  for (OpOperand &use : llvm::make_early_inc_range(oldOp->getUses())) {
+    Operation *user = use.getOwner();
+
+    // Only replace uses inside our target loop
+    if (!forOp->isAncestor(user))
+      continue;
+
+    if (auto subviewUse = dyn_cast<memref::SubViewOp>(user)) {
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(subviewUse);
+      MemRefType newType = memref::SubViewOp::inferRankReducedResultType(
+          subviewUse.getType().getShape(), cast<MemRefType>(val.getType()),
+          subviewUse.getStaticOffsets(), subviewUse.getStaticSizes(),
+          subviewUse.getStaticStrides());
+      Value newSubview = rewriter.create<memref::SubViewOp>(
+          subviewUse->getLoc(), newType, val, subviewUse.getMixedOffsets(),
+          subviewUse.getMixedSizes(), subviewUse.getMixedStrides());
+
+      replaceUsesAndPropagateType(rewriter, subviewUse, newSubview, forOp);
+      rewriter.eraseOp(subviewUse);
+      continue;
+    }
+
+    // Non-subview: replace with new value
+    rewriter.startOpModification(user);
+    use.set(val);
+    rewriter.finalizeOpModification(user);
+  }
+}
+
 /// Multi-buffer LDS allocations used by gather_to_lds operations.
-/// Only used in async copy mode.
+/// This is subview-aware: handles allocations used through intermediate
+/// operations (subview, expand_shape) defined outside the target loop.
 static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
                                                unsigned numBuffers) {
   SetVector<memref::AllocOp> sharedAllocs;
 
+  // Find all LDS allocations used by gather_to_lds, tracing through subviews
   forOp->walk([&](amdgpu::GatherToLDSOp gatherOp) {
-    Value base = gatherOp.getDst();
-    while (auto subview = base.getDefiningOp<memref::SubViewOp>())
-      base = subview.getSource();
-
+    Value base = traceToAllocation(gatherOp.getDst());
     if (auto alloc = base.getDefiningOp<memref::AllocOp>()) {
       if (hasSharedMemoryAddressSpace(alloc.getType()))
         sharedAllocs.insert(alloc);
@@ -804,15 +876,186 @@ static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
     return failure();
   }
 
+  IRRewriter rewriter(forOp->getContext());
+
   for (memref::AllocOp alloc : sharedAllocs) {
-    if (failed(memref::multiBuffer(alloc, numBuffers,
-                                   /*skipOverrideAnalysis=*/true))) {
-      alloc.emitError("failed to multi-buffer LDS for async copy pipelining");
-      return failure();
+    // First try the standard multiBuffer - works if alloc users are in the loop
+    if (succeeded(memref::multiBuffer(alloc, numBuffers,
+                                      /*skipOverrideAnalysis=*/true))) {
+      LDBG() << "Standard multi-buffered: " << *alloc;
+      continue;
     }
-    LDBG() << "Multi-buffered LDS allocation with " << numBuffers
-           << " buffers: " << *alloc;
+
+    // Standard multiBuffer failed - use subview-aware approach
+    LDBG() << "Using subview-aware multi-buffering for: " << *alloc;
+
+    Location loc = alloc.getLoc();
+    MemRefType origType = alloc.getType();
+    ArrayRef<int64_t> origShape = origType.getShape();
+
+    // 1. Create multi-buffered type: [numBuffers, ...original_shape...]
+    SmallVector<int64_t> mbShape{static_cast<int64_t>(numBuffers)};
+    llvm::append_range(mbShape, origShape);
+    MemRefType mbType = MemRefType::Builder(origType)
+                            .setShape(mbShape)
+                            .setLayout(MemRefLayoutAttrInterface());
+
+    // 2. Create multi-buffered allocation at the same location
+    rewriter.setInsertionPoint(alloc);
+    auto mbAlloc = rewriter.create<memref::AllocOp>(loc, mbType);
+    LDBG() << "Created multi-buffered alloc: " << mbAlloc;
+
+    // 3. Inside the loop, compute buffer index and create subview
+    rewriter.setInsertionPointToStart(forOp.getBody());
+    Value iv = forOp.getInductionVar();
+    Value lb = forOp.getLowerBound();
+    Value step = forOp.getStep();
+
+    // buffer_index = ((iv - lb) / step) % numBuffers
+    AffineExpr ivExpr, lbExpr, stepExpr;
+    bindDims(rewriter.getContext(), ivExpr, lbExpr, stepExpr);
+    Value bufferIndex = affine::makeComposedAffineApply(
+        rewriter, loc,
+        ((ivExpr - lbExpr).floorDiv(stepExpr)) % numBuffers,
+        {iv, lb, step});
+
+    // 4. Create subview that extracts one buffer slice
+    SmallVector<OpFoldResult> offsets(mbShape.size(), rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> sizes(mbShape.size(), rewriter.getIndexAttr(1));
+    SmallVector<OpFoldResult> strides(mbShape.size(), rewriter.getIndexAttr(1));
+
+    offsets.front() = bufferIndex;
+    for (size_t i = 0; i < origShape.size(); ++i) {
+      sizes[1 + i] = rewriter.getIndexAttr(origShape[i]);
+    }
+
+    MemRefType sliceType = memref::SubViewOp::inferRankReducedResultType(
+        origShape, mbType, offsets, sizes, strides);
+    Value bufferSlice = rewriter.create<memref::SubViewOp>(
+        loc, sliceType, mbAlloc, offsets, sizes, strides);
+    LDBG() << "Created buffer slice: " << bufferSlice;
+
+    // 5. Handle deallocs - replace with dealloc of the new allocation
+    for (OpOperand &use : llvm::make_early_inc_range(alloc->getUses())) {
+      if (auto dealloc = dyn_cast<memref::DeallocOp>(use.getOwner())) {
+        rewriter.setInsertionPoint(dealloc);
+        rewriter.create<memref::DeallocOp>(dealloc.getLoc(), mbAlloc);
+        rewriter.eraseOp(dealloc);
+      }
+    }
+
+    // 6. For each use of the allocation that's OUTSIDE the loop but whose
+    //    derived values are used INSIDE the loop, we need to rebuild the
+    //    chain inside the loop sourced from bufferSlice.
+    SmallVector<std::pair<Operation *, Value>> toClone;
+    for (OpOperand &use : llvm::make_early_inc_range(alloc->getUses())) {
+      Operation *user = use.getOwner();
+
+      // Skip if user is inside our target loop - will be handled by RAUW
+      if (forOp->isAncestor(user))
+        continue;
+
+      // Check if this user (or its derived values) has any use inside the loop
+      std::function<bool(Operation *)> hasUseInLoop = [&](Operation *op) -> bool {
+        for (Value result : op->getResults()) {
+          for (Operation *u : result.getUsers()) {
+            if (forOp->isAncestor(u))
+              return true;
+            // Check derived operations recursively
+            if (isa<memref::SubViewOp, memref::ExpandShapeOp, memref::CastOp>(u)) {
+              if (hasUseInLoop(u))
+                return true;
+            }
+          }
+        }
+        return false;
+      };
+
+      if (!hasUseInLoop(user))
+        continue;
+
+      // Clone this operation inside the loop, sourced from bufferSlice
+      if (auto subview = dyn_cast<memref::SubViewOp>(user)) {
+        rewriter.setInsertionPointAfter(bufferSlice.getDefiningOp());
+
+        // The bufferSlice may have a different type (with strided layout)
+        // so we need to infer the correct result type
+        MemRefType newResultType = memref::SubViewOp::inferRankReducedResultType(
+            subview.getType().getShape(),
+            cast<MemRefType>(bufferSlice.getType()),
+            subview.getStaticOffsets(), subview.getStaticSizes(),
+            subview.getStaticStrides());
+
+        auto newSubview = rewriter.create<memref::SubViewOp>(
+            subview.getLoc(), newResultType, bufferSlice,
+            subview.getMixedOffsets(), subview.getMixedSizes(),
+            subview.getMixedStrides());
+
+        LDBG() << "Cloned subview inside loop: " << newSubview;
+
+        // Replace uses of the original subview that are inside the loop
+        for (OpOperand &subviewUse :
+             llvm::make_early_inc_range(subview->getUses())) {
+          if (forOp->isAncestor(subviewUse.getOwner())) {
+            rewriter.startOpModification(subviewUse.getOwner());
+            subviewUse.set(newSubview);
+            rewriter.finalizeOpModification(subviewUse.getOwner());
+          }
+        }
+
+        // Also handle derived operations (expand_shape, etc.) from this subview
+        replaceUsesAndPropagateType(rewriter, subview, newSubview, forOp);
+      } else if (auto expand = dyn_cast<memref::ExpandShapeOp>(user)) {
+        rewriter.setInsertionPointAfter(bufferSlice.getDefiningOp());
+
+        // Expand shape needs special handling - compute correct result type
+        // that accounts for the strided layout of the buffer slice
+        MemRefType sliceType = cast<MemRefType>(bufferSlice.getType());
+        ArrayRef<int64_t> resultShape = expand.getResultType().getShape();
+        auto maybeResultType = memref::ExpandShapeOp::computeExpandedType(
+            sliceType, resultShape, expand.getReassociationIndices());
+
+        if (failed(maybeResultType)) {
+          LDBG() << "Failed to compute expanded type for: " << expand;
+          continue;
+        }
+
+        auto newExpand = rewriter.create<memref::ExpandShapeOp>(
+            expand.getLoc(), *maybeResultType, bufferSlice,
+            expand.getReassociation(), expand.getOutputShape(),
+            expand.getStaticOutputShape());
+
+        LDBG() << "Cloned expand_shape inside loop: " << newExpand;
+
+        // Replace uses inside the loop
+        for (OpOperand &expandUse :
+             llvm::make_early_inc_range(expand->getUses())) {
+          if (forOp->isAncestor(expandUse.getOwner())) {
+            rewriter.startOpModification(expandUse.getOwner());
+            expandUse.set(newExpand);
+            rewriter.finalizeOpModification(expandUse.getOwner());
+          }
+        }
+
+        replaceUsesAndPropagateType(rewriter, expand, newExpand, forOp);
+      }
+    }
+
+    // 7. Replace any remaining direct uses of the allocation inside the loop
+    for (OpOperand &use : llvm::make_early_inc_range(alloc->getUses())) {
+      if (forOp->isAncestor(use.getOwner())) {
+        rewriter.startOpModification(use.getOwner());
+        use.set(bufferSlice);
+        rewriter.finalizeOpModification(use.getOwner());
+      }
+    }
+
+    // 8. Erase the original allocation if it has no remaining uses
+    if (alloc->use_empty()) {
+      rewriter.eraseOp(alloc);
+    }
   }
+
   return success();
 }
 
