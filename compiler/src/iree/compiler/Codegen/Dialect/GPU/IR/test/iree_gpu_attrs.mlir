@@ -207,3 +207,21 @@ module {
 }
 // CHECK-LABEL: func @test_lane_increment_with_step
 //  CHECK-SAME:   lane_increment = #iree_gpu.lane_increment<16, step = 2>
+
+module {
+  func.func @test_lane_increment_aligned() attributes {
+      lane_increment = #iree_gpu.lane_increment<64, aligned>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lane_increment_aligned
+//  CHECK-SAME:   lane_increment = #iree_gpu.lane_increment<64, aligned>
+
+module {
+  func.func @test_lane_increment_step_and_aligned() attributes {
+      lane_increment = #iree_gpu.lane_increment<64, step = 2, aligned>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lane_increment_step_and_aligned
+//  CHECK-SAME:   lane_increment = #iree_gpu.lane_increment<64, step = 2, aligned>
