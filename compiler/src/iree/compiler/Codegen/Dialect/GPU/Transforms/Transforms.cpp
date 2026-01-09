@@ -2076,6 +2076,15 @@ void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
   patterns.add<LowerValueBarrierPattern>(patterns.getContext());
 }
 
+//===----------------------------------------------------------------------===//
+// SwizzleHintOp Fold Patterns
+//===----------------------------------------------------------------------===//
+
+// The following patterns are adapted from the populateFoldTensorEmptyPatterns
+// in upstream llvm-project. The main change is to add support for folding with
+// swizzle_hint ops from IREE. Once swizzle_hint ops are more widely used and
+// proven stable, we could consider upstreaming this extension.
+
 namespace {
 struct FoldSwizzleHintOpWithExtractSliceOp
     : public OpRewritePattern<tensor::ExtractSliceOp> {
