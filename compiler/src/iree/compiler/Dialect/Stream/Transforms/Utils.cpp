@@ -73,7 +73,8 @@ bool recognizeDispatchEntryPoints(ModuleOp moduleOp, SymbolTable &symbolTable,
           return;
         }
         auto encodingTypeInterface =
-            dyn_cast<IREE::Encoding::EncodingTypeInterface>(subspanOp.getType());
+            dyn_cast<IREE::Encoding::EncodingTypeInterface>(
+                subspanOp.getType());
         if (!encodingTypeInterface) {
           result = false;
           return;
@@ -133,7 +134,8 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp,
   // for those tensor types. The map records the mapping between an export op
   // and the possible binding layouts.
   //===--------------------------------------------------------------------===//
-  DenseMap<ExecutableExportOp, SetVector<ArrayAttr>> bindingLayoutSetPerExportOp;
+  DenseMap<ExecutableExportOp, SetVector<ArrayAttr>>
+      bindingLayoutSetPerExportOp;
 
   // Records the binding layouts for a dispatch op.
   llvm::MapVector<TensorDispatchOp, SmallVector<Attribute>>
@@ -187,8 +189,8 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp,
       // Update the binding encodings within the cloned executable op.
       auto funcOp = cast<mlir::FunctionOpInterface>(symbolTable.lookupSymbolIn(
           dupOp.getInnerModule(), exportOp.getSymName()));
-      if (failed(
-              updateBindingEncodings(funcOp, bindingLayoutTypeAttrs.getValue()))) {
+      if (failed(updateBindingEncodings(funcOp,
+                                        bindingLayoutTypeAttrs.getValue()))) {
         return funcOp->emitOpError("failed to update encodings for bindings");
       }
       dispatchSiteToExecutableOp[ExportAndBindingLayouts(
@@ -208,14 +210,14 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp,
     dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPoint) {
       auto exportOp = cast<ExecutableExportOp>(
           symbolTable.lookupSymbolIn(moduleOp, entryPoint));
-      auto info = ExportAndBindingLayouts(exportOp,
-                                          rewriter.getArrayAttr(bindingLayoutAttrs));
+      auto info = ExportAndBindingLayouts(
+          exportOp, rewriter.getArrayAttr(bindingLayoutAttrs));
       assert(dispatchSiteToExecutableOp.count(info));
 
       auto executableOp = dispatchSiteToExecutableOp[info];
-      auto newSym = SymbolRefAttr::get(
-          executableOp->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName()),
-          entryPoint.getNestedReferences());
+      auto newSym = SymbolRefAttr::get(executableOp->getAttrOfType<StringAttr>(
+                                           SymbolTable::getSymbolAttrName()),
+                                       entryPoint.getNestedReferences());
       newEntryPoints.push_back(newSym);
     });
 

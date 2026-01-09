@@ -92,7 +92,6 @@ static Type getTypeWithResolvedEncodingLayouts(
   return rankedTensorType.cloneWithEncoding(newEncoding);
 };
 
-
 /// Returns true if any of encoding types is a recognized encoding. See
 /// `isRecognizedEncodingType` method for the definition.
 static bool hasRecognizedEncoding(ModuleOp moduleOp, SymbolTable &symbolTable,

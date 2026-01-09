@@ -85,8 +85,9 @@ bool recognizeDispatchEntryPoints(ModuleOp moduleOp, SymbolTable &symbolTable,
 /// IREE::Encoding::EncodingTypeInterface type interface, the method uses the
 /// interface methods to compute the type that has updated encodings (i.e.,
 /// encodings with layouts) and updates the type.
-LogicalResult updateBindingEncodings(FunctionOpInterface funcOp,
-                                     ArrayRef<Attribute> bindingLayoutTypeAttrs);
+LogicalResult
+updateBindingEncodings(FunctionOpInterface funcOp,
+                       ArrayRef<Attribute> bindingLayoutTypeAttrs);
 
 /// Duplicates stream.executables based on the operand encodings and result
 /// encodings of stream.tensor.dispatch ops. Some executables can be launched by
