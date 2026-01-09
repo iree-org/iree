@@ -2063,7 +2063,7 @@ iree_generated_e2e_runner_test(
     "--mx_scale_type=f8E8M0FNU"
     "--mx_block_size=32"
     "--shapes=custom_mnk"
-    "--mnk=10000,16384,16384"
+    "--mnk=16384,16384,16384"
     "--mnk_dynamicities=static,static,static"
     "--transpose_rhs"
     "--no-accumulate"
