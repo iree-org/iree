@@ -346,6 +346,15 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
           "Enable aggressive reshape movement (bubbling expand/collapse "
           "shapes across reduction ops)."),
       llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-flow-enable-pad-handling", enablePadHandling,
+      llvm::cl::desc("Enable native handling of tensor.pad operations."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-dispatch-creation-enable-fuse-padding-into-linalg-consumer-ops",
+      enableFusePaddingIntoLinalgConsumerOps,
+      llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
+      llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler

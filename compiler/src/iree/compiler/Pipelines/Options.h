@@ -239,6 +239,12 @@ struct DispatchCreationOptions {
   // across reduction ops).
   bool enableAggressiveReshapeMovement = false;
 
+  // Enables native handling of tensor.pad operations.
+  bool enablePadHandling = false;
+
+  // Enables fusing tensor.pad ops into Linalg consumer ops.
+  bool enableFusePaddingIntoLinalgConsumerOps = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<DispatchCreationOptions>;
 };
