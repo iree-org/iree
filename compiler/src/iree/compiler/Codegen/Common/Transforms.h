@@ -211,6 +211,20 @@ void populateCombineRelayoutOpPatterns(
 /// Populate patterns to fuse tilable consumers of forall ops into it.
 void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns);
 
+//===----------------------------------------------------------------------===//
+// Utilities for iteration space expansion transformations
+//===----------------------------------------------------------------------===//
+
+/// Helper struct to hold the expand/collapse shape ops created for dimension
+/// expansion or blocking transformations.
+struct ReshapeOps {
+  tensor::ExpandShapeOp expandShapeOp;
+  tensor::CollapseShapeOp collapseShapeOp;
+};
+
+/// Populate patterns to remove optimization barriers.
+void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
