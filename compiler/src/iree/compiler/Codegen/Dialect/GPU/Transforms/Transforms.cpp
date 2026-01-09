@@ -102,7 +102,7 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   }
 
   // Skip swizzle hint ops.
-  Operation* destination = forallOp.getDpsInits()[0].getDefiningOp();
+  Operation *destination = forallOp.getDpsInits()[0].getDefiningOp();
   if (auto swizzleOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(destination)) {
     destination = swizzleOp->getOperand(0).getDefiningOp();
   }
@@ -125,9 +125,13 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
       empty.getDynamicSizes(),
       /*copy=*/Value(), /*size_hint=*/Value(),
       /*memory_space=*/sharedMemoryAddrSpace);
-  // If the original `tensor.empty` has a swizzle hint, apply it to the new allocation.
-  if (auto swizzleHintOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
-    auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(rewriter, empty->getLoc(), allocTensor.getResult(), swizzleHintOp.getSwizzle());
+  // If the original `tensor.empty` has a swizzle hint, apply it to the new
+  // allocation.
+  if (auto swizzleHintOp =
+          dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
+    auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
+        rewriter, empty->getLoc(), allocTensor.getResult(),
+        swizzleHintOp.getSwizzle());
     return newSwizzle.getResult();
   }
   return allocTensor.getResult();
