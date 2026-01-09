@@ -2393,6 +2393,34 @@ DimensionExpansionAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
+// Index Hint Attributes
+//===----------------------------------------------------------------------===//
+
+// Custom parser/printer to make the step optional. When the step is 1, the step
+// field will be ommited.
+Attribute IREE::GPU::LaneIncrementAttr::parse(AsmParser &parser, Type) {
+  int64_t groupSize = 0;
+  if (failed(parser.parseLess()) || failed(parser.parseInteger(groupSize))) {
+    return {};
+  }
+  int64_t step = 1;
+  if (succeeded(parser.parseOptionalComma())) {
+    if (failed(parser.parseKeyword("step")) || failed(parser.parseEqual()) ||
+        failed(parser.parseInteger(step))) {
+      return {};
+    }
+  }
+  return LaneIncrementAttr::get(parser.getContext(), groupSize, step);
+}
+
+void IREE::GPU::LaneIncrementAttr::print(AsmPrinter &printer) const {
+  printer << "<" << getGroupSize();
+  if (getStep() != 1) {
+    printer << ", step = " << getStep();
+  }
+  printer << ">";
+}
+
 //===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//

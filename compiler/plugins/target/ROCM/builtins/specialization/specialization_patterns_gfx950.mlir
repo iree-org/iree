@@ -94,3 +94,35 @@ pdl.pattern @f8E4M3_pingpong : benefit(1) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
   }
 }
+
+pdl.pattern @f4E2M1FN_pingpong : benefit(1) {
+  %imaps = pdl.attribute = [
+    affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+    affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
+    affine_map<(d0, d1, d2, d3) -> (d0, d2)>,
+    affine_map<(d0, d1, d2, d3) -> (d1, d2)>,
+    affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+  ]
+  %elemtypes = pdl.attribute = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]
+  %operands = pdl.operands
+  %types = pdl.types
+  %scaled_matmul = pdl.operation (%operands : !pdl.range<value>) -> (%types : !pdl.range<type>)
+  pdl.apply_native_constraint "matchContraction"(
+        %scaled_matmul, %elemtypes, %imaps
+        : !pdl.operation, !pdl.attribute, !pdl.attribute)
+
+  // Skip if the operation already has ranges.
+  %attr_name = pdl.attribute = "iree_codegen.specialization_ranges"
+  pdl.apply_native_constraint "hasAttr"(
+        %scaled_matmul, %attr_name
+        : !pdl.operation, !pdl.attribute) {isNegated = true}
+
+  pdl.rewrite %scaled_matmul {
+    %ranges = pdl.attribute = #util<int.assumption.multi_array[
+        [<umin = 1024, umax = 16384, udiv = 128>] // Medium pingpong
+      ]>
+    pdl.apply_native_rewrite "annotateOperation"(
+        %scaled_matmul, %attr_name, %ranges
+        : !pdl.operation, !pdl.attribute, !pdl.attribute)
+  }
+}

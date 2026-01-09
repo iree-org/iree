@@ -228,6 +228,26 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "json",
+    srcs = ["json.c"],
+    hdrs = ["json.h"],
+    deps = [
+        ":unicode",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "json_test",
+    srcs = ["json_test.cc"],
+    deps = [
+        ":json",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "memory",
     srcs = ["memory.c"],
     hdrs = ["memory.h"],
@@ -332,6 +352,28 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "unicode",
+    srcs = [
+        "unicode.c",
+        "unicode_tables.c",
+    ],
+    hdrs = ["unicode.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "unicode_test",
+    srcs = ["unicode_test.cc"],
+    deps = [
+        ":unicode",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 

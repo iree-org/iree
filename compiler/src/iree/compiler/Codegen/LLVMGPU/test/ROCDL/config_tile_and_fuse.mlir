@@ -1068,3 +1068,47 @@ func.func @producer_broadcasted_and_stored_to_buffer2(%arg0: tensor<4xi64>, %arg
 //       CHECK:     reduction = [0, 4]
 //  CHECK-SAME:     thread = [1, 0]
 //  CHECK-SAME:     workgroup = [64, 0]
+
+// -----
+// This test is to check that we c promote in such cases since we have codegen issues with this case
+// see https://github.com/iree-org/iree/issues/23038
+func.func @unaligned_matmul_biasadd(%lhs : tensor<513x513xf16>, %rhs : tensor<513x513xf16>, %bias : tensor<513x513xf32>) -> tensor<513x513xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<513x513xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<513x513xf32>) -> tensor<513x513xf32>
+    %mm = linalg.matmul ins(%lhs, %rhs : tensor<513x513xf16>, tensor<513x513xf16>) outs(%fill : tensor<513x513xf32>) -> tensor<513x513xf32>
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>],
+                        iterator_types = ["parallel", "parallel"]}
+         ins(%mm, %bias : tensor<513x513xf32>, tensor<513x513xf32>) outs(%empty : tensor<513x513xf32>)   {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %18 = arith.addf %in, %in_0 : f32
+      linalg.yield %18 : f32
+    }  -> tensor<513x513xf32>
+    return %mm : tensor<513x513xf32>
+}
+// CHECK-LABEL: func.func @unaligned_matmul_biasadd(
+//           CHECK: promote_operands = [0, 1, 2]
+
+// -----
+// Dont c promote if the shape is aligned even with bias add.
+func.func @aligned_matmul_biasadd(%lhs : tensor<512x512xf16>, %rhs : tensor<512x512xf16>, %bias : tensor<512x512xf32>) -> tensor<512x512xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<512x512xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<512x512xf32>) -> tensor<512x512xf32>
+    %mm = linalg.matmul ins(%lhs, %rhs : tensor<512x512xf16>, tensor<512x512xf16>) outs(%fill : tensor<512x512xf32>) -> tensor<512x512xf32>
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>],
+                        iterator_types = ["parallel", "parallel"]}
+        ins(%mm, %bias : tensor<512x512xf32>, tensor<512x512xf32>) outs(%empty : tensor<512x512xf32>)   {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %18 = arith.addf %in, %in_0 : f32
+      linalg.yield %18 : f32
+    }  -> tensor<512x512xf32>
+    return %mm : tensor<512x512xf32>
+}
+
+// CHECK-LABEL: func.func @aligned_matmul_biasadd(
+//           CHECK: promote_operands = [0, 1]

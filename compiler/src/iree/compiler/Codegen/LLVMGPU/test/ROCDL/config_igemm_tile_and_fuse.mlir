@@ -313,3 +313,48 @@ func.func @conv_nhwc_small_channel_size(%arg0: tensor<16x26x19x3xf16>, %arg1: te
 //     CHECK-LABEL:  func.func @conv_nhwc_small_channel_size
 // PAD-CONV-GFX942:     padding = [1, 4, 32, 64, 32]
 // PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 64, 0, 0, 0]
+
+// -----
+// This test is to check that we c promote in such cases since we have codegen issues with this case
+// see https://github.com/iree-org/iree/issues/23038
+func.func @nhwc_conv_mfma_biasadd(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x128x64xf32>, %5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x33x33x64xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32>
+  %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x35x35x128xf32>, tensor<3x3x128x64xf32>) outs(%empty : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%7, %5 : tensor<2x33x33x64xf32>, tensor<2x33x33x64xf32>) outs(%empty : tensor<2x33x33x64xf32>)   {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %18 = arith.addf %in, %in_0 : f32
+        linalg.yield %18 : f32
+      }  -> tensor<2x33x33x64xf32>
+  return %7 : tensor<2x33x33x64xf32>
+}
+
+//     CHECK-LABEL: nhwc_conv_mfma_biasadd
+//           CHECK: promote_operands = [0, 1, 2]
+
+// -----
+// Check that we dont c promote if there is no additonal operand
+func.func @nhwc_conv_mfma_truncf(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x128x64xf32>, %5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf16> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x33x33x64xf32>
+  %empty2 = tensor.empty() : tensor<2x33x33x64xf16>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32>
+  %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x35x35x128xf32>, tensor<3x3x128x64xf32>) outs(%empty : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+       ins(%7 : tensor<2x33x33x64xf32>) outs(%empty2 : tensor<2x33x33x64xf16>)   {
+       ^bb0(%in: f32, %out: f16):
+         %18 = arith.truncf %in : f32 to f16
+        linalg.yield %18 : f16
+       }  -> tensor<2x33x33x64xf16>
+  return %8 : tensor<2x33x33x64xf16>
+}
+
+//     CHECK-LABEL: nhwc_conv_mfma_truncf
+//           CHECK: promote_operands = [0, 1]
