@@ -40,9 +40,8 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4xf32>
 //     CHECK-DAG:    gpu.thread_id  x
 //         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %c0 to %c10240 step %c1024 iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<1x1x4xf32>) {
-//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//         CHECK:      %[[STRIDED:.+]] = vector.insert_strided_slice %[[V]], {{.*}} : vector<4xf32> into vector<1x1x4xf32>
-//         CHECK:      %[[ADD:.+]] = arith.addf %[[STRIDED]], %[[A0]] : vector<1x1x4xf32>
+//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} : memref<512x10x8x1x1x32x4xf32, strided<[10240, 1024, 128, 128, 128, 4, 1]>, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
+//         CHECK:      %[[ADD:.+]] = arith.addf %[[V]], %[[A0]] : vector<1x1x4xf32>
 //         CHECK:      scf.yield %[[ADD]] : vector<1x1x4xf32>
 //         CHECK:    }
 //         CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
@@ -104,7 +103,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:  func.func @warp_reduction_broadcast_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32,
+//         CHECK:      vector.transfer_read {{.*}} : memref<512x10x8x1x1x32x4xf32, strided<[10240, 1024, 128, 128, 128, 4, 1]>, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
 //         CHECK:      arith.addf {{.*}} : vector<1x1x4xf32>
 //         CHECK:      scf.yield
 //         CHECK:    gpu.subgroup_reduce
@@ -145,7 +144,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:  func.func @softmax()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32,
+//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x10x32x1x1x32x4xf32, strided<[5242880, 40960, 4096, 128, 128, 128, 4, 1]>, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
 //         CHECK:      arith.maxnumf {{.*}} : vector<1x1x4xf32>
 //         CHECK:      scf.yield
 //         CHECK:    vector.multi_reduction <maxnumf>
@@ -207,7 +206,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:  func.func @softmax_singlesubgroup()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<12x256x40960xf32,
+//         CHECK:      vector.transfer_read {{.*}} : memref<12x256x320x1x1x1x32x4xf32, strided<[10485760, 40960, 128, 128, 128, 128, 4, 1]>, #hal.descriptor_type<storage_buffer>>, vector<1x1x4xf32>
 //         CHECK:      arith.maxnumf {{.*}} : vector<1x1x4xf32>
 //         CHECK:      scf.yield
 //         CHECK:    vector.multi_reduction <maxnumf>

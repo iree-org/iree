@@ -30,14 +30,17 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 8)
-// CHECK: %[[Y_SCALED:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %c0] by (4, 4)
-// CHECK: %[[RD00:.+]] = vector.transfer_read %arg0[%[[Y_SCALED]], %[[YX]]#2], {{.*}} : memref<32x32xf16>, vector<4x1xf16>
-// CHECK: vector.insert_strided_slice %[[RD00]], %{{.*}} {offsets = [0, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<4x1xf16> into vector<1x2x1x1x4x1xf16>
-// CHECK: %[[X_PLUS_BATCH:.+]] = affine.linearize_index disjoint [%c1, %[[YX]]#2] by (2, 8)
-// CHECK: vector.transfer_read %arg0[%[[Y_SCALED]], %[[X_PLUS_BATCH]]], %{{.*}} {in_bounds = [true, true]} : memref<32x32xf16>, vector<4x1xf16>
-// CHECK: vector.insert_strided_slice {{.*}} {offsets = [0, 1, 0, 0, 0, 0]
-// CHECK: iree_vector_ext.to_simd %{{.*}} : vector<1x2x1x1x4x1xf16> -> vector<16x16xf16>
+// CHECK: %[[DELIN:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 8)
+// CHECK: %[[RECAST:.+]] = memref.reinterpret_cast %arg0 to offset: [0]
+// CHECK-SAME: sizes: [2, 1, 1, 1, 4, 4, 2, 1, 2, 1, 8, 1]
+// CHECK-SAME: strides: [512, 512, 512, 512, 128, 32, 16, 16, 8, 8, 1, 1] : memref<32x32xf16>
+// CHECK-SAME: to memref<2x1x1x1x4x4x2x1x2x1x8x1xf16, strided<[512, 512, 512, 512, 128, 32, 16, 16, 8, 8, 1, 1]>>
+// CHECK: %[[TRANSPOSE:.+]] = memref.transpose %[[RECAST]]
+// CHECK-SAME: (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11) -> (d0, d6, d1, d7, d2, d8, d3, d9, d4, d10, d5, d11)
+// CHECK-SAME: memref<2x1x1x1x4x4x2x1x2x1x8x1xf16, strided<[512, 512, 512, 512, 128, 32, 16, 16, 8, 8, 1, 1]>>
+// CHECK-SAME: to memref<2x2x1x1x1x2x1x1x4x8x4x1xf16, strided<[512, 16, 512, 16, 512, 8, 512, 8, 128, 1, 32, 1]>>
+// CHECK: %[[READ:.+]] = vector.transfer_read %[[TRANSPOSE]][%c0, %c0, %c0, %c0, %c0, %c0, %c0, %c0, %[[DELIN]]#1, %[[DELIN]]#2, %c0, %c0], {{.*}}
+// CHECK: iree_vector_ext.to_simd %[[READ]] : vector<1x2x1x1x4x1xf16> -> vector<16x16xf16>
 
 // -----
 
@@ -74,14 +77,18 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[X:.+]]:2 = affine.delinearize_index %[[IDX]] into (8) : index, index
-// CHECK: %[[OFF0:.+]] = affine.linearize_index [%[[X]]#1, %[[I0]]]  by (8, 1)
-// CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF0]], %[[I1]]]
-// CHECK: %[[OFF1:.+]] = affine.linearize_index [%c1, %[[I1]]] by (2, 8)
-// CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF0]], %[[OFF1]]]
-// CHECK: %[[OFF2:.+]] = affine.linearize_index [%c1, %[[X]]#1, %[[I0]]] by (2, 8, 1)
-// CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF2]], %[[I1]]]
-// CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[OFF2]], %[[OFF1]]]
+// CHECK: %[[DELIN:.+]]:2 = affine.delinearize_index %[[IDX]] into (8) : index, index
+// CHECK: %[[DELIN0:.+]]:3 = affine.delinearize_index %[[I0]] into (2, 2, 8) : index, index, index
+// CHECK: %[[DELIN1:.+]]:3 = affine.delinearize_index %[[I1]] into (2, 2, 8) : index, index, index
+// CHECK: %[[RECAST:.+]] = memref.reinterpret_cast %arg2 to offset: [0]
+// CHECK-SAME: sizes: [32, 32, 2, 1, 2, 1, 8, 1, 2, 1, 2, 1, 1, 8]
+// CHECK-SAME: strides: [32768, 1024, 512, 512, 256, 256, 32, 32, 16, 16, 8, 8, 8, 1] : memref<32x32x32x32xf16>
+// CHECK-SAME: to memref<32x32x2x1x2x1x8x1x2x1x2x1x1x8xf16, strided<[32768, 1024, 512, 512, 256, 256, 32, 32, 16, 16, 8, 8, 8, 1]>>
+// CHECK: %[[TRANSPOSE:.+]] = memref.transpose %[[RECAST]] (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13) -> (d0, d1, d2, d8, d3, d9, d4, d10, d5, d11, d6, d12, d7, d13)
+// CHECK-SAME: memref<32x32x2x1x2x1x8x1x2x1x2x1x1x8xf16, strided<[32768, 1024, 512, 512, 256, 256, 32, 32, 16, 16, 8, 8, 8, 1]>>
+// CHECK-SAME: to memref<32x32x2x2x1x1x2x2x1x1x8x1x1x8xf16, strided<[32768, 1024, 512, 16, 512, 16, 256, 8, 256, 8, 32, 8, 32, 1]>>
+// CHECK: %[[READ:.+]] = vector.transfer_read %[[TRANSPOSE]][%c0, %c0, %[[DELIN0]]#0, %[[DELIN1]]#0, %c0, %c0, %c0, %c0, %c0, %c0, %[[DELIN]]#1, %c0, %c0, %c0], {{.*}}
+// CHECK: iree_vector_ext.to_simd %[[READ]] : vector<2x2x1x1x1x8xf16> -> vector<16x16xf16>
 
 // -----
 
@@ -279,9 +286,12 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 16)
-// CHECK: %[[LANEY:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %c0] by (4, 4)
-// CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x32xf16>, vector<4xf16>
+// CHECK: %[[DELIN:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 16) : index, index, index
+// CHECK: %[[RECAST:.+]] = memref.reinterpret_cast %arg0 to offset: [0]
+// CHECK-SAME: sizes: [32, 2, 1, 1, 1, 4, 4], strides: [32, 16, 16, 16, 16, 4, 1]
+// CHECK-SAME: memref<32x32xf16> to memref<32x2x1x1x1x4x4xf16, strided<[32, 16, 16, 16, 16, 4, 1]>>
+// CHECK: %[[READ:.+]] = vector.transfer_read %[[RECAST]][%c0, %c0, %c0, %c0, %c0, %[[DELIN]]#1, %c0], {{.*}}
+// CHECK: iree_vector_ext.to_simd %[[READ]] : vector<1x1x4xf16> -> vector<16xf16>
 
 // -----
 
@@ -315,10 +325,13 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
-// CHECK: %[[SUBGROUP:.+]]:2 = affine.delinearize_index %[[IDX]] into (16)
-// CHECK: %[[LANEY:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %[[SUBGROUP]]#1, %c0] by (2, 16, 4)
-// CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x128xf16>, vector<4xf16>
+// CHECK: %[[DELIN0:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64) : index, index, index
+// CHECK: %[[DELIN1:.+]]:2 = affine.delinearize_index %[[IDX]] into (16) : index, index
+// CHECK: %[[RECAST:.+]] = memref.reinterpret_cast %arg0 to offset: [0]
+// CHECK-SAME: sizes: [32, 1, 2, 1, 1, 16, 4], strides: [128, 128, 64, 64, 64, 4, 1]
+// CHECK-SAME: memref<32x128xf16> to memref<32x1x2x1x1x16x4xf16, strided<[128, 128, 64, 64, 64, 4, 1]>>
+// CHECK: %[[READ:.+]] = vector.transfer_read %[[RECAST]][%c0, %c0, %[[DELIN0]]#1, %c0, %c0, %[[DELIN1]]#1, %c0], {{.*}}
+// CHECK: iree_vector_ext.to_simd %[[READ]] : vector<1x1x4xf16> -> vector<128xf16>
 
 // -----
 
@@ -529,14 +542,25 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: %[[B00:.+]] = vector.transfer_read %{{.*}}[%c0, %c0, %[[LANEX:[a-zA-Z0-9]+]], %[[OFFSET0:[a-zA-Z0-9]+]]]
-// CHECK: %[[B10:.+]] = vector.transfer_read %{{.*}}[%c0, %c0, %[[LANEX]], %[[OFFSET1:[a-zA-Z0-9]+]]]
-// CHECK: %[[B01:.+]] = vector.transfer_read %{{.*}}[%c0, %c0, %[[LANEX_PLUS_BATCH:[a-zA-Z0-9]+]], %[[OFFSET0]]]
-// CHECK: %[[B11:.+]] = vector.transfer_read %{{.*}}[%c0, %c0, %[[LANEX_PLUS_BATCH]], %[[OFFSET1]]]
-// CHECK: vector.transfer_write %[[B00]], %{{.*}}[%c0, %c0, %[[LANEX]], %[[OFFSET0]]]
-// CHECK: vector.transfer_write %[[B10]], %{{.*}}[%c0, %c0, %[[LANEX]], %[[OFFSET1]]]
-// CHECK: vector.transfer_write %[[B01]], %{{.*}}[%c0, %c0, %[[LANEX_PLUS_BATCH]], %[[OFFSET0]]]
-// CHECK: vector.transfer_write %[[B11]], %{{.*}}[%c0, %c0, %[[LANEX_PLUS_BATCH]], %[[OFFSET1]]]
+// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// CHECK: %[[DELIN:.+]]:2 = affine.delinearize_index %[[IDX]] into (8) : index, index
+// CHECK: %[[RECAST:.+]] = memref.reinterpret_cast %arg2 to offset: [0]
+// CHECK-SAME: sizes: [32, 32, 2, 1, 2, 1, 8, 1, 2, 1, 2, 1, 1, 8]
+// CHECK-SAME: strides: [32768, 1024, 512, 512, 256, 256, 32, 32, 16, 16, 8, 8, 8, 1]
+// CHECK-SAME: memref<32x32x32x32xf16> to memref<32x32x2x1x2x1x8x1x2x1x2x1x1x8xf16, strided<[32768, 1024, 512, 512, 256, 256, 32, 32, 16, 16, 8, 8, 8, 1]>>
+// CHECK: %[[TRANSPOSE:.+]] = memref.transpose %[[RECAST]]
+// CHECK-SAME: (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13) -> (d0, d1, d2, d8, d3, d9, d4, d10, d5, d11, d6, d12, d7, d13)
+// CHECK-SAME: memref<32x32x2x1x2x1x8x1x2x1x2x1x1x8xf16, strided<[32768, 1024, 512, 512, 256, 256, 32, 32, 16, 16, 8, 8, 8, 1]>>
+// CHECK-SAME: to memref<32x32x2x2x1x1x2x2x1x1x8x1x1x8xf16, strided<[32768, 1024, 512, 16, 512, 16, 256, 8, 256, 8, 32, 8, 32, 1]>>
+// CHECK: %[[READ:.+]] = vector.transfer_read %[[TRANSPOSE]][{{.*}}], {{.*}}
+// CHECK: %[[W0:.+]] = vector.extract %[[READ]][0, 0, 0, 0] : vector<1x8xf16> from vector<2x2x1x1x1x8xf16>
+// CHECK: vector.transfer_write %[[W0]], %arg3[%c0, %c0, %[[LANEX:.+]], %arg1]
+// CHECK: %[[W1:.+]] = vector.extract %[[READ]][0, 1, 0, 0] : vector<1x8xf16> from vector<2x2x1x1x1x8xf16>
+// CHECK: vector.transfer_write %[[W1]], %arg3[%c0, %c0, %[[LANEX]], %[[OFFSET1:.+]]]
+// CHECK: %[[W2:.+]] = vector.extract %[[READ]][1, 0, 0, 0] : vector<1x8xf16> from vector<2x2x1x1x1x8xf16>
+// CHECK: vector.transfer_write %[[W2]], %arg3[%c0, %c0, %[[LANEX_PLUS_BATCH:.+]], %arg1]
+// CHECK: %[[W3:.+]] = vector.extract %[[READ]][1, 1, 0, 0] : vector<1x8xf16> from vector<2x2x1x1x1x8xf16>
+// CHECK: vector.transfer_write %[[W3]], %arg3[%c0, %c0, %[[LANEX_PLUS_BATCH]], %[[OFFSET1]]]
 
 // -----
 
@@ -588,30 +612,37 @@ func.func @mfma_64x128x8_read(%mem: memref<128x8xf16>,
   // CHECK: %[[IDX:.+]] = gpu.thread_id  x
   // CHECK-DAG: %[[WG:.+]]:4 = affine.delinearize_index %[[IDX]] into (4, 2, 64)
   // CHECK-DAG: %[[LANE:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 32)
-  // This doesn't canonicalize away currently, but could be equivalent to %WG
-  // CHECK-DAG: %[[WG_N:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
-  // CHECK-DAG: %[[LHSM:.+]] = affine.linearize_index disjoint [%[[WG]]#1, %[[LANE]]#2]
-  // LHSK = RHSK
-  // CHECK-DAG: %[[LHSK:.+]] = affine.linearize_index disjoint [%[[LANE]]#1, %c0] by (2, 4)
-  // ACCN = RHSN
-  // CHECK-DAG: %[[RHSN_DUP_WG:.+]] = affine.linearize_index disjoint [%[[WG_N]]#1, %[[LANE]]#2] by (2, 32)
-  // CHECK-DAG: %[[RHSN:.+]] = affine.linearize_index disjoint [%[[WG]]#2, %[[LANE]]#2] by (2, 32)
 
-  // M is unrolled 4 times.
-  // CHECK-DAG: %[[ACCM0:.+]] = affine.linearize_index disjoint [%[[WG]]#1, %c0, %[[LANE]]#1, %c0] by (4, 4, 2, 4)
-  // CHECK-DAG: %[[ACCM1:.+]] = affine.linearize_index disjoint [%[[WG]]#1, %c1, %[[LANE]]#1, %c0] by (4, 4, 2, 4)
-  // CHECK-DAG: %[[ACCM2:.+]] = affine.linearize_index disjoint [%[[WG]]#1, %c2, %[[LANE]]#1, %c0] by (4, 4, 2, 4)
-  // CHECK-DAG: %[[ACCM3:.+]] = affine.linearize_index disjoint [%[[WG]]#1, %c3, %[[LANE]]#1, %c0] by (4, 4, 2, 4)
+  // A: 128x8 with layout_a
+  // CHECK: %[[RECAST_A:.+]] = memref.reinterpret_cast %arg0 to offset: [0]
+  // CHECK-SAME: sizes: [1, 4, 1, 1, 32, 1, 1, 1, 1, 1, 2, 4], strides: [1024, 256, 256, 256, 8, 8, 8, 8, 8, 8, 4, 1]
+  // CHECK-SAME: memref<128x8xf16> to memref<1x4x1x1x32x1x1x1x1x1x2x4xf16, strided<[1024, 256, 256, 256, 8, 8, 8, 8, 8, 8, 4, 1]>>
+  // CHECK: %[[TRANSPOSE_A:.+]] = memref.transpose %[[RECAST_A]]
+  // CHECK-SAME: (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11) -> (d0, d6, d1, d7, d2, d8, d3, d9, d4, d10, d5, d11)
+  // CHECK-SAME: to memref<1x1x4x1x1x1x1x1x32x2x1x4xf16, strided<[1024, 8, 256, 8, 256, 8, 256, 8, 8, 4, 8, 1]>>
+  // CHECK: %[[READ_A:.+]] = vector.transfer_read %[[TRANSPOSE_A]][%c0, %c0, %[[WG]]#1, %c0, %c0, %c0, %c0, %c0, %[[LANE]]#2, %[[LANE]]#1, %c0, %c0], {{.*}} : {{.*}}, vector<1x1x1x1x1x4xf16>
+  // CHECK: %[[A:.+]] = iree_vector_ext.to_simd %[[READ_A]] : vector<1x1x1x1x1x4xf16> -> vector<128x8xf16>
 
-  // M, K
-  // CHECK-DAG: transfer_read %{{.*}}[%[[LHSM]], %[[LHSK]]]
-  // K, N
-  // CHECK-DAG: transfer_read %{{.*}}[%[[LHSK]], %[[RHSN_DUP_WG]]]
-  // M, N
-  // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM0]], %[[RHSN]]]
-  // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM1]], %[[RHSN]]]
-  // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM2]], %[[RHSN]]]
-  // CHECK-DAG: transfer_read %{{.*}}[%[[ACCM3]], %[[RHSN]]]
+  // B: 8x64 with layout_b
+  // CHECK: %[[WG_N:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
+  // CHECK: %[[RECAST_B:.+]] = memref.reinterpret_cast %arg1 to offset: [0]
+  // CHECK-SAME: sizes: [1, 1, 1, 1, 2, 4, 1, 2, 1, 1, 32, 1], strides: [512, 512, 512, 512, 256, 64, 64, 32, 32, 32, 1, 1]
+  // CHECK-SAME: memref<8x64xf16> to memref<1x1x1x1x2x4x1x2x1x1x32x1xf16, strided<[512, 512, 512, 512, 256, 64, 64, 32, 32, 32, 1, 1]>>
+  // CHECK: %[[TRANSPOSE_B:.+]] = memref.transpose %[[RECAST_B]]
+  // CHECK-SAME: (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11) -> (d0, d6, d1, d7, d2, d8, d3, d9, d4, d10, d5, d11)
+  // CHECK-SAME: to memref<1x1x1x2x1x1x1x1x2x32x4x1xf16, strided<[512, 64, 512, 32, 512, 32, 512, 32, 256, 1, 64, 1]>>
+  // CHECK: %[[READ_B:.+]] = vector.transfer_read %[[TRANSPOSE_B]][%c0, %c0, %c0, %[[WG_N]]#1, %c0, %c0, %c0, %c0, %[[LANE]]#1, %[[LANE]]#2, %c0, %c0], {{.*}} : {{.*}}, vector<1x1x1x1x4x1xf16>
+  // CHECK: %[[B:.+]] = iree_vector_ext.to_simd %[[READ_B]] : vector<1x1x1x1x4x1xf16> -> vector<8x64xf16>
+
+  // C: 128x64 with layout_c
+  // CHECK: %[[RECAST_C:.+]] = memref.reinterpret_cast %arg2 to offset: [0]
+  // CHECK-SAME: sizes: [1, 4, 1, 4, 2, 4, 1, 2, 1, 1, 32, 1], strides: [8192, 2048, 2048, 512, 256, 64, 64, 32, 32, 32, 1, 1]
+  // CHECK-SAME: memref<128x64xf16> to memref<1x4x1x4x2x4x1x2x1x1x32x1xf16, strided<[8192, 2048, 2048, 512, 256, 64, 64, 32, 32, 32, 1, 1]>>
+  // CHECK: %[[TRANSPOSE_C:.+]] = memref.transpose %[[RECAST_C]]
+  // CHECK-SAME: (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11) -> (d0, d6, d1, d7, d2, d8, d3, d9, d4, d10, d5, d11)
+  // CHECK-SAME: to memref<1x1x4x2x1x1x4x1x2x32x4x1xf16, strided<[8192, 64, 2048, 32, 2048, 32, 512, 32, 256, 1, 64, 1]>>
+  // CHECK: %[[READ_C:.+]] = vector.transfer_read %[[TRANSPOSE_C]][%c0, %c0, %[[WG]]#1, %[[WG]]#2, %c0, %c0, %c0, %c0, %[[LANE]]#1, %[[LANE]]#2, %c0, %c0], {{.*}} : {{.*}}, vector<1x1x4x1x4x1xf16>
+  // CHECK: %[[C:.+]] = iree_vector_ext.to_simd %[[READ_C]] : vector<1x1x4x1x4x1xf16> -> vector<128x64xf16>
 
   %a = vector.transfer_read %mem[%c0, %c0], %cst
           {in_bounds = [true, true]}
@@ -937,32 +968,32 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG:         %[[IDX:.+]] = gpu.thread_id  x
 // CHECK-DAG:         %[[WG:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
 // CHECK-DAG:         %[[LANE:.+]]:4 = affine.delinearize_index %[[IDX]] into (4, 8, 2)
-// CHECK-DAG:         %[[DIM:.+]]  = affine.linearize_index disjoint [%[[WG]]#1, %[[LANE]]#1, %c0] by (2, 4, 4)
-//       COM:           DIM1 == LANE#2
-// CHECK-DAG:         %[[DIM2:.+]] = affine.linearize_index disjoint [%[[LANE]]#3, %c0] by (2, 2)
-// CHECK-DAG:         %[[DIM3:.+]] = affine.linearize_index disjoint [%c1, %[[LANE]]#3, %c0] by (4, 2, 2)
-// CHECK-DAG:         %[[DIM4:.+]] = affine.linearize_index disjoint [%c2, %[[LANE]]#3, %c0] by (4, 2, 2)
-// CHECK-DAG:         %[[DIM5:.+]] = affine.linearize_index disjoint [%c3, %[[LANE]]#3, %c0] by (4, 2, 2)
-// CHECK-DAG:         %[[DIM6:.+]] = affine.linearize_index disjoint [%c1, %[[LANE]]#2] by (2, 8)
-// CHECK-DAG:         %[[RD0:.+]] = vector.transfer_read %arg0[%[[DIM]], %[[LANE]]#2, %[[DIM2]]], {{.*}} : memref<32x32x32xf16>, vector<4x1x2xf16>
-// CHECK-DAG:         %[[RD1:.+]] = vector.transfer_read %arg0[%[[DIM]], %[[LANE]]#2, %[[DIM3]]]
-// CHECK-DAG:         %[[RD2:.+]] = vector.transfer_read %arg0[%[[DIM]], %[[LANE]]#2, %[[DIM4]]]
-// CHECK-DAG:         %[[RD3:.+]] = vector.transfer_read %arg0[%[[DIM]], %[[LANE]]#2, %[[DIM5]]]
-// CHECK-DAG:         %[[RD4:.+]] = vector.transfer_read %arg0[%[[DIM]], %[[DIM6]], %[[DIM2]]]
-// CHECK-DAG:         %[[RD5:.+]] = vector.transfer_read %arg0[%[[DIM]], %[[DIM6]], %[[DIM3]]]
-// CHECK-DAG:         %[[RD6:.+]] = vector.transfer_read %arg0[%[[DIM]], %[[DIM6]], %[[DIM4]]]
-// CHECK-DAG:         %[[RD7:.+]] = vector.transfer_read %arg0[%[[DIM]], %[[DIM6]], %[[DIM5]]]
+// CHECK:         %[[RECAST:.+]] = memref.reinterpret_cast %arg0 to offset: [0]
+// CHECK-SAME:        sizes: [1, 2, 1, 1, 4, 4, 2, 1, 2, 1, 8, 1, 2, 1, 4, 1, 2, 2]
+// CHECK-SAME:        strides: [32768, 16384, 16384, 16384, 4096, 1024, 512, 512, 256, 256, 32, 32, 16, 16, 4, 4, 2, 1]
+// CHECK-SAME:        memref<32x32x32xf16> to memref<1x2x1x1x4x4x2x1x2x1x8x1x2x1x4x1x2x2xf16, strided<[32768, 16384, 16384, 16384, 4096, 1024, 512, 512, 256, 256, 32, 32, 16, 16, 4, 4, 2, 1]>>
+// CHECK:         %[[TRANSPOSE:.+]] = memref.transpose %[[RECAST]]
+// CHECK-SAME:        (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16, d17) -> (d0, d6, d12, d1, d7, d13, d2, d8, d14, d3, d9, d15, d4, d10, d16, d5, d11, d17)
+// CHECK-SAME:        to memref<1x2x2x2x1x1x1x2x4x1x1x1x4x8x2x4x1x2xf16, strided<[32768, 512, 16, 16384, 512, 16, 16384, 256, 4, 16384, 256, 4, 4096, 32, 2, 1024, 32, 1]>>
+// CHECK:         %[[READ:.+]] = vector.transfer_read %[[TRANSPOSE]][{{.*}}], {{.*}} : {{.*}}, vector<1x2x4x1x1x1x4x1x2xf16>
+// CHECK:         %[[T:.+]] = vector.transpose %[[READ]], [1, 2, 0, 4, 5, 3, 7, 8, 6] : vector<1x2x4x1x1x1x4x1x2xf16> to vector<2x4x1x1x1x1x1x2x4xf16>
 
-// CHECK:         vector.transpose %{{.*}}, [1, 2, 0, 4, 5, 3, 7, 8, 6] : vector<1x2x4x1x1x1x4x1x2xf16> to vector<2x4x1x1x1x1x1x2x4xf16>
-
-// CHECK-DAG:         vector.transfer_write %{{.*}}, %arg0[%[[LANE]]#2, %[[DIM2]], %[[DIM]]] {{.*}} : vector<1x2x4xf16>, memref<32x32x32xf16>
-// CHECK-DAG:         vector.transfer_write %{{.*}}, %arg0[%[[LANE]]#2, %[[DIM3]], %[[DIM]]]
-// CHECK-DAG:         vector.transfer_write %{{.*}}, %arg0[%[[LANE]]#2, %[[DIM4]], %[[DIM]]]
-// CHECK-DAG:         vector.transfer_write %{{.*}}, %arg0[%[[LANE]]#2, %[[DIM5]], %[[DIM]]]
-// CHECK-DAG:         vector.transfer_write %{{.*}}, %arg0[%[[DIM6]], %[[DIM2]], %[[DIM]]]
-// CHECK-DAG:         vector.transfer_write %{{.*}}, %arg0[%[[DIM6]], %[[DIM3]], %[[DIM]]]
-// CHECK-DAG:         vector.transfer_write %{{.*}}, %arg0[%[[DIM6]], %[[DIM4]], %[[DIM]]]
-// CHECK-DAG:         vector.transfer_write %{{.*}}, %arg0[%[[DIM6]], %[[DIM5]], %[[DIM]]]
+// CHECK:         %[[W0:.+]] = vector.extract %[[T]][0, 0, 0, 0, 0, 0] : vector<1x2x4xf16> from vector<2x4x1x1x1x1x1x2x4xf16>
+// CHECK:         vector.transfer_write %[[W0]], %arg0[%[[LANE]]#2, %[[DIM2:.+]], %[[DIM:.+]]] {{.*}} : vector<1x2x4xf16>, memref<32x32x32xf16>
+// CHECK:         %[[W1:.+]] = vector.extract %[[T]][0, 1, 0, 0, 0, 0] : vector<1x2x4xf16> from vector<2x4x1x1x1x1x1x2x4xf16>
+// CHECK:         vector.transfer_write %[[W1]], %arg0[%[[LANE]]#2, %[[DIM3:.+]], %[[DIM]]]
+// CHECK:         %[[W2:.+]] = vector.extract %[[T]][0, 2, 0, 0, 0, 0] : vector<1x2x4xf16> from vector<2x4x1x1x1x1x1x2x4xf16>
+// CHECK:         vector.transfer_write %[[W2]], %arg0[%[[LANE]]#2, %[[DIM4:.+]], %[[DIM]]]
+// CHECK:         %[[W3:.+]] = vector.extract %[[T]][0, 3, 0, 0, 0, 0] : vector<1x2x4xf16> from vector<2x4x1x1x1x1x1x2x4xf16>
+// CHECK:         vector.transfer_write %[[W3]], %arg0[%[[LANE]]#2, %[[DIM5:.+]], %[[DIM]]]
+// CHECK:         %[[W4:.+]] = vector.extract %[[T]][1, 0, 0, 0, 0, 0] : vector<1x2x4xf16> from vector<2x4x1x1x1x1x1x2x4xf16>
+// CHECK:         vector.transfer_write %[[W4]], %arg0[%[[DIM6:.+]], %[[DIM2]], %[[DIM]]]
+// CHECK:         %[[W5:.+]] = vector.extract %[[T]][1, 1, 0, 0, 0, 0] : vector<1x2x4xf16> from vector<2x4x1x1x1x1x1x2x4xf16>
+// CHECK:         vector.transfer_write %[[W5]], %arg0[%[[DIM6]], %[[DIM3]], %[[DIM]]]
+// CHECK:         %[[W6:.+]] = vector.extract %[[T]][1, 2, 0, 0, 0, 0] : vector<1x2x4xf16> from vector<2x4x1x1x1x1x1x2x4xf16>
+// CHECK:         vector.transfer_write %[[W6]], %arg0[%[[DIM6]], %[[DIM4]], %[[DIM]]]
+// CHECK:         %[[W7:.+]] = vector.extract %[[T]][1, 3, 0, 0, 0, 0] : vector<1x2x4xf16> from vector<2x4x1x1x1x1x1x2x4xf16>
+// CHECK:         vector.transfer_write %[[W7]], %arg0[%[[DIM6]], %[[DIM5]], %[[DIM]]]
 
 // -----
 
