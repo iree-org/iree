@@ -74,6 +74,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:ExecutionEngine",
         "@llvm-project//llvm:IRReader",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:GPUDialect",
@@ -86,6 +87,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:ROCDLDialect",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )
 
