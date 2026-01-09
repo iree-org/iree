@@ -2471,27 +2471,57 @@ DimensionExpansionAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 // Index Hint Attributes
 //===----------------------------------------------------------------------===//
 
-// Custom parser/printer to make the step optional. When the step is 1, the step
-// field will be ommited.
+// Custom parser/printer to make the step and aligned fields optional.
+// When step is 1 and aligned is false, these fields will be omitted.
+// Format: <group_size[, step = N][, aligned]>
 Attribute IREE::GPU::LaneIncrementAttr::parse(AsmParser &parser, Type) {
   int64_t groupSize = 0;
   if (failed(parser.parseLess()) || failed(parser.parseInteger(groupSize))) {
     return {};
   }
   int64_t step = 1;
-  if (succeeded(parser.parseOptionalComma())) {
-    if (failed(parser.parseKeyword("step")) || failed(parser.parseEqual()) ||
-        failed(parser.parseInteger(step))) {
+  bool aligned = false;
+  bool parsedStep = false;
+  bool parsedAligned = false;
+  // Parse optional ", step = N" and/or ", aligned"
+  while (succeeded(parser.parseOptionalComma())) {
+    if (succeeded(parser.parseOptionalKeyword("step"))) {
+      if (parsedStep) {
+        parser.emitError(parser.getCurrentLocation(),
+                         "'step' specified more than once");
+        return {};
+      }
+      if (failed(parser.parseEqual()) || failed(parser.parseInteger(step))) {
+        return {};
+      }
+      parsedStep = true;
+    } else if (succeeded(parser.parseOptionalKeyword("aligned"))) {
+      if (parsedAligned) {
+        parser.emitError(parser.getCurrentLocation(),
+                         "'aligned' specified more than once");
+        return {};
+      }
+      aligned = true;
+      parsedAligned = true;
+    } else {
+      parser.emitError(parser.getCurrentLocation(),
+                       "expected 'step' or 'aligned'");
       return {};
     }
   }
-  return LaneIncrementAttr::get(parser.getContext(), groupSize, step);
+  if (failed(parser.parseGreater())) {
+    return {};
+  }
+  return LaneIncrementAttr::get(parser.getContext(), groupSize, step, aligned);
 }
 
 void IREE::GPU::LaneIncrementAttr::print(AsmPrinter &printer) const {
   printer << "<" << getGroupSize();
   if (getStep() != 1) {
     printer << ", step = " << getStep();
+  }
+  if (getAligned()) {
+    printer << ", aligned";
   }
   printer << ">";
 }
