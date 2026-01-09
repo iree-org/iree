@@ -36,7 +36,6 @@ iree_cc_library(
     "DecomposeMapScatter.cpp"
     "DecomposeWinogradPass.cpp"
     "FoldUnitExtentDims.cpp"
-    "GeneralizeLinalgExtOps.cpp"
     "PadContractionToBlockSize.cpp"
     "Passes.cpp"
     "ReshapeFusion.cpp"

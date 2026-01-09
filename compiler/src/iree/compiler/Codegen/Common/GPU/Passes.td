@@ -153,16 +153,13 @@ def GPUFuseAndHoistParallelLoopsPass :
 
 def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Convert named Linalg and LinalgExt ops to linalg.generic ops";
+  let summary = "Convert named Linalg ops to linalg.generic ops";
 
   let description = [{
-    Convert a subset of named Linalg and LinalgExt ops to linalg.generics. The
-    subset does not contain all named ops. The rule-of-thumb is that named ops
-    whose operand maps are projections are in the subset. For example convolutions
-    and pooling ops are not generalized by this pass, but matmuls are.
-
-    LinalgExt ops like `iree_linalg_ext.arg_compare` are also generalized by this
-    pass.
+    Convert a subset of named Linalg ops to linalg.generics. The subset does not
+    contain all named ops. The rule-of-thumb is that named ops whose operand
+    maps are projections are in the subset. For example convolutions and pooling ops
+    are not generalized by this pass, but matmuls are.
   }];
 }
 

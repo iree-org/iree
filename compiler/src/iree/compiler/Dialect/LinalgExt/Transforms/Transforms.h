@@ -188,39 +188,4 @@ FailureOr<linalg::SplitReductionResult>
 splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                      linalg::ControlSplitReductionFn controlSplitReductionFn);
 
-/// Generalize an ArgCompareOp to a linalg.generic by inlining its comparator
-/// region. This transforms the high-level arg_compare operation into a
-/// linalg.generic with explicit index tracking and selection logic.
-///
-/// Example:
-/// ```mlir
-/// %result:2 = iree_linalg_ext.arg_compare dimension(1)
-///     ins(%input : tensor<4x128xf32>)
-///     outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>) {
-///   ^bb0(%a: f32, %b: f32):
-///     %cmp = arith.cmpf ogt, %a, %b : f32
-///     iree_linalg_ext.yield %cmp : i1
-/// } -> tensor<4xf32>, tensor<4xi32>
-/// ```
-/// Becomes:
-/// ```mlir
-/// %result:2 = linalg.generic {
-///     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-///                      affine_map<(d0, d1) -> (d0)>,
-///                      affine_map<(d0, d1) -> (d0)>],
-///     iterator_types = ["parallel", "reduction"]}
-///     ins(%input : tensor<4x128xf32>)
-///     outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>) {
-///   ^bb0(%in: f32, %acc_val: f32, %acc_idx: i32):
-///     %idx = linalg.index 1 : index
-///     %idx_cast = arith.index_cast %idx : index to i32
-///     %cmp = arith.cmpf ogt, %in, %acc_val : f32
-///     %new_val = arith.select %cmp, %in, %acc_val : f32
-///     %new_idx = arith.select %cmp, %idx_cast, %acc_idx : i32
-///     linalg.yield %new_val, %new_idx : f32, i32
-/// } -> tensor<4xf32>, tensor<4xi32>
-/// ```
-FailureOr<linalg::GenericOp> generalizeArgCompareOp(RewriterBase &rewriter,
-                                                    ArgCompareOp argCompareOp);
-
 }; // namespace mlir::iree_compiler::IREE::LinalgExt
