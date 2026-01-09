@@ -22,8 +22,7 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
 INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
-RISCV_PLATFORM="${IREE_TARGET_PLATFORM:-linux}"
-RISCV_ARCH="${IREE_TARGET_ARCH:-riscv_64}"
+CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$(realpath build_tools/cmake/linux_riscv64.cmake)}"
 RISCV_TOOLCHAIN_PREFIX="${RISCV_TOOLCHAIN_PREFIX:-}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
@@ -33,12 +32,6 @@ IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 
-# Create install directory now--we need to get its real path later.
-mkdir -p "${INSTALL_DIR}"
-
-RISCV_PLATFORM_ARCH="${RISCV_PLATFORM}-${RISCV_ARCH}"
-echo "Build riscv target with the config of ${RISCV_PLATFORM_ARCH}"
-TOOLCHAIN_FILE="$(realpath build_tools/cmake/riscv.toolchain.cmake)"
 declare -a args
 args=(
   "-G" "Ninja"
@@ -56,8 +49,7 @@ args=(
   "-DIREE_BUILD_ALL_CHECK_TEST_MODULES=OFF"
   "-DIREE_BUILD_COMPILER=OFF"
   "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
-  "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}"
-  "-DRISCV_CPU=${RISCV_PLATFORM_ARCH}"
+  "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
   "-DRISCV_TOOLCHAIN_PREFIX=${RISCV_TOOLCHAIN_PREFIX}"
   "-DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT}"
 
@@ -68,17 +60,6 @@ args=(
   "-DIREE_TARGET_BACKEND_DEFAULTS=OFF"
   "-DIREE_TARGET_BACKEND_LLVM_CPU=ON"
 )
-
-if [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
-  args+=(
-    # TODO(#6353): Off until tools/ are refactored to support threadless config.
-    -DIREE_BUILD_TESTS=OFF
-    -DRISCV_TOOLCHAIN_TRIPLE="riscv32-unknown-elf"
-  )
-elif [[ "${RISCV_PLATFORM}" != "linux" ]]; then
-  echo "riscv config for ${RISCV_PLATFORM_ARCH} not supported yet"
-  return -1
-fi
 
 "${CMAKE_BIN}" "${args[@]}"
 echo "Building all"
