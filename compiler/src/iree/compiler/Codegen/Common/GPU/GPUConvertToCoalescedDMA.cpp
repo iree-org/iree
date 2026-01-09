@@ -663,9 +663,11 @@ private:
     // across warps.
     if (rank == 1) {
       int64_t dim = shape[0];
-      // Dynamic dimensions should have been rejected earlier in tileAtSubgroupLevel.
-      assert(ShapedType::isStatic(dim) &&
-             "dynamic dimensions should be handled before tile size computation");
+      // Dynamic dimensions should have been rejected earlier in
+      // tileAtSubgroupLevel.
+      assert(
+          ShapedType::isStatic(dim) &&
+          "dynamic dimensions should be handled before tile size computation");
       if (totalWarps > 1) {
         int64_t warpsToUse = std::min(totalWarps, dim);
         int64_t tileSize = llvm::divideCeil(dim, warpsToUse);
