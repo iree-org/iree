@@ -411,12 +411,38 @@ static PermutationResult getExpandedPermutation(ImplicitLocOpBuilder &builder,
 
 namespace {
 
-struct DistributeTransferReadWithSingleRead final
+/// Distribute a vector.transfer_read to a single vector.transfer_read. In
+/// constrast to the more generic DistributeTransferRead pattern, which will
+/// read each element vector individually and then insert them into the larger
+/// result, this pattern aims to generate only a single read.
+/// It achieves this by reinterpreting (memref.reinterpret_cast) the base memory
+/// to match the unpacked distributed vector layout first. It then transposes
+/// the memref (memref.transpose) into the packed distributed vector layout and
+/// then inserts a single transfer_read to read the distributed vector from that
+/// memref.
+///
+/// Assuming a two-dimensional vector layout and memref<A x B x C x D>, the
+/// reinterpretation yields:
+/// memref<A x B x
+///  (C / size1) x Warp1 x Batch1 x Outer1 x Thread1 x Element1 x
+///  (D / size0) x Warp0 x Batch0 x Outer0 x Thread0 x Element0 >
+///
+/// The transpose then yields:
+/// memref<A x B x
+///  (C / size1) x (D / size0) x Warp1 x Warp0 x Batch1 x Batch0 x
+///  Outer1 x Outer0 x Thread1 x Thread0 x Element1 x Element0 >
+///
+/// From that memref, we can read with a single transfer_read a
+/// vector<Batch1 x Batch0 x Outer1 x Outer0 x Element1 x Element0>.
+///
+/// This pattern has a number of prerequisites and will fall back to the more
+/// generic DistributeTransferRead pattern if they are not met.
+struct DistributeTransferReadToSingleRead final
     : OpDistributionPattern<vector::TransferReadOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  DistributeTransferReadWithSingleRead(MLIRContext *context, Value threadId,
-                                       int64_t subgroupSize)
+  DistributeTransferReadToSingleRead(MLIRContext *context, Value threadId,
+                                     int64_t subgroupSize)
       : OpDistributionPattern(context), threadId(threadId),
         subgroupSize(subgroupSize) {}
 
@@ -448,8 +474,8 @@ struct DistributeTransferReadWithSingleRead final
                                          "distribution expects memrefs");
     }
 
-    // We require the memref to static shape and stride in the last `vectorRank`
-    // dimensions and also have static offset.
+    // We require the memref to  have static shape and stride in the last
+    // `vectorRank` dimensions and also have static offset.
     int64_t vectorRank = vectorLayout.getRank();
     int64_t memRank = memrefTy.getRank();
     int64_t undistributedDims = memRank - vectorRank;
@@ -2561,7 +2587,7 @@ struct DistributeShapeCast final : OpDistributionPattern<vector::ShapeCastOp> {
 void populateGPUDistributeNestedLayoutAttrPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferReadWithSingleRead, DistributeTransferRead,
+  patterns.add<DistributeTransferReadToSingleRead, DistributeTransferRead,
                DistributeTransferGather, DistributeMapScatter>(
       patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
