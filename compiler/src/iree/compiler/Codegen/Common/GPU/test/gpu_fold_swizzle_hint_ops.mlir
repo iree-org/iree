@@ -124,4 +124,3 @@ func.func @fold_rank_reducing_extract_slice() -> tensor<32xf32> {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<32xf32>
 //       CHECK:   %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.rotate_rows<64, 4>] : tensor<32xf32>
 //       CHECK:   return %[[SWIZZLE]]
-
