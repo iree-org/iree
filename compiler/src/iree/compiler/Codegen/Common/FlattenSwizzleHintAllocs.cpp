@@ -51,7 +51,7 @@ static void flattenSwizzleHintAllocs(RewriterBase &rewriter,
   auto expandShape = memref::ExpandShapeOp::create(rewriter, hintOp.getLoc(),
                                                    resultType.getShape(),
                                                    newSwizzleHintOp, {reassoc});
-  rewriter.replaceAllUsesWith(hintOp, expandShape);
+  rewriter.replaceOp(hintOp, expandShape);
 }
 
 void FlattenSwizzleHintAllocsPass::runOnOperation() {
