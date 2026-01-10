@@ -177,6 +177,12 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "Propagates transposes to named ops even when the resulting op will "
           "be a linalg.generic"),
       llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-global-opt-propagate-transposes-through-conv",
+      propagateTransposesThroughConv,
+      llvm::cl::desc(
+          "Enables propagation of transpose ops through convolutions."),
+      llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-outer-dim-concat", outerDimConcat,
                    {init_at_opt(llvm::OptimizationLevel::O0, false),
                     init_at_opt(llvm::OptimizationLevel::O1, true)},

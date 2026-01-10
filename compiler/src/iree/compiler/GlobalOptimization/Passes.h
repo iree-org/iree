@@ -64,6 +64,13 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
           "ops, rewriting named ops as fused generics."),
       llvm::cl::init(false),
   };
+  Option<bool> propagateTransposesThroughConv{
+      *this,
+      "propagate-transposes-through-conv",
+      llvm::cl::desc(
+          "Enables propagation of transpose ops through convolutions"),
+      llvm::cl::init(false),
+  };
   Option<bool> outerDimConcat{
       *this,
       "outer-dim-concat",
