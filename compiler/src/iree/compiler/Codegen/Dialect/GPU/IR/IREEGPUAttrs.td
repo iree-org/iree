@@ -131,43 +131,6 @@ def IREEGPU_PromoteWithCacheSwizzle :
   );
 }
 
-def IREEGPU_SwizzleOperand :
-    AttrDef<IREEGPU_Dialect, "SwizzleOperand", [
-      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr, [
-        "promoteOperand",
-      ]>
-    ]> {
-  let mnemonic = "swizzle_operand";
-  let summary = [{
-    Indicate promotion of an operand with setting a xor swizzle value.
-  }];
-  let description = [{
-    When promoting, this will create a swizzle hint op on the alloc associated
-    with the input operand. For example,
-
-    ```
-    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
-    %1 = linalg.matmul ins(%0, ...)
-    ```
-
-    Becomes with `#iree_gpu.swizzle_operand<#iree_gpu.use_global_load_dma>`
-
-    ```
-    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
-    %1 = tensor.empty()
-    %2 = swizzle_hint_op %1 xor_shuffle(8192, 32)
-    %3 = linalg.copy lowering_config = #iree_gpu.use_global_load_dma ins(%0) outs(%1)
-    %4 = linalg.matmul ins(%3, ...)
-    ```
-  }];
-  let assemblyFormat = "`<` struct(params) `>`";
-  let parameters = (ins
-    "Attribute":$copy_config,
-    AttrParameter<"int64_t", "">:$row_width,
-    AttrParameter<"int64_t", "">:$access_width
-  );
-}
-
 //===----------------------------------------------------------------------===//
 // GPU Workgroup Processor (WGP) Level Feature/Limit Attributes
 //===----------------------------------------------------------------------===//
