@@ -322,3 +322,14 @@ func.func @swizzle_raw_buffer_to_lds_ignore_dst_op(%global : memref<32768xi8, #a
 //   CHECK:   %[[LDSOFFSET:.+]] = arith.constant 0 : index
 //       CHECK:   %[[LDS:.+]] = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
 //       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[LDSOFFSET]]]
+
+// -----
+
+// Verify that swizzle_hint fails on non-flat (rank > 1) memrefs.
+func.func @swizzle_hint_non_flat_memref_error(%src: memref<32x64xf32>) -> vector<4xf32> {
+  // expected-error @+1 {{swizzle hint operand must be a flat memref, got 'memref<32x64xf32>'}}
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<32x64xf32>
+  %offset = arith.constant 0 : index
+  %1 = vector.load %0[%offset, %offset] : memref<32x64xf32>, vector<4xf32>
+  return %1: vector<4xf32>
+}
