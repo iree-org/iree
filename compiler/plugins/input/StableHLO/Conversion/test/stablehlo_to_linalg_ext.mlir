@@ -380,24 +380,25 @@ func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
   return %1, %2 : tensor<5xf32>, tensor<5xf32>
 }
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[EMPTY_REAL:.+]] = tensor.empty() : tensor<8xf32>
+// CHECK-DAG:    %[[EMPTY_IMAG:.+]] = tensor.empty() : tensor<8xf32>
+// CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
-// CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<8xf32>
-// CHECK:        %[[REORDERED:.+]] = linalg.generic
-// CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]]]
+// CHECK:        %[[REORDERED:.+]]:2 = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]]
 // CHECK-SAME:     iterator_types = ["parallel"]
 // CHECK-SAME:     ins(%[[INDICES]]
-// CHECK-SAME:     outs(%[[EMPTY]]
-// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32):
+// CHECK-SAME:     outs(%[[EMPTY_REAL]], %[[EMPTY_IMAG]]
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32, %{{.+}}: f32):
 // CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
 // CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[IDXVAL]]] : tensor<8xf32>
-// CHECK:          linalg.yield %[[LOAD]] : f32
-// CHECK-DAG:    %[[IMAG:.+]] = arith.constant dense<0.000000e+00> : tensor<8xf32>
+// CHECK:          linalg.yield %[[LOAD]], %[[ZERO]] : f32, f32
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
 // CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
-// CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
+// CHECK-SAME:     outs(%[[REORDERED]]#0, %[[REORDERED]]#1
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
@@ -412,7 +413,7 @@ func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
 // CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
 // CHECK:        %[[RES_IMAG:.+]] = tensor.extract_slice %[[R3]]#1[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
-// CHECK:        %{{.+}} = stablehlo.complex %[[RES_REAL]], %[[RES_IMAG]]
+// CHECK:        %{{.+}} = stablehlo.complex %[[RES_REAL]], %[[RES_IMAG]] : tensor<5xcomplex<f32>>
 
 // -----
 
@@ -428,25 +429,26 @@ func.func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>
   return %1, %2 : tensor<4x5xf32>, tensor<4x5xf32>
 }
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[EMPTY_REAL:.+]] = tensor.empty() : tensor<4x8xf32>
+// CHECK-DAG:    %[[EMPTY_IMAG:.+]] = tensor.empty() : tensor<4x8xf32>
+// CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
-// CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<4x8xf32>
-// CHECK:        %[[REORDERED:.+]] = linalg.generic
-// CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]]]
+// CHECK:        %[[REORDERED:.+]]:2 = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP1]]]
 // CHECK-SAME:     iterator_types = ["parallel", "parallel"]
 // CHECK-SAME:     ins(%[[INDICES]]
-// CHECK-SAME:     outs(%[[EMPTY]]
-// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32):
+// CHECK-SAME:     outs(%[[EMPTY_REAL]], %[[EMPTY_IMAG]]
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32, %{{.+}}: f32):
 // CHECK:          %[[I:.+]] = linalg.index 0
 // CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
 // CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[I]], %[[IDXVAL]]] : tensor<4x8xf32>
-// CHECK:          linalg.yield %[[LOAD]] : f32
-// CHECK-DAG:    %[[IMAG:.+]] = arith.constant dense<0.000000e+00> : tensor<4x8xf32>
+// CHECK:          linalg.yield %[[LOAD]], %[[ZERO]] : f32, f32
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
 // CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
-// CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
+// CHECK-SAME:     outs(%[[REORDERED]]#0, %[[REORDERED]]#1
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
@@ -461,8 +463,326 @@ func.func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
 // CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0, 0] [4, 5] [1, 1] : tensor<4x8xf32> to tensor<4x5xf32>
 // CHECK:        %[[RES_IMAG:.+]] = tensor.extract_slice %[[R3]]#1[0, 0] [4, 5] [1, 1] : tensor<4x8xf32> to tensor<4x5xf32>
-// CHECK:        %{{.+}} = stablehlo.complex %[[RES_REAL]], %[[RES_IMAG]]
+// CHECK:        %{{.+}} = stablehlo.complex %[[RES_REAL]], %[[RES_IMAG]] : tensor<4x5xcomplex<f32>>
 
+// -----
+
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// CHECK:      func.func @irfft_1d
+func.func @irfft_1d(%input: tensor<5xcomplex<f32>>) -> tensor<8xf32> {
+  %0 = "stablehlo.fft"(%input) {
+    fft_length = array<i64: 8>, fft_type = #stablehlo<fft_type IRFFT>
+  } : (tensor<5xcomplex<f32>>) -> tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+// CHECK-SAME:   %[[ARG:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<3xcomplex<f32>>
+// CHECK:        %[[MIRRORED:.+]] = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP]]]
+// CHECK-SAME:     iterator_types = ["parallel"]
+// CHECK-SAME:     outs(%[[EMPTY]]
+// CHECK:        ^bb0(%{{.+}}: complex<f32>):
+// CHECK:          %[[IDX0:.+]] = linalg.index 0 : index
+// CHECK:          %[[CST3:.+]] = arith.constant 3 : index
+// CHECK:          %[[IDXVAL:.+]] = arith.subi %[[CST3]], %[[IDX0]] : index
+// CHECK:          %[[EXTRACTED:.+]] = tensor.extract %[[ARG]][%[[IDXVAL]]] : tensor<5xcomplex<f32>>
+// CHECK:          %[[CONJ:.+]] = complex.conj %[[EXTRACTED]] : complex<f32>
+// CHECK:          linalg.yield %[[CONJ]] : complex<f32>
+// CHECK-DAG:    %[[INPUT:.+]] = tensor.concat dim(0) %[[ARG]], %[[MIRRORED]] : (tensor<5xcomplex<f32>>, tensor<3xcomplex<f32>>) -> tensor<8xcomplex<f32>>
+// CHECK-DAG:    %[[EMPTY_REAL:.+]] = tensor.empty() : tensor<8xf32>
+// CHECK-DAG:    %[[EMPTY_IMAG:.+]] = tensor.empty() : tensor<8xf32>
+// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
+// CHECK-DAG:    %[[SCALE:.+]] = arith.constant {{.+}} : f32
+// CHECK:        %[[REORDERED:.+]]:2 = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]]
+// CHECK-SAME:     iterator_types = ["parallel"]
+// CHECK-SAME:     ins(%[[INDICES]]
+// CHECK-SAME:     outs(%[[EMPTY_REAL]], %[[EMPTY_IMAG]]
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32, %{{.+}}: f32):
+// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[INPUT]][%[[IDXVAL]]] : tensor<8xcomplex<f32>>
+// CHECK:          %[[REAL:.+]] = complex.re %[[LOAD]] : complex<f32>
+// CHECK:          %[[IMAG:.+]] = complex.im %[[LOAD]] : complex<f32>
+// CHECK:          %[[REAL_SCALED:.+]] = arith.mulf %[[REAL]], %[[SCALE]] : f32
+// CHECK:          %[[IMAG_SCALED:.+]] = arith.mulf %[[IMAG]], %[[SCALE]] : f32
+// CHECK:          linalg.yield %[[REAL_SCALED]], %[[IMAG_SCALED]] : f32, f32
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[REORDERED]]#0, %[[REORDERED]]#1
+// CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK:        %[[R2:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
+// CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK:        %[[R3:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
+// CHECK:        return %[[R3]]#0
+
+// -----
+
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK:      func.func @irfft_2d
+func.func @irfft_2d(%input: tensor<4x5xcomplex<f32>>) -> tensor<4x8xf32> {
+  %0 = "stablehlo.fft"(%input) {
+    fft_length = array<i64: 8>, fft_type = #stablehlo<fft_type IRFFT>
+  } : (tensor<4x5xcomplex<f32>>) -> tensor<4x8xf32>
+  return %0 : tensor<4x8xf32>
+}
+// CHECK-SAME:   %[[ARG:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<4x3xcomplex<f32>>
+// CHECK:        %[[MIRRORED:.+]] = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP1]]]
+// CHECK-SAME:     iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:     outs(%[[EMPTY]]
+// CHECK:        ^bb0(%{{.+}}: complex<f32>):
+// CHECK:          %[[IDX1:.+]] = linalg.index 1 : index
+// CHECK:          %[[CST3:.+]] = arith.constant 3 : index
+// CHECK:          %[[IDXVAL:.+]] = arith.subi %[[CST3]], %[[IDX1]] : index
+// CHECK:          %[[IDX0:.+]] = linalg.index 0 : index
+// CHECK:          %[[EXTRACTED:.+]] = tensor.extract %[[ARG]][%[[IDX0]], %[[IDXVAL]]] : tensor<4x5xcomplex<f32>>
+// CHECK:          %[[CONJ:.+]] = complex.conj %[[EXTRACTED]] : complex<f32>
+// CHECK:          linalg.yield %[[CONJ]] : complex<f32>
+// CHECK-DAG:    %[[INPUT:.+]] = tensor.concat dim(1) %[[ARG]], %[[MIRRORED]] : (tensor<4x5xcomplex<f32>>, tensor<4x3xcomplex<f32>>) -> tensor<4x8xcomplex<f32>>
+// CHECK-DAG:    %[[EMPTY_REAL:.+]] = tensor.empty() : tensor<4x8xf32>
+// CHECK-DAG:    %[[EMPTY_IMAG:.+]] = tensor.empty() : tensor<4x8xf32>
+// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
+// CHECK-DAG:    %[[SCALE:.+]] = arith.constant {{.+}} : f32
+// CHECK:        %[[REORDERED:.+]]:2 = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:     iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:     ins(%[[INDICES]]
+// CHECK-SAME:     outs(%[[EMPTY_REAL]], %[[EMPTY_IMAG]]
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32, %{{.+}}: f32):
+// CHECK:          %[[I:.+]] = linalg.index 0
+// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[INPUT]][%[[I]], %[[IDXVAL]]] : tensor<4x8xcomplex<f32>>
+// CHECK:          %[[REAL:.+]] = complex.re %[[LOAD]] : complex<f32>
+// CHECK:          %[[IMAG:.+]] = complex.im %[[LOAD]] : complex<f32>
+// CHECK:          %[[REAL_SCALED:.+]] = arith.mulf %[[REAL]], %[[SCALE]] : f32
+// CHECK:          %[[IMAG_SCALED:.+]] = arith.mulf %[[IMAG]], %[[SCALE]] : f32
+// CHECK:          linalg.yield %[[REAL_SCALED]], %[[IMAG_SCALED]] : f32, f32
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[REORDERED]]#0, %[[REORDERED]]#1
+// CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK:        %[[R2:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
+// CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK:        %[[R3:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
+// CHECK:        return %[[R3]]#0
+
+// -----
+
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// CHECK:      func.func @fft_1d
+func.func @fft_1d(%input: tensor<8xcomplex<f32>>) -> (tensor<8xf32>, tensor<8xf32>) {
+  %0 = "stablehlo.fft"(%input) {
+    fft_length = array<i64: 8>, fft_type = #stablehlo<fft_type FFT>
+  } : (tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>>
+  %1 = "stablehlo.real"(%0) : (tensor<8xcomplex<f32>>) -> tensor<8xf32>
+  %2 = "stablehlo.imag"(%0) : (tensor<8xcomplex<f32>>) -> tensor<8xf32>
+  return %1, %2 : tensor<8xf32>, tensor<8xf32>
+}
+// CHECK-SAME:   %[[ARG:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[EMPTY_REAL:.+]] = tensor.empty() : tensor<8xf32>
+// CHECK-DAG:    %[[EMPTY_IMAG:.+]] = tensor.empty() : tensor<8xf32>
+// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
+// CHECK:        %[[REORDERED:.+]]:2 = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]]
+// CHECK-SAME:     iterator_types = ["parallel"]
+// CHECK-SAME:     ins(%[[INDICES]]
+// CHECK-SAME:     outs(%[[EMPTY_REAL]], %[[EMPTY_IMAG]]
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32, %{{.+}}: f32):
+// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[ARG]][%[[IDXVAL]]] : tensor<8xcomplex<f32>>
+// CHECK:          %[[REAL:.+]] = complex.re %[[LOAD]] : complex<f32>
+// CHECK:          %[[IMAG:.+]] = complex.im %[[LOAD]] : complex<f32>
+// CHECK:          linalg.yield %[[REAL]], %[[IMAG]] : f32, f32
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[REORDERED]]#0, %[[REORDERED]]#1
+// CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK:        %[[R2:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
+// CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK:        %[[R3:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
+// CHECK:        %{{.+}} = stablehlo.complex %[[R3]]#0, %[[R3]]#1 : tensor<8xcomplex<f32>>
+
+// -----
+
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:      func.func @fft_2d
+func.func @fft_2d(%input: tensor<4x8xcomplex<f32>>) -> (tensor<4x8xf32>, tensor<4x8xf32>) {
+  %0 = "stablehlo.fft"(%input) {
+    fft_length = array<i64: 8>, fft_type = #stablehlo<fft_type FFT>
+  } : (tensor<4x8xcomplex<f32>>) -> tensor<4x8xcomplex<f32>>
+  %1 = "stablehlo.real"(%0) : (tensor<4x8xcomplex<f32>>) -> tensor<4x8xf32>
+  %2 = "stablehlo.imag"(%0) : (tensor<4x8xcomplex<f32>>) -> tensor<4x8xf32>
+  return %1, %2 : tensor<4x8xf32>, tensor<4x8xf32>
+}
+// CHECK-SAME:   %[[ARG:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[EMPTY_REAL:.+]] = tensor.empty() : tensor<4x8xf32>
+// CHECK-DAG:    %[[EMPTY_IMAG:.+]] = tensor.empty() : tensor<4x8xf32>
+// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
+// CHECK:        %[[REORDERED:.+]]:2 = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:     iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:     ins(%[[INDICES]]
+// CHECK-SAME:     outs(%[[EMPTY_REAL]], %[[EMPTY_IMAG]]
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32, %{{.+}}: f32):
+// CHECK:          %[[I:.+]] = linalg.index 0
+// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[ARG]][%[[I]], %[[IDXVAL]]] : tensor<4x8xcomplex<f32>>
+// CHECK:          %[[REAL:.+]] = complex.re %[[LOAD]] : complex<f32>
+// CHECK:          %[[IMAG:.+]] = complex.im %[[LOAD]] : complex<f32>
+// CHECK:          linalg.yield %[[REAL]], %[[IMAG]] : f32, f32
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[REORDERED]]#0, %[[REORDERED]]#1
+// CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK:        %[[R2:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
+// CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK:        %[[R3:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
+// CHECK:        %{{.+}} = stablehlo.complex %[[R3]]#0, %[[R3]]#1 : tensor<4x8xcomplex<f32>>
+
+// -----
+
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// CHECK:      func.func @ifft_1d
+func.func @ifft_1d(%input: tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>> {
+  %0 = "stablehlo.fft"(%input) {
+    fft_length = array<i64: 8>, fft_type = #stablehlo<fft_type IFFT>
+  } : (tensor<8xcomplex<f32>>) -> tensor<8xcomplex<f32>>
+  return %0 : tensor<8xcomplex<f32>>
+}
+// CHECK-SAME:   %[[ARG:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[EMPTY_REAL:.+]] = tensor.empty() : tensor<8xf32>
+// CHECK-DAG:    %[[EMPTY_IMAG:.+]] = tensor.empty() : tensor<8xf32>
+// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
+// CHECK-DAG:    %[[SCALE:.+]] = arith.constant {{.+}} : f32
+// CHECK:        %[[REORDERED:.+]]:2 = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]]
+// CHECK-SAME:     iterator_types = ["parallel"]
+// CHECK-SAME:     ins(%[[INDICES]]
+// CHECK-SAME:     outs(%[[EMPTY_REAL]], %[[EMPTY_IMAG]]
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32, %{{.+}}: f32):
+// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[ARG]][%[[IDXVAL]]] : tensor<8xcomplex<f32>>
+// CHECK:          %[[REAL:.+]] = complex.re %[[LOAD]] : complex<f32>
+// CHECK:          %[[IMAG:.+]] = complex.im %[[LOAD]] : complex<f32>
+// CHECK:          %[[REAL_SCALED:.+]] = arith.mulf %[[REAL]], %[[SCALE]] : f32
+// CHECK:          %[[IMAG_SCALED:.+]] = arith.mulf %[[IMAG]], %[[SCALE]] : f32
+// CHECK:          linalg.yield %[[REAL_SCALED]], %[[IMAG_SCALED]] : f32, f32
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[REORDERED]]#0, %[[REORDERED]]#1
+// CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK:        %[[R2:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
+// CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK:        %[[R3:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
+// CHECK:        %{{.+}} = stablehlo.complex %[[R3]]#0, %[[R3]]#1 : tensor<8xcomplex<f32>>
+
+// -----
+
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK:      func.func @ifft_2d
+func.func @ifft_2d(%input: tensor<4x8xcomplex<f32>>) -> tensor<4x8xcomplex<f32>> {
+  %0 = "stablehlo.fft"(%input) {
+    fft_length = array<i64: 8>, fft_type = #stablehlo<fft_type IFFT>
+  } : (tensor<4x8xcomplex<f32>>) -> tensor<4x8xcomplex<f32>>
+  return %0 : tensor<4x8xcomplex<f32>>
+}
+// CHECK-SAME:   %[[ARG:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[EMPTY_REAL:.+]] = tensor.empty() : tensor<4x8xf32>
+// CHECK-DAG:    %[[EMPTY_IMAG:.+]] = tensor.empty() : tensor<4x8xf32>
+// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
+// CHECK-DAG:    %[[SCALE:.+]] = arith.constant {{.+}} : f32
+// CHECK:        %[[REORDERED:.+]]:2 = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:     iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:     ins(%[[INDICES]]
+// CHECK-SAME:     outs(%[[EMPTY_REAL]], %[[EMPTY_IMAG]]
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32, %{{.+}}: f32):
+// CHECK:          %[[I:.+]] = linalg.index 0
+// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[ARG]][%[[I]], %[[IDXVAL]]] : tensor<4x8xcomplex<f32>>
+// CHECK:          %[[REAL:.+]] = complex.re %[[LOAD]] : complex<f32>
+// CHECK:          %[[IMAG:.+]] = complex.im %[[LOAD]] : complex<f32>
+// CHECK:          %[[REAL_SCALED:.+]] = arith.mulf %[[REAL]], %[[SCALE]] : f32
+// CHECK:          %[[IMAG_SCALED:.+]] = arith.mulf %[[IMAG]], %[[SCALE]] : f32
+// CHECK:          linalg.yield %[[REAL_SCALED]], %[[IMAG_SCALED]] : f32, f32
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
+// CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[REORDERED]]#0, %[[REORDERED]]#1
+// CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
+// CHECK:        %[[R2:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
+// CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
+// CHECK:        %[[R3:.+]]:2 = iree_linalg_ext.fft
+// CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
+// CHECK:        %{{.+}} = stablehlo.complex %[[R3]]#0, %[[R3]]#1 : tensor<4x8xcomplex<f32>>
 // -----
 
 // CHECK-LABEL: func.func @reverse_dim1
