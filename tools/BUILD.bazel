@@ -45,6 +45,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base:base_stats",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal:types",

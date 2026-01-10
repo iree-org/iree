@@ -91,6 +91,7 @@ iree_cc_binary(
   DEPS
     benchmark
     iree::base
+    iree::base::base_stats
     iree::base::internal::flags
     iree::hal
     iree::modules::hal::types
