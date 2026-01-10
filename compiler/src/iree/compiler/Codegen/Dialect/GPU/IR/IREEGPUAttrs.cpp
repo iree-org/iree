@@ -2275,7 +2275,6 @@ Value PromoteWithCacheSwizzleAttr::promoteOperand(
   return cacheSwizzlePromotionImpl(builder, operand, getCopyConfig());
 }
 
-
 //===----------------------------------------------------------------------===//
 // SwizzleOperandAttr
 //===----------------------------------------------------------------------===//
