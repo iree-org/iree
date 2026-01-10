@@ -90,7 +90,7 @@ func.func @wmmar3_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32
 // -----
 
 // This tests cast_type_to_fit_mma works on contract where intrinsic is set by to_layout.
-// "iree.amdgpu.mma" will be generated from the "intrinsic" attribute of to_layout.
+// "iree.gpu.mma" will be generated from the "intrinsic" attribute of to_layout.
 // this also shows that we can overwrite default intrinsics if explicitly set.
 
 func.func @to_layout_config_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf16>) -> vector<96x64xf16> {
@@ -109,7 +109,7 @@ func.func @to_layout_config_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: ve
 //  CHECK-SAME: (%[[A:.+]]: vector<96x16xf16>, %[[B:.+]]: vector<16x64xf16>, %[[INIT:.+]]: vector<96x64xf16>)
 //       CHECK:   arith.extf
 //       CHECK:   vector.contract
-//  CHECK-SAME:     {iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}
+//  CHECK-SAME:     {iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}
 //  CHECK-SAME:     : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
 //       CHECK:   arith.truncf
 
@@ -119,14 +119,14 @@ func.func @to_layout_config_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: ve
 
 // IR generated in transform_dialect is different from the one in C++ pipeline.
 // it will not have mma_schedule on function attributes, but instead it will have
-// "iree.amdgpu.mma" attribute directly on vector.contract.
+// "iree.gpu.mma" attribute directly on vector.contract.
 
 func.func @transform_dialect_mfma_matmul_96x64x16(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf16>) -> vector<96x64xf16> {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
       %lhs, %rhs, %init
-      {iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}
+      {iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}
       : vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf16>
   return %0 : vector<96x64xf16>
 }

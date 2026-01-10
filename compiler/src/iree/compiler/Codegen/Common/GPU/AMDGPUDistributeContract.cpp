@@ -127,11 +127,11 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     // We assume there is an decision made before regarding which mfma intrinsic
     // to use and it is attached as an attribute to this contract op.
-    auto mmaKind = contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>(
-        "iree.amdgpu.mma");
+    auto mmaKind =
+        contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>("iree.gpu.mma");
     if (!mmaKind) {
       return rewriter.notifyMatchFailure(
-          contractOp, "missing iree.amdgpu.mma intrinsic attribute");
+          contractOp, "missing iree.gpu.mma intrinsic attribute");
     }
 
     // Check if the given intrinsic can be distributed with the given
