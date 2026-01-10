@@ -157,10 +157,6 @@ static void swizzleGatherToLDS(RewriterBase &rewriter,
   });
 }
 
-static bool verifyFlatSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
-  return cast<MemRefType>(hintOp.getOperand().getType()).getRank() == 1;
-}
-
 /// Resolves all hints. Walks all direct users and splits them into loads and
 /// stores. If any user is not a swizzle-able load or store, bail out and
 /// silently drop the optimization hint.
@@ -246,12 +242,6 @@ void ResolveSwizzleHintsPass::runOnOperation() {
   // silently pass through for that hint.
   IRRewriter rewriter(funcOp->getContext());
   for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
-    if (!verifyFlatSwizzleHintOp(hintOp)) {
-      hintOp.emitError() << "swizzle hint operand must be a flat memref, got "
-                         << hintOp.getOperand().getType();
-      signalPassFailure();
-      return;
-    }
     resolveHintOp(rewriter, hintOp);
   }
 
