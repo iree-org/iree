@@ -299,11 +299,12 @@ static Value generateEncodingTransferOps(RewriterBase &rewriter, Value src,
   Value value = src;
   if (srcType.getEncoding()) {
     value = IREE::Encoding::UnsetEncodingOp::create(
-        rewriter, src.getLoc(), srcType.dropEncoding(), value, dynamicDims);
+        rewriter, src.getLoc(), srcType.dropEncoding(), value, dynamicDims,
+        /*encodingDims=*/ValueRange{});
   }
   if (destType.getEncoding()) {
-    value = IREE::Encoding::SetEncodingOp::create(rewriter, src.getLoc(),
-                                                  destType, value);
+    value = IREE::Encoding::SetEncodingOp::create(
+        rewriter, src.getLoc(), destType, value, /*encodingDims=*/ValueRange{});
   }
   return value;
 }
