@@ -29,6 +29,14 @@ namespace mlir::iree_compiler::IREE::VM {
 /// Generic method for verifying VM fail ops.
 LogicalResult verifyFailOp(Operation *op, Value statusVal);
 
+//===----------------------------------------------------------------------===//
+// custom<ResultTypeList>
+//===----------------------------------------------------------------------===//
+// (type, type, ...)
+
+ParseResult parseResultTypeList(OpAsmParser &parser, ArrayAttr &resultTypes);
+void printResultTypeList(OpAsmPrinter &p, Operation *op, ArrayAttr resultTypes);
+
 } // namespace mlir::iree_compiler::IREE::VM
 
 #define GET_OP_CLASSES

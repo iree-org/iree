@@ -53,6 +53,7 @@ iree_cc_test(
     iree::vm
     iree::vm::test::all_bytecode_modules_c
     iree::vm::test::async_bytecode_modules_c
+    iree::vm::test::async_ops_test_module
 )
 
 iree_bytecode_module(

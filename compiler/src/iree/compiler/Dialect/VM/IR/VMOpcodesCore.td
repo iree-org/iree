@@ -47,7 +47,7 @@ class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
   string opcodeEnumTag = enumTag;
 }
 
-// Next available opcode: 0x87
+// Next available opcode: 0x89
 
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
@@ -197,6 +197,8 @@ def VM_OPC_ImportResolved        : VM_OPC<0x5C, "ImportResolved">;
 
 // Async/fiber ops:
 def VM_OPC_Yield                 : VM_OPC<0x5D, "Yield">;
+def VM_OPC_CallYieldable         : VM_OPC<0x87, "CallYieldable">;
+def VM_OPC_CallVariadicYieldable : VM_OPC<0x88, "CallVariadicYieldable">;
 
 // Debugging:
 def VM_OPC_Trace                 : VM_OPC<0x5E, "Trace">;
@@ -363,6 +365,8 @@ def VM_CoreOpcodeAttr :
     VM_OPC_Fail,
     VM_OPC_ImportResolved,
     VM_OPC_Yield,
+    VM_OPC_CallYieldable,
+    VM_OPC_CallVariadicYieldable,
     VM_OPC_Trace,
     VM_OPC_Print,
     VM_OPC_CondBreak,

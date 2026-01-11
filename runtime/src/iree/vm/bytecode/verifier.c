@@ -1613,6 +1613,62 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
           iree_vm_ImportFunctionDef_full_name(import_def));
     });
 
+    IREE_VM_ISA_VERIFY_OP(CORE, CallYieldable, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(callee_ordinal);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(dest_pc);
+      IREE_VM_ISA_VERIFY_VARIADIC_RESULTS_ANY(results);
+      if (iree_vm_isa_function_ordinal_is_import(callee_ordinal)) {
+        callee_ordinal = iree_vm_isa_function_ordinal_as_import(callee_ordinal);
+        IREE_VM_ISA_VERIFY_IMPORT_ORDINAL(callee_ordinal);
+        iree_vm_ImportFunctionDef_table_t import_def =
+            iree_vm_ImportFunctionDef_vec_at(verify_state->imported_functions,
+                                             callee_ordinal);
+        IREE_RETURN_IF_ERROR(
+            iree_vm_bytecode_function_verify_call(
+                verify_state, iree_vm_ImportFunctionDef_signature(import_def),
+                /*segment_sizes=*/NULL, operands, results),
+            "yieldable call to import '%s'",
+            iree_vm_ImportFunctionDef_full_name(import_def));
+      } else {
+        IREE_VM_ISA_VERIFY_FUNCTION_ORDINAL(callee_ordinal);
+        IREE_RETURN_IF_ERROR(
+            iree_vm_bytecode_function_verify_call(
+                verify_state,
+                iree_vm_FunctionSignatureDef_vec_at(
+                    verify_state->function_signatures, callee_ordinal),
+                /*segment_sizes=*/NULL, operands, results),
+            "yieldable call to internal function %d", callee_ordinal);
+      }
+      verify_state->in_block = 0;  // terminator
+    });
+
+    IREE_VM_ISA_VERIFY_OP(CORE, CallVariadicYieldable, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(callee_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_sizes);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(dest_pc);
+      IREE_VM_ISA_VERIFY_VARIADIC_RESULTS_ANY(results);
+      if (IREE_UNLIKELY(
+              !iree_vm_isa_function_ordinal_is_import(callee_ordinal))) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "variadic yieldable calls only supported for imports");
+      }
+      callee_ordinal = iree_vm_isa_function_ordinal_as_import(callee_ordinal);
+      IREE_VM_ISA_VERIFY_IMPORT_ORDINAL(callee_ordinal);
+      iree_vm_ImportFunctionDef_table_t import_def =
+          iree_vm_ImportFunctionDef_vec_at(verify_state->imported_functions,
+                                           callee_ordinal);
+      IREE_RETURN_IF_ERROR(
+          iree_vm_bytecode_function_verify_call(
+              verify_state, iree_vm_ImportFunctionDef_signature(import_def),
+              segment_sizes, operands, results),
+          "variadic yieldable call to import '%s'",
+          iree_vm_ImportFunctionDef_full_name(import_def));
+      verify_state->in_block = 0;  // terminator
+    });
+
     IREE_VM_ISA_VERIFY_OP(CORE, Return, {
       IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_verify_cconv_registers(
