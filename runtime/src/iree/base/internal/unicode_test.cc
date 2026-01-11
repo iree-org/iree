@@ -603,90 +603,91 @@ TEST(UnicodeCccTest, HebrewCombining) {
 }
 
 //===----------------------------------------------------------------------===//
-// NFC Composition Pair Tests
+// Composition Pair Tests
 //===----------------------------------------------------------------------===//
 
-TEST(UnicodeNfcComposeTest, LatinCompositions) {
+TEST(UnicodeComposePairTest, LatinCompositions) {
   // Common Latin letter + combining mark compositions.
-  EXPECT_EQ(iree_unicode_nfc_compose('A', 0x0300), 0x00C0u);  // A + grave → À
-  EXPECT_EQ(iree_unicode_nfc_compose('A', 0x0301), 0x00C1u);  // A + acute → Á
-  EXPECT_EQ(iree_unicode_nfc_compose('A', 0x0302),
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0300), 0x00C0u);  // A + grave → À
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0301), 0x00C1u);  // A + acute → Á
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0302),
             0x00C2u);  // A + circumflex → Â
-  EXPECT_EQ(iree_unicode_nfc_compose('A', 0x0303), 0x00C3u);  // A + tilde → Ã
-  EXPECT_EQ(iree_unicode_nfc_compose('A', 0x0308),
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0303), 0x00C3u);  // A + tilde → Ã
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0308),
             0x00C4u);  // A + diaeresis → Ä
-  EXPECT_EQ(iree_unicode_nfc_compose('A', 0x030A),
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x030A),
             0x00C5u);  // A + ring above → Å
-  EXPECT_EQ(iree_unicode_nfc_compose('C', 0x0327), 0x00C7u);  // C + cedilla → Ç
-  EXPECT_EQ(iree_unicode_nfc_compose('E', 0x0301), 0x00C9u);  // E + acute → É
-  EXPECT_EQ(iree_unicode_nfc_compose('N', 0x0303), 0x00D1u);  // N + tilde → Ñ
-  EXPECT_EQ(iree_unicode_nfc_compose('O', 0x0308),
+  EXPECT_EQ(iree_unicode_compose_pair('C', 0x0327),
+            0x00C7u);  // C + cedilla → Ç
+  EXPECT_EQ(iree_unicode_compose_pair('E', 0x0301), 0x00C9u);  // E + acute → É
+  EXPECT_EQ(iree_unicode_compose_pair('N', 0x0303), 0x00D1u);  // N + tilde → Ñ
+  EXPECT_EQ(iree_unicode_compose_pair('O', 0x0308),
             0x00D6u);  // O + diaeresis → Ö
-  EXPECT_EQ(iree_unicode_nfc_compose('U', 0x0308),
+  EXPECT_EQ(iree_unicode_compose_pair('U', 0x0308),
             0x00DCu);  // U + diaeresis → Ü
 }
 
-TEST(UnicodeNfcComposeTest, LowercaseLatinCompositions) {
-  EXPECT_EQ(iree_unicode_nfc_compose('a', 0x0300), 0x00E0u);  // a + grave → à
-  EXPECT_EQ(iree_unicode_nfc_compose('a', 0x0301), 0x00E1u);  // a + acute → á
-  EXPECT_EQ(iree_unicode_nfc_compose('e', 0x0301), 0x00E9u);  // e + acute → é
-  EXPECT_EQ(iree_unicode_nfc_compose('n', 0x0303), 0x00F1u);  // n + tilde → ñ
-  EXPECT_EQ(iree_unicode_nfc_compose('o', 0x0308),
+TEST(UnicodeComposePairTest, LowercaseLatinCompositions) {
+  EXPECT_EQ(iree_unicode_compose_pair('a', 0x0300), 0x00E0u);  // a + grave → à
+  EXPECT_EQ(iree_unicode_compose_pair('a', 0x0301), 0x00E1u);  // a + acute → á
+  EXPECT_EQ(iree_unicode_compose_pair('e', 0x0301), 0x00E9u);  // e + acute → é
+  EXPECT_EQ(iree_unicode_compose_pair('n', 0x0303), 0x00F1u);  // n + tilde → ñ
+  EXPECT_EQ(iree_unicode_compose_pair('o', 0x0308),
             0x00F6u);  // o + diaeresis → ö
-  EXPECT_EQ(iree_unicode_nfc_compose('u', 0x0308),
+  EXPECT_EQ(iree_unicode_compose_pair('u', 0x0308),
             0x00FCu);  // u + diaeresis → ü
 }
 
-TEST(UnicodeNfcComposeTest, GreekCompositions) {
+TEST(UnicodeComposePairTest, GreekCompositions) {
   // Greek letter + combining mark compositions.
-  EXPECT_EQ(iree_unicode_nfc_compose(0x0391, 0x0301),
+  EXPECT_EQ(iree_unicode_compose_pair(0x0391, 0x0301),
             0x0386u);  // Α + acute → Ά
-  EXPECT_EQ(iree_unicode_nfc_compose(0x03B1, 0x0301),
+  EXPECT_EQ(iree_unicode_compose_pair(0x03B1, 0x0301),
             0x03ACu);  // α + acute → ά
-  EXPECT_EQ(iree_unicode_nfc_compose(0x03B5, 0x0301),
+  EXPECT_EQ(iree_unicode_compose_pair(0x03B5, 0x0301),
             0x03ADu);  // ε + acute → έ
 }
 
-TEST(UnicodeNfcComposeTest, NoComposition) {
+TEST(UnicodeComposePairTest, NoComposition) {
   // Pairs that don't compose should return 0.
-  EXPECT_EQ(iree_unicode_nfc_compose('A', 'B'), 0u);  // Not a valid pair
-  EXPECT_EQ(iree_unicode_nfc_compose('X', 0x0301),
+  EXPECT_EQ(iree_unicode_compose_pair('A', 'B'), 0u);  // Not a valid pair
+  EXPECT_EQ(iree_unicode_compose_pair('X', 0x0301),
             0u);  // X doesn't compose with acute
-  EXPECT_EQ(iree_unicode_nfc_compose(0x4E2D, 0x0301),
+  EXPECT_EQ(iree_unicode_compose_pair(0x4E2D, 0x0301),
             0u);  // CJK doesn't compose
 }
 
-TEST(UnicodeNfcComposeTest, LatinExtendedCompositions) {
+TEST(UnicodeComposePairTest, LatinExtendedCompositions) {
   // Compositions in Latin Extended blocks.
-  EXPECT_EQ(iree_unicode_nfc_compose('A', 0x0304), 0x0100u);  // A + macron → Ā
-  EXPECT_EQ(iree_unicode_nfc_compose('a', 0x0304), 0x0101u);  // a + macron → ā
-  EXPECT_EQ(iree_unicode_nfc_compose('C', 0x030C), 0x010Cu);  // C + caron → Č
-  EXPECT_EQ(iree_unicode_nfc_compose('c', 0x030C), 0x010Du);  // c + caron → č
-  EXPECT_EQ(iree_unicode_nfc_compose('S', 0x030C), 0x0160u);  // S + caron → Š
-  EXPECT_EQ(iree_unicode_nfc_compose('s', 0x030C), 0x0161u);  // s + caron → š
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0304), 0x0100u);  // A + macron → Ā
+  EXPECT_EQ(iree_unicode_compose_pair('a', 0x0304), 0x0101u);  // a + macron → ā
+  EXPECT_EQ(iree_unicode_compose_pair('C', 0x030C), 0x010Cu);  // C + caron → Č
+  EXPECT_EQ(iree_unicode_compose_pair('c', 0x030C), 0x010Du);  // c + caron → č
+  EXPECT_EQ(iree_unicode_compose_pair('S', 0x030C), 0x0160u);  // S + caron → Š
+  EXPECT_EQ(iree_unicode_compose_pair('s', 0x030C), 0x0161u);  // s + caron → š
 }
 
 //===----------------------------------------------------------------------===//
-// Full NFC Normalization Tests
+// Unicode Composition Tests
 //===----------------------------------------------------------------------===//
 
-TEST(UnicodeNfcTest, AsciiPassthrough) {
+TEST(UnicodeComposeTest, AsciiPassthrough) {
   char buffer[64];
   iree_host_size_t length = 0;
-  IREE_ASSERT_OK(iree_unicode_nfc(iree_make_cstring_view("Hello World"), buffer,
-                                  sizeof(buffer), &length));
+  IREE_ASSERT_OK(iree_unicode_compose(iree_make_cstring_view("Hello World"),
+                                      buffer, sizeof(buffer), &length));
   EXPECT_EQ(std::string(buffer, length), "Hello World");
 }
 
-TEST(UnicodeNfcTest, EmptyString) {
+TEST(UnicodeComposeTest, EmptyString) {
   char buffer[64];
   iree_host_size_t length = 0;
-  IREE_ASSERT_OK(iree_unicode_nfc(iree_make_cstring_view(""), buffer,
-                                  sizeof(buffer), &length));
+  IREE_ASSERT_OK(iree_unicode_compose(iree_make_cstring_view(""), buffer,
+                                      sizeof(buffer), &length));
   EXPECT_EQ(length, 0u);
 }
 
-TEST(UnicodeNfcTest, AlreadyComposed) {
+TEST(UnicodeComposeTest, AlreadyComposed) {
   // Already-composed characters should pass through unchanged.
   char buffer[64];
   iree_host_size_t length = 0;
@@ -694,20 +695,20 @@ TEST(UnicodeNfcTest, AlreadyComposed) {
   // "café" with precomposed é (U+00E9).
   const char input[] = "caf\xC3\xA9";
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
   EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
 }
 
-TEST(UnicodeNfcTest, DecomposedToComposed) {
+TEST(UnicodeComposeTest, DecomposedToComposed) {
   char buffer[64];
   iree_host_size_t length = 0;
 
   // "café" with decomposed é: 'e' (U+0065) + combining acute (U+0301).
   const char input[] = "cafe\xCC\x81";  // e + combining acute
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
 
   // Should compose to "café" with precomposed é.
   const char expected[] = "caf\xC3\xA9";
@@ -715,7 +716,7 @@ TEST(UnicodeNfcTest, DecomposedToComposed) {
             std::string(expected, sizeof(expected) - 1));
 }
 
-TEST(UnicodeNfcTest, MultipleDecomposedCharacters) {
+TEST(UnicodeComposeTest, MultipleDecomposedCharacters) {
   char buffer[64];
   iree_host_size_t length = 0;
 
@@ -723,8 +724,8 @@ TEST(UnicodeNfcTest, MultipleDecomposedCharacters) {
   // r + e + acute + s + u + m + e + acute
   const char input[] = "re\xCC\x81sume\xCC\x81";
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
 
   // Should compose to "résumé" with precomposed é.
   const char expected[] = "r\xC3\xA9sum\xC3\xA9";
@@ -732,16 +733,16 @@ TEST(UnicodeNfcTest, MultipleDecomposedCharacters) {
             std::string(expected, sizeof(expected) - 1));
 }
 
-TEST(UnicodeNfcTest, MultipleMarksOnSameBase) {
+TEST(UnicodeComposeTest, MultipleMarksOnSameBase) {
   char buffer[64];
   iree_host_size_t length = 0;
 
   // o + combining acute (U+0301) + combining diaeresis (U+0308).
-  // NFC can only compose one mark, so result should be ó + diaeresis.
+  // Composition can only compose one mark, so result should be ó + diaeresis.
   const char input[] = "o\xCC\x81\xCC\x88";
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
 
   // o + acute composes to ó (U+00F3), diaeresis remains.
   // Expected: ó (C3 B3) + combining diaeresis (CC 88).
@@ -750,7 +751,7 @@ TEST(UnicodeNfcTest, MultipleMarksOnSameBase) {
             std::string(expected, sizeof(expected) - 1));
 }
 
-TEST(UnicodeNfcTest, CanonicalOrdering) {
+TEST(UnicodeComposeTest, CanonicalOrdering) {
   char buffer[64];
   iree_host_size_t length = 0;
 
@@ -760,49 +761,49 @@ TEST(UnicodeNfcTest, CanonicalOrdering) {
   // Since 202 < 230, order is already canonical.
   const char input1[] = "o\xCC\xA7\xCC\x81";  // cedilla + acute
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input1, sizeof(input1) - 1),
-                       buffer, sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input1, sizeof(input1) - 1),
+                           buffer, sizeof(buffer), &length));
 
   // o + acute (CCC=230) + cedilla (CCC=202) is NOT canonical order.
-  // NFC should reorder to cedilla + acute, then compose.
+  // Compose should reorder to cedilla + acute, then compose.
   char buffer2[64];
   iree_host_size_t length2 = 0;
   const char input2[] = "o\xCC\x81\xCC\xA7";  // acute + cedilla (wrong order)
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input2, sizeof(input2) - 1),
-                       buffer2, sizeof(buffer2), &length2));
+      iree_unicode_compose(iree_make_string_view(input2, sizeof(input2) - 1),
+                           buffer2, sizeof(buffer2), &length2));
 
   // Both should produce the same canonical result.
   EXPECT_EQ(std::string(buffer, length), std::string(buffer2, length2));
 }
 
-TEST(UnicodeNfcTest, NonComposingMarks) {
+TEST(UnicodeComposeTest, NonComposingMarks) {
   char buffer[64];
   iree_host_size_t length = 0;
 
   // 'x' doesn't compose with acute accent, so mark should remain.
   const char input[] = "x\xCC\x81";  // x + combining acute
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
 
   // Should remain unchanged (x doesn't compose with acute).
   EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
 }
 
-TEST(UnicodeNfcTest, CjkUnchanged) {
+TEST(UnicodeComposeTest, CjkUnchanged) {
   char buffer[64];
   iree_host_size_t length = 0;
 
   // CJK characters pass through unchanged.
   const char input[] = "\xE4\xB8\xAD\xE6\x96\x87";  // 中文
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
   EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
 }
 
-TEST(UnicodeNfcTest, MixedContent) {
+TEST(UnicodeComposeTest, MixedContent) {
   char buffer[128];
   iree_host_size_t length = 0;
 
@@ -811,8 +812,8 @@ TEST(UnicodeNfcTest, MixedContent) {
   // With decomposed é: e + combining acute.
   const char input[] = "Hello cafe\xCC\x81 \xE4\xB8\xAD\xE6\x96\x87";
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
 
   // Expected: "Hello café 中文" with composed é.
   const char expected[] = "Hello caf\xC3\xA9 \xE4\xB8\xAD\xE6\x96\x87";
@@ -820,19 +821,19 @@ TEST(UnicodeNfcTest, MixedContent) {
             std::string(expected, sizeof(expected) - 1));
 }
 
-TEST(UnicodeNfcTest, BufferTooSmall) {
+TEST(UnicodeComposeTest, BufferTooSmall) {
   char buffer[4];
   iree_host_size_t length = 0;
 
   // Buffer too small for output.
-  iree_status_t status = iree_unicode_nfc(iree_make_cstring_view("Hello World"),
-                                          buffer, sizeof(buffer), &length);
+  iree_status_t status = iree_unicode_compose(
+      iree_make_cstring_view("Hello World"), buffer, sizeof(buffer), &length);
   EXPECT_THAT(Status(std::move(status)),
               StatusIs(StatusCode::kResourceExhausted));
 }
 
-TEST(UnicodeNfcTest, ScratchSpaceRequirement) {
-  // NFC uses the output buffer as scratch space for uint32_t codepoints.
+TEST(UnicodeComposeTest, ScratchSpaceRequirement) {
+  // Compose uses the output buffer as scratch space for uint32_t codepoints.
   // Buffer must be at least (codepoint_count * 4) bytes for non-ASCII input.
 
   // "café" with decomposed é: 5 codepoints × 4 bytes = 20 bytes needed.
@@ -843,8 +844,8 @@ TEST(UnicodeNfcTest, ScratchSpaceRequirement) {
   char small_buffer[8];
   iree_host_size_t length = 0;
   iree_status_t status =
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
-                       small_buffer, sizeof(small_buffer), &length);
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           small_buffer, sizeof(small_buffer), &length);
   EXPECT_THAT(Status(std::move(status)),
               StatusIs(StatusCode::kResourceExhausted));
 
@@ -852,22 +853,22 @@ TEST(UnicodeNfcTest, ScratchSpaceRequirement) {
   char buffer[20];
   length = 0;
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
   EXPECT_EQ(length, 5u);
   EXPECT_EQ(std::string(buffer, length),
             std::string(expected, sizeof(expected) - 1));
 }
 
-TEST(UnicodeNfcTest, GreekWithAccents) {
+TEST(UnicodeComposeTest, GreekWithAccents) {
   char buffer[64];
   iree_host_size_t length = 0;
 
   // Greek alpha + combining acute.
   const char input[] = "\xCE\xB1\xCC\x81";  // α + acute
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
 
   // Should compose to ά (U+03AC).
   const char expected[] = "\xCE\xAC";
@@ -875,19 +876,19 @@ TEST(UnicodeNfcTest, GreekWithAccents) {
             std::string(expected, sizeof(expected) - 1));
 }
 
-TEST(UnicodeNfcTest, Emoji) {
+TEST(UnicodeComposeTest, Emoji) {
   char buffer[64];
   iree_host_size_t length = 0;
 
   // Emoji pass through unchanged.
   const char input[] = "\xF0\x9F\x98\x80";  // 😀
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
   EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
 }
 
-TEST(UnicodeNfcTest, HangulUnchanged) {
+TEST(UnicodeComposeTest, HangulUnchanged) {
   char buffer[64];
   iree_host_size_t length = 0;
 
@@ -895,8 +896,8 @@ TEST(UnicodeNfcTest, HangulUnchanged) {
   // We don't do Hangul algorithmic composition.
   const char input[] = "\xEA\xB0\x80";  // 가 (U+AC00)
   IREE_ASSERT_OK(
-      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1), buffer,
-                       sizeof(buffer), &length));
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
   EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
 }
 

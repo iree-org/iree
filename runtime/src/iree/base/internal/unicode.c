@@ -512,7 +512,7 @@ static uint32_t iree_unicode_nfc_pair_lookup(uint32_t base,
   return 0;  // No composition.
 }
 
-uint32_t iree_unicode_nfc_compose(uint32_t base, uint32_t combining) {
+uint32_t iree_unicode_compose_pair(uint32_t base, uint32_t combining) {
   return iree_unicode_nfc_pair_lookup(base, combining);
 }
 
@@ -539,8 +539,8 @@ static void iree_unicode_canonical_order(uint32_t* codepoints,
 
 // Apply canonical composition to a sequence of codepoints.
 // Modifies the array in place and returns the new count.
-static iree_host_size_t iree_unicode_canonical_compose(uint32_t* codepoints,
-                                                       iree_host_size_t count) {
+static iree_host_size_t iree_unicode_compose_codepoints(
+    uint32_t* codepoints, iree_host_size_t count) {
   if (count < 2) return count;
 
   iree_host_size_t write_index = 0;
@@ -567,7 +567,7 @@ static iree_host_size_t iree_unicode_canonical_compose(uint32_t* codepoints,
       // 2. Last CCC < current CCC (not blocked)
       if (current_ccc == 0 || last_ccc < current_ccc) {
         uint32_t composition =
-            iree_unicode_nfc_compose(codepoints[starter_index], current);
+            iree_unicode_compose_pair(codepoints[starter_index], current);
         if (composition != 0) {
           codepoints[starter_index] = composition;
           composed = true;
@@ -590,10 +590,10 @@ static iree_host_size_t iree_unicode_canonical_compose(uint32_t* codepoints,
   return write_index;
 }
 
-iree_status_t iree_unicode_nfc(iree_string_view_t input, char* out_buffer,
-                               iree_host_size_t capacity,
-                               iree_host_size_t* out_length) {
-  // Fast path: ASCII-only input is already NFC.
+iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
+                                   iree_host_size_t capacity,
+                                   iree_host_size_t* out_length) {
+  // Fast path: ASCII-only input needs no composition.
   bool all_ascii = true;
   for (iree_host_size_t i = 0; i < input.size && all_ascii; ++i) {
     if ((uint8_t)input.data[i] > 0x7F) all_ascii = false;
@@ -629,7 +629,7 @@ iree_status_t iree_unicode_nfc(iree_string_view_t input, char* out_buffer,
 
   // Apply canonical composition in-place.
   iree_host_size_t composed_count =
-      iree_unicode_canonical_compose(codepoints, decode_index);
+      iree_unicode_compose_codepoints(codepoints, decode_index);
 
   // Encode back to UTF-8 in-place.
   // Safe because we read 4 bytes per codepoint and write 1-4 bytes,

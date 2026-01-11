@@ -225,30 +225,56 @@ uint32_t iree_unicode_to_upper(uint32_t codepoint);
 uint32_t iree_unicode_nfd_base(uint32_t codepoint);
 
 //===----------------------------------------------------------------------===//
-// NFC Normalization
+// Unicode Composition
 //===----------------------------------------------------------------------===//
 
 // Returns the Canonical Combining Class (CCC) for |codepoint|.
 // Returns 0 for base characters (starters), non-zero for combining marks.
-// CCC values are used to canonically order combining marks during NFC.
+// CCC values are used to canonically order combining marks.
 uint8_t iree_unicode_ccc(uint32_t codepoint);
 
-// Looks up a composition: base + combining -> composed.
+// Looks up a canonical composition: base + combining -> composed.
 // Returns the composed codepoint, or 0 if no composition exists.
-uint32_t iree_unicode_nfc_compose(uint32_t base, uint32_t combining);
+// This is a building block for NFC normalization.
+uint32_t iree_unicode_compose_pair(uint32_t base, uint32_t combining);
 
-// Applies NFC (Canonical Composition) normalization to UTF-8 input.
+// Applies canonical ordering and composition to UTF-8 input.
 // Writes result to |out_buffer| (max |capacity| bytes).
 // Returns the output length in |*out_length|.
 //
-// ASCII-only input is a fast path (unchanged, just copy).
-// For non-ASCII, applies canonical ordering and composition.
+// IMPORTANT: This is NOT full NFC normalization. It performs:
+//   1. Canonical ordering (sort combining marks by CCC)
+//   2. Canonical composition (combine base + combining -> precomposed)
 //
-// Note: This assumes input is valid UTF-8. Invalid sequences are passed
-// through unchanged (no replacement character insertion).
-iree_status_t iree_unicode_nfc(iree_string_view_t input, char* out_buffer,
-                               iree_host_size_t capacity,
-                               iree_host_size_t* out_length);
+// It does NOT perform NFD decomposition first, which full NFC requires.
+// Full NFC is: Compose(Decompose(input)). This function only does Compose().
+//
+// This is sufficient when:
+//   - Input is already in NFD form (fully decomposed)
+//   - Input is already in NFC form (nothing to compose)
+//   - Input is from typical user keyboards (OS normalizes to NFC)
+//
+// This may produce incorrect results when:
+//   - Input has precomposed characters followed by additional combining marks
+//     that would interact differently if the precomposed char were decomposed
+//   - Example: é (U+00E9) + combining mark might need decomposition first
+//
+// For tokenizer use cases (BERT, GPT, LLaMA), this limitation is acceptable:
+//   - BERT uses NFD + accent stripping, not NFC
+//   - GPT-2/LLaMA use no normalizer at all
+//   - Real-world input text is typically already NFC from OS input methods
+//
+// If full NFC is needed later, add iree_unicode_nfc() that decomposes first.
+//
+// Buffer requirements:
+//   |capacity| must be >= iree_unicode_utf8_codepoint_count(input) * 4
+//   The function uses |out_buffer| as scratch space for codepoint processing.
+//   For ASCII-only input, only input.size bytes are needed (fast path).
+//
+// Note: Assumes input is valid UTF-8. Invalid sequences pass through unchanged.
+iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
+                                   iree_host_size_t capacity,
+                                   iree_host_size_t* out_length);
 
 #ifdef __cplusplus
 }  // extern "C"
