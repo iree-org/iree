@@ -832,31 +832,46 @@ TEST(UnicodeComposeTest, BufferTooSmall) {
               StatusIs(StatusCode::kResourceExhausted));
 }
 
-TEST(UnicodeComposeTest, ScratchSpaceRequirement) {
-  // Compose uses the output buffer as scratch space for uint32_t codepoints.
-  // Buffer must be at least (codepoint_count * 4) bytes for non-ASCII input.
+TEST(UnicodeComposeTest, BufferCapacityIsInputSize) {
+  // Compose only needs capacity >= input.size (output can only shrink).
+  // Uses a small internal buffer for processing, not the output buffer.
 
-  // "café" with decomposed é: 5 codepoints × 4 bytes = 20 bytes needed.
-  const char input[] = "cafe\xCC\x81";    // 5 bytes, 5 codepoints
+  // "café" with decomposed é: 6 bytes input (4 ASCII + 2-byte combining mark),
+  // 5 codepoints, composes to 5 bytes output.
+  const char input[] = "cafe\xCC\x81";    // 6 bytes, 5 codepoints
   const char expected[] = "caf\xC3\xA9";  // 5 bytes output
 
-  // Buffer too small for scratch space (only 8 bytes, need 20).
-  char small_buffer[8];
+  // Verify our understanding of the input/output sizes.
+  EXPECT_EQ(sizeof(input) - 1, 6u);     // Input is 6 bytes.
+  EXPECT_EQ(sizeof(expected) - 1, 5u);  // Output is 5 bytes.
+
+  // Buffer exactly input size should work.
+  char exact_buffer[6];
   iree_host_size_t length = 0;
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           exact_buffer, sizeof(exact_buffer), &length));
+  EXPECT_EQ(length, 5u);
+  EXPECT_EQ(std::string(exact_buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+
+  // Buffer smaller than input size should fail.
+  char small_buffer[5];
+  length = 0;
   iree_status_t status =
       iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
                            small_buffer, sizeof(small_buffer), &length);
   EXPECT_THAT(Status(std::move(status)),
               StatusIs(StatusCode::kResourceExhausted));
 
-  // Adequate buffer for scratch space.
-  char buffer[20];
+  // Larger buffer also works.
+  char large_buffer[64];
   length = 0;
   IREE_ASSERT_OK(
       iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
-                           buffer, sizeof(buffer), &length));
+                           large_buffer, sizeof(large_buffer), &length));
   EXPECT_EQ(length, 5u);
-  EXPECT_EQ(std::string(buffer, length),
+  EXPECT_EQ(std::string(large_buffer, length),
             std::string(expected, sizeof(expected) - 1));
 }
 
@@ -899,6 +914,153 @@ TEST(UnicodeComposeTest, HangulUnchanged) {
       iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
                            buffer, sizeof(buffer), &length));
   EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
+}
+
+TEST(UnicodeComposeTest, MultipleCombiningSequences) {
+  // Test that multiple combining sequences in one string are processed
+  // correctly by the chunk-based algorithm.
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // "café naïve" with decomposed accents.
+  // café: c a f e + combining acute
+  // naïve: n a i + combining diaeresis v e
+  const char input[] = "caf\x65\xCC\x81 na\x69\xCC\x88ve";
+  const char expected[] = "caf\xC3\xA9 na\xC3\xAFve";
+
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, ManyCombiningMarks) {
+  // Test a sequence with many combining marks on one base character.
+  // This exercises the internal buffer for combining sequences.
+  char buffer[256];
+  iree_host_size_t length = 0;
+
+  // Build a string with a base character followed by 10 combining marks.
+  // Using combining acute (U+0301) repeatedly - CCC 230.
+  std::string input = "a";
+  for (int i = 0; i < 10; ++i) {
+    input += "\xCC\x81";  // Combining acute.
+  }
+
+  // Should succeed - 10 marks is well under the 32-codepoint limit.
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input.data(), input.size()),
+                           buffer, sizeof(buffer), &length));
+
+  // First acute should compose with 'a' to form 'á', rest remain.
+  // á = U+00E1 = C3 A1
+  std::string expected = "\xC3\xA1";
+  for (int i = 0; i < 9; ++i) {
+    expected += "\xCC\x81";  // Remaining acute marks.
+  }
+  EXPECT_EQ(std::string(buffer, length), expected);
+}
+
+TEST(UnicodeComposeTest, CombiningSequenceLimitExceeded) {
+  // Test that exceeding 32 combining marks fails with RESOURCE_EXHAUSTED.
+  char buffer[512];
+  iree_host_size_t length = 0;
+
+  // Build a string with a base character followed by 35 combining marks.
+  std::string input = "a";
+  for (int i = 0; i < 35; ++i) {
+    input += "\xCC\x81";  // Combining acute.
+  }
+
+  // Should fail - 36 codepoints (1 base + 35 marks) exceeds 32 limit.
+  iree_status_t status =
+      iree_unicode_compose(iree_make_string_view(input.data(), input.size()),
+                           buffer, sizeof(buffer), &length);
+  EXPECT_THAT(Status(std::move(status)),
+              StatusIs(StatusCode::kResourceExhausted));
+}
+
+TEST(UnicodeComposeTest, LeadingCombiningMark) {
+  // Test input that starts with a combining mark (no preceding base).
+  // This is unusual but valid Unicode.
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // Combining acute followed by 'a' + combining acute.
+  const char input[] =
+      "\xCC\x81"
+      "a\xCC\x81";
+  // First mark has no base to combine with, second forms 'á'.
+  const char expected[] = "\xCC\x81\xC3\xA1";
+
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, SingleCombiningMark) {
+  // Test single combining mark with no base (edge case).
+  char buffer[8];
+  iree_host_size_t length = 0;
+
+  const char input[] = "\xCC\x81";  // Just combining acute.
+
+  // Should pass through unchanged.
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
+}
+
+TEST(UnicodeComposeTest, CombiningSequenceLimitBoundary) {
+  // Test exactly 32 codepoints (1 base + 31 combining marks) succeeds.
+  // This is the maximum allowed combining sequence length.
+  char buffer[256];
+  iree_host_size_t length = 0;
+
+  // Build a string with exactly 32 codepoints.
+  std::string input = "a";  // 1 base character.
+  for (int i = 0; i < 31; ++i) {
+    input += "\xCC\x81";  // 31 combining acute marks.
+  }
+
+  // Should succeed - exactly at the 32-codepoint limit.
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input.data(), input.size()),
+                           buffer, sizeof(buffer), &length));
+
+  // First acute composes with 'a' to form 'á', rest remain.
+  std::string expected = "\xC3\xA1";  // á
+  for (int i = 0; i < 30; ++i) {
+    expected += "\xCC\x81";  // 30 remaining acute marks.
+  }
+  EXPECT_EQ(std::string(buffer, length), expected);
+}
+
+TEST(UnicodeComposeTest, InvalidUtf8BehaviorUndefined) {
+  // Invalid UTF-8 behavior is undefined per the API contract.
+  // This test documents current behavior but does not guarantee it.
+  // The decoder replaces invalid bytes with U+FFFD, which may cause
+  // output to exceed input size.
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // Single invalid byte 0xFF - decoder returns U+FFFD (3 bytes: EF BF BD).
+  // With capacity = 1, this would fail; with larger capacity it may succeed.
+  const char invalid_input[] = "\xFF";
+
+  // We document that behavior is undefined, so we just verify it doesn't crash.
+  // The actual result depends on implementation details.
+  iree_status_t status = iree_unicode_compose(
+      iree_make_string_view(invalid_input, sizeof(invalid_input) - 1), buffer,
+      sizeof(buffer), &length);
+
+  // Either succeeds (with replacement char) or fails (capacity issues).
+  // We don't assert on the result, just that it doesn't crash.
+  iree_status_ignore(status);
 }
 
 }  // namespace

@@ -590,6 +590,37 @@ static iree_host_size_t iree_unicode_compose_codepoints(
   return write_index;
 }
 
+// Maximum combining sequence length (starter + combining marks).
+// Unicode Stream-Safe Text Format limits to 30 combining characters.
+// Real-world text rarely exceeds 3-4 combining marks per base character.
+#define IREE_UNICODE_MAX_COMBINING_SEQUENCE 32
+
+// Flushes a combining sequence: applies canonical ordering and composition,
+// then encodes to output. Returns the number of bytes written, or 0 on error.
+static iree_host_size_t iree_unicode_flush_sequence(
+    uint32_t* sequence, iree_host_size_t sequence_count, char* out_buffer,
+    iree_host_size_t capacity, iree_host_size_t output_position) {
+  if (sequence_count == 0) return 0;
+
+  // Apply canonical ordering and composition.
+  iree_unicode_canonical_order(sequence, sequence_count);
+  iree_host_size_t composed_count =
+      iree_unicode_compose_codepoints(sequence, sequence_count);
+
+  // Encode to output buffer.
+  iree_host_size_t bytes_written = 0;
+  for (iree_host_size_t i = 0; i < composed_count; ++i) {
+    iree_host_size_t encoded_length =
+        iree_unicode_utf8_encoded_length(sequence[i]);
+    if (output_position + bytes_written + encoded_length > capacity) {
+      return 0;  // Would overflow.
+    }
+    bytes_written += iree_unicode_utf8_encode(
+        sequence[i], out_buffer + output_position + bytes_written);
+  }
+  return bytes_written;
+}
+
 iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
                                    iree_host_size_t capacity,
                                    iree_host_size_t* out_length) {
@@ -607,37 +638,49 @@ iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
     return iree_ok_status();
   }
 
-  // Count codepoints to check buffer requirements.
-  // We use the output buffer as scratch space for codepoints (4 bytes each).
-  iree_host_size_t codepoint_count = iree_unicode_utf8_codepoint_count(input);
-  iree_host_size_t required_capacity = codepoint_count * sizeof(uint32_t);
-  if (required_capacity > capacity) {
+  // Output can only shrink (composition combines characters), so input.size
+  // is sufficient capacity.
+  if (input.size > capacity) {
     return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
   }
 
-  // Decode UTF-8 directly into output buffer (as uint32_t array).
-  uint32_t* codepoints = (uint32_t*)out_buffer;
-  iree_host_size_t decode_position = 0;
-  iree_host_size_t decode_index = 0;
-  while (decode_position < input.size) {
-    codepoints[decode_index++] =
-        iree_unicode_utf8_decode(input, &decode_position);
+  // Process combining sequences one at a time using a small fixed buffer.
+  // A combining sequence is a starter (CCC=0) followed by combining marks.
+  uint32_t sequence[IREE_UNICODE_MAX_COMBINING_SEQUENCE];
+  iree_host_size_t sequence_count = 0;
+  iree_host_size_t input_position = 0;
+  iree_host_size_t output_position = 0;
+
+  while (input_position < input.size) {
+    uint32_t codepoint = iree_unicode_utf8_decode(input, &input_position);
+    uint8_t ccc = iree_unicode_ccc(codepoint);
+
+    if (ccc == 0 && sequence_count > 0) {
+      // New starter: flush the previous sequence.
+      iree_host_size_t bytes_written = iree_unicode_flush_sequence(
+          sequence, sequence_count, out_buffer, capacity, output_position);
+      if (bytes_written == 0 && sequence_count > 0) {
+        return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+      }
+      output_position += bytes_written;
+      sequence_count = 0;
+    }
+
+    // Add codepoint to current sequence.
+    if (sequence_count >= IREE_UNICODE_MAX_COMBINING_SEQUENCE) {
+      return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+    }
+    sequence[sequence_count++] = codepoint;
   }
 
-  // Apply canonical ordering in-place.
-  iree_unicode_canonical_order(codepoints, decode_index);
-
-  // Apply canonical composition in-place.
-  iree_host_size_t composed_count =
-      iree_unicode_compose_codepoints(codepoints, decode_index);
-
-  // Encode back to UTF-8 in-place.
-  // Safe because we read 4 bytes per codepoint and write 1-4 bytes,
-  // so output position never catches up to unread codepoints.
-  iree_host_size_t output_position = 0;
-  for (iree_host_size_t i = 0; i < composed_count; ++i) {
-    output_position +=
-        iree_unicode_utf8_encode(codepoints[i], out_buffer + output_position);
+  // Flush any remaining sequence.
+  if (sequence_count > 0) {
+    iree_host_size_t bytes_written = iree_unicode_flush_sequence(
+        sequence, sequence_count, out_buffer, capacity, output_position);
+    if (bytes_written == 0 && sequence_count > 0) {
+      return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+    }
+    output_position += bytes_written;
   }
 
   *out_length = output_position;

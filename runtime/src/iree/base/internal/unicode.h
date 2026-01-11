@@ -267,11 +267,15 @@ uint32_t iree_unicode_compose_pair(uint32_t base, uint32_t combining);
 // If full NFC is needed later, add iree_unicode_nfc() that decomposes first.
 //
 // Buffer requirements:
-//   |capacity| must be >= iree_unicode_utf8_codepoint_count(input) * 4
-//   The function uses |out_buffer| as scratch space for codepoint processing.
-//   For ASCII-only input, only input.size bytes are needed (fast path).
+//   |capacity| must be >= input.size (output can only shrink via composition).
+//   Uses a small fixed internal buffer (~128 bytes) for processing.
 //
-// Note: Assumes input is valid UTF-8. Invalid sequences pass through unchanged.
+// Combining sequence limit:
+//   Returns IREE_STATUS_RESOURCE_EXHAUSTED if any combining sequence exceeds
+//   32 codepoints (starter + combining marks). This limit exceeds Unicode's
+//   Stream-Safe Text Format (30 characters) and handles all real-world text.
+//
+// Requires valid UTF-8 input. Behavior is undefined for invalid sequences.
 iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
                                    iree_host_size_t capacity,
                                    iree_host_size_t* out_length);
