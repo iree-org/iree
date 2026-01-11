@@ -204,3 +204,5 @@ jobs:
               --timeout=120 \
               --durations=0 \
               --test-config-file=${CONFIG_FILE_PATH}
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
