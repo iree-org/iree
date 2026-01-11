@@ -66,6 +66,23 @@ iree_host_size_t iree_unicode_utf8_codepoint_count(iree_string_view_t text);
 // Returns true if valid, false if any invalid sequences are found.
 bool iree_unicode_utf8_validate(iree_string_view_t text);
 
+// Returns the number of trailing bytes that form an incomplete UTF-8 sequence.
+// Used to detect multi-byte UTF-8 characters split across buffer boundaries.
+//
+// When processing UTF-8 in fixed-size buffers, the last few bytes may be the
+// start of a multi-byte sequence whose continuation bytes haven't arrived yet.
+// This function detects such incomplete tails so callers can:
+// 1. Flush only complete bytes
+// 2. Carry over incomplete bytes to the next buffer
+//
+// Returns 0 if the buffer ends with complete sequences (or is empty).
+// Returns 1-3 if the last 1-3 bytes form an incomplete sequence.
+//
+// Example: Buffer ending with [0xC3] returns 1 (start of 2-byte sequence).
+// Example: Buffer ending with [0xE2, 0x80] returns 2 (incomplete 3-byte seq).
+iree_host_size_t iree_unicode_utf8_incomplete_tail_length(
+    const char* data, iree_host_size_t size);
+
 //===----------------------------------------------------------------------===//
 // Unicode Categories
 //===----------------------------------------------------------------------===//
@@ -106,6 +123,19 @@ typedef struct iree_unicode_nfd_mapping_t {
   uint32_t codepoint;
   uint32_t base;
 } iree_unicode_nfd_mapping_t;
+
+// Canonical Combining Class (CCC) entry for combining marks.
+typedef struct iree_unicode_ccc_entry_t {
+  uint32_t codepoint;
+  uint8_t ccc;
+} iree_unicode_ccc_entry_t;
+
+// NFC composition pair: (base, combining) -> composed.
+typedef struct iree_unicode_nfc_pair_t {
+  uint32_t base;
+  uint32_t combining;
+  uint32_t composed;
+} iree_unicode_nfc_pair_t;
 
 // Returns the general category of |codepoint|.
 iree_unicode_category_t iree_unicode_category(uint32_t codepoint);
@@ -155,6 +185,20 @@ bool iree_unicode_is_whitespace(uint32_t codepoint);
 // Returns true if |codepoint| is a control character (Cc category).
 bool iree_unicode_is_control(uint32_t codepoint);
 
+// Returns true if |codepoint| is a CJK character.
+// This includes CJK Unified Ideographs and related blocks (Han characters).
+bool iree_unicode_is_cjk(uint32_t codepoint);
+
+// Returns true if |codepoint| is Hiragana (U+3040-U+309F).
+bool iree_unicode_is_hiragana(uint32_t codepoint);
+
+// Returns true if |codepoint| is Katakana (U+30A0-U+30FF, U+31F0-U+31FF).
+bool iree_unicode_is_katakana(uint32_t codepoint);
+
+// Returns true if |codepoint| is Hangul (Korean).
+// Includes Hangul Syllables, Jamo, and Compatibility Jamo blocks.
+bool iree_unicode_is_hangul(uint32_t codepoint);
+
 //===----------------------------------------------------------------------===//
 // Case Folding
 //===----------------------------------------------------------------------===//
@@ -179,6 +223,32 @@ uint32_t iree_unicode_to_upper(uint32_t codepoint);
 // It handles common Latin, Greek, and Cyrillic accented characters.
 // For full NFD normalization (1:N mappings), use a dedicated Unicode library.
 uint32_t iree_unicode_nfd_base(uint32_t codepoint);
+
+//===----------------------------------------------------------------------===//
+// NFC Normalization
+//===----------------------------------------------------------------------===//
+
+// Returns the Canonical Combining Class (CCC) for |codepoint|.
+// Returns 0 for base characters (starters), non-zero for combining marks.
+// CCC values are used to canonically order combining marks during NFC.
+uint8_t iree_unicode_ccc(uint32_t codepoint);
+
+// Looks up a composition: base + combining -> composed.
+// Returns the composed codepoint, or 0 if no composition exists.
+uint32_t iree_unicode_nfc_compose(uint32_t base, uint32_t combining);
+
+// Applies NFC (Canonical Composition) normalization to UTF-8 input.
+// Writes result to |out_buffer| (max |capacity| bytes).
+// Returns the output length in |*out_length|.
+//
+// ASCII-only input is a fast path (unchanged, just copy).
+// For non-ASCII, applies canonical ordering and composition.
+//
+// Note: This assumes input is valid UTF-8. Invalid sequences are passed
+// through unchanged (no replacement character insertion).
+iree_status_t iree_unicode_nfc(iree_string_view_t input, char* out_buffer,
+                               iree_host_size_t capacity,
+                               iree_host_size_t* out_length);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -9,7 +9,8 @@
 
 This script parses the Unicode Character Database (UCD) and generates
 the unicode_tables.c file with category ranges, whitespace codepoints,
-case mappings, and NFD decomposition tables.
+case mappings, NFD decomposition, CCC (Canonical Combining Class), and
+NFC composition tables.
 
 Usage:
   # Generate tables (downloads UCD if needed):
@@ -72,11 +73,12 @@ def download_ucd_file(version: str, filename: str, cache_dir: Path) -> Path:
 
 
 def parse_unicode_data(path: Path) -> dict:
-    """Parse UnicodeData.txt to extract categories and case mappings."""
+    """Parse UnicodeData.txt to extract categories, case mappings, and CCC."""
     data = {
         "categories": {},  # codepoint -> category
         "uppercase": {},  # codepoint -> uppercase mapping
         "lowercase": {},  # codepoint -> lowercase mapping
+        "ccc": {},  # codepoint -> canonical combining class (non-zero only)
     }
 
     with open(path, "r", encoding="utf-8") as f:
@@ -92,6 +94,7 @@ def parse_unicode_data(path: Path) -> dict:
             codepoint = int(fields[0], 16)
             name = fields[1]
             category = fields[2]
+            ccc = int(fields[3]) if fields[3] else 0  # Canonical Combining Class
             uppercase = fields[12]
             lowercase = fields[13]
 
@@ -106,6 +109,10 @@ def parse_unicode_data(path: Path) -> dict:
                 continue
 
             data["categories"][codepoint] = category
+
+            # Store CCC only for non-zero values (combining marks).
+            if ccc > 0:
+                data["ccc"][codepoint] = ccc
 
             if uppercase:
                 data["uppercase"][codepoint] = int(uppercase, 16)
@@ -192,6 +199,129 @@ def parse_unicode_data_for_decomposition(path: Path, categories: dict) -> dict:
     return nfd
 
 
+def parse_composition_exclusions(path: Path) -> set:
+    """Parse CompositionExclusions.txt to get excluded codepoints.
+
+    These are codepoints that have canonical decompositions but should NOT
+    be composed during NFC normalization.
+    """
+    exclusions = set()
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            # Remove inline comments.
+            if "#" in line:
+                line = line[: line.index("#")].strip()
+
+            if not line:
+                continue
+
+            # Each line is a single codepoint.
+            exclusions.add(int(line, 16))
+
+    return exclusions
+
+
+def parse_derived_normalization_props(path: Path) -> set:
+    """Parse DerivedNormalizationProps.txt to get Full_Composition_Exclusion.
+
+    This includes all characters that should be excluded from NFC composition:
+    - Characters from CompositionExclusions.txt
+    - Singletons (decompose to single character)
+    - Non-starter decompositions
+    """
+    exclusions = set()
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            # Remove inline comments.
+            if "#" in line:
+                line = line[: line.index("#")].strip()
+
+            if not line:
+                continue
+
+            parts = line.split(";")
+            if len(parts) < 2:
+                continue
+
+            prop = parts[1].strip()
+            if prop != "Full_Composition_Exclusion":
+                continue
+
+            codepoint_range = parts[0].strip()
+            if ".." in codepoint_range:
+                start, end = codepoint_range.split("..")
+                for cp in range(int(start, 16), int(end, 16) + 1):
+                    exclusions.add(cp)
+            else:
+                exclusions.add(int(codepoint_range, 16))
+
+    return exclusions
+
+
+def build_nfc_composition_pairs(path: Path, exclusions: set) -> dict:
+    """Build NFC composition table from canonical decompositions.
+
+    This creates the reverse mapping: (base, combining) -> composed.
+    Only includes "Primary Composites" - characters that:
+    - Have a canonical decomposition to exactly 2 codepoints
+    - Are not in the Full_Composition_Exclusion set
+    - The first codepoint (base) has CCC=0 (is a starter)
+
+    Args:
+        path: Path to UnicodeData.txt
+        exclusions: Set of codepoints excluded from composition
+    """
+    pairs = {}  # (base, combining) -> composed
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            fields = line.split(";")
+            if len(fields) < 6:
+                continue
+
+            composed = int(fields[0], 16)
+            decomposition = fields[5].strip()
+
+            if not decomposition:
+                continue
+
+            # Skip compatibility decompositions.
+            if decomposition.startswith("<"):
+                continue
+
+            # Skip excluded codepoints.
+            if composed in exclusions:
+                continue
+
+            # Parse canonical decomposition.
+            parts = decomposition.split()
+
+            # Only include 2-character decompositions.
+            if len(parts) != 2:
+                continue
+
+            base = int(parts[0], 16)
+            combining = int(parts[1], 16)
+
+            pairs[(base, combining)] = composed
+
+    return pairs
+
+
 def build_category_ranges(categories: dict) -> list:
     """Build compact category ranges from individual codepoint categories."""
     # Group by major category (first letter).
@@ -259,6 +389,8 @@ def generate_tables_c(
     whitespace: set,
     case_mappings: dict,
     nfd_mappings: dict,
+    ccc_mappings: dict,
+    nfc_pairs: dict,
 ) -> str:
     """Generate the unicode_tables.c file content."""
     lines = []
@@ -394,6 +526,49 @@ const iree_unicode_nfd_mapping_t iree_unicode_nfd_mappings[] = {"""
 
 const iree_host_size_t iree_unicode_nfd_mappings_count =
     sizeof(iree_unicode_nfd_mappings) / sizeof(iree_unicode_nfd_mappings[0]);
+
+//===----------------------------------------------------------------------===//
+// Canonical Combining Class (CCC) table
+//===----------------------------------------------------------------------===//
+
+const iree_unicode_ccc_entry_t iree_unicode_ccc_entries[] = {"""
+    )
+
+    # CCC entries - packed.
+    ccc_entries = []
+    for cp in sorted(ccc_mappings.keys()):
+        ccc = ccc_mappings[cp]
+        ccc_entries.append(f"{{{hex_compact(cp)},{ccc}}},")
+    lines.extend(pack_entries(ccc_entries))
+
+    lines.append(
+        """\
+};
+
+const iree_host_size_t iree_unicode_ccc_entries_count =
+    sizeof(iree_unicode_ccc_entries) / sizeof(iree_unicode_ccc_entries[0]);
+
+//===----------------------------------------------------------------------===//
+// NFC composition pairs table
+//===----------------------------------------------------------------------===//
+
+const iree_unicode_nfc_pair_t iree_unicode_nfc_pairs[] = {"""
+    )
+
+    # NFC pairs - sorted by (base, combining) for binary search.
+    nfc_entries = []
+    for (base, combining), composed in sorted(nfc_pairs.items()):
+        nfc_entries.append(
+            f"{{{hex_compact(base)},{hex_compact(combining)},{hex_compact(composed)}}},"
+        )
+    lines.extend(pack_entries(nfc_entries))
+
+    lines.append(
+        """\
+};
+
+const iree_host_size_t iree_unicode_nfc_pairs_count =
+    sizeof(iree_unicode_nfc_pairs) / sizeof(iree_unicode_nfc_pairs[0]);
 """
     )
 
@@ -443,6 +618,7 @@ def main():
         ucd_dir = args.ucd_dir
         unicode_data_path = ucd_dir / "UnicodeData.txt"
         prop_list_path = ucd_dir / "PropList.txt"
+        derived_norm_props_path = ucd_dir / "DerivedNormalizationProps.txt"
     else:
         cache_dir = Path.home() / ".cache" / "iree" / "ucd"
         unicode_data_path = download_ucd_file(
@@ -450,6 +626,9 @@ def main():
         )
         prop_list_path = download_ucd_file(
             args.unicode_version, "PropList.txt", cache_dir
+        )
+        derived_norm_props_path = download_ucd_file(
+            args.unicode_version, "DerivedNormalizationProps.txt", cache_dir
         )
 
     print(f"Parsing UnicodeData.txt...")
@@ -463,6 +642,12 @@ def main():
         unicode_data_path, unicode_data["categories"]
     )
 
+    print(f"Parsing composition exclusions...")
+    composition_exclusions = parse_derived_normalization_props(derived_norm_props_path)
+
+    print(f"Building NFC composition pairs...")
+    nfc_pairs = build_nfc_composition_pairs(unicode_data_path, composition_exclusions)
+
     print(f"Building category ranges...")
     category_ranges = build_category_ranges(unicode_data["categories"])
 
@@ -471,12 +656,15 @@ def main():
         "uppercase": unicode_data["uppercase"],
         "lowercase": unicode_data["lowercase"],
     }
+    ccc_mappings = unicode_data["ccc"]
     content = generate_tables_c(
         args.unicode_version,
         category_ranges,
         whitespace,
         case_mappings,
         nfd_mappings,
+        ccc_mappings,
+        nfc_pairs,
     )
 
     if args.check:
@@ -498,7 +686,9 @@ def main():
             f"Done. Generated {len(category_ranges)} category ranges, "
             f"{len(whitespace)} whitespace codepoints, "
             f"{len(case_mappings['uppercase']) + len(case_mappings['lowercase'])} case mappings, "
-            f"{len(nfd_mappings)} NFD mappings."
+            f"{len(nfd_mappings)} NFD mappings, "
+            f"{len(ccc_mappings)} CCC entries, "
+            f"{len(nfc_pairs)} NFC composition pairs."
         )
 
 
