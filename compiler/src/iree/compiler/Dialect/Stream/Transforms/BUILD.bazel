@@ -54,12 +54,14 @@ iree_compiler_cc_library(
         "SpecializeEncodings.cpp",
         "SyncInitializers.cpp",
         "UnifyEncodingForGlobals.cpp",
+        "Utils.cpp",
         "VerifyAffinities.cpp",
         "VerifyAsyncAccessRanges.cpp",
         "VerifyLowerings.cpp",
     ],
     hdrs = [
         "Passes.h",
+        "Utils.h",
     ],
     deps = [
         ":PassesIncGen",
