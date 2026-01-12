@@ -334,6 +334,9 @@ getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm,
 
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
+/// When `doCPromotion` is true, the accumulator uses shared memory. This can be
+/// due to padding requirements or because the operation has an existing
+/// accumulator that needs to be loaded from global memory (matmul_accumulate).
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
     bool transposedLhs, bool transposedRhs, bool isGemm,
@@ -615,12 +618,16 @@ static bool checkForElementwiseUsersWithNewOperands(linalg::LinalgOp linalgOp) {
 /// determine the convolution dimensions for padding when creating
 /// `padding_conv` config. `padding_conv` attribute is only used when padding
 /// convolutions before converting them to IGEMM.
+/// `hasExistingAccumulator` indicates whether the accumulator is read from
+/// global memory (matmul_accumulate) vs zero-initialized in registers. When
+/// true, the accumulator needs shared memory, similar to when padding requires
+/// C promotion.
 static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
     bool isGemm, bool scaled, int64_t splitReductionTripCnt,
-    bool CPromoteIfPadding,
+    bool CPromoteIfPadding, bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -795,23 +802,26 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              rhsElemType,
                              initElemType};
 
+  // Accumulator needs shared memory if:
+  // - Padding requires C promotion, OR
+  // - The operation has an existing accumulator (matmul_accumulate)
+  bool doCPromotion =
+      (couldNeedPadding && CPromoteIfPadding) || hasExistingAccumulator;
+
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs, isGemm,
-      /*mustBeAligned=*/true,
-      /*doCPromotion=*/couldNeedPadding && CPromoteIfPadding, scaled,
-      splitReductionTripCnt);
+      /*mustBeAligned=*/true, doCPromotion, scaled, splitReductionTripCnt);
 
-  // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
-  // the GEMM is accumulating (i.e., doesn't have a zero fill dpsInit) as that
-  // buffer currently gets materialized as private memory. We need to add
-  // missing patterns to fix that.
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
     mustBeAligned = false;
+    // For unaligned schedules, C promotion is needed for padding OR existing
+    // accumulator.
+    bool doCPromotionUnaligned = CPromoteIfPadding || hasExistingAccumulator;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
-        /*doCPromotion=*/CPromoteIfPadding, scaled, splitReductionTripCnt);
+        doCPromotionUnaligned, scaled, splitReductionTripCnt);
   }
 
   if (!schedule) {
@@ -1016,12 +1026,16 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   if (clGPUTestCpromotion) {
     CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp);
   }
+  // Detect if the convolution is accumulating (reads existing accumulator).
+  bool hasExistingAccumulator = isValidInPlaceAccumulatingOp(
+      cast<DestinationStyleOpInterface>(linalgOp.getOperation()));
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
           useDirectLoad, /*isGemm=*/false,
           /*scaled=*/false, splitReductionTripCnt,
-          /*CPromoteIfPadding=*/CPromoteIfPadding, convToIgemmInfo);
+          /*CPromoteIfPadding=*/CPromoteIfPadding, hasExistingAccumulator,
+          convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -1068,10 +1082,17 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   if (clGPUTestCpromotion) {
     CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp);
   }
+
+  // Detect if the matmul is accumulating (reads existing accumulator from
+  // global memory). This affects shared memory usage for scaled MMA operations.
+  bool hasExistingAccumulator = isValidInPlaceAccumulatingOp(
+      cast<DestinationStyleOpInterface>(linalgOp.getOperation()));
+
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-          /*scaled=*/false, splitReductionTripCnt, CPromoteIfPadding);
+          /*scaled=*/false, splitReductionTripCnt, CPromoteIfPadding,
+          hasExistingAccumulator);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -1081,7 +1102,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     useDirectLoad = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-        /*scaled=*/true, splitReductionTripCnt, CPromoteIfPadding);
+        /*scaled=*/true, splitReductionTripCnt, CPromoteIfPadding,
+        hasExistingAccumulator);
   }
 
   if (failed(configAndWgSize)) {
