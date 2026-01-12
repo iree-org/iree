@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-pcf-convert-sref-to-memref)" --split-input-file | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-pcf-convert-sref-to-memref)" --split-input-file --verify-diagnostics | FileCheck %s
 
 util.func private @convert_generic_with_init(%arg0: memref<?x?xi32, strided<[?, 1]>, 3>) {
   %0 = pcf.generic scope(#pcf.test_scope)
@@ -288,6 +288,15 @@ func.func @convert_alloc(%d0: index) -> !pcf.sref<?x5xi32, #pcf.sequential> {
 //  CHECK-SAME:   %[[D0:[A-Za-z0-9]+]]: index
 //       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) {alignment = 16 : i64} : memref<?x5xi32>
 //       CHECK:   return %[[ALLOC]] : memref<?x5xi32>
+
+// -----
+
+// expected-error@+1 {{failed to legalize operation}}
+func.func @invalid_workgroup_alloc(%d0: index) -> !pcf.sref<?x5xi32, #iree_codegen.workgroup_scope> {
+// expected-error@+1 {{failed to get memory space for allocation}}
+  %0 = pcf.alloc(%d0) : !pcf.sref<?x5xi32, #iree_codegen.workgroup_scope>
+  return %0 : !pcf.sref<?x5xi32, #iree_codegen.workgroup_scope>
+}
 
 // -----
 
