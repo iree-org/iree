@@ -228,3 +228,48 @@ func.func @data_tiled_scaled_mma_inner_tiled_with_copy(
 //       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config
 //       CHECK:   linalg.copy
 //   CHECK-NOT:   lowering_config
+
+// -----
+
+// Test that scaled matmul with an existing accumulator (matmul_accumulate)
+// gets smaller tiles than a zero-initialized matmul to account for accumulator
+// memory in workgroup memory (LDS). Without this, 256x256 tiles would be
+// selected, but the 256x256 f32 accumulator (256KB) exceeds gfx950's 160KB
+// workgroup memory limit (max_workgroup_memory_bytes).
+#lhs_map_acc = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
+#rhs_map_acc = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
+#scale_m_acc = affine_map<(M, N, Ko, Kb) -> (M, Ko)>
+#scale_n_acc = affine_map<(M, N, Ko, Kb) -> (N, Ko)>
+#out_map_acc = affine_map<(M, N, Ko, Kb) -> (M, N)>
+func.func @scaled_matmul_accumulate(
+    %C_dispatch: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024x1024xf32>>,
+    %A: tensor<1024x512x32xf4E2M1FN>, %B: tensor<1024x512x32xf4E2M1FN>,
+    %A_scales: tensor<1024x512xf8E8M0FNU>, %B_scales: tensor<1024x512xf8E8M0FNU>) {
+  // Load accumulator from a readwrite buffer - this triggers hasExistingAccumulator
+  %C = iree_tensor_ext.dispatch.tensor.load %C_dispatch, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024x1024xf32>> -> tensor<1024x1024xf32>
+  %result = linalg.generic {
+    indexing_maps = [#lhs_map_acc, #rhs_map_acc, #scale_m_acc, #scale_n_acc, #out_map_acc],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+  } ins(%A, %B, %A_scales, %B_scales : tensor<1024x512x32xf4E2M1FN>, tensor<1024x512x32xf4E2M1FN>, tensor<1024x512xf8E8M0FNU>, tensor<1024x512xf8E8M0FNU>) outs(%C : tensor<1024x1024xf32>) {
+  ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
+    %1 = arith.scaling_extf %a, %a_scale : f4E2M1FN, f8E8M0FNU to f32
+    %2 = arith.scaling_extf %b, %b_scale : f4E2M1FN, f8E8M0FNU to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<1024x1024xf32>
+  // Store result back to the same buffer
+  iree_tensor_ext.dispatch.tensor.store %result, %C_dispatch, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
+      : tensor<1024x1024xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024x1024xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @scaled_matmul_accumulate
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
+//  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
+//  CHECK-SAME:     reduction = [0, 0, 1, 1]
+//  CHECK-SAME:     subgroup = [2, 8, 0, 0]
+//       CHECK:     workgroup = [128, 256, 0, 0]

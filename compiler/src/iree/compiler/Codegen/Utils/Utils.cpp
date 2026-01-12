@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
@@ -2216,6 +2217,77 @@ std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp copyOp) {
     }
   }
   return tileSizes;
+}
+
+//===----------------------------------------------------------------------===//
+// Utility functions for accumulating operations
+//===----------------------------------------------------------------------===//
+
+// Get the `iree_tensor_ext.dispatch.tensor.load` that this value is
+// populated with. This could potentially walk the use-def chain to get the load
+// operation, but for now it just returns the load op if that is the defining
+// operation for `v`.
+template <typename LoadOpTy>
+static std::optional<LoadOpTy> getLoadOp(Value v) {
+  if (auto loadOp = v.getDefiningOp<LoadOpTy>()) {
+    return loadOp;
+  }
+  return std::nullopt;
+}
+
+// Get the `iree_tensor_ext.dispatch.tensor.store` that this value is
+// populated writes to. This could potentially walk the use-def chain of DPS
+// init operands to get the store operation, but for now it just returns the
+// store op if the result has a single use and that use is the store op.
+template <typename StoreOpTy>
+static std::optional<StoreOpTy> getStoreOp(Value v) {
+  if (v.getNumUses() != 1) {
+    return std::nullopt;
+  }
+  if (auto storeOp = dyn_cast<StoreOpTy>(*(v.getUsers().begin()))) {
+    return storeOp;
+  }
+  return std::nullopt;
+}
+
+bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp) {
+  assert(dpsOp.getNumDpsInits() == 1 &&
+         "expected op to have a single outs operand");
+  OpOperand *initValue = dpsOp.getDpsInitOperand(0);
+
+  // Case 1. Check for the case when reading/writing from the same buffer
+  // through `iree_codegen.load_from_buffer`/`iree_codegen.store_to_buffer`.
+  {
+    std::optional<IREE::Codegen::LoadFromBufferOp> loadOp =
+        getLoadOp<IREE::Codegen::LoadFromBufferOp>(initValue->get());
+    std::optional<IREE::Codegen::StoreToBufferOp> storeOp =
+        getStoreOp<IREE::Codegen::StoreToBufferOp>(dpsOp->getResult(0));
+    if (loadOp && storeOp && loadOp->getBuffer() == storeOp->getBuffer()) {
+      return true;
+    }
+  }
+
+  // Case 2. If the `outs` operand is from a read-write buffer, and the result
+  // is writing into the same buffer, do not convert to a non-accumulating gemm.
+  // This currently would only work for very simple cases, but could be
+  // generalized further.
+  {
+    std::optional<IREE::TensorExt::DispatchTensorLoadOp> initLoadOp =
+        getLoadOp<IREE::TensorExt::DispatchTensorLoadOp>(initValue->get());
+    std::optional<IREE::TensorExt::DispatchTensorStoreOp> resultStoreOp =
+        getStoreOp<IREE::TensorExt::DispatchTensorStoreOp>(dpsOp->getResult(0));
+    if (initLoadOp && resultStoreOp && initLoadOp->getSource() &&
+        resultStoreOp->getTarget()) {
+      // Check that the source and the result have a read/write tag. If they
+      // don't then its really a bug in the way the dispatch is formed, but
+      // check here for safety.
+      if (initLoadOp->getSourceType().getAccess() ==
+          IREE::TensorExt::TensorAccess::ReadWrite) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 } // namespace mlir::iree_compiler
