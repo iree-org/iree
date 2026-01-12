@@ -409,6 +409,8 @@ detail::getTiedResultOperandIndex(Operation *op, unsigned resultIndex) {
     if (resultIndex >= indexAndLength.second)
       return std::nullopt;
   }
+  if (resultIndex >= valueAttrs.size())
+    return std::nullopt;
   int64_t value = cast<IntegerAttr>(valueAttrs[resultIndex]).getInt();
   if (value == IREE::Util::TiedOpInterface::kUntiedIndex)
     return std::nullopt;

@@ -1738,6 +1738,27 @@ void FuncOp::print(OpAsmPrinter &p) {
   }
 }
 
+LogicalResult FuncOp::verify() {
+  Operation *op = getOperation();
+
+  auto tiedOperandsAttr = getTiedOperandsAttr();
+  if (tiedOperandsAttr) {
+    auto functionType = cast<FunctionType>(getFunctionTypeAttr().getValue());
+    auto numInputs = functionType.getInputs().size();
+
+    if (llvm::any_of(tiedOperandsAttr.getAsRange<IntegerAttr>(),
+                     [numInputs](IntegerAttr attr) {
+                       auto index = attr.getInt();
+                       return index !=
+                                  IREE::Util::TiedOpInterface::kUntiedIndex &&
+                              (index < 0 || index >= numInputs);
+                     }))
+      return op->emitError("tied_operands index out of range");
+  }
+
+  return success();
+}
+
 bool IREE::Util::FuncOp::canDiscardOnUseEmpty() {
   return getVisibility() != SymbolTable::Visibility::Public &&
          !anyAncestorHasAnyRefsToSymbol(this->getOperation(), getSymNameAttr());
