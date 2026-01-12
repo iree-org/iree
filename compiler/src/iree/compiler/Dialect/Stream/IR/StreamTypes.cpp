@@ -108,6 +108,11 @@ bool AsyncAccessRange::mayOverlap(const AsyncAccessRange &lhs,
     return false;
   }
 
+  // TODO(benvanik): use integer range analysis (Presburger) to prove when
+  // constant or affine ranges like [100,200) and [500,600) don't overlap.
+  // This would enable more aggressive optimization in ElideAsyncCopies and
+  // other passes that use overlap checking.
+
   // _May_ overlap. More analysis required.
   return true;
 }

@@ -1128,6 +1128,207 @@ static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Stream::AsyncUpdateOp elision
+//===----------------------------------------------------------------------===//
+
+// Returns true if |updateOp| is safe to elide by proving the mutation has no
+// observable effect. An update is not observable if no subsequent operation
+// reads from the mutated region.
+static bool isSafeToElideUpdateOp(IREE::Stream::AsyncUpdateOp updateOp,
+                                  ElisionAnalysis &analysis) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "isSafeToElideUpdateOp:\n";
+    llvm::dbgs() << "  ";
+    updateOp.print(llvm::dbgs(), analysis.getAsmState());
+    llvm::dbgs() << "\n";
+  });
+
+  // Check if target (or its base through tied chains) is a block argument
+  // with reference semantics. If passed by-reference, mutation might be
+  // observable to caller.
+  Value target = updateOp.getTarget();
+  Value targetBase = IREE::Util::TiedOpInterface::findTiedBaseValue(target);
+  if (auto arg = llvm::dyn_cast<BlockArgument>(targetBase)) {
+    if (!analysis.isArgMoved(arg)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - update target traces to by-ref arg; cannot elide\n");
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs()
+               << "  ? update target traces to by-value arg; may elide\n");
+  }
+
+  // Verify target has no other users that might observe mutation through
+  // the shared underlying buffer. In well-formed CoW IR, target should
+  // only be used by this update, but we check defensively.
+  if (!target.hasOneUse()) {
+    LLVM_DEBUG(llvm::dbgs() << "  - target has multiple users; cannot elide\n");
+    return false;
+  }
+
+  // Build access range for the update operation.
+  // The update writes to target[offset, end), and result aliases target.
+  // We use result as the resource since we're checking against users of result.
+  Value result = updateOp.getResult();
+  AsyncAccessRange updateRange;
+  updateRange.access = ResourceAccessBitfield::Write;
+  updateRange.resource = result; // Use result, not target, for alias matching.
+  updateRange.start = updateOp.getTargetOffset();
+  updateRange.end = updateOp.getTargetEnd();
+  updateRange.length = updateOp.getUpdateSize();
+
+  // Check all uses of the result to see if they read the mutated region.
+  SmallVector<AsyncAccessRange> queryRanges;
+  LLVM_DEBUG(llvm::dbgs() << "  Checking users of update result\n");
+  for (auto user : result.getUsers()) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "  Examining user: ";
+      user->print(llvm::dbgs(), analysis.getAsmState());
+      llvm::dbgs() << "\n";
+    });
+
+    // Check if result is used as target of another update.
+    // If so, that update's result will alias our written region, and
+    // downstream reads of that result will read our region indirectly.
+    if (auto nextUpdate = dyn_cast<IREE::Stream::AsyncUpdateOp>(user)) {
+      if (nextUpdate.getTarget() == result) {
+        // Check if the next update fully overwrites our write region.
+        // This handles patterns like: alloca -> update[0:4] -> update[0:4]
+        // where the second update completely replaces the first.
+        bool sameStart =
+            (nextUpdate.getTargetOffset() == updateOp.getTargetOffset());
+        bool sameEnd = (nextUpdate.getTargetEnd() == updateOp.getTargetEnd());
+        if (sameStart && sameEnd) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "  ? chained update fully overwrites same region; "
+                        "continuing analysis\n");
+          // This chained update overwrites our write - safe to continue
+          // checking other users.
+          continue;
+        }
+        // Different regions or can't prove full coverage - be conservative.
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "  - result used as target of chained update; cannot elide\n");
+        return false;
+      }
+    }
+
+    // Check if result is used by a tied dispatch operation.
+    // When a dispatch is tied to our result, the dispatch's result aliases
+    // our buffer. Downstream operations reading from that dispatch result
+    // may read our update region, but we don't transitively track those reads
+    // through the tied chain. Conservatively block elision unless we can prove
+    // the dispatch fully overwrites our update region.
+    if (auto dispatchOp = dyn_cast<IREE::Stream::AsyncDispatchOp>(user)) {
+      for (auto &operand : user->getOpOperands()) {
+        if (operand.get() != result)
+          continue;
+        if (dispatchOp.isOperandTied(operand.getOperandNumber())) {
+          // Result is tied to dispatch - check if dispatch fully overwrites
+          // the update region. If not, downstream reads might access our
+          // update region through the dispatch's tied result.
+          // For now, conservatively block elision for any tied dispatch usage.
+          // TODO(benvanik): check if dispatch write range fully covers update
+          // range, which would make elision safe.
+          LLVM_DEBUG(
+              llvm::dbgs()
+              << "  - result used by tied dispatch; cannot elide (downstream "
+                 "reads may access update region through tied result)\n");
+          return false;
+        }
+      }
+    }
+
+    if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(user)) {
+      // Query the user operation for its access ranges.
+      accessOp.getAsyncAccessRanges(queryRanges);
+      LLVM_DEBUG(llvm::dbgs() << "    Got " << queryRanges.size()
+                              << " access ranges from user\n");
+      for (auto &userRange : queryRanges) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "    Range: ";
+          userRange.print(llvm::dbgs(), analysis.getAsmState());
+          llvm::dbgs() << "\n";
+          llvm::dbgs() << "      resource == target? "
+                       << (userRange.resource == target) << "\n";
+          llvm::dbgs() << "      resource == result? "
+                       << (userRange.resource == result) << "\n";
+        });
+        // Only check accesses to the same resource.
+        // Note: result aliases target (tied operand), so check both.
+        if (userRange.resource != target && userRange.resource != result) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "    Skipping range - different resource\n");
+          continue;
+        }
+
+        LLVM_DEBUG(llvm::dbgs() << "    Checking overlap...\n");
+        // TODO(benvanik): use integer range analysis (Presburger) to prove
+        // disjoint constant ranges don't overlap. Currently we conservatively
+        // assume overlap unless start == end (adjacent) or different resources.
+        // Check for overlap with the updated region.
+        if (IREE::Stream::AsyncAccessRange::mayOverlap(updateRange,
+                                                       userRange)) {
+          LLVM_DEBUG(llvm::dbgs() << "    Ranges overlap!\n");
+          // If the overlapping access has a read component, mutation is
+          // observable. Only pure writes (overwrites) are safe.
+          if (!userRange.isWriteOnly()) {
+            LLVM_DEBUG(
+                {
+                  llvm::dbgs()
+                      << "  - user reads from mutated region; cannot elide\n";
+                  llvm::dbgs() << "    v update ";
+                  updateRange.print(llvm::dbgs(), analysis.getAsmState());
+                  llvm::dbgs() << "\n";
+                  llvm::dbgs() << "    ^ conflict ";
+                  userRange.print(llvm::dbgs(), analysis.getAsmState());
+                  llvm::dbgs() << "\n";
+                });
+            return false;
+          }
+          // If the overlapping access is write-only, mutation is overwritten
+          // (safe to elide).
+        }
+      }
+      queryRanges.clear();
+    } else {
+      // Unknown user - conservatively assume it reads the mutation.
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "  - analysis failure on unhandled user of update result:\n";
+        user->print(llvm::dbgs(), analysis.getAsmState());
+      });
+      return false;
+    }
+  }
+
+  // No overlapping reads found - mutation is not observable.
+  LLVM_DEBUG(llvm::dbgs() << "  + update can be elided\n");
+  return true;
+}
+
+// Elides an update operation by proving the mutation has no observable effect.
+static void elideUpdateOp(IREE::Stream::AsyncUpdateOp updateOp) {
+  Value source = updateOp.getUpdate();
+  Value target = updateOp.getTarget();
+  Value result = updateOp.getResult();
+
+  // If this is a full-buffer update with matching types, replace with source.
+  // This handles patterns like: alloca -> full-buffer update -> use
+  // where we can bypass the staging buffer entirely.
+  if (updateOp.getUpdateSize() == updateOp.getTargetSize() &&
+      source.getType() == result.getType()) {
+    // Replace result with source (bypass staging buffer).
+    result.replaceAllUsesWith(source);
+  } else {
+    // Replace result with target (mutation didn't matter).
+    result.replaceAllUsesWith(target);
+  }
+  updateOp.erase();
+}
+
+//===----------------------------------------------------------------------===//
 // --iree-stream-elide-async-copies
 //===----------------------------------------------------------------------===//
 
@@ -1136,13 +1337,16 @@ struct ElisionResults {
   unsigned clonesElided = 0;
   unsigned transfersElided = 0;
   unsigned slicesElided = 0;
+  unsigned updatesElided = 0;
   bool didChange() const {
-    return clonesElided > 0 || transfersElided > 0 || slicesElided > 0;
+    return clonesElided > 0 || transfersElided > 0 || slicesElided > 0 ||
+           updatesElided > 0;
   }
   void add(ElisionResults &other) {
     clonesElided += other.clonesElided;
     transfersElided += other.transfersElided;
     slicesElided += other.slicesElided;
+    updatesElided += other.updatesElided;
   }
 };
 
@@ -1173,6 +1377,13 @@ static ElisionResults tryElideAsyncCopiesInRegion(
             if (isSafeToElideSliceOp(sliceOp, analysis)) {
               elideSliceOp(sliceOp);
               ++results.slicesElided;
+            }
+            return WalkResult::advance();
+          })
+          .Case<IREE::Stream::AsyncUpdateOp>([&](auto updateOp) {
+            if (isSafeToElideUpdateOp(updateOp, analysis)) {
+              elideUpdateOp(updateOp);
+              ++results.updatesElided;
             }
             return WalkResult::advance();
           })
