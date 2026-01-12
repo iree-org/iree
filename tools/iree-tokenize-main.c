@@ -26,6 +26,10 @@
 // Example showing tokenizer info:
 //   iree-tokenize tokenizer.json --info
 //   # Output: {"vocab_size":30522,"model_type":"BPE",...}
+//
+// Example raw output for iree-run-module integration:
+//   iree-tokenize tokenizer.json --raw "Hello, world!"
+//   # Output: 101,7592,1010,2088,999,102
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +51,8 @@ IREE_FLAG(bool, batch, false, "Batch mode: read lines from stdin.");
 IREE_FLAG(bool, stream, false, "Stream stdin continuously (not line-by-line).");
 IREE_FLAG(int32_t, max_length, 0, "Max output length (0 = unlimited).");
 IREE_FLAG(bool, info, false, "Show tokenizer info instead of encoding.");
+IREE_FLAG(bool, raw, false,
+          "Output comma-separated IDs only (no JSON), for iree-run-module.");
 
 //===----------------------------------------------------------------------===//
 // JSON Output Helpers
@@ -103,19 +109,32 @@ static iree_status_t iree_tooling_tokenize_encode(iree_tokenizer_t* tokenizer,
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_tokenizer_encode(tokenizer, text, options, ids,
                                   IREE_ARRAYSIZE(ids), &count));
-    fputs("{\"ids\":", stdout);
-    iree_tooling_print_json_ids(ids, count);
-    fputs("}\n", stdout);
+    if (FLAG_raw) {
+      // Raw mode: comma-separated IDs only.
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        if (i > 0) fputc(',', stdout);
+        fprintf(stdout, "%" PRId32, ids[i]);
+      }
+      fputc('\n', stdout);
+    } else {
+      fputs("{\"ids\":", stdout);
+      iree_tooling_print_json_ids(ids, count);
+      fputs("}\n", stdout);
+    }
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
 
   // Stream tokens directly to stdout (no output buffer limit).
-  fputs("{\"ids\":[", stdout);
+  if (!FLAG_raw) fputs("{\"ids\":[", stdout);
   iree_tooling_encode_context_t ctx = {.first_token = true};
   iree_status_t status = iree_tokenizer_encode_streaming(
       tokenizer, text, flags, iree_tooling_encode_callback, &ctx);
-  fputs("]}\n", stdout);
+  if (FLAG_raw) {
+    fputc('\n', stdout);
+  } else {
+    fputs("]}\n", stdout);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -307,8 +326,8 @@ static iree_status_t iree_tooling_tokenize_stdin_streaming(
       FLAG_no_special ? IREE_TOKENIZER_ENCODE_FLAG_DEFAULT
                       : IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS;
 
-  // Start JSON output.
-  fputs("{\"ids\":[", stdout);
+  // Start output (JSON wrapper or raw).
+  if (!FLAG_raw) fputs("{\"ids\":[", stdout);
   iree_tooling_encode_context_t ctx = {.first_token = true};
 
   // Initialize streaming state (~8.5KB, stack allocated).
@@ -323,7 +342,11 @@ static iree_status_t iree_tooling_tokenize_stdin_streaming(
     iree_status_t status = iree_tokenizer_encode_stream_feed(
         &state, chunk, iree_tooling_encode_callback, &ctx);
     if (!iree_status_is_ok(status)) {
-      fputs("]}\n", stdout);
+      if (FLAG_raw) {
+        fputc('\n', stdout);
+      } else {
+        fputs("]}\n", stdout);
+      }
       IREE_TRACE_ZONE_END(z0);
       return status;
     }
@@ -333,13 +356,21 @@ static iree_status_t iree_tooling_tokenize_stdin_streaming(
   iree_status_t status = iree_tokenizer_encode_stream_finalize(
       &state, iree_tooling_encode_callback, &ctx);
   if (!iree_status_is_ok(status)) {
-    fputs("]}\n", stdout);
+    if (FLAG_raw) {
+      fputc('\n', stdout);
+    } else {
+      fputs("]}\n", stdout);
+    }
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
 
-  // Close JSON.
-  fputs("]}\n", stdout);
+  // Close output.
+  if (FLAG_raw) {
+    fputc('\n', stdout);
+  } else {
+    fputs("]}\n", stdout);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -450,6 +481,14 @@ int main(int argc, char** argv) {
       "  Encode text to token IDs (default mode):\n"
       "    iree-tokenize tokenizer.json \"hello, world!\"\n"
       "    {\"ids\":[101,7592,1010,2088,999,102]}\n"
+      "\n"
+      "  Raw output for iree-run-module integration:\n"
+      "    iree-tokenize tokenizer.json --raw \"hello, world!\"\n"
+      "    101,7592,1010,2088,999,102\n"
+      "\n"
+      "  Use with iree-run-module:\n"
+      "    iree-run-module --module=model.vmfb \\\n"
+      "      --input=\"6xi32=$(iree-tokenize tokenizer.json --raw 'hello')\"\n"
       "\n"
       "  Encode without special tokens (no [CLS]/[SEP] or BOS/EOS):\n"
       "    iree-tokenize tokenizer.json --no_special \"hello world\"\n"

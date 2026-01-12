@@ -10,6 +10,10 @@
 // RUN:   FileCheck %s --check-prefix=BATCH
 // RUN: iree-tokenize %p/iree-tokenize.json --decode "0,5,6,1" | \
 // RUN:   FileCheck %s --check-prefix=DECODE
+// RUN: iree-tokenize %p/iree-tokenize.json --raw "hello world" | \
+// RUN:   FileCheck %s --check-prefix=RAW
+// RUN: iree-tokenize %p/iree-tokenize.json --raw --no_special "hello" | \
+// RUN:   FileCheck %s --check-prefix=RAW-NOSPEC
 
 // Basic encoding with special tokens.
 // BASIC: {"ids":[0,5,6,1]}
@@ -29,3 +33,9 @@
 
 // Decoding back to text.
 // DECODE: {"text":"[CLS] hello world [SEP]"}
+
+// Raw output (comma-separated IDs, no JSON wrapper).
+// RAW: 0,5,6,1
+
+// Raw output without special tokens.
+// RAW-NOSPEC: 5
