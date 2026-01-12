@@ -1,0 +1,78 @@
+{
+  "model": {
+    "type": "WordPiece",
+    "vocab": {
+      "[PAD]": 0, "[UNK]": 1, "[CLS]": 2, "[SEP]": 3, "[MASK]": 4,
+      "the": 5, "quick": 6, "brown": 7, "fox": 8, "jump": 9,
+      "##s": 10, "over": 11, "lazy": 12, "dog": 13, "hello": 14,
+      "world": 15, "this": 16, "is": 17, "a": 18, "test": 19,
+      "sentence": 20, "with": 21, "punctuation": 22, "upper": 23,
+      "##case": 24, "and": 25, "mixed": 26, "word": 27, "too": 28,
+      "##ing": 29, "##ed": 30, "##er": 31, "##ly": 32, "##tion": 33,
+      "##able": 34, "##ness": 35, "un": 36, "re": 37, "pre": 38,
+      ",": 39, ".": 40, "!": 41, "?": 42, ";": 43, ":": 44,
+      "'": 45, "\"": 46, "-": 47, "(": 48, ")": 49,
+      "i": 50, "you": 51, "he": 52, "she": 53, "it": 54,
+      "we": 55, "they": 56, "have": 57, "has": 58, "had": 59,
+      "do": 60, "does": 61, "did": 62, "will": 63, "would": 64,
+      "can": 65, "could": 66, "should": 67, "may": 68, "might": 69,
+      "be": 70, "am": 71, "are": 72, "was": 73, "were": 74,
+      "been": 75, "being": 76, "not": 77, "no": 78, "yes": 79,
+      "all": 80, "each": 81, "every": 82, "both": 83, "few": 84,
+      "more": 85, "most": 86, "other": 87, "some": 88, "such": 89,
+      "what": 90, "which": 91, "who": 92, "when": 93, "where": 94,
+      "why": 95, "how": 96, "if": 97, "then": 98, "than": 99,
+      "so": 100, "as": 101, "just": 102, "also": 103, "only": 104,
+      "now": 105, "new": 106, "good": 107, "first": 108, "last": 109,
+      "long": 110, "great": 111, "little": 112, "own": 113, "old": 114,
+      "right": 115, "high": 116, "small": 117, "large": 118, "next": 119,
+      "early": 120, "young": 121, "important": 122, "public": 123, "bad": 124,
+      "same": 125, "able": 126, "to": 127, "of": 128, "in": 129,
+      "for": 130, "on": 131, "at": 132, "by": 133, "from": 134,
+      "up": 135, "about": 136, "into": 137, "through": 138, "after": 139
+    },
+    "unk_token": "[UNK]",
+    "continuing_subword_prefix": "##"
+  },
+  "added_tokens": [
+    {"id": 0, "content": "[PAD]", "special": true},
+    {"id": 1, "content": "[UNK]", "special": true},
+    {"id": 2, "content": "[CLS]", "special": true},
+    {"id": 3, "content": "[SEP]", "special": true},
+    {"id": 4, "content": "[MASK]", "special": true}
+  ],
+  "normalizer": {
+    "type": "BertNormalizer",
+    "clean_text": true,
+    "handle_chinese_chars": true,
+    "strip_accents": true,
+    "lowercase": true
+  },
+  "pre_tokenizer": {
+    "type": "BertPreTokenizer"
+  },
+  "decoder": {
+    "type": "WordPiece",
+    "prefix": "##",
+    "cleanup": true
+  },
+  "post_processor": {
+    "type": "TemplateProcessing",
+    "single": [
+      {"SpecialToken": {"id": "[CLS]", "type_id": 0}},
+      {"Sequence": {"id": "A", "type_id": 0}},
+      {"SpecialToken": {"id": "[SEP]", "type_id": 0}}
+    ],
+    "pair": [
+      {"SpecialToken": {"id": "[CLS]", "type_id": 0}},
+      {"Sequence": {"id": "A", "type_id": 0}},
+      {"SpecialToken": {"id": "[SEP]", "type_id": 0}},
+      {"Sequence": {"id": "B", "type_id": 1}},
+      {"SpecialToken": {"id": "[SEP]", "type_id": 1}}
+    ],
+    "special_tokens": {
+      "[CLS]": {"id": "[CLS]", "ids": [2], "tokens": ["[CLS]"]},
+      "[SEP]": {"id": "[SEP]", "ids": [3], "tokens": ["[SEP]"]}
+    }
+  }
+}

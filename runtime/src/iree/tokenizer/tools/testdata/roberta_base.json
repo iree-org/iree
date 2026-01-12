@@ -1,0 +1,11 @@
+{
+  "model": "FacebookAI/roberta-base",
+  "description": "#20 - RoBERTa base (8M+ downloads)",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "unicode", "input": "Héllo wörld! café résumé"},
+    {"name": "sentence", "input": "The capital of France is <mask>."},
+    {"name": "long", "input": "Natural language processing is a subfield of artificial intelligence."},
+    {"name": "no_special", "input": "hello world", "add_special_tokens": false}
+  ]
+}

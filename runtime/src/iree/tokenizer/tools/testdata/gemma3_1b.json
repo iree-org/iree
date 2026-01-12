@@ -1,0 +1,9 @@
+{
+  "model": "unsloth/gemma-3-1b-it",
+  "description": "Gemma 3 1B Instruct - ungated Unsloth mirror",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "instruction", "input": "Write a haiku about programming"},
+    {"name": "no_special", "input": "test", "add_special_tokens": false}
+  ]
+}

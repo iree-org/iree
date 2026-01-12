@@ -1,0 +1,11 @@
+{
+  "model": "nghuyong/ernie-2.0-base-en",
+  "description": "ERNIE 2.0 - Baidu enhanced BERT",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "unicode", "input": "Héllo wörld!"},
+    {"name": "special_chars", "input": "x = 1 + 2"},
+    {"name": "entity", "input": "Barack Obama was the 44th President."},
+    {"name": "no_special", "input": "hello", "add_special_tokens": false}
+  ]
+}

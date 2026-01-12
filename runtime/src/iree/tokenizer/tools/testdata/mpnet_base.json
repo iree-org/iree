@@ -1,0 +1,11 @@
+{
+  "model": "microsoft/mpnet-base",
+  "description": "MPNet base - masked and permuted pretraining",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "unicode", "input": "Héllo wörld! café"},
+    {"name": "special_chars", "input": "Code: `x = 1`"},
+    {"name": "sentence", "input": "This is a sample sentence for embedding."},
+    {"name": "no_special", "input": "hello world", "add_special_tokens": false}
+  ]
+}
