@@ -147,9 +147,9 @@ static Value consumeBoundFence(Value timepoint, PatternRewriter &rewriter) {
 
 Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
                              PatternRewriter &rewriter) {
-  // Check to see if anyone is consuming the timepoint - if not then we don't
-  // need create a fence.
-  if (timepoint.use_empty()) {
+  // Handle nullptr timepoint (from TimelineOps with no result timepoint) or
+  // timepoints with no consumers by returning a null fence.
+  if (!timepoint || timepoint.use_empty()) {
     return IREE::Util::NullOp::create(rewriter, loc,
                                       rewriter.getType<IREE::HAL::FenceType>());
   }
