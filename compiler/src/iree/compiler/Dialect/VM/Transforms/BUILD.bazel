@@ -20,7 +20,9 @@ package(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
+        "AnnotateFunctions.cpp",
         "Conversion.cpp",
+        "ConvertToYieldableCalls.cpp",
         "DeduplicateRodata.cpp",
         "DropEmptyModuleInitializers.cpp",
         "DropUnusedCalls.cpp",

@@ -19,6 +19,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -365,26 +366,46 @@ bool ValueLiveness::isLastRealValueUse(Value value, Operation *useOp,
   // Check if value escapes block.
   auto &blockSets = blockLiveness_[useOp->getBlock()];
   if (blockSets.liveOut.count(value)) {
-    // Value is in liveOut, but if useOp is a branch terminator and the value
-    // is passed as a successor operand, we need to check if ALL escaping uses
-    // are through this branch. If so, the branch IS the last use.
+    // Value is in liveOut. For non-terminators, this means the value has uses
+    // after this block, so it's not at last use.
     if (!useOp->hasTrait<OpTrait::IsTerminator>()) {
       return false;
     }
-    // For terminators, check if the value escapes to any successor blocks
-    // OTHER than through this terminator's successor operands.
-    // Discard ops don't count as "escaping" - they're cleanup markers.
-    for (auto &use : value.getUses()) {
-      Operation *userOp = use.getOwner();
-      if (userOp->getBlock() != useOp->getBlock() &&
-          !isa<IREE::VM::DiscardRefsOp>(userOp)) {
-        // This use is in another block - the value truly escapes.
-        return false;
+    // For branch terminators where the value is forwarded as a successor
+    // operand, discards in successors are just cleanup - they don't count as
+    // "real" uses since the branch transfers ownership. But for other
+    // terminators (like vm.call.yieldable), the value is NOT forwarded -
+    // discards in successors ARE real uses of the original value.
+    bool valueIsSuccessorOperand = false;
+    if (auto branchOp = dyn_cast<BranchOpInterface>(useOp)) {
+      for (unsigned i = 0; i < useOp->getNumSuccessors(); ++i) {
+        SuccessorOperands succOperands = branchOp.getSuccessorOperands(i);
+        for (Value operand : succOperands.getForwardedOperands()) {
+          if (operand == value) {
+            valueIsSuccessorOperand = true;
+            break;
+          }
+        }
+        if (valueIsSuccessorOperand)
+          break;
       }
     }
-    // All uses are in the current block, so even though it's "liveOut" (because
-    // it's passed as a successor operand), the branch terminator IS the last
-    // use. Fall through to check if this is the last use within the block.
+    // Check if the value escapes to any successor blocks.
+    for (auto &use : value.getUses()) {
+      Operation *userOp = use.getOwner();
+      if (userOp->getBlock() != useOp->getBlock()) {
+        // Use is in another block. If it's a discard AND the value was
+        // forwarded as a successor operand, skip it (ownership transferred).
+        // Otherwise, it's a real use and the value escapes.
+        bool isDiscardOfForwardedValue =
+            isa<IREE::VM::DiscardRefsOp>(userOp) && valueIsSuccessorOperand;
+        if (!isDiscardOfForwardedValue) {
+          return false;
+        }
+      }
+    }
+    // All uses in other blocks were discards of forwarded values. Fall through
+    // to check if this is the last use within the block.
   }
 
   // Walk forward to see if any non-discard uses exist after this op.

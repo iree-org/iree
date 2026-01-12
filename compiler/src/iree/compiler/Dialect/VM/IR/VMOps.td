@@ -1365,6 +1365,7 @@ def VM_BufferAllocOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc]>,
       AlwaysSpeculatable,
+      VM_MayFail,
     ]> {
   let summary = [{Allocates a new zero-initialized buffer.}];
   let description = [{
@@ -1396,6 +1397,7 @@ def VM_BufferCloneOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc, MemRead]>,
       AlwaysSpeculatable,
+      VM_MayFail,
     ]> {
   let summary = [{Clones a buffer.}];
   let description = [{
@@ -1460,6 +1462,7 @@ def VM_BufferCopyOp :
     VM_Op<"buffer.copy", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Copies a range of a buffer to another.}];
   let description = [{
@@ -1492,6 +1495,7 @@ def VM_BufferCompareOp :
     VM_Op<"buffer.compare", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Compares a range of a buffer to another.}];
   let description = [{
@@ -1529,6 +1533,7 @@ class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Fills an element range of the buffer with the given value, like memset.
@@ -1587,6 +1592,7 @@ class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Loads a value from the buffer at the given element offset.
@@ -1618,6 +1624,7 @@ class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Stores a value to the buffer at the given element offset.
@@ -1709,6 +1716,7 @@ def VM_BufferStoreF64Op :
 def VM_BufferHashOp : VM_Op<"buffer.hash", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let description = [{
     Computes the SipHash-2-4 of the source buffer at the given offset for
@@ -1760,6 +1768,7 @@ def VM_ListAllocOp :
     VM_Op<"list.alloc", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc]>,
+      VM_MayFail,
     ]> {
   let summary = [{Allocates a new empty list.}];
   let description = [{
@@ -1789,6 +1798,7 @@ def VM_ListReserveOp :
     VM_Op<"list.reserve", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc, MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Reserves capacity for list growth.}];
   let description = [{
@@ -1816,6 +1826,7 @@ def VM_ListSizeOp :
     VM_Op<"list.size", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let summary = [{The size of the list in elements.}];
   let description = [{
@@ -1844,6 +1855,7 @@ def VM_ListResizeOp :
     VM_Op<"list.resize", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Resizes the list to a new count in elements.}];
   let description = [{
@@ -1873,6 +1885,7 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ])> {
   let summary = [{Primitive type element accessor.}];
   let description = [{
@@ -1904,6 +1917,7 @@ class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let summary = [{Primitive type element mutator.}];
   let description = [{
@@ -1957,6 +1971,7 @@ def VM_ListGetRefOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let summary = [{ref type element accessor.}];
   let description = [{
@@ -2004,6 +2019,7 @@ def VM_ListSetRefOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{ref type element mutator.}];
   let description = [{
@@ -4421,6 +4437,7 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
       DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       CallOpInterface,
+      VM_MayFail,
     ])> {
   let extraClassDeclaration = [{
     /// Get the argument operands to the called function.
@@ -4568,6 +4585,241 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
   let hasCanonicalizer = 1;
 }
 
+def VM_CallYieldableOp : VM_Op<"call.yieldable", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+    CallOpInterface,
+    Terminator,
+    Util_YieldPoint,
+    VM_MayFail,
+  ]> {
+  let summary = [{Call operation that may yield.}];
+  let description = [{
+    Calls a VM function (internal or imported) that may yield. If the call
+    yields execution resumes at the specified successor block with the call
+    results as block arguments. If the call completes synchronously control
+    branches to the successor with the results.
+
+    This op is a terminator that combines a call with an explicit resume point,
+    making the yield/resume semantics visible in the IR.
+
+    ```
+    ^bb0:
+      vm.call.yieldable @hal.fence.await(%timeout, %fence) : (i32, !vm.ref<?>) -> ^resume(i32)
+    ^resume(%result : i32):
+      vm.return %result
+    ```
+  }];
+
+  let arguments = (ins
+    VM_FuncRefAttr:$callee,
+    Variadic<VM_AnyType>:$arguments,
+    TypeArrayAttr:$result_types,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let successors = (successor
+    AnySuccessor:$dest
+  );
+
+  let assemblyFormat = [{
+    $callee `(` $arguments `)` attr-dict `:` `(` type($arguments) `)`
+    `->` $dest custom<ResultTypeList>($result_types)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CallYieldable>,
+    VM_EncFuncAttr<"callee">,
+    VM_EncVariadicOperands<"arguments">,
+    VM_EncBranchTarget<"dest">,
+    VM_EncBlockArgResults<"dest">,
+  ];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "FlatSymbolRefAttr":$callee,
+      "ValueRange":$arguments,
+      "Block *":$dest,
+      "ArrayRef<Type>":$resultTypes),
+    [{
+      $_state.addAttribute("callee", callee);
+      $_state.addOperands(arguments);
+      $_state.addAttribute("result_types",
+          $_builder.getTypeArrayAttr(resultTypes));
+      $_state.addSuccessors(dest);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return getArguments();
+    }
+    MutableOperandRange getArgOperandsMutable() {
+      return getArgumentsMutable();
+    }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+    }
+
+    /// Get the result types of the call.
+    SmallVector<Type> getResultTypesVec() {
+      SmallVector<Type> types;
+      for (auto typeAttr : getResultTypes())
+        types.push_back(cast<TypeAttr>(typeAttr).getValue());
+      return types;
+    }
+
+    void setDest(Block *block);
+
+    /// RefMoveInterface: ref operands support MOVE (callee handles ownership).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return isa<IREE::VM::RefType>(getArguments()[operandIndex].getType());
+    }
+    /// RefMoveInterface: ref results support MOVE (callee transfers ownership).
+    bool isRefResultMovable(unsigned resultIndex) {
+      return isa<IREE::VM::RefType>(getResultTypesVec()[resultIndex]);
+    }
+  }];
+
+  let hasVerifier = 1;
+}
+
+def VM_CallVariadicYieldableOp : VM_Op<"call.variadic.yieldable", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+    CallOpInterface,
+    Terminator,
+    Util_YieldPoint,
+    VM_MayFail,
+  ]> {
+  let summary = [{Variadic call operation that may yield.}];
+  let description = [{
+    Calls a variadic VM import function that may yield. If the call yields,
+    execution resumes at the specified successor block with the call results
+    as block arguments. If the call completes synchronously, control branches
+    to the successor with the results.
+
+    Variadic arguments must be specified with a total count in the segment_sizes
+    attribute. Only imports are supported (not internal functions).
+
+    ```
+    ^bb0:
+      vm.call.variadic.yieldable @import(%a, %b, %c) {segment_sizes = dense<[1, 2]> : vector<2xi16>}
+        : (i32, i32, i32) -> ^resume(i32)
+    ^resume(%result : i32):
+      vm.return %result
+    ```
+  }];
+
+  let arguments = (ins
+    VM_FuncRefAttr:$callee,
+    SignlessIntElementsAttr<16>:$segment_sizes,
+    TypeArrayAttr:$segment_types,
+    Variadic<VM_AnyType>:$operands,
+    TypeArrayAttr:$result_types,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let successors = (successor
+    AnySuccessor:$dest
+  );
+
+  let assemblyFormat = [{
+    $callee `(` $operands `)` attr-dict `:` `(` type($operands) `)`
+    `->` $dest custom<ResultTypeList>($result_types)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CallVariadicYieldable>,
+    VM_EncFuncAttr<"callee">,
+    VM_EncPrimitiveArrayAttr<"segment_sizes", 16>,
+    VM_EncVariadicOperands<"operands">,
+    VM_EncBranchTarget<"dest">,
+    VM_EncBlockArgResults<"dest">,
+  ];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "FlatSymbolRefAttr":$callee,
+      "ArrayRef<int16_t>":$segmentSizes,
+      "ArrayRef<Type>":$segmentTypes,
+      "ValueRange":$operands,
+      "Block *":$dest,
+      "ArrayRef<Type>":$resultTypes),
+    [{
+      $_state.addAttribute("callee", callee);
+      $_state.addAttribute("segment_sizes",
+          DenseIntElementsAttr::get(
+              VectorType::get({static_cast<int64_t>(segmentSizes.size())},
+                              $_builder.getIntegerType(16)),
+              segmentSizes));
+      $_state.addAttribute("segment_types", $_builder.getArrayAttr(
+          llvm::map_to_vector(segmentTypes, [&](Type type) {
+              return cast<Attribute>(TypeAttr::get(type));
+          })));
+      $_state.addOperands(operands);
+      $_state.addAttribute("result_types",
+          $_builder.getTypeArrayAttr(resultTypes));
+      $_state.addSuccessors(dest);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return getOperands();
+    }
+    MutableOperandRange getArgOperandsMutable() {
+      return getOperandsMutable();
+    }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+    }
+
+    /// Get the result types of the call.
+    SmallVector<Type> getResultTypesVec() {
+      SmallVector<Type> types;
+      for (auto typeAttr : getResultTypes())
+        types.push_back(cast<TypeAttr>(typeAttr).getValue());
+      return types;
+    }
+
+    void setDest(Block *block);
+
+    /// RefMoveInterface: ref operands support MOVE (callee handles ownership).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return isa<IREE::VM::RefType>(getOperands()[operandIndex].getType());
+    }
+    /// RefMoveInterface: ref results support MOVE (callee transfers ownership).
+    bool isRefResultMovable(unsigned resultIndex) {
+      return isa<IREE::VM::RefType>(getResultTypesVec()[resultIndex]);
+    }
+  }];
+
+  let hasVerifier = 1;
+}
+
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     DeclareOpInterfaceMethods<VM_RefMoveInterface>,
@@ -4621,6 +4873,7 @@ def VM_ReturnOp : VM_Op<"return", [
 def VM_FailOp : VM_Op<"fail", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
+    VM_MayFail,
   ]> {
   let summary = [{Raises a global failure.}];
   let description = [{
@@ -4673,6 +4926,7 @@ def VM_FailOp : VM_Op<"fail", [
 
 def VM_CondFailOp : VM_Op<"cond_fail", [
     VM_PseudoOp,
+    VM_MayFail,
   ]> {
   let summary = [{Raises a global failure if the condition is true.}];
   let description = [{
