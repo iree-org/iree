@@ -189,7 +189,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: iree-org/iree-test-suites
-          ref: 17a391dc3882f136e567bf2687806ef6af46ad64
+          ref: 58e57834b86240e6d5a2a997933f53c8dde1156a
           path: iree-test-suites
       - name: Install ONNX models test suite requirements
         run: |
