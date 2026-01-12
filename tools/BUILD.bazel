@@ -241,6 +241,7 @@ iree_runtime_cc_binary(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:json",
         "//runtime/src/iree/base/internal:unicode",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/tokenizer",

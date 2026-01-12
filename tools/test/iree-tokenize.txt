@@ -2,7 +2,9 @@
 // RUN:   FileCheck %s --check-prefix=BASIC
 // RUN: iree-tokenize %p/iree-tokenize.json --no_special "hello" | \
 // RUN:   FileCheck %s --check-prefix=NOSPEC
-// RUN: iree-tokenize %p/iree-tokenize.json "日本語テスト" | \
+// Unicode test: 日本語テスト (Japanese: "Japanese language test")
+// Uses --json_string with \u escapes for Windows portability.
+// RUN: iree-tokenize %p/iree-tokenize.json --json_string "\u65e5\u672c\u8a9e\u30c6\u30b9\u30c8" | \
 // RUN:   FileCheck %s --check-prefix=UNICODE
 // RUN: iree-tokenize %p/iree-tokenize.json --info | \
 // RUN:   FileCheck %s --check-prefix=INFO
