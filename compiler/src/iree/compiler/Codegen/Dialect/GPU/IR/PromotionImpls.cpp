@@ -46,25 +46,22 @@ Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v,
     Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
                                           tensorType.getElementType());
     auto copy = linalg::CopyOp::create(builder, loc, v, empty);
-    if (attr) {
-      setLoweringConfig(copy, attr);
-    }
+    setLoweringConfig(copy, attr);
     return copy.getResult(0);
   }
   int64_t numElements = tensorType.getNumElements();
   Value empty = tensor::EmptyOp::create(builder, loc, {numElements},
                                         tensorType.getElementType());
-  Value swizzled = IREE::Codegen::SwizzleHintOp::create(
-      builder, loc, empty,
+  IREE::Codegen::SwizzleAttrInterface swizzle =
       IREE::Codegen::XORShuffleAttr::get(builder.getContext(), rowWidth,
-                                         accessWidth, int64_t(), int64_t()));
+                                         accessWidth, int64_t(), int64_t());
+  Value swizzled =
+      IREE::Codegen::SwizzleHintOp::create(builder, loc, empty, swizzle);
   Value expanded = tensor::ExpandShapeOp::create(
       builder, loc, tensorType, swizzled,
       {llvm::to_vector(llvm::seq(tensorType.getRank()))});
   auto copy = linalg::CopyOp::create(builder, loc, v, expanded);
-  if (attr) {
-    setLoweringConfig(copy, attr);
-  }
+  setLoweringConfig(copy, attr);
   return copy.getResult(0);
 }
 
