@@ -1,0 +1,12 @@
+{
+  "model": "dmis-lab/biobert-v1.1",
+  "description": "BioBERT - biomedical text",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "medical", "input": "The patient presented with acute myocardial infarction."},
+    {"name": "drug", "input": "Metformin 500mg twice daily was prescribed."},
+    {"name": "gene", "input": "BRCA1 mutations are associated with breast cancer."},
+    {"name": "special_chars", "input": "Dosage: 10mg/kg IV q8h"},
+    {"name": "no_special", "input": "clinical trial", "add_special_tokens": false}
+  ]
+}

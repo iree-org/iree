@@ -1,0 +1,182 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# DFA Executor
+#===------------------------------------------------------------------------===#
+
+# Minimal runtime library for executing pre-compiled DFAs.
+# This is the only regex code needed when DFAs are embedded at compile time.
+iree_runtime_cc_library(
+    name = "exec",
+    srcs = ["exec.c"],
+    hdrs = ["exec.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:unicode",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "exec_test",
+    srcs = ["exec_test.cc"],
+    deps = [
+        ":exec",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "exec_benchmark",
+    srcs = ["exec_benchmark.cc"],
+    deps = [
+        ":exec",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Regex Compiler (Internal Components)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "internal_lexer",
+    srcs = ["internal/lexer.c"],
+    hdrs = ["internal/lexer.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":exec",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "internal_ast",
+    hdrs = ["internal/ast.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "internal_parser",
+    srcs = ["internal/parser.c"],
+    hdrs = ["internal/parser.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":exec",
+        ":internal_ast",
+        ":internal_lexer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "internal_nfa",
+    srcs = ["internal/nfa.c"],
+    hdrs = ["internal/nfa.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":exec",
+        ":internal_ast",
+        ":internal_lexer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:unicode",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "internal_dfa",
+    srcs = ["internal/dfa.c"],
+    hdrs = ["internal/dfa.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":exec",
+        ":internal_nfa",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:arena",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Regex Compiler (Public API)
+#===------------------------------------------------------------------------===#
+
+# Full compiler for transforming regex patterns to DFA binary format.
+# Includes lexer, parser, NFA/DFA construction, and serialization.
+iree_runtime_cc_library(
+    name = "compile",
+    srcs = ["compile.c"],
+    hdrs = ["compile.h"],
+    deps = [
+        ":exec",
+        ":internal_dfa",
+        ":internal_nfa",
+        ":internal_parser",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "compile_test",
+    srcs = ["compile_test.cc"],
+    deps = [
+        ":compile",
+        ":exec",
+        ":internal_parser",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "compile_benchmark",
+    srcs = ["compile_benchmark.cc"],
+    deps = [
+        ":compile",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# End-to-End Regex Tests
+#===------------------------------------------------------------------------===#
+
+# Combined compile + execute tests for verifying regex matching behavior.
+# For compiler-only tests, see compile_test.
+# For executor-only tests with hand-built DFAs, see exec_test.
+iree_runtime_cc_test(
+    name = "regex_test",
+    srcs = ["regex_test.cc"],
+    deps = [
+        ":compile",
+        ":exec",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
