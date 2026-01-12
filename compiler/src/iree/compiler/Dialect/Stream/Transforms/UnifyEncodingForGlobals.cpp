@@ -606,10 +606,11 @@ static Value maybeInsertReencode(IRRewriter &rewriter, Operation *op,
 static void updateTensorCloneOp(TensorCloneOp cloneOp,
                                 const OperandEncodingUpdates &operandUpdates,
                                 IRRewriter &rewriter) {
-  if (!operandUpdates.contains(0)) {
+  int operandNumber = cloneOp.getSourceMutable().getOperandNumber();
+  if (!operandUpdates.contains(operandNumber)) {
     return;
   }
-  Attribute newEncoding = operandUpdates.lookup(0);
+  Attribute newEncoding = operandUpdates.lookup(operandNumber);
   Value reencoded = maybeInsertReencode(
       rewriter, cloneOp, cloneOp.getSource(), cloneOp.getSourceEncoding(),
       cloneOp.getSourceEncodingDims(), cloneOp.getSourceSize(), newEncoding,
@@ -642,9 +643,9 @@ static void updateTensorUpdateOp(TensorUpdateOp updateOp,
                                  const OperandEncodingUpdates &operandUpdates,
                                  IRRewriter &rewriter) {
   // Handle target operand.
-  int operandNumber = updateOp.getTargetMutable().getOperandNumber();
-  if (operandUpdates.contains(operandNumber)) {
-    Attribute newEncoding = operandUpdates.lookup(operandNumber);
+  int targetOperandNum = updateOp.getTargetMutable().getOperandNumber();
+  if (operandUpdates.contains(targetOperandNum)) {
+    Attribute newEncoding = operandUpdates.lookup(targetOperandNum);
     Value reencoded = maybeInsertReencode(
         rewriter, updateOp, updateOp.getTarget(), updateOp.getTargetEncoding(),
         updateOp.getTargetEncodingDims(), updateOp.getTargetSize(), newEncoding,
@@ -702,7 +703,9 @@ static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
   }
 }
 
-// Collects updates for stream tensor ops by walking from global loads.
+// Collects updates for stream tensor ops by walking from global loads. Fixup
+// should be applied to all stream tensor ops that use the encoded global's
+// data.
 static void collectUpdatesForStreamTensorOps(Explorer &explorer,
                                              EncodedGlobalInfo &encodedInfo,
                                              Attribute newEncoding,
@@ -735,47 +738,24 @@ static void collectUpdatesForStreamTensorOps(Explorer &explorer,
         return WalkResult::advance();
       }
 
-      // Handle TensorCloneOp - may need re-encode insertion.
-      if (auto cloneOp = dyn_cast<TensorCloneOp>(user)) {
-        LDBG() << "      Found TensorCloneOp";
-        updates[user][operand.getOperandNumber()] = newEncoding;
-        // Continue tracing through the clone's result.
-        worklist.push_back(cloneOp.getResult());
-        return WalkResult::advance();
-      }
-
-      // Handle TensorEncodeOp - may need re-encode insertion.
-      if (auto encodeOp = dyn_cast<TensorEncodeOp>(user)) {
-        LDBG() << "      Found TensorEncodeOp";
-        updates[user][operand.getOperandNumber()] = newEncoding;
-        // Don't continue tracing - encode produces a different encoding.
-        return WalkResult::advance();
-      }
-
-      // Handle TensorUpdateOp - may need re-encode insertion.
-      if (auto updateOp = dyn_cast<TensorUpdateOp>(user)) {
-        LDBG() << "      Found TensorUpdateOp";
-        updates[user][operand.getOperandNumber()] = newEncoding;
-        // Continue tracing through the update's result if the encoded global
-        // flows to the target operand.
-        if (operand.getOperandNumber() == 0) {
-          worklist.push_back(updateOp.getResult());
-        }
-        return WalkResult::advance();
-      }
-
-      // Handle TensorDispatchOp - update operand encodings.
-      auto dispatchOp = dyn_cast<IREE::Stream::TensorDispatchOp>(user);
-      if (!dispatchOp) {
-        return WalkResult::advance();
-      }
-
-      // The operand number is the index in the full operand list (including
-      // workload). We need the index in getMixedOperands() for encoding lookup.
-      unsigned mixedOperandIdx =
-          operand.getOperandNumber() - dispatchOp.getWorkload().size();
-      LDBG() << "      Found TensorDispatchOp operand " << mixedOperandIdx;
-      updates[user][mixedOperandIdx] = newEncoding;
+      // Do not continue walking past these ops because this is the end point.
+      // The fixup will be applied directly to these ops, so updates are not
+      // needed for their users.
+      TypeSwitch<Operation *>(user)
+          .Case<TensorDispatchOp>([&](auto dispatchOp) {
+            // The operand number is the index in the full operand list
+            // (including workload). We need the index in getMixedOperands() for
+            // encoding lookup.
+            unsigned mixedOperandIdx =
+                operand.getOperandNumber() - dispatchOp.getWorkload().size();
+            LDBG() << "      Found TensorDispatchOp operand "
+                   << mixedOperandIdx;
+            updates[user][mixedOperandIdx] = newEncoding;
+          })
+          .Case<TensorCloneOp, TensorEncodeOp, TensorUpdateOp>([&](auto op) {
+            updates[user][operand.getOperandNumber()] = newEncoding;
+          })
+          .Default([](Operation *op) {});
       return WalkResult::advance();
     });
   }
