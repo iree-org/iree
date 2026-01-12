@@ -4600,6 +4600,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#-iree-pcf-resolve-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-pcf-resolve-tokens
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4705,6 +4714,19 @@ determines how worker IDs and counts are materialized.</p>
 scope) is inserted after the lowered op. This attribute is introduced when
 converting sref to memref to retain the required synchronization semantics
 of any tied results.</p>
+<h3 id="-iree-pcf-resolve-tokens"><code>-iree-pcf-resolve-tokens</code><a class="headerlink" href="#-iree-pcf-resolve-tokens" title="Permanent link">link</a></h3>
+<p><em>Resolves synchronization scopes on <code>pcf.sref</code> types.</em></p>
+<p>Resolves synchronization scopes attached to <code>pcf.sref</code> types by expanding
+them to their concrete representations. This pass should run before
+<code>iree-pcf-convert-sref-to-memref</code>.</p>
+<p>The input is IR containing <code>pcf.sref</code> types with sync scope attributes.
+The pass expands <code>pcf.sref&lt;..., sync_scope&gt;</code> types into a <code>pcf.sref</code>
+without sync scope plus any concrete types required by the sync scope
+attribute. For shaped refs with <code>sync_on_return</code> scope, the parent
+<code>pcf.generic</code> or <code>pcf.loop</code> op has its <code>sync_on_return</code> flag set to true,
+ensuring a barrier is inserted when the op is lowered.</p>
+<p>Write operations (<code>pcf.write_slice</code>) are updated to enqueue writes through
+the sync scope's interface methods.</p>
 
 
 
