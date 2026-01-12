@@ -132,6 +132,9 @@ struct GlobalOptimizationOptions {
   // rewriting named ops as fused generics.
   bool aggressiveTransposePropagation = false;
 
+  // Enables propagation of transpose ops through convolutions.
+  bool propagateTransposesThroughConv = false;
+
   // Enables transposing all concatenations to the outer most dimension.
   bool outerDimConcat = false;
 
