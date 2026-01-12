@@ -34,6 +34,7 @@ iree_cc_library(
     "FusePCFWrites.cpp"
     "LowerStructuralPCF.cpp"
     "Passes.cpp"
+    "ResolveTokens.cpp"
     "Transforms.cpp"
   DEPS
     ::PassesIncGen
