@@ -1,0 +1,10 @@
+{
+  "model": "intfloat/e5-base-v2",
+  "description": "E5 Base v2 embeddings (950k+ downloads)",
+  "tests": [
+    {"name": "query", "input": "query: What is artificial intelligence?"},
+    {"name": "passage", "input": "passage: AI is the simulation of human intelligence"},
+    {"name": "simple", "input": "Hello world"},
+    {"name": "no_special", "input": "test", "add_special_tokens": false}
+  ]
+}

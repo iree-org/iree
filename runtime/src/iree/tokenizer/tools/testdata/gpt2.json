@@ -1,0 +1,68 @@
+{
+  "model": "gpt2",
+  "description": "GPT-2 - BPE with byte-level encoding",
+  "tests": [
+    {
+      "name": "simple_ascii",
+      "input": "Hello, world!"
+    },
+    {
+      "name": "unicode_accents",
+      "input": "Héllo wörld! café résumé"
+    },
+    {
+      "name": "unicode_cjk",
+      "input": "Hello 你好世界 こんにちは"
+    },
+    {
+      "name": "unicode_emoji",
+      "input": "Hello world! 🌍🚀"
+    },
+    {
+      "name": "special_chars",
+      "input": "Code: `x = 1` and $100"
+    },
+    {
+      "name": "code_snippet",
+      "input": "def hello():\n    print('Hello, world!')"
+    },
+    {
+      "name": "punctuation",
+      "input": "Wait... Really?! Yes: it's true."
+    },
+    {
+      "name": "numbers",
+      "input": "The year 2026 has 365 days."
+    },
+    {
+      "name": "empty_string",
+      "input": ""
+    },
+    {
+      "name": "whitespace_variations",
+      "input": "hello   world\ttab\nnewline"
+    },
+    {
+      "name": "leading_space",
+      "input": " hello world",
+      "description": "GPT-2 byte-level treats leading space specially"
+    },
+    {
+      "name": "no_special_tokens",
+      "input": "hello world",
+      "add_special_tokens": false
+    },
+    {
+      "name": "decode_simple",
+      "decode_ids": [15496, 11, 995, 0]
+    },
+    {
+      "name": "repeated_chars",
+      "input": "aaaaaaaaaa"
+    },
+    {
+      "name": "mixed_case",
+      "input": "HeLLo WoRLD"
+    }
+  ]
+}

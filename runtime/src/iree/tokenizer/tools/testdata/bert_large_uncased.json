@@ -1,0 +1,11 @@
+{
+  "model": "google-bert/bert-large-uncased",
+  "description": "BERT large uncased - larger model variant",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "unicode", "input": "Héllo wörld! café résumé"},
+    {"name": "special_chars", "input": "Code: `x = 1` and $100"},
+    {"name": "long", "input": "The quick brown fox jumps over the lazy dog."},
+    {"name": "no_special", "input": "hello world", "add_special_tokens": false}
+  ]
+}

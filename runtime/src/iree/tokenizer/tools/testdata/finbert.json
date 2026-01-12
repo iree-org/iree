@@ -1,0 +1,12 @@
+{
+  "model": "ProsusAI/finbert",
+  "description": "FinBERT - financial sentiment analysis",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "financial", "input": "The stock price increased by 5% today."},
+    {"name": "currency", "input": "Revenue was $1.2 billion, up from $900 million."},
+    {"name": "percentages", "input": "Q3 earnings beat estimates by 15%."},
+    {"name": "special_chars", "input": "P/E ratio is 25.3x"},
+    {"name": "no_special", "input": "market rally", "add_special_tokens": false}
+  ]
+}
