@@ -293,12 +293,9 @@ func.func @elem_pack(%arg0: tensor<128x384xf32>) -> tensor<16x?x8x?xf32> attribu
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
 #map_rb0 = affine_map<(d0, d1) -> (d0, d1)>
 #map_rb1 = affine_map<(d0, d1) -> (d0)>
-#map_rb2 = affine_map<(d0, d1) -> (d1)>
 #map_rb_outer = affine_map<()[s0] -> (1024 ceildiv s0)>
-func.func @reduction_broadcast_pack(%arg0: tensor<384x1024xf32>, %arg1: tensor<384xf32>, %arg2: tensor<1024xf32>, %arg3: tensor<1024xf32>) -> tensor<48x?x8x?xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
-  %cst = arith.constant -0.000000e+00 : f32
-  %cst_0 = arith.constant 1.024000e+03 : f32
-  %cst_1 = arith.constant 9.99999996E-13 : f32
+func.func @reduction_broadcast_pack(%arg0: tensor<384x1024xf32>, %arg1: tensor<384xf32>) -> tensor<48x?x8x?xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %cst = arith.constant 0.0 : f32
   %c16 = arith.constant 16 : index
   %vscale = vector.vscale
   %c16_vscale = arith.muli %vscale, %c16 : index
@@ -314,17 +311,9 @@ func.func @reduction_broadcast_pack(%arg0: tensor<384x1024xf32>, %arg1: tensor<3
     %res = arith.addf %out, %mul : f32
     linalg.yield %res : f32
   } -> tensor<384xf32>
-  %generic1 = linalg.generic {indexing_maps = [#map_rb0, #map_rb1, #map_rb2, #map_rb2, #map_rb1, #map_rb0], iterator_types = ["parallel", "parallel"]} ins(%arg0, %generic0, %arg2, %arg3, %arg1 : tensor<384x1024xf32>, tensor<384xf32>, tensor<1024xf32>, tensor<1024xf32>, tensor<384xf32>) outs(%empty1 : tensor<384x1024xf32>) {
-  ^bb0(%in: f32, %in1: f32, %in2: f32, %in3: f32, %in4: f32, %out: f32):
-    %nrm = arith.divf %in1, %cst_0 : f32
-    %add = arith.addf %nrm, %cst_1 : f32
-    %rsqrt = math.rsqrt %add : f32
-    %mul0 = arith.mulf %rsqrt, %in2 : f32
-    %mul1 = arith.mulf %in4, %mul0 : f32
-    %sub = arith.subf %in3, %mul1 : f32
-    %mul2 = arith.mulf %in, %mul0 : f32
-    %add2 = arith.addf %mul2, %sub : f32
-    linalg.yield %add2 : f32
+  %generic1 = linalg.generic {indexing_maps = [#map_rb1, #map_rb0], iterator_types = ["parallel", "parallel"]} ins(%generic0 : tensor<384xf32>) outs(%empty1 : tensor<384x1024xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
   } -> tensor<384x1024xf32>
   %pack = linalg.pack %generic1 inner_dims_pos = [0, 1] inner_tiles = [8, %c16_vscale] into %empty2 : tensor<384x1024xf32> -> tensor<48x?x8x?xf32>
   return %pack : tensor<48x?x8x?xf32>
