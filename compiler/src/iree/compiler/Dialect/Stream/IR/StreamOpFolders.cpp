@@ -1501,7 +1501,8 @@ struct ConvertSplatConstantsIntoSplats
                                   splatElementAttr.getType(), splatElementAttr);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
         constantOp, constantOp.getResult().getType(), splatValue,
-        constantOp.getResultSize(), constantOp.getAffinityAttr());
+        constantOp.getResultSize(), constantOp.getAffinityAttr(),
+        constantOp.getAwaitTimepoint());
     return success();
   }
 };
@@ -1579,7 +1580,8 @@ struct PropagateSplatsThroughSlices : public OpRewritePattern<AsyncSliceOp> {
       return failure();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
         sliceOp, sliceOp.getResult().getType(), splatOp.getValue(),
-        sliceOp.getResultSize(), sliceOp.getAffinityAttr());
+        sliceOp.getResultSize(), sliceOp.getAffinityAttr(),
+        splatOp.getAwaitTimepoint());
     return success();
   }
 };
@@ -2332,6 +2334,521 @@ void AsyncConcurrentOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.parameter.load
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Safely traverses through timepoint.await to find timeline-unsafe producer.
+// Only succeeds if single-use chain: producer -> await -> consumer.
+// This allows folding patterns to work with legal IR that properly awaits
+// timeline resources before consuming them.
+static Value tryLookThroughAwait(Value operand) {
+  auto awaitOp = operand.getDefiningOp<IREE::Stream::TimepointAwaitOp>();
+  if (!awaitOp) {
+    return operand;
+  }
+  if (!operand.hasOneUse()) {
+    return operand;
+  }
+
+  // Find awaited resource (await maps timepoint + resources -> resources).
+  for (auto [resource, result] :
+       llvm::zip_equal(awaitOp.getResourceOperands(), awaitOp.getResults())) {
+    if (result == operand) {
+      // Check resource comes from timeline op with single use.
+      if (resource.hasOneUse() &&
+          isa_and_nonnull<IREE::Stream::TimelineOpInterface>(
+              resource.getDefiningOp())) {
+        return resource;
+      }
+      break;
+    }
+  }
+  return operand;
+}
+
+// For result folding: finds consumer of timeline result through await barrier.
+// Returns {consumer_op, consumed_value} if single-use chain exists.
+static std::pair<Operation *, Value>
+findConsumerThroughAwait(Value timelineResult) {
+  if (!timelineResult.hasOneUse()) {
+    return {nullptr, nullptr};
+  }
+
+  Operation *consumer = *timelineResult.getUsers().begin();
+
+  // If consumer is await, look through it to find actual consumer.
+  if (auto awaitOp = dyn_cast<IREE::Stream::TimepointAwaitOp>(consumer)) {
+    for (auto [resource, result] :
+         llvm::zip_equal(awaitOp.getResourceOperands(), awaitOp.getResults())) {
+      if (resource == timelineResult) {
+        if (!result.hasOneUse())
+          return {nullptr, nullptr};
+        return {*result.getUsers().begin(), result};
+      }
+    }
+    return {nullptr, nullptr};
+  }
+
+  return {consumer, timelineResult};
+}
+
+// Folds resource.subview on the load result into the load operation.
+// This adjusts the parameter offset and size to load only the required portion.
+//
+// Example:
+//  %loaded = stream.async.parameter.load "scope"::"key"[%offset]
+//      : !stream.resource<constant>{%size}
+//  %view = stream.resource.subview %loaded[%view_offset]
+//      : !stream.resource<constant>{%size} ->
+//      !stream.resource<constant>{%view_size}
+// ->
+//  %new_offset = arith.addi %offset, index_cast(%view_offset)
+//  %loaded = stream.async.parameter.load "scope"::"key"[%new_offset]
+//      : !stream.resource<constant>{%view_size}
+struct FoldAsyncParameterLoadResultSubview
+    : public OpRewritePattern<AsyncParameterLoadOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(AsyncParameterLoadOp op,
+                                PatternRewriter &rewriter) const override {
+    // Find consumer through optional await barrier (single-use chain).
+    auto [consumer, consumedValue] = findConsumerThroughAwait(op.getResult());
+    auto subviewOp =
+        dyn_cast_if_present<IREE::Stream::ResourceSubviewOp>(consumer);
+    if (!subviewOp) {
+      return failure();
+    }
+    // Verify the subview operates on the consumed value.
+    if (subviewOp.getSource() != consumedValue) {
+      return failure();
+    }
+
+    // Move the load operation to just before the subview so we can safely
+    // create new operations that depend on subview operands.
+    op->moveBefore(subviewOp);
+
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+
+    // Compute new parameter offset: source_offset + index_cast(subview_offset).
+    // Parameter offsets are I64, subview offsets are index type.
+    auto subviewOffsetI64 = rewriter.createOrFold<mlir::arith::IndexCastOp>(
+        subviewOp.getLoc(), rewriter.getI64Type(), subviewOp.getSourceOffset());
+    auto newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+        op.getLoc(), op.getSourceOffset(), subviewOffsetI64);
+
+    rewriter.restoreInsertionPoint(ip);
+
+    // Update load to use new offset and subview's result size.
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+      op.getResultSizeMutable().assign(subviewOp.getResultSize());
+    });
+
+    // Replace subview with load result and erase the subview.
+    rewriter.replaceOp(subviewOp, op.getResult());
+    return success();
+  }
+};
+
+// Folds async.slice on the load result into the load operation.
+// This adjusts the parameter offset and size to load only the sliced portion.
+//
+// Example:
+//  %loaded = stream.async.parameter.load "scope"::"key"[%offset]
+//      : !stream.resource<constant>{%size}
+//  %sliced = stream.async.slice %loaded[%slice_offset to %slice_end]
+//      : !stream.resource<constant>{%size} ->
+//      !stream.resource<constant>{%slice_size}
+// ->
+//  %new_offset = arith.addi %offset, index_cast(%slice_offset)
+//  %loaded = stream.async.parameter.load "scope"::"key"[%new_offset]
+//      : !stream.resource<constant>{%slice_size}
+struct FoldAsyncParameterLoadResultSlice
+    : public OpRewritePattern<AsyncParameterLoadOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(AsyncParameterLoadOp op,
+                                PatternRewriter &rewriter) const override {
+    // Find consumer through optional await barrier (single-use chain).
+    auto [consumer, consumedValue] = findConsumerThroughAwait(op.getResult());
+    auto sliceOp = dyn_cast_or_null<IREE::Stream::AsyncSliceOp>(consumer);
+    if (!sliceOp) {
+      return failure();
+    }
+    // Verify the slice operates on the consumed value.
+    if (sliceOp.getSource() != consumedValue) {
+      return failure();
+    }
+
+    // Move the load operation to just before the slice so we can safely
+    // create new operations that depend on slice operands.
+    op->moveBefore(sliceOp);
+
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+
+    // Compute new parameter offset: source_offset + index_cast(slice_offset).
+    // Parameter offsets are I64, slice offsets are index type.
+    auto sliceOffsetI64 = rewriter.createOrFold<mlir::arith::IndexCastOp>(
+        sliceOp.getLoc(), rewriter.getI64Type(), sliceOp.getSourceOffset());
+    auto newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+        op.getLoc(), op.getSourceOffset(), sliceOffsetI64);
+
+    rewriter.restoreInsertionPoint(ip);
+
+    // Update load to use new offset and slice's result size.
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+      op.getResultSizeMutable().assign(sliceOp.getResultSize());
+    });
+
+    // Replace slice with load result and erase the slice.
+    rewriter.replaceOp(sliceOp, op.getResult());
+    return success();
+  }
+};
+
+} // namespace
+
+void AsyncParameterLoadOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ElideUnusedOp<AsyncParameterLoadOp>>(context);
+  results.insert<ElideImmediateTimepointWait<AsyncParameterLoadOp>>(context);
+  results.insert<FoldAsyncParameterLoadResultSubview>(context);
+  results.insert<FoldAsyncParameterLoadResultSlice>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.read
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds resource.subview on target into the async.parameter.read operation.
+// This combines offset arithmetic and eliminates the intermediate subview.
+//
+// Example:
+//  %subview = stream.resource.subview %target[%subview_offset] : ...
+//      -> ...{%subview_size}
+//  %result = stream.async.parameter.read "scope"::"key"[%param_offset]
+//      -> %subview[%target_offset for %length] : ...
+// ->
+//  %new_param_offset = arith.addi %param_offset, %subview_offset
+//  %new_target_offset = arith.addi %subview_offset, %target_offset
+//  %result = stream.async.parameter.read "scope"::"key"[%new_param_offset]
+//      -> %target[%new_target_offset for %length] : ...
+struct FoldAsyncParameterReadTargetSubview
+    : public OpRewritePattern<AsyncParameterReadOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(AsyncParameterReadOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
+    auto newTargetResource = tryLookThroughAwait(op.getTarget());
+    auto newTargetSize = op.getTargetSize();
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
+    Value newTargetEnd;
+    if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+            newTargetResource.getDefiningOp())) {
+      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), newSourceOffset,
+          rewriter.createOrFold<mlir::arith::IndexCastOp>(
+              subviewOp.getLoc(), rewriter.getI64Type(),
+              subviewOp.getSourceOffset()));
+      newTargetResource = subviewOp.getSource();
+      newTargetSize = subviewOp.getSourceSize();
+      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), subviewOp.getSourceOffset(), newTargetOffset);
+      newTargetEnd = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), newTargetOffset, op.getTargetLength());
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate) {
+      return failure();
+    }
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+      op.getTargetMutable().assign(newTargetResource);
+      op.getTargetSizeMutable().assign(newTargetSize);
+      op.getTargetOffsetMutable().assign(newTargetOffset);
+      op.getTargetEndMutable().assign(newTargetEnd);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void AsyncParameterReadOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ElideUnusedOp<AsyncParameterReadOp>>(context);
+  results.insert<ElideImmediateTimepointWait<AsyncParameterReadOp>>(context);
+  results.insert<FoldAsyncParameterReadTargetSubview>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.write
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds resource.subview on source into the async.parameter.write operation.
+// This combines offset arithmetic and eliminates the intermediate subview.
+//
+// Example:
+//  %subview = stream.resource.subview %source[%subview_offset] : ...
+//      -> ...{%subview_size}
+//  %result = stream.async.parameter.write %subview[%source_offset for %length]
+//      -> "scope"::"key"[%param_offset] : ...
+// ->
+//  %new_source_offset = arith.addi %subview_offset, %source_offset
+//  %new_param_offset = arith.addi %param_offset, %subview_offset
+//  %result = stream.async.parameter.write
+//      %source[%new_source_offset for %length]
+//      -> "scope"::"key"[%new_param_offset] : ...
+struct FoldAsyncParameterWriteSourceSubview
+    : public OpRewritePattern<AsyncParameterWriteOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(AsyncParameterWriteOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newSourceResource = tryLookThroughAwait(op.getSource());
+    auto newSourceSize = op.getSourceSize();
+    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
+    auto newTargetOffset = llvm::cast<Value>(op.getTargetOffset());
+    Value newSourceEnd;
+    if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+            newSourceResource.getDefiningOp())) {
+      newSourceResource = subviewOp.getSource();
+      newSourceSize = subviewOp.getSourceSize();
+      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), subviewOp.getSourceOffset(), newSourceOffset);
+      newSourceEnd = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), newSourceOffset, op.getSourceLength());
+      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), newTargetOffset,
+          rewriter.createOrFold<mlir::arith::IndexCastOp>(
+              subviewOp.getLoc(), rewriter.getI64Type(),
+              subviewOp.getSourceOffset()));
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate) {
+      return failure();
+    }
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceMutable().assign(newSourceResource);
+      op.getSourceSizeMutable().assign(newSourceSize);
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+      op.getSourceEndMutable().assign(newSourceEnd);
+      op.getTargetOffsetMutable().assign(newTargetOffset);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void AsyncParameterWriteOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ElideUnusedOp<AsyncParameterWriteOp>>(context);
+  results.insert<ElideImmediateTimepointWait<AsyncParameterWriteOp>>(context);
+  results.insert<FoldAsyncParameterWriteSourceSubview>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.gather
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds resource.subview on target into the async.parameter.gather operation.
+// This combines offset arithmetic for all variadic source_offsets and
+// target_offsets.
+//
+// Example:
+//  %subview = stream.resource.subview %target[%subview_offset] : ...
+//      -> ...{%subview_size}
+//  %result = stream.async.parameter.gather {
+//    "scope"::"key0"[%param_offset0] -> %subview[%target_offset0 for %length0],
+//    "scope"::"key1"[%param_offset1] -> %subview[%target_offset1 for %length1]
+//  } : ...
+// ->
+//  %new_param_offset0 = arith.addi %param_offset0, %subview_offset
+//  %new_param_offset1 = arith.addi %param_offset1, %subview_offset
+//  %new_target_offset0 = arith.addi %subview_offset, %target_offset0
+//  %new_target_offset1 = arith.addi %subview_offset, %target_offset1
+//  %result = stream.async.parameter.gather {
+//    "scope"::"key0"[%new_param_offset0]
+//        -> %target[%new_target_offset0 for %length0],
+//    "scope"::"key1"[%new_param_offset1]
+//        -> %target[%new_target_offset1 for %length1]
+//  } : ...
+struct FoldAsyncParameterGatherTargetSubview
+    : public OpRewritePattern<AsyncParameterGatherOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(AsyncParameterGatherOp op,
+                                PatternRewriter &rewriter) const override {
+    auto targetResource = tryLookThroughAwait(op.getTarget());
+    auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+        targetResource.getDefiningOp());
+    if (!subviewOp) {
+      return failure();
+    }
+
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+
+    // Adjust all source_offsets (I64) by adding index_cast(subview_offset).
+    SmallVector<Value> newSourceOffsets;
+    auto subviewOffsetI64 = rewriter.createOrFold<mlir::arith::IndexCastOp>(
+        subviewOp.getLoc(), rewriter.getI64Type(), subviewOp.getSourceOffset());
+    for (auto sourceOffset : op.getSourceOffsets()) {
+      auto newOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), sourceOffset, subviewOffsetI64);
+      newSourceOffsets.push_back(newOffset);
+    }
+
+    // Adjust all target_offsets (index) by adding subview_offset.
+    SmallVector<Value> newTargetOffsets;
+    for (auto targetOffset : op.getTargetOffsets()) {
+      auto newOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), subviewOp.getSourceOffset(), targetOffset);
+      newTargetOffsets.push_back(newOffset);
+    }
+
+    // Compute all target_ends (index) as target_offset + target_length.
+    SmallVector<Value> newTargetEnds;
+    auto targetLengths = op.getTargetLengths();
+    for (auto [newOffset, length] :
+         llvm::zip_equal(newTargetOffsets, targetLengths)) {
+      auto newEnd = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), newOffset, length);
+      newTargetEnds.push_back(newEnd);
+    }
+
+    rewriter.restoreInsertionPoint(ip);
+
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceOffsetsMutable().assign(newSourceOffsets);
+      op.getTargetMutable().assign(subviewOp.getSource());
+      op.getTargetSizeMutable().assign(subviewOp.getSourceSize());
+      op.getTargetOffsetsMutable().assign(newTargetOffsets);
+      op.getTargetEndsMutable().assign(newTargetEnds);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void AsyncParameterGatherOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ElideUnusedOp<AsyncParameterGatherOp>>(context);
+  results.insert<ElideImmediateTimepointWait<AsyncParameterGatherOp>>(context);
+  results.insert<FoldAsyncParameterGatherTargetSubview>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.scatter
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds resource.subview on source into the async.parameter.scatter operation.
+// This combines offset arithmetic for all variadic source_offsets and
+// target_offsets.
+//
+// Example:
+//  %subview = stream.resource.subview %source[%subview_offset] : ...
+//      -> ...{%subview_size}
+//  %result = stream.async.parameter.scatter {
+//    %subview[%source_offset0 for %length0] -> "scope"::"key0"[%param_offset0],
+//    %subview[%source_offset1 for %length1] -> "scope"::"key1"[%param_offset1]
+//  } : ...
+// ->
+//  %new_source_offset0 = arith.addi %subview_offset, %source_offset0
+//  %new_source_offset1 = arith.addi %subview_offset, %source_offset1
+//  %new_param_offset0 = arith.addi %param_offset0, %subview_offset
+//  %new_param_offset1 = arith.addi %param_offset1, %subview_offset
+//  %result = stream.async.parameter.scatter {
+//    %source[%new_source_offset0 for %length0] ->
+//    "scope"::"key0"[%new_param_offset0],
+//        %source[%new_source_offset1 for %length1]
+//        -> "scope"::"key1"[%new_param_offset1]
+//  } : ...
+struct FoldAsyncParameterScatterSourceSubview
+    : public OpRewritePattern<AsyncParameterScatterOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(AsyncParameterScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    auto sourceResource = tryLookThroughAwait(op.getSource());
+    auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+        sourceResource.getDefiningOp());
+    if (!subviewOp) {
+      return failure();
+    }
+
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+
+    // Adjust all source_offsets (index) by adding subview_offset.
+    SmallVector<Value> newSourceOffsets;
+    for (auto sourceOffset : op.getSourceOffsets()) {
+      auto newOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), subviewOp.getSourceOffset(), sourceOffset);
+      newSourceOffsets.push_back(newOffset);
+    }
+
+    // Compute all source_ends (index) as source_offset + source_length.
+    SmallVector<Value> newSourceEnds;
+    auto sourceLengths = op.getSourceLengths();
+    for (auto [newOffset, length] :
+         llvm::zip_equal(newSourceOffsets, sourceLengths)) {
+      auto newEnd = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), newOffset, length);
+      newSourceEnds.push_back(newEnd);
+    }
+
+    // Adjust all target_offsets (I64) by adding index_cast(subview_offset).
+    SmallVector<Value> newTargetOffsets;
+    auto subviewOffsetI64 = rewriter.createOrFold<mlir::arith::IndexCastOp>(
+        subviewOp.getLoc(), rewriter.getI64Type(), subviewOp.getSourceOffset());
+    for (auto targetOffset : op.getTargetOffsets()) {
+      auto newOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), targetOffset, subviewOffsetI64);
+      newTargetOffsets.push_back(newOffset);
+    }
+
+    rewriter.restoreInsertionPoint(ip);
+
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceMutable().assign(subviewOp.getSource());
+      op.getSourceSizeMutable().assign(subviewOp.getSourceSize());
+      op.getSourceOffsetsMutable().assign(newSourceOffsets);
+      op.getSourceEndsMutable().assign(newSourceEnds);
+      op.getTargetOffsetsMutable().assign(newTargetOffsets);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void AsyncParameterScatterOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ElideUnusedOp<AsyncParameterScatterOp>>(context);
+  results.insert<ElideImmediateTimepointWait<AsyncParameterScatterOp>>(context);
+  results.insert<FoldAsyncParameterScatterSourceSubview>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // stream.cmd.flush
 //===----------------------------------------------------------------------===//
 
@@ -3026,9 +3543,47 @@ void CmdParameterWriteOp::getCanonicalizationPatterns(
 // stream.cmd.parameter.gather
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+struct FoldCmdParameterGatherTargetSubview
+    : public OpRewritePattern<CmdParameterGatherOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(CmdParameterGatherOp op,
+                                PatternRewriter &rewriter) const override {
+    auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+        op.getTarget().getDefiningOp());
+    if (!subviewOp) {
+      return failure();
+    }
+
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+
+    // Adjust all target_offsets (index) by adding subview_offset.
+    SmallVector<Value> newTargetOffsets;
+    for (auto targetOffset : op.getTargetOffsets()) {
+      auto newOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), subviewOp.getSourceOffset(), targetOffset);
+      newTargetOffsets.push_back(newOffset);
+    }
+
+    rewriter.restoreInsertionPoint(ip);
+
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getTargetMutable().assign(subviewOp.getSource());
+      op.getTargetSizeMutable().assign(subviewOp.getSourceSize());
+      op.getTargetOffsetsMutable().assign(newTargetOffsets);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
 void CmdParameterGatherOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   results.insert<ElideUnusedOp<CmdParameterGatherOp>>(context);
+  results.insert<FoldCmdParameterGatherTargetSubview>(context);
   results.insert<ElideImmediateTimepointWait<CmdParameterGatherOp>>(context);
 }
 
@@ -3036,9 +3591,47 @@ void CmdParameterGatherOp::getCanonicalizationPatterns(
 // stream.cmd.parameter.scatter
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+struct FoldCmdParameterScatterSourceSubview
+    : public OpRewritePattern<CmdParameterScatterOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(CmdParameterScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+        op.getSource().getDefiningOp());
+    if (!subviewOp) {
+      return failure();
+    }
+
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+
+    // Adjust all source_offsets (index) by adding subview_offset.
+    SmallVector<Value> newSourceOffsets;
+    for (auto sourceOffset : op.getSourceOffsets()) {
+      auto newOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subviewOp.getLoc(), subviewOp.getSourceOffset(), sourceOffset);
+      newSourceOffsets.push_back(newOffset);
+    }
+
+    rewriter.restoreInsertionPoint(ip);
+
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceMutable().assign(subviewOp.getSource());
+      op.getSourceSizeMutable().assign(subviewOp.getSourceSize());
+      op.getSourceOffsetsMutable().assign(newSourceOffsets);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
 void CmdParameterScatterOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   results.insert<ElideUnusedOp<CmdParameterScatterOp>>(context);
+  results.insert<FoldCmdParameterScatterSourceSubview>(context);
   results.insert<ElideImmediateTimepointWait<CmdParameterScatterOp>>(context);
 }
 

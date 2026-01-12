@@ -72,3 +72,57 @@ util.func private @FoldParameterWriteSourceSubview(%wait: !stream.timepoint, %so
   %timepoint = stream.cmd.parameter.write await(%wait) => %subview[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
   util.return %timepoint : !stream.timepoint
 }
+
+// -----
+
+// CHECK-LABEL: @FoldParameterGatherTargetSubview
+// CHECK-SAME: (%[[WAIT:.+]]: !stream.timepoint, %[[TARGET:.+]]: !stream.resource<transient>, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
+util.func private @FoldParameterGatherTargetSubview(%wait: !stream.timepoint, %target: !stream.resource<transient>, %offset: index, %length: index) -> !stream.timepoint {
+  %c50_i64 = arith.constant 50 : i64
+  %c51_i64 = arith.constant 51 : i64
+  %c100 = arith.constant 100 : index
+  %c101 = arith.constant 101 : index
+  %c200 = arith.constant 200 : index
+  %c201 = arith.constant 201 : index
+  %c300 = arith.constant 300 : index
+  // CHECK-DAG: %[[RESOURCE_OFFSET0:.+]] = arith.addi %[[OFFSET]], %c100
+  // CHECK-DAG: %[[RESOURCE_OFFSET1:.+]] = arith.addi %[[OFFSET]], %c101
+  // CHECK-NOT: stream.resource.subview
+  %subview = stream.resource.subview %target[%offset] : !stream.resource<transient>{%length} -> !stream.resource<transient>{%c300}
+  // CHECK: %{{.+}} = stream.cmd.parameter.gather await(%[[WAIT]]) => {
+  // CHECK-NEXT: "scope"::"key0"[%c50_i64] -> %[[TARGET]][%[[RESOURCE_OFFSET0]] for %c200] : !stream.resource<transient>{%[[LENGTH]]},
+  // CHECK-NEXT: "scope"::"key1"[%c51_i64] -> %[[TARGET]][%[[RESOURCE_OFFSET1]] for %c201] : !stream.resource<transient>{%[[LENGTH]]}
+  // CHECK-NEXT: } => !stream.timepoint
+  %timepoint = stream.cmd.parameter.gather await(%wait) => {
+    "scope"::"key0"[%c50_i64] -> %subview[%c100 for %c200] : !stream.resource<transient>{%c300},
+    "scope"::"key1"[%c51_i64] -> %subview[%c101 for %c201] : !stream.resource<transient>{%c300}
+  } => !stream.timepoint
+  util.return %timepoint : !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @FoldParameterScatterSourceSubview
+// CHECK-SAME: (%[[WAIT:.+]]: !stream.timepoint, %[[SOURCE:.+]]: !stream.resource<transient>, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
+util.func private @FoldParameterScatterSourceSubview(%wait: !stream.timepoint, %source: !stream.resource<transient>, %offset: index, %length: index) -> !stream.timepoint {
+  %c50_i64 = arith.constant 50 : i64
+  %c51_i64 = arith.constant 51 : i64
+  %c100 = arith.constant 100 : index
+  %c101 = arith.constant 101 : index
+  %c200 = arith.constant 200 : index
+  %c201 = arith.constant 201 : index
+  %c300 = arith.constant 300 : index
+  // CHECK-DAG: %[[RESOURCE_OFFSET0:.+]] = arith.addi %[[OFFSET]], %c100
+  // CHECK-DAG: %[[RESOURCE_OFFSET1:.+]] = arith.addi %[[OFFSET]], %c101
+  // CHECK-NOT: stream.resource.subview
+  %subview = stream.resource.subview %source[%offset] : !stream.resource<transient>{%length} -> !stream.resource<transient>{%c300}
+  // CHECK: %{{.+}} = stream.cmd.parameter.scatter await(%[[WAIT]]) => {
+  // CHECK-NEXT: %[[SOURCE]][%[[RESOURCE_OFFSET0]] for %c200] : !stream.resource<transient>{%[[LENGTH]]} -> "scope"::"key0"[%c50_i64],
+  // CHECK-NEXT: %[[SOURCE]][%[[RESOURCE_OFFSET1]] for %c201] : !stream.resource<transient>{%[[LENGTH]]} -> "scope"::"key1"[%c51_i64]
+  // CHECK-NEXT: } => !stream.timepoint
+  %timepoint = stream.cmd.parameter.scatter await(%wait) => {
+    %subview[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key0"[%c50_i64],
+    %subview[%c101 for %c201] : !stream.resource<transient>{%c300} -> "scope"::"key1"[%c51_i64]
+  } => !stream.timepoint
+  util.return %timepoint : !stream.timepoint
+}
