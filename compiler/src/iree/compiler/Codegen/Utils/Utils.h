@@ -434,6 +434,21 @@ bool neverRunsSecondIteration(scf::ForOp op);
 bool hasExternalCapture(linalg::GenericOp genericOp);
 
 //===----------------------------------------------------------------------===//
+// Utility functions for accumulating operations
+//===----------------------------------------------------------------------===//
+
+/// Check if the init value of the DPS operation is read/write from the same
+/// buffer. This determines whether the operation is a valid in-place
+/// accumulating op. For GEMMs:
+/// - Returns true: The GEMM reads and writes to the same buffer
+/// (matmul_accumulate)
+///   The accumulator needs to be loaded from global memory.
+/// - Returns false: The GEMM will be converted to a non-accumulating GEMM + add
+///   by ConvertAccGEMMToGEMMPass, and the accumulator can be zero-initialized
+///   in registers.
+bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp);
+
+//===----------------------------------------------------------------------===//
 // Utility functions for copy operations
 //===----------------------------------------------------------------------===//
 

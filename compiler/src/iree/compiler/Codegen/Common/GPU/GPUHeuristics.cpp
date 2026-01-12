@@ -681,6 +681,11 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
                              transposedLhs, transposedRhs);
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
           schedule, lhsBitwidth, rhsBitwidth, problem.numHorizontallyFusedOps);
+      // Add accumulator/result memory when it uses shared memory (LDS):
+      // - Result needs padding in shared memory, OR
+      // - matmul_accumulate loads accumulator from global memory via shared mem
+      // For zero-initialized GEMMs without C promotion, the accumulator stays
+      // in registers and doesn't need shared memory.
       if (doCPromotion) {
         sharedMemoryUsed += calculateResultSharedMemoryUsedInBytes(
             schedule, resultBitwidth, problem.numHorizontallyFusedOps);
