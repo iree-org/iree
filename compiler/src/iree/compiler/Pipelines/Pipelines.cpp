@@ -191,6 +191,8 @@ void buildIREEPrecompileTransformPassPipeline(
       globalOptimizationOptions.aggressiveTransposePropagation;
   globalTransformOptions.propagateTransposesThroughConv =
       globalOptimizationOptions.propagateTransposesThroughConv;
+  globalTransformOptions.sinkTransposeThroughPad =
+      globalOptimizationOptions.sinkTransposeThroughPad;
   globalTransformOptions.outerDimConcat =
       globalOptimizationOptions.outerDimConcat;
   // The pipeline option has higher priority.

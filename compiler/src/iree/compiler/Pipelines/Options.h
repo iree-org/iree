@@ -135,6 +135,9 @@ struct GlobalOptimizationOptions {
   // Enables propagation of transpose ops through convolutions.
   bool propagateTransposesThroughConv = false;
 
+  // Enables sinking transpose through pad operations.
+  bool sinkTransposeThroughPad = false;
+
   // Enables transposing all concatenations to the outer most dimension.
   bool outerDimConcat = false;
 

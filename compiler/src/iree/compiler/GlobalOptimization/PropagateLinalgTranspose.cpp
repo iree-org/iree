@@ -1338,7 +1338,9 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(
         context, enableEdgeReshapePropagation);
-    sinkingPatterns.insert<SinkTransposeThroughPad>(context);
+    if (enableSinkTransposeThroughPad) {
+      sinkingPatterns.insert<SinkTransposeThroughPad>(context);
+    }
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
         context, enableAggressivePropagation, enableConvolutionPropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);
