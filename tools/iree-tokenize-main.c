@@ -37,6 +37,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/internal/json.h"
 #include "iree/io/file_contents.h"
 #include "iree/tokenizer/huggingface/tokenizer_json.h"
 #include "iree/tokenizer/tokenizer.h"
@@ -53,6 +54,19 @@ IREE_FLAG(int32_t, max_length, 0, "Max output length (0 = unlimited).");
 IREE_FLAG(bool, info, false, "Show tokenizer info instead of encoding.");
 IREE_FLAG(bool, raw, false,
           "Output comma-separated IDs only (no JSON), for iree-run-module.");
+IREE_FLAG(bool, json_string, false,
+          "Input is a JSON-encoded string (handles \\uXXXX escapes).");
+
+//===----------------------------------------------------------------------===//
+// Input Processing Flags
+//===----------------------------------------------------------------------===//
+
+typedef uint32_t iree_tooling_encode_flags_t;
+enum iree_tooling_encode_flag_bits_t {
+  IREE_TOOLING_ENCODE_FLAG_DEFAULT = 0,
+  // Input is a JSON-encoded string with \uXXXX escapes.
+  IREE_TOOLING_ENCODE_FLAG_JSON_STRING = 1u << 0,
+};
 
 //===----------------------------------------------------------------------===//
 // JSON Output Helpers
@@ -458,6 +472,71 @@ static iree_status_t iree_tooling_tokenize_batch(
 }
 
 //===----------------------------------------------------------------------===//
+// Single Input Processing
+//===----------------------------------------------------------------------===//
+
+// Processes text input for encoding, handling JSON escapes if requested.
+static iree_status_t iree_tooling_process_encode(
+    iree_tokenizer_t* tokenizer, iree_string_view_t raw_input,
+    iree_tooling_encode_flags_t flags, iree_allocator_t allocator) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_string_view_t input = raw_input;
+  char* decoded_buffer = NULL;
+
+  // Decode JSON escapes if requested.
+  if (iree_any_bit_set(flags, IREE_TOOLING_ENCODE_FLAG_JSON_STRING)) {
+    // Strip surrounding quotes if present.
+    iree_string_view_t escaped = raw_input;
+    if (escaped.size >= 2 && escaped.data[0] == '"' &&
+        escaped.data[escaped.size - 1] == '"') {
+      escaped = iree_string_view_substr(escaped, 1, escaped.size - 2);
+    }
+
+    // First pass: compute required size.
+    iree_host_size_t decoded_length = 0;
+    iree_status_t status =
+        iree_json_unescape_string(escaped, 0, NULL, &decoded_length);
+    if (!iree_status_is_ok(status)) {
+      IREE_TRACE_ZONE_END(z0);
+      return status;
+    }
+
+    // Allocate and decode.
+    status = iree_allocator_malloc(allocator, decoded_length + 1,
+                                   (void**)&decoded_buffer);
+    if (!iree_status_is_ok(status)) {
+      IREE_TRACE_ZONE_END(z0);
+      return status;
+    }
+    status = iree_json_unescape_string(escaped, decoded_length + 1,
+                                       decoded_buffer, &decoded_length);
+    if (!iree_status_is_ok(status)) {
+      iree_allocator_free(allocator, decoded_buffer);
+      IREE_TRACE_ZONE_END(z0);
+      return status;
+    }
+    decoded_buffer[decoded_length] = '\0';
+    input = iree_make_string_view(decoded_buffer, decoded_length);
+  }
+
+  iree_status_t status = iree_tooling_tokenize_encode(tokenizer, input);
+
+  iree_allocator_free(allocator, decoded_buffer);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+// Processes comma-separated IDs for decoding back to text.
+static iree_status_t iree_tooling_process_decode(iree_tokenizer_t* tokenizer,
+                                                 iree_string_view_t input) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_tooling_tokenize_decode(tokenizer, input);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
 // Main
 //===----------------------------------------------------------------------===//
 
@@ -551,6 +630,24 @@ int main(int argc, char** argv) {
         iree_tokenizer_from_huggingface_json(json, host_allocator, &tokenizer);
   }
 
+  // Validate flag combinations.
+  if (iree_status_is_ok(status) && FLAG_json_string) {
+    if (FLAG_batch || FLAG_stream) {
+      fprintf(stderr,
+              "Error: --json_string is not supported with --batch/--stream\n"
+              "(file/stdin input preserves UTF-8; use --json_string only for "
+              "command-line arguments)\n");
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "--json_string requires single input mode");
+    } else if (FLAG_decode) {
+      fprintf(stderr,
+              "Error: --json_string is not supported with --decode\n"
+              "(decode takes numeric IDs, not text)\n");
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "--json_string requires encode mode");
+    }
+  }
+
   // Process based on mode.
   if (iree_status_is_ok(status)) {
     if (FLAG_info) {
@@ -572,12 +669,16 @@ int main(int argc, char** argv) {
               "Usage: iree-tokenize <tokenizer.json> [flags] <text>\n");
       status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing input");
     } else {
-      // Concatenate remaining args as input text.
       iree_string_view_t input = iree_make_cstring_view(argv[2]);
       if (FLAG_decode) {
-        status = iree_tooling_tokenize_decode(tokenizer, input);
+        status = iree_tooling_process_decode(tokenizer, input);
       } else {
-        status = iree_tooling_tokenize_encode(tokenizer, input);
+        iree_tooling_encode_flags_t flags = IREE_TOOLING_ENCODE_FLAG_DEFAULT;
+        if (FLAG_json_string) {
+          flags |= IREE_TOOLING_ENCODE_FLAG_JSON_STRING;
+        }
+        status = iree_tooling_process_encode(tokenizer, input, flags,
+                                             host_allocator);
       }
     }
   }

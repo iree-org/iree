@@ -265,6 +265,7 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::flags
+    iree::base::internal::json
     iree::base::internal::unicode
     iree::io::file_handle
     iree::tokenizer::tokenizer
