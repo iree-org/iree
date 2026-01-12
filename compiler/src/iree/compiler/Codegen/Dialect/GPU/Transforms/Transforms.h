@@ -195,8 +195,7 @@ void populateIREEGPUVectorUnrollPatterns(
 void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
 
-/// Populate patterns to reorder swizzle_hint ops that follow tensor.empty ops
-/// to enable other patterns.
+// Populate patterns to fold tensor.empty ops through swizzle hint ops.
 void populateFoldSwizzleHintOpPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU

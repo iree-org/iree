@@ -61,6 +61,7 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
 }
 
 void GPUApplyTilingLevelPass::runOnOperation() {
+
   FunctionOpInterface funcOp = getOperation();
   if (!llvm::is_contained({IREE::GPU::TilingLevel::Reduction,
                            IREE::GPU::TilingLevel::Thread,
