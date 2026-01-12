@@ -4565,6 +4565,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-pcf-convert-sref-to-memref" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-pcf-convert-sref-to-memref
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-pcf-fuse-consumers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-pcf-fuse-consumers
@@ -4633,6 +4642,21 @@ mapping attributes are converted.</p>
 <p>The underlying conversion pattern is exposed separately via
 <code>convertForallToPCF()</code> with callbacks for mapping processor IDs to custom
 execution scopes.</p>
+<h3 id="-iree-pcf-convert-sref-to-memref"><code>-iree-pcf-convert-sref-to-memref</code><a class="headerlink" href="#-iree-pcf-convert-sref-to-memref" title="Permanent link">link</a></h3>
+<p><em>Converts pcf.sref types to concrete memref types</em></p>
+<p>Converts <code>pcf.sref</code> (shaped reference) types to <code>memref</code> types with
+appropriate layouts and memory spaces derived from the scope attribute.
+After this pass, there are no remaining results tied to PCF parallel ops.
+All <code>pcf.sref</code> types are converted to concrete <code>memref</code> types, preparing
+the IR for structural lowering of PCF ops to SCF/CF.</p>
+<p>The input is expected to be bufferized IR where tied inputs to parallel
+ops are already <code>memref</code> types. Layouts are derived from these parallel op
+tied inputs and propagated via dataflow analysis.</p>
+<p>Op conversions:
+- <code>pcf.alloc</code> -&gt; <code>memref.alloc</code>
+- <code>pcf.write_slice</code> -&gt; <code>memref.subview</code> + <code>memref.copy</code> or <code>vector.transfer_write</code>
+- <code>pcf.read_slice</code> -&gt; <code>memref.subview</code> + <code>vector.transfer_read</code>
+- <code>pcf.generic</code>/<code>pcf.loop</code> region arguments become the tied memref inputs</p>
 <h3 id="-iree-pcf-fuse-consumers"><code>-iree-pcf-fuse-consumers</code><a class="headerlink" href="#-iree-pcf-fuse-consumers" title="Permanent link">link</a></h3>
 <p><em>Fuses all consumers of pcf.generic/loop ops</em></p>
 <p>Test pass for fusing consumer operations into <code>pcf.generic</code> and <code>pcf.loop</code>
