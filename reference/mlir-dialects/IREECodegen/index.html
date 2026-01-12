@@ -2212,6 +2212,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#workgroupscopeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      WorkgroupScopeAttr
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5534,6 +5543,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#workgroupscopeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      WorkgroupScopeAttr
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5966,6 +5984,7 @@ within a backend.</p>
 <li><a href="#xorshuffleattr">XORShuffleAttr</a></li>
 <li><a href="#localmappingattr">LocalMappingAttr</a></li>
 <li><a href="#workgroupmappingattr">WorkgroupMappingAttr</a></li>
+<li><a href="#workgroupscopeattr">WorkgroupScopeAttr</a></li>
 </ul>
 </li>
 <li><a href="#types">Types</a><ul>
@@ -7172,6 +7191,28 @@ if <code>a &gt; b</code>. In the same way it is illegal to for the list to
 <tr>
 <td style="text-align: center;">delinearizedDim</td>
 <td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="workgroupscopeattr">WorkgroupScopeAttr<a class="headerlink" href="#workgroupscopeattr" title="Permanent link">link</a></h3>
+<p><em>Attribute representing parallel execution across workgroups.</em></p>
+<p>Parallel scope that maps to workgroup execution.</p>
+<p>If |linearize| is set to true, workgroup ids are linearized into a single
+id which is then typically delinearized based on the problem space.</p>
+<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">linearize</td>
+<td style="text-align: center;"><code>bool</code></td>
 <td></td>
 </tr>
 </tbody>
