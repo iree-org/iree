@@ -284,6 +284,39 @@ TEST(StringViewTest, ConsumePrefix) {
   EXPECT_EQ(consume_prefix("abcdef", "bc"), "FAILED");
 }
 
+TEST(StringViewTest, ConsumePrefixChar) {
+  auto consume_prefix_char = [](const char* value, char c) -> std::string {
+    iree_string_view_t value_sv = iree_make_cstring_view(value);
+    if (iree_string_view_consume_prefix_char(&value_sv, c)) {
+      return ToString(value_sv);
+    } else {
+      return "FAILED";
+    }
+  };
+  EXPECT_EQ(consume_prefix_char("", 'a'), "FAILED");
+  EXPECT_EQ(consume_prefix_char("a", 'a'), "");
+  EXPECT_EQ(consume_prefix_char("a", 'b'), "FAILED");
+  EXPECT_EQ(consume_prefix_char("ab", 'a'), "b");
+  EXPECT_EQ(consume_prefix_char("ab", 'b'), "FAILED");
+  EXPECT_EQ(consume_prefix_char("{foo}", '{'), "foo}");
+  EXPECT_EQ(consume_prefix_char("[1,2]", '['), "1,2]");
+  EXPECT_EQ(consume_prefix_char(":", ':'), "");
+  EXPECT_EQ(consume_prefix_char(",next", ','), "next");
+}
+
+TEST(StringViewTest, StartsWithChar) {
+  auto starts_with_char = [](const char* value, char c) -> bool {
+    return iree_string_view_starts_with_char(iree_make_cstring_view(value), c);
+  };
+  EXPECT_FALSE(starts_with_char("", 'a'));
+  EXPECT_TRUE(starts_with_char("a", 'a'));
+  EXPECT_FALSE(starts_with_char("a", 'b'));
+  EXPECT_TRUE(starts_with_char("abc", 'a'));
+  EXPECT_FALSE(starts_with_char("abc", 'b'));
+  EXPECT_TRUE(starts_with_char("{", '{'));
+  EXPECT_TRUE(starts_with_char("[1,2]", '['));
+}
+
 TEST(StringViewTest, ConsumeSuffix) {
   auto consume_suffix = [](const char* value,
                            const char* suffix) -> std::string {

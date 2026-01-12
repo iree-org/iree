@@ -6,8 +6,6 @@
 
 #include "iree/base/internal/json.h"
 
-#include <ctype.h>
-#include <errno.h>
 #include <stdlib.h>
 
 #include "iree/base/internal/unicode.h"
@@ -36,13 +34,38 @@ static void iree_json_skip_bom(iree_string_view_t* str) {
   }
 }
 
+// Returns true if |c| is JSON whitespace (space, tab, newline, carriage
+// return). This is faster than isspace() which is locale-aware and has call
+// overhead.
+static inline bool iree_json_is_whitespace(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+// Returns true if |c| is an ASCII digit ('0'-'9').
+// This is faster than isdigit() which may have function call overhead.
+static inline bool iree_json_is_digit(char c) { return c >= '0' && c <= '9'; }
+
+// Skips leading JSON whitespace characters in place.
+// Unlike iree_string_view_trim, this only trims the front (not trailing) and
+// uses simple comparisons instead of locale-aware isspace().
+static inline void iree_json_skip_whitespace(iree_string_view_t* str) {
+  const char* data = str->data;
+  iree_host_size_t size = str->size;
+  while (size > 0 && iree_json_is_whitespace(*data)) {
+    data++;
+    size--;
+  }
+  str->data = data;
+  str->size = size;
+}
+
 // Skips whitespace and JSONC-style comments (// and /* */).
 // This allows parsing both strict JSON and JSONC (JSON with Comments).
 static iree_status_t iree_json_skip_whitespace_and_comments(
     iree_string_view_t* str) {
   while (str->size > 0) {
     // Skip leading whitespace.
-    *str = iree_string_view_trim(*str);
+    iree_json_skip_whitespace(str);
     if (str->size == 0) return iree_ok_status();
 
     // Check for single-line comment: //
@@ -116,10 +139,10 @@ iree_status_t iree_json_consume_number(iree_string_view_t* str,
     ++i;
   } else {
     // Non-zero leading digit followed by more digits.
-    if (i >= str->size || !isdigit((unsigned char)str->data[i])) {
+    if (i >= str->size || !iree_json_is_digit(str->data[i])) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid number");
     }
-    while (i < str->size && isdigit((unsigned char)str->data[i])) {
+    while (i < str->size && iree_json_is_digit(str->data[i])) {
       ++i;
     }
   }
@@ -127,11 +150,11 @@ iree_status_t iree_json_consume_number(iree_string_view_t* str,
   // Optional fractional part.
   if (i < str->size && str->data[i] == '.') {
     ++i;
-    if (i >= str->size || !isdigit((unsigned char)str->data[i])) {
+    if (i >= str->size || !iree_json_is_digit(str->data[i])) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "invalid fractional part in number");
     }
-    while (i < str->size && isdigit((unsigned char)str->data[i])) {
+    while (i < str->size && iree_json_is_digit(str->data[i])) {
       ++i;
     }
   }
@@ -143,11 +166,11 @@ iree_status_t iree_json_consume_number(iree_string_view_t* str,
     if (i < str->size && (str->data[i] == '+' || str->data[i] == '-')) {
       ++i;
     }
-    if (i >= str->size || !isdigit((unsigned char)str->data[i])) {
+    if (i >= str->size || !iree_json_is_digit(str->data[i])) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "invalid exponent in number");
     }
-    while (i < str->size && isdigit((unsigned char)str->data[i])) {
+    while (i < str->size && iree_json_is_digit(str->data[i])) {
       ++i;
     }
   }
@@ -246,19 +269,19 @@ static iree_status_t iree_json_consume_object_impl(
   }
   *out_value = iree_string_view_empty();
   const char* start = str->data;
-  if (!iree_string_view_consume_prefix(str, IREE_SV("{"))) {
+  if (!iree_string_view_consume_prefix_char(str, '{')) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing object {");
   }
   IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
   while (!iree_string_view_is_empty(*str)) {
     // Check for end of object.
-    if (iree_string_view_starts_with(*str, IREE_SV("}"))) break;
+    if (iree_string_view_starts_with_char(*str, '}')) break;
     // Try to parse key string.
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_json_consume_string(str, &key));
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
     // Expect : separator.
-    if (!iree_string_view_consume_prefix(str, IREE_SV(":"))) {
+    if (!iree_string_view_consume_prefix_char(str, ':')) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "missing object member separator");
     }
@@ -269,15 +292,15 @@ static iree_status_t iree_json_consume_object_impl(
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
     // If there's a comma then continue to next member (trailing commas
     // allowed).
-    if (!iree_string_view_consume_prefix(str, IREE_SV(","))) break;
+    if (!iree_string_view_consume_prefix_char(str, ',')) break;
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
   }
   // Verify closing brace before computing end pointer (str->data may be NULL).
-  if (!iree_string_view_starts_with(*str, IREE_SV("}"))) {
+  if (!iree_string_view_starts_with_char(*str, '}')) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing object }");
   }
   const char* end = str->data + 1;
-  iree_string_view_consume_prefix(str, IREE_SV("}"));
+  iree_string_view_consume_prefix_char(str, '}');
   *out_value = iree_make_string_view(start, end - start);
   return iree_ok_status();
 }
@@ -298,13 +321,13 @@ static iree_status_t iree_json_consume_array_impl(iree_string_view_t* str,
   }
   *out_value = iree_string_view_empty();
   const char* start = str->data;
-  if (!iree_string_view_consume_prefix(str, IREE_SV("["))) {
+  if (!iree_string_view_consume_prefix_char(str, '[')) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array [");
   }
   IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
   while (!iree_string_view_is_empty(*str)) {
     // Check for end of array.
-    if (iree_string_view_starts_with(*str, IREE_SV("]"))) break;
+    if (iree_string_view_starts_with_char(*str, ']')) break;
     // Get the array element.
     iree_string_view_t value = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_json_consume_value_impl(str, &value, depth + 1));
@@ -312,16 +335,16 @@ static iree_status_t iree_json_consume_array_impl(iree_string_view_t* str,
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
     // If there's a comma then continue to next element (trailing commas
     // allowed).
-    if (!iree_string_view_consume_prefix(str, IREE_SV(","))) break;
+    if (!iree_string_view_consume_prefix_char(str, ',')) break;
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(str));
   }
   // Verify closing bracket before computing end pointer (str->data may be
   // NULL).
-  if (!iree_string_view_starts_with(*str, IREE_SV("]"))) {
+  if (!iree_string_view_starts_with_char(*str, ']')) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array ]");
   }
   const char* end = str->data + 1;
-  iree_string_view_consume_prefix(str, IREE_SV("]"));
+  iree_string_view_consume_prefix_char(str, ']');
   *out_value = iree_make_string_view(start, end - start);
   return iree_ok_status();
 }
@@ -373,20 +396,20 @@ iree_status_t iree_json_enumerate_object(iree_string_view_t object_value,
                                          iree_json_object_visitor_fn_t visitor,
                                          void* user_data) {
   iree_string_view_t str = object_value;
-  if (!iree_string_view_consume_prefix(&str, IREE_SV("{"))) {
+  if (!iree_string_view_consume_prefix_char(&str, '{')) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing object {");
   }
   IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
   bool cancelled = false;
   while (!iree_string_view_is_empty(str)) {
     // Check for end of object.
-    if (iree_string_view_starts_with(str, IREE_SV("}"))) break;
+    if (iree_string_view_starts_with_char(str, '}')) break;
     // Try to parse key string.
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_json_consume_string(&str, &key));
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
     // Expect : separator.
-    if (!iree_string_view_consume_prefix(&str, IREE_SV(":"))) {
+    if (!iree_string_view_consume_prefix_char(&str, ':')) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "missing object member separator");
     }
@@ -405,11 +428,11 @@ iree_status_t iree_json_enumerate_object(iree_string_view_t object_value,
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
     // If there's a comma then continue to next member (trailing commas
     // allowed).
-    if (!iree_string_view_consume_prefix(&str, IREE_SV(","))) break;
+    if (!iree_string_view_consume_prefix_char(&str, ',')) break;
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
   }
   // Verify closing brace (unless cancelled early).
-  if (!cancelled && !iree_string_view_starts_with(str, IREE_SV("}"))) {
+  if (!cancelled && !iree_string_view_starts_with_char(str, '}')) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing object }");
   }
   return iree_ok_status();
@@ -418,6 +441,7 @@ iree_status_t iree_json_enumerate_object(iree_string_view_t object_value,
 typedef struct iree_json_lookup_object_value_state_t {
   iree_string_view_t key;
   iree_string_view_t* value;
+  bool found;
 } iree_json_lookup_object_value_state_t;
 
 static iree_status_t iree_json_lookup_object_value_visitor(
@@ -426,6 +450,7 @@ static iree_status_t iree_json_lookup_object_value_visitor(
       (iree_json_lookup_object_value_state_t*)user_data;
   if (iree_string_view_equal(key, state->key)) {
     *state->value = value;
+    state->found = true;
     return iree_status_from_code(IREE_STATUS_CANCELLED);
   }
   return iree_ok_status();
@@ -438,6 +463,24 @@ iree_status_t iree_json_lookup_object_value(iree_string_view_t object_value,
   iree_json_lookup_object_value_state_t state = {
       .key = key,
       .value = out_value,
+      .found = false,
+  };
+  IREE_RETURN_IF_ERROR(iree_json_enumerate_object(
+      object_value, iree_json_lookup_object_value_visitor, &state));
+  if (!state.found) {
+    return iree_status_from_code(IREE_STATUS_NOT_FOUND);
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_json_try_lookup_object_value(iree_string_view_t object_value,
+                                                iree_string_view_t key,
+                                                iree_string_view_t* out_value) {
+  *out_value = iree_string_view_empty();
+  iree_json_lookup_object_value_state_t state = {
+      .key = key,
+      .value = out_value,
+      .found = false,
   };
   return iree_json_enumerate_object(
       object_value, iree_json_lookup_object_value_visitor, &state);
@@ -451,7 +494,7 @@ iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
                                         iree_json_array_visitor_fn_t visitor,
                                         void* user_data) {
   iree_string_view_t str = array_value;
-  if (!iree_string_view_consume_prefix(&str, IREE_SV("["))) {
+  if (!iree_string_view_consume_prefix_char(&str, '[')) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array [");
   }
   IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
@@ -459,7 +502,7 @@ iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
   bool cancelled = false;
   while (!iree_string_view_is_empty(str)) {
     // Check for end of array.
-    if (iree_string_view_starts_with(str, IREE_SV("]"))) break;
+    if (iree_string_view_starts_with_char(str, ']')) break;
     // Get the array element.
     iree_string_view_t value = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_json_consume_value(&str, &value));
@@ -476,12 +519,114 @@ iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
     // If there's a comma then continue to next element (trailing commas
     // allowed).
-    if (!iree_string_view_consume_prefix(&str, IREE_SV(","))) break;
+    if (!iree_string_view_consume_prefix_char(&str, ',')) break;
     IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
   }
   // Verify closing bracket (unless cancelled early).
-  if (!cancelled && !iree_string_view_starts_with(str, IREE_SV("]"))) {
+  if (!cancelled && !iree_string_view_starts_with_char(str, ']')) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array ]");
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_json_enumerate_array_typed(
+    iree_string_view_t array_value, iree_json_array_visitor_typed_fn_t visitor,
+    void* user_data) {
+  iree_string_view_t str = array_value;
+  if (!iree_string_view_consume_prefix_char(&str, '[')) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array [");
+  }
+  IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+  iree_host_size_t index = 0;
+  bool cancelled = false;
+  while (!iree_string_view_is_empty(str)) {
+    // Check for end of array.
+    if (iree_string_view_starts_with_char(str, ']')) break;
+    // Infer the value type from the first character BEFORE consuming.
+    // This allows distinguishing string "[" from array [ at the lexical level.
+    iree_json_value_type_t type = iree_json_infer_value_type(str.data[0]);
+    // Get the array element.
+    iree_string_view_t value = iree_string_view_empty();
+    IREE_RETURN_IF_ERROR(iree_json_consume_value(&str, &value));
+    // Emit the element with its type.
+    iree_status_t status = visitor(user_data, index, type, value);
+    if (iree_status_is_cancelled(status)) {
+      iree_status_ignore(status);
+      cancelled = true;
+      break;
+    }
+    IREE_RETURN_IF_ERROR(status);
+    ++index;
+    // Skip whitespace/comments before comma or closing bracket.
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+    // If there's a comma then continue to next element (trailing commas
+    // allowed).
+    if (!iree_string_view_consume_prefix_char(&str, ',')) break;
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+  }
+  // Verify closing bracket (unless cancelled early).
+  if (!cancelled && !iree_string_view_starts_with_char(str, ']')) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing array ]");
+  }
+  return iree_ok_status();
+}
+
+typedef struct iree_json_array_length_state_t {
+  iree_host_size_t count;
+} iree_json_array_length_state_t;
+
+static iree_status_t iree_json_array_length_visitor(void* user_data,
+                                                    iree_host_size_t index,
+                                                    iree_string_view_t value) {
+  iree_json_array_length_state_t* state =
+      (iree_json_array_length_state_t*)user_data;
+  state->count = index + 1;
+  (void)value;
+  return iree_ok_status();
+}
+
+iree_status_t iree_json_array_length(iree_string_view_t array_value,
+                                     iree_host_size_t* out_length) {
+  *out_length = 0;
+  iree_json_array_length_state_t state = {.count = 0};
+  IREE_RETURN_IF_ERROR(iree_json_enumerate_array(
+      array_value, iree_json_array_length_visitor, &state));
+  *out_length = state.count;
+  return iree_ok_status();
+}
+
+typedef struct iree_json_array_get_state_t {
+  iree_host_size_t target_index;
+  iree_string_view_t* out_value;
+  bool found;
+} iree_json_array_get_state_t;
+
+static iree_status_t iree_json_array_get_visitor(void* user_data,
+                                                 iree_host_size_t index,
+                                                 iree_string_view_t value) {
+  iree_json_array_get_state_t* state = (iree_json_array_get_state_t*)user_data;
+  if (index == state->target_index) {
+    *state->out_value = value;
+    state->found = true;
+    return iree_status_from_code(IREE_STATUS_CANCELLED);
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_json_array_get(iree_string_view_t array_value,
+                                  iree_host_size_t index,
+                                  iree_string_view_t* out_value) {
+  *out_value = iree_string_view_empty();
+  iree_json_array_get_state_t state = {
+      .target_index = index,
+      .out_value = out_value,
+      .found = false,
+  };
+  IREE_RETURN_IF_ERROR(iree_json_enumerate_array(
+      array_value, iree_json_array_get_visitor, &state));
+  if (!state.found) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "array index %" PRIhsz " out of range", index);
   }
   return iree_ok_status();
 }
@@ -795,7 +940,7 @@ iree_status_t iree_json_parse_int64(iree_string_view_t value, int64_t* out) {
   uint64_t magnitude = 0;
   while (i < value.size) {
     char c = value.data[i];
-    if (!isdigit((unsigned char)c)) {
+    if (!iree_json_is_digit(c)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "invalid digit '%c' in number", c);
     }
@@ -851,7 +996,7 @@ iree_status_t iree_json_parse_uint64(iree_string_view_t value, uint64_t* out) {
   uint64_t result = 0;
   for (iree_host_size_t i = 0; i < value.size; ++i) {
     char c = value.data[i];
-    if (!isdigit((unsigned char)c)) {
+    if (!iree_json_is_digit(c)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "invalid digit '%c' in number", c);
     }
@@ -867,33 +1012,400 @@ iree_status_t iree_json_parse_uint64(iree_string_view_t value, uint64_t* out) {
   return iree_ok_status();
 }
 
+// Parses a JSON number as a double, locale-independent.
+// JSON numbers are always in "C" format: optional '-', digits, optional
+// '.digits', optional 'e'/'E' with optional sign and digits. This avoids
+// strtod() which is locale-aware and would misparse in non-C locales.
 iree_status_t iree_json_parse_double(iree_string_view_t value, double* out) {
   if (value.size == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "empty number");
   }
 
-  // Need a null-terminated string for strtod.
-  // Use a stack buffer for small numbers, which covers all realistic cases.
-  char stack_buf[64];
-  char* buf = stack_buf;
-  if (value.size >= sizeof(stack_buf)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "number too long for parsing");
-  }
-  memcpy(buf, value.data, value.size);
-  buf[value.size] = '\0';
+  const char* p = value.data;
+  const char* end = value.data + value.size;
 
-  char* endptr;
-  errno = 0;
-  double result = strtod(buf, &endptr);
-
-  if (errno == ERANGE) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "float out of range");
+  // Handle sign.
+  bool negative = false;
+  if (p < end && *p == '-') {
+    negative = true;
+    p++;
   }
-  if (endptr != buf + value.size) {
+
+  // Parse integer part.
+  if (p >= end || !iree_json_is_digit(*p)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid number");
+  }
+  uint64_t mantissa = 0;
+  int mantissa_digits = 0;
+  while (p < end && iree_json_is_digit(*p)) {
+    if (mantissa_digits <
+        18) {  // Avoid overflow, ~18 decimal digits fit in uint64.
+      mantissa = mantissa * 10 + (*p - '0');
+      mantissa_digits++;
+    }
+    p++;
+  }
+
+  // Parse fractional part.
+  int decimal_exponent = 0;
+  if (p < end && *p == '.') {
+    p++;
+    if (p >= end || !iree_json_is_digit(*p)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid fractional part");
+    }
+    while (p < end && iree_json_is_digit(*p)) {
+      if (mantissa_digits < 18) {
+        mantissa = mantissa * 10 + (*p - '0');
+        mantissa_digits++;
+        decimal_exponent--;
+      }
+      p++;
+    }
+  }
+
+  // Parse exponent.
+  int exponent = 0;
+  if (p < end && (*p == 'e' || *p == 'E')) {
+    p++;
+    bool exp_negative = false;
+    if (p < end && (*p == '+' || *p == '-')) {
+      exp_negative = (*p == '-');
+      p++;
+    }
+    if (p >= end || !iree_json_is_digit(*p)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid exponent");
+    }
+    while (p < end && iree_json_is_digit(*p)) {
+      exponent = exponent * 10 + (*p - '0');
+      if (exponent > 400) {  // Prevent overflow, IEEE 754 max exponent is ~308.
+        exponent = 400;
+      }
+      p++;
+    }
+    if (exp_negative) exponent = -exponent;
+  }
+
+  // Check we consumed all input.
+  if (p != end) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid number");
   }
 
-  *out = result;
+  // Combine mantissa with total exponent.
+  int total_exponent = decimal_exponent + exponent;
+  double result = (double)mantissa;
+
+  // Apply exponent using powers of 10.
+  // Use a lookup table for common exponents to avoid pow() function call.
+  static const double pos_powers[] = {
+      1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,  1e8,  1e9,  1e10, 1e11,
+      1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+  };
+  static const double neg_powers[] = {
+      1e0,   1e-1,  1e-2,  1e-3,  1e-4,  1e-5,  1e-6,  1e-7,
+      1e-8,  1e-9,  1e-10, 1e-11, 1e-12, 1e-13, 1e-14, 1e-15,
+      1e-16, 1e-17, 1e-18, 1e-19, 1e-20, 1e-21, 1e-22,
+  };
+
+  if (total_exponent >= 0) {
+    if (total_exponent < (int)(sizeof(pos_powers) / sizeof(pos_powers[0]))) {
+      result *= pos_powers[total_exponent];
+    } else {
+      // Large positive exponent - multiply in steps to avoid overflow.
+      while (total_exponent >= 22) {
+        result *= 1e22;
+        total_exponent -= 22;
+      }
+      result *= pos_powers[total_exponent];
+    }
+  } else {
+    int abs_exp = -total_exponent;
+    if (abs_exp < (int)(sizeof(neg_powers) / sizeof(neg_powers[0]))) {
+      result *= neg_powers[abs_exp];
+    } else {
+      // Large negative exponent - multiply in steps.
+      while (abs_exp >= 22) {
+        result *= 1e-22;
+        abs_exp -= 22;
+      }
+      result *= neg_powers[abs_exp];
+    }
+  }
+
+  *out = negative ? -result : result;
+  return iree_ok_status();
+}
+
+iree_status_t iree_json_parse_bool(iree_string_view_t value, bool* out) {
+  if (iree_string_view_equal(value, IREE_SV("true"))) {
+    *out = true;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(value, IREE_SV("false"))) {
+    *out = false;
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "expected 'true' or 'false', got '%.*s'",
+                          (int)value.size, value.data);
+}
+
+iree_status_t iree_json_try_lookup_bool(iree_string_view_t object_value,
+                                        iree_string_view_t key,
+                                        bool default_value, bool* out) {
+  iree_string_view_t value = iree_string_view_empty();
+  IREE_RETURN_IF_ERROR(
+      iree_json_try_lookup_object_value(object_value, key, &value));
+  if (iree_string_view_is_empty(value) ||
+      iree_string_view_equal(value, IREE_SV("null"))) {
+    *out = default_value;
+    return iree_ok_status();
+  }
+  return iree_json_parse_bool(value, out);
+}
+
+iree_status_t iree_json_try_lookup_int64(iree_string_view_t object_value,
+                                         iree_string_view_t key,
+                                         int64_t default_value, int64_t* out) {
+  iree_string_view_t value = iree_string_view_empty();
+  IREE_RETURN_IF_ERROR(
+      iree_json_try_lookup_object_value(object_value, key, &value));
+  if (iree_string_view_is_empty(value) ||
+      iree_string_view_equal(value, IREE_SV("null"))) {
+    *out = default_value;
+    return iree_ok_status();
+  }
+  return iree_json_parse_int64(value, out);
+}
+
+iree_status_t iree_json_try_lookup_string(iree_string_view_t object_value,
+                                          iree_string_view_t key,
+                                          iree_string_view_t default_value,
+                                          char* out_buffer,
+                                          iree_host_size_t buffer_capacity,
+                                          iree_host_size_t* out_length) {
+  // Manually parse to get raw value (with quotes for strings).
+  iree_string_view_t str = object_value;
+  if (!iree_string_view_consume_prefix_char(&str, '{')) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing object {");
+  }
+  IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+
+  bool found = false;
+  iree_string_view_t raw_value = iree_string_view_empty();
+  while (!iree_string_view_is_empty(str)) {
+    if (iree_string_view_starts_with_char(str, '}')) break;
+    // Parse key.
+    iree_string_view_t member_key = iree_string_view_empty();
+    IREE_RETURN_IF_ERROR(iree_json_consume_string(&str, &member_key));
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+    if (!iree_string_view_consume_prefix_char(&str, ':')) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "missing object member separator");
+    }
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+    // Record raw value span before consuming.
+    const char* value_start = str.data;
+    iree_string_view_t value = iree_string_view_empty();
+    IREE_RETURN_IF_ERROR(iree_json_consume_value(&str, &value));
+    if (iree_string_view_equal(member_key, key)) {
+      raw_value = iree_make_string_view(value_start, str.data - value_start);
+      found = true;
+      break;
+    }
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+    if (!iree_string_view_consume_prefix_char(&str, ',')) break;
+    IREE_RETURN_IF_ERROR(iree_json_skip_whitespace_and_comments(&str));
+  }
+
+  // If not found or null, use default.
+  if (!found || iree_string_view_equal(raw_value, IREE_SV("null"))) {
+    if (default_value.size > buffer_capacity) {
+      *out_length = default_value.size;
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "buffer too small for default value");
+    }
+    memcpy(out_buffer, default_value.data, default_value.size);
+    *out_length = default_value.size;
+    return iree_ok_status();
+  }
+
+  // Value must be a string (starts with quote).
+  if (raw_value.size < 2 || raw_value.data[0] != '"') {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "expected string value for key '%.*s'",
+                            (int)key.size, key.data);
+  }
+
+  // Strip surrounding quotes and unescape.
+  iree_string_view_t content =
+      iree_string_view_substr(raw_value, 1, raw_value.size - 2);
+  return iree_json_unescape_string(content, buffer_capacity, out_buffer,
+                                   out_length);
+}
+
+//===----------------------------------------------------------------------===//
+// Object Key Validation
+//===----------------------------------------------------------------------===//
+
+// Returns true if |key| is in the |allowed_keys| array.
+static bool iree_json_is_key_allowed(iree_string_view_t key,
+                                     const iree_string_view_t* allowed_keys,
+                                     iree_host_size_t allowed_key_count) {
+  for (iree_host_size_t i = 0; i < allowed_key_count; ++i) {
+    if (iree_string_view_equal(key, allowed_keys[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Visitor state for collecting unknown keys.
+typedef struct iree_json_validate_keys_state_t {
+  const iree_string_view_t* allowed_keys;
+  iree_host_size_t allowed_key_count;
+  // Unknown keys are collected into a fixed-size buffer.
+  // If more unknown keys are found than fit, we just count them.
+  iree_string_view_t unknown_keys[8];
+  iree_host_size_t unknown_key_count;
+} iree_json_validate_keys_state_t;
+
+static iree_status_t iree_json_validate_keys_visitor(void* user_data,
+                                                     iree_string_view_t key,
+                                                     iree_string_view_t value) {
+  (void)value;  // Unused - we only care about keys.
+  iree_json_validate_keys_state_t* state =
+      (iree_json_validate_keys_state_t*)user_data;
+  if (!iree_json_is_key_allowed(key, state->allowed_keys,
+                                state->allowed_key_count)) {
+    // Record unknown key if we have room.
+    if (state->unknown_key_count < IREE_ARRAYSIZE(state->unknown_keys)) {
+      state->unknown_keys[state->unknown_key_count] = key;
+    }
+    ++state->unknown_key_count;
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_json_validate_object_keys(
+    iree_string_view_t object_value, const iree_string_view_t* allowed_keys,
+    iree_host_size_t allowed_key_count) {
+  iree_json_validate_keys_state_t state = {
+      .allowed_keys = allowed_keys,
+      .allowed_key_count = allowed_key_count,
+      .unknown_key_count = 0,
+  };
+
+  IREE_RETURN_IF_ERROR(iree_json_enumerate_object(
+      object_value, iree_json_validate_keys_visitor, &state));
+
+  if (state.unknown_key_count == 0) {
+    return iree_ok_status();
+  }
+
+  // Build error message listing unknown keys and supported keys.
+  // Use a fixed-size buffer for the message.
+  char message[512];
+  iree_host_size_t message_length = 0;
+
+  // Add unknown keys to message.
+  message_length +=
+      snprintf(message + message_length, sizeof(message) - message_length,
+               "unknown key%s: ", state.unknown_key_count == 1 ? "" : "s");
+  iree_host_size_t displayed_count =
+      state.unknown_key_count < IREE_ARRAYSIZE(state.unknown_keys)
+          ? state.unknown_key_count
+          : IREE_ARRAYSIZE(state.unknown_keys);
+  for (iree_host_size_t i = 0; i < displayed_count; ++i) {
+    if (i > 0) {
+      message_length += snprintf(message + message_length,
+                                 sizeof(message) - message_length, ", ");
+    }
+    message_length += snprintf(
+        message + message_length, sizeof(message) - message_length, "'%.*s'",
+        (int)state.unknown_keys[i].size, state.unknown_keys[i].data);
+  }
+  if (state.unknown_key_count > displayed_count) {
+    message_length += snprintf(
+        message + message_length, sizeof(message) - message_length,
+        ", ... (+%zu more)", state.unknown_key_count - displayed_count);
+  }
+
+  // Add supported keys to message.
+  message_length += snprintf(message + message_length,
+                             sizeof(message) - message_length, " (supported: ");
+  for (iree_host_size_t i = 0; i < allowed_key_count && i < 16; ++i) {
+    if (i > 0) {
+      message_length += snprintf(message + message_length,
+                                 sizeof(message) - message_length, ", ");
+    }
+    message_length +=
+        snprintf(message + message_length, sizeof(message) - message_length,
+                 "%.*s", (int)allowed_keys[i].size, allowed_keys[i].data);
+  }
+  if (allowed_key_count > 16) {
+    message_length += snprintf(message + message_length,
+                               sizeof(message) - message_length, ", ...");
+  }
+  message_length +=
+      snprintf(message + message_length, sizeof(message) - message_length, ")");
+
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "%.*s",
+                          (int)message_length, message);
+}
+
+//===----------------------------------------------------------------------===//
+// Unicode Codepoint Parsing
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_json_parse_codepoint(iree_string_view_t value,
+                                        uint32_t default_codepoint,
+                                        uint32_t* out_codepoint) {
+  if (value.size == 0) {
+    *out_codepoint = default_codepoint;
+    return iree_ok_status();
+  }
+
+  // First unescape the string to handle \u sequences.
+  iree_host_size_t unescaped_length = 0;
+  iree_status_t status =
+      iree_json_unescape_string(value, 0, NULL, &unescaped_length);
+  if (!iree_status_is_ok(status) &&
+      !iree_status_is_resource_exhausted(status)) {
+    return status;
+  }
+
+  // Allocate a small stack buffer for the unescaped character.
+  char buffer[8];
+  if (unescaped_length > sizeof(buffer)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "codepoint string too long");
+  }
+
+  IREE_RETURN_IF_ERROR(iree_json_unescape_string(value, sizeof(buffer), buffer,
+                                                 &unescaped_length));
+
+  // Decode the first UTF-8 codepoint.
+  if (unescaped_length == 0) {
+    *out_codepoint = default_codepoint;
+    return iree_ok_status();
+  }
+
+  const uint8_t* bytes = (const uint8_t*)buffer;
+  if (bytes[0] < 0x80) {
+    *out_codepoint = bytes[0];
+  } else if ((bytes[0] & 0xE0) == 0xC0 && unescaped_length >= 2) {
+    *out_codepoint = ((bytes[0] & 0x1F) << 6) | (bytes[1] & 0x3F);
+  } else if ((bytes[0] & 0xF0) == 0xE0 && unescaped_length >= 3) {
+    *out_codepoint = ((bytes[0] & 0x0F) << 12) | ((bytes[1] & 0x3F) << 6) |
+                     (bytes[2] & 0x3F);
+  } else if ((bytes[0] & 0xF8) == 0xF0 && unescaped_length >= 4) {
+    *out_codepoint = ((bytes[0] & 0x07) << 18) | ((bytes[1] & 0x3F) << 12) |
+                     ((bytes[2] & 0x3F) << 6) | (bytes[3] & 0x3F);
+  } else {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid UTF-8 in codepoint");
+  }
+
   return iree_ok_status();
 }

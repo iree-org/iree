@@ -10,8 +10,13 @@
 #include <vector>
 
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace {
+
+using iree::Status;
+using iree::StatusCode;
+using iree::testing::status::StatusIs;
 
 //===----------------------------------------------------------------------===//
 // UTF-8 Codec Tests
@@ -182,6 +187,77 @@ TEST(UnicodeUtf8Test, EncodedLength) {
   EXPECT_EQ(iree_unicode_utf8_encoded_length(0x110000), 0);  // Invalid
 }
 
+TEST(UnicodeUtf8Test, IncompleteTailLengthEmpty) {
+  // Empty buffer has no incomplete tail.
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length("", 0), 0u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthCompleteAscii) {
+  // Complete ASCII strings have no incomplete tail.
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length("Hello", 5), 0u);
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length("x", 1), 0u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthCompleteTwoByte) {
+  // Complete 2-byte UTF-8 sequence "é" (U+00E9 = 0xC3 0xA9).
+  const char complete[] = "\xC3\xA9";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(complete, 2), 0u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthCompleteThreeByte) {
+  // Complete 3-byte UTF-8 sequence "中" (U+4E2D = 0xE4 0xB8 0xAD).
+  const char complete[] = "\xE4\xB8\xAD";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(complete, 3), 0u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthCompleteFourByte) {
+  // Complete 4-byte UTF-8 sequence U+1F600 (grinning face emoji).
+  const char complete[] = "\xF0\x9F\x98\x80";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(complete, 4), 0u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthIncompleteTwoByte) {
+  // Incomplete 2-byte sequence: only lead byte present (0xC3).
+  const char incomplete[] = "abc\xC3";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(incomplete, 4), 1u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthIncompleteThreeByte) {
+  // Incomplete 3-byte sequence: lead + 1 continuation (0xE4 0xB8).
+  const char incomplete1[] = "abc\xE4\xB8";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(incomplete1, 5), 2u);
+
+  // Incomplete 3-byte sequence: only lead byte (0xE4).
+  const char incomplete2[] = "abc\xE4";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(incomplete2, 4), 1u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthIncompleteFourByte) {
+  // Incomplete 4-byte sequence: lead + 2 continuations (0xF0 0x9F 0x98).
+  const char incomplete1[] = "abc\xF0\x9F\x98";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(incomplete1, 6), 3u);
+
+  // Incomplete 4-byte sequence: lead + 1 continuation (0xF0 0x9F).
+  const char incomplete2[] = "abc\xF0\x9F";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(incomplete2, 5), 2u);
+
+  // Incomplete 4-byte sequence: only lead byte (0xF0).
+  const char incomplete3[] = "abc\xF0";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(incomplete3, 4), 1u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthOrphanContinuations) {
+  // Four continuation bytes with no lead byte - malformed, treated as complete.
+  const char orphans[] = "\x80\x80\x80\x80";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(orphans, 4), 0u);
+}
+
+TEST(UnicodeUtf8Test, IncompleteTailLengthInvalidLeadByte) {
+  // Invalid lead byte 0xFF followed by nothing - treated as complete.
+  const char invalid[] = "abc\xFF";
+  EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length(invalid, 4), 0u);
+}
+
 //===----------------------------------------------------------------------===//
 // Category Tests
 //===----------------------------------------------------------------------===//
@@ -282,6 +358,32 @@ TEST(UnicodeCategoryTest, C1ControlCharacters) {
   EXPECT_TRUE(iree_unicode_is_control(0x85));  // NEL (Next Line)
   EXPECT_TRUE(iree_unicode_is_control(0x9F));
   EXPECT_FALSE(iree_unicode_is_control(0xA0));  // NBSP is not a control
+}
+
+TEST(UnicodeCategoryTest, CJKCharacters) {
+  // CJK Unified Ideographs (U+4E00-U+9FFF).
+  EXPECT_TRUE(iree_unicode_is_cjk(0x4E00));  // First CJK Unified Ideograph
+  EXPECT_TRUE(iree_unicode_is_cjk(0x4E2D));  // 中 (middle)
+  EXPECT_TRUE(iree_unicode_is_cjk(0x6587));  // 文 (text)
+  EXPECT_TRUE(iree_unicode_is_cjk(0x9FFF));  // Last CJK Unified Ideograph
+
+  // CJK Extension A (U+3400-U+4DBF).
+  EXPECT_TRUE(iree_unicode_is_cjk(0x3400));
+  EXPECT_TRUE(iree_unicode_is_cjk(0x4DBF));
+
+  // CJK Extension B (U+20000-U+2A6DF).
+  EXPECT_TRUE(iree_unicode_is_cjk(0x20000));
+  EXPECT_TRUE(iree_unicode_is_cjk(0x2A6DF));
+
+  // CJK Compatibility Ideographs (U+F900-U+FAFF).
+  EXPECT_TRUE(iree_unicode_is_cjk(0xF900));
+  EXPECT_TRUE(iree_unicode_is_cjk(0xFAFF));
+
+  // Non-CJK characters.
+  EXPECT_FALSE(iree_unicode_is_cjk('A'));     // ASCII
+  EXPECT_FALSE(iree_unicode_is_cjk(0x3041));  // Hiragana あ
+  EXPECT_FALSE(iree_unicode_is_cjk(0x30A1));  // Katakana ア
+  EXPECT_FALSE(iree_unicode_is_cjk(0xAC00));  // Hangul 가
 }
 
 TEST(UnicodeCategoryTest, NonAsciiPunctuation) {
@@ -452,6 +554,513 @@ TEST(UnicodeNfdTest, NonDecomposable) {
   EXPECT_EQ(iree_unicode_nfd_base(0x00D0), 0x00D0u);  // Ð (Eth)
   EXPECT_EQ(iree_unicode_nfd_base(0x00D8), 0x00D8u);  // Ø (O with stroke)
   EXPECT_EQ(iree_unicode_nfd_base(0x00DE), 0x00DEu);  // Þ (Thorn)
+}
+
+//===----------------------------------------------------------------------===//
+// Canonical Combining Class (CCC) Tests
+//===----------------------------------------------------------------------===//
+
+TEST(UnicodeCccTest, BaseCharactersHaveZeroCcc) {
+  // Base characters (starters) have CCC=0.
+  EXPECT_EQ(iree_unicode_ccc('A'), 0);
+  EXPECT_EQ(iree_unicode_ccc('a'), 0);
+  EXPECT_EQ(iree_unicode_ccc('0'), 0);
+  EXPECT_EQ(iree_unicode_ccc(0x00E9), 0);  // é (precomposed, is a starter)
+  EXPECT_EQ(iree_unicode_ccc(0x4E2D), 0);  // 中 (CJK)
+}
+
+TEST(UnicodeCccTest, CombiningDiacriticalMarks) {
+  // Combining marks have non-zero CCC values.
+  EXPECT_EQ(iree_unicode_ccc(0x0300), 230);  // Combining Grave Accent
+  EXPECT_EQ(iree_unicode_ccc(0x0301), 230);  // Combining Acute Accent
+  EXPECT_EQ(iree_unicode_ccc(0x0302), 230);  // Combining Circumflex Accent
+  EXPECT_EQ(iree_unicode_ccc(0x0303), 230);  // Combining Tilde
+  EXPECT_EQ(iree_unicode_ccc(0x0304), 230);  // Combining Macron
+  EXPECT_EQ(iree_unicode_ccc(0x0308), 230);  // Combining Diaeresis
+  EXPECT_EQ(iree_unicode_ccc(0x030A), 230);  // Combining Ring Above
+  EXPECT_EQ(iree_unicode_ccc(0x030C), 230);  // Combining Caron
+}
+
+TEST(UnicodeCccTest, BelowMarks) {
+  // Marks that attach below have lower CCC values.
+  EXPECT_EQ(iree_unicode_ccc(0x0327), 202);  // Combining Cedilla
+  EXPECT_EQ(iree_unicode_ccc(0x0328), 202);  // Combining Ogonek
+}
+
+TEST(UnicodeCccTest, DoubleMarks) {
+  // Double diacritics (spanning two base characters).
+  EXPECT_EQ(iree_unicode_ccc(0x035C), 233);  // Combining Double Breve Below
+  EXPECT_EQ(iree_unicode_ccc(0x035D), 234);  // Combining Double Breve
+  EXPECT_EQ(iree_unicode_ccc(0x035E), 234);  // Combining Double Macron
+}
+
+TEST(UnicodeCccTest, HebrewCombining) {
+  // Hebrew combining marks have specific CCC values.
+  EXPECT_EQ(iree_unicode_ccc(0x05B0), 10);  // Hebrew Point Sheva
+  EXPECT_EQ(iree_unicode_ccc(0x05B1), 11);  // Hebrew Point Hataf Segol
+  EXPECT_EQ(iree_unicode_ccc(0x05BC), 21);  // Hebrew Point Dagesh
+  EXPECT_EQ(iree_unicode_ccc(0x05C1), 24);  // Hebrew Point Shin Dot
+}
+
+//===----------------------------------------------------------------------===//
+// Composition Pair Tests
+//===----------------------------------------------------------------------===//
+
+TEST(UnicodeComposePairTest, LatinCompositions) {
+  // Common Latin letter + combining mark compositions.
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0300), 0x00C0u);  // A + grave → À
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0301), 0x00C1u);  // A + acute → Á
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0302),
+            0x00C2u);  // A + circumflex → Â
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0303), 0x00C3u);  // A + tilde → Ã
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0308),
+            0x00C4u);  // A + diaeresis → Ä
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x030A),
+            0x00C5u);  // A + ring above → Å
+  EXPECT_EQ(iree_unicode_compose_pair('C', 0x0327),
+            0x00C7u);  // C + cedilla → Ç
+  EXPECT_EQ(iree_unicode_compose_pair('E', 0x0301), 0x00C9u);  // E + acute → É
+  EXPECT_EQ(iree_unicode_compose_pair('N', 0x0303), 0x00D1u);  // N + tilde → Ñ
+  EXPECT_EQ(iree_unicode_compose_pair('O', 0x0308),
+            0x00D6u);  // O + diaeresis → Ö
+  EXPECT_EQ(iree_unicode_compose_pair('U', 0x0308),
+            0x00DCu);  // U + diaeresis → Ü
+}
+
+TEST(UnicodeComposePairTest, LowercaseLatinCompositions) {
+  EXPECT_EQ(iree_unicode_compose_pair('a', 0x0300), 0x00E0u);  // a + grave → à
+  EXPECT_EQ(iree_unicode_compose_pair('a', 0x0301), 0x00E1u);  // a + acute → á
+  EXPECT_EQ(iree_unicode_compose_pair('e', 0x0301), 0x00E9u);  // e + acute → é
+  EXPECT_EQ(iree_unicode_compose_pair('n', 0x0303), 0x00F1u);  // n + tilde → ñ
+  EXPECT_EQ(iree_unicode_compose_pair('o', 0x0308),
+            0x00F6u);  // o + diaeresis → ö
+  EXPECT_EQ(iree_unicode_compose_pair('u', 0x0308),
+            0x00FCu);  // u + diaeresis → ü
+}
+
+TEST(UnicodeComposePairTest, GreekCompositions) {
+  // Greek letter + combining mark compositions.
+  EXPECT_EQ(iree_unicode_compose_pair(0x0391, 0x0301),
+            0x0386u);  // Α + acute → Ά
+  EXPECT_EQ(iree_unicode_compose_pair(0x03B1, 0x0301),
+            0x03ACu);  // α + acute → ά
+  EXPECT_EQ(iree_unicode_compose_pair(0x03B5, 0x0301),
+            0x03ADu);  // ε + acute → έ
+}
+
+TEST(UnicodeComposePairTest, NoComposition) {
+  // Pairs that don't compose should return 0.
+  EXPECT_EQ(iree_unicode_compose_pair('A', 'B'), 0u);  // Not a valid pair
+  EXPECT_EQ(iree_unicode_compose_pair('X', 0x0301),
+            0u);  // X doesn't compose with acute
+  EXPECT_EQ(iree_unicode_compose_pair(0x4E2D, 0x0301),
+            0u);  // CJK doesn't compose
+}
+
+TEST(UnicodeComposePairTest, LatinExtendedCompositions) {
+  // Compositions in Latin Extended blocks.
+  EXPECT_EQ(iree_unicode_compose_pair('A', 0x0304), 0x0100u);  // A + macron → Ā
+  EXPECT_EQ(iree_unicode_compose_pair('a', 0x0304), 0x0101u);  // a + macron → ā
+  EXPECT_EQ(iree_unicode_compose_pair('C', 0x030C), 0x010Cu);  // C + caron → Č
+  EXPECT_EQ(iree_unicode_compose_pair('c', 0x030C), 0x010Du);  // c + caron → č
+  EXPECT_EQ(iree_unicode_compose_pair('S', 0x030C), 0x0160u);  // S + caron → Š
+  EXPECT_EQ(iree_unicode_compose_pair('s', 0x030C), 0x0161u);  // s + caron → š
+}
+
+//===----------------------------------------------------------------------===//
+// Unicode Composition Tests
+//===----------------------------------------------------------------------===//
+
+TEST(UnicodeComposeTest, AsciiPassthrough) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_unicode_compose(iree_make_cstring_view("Hello World"),
+                                      buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length), "Hello World");
+}
+
+TEST(UnicodeComposeTest, EmptyString) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_unicode_compose(iree_make_cstring_view(""), buffer,
+                                      sizeof(buffer), &length));
+  EXPECT_EQ(length, 0u);
+}
+
+TEST(UnicodeComposeTest, AlreadyComposed) {
+  // Already-composed characters should pass through unchanged.
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // "café" with precomposed é (U+00E9).
+  const char input[] = "caf\xC3\xA9";
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
+}
+
+TEST(UnicodeComposeTest, DecomposedToComposed) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // "café" with decomposed é: 'e' (U+0065) + combining acute (U+0301).
+  const char input[] = "cafe\xCC\x81";  // e + combining acute
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+
+  // Should compose to "café" with precomposed é.
+  const char expected[] = "caf\xC3\xA9";
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, MultipleDecomposedCharacters) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // "résumé" with all decomposed accents.
+  // r + e + acute + s + u + m + e + acute
+  const char input[] = "re\xCC\x81sume\xCC\x81";
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+
+  // Should compose to "résumé" with precomposed é.
+  const char expected[] = "r\xC3\xA9sum\xC3\xA9";
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, MultipleMarksOnSameBase) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // o + combining acute (U+0301) + combining diaeresis (U+0308).
+  // Composition can only compose one mark, so result should be ó + diaeresis.
+  const char input[] = "o\xCC\x81\xCC\x88";
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+
+  // o + acute composes to ó (U+00F3), diaeresis remains.
+  // Expected: ó (C3 B3) + combining diaeresis (CC 88).
+  const char expected[] = "\xC3\xB3\xCC\x88";
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, CanonicalOrdering) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // Test that combining marks are canonically ordered.
+  // o + cedilla (CCC=202) + acute (CCC=230).
+  // Cedilla is below (202), acute is above (230).
+  // Since 202 < 230, order is already canonical.
+  const char input1[] = "o\xCC\xA7\xCC\x81";  // cedilla + acute
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input1, sizeof(input1) - 1),
+                           buffer, sizeof(buffer), &length));
+
+  // o + acute (CCC=230) + cedilla (CCC=202) is NOT canonical order.
+  // Compose should reorder to cedilla + acute, then compose.
+  char buffer2[64];
+  iree_host_size_t length2 = 0;
+  const char input2[] = "o\xCC\x81\xCC\xA7";  // acute + cedilla (wrong order)
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input2, sizeof(input2) - 1),
+                           buffer2, sizeof(buffer2), &length2));
+
+  // Both should produce the same canonical result.
+  EXPECT_EQ(std::string(buffer, length), std::string(buffer2, length2));
+}
+
+TEST(UnicodeComposeTest, NonComposingMarks) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // 'x' doesn't compose with acute accent, so mark should remain.
+  const char input[] = "x\xCC\x81";  // x + combining acute
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+
+  // Should remain unchanged (x doesn't compose with acute).
+  EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
+}
+
+TEST(UnicodeComposeTest, CjkUnchanged) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // CJK characters pass through unchanged.
+  const char input[] = "\xE4\xB8\xAD\xE6\x96\x87";  // 中文
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
+}
+
+TEST(UnicodeComposeTest, MixedContent) {
+  char buffer[128];
+  iree_host_size_t length = 0;
+
+  // Mixed ASCII, decomposed accents, and CJK.
+  // "Hello café 中文"
+  // With decomposed é: e + combining acute.
+  const char input[] = "Hello cafe\xCC\x81 \xE4\xB8\xAD\xE6\x96\x87";
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+
+  // Expected: "Hello café 中文" with composed é.
+  const char expected[] = "Hello caf\xC3\xA9 \xE4\xB8\xAD\xE6\x96\x87";
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, BufferTooSmall) {
+  char buffer[4];
+  iree_host_size_t length = 0;
+
+  // Buffer too small for output.
+  iree_status_t status = iree_unicode_compose(
+      iree_make_cstring_view("Hello World"), buffer, sizeof(buffer), &length);
+  EXPECT_THAT(Status(std::move(status)),
+              StatusIs(StatusCode::kResourceExhausted));
+}
+
+TEST(UnicodeComposeTest, BufferCapacityIsInputSize) {
+  // Compose only needs capacity >= input.size (output can only shrink).
+  // Uses a small internal buffer for processing, not the output buffer.
+
+  // "café" with decomposed é: 6 bytes input (4 ASCII + 2-byte combining mark),
+  // 5 codepoints, composes to 5 bytes output.
+  const char input[] = "cafe\xCC\x81";    // 6 bytes, 5 codepoints
+  const char expected[] = "caf\xC3\xA9";  // 5 bytes output
+
+  // Verify our understanding of the input/output sizes.
+  EXPECT_EQ(sizeof(input) - 1, 6u);     // Input is 6 bytes.
+  EXPECT_EQ(sizeof(expected) - 1, 5u);  // Output is 5 bytes.
+
+  // Buffer exactly input size should work.
+  char exact_buffer[6];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           exact_buffer, sizeof(exact_buffer), &length));
+  EXPECT_EQ(length, 5u);
+  EXPECT_EQ(std::string(exact_buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+
+  // Buffer smaller than input size should fail.
+  char small_buffer[5];
+  length = 0;
+  iree_status_t status =
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           small_buffer, sizeof(small_buffer), &length);
+  EXPECT_THAT(Status(std::move(status)),
+              StatusIs(StatusCode::kResourceExhausted));
+
+  // Larger buffer also works.
+  char large_buffer[64];
+  length = 0;
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           large_buffer, sizeof(large_buffer), &length));
+  EXPECT_EQ(length, 5u);
+  EXPECT_EQ(std::string(large_buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, GreekWithAccents) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // Greek alpha + combining acute.
+  const char input[] = "\xCE\xB1\xCC\x81";  // α + acute
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+
+  // Should compose to ά (U+03AC).
+  const char expected[] = "\xCE\xAC";
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, Emoji) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // Emoji pass through unchanged.
+  const char input[] = "\xF0\x9F\x98\x80";  // 😀
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
+}
+
+TEST(UnicodeComposeTest, HangulUnchanged) {
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // Pre-composed Hangul syllables pass through unchanged.
+  // We don't do Hangul algorithmic composition.
+  const char input[] = "\xEA\xB0\x80";  // 가 (U+AC00)
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
+}
+
+TEST(UnicodeComposeTest, MultipleCombiningSequences) {
+  // Test that multiple combining sequences in one string are processed
+  // correctly by the chunk-based algorithm.
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // "café naïve" with decomposed accents.
+  // café: c a f e + combining acute
+  // naïve: n a i + combining diaeresis v e
+  const char input[] = "caf\x65\xCC\x81 na\x69\xCC\x88ve";
+  const char expected[] = "caf\xC3\xA9 na\xC3\xAFve";
+
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, ManyCombiningMarks) {
+  // Test a sequence with many combining marks on one base character.
+  // This exercises the internal buffer for combining sequences.
+  char buffer[256];
+  iree_host_size_t length = 0;
+
+  // Build a string with a base character followed by 10 combining marks.
+  // Using combining acute (U+0301) repeatedly - CCC 230.
+  std::string input = "a";
+  for (int i = 0; i < 10; ++i) {
+    input += "\xCC\x81";  // Combining acute.
+  }
+
+  // Should succeed - 10 marks is well under the 32-codepoint limit.
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input.data(), input.size()),
+                           buffer, sizeof(buffer), &length));
+
+  // First acute should compose with 'a' to form 'á', rest remain.
+  // á = U+00E1 = C3 A1
+  std::string expected = "\xC3\xA1";
+  for (int i = 0; i < 9; ++i) {
+    expected += "\xCC\x81";  // Remaining acute marks.
+  }
+  EXPECT_EQ(std::string(buffer, length), expected);
+}
+
+TEST(UnicodeComposeTest, CombiningSequenceLimitExceeded) {
+  // Test that exceeding 32 combining marks fails with RESOURCE_EXHAUSTED.
+  char buffer[512];
+  iree_host_size_t length = 0;
+
+  // Build a string with a base character followed by 35 combining marks.
+  std::string input = "a";
+  for (int i = 0; i < 35; ++i) {
+    input += "\xCC\x81";  // Combining acute.
+  }
+
+  // Should fail - 36 codepoints (1 base + 35 marks) exceeds 32 limit.
+  iree_status_t status =
+      iree_unicode_compose(iree_make_string_view(input.data(), input.size()),
+                           buffer, sizeof(buffer), &length);
+  EXPECT_THAT(Status(std::move(status)),
+              StatusIs(StatusCode::kResourceExhausted));
+}
+
+TEST(UnicodeComposeTest, LeadingCombiningMark) {
+  // Test input that starts with a combining mark (no preceding base).
+  // This is unusual but valid Unicode.
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // Combining acute followed by 'a' + combining acute.
+  const char input[] =
+      "\xCC\x81"
+      "a\xCC\x81";
+  // First mark has no base to combine with, second forms 'á'.
+  const char expected[] = "\xCC\x81\xC3\xA1";
+
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length),
+            std::string(expected, sizeof(expected) - 1));
+}
+
+TEST(UnicodeComposeTest, SingleCombiningMark) {
+  // Test single combining mark with no base (edge case).
+  char buffer[8];
+  iree_host_size_t length = 0;
+
+  const char input[] = "\xCC\x81";  // Just combining acute.
+
+  // Should pass through unchanged.
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input, sizeof(input) - 1),
+                           buffer, sizeof(buffer), &length));
+  EXPECT_EQ(std::string(buffer, length), std::string(input, sizeof(input) - 1));
+}
+
+TEST(UnicodeComposeTest, CombiningSequenceLimitBoundary) {
+  // Test exactly 32 codepoints (1 base + 31 combining marks) succeeds.
+  // This is the maximum allowed combining sequence length.
+  char buffer[256];
+  iree_host_size_t length = 0;
+
+  // Build a string with exactly 32 codepoints.
+  std::string input = "a";  // 1 base character.
+  for (int i = 0; i < 31; ++i) {
+    input += "\xCC\x81";  // 31 combining acute marks.
+  }
+
+  // Should succeed - exactly at the 32-codepoint limit.
+  IREE_ASSERT_OK(
+      iree_unicode_compose(iree_make_string_view(input.data(), input.size()),
+                           buffer, sizeof(buffer), &length));
+
+  // First acute composes with 'a' to form 'á', rest remain.
+  std::string expected = "\xC3\xA1";  // á
+  for (int i = 0; i < 30; ++i) {
+    expected += "\xCC\x81";  // 30 remaining acute marks.
+  }
+  EXPECT_EQ(std::string(buffer, length), expected);
+}
+
+TEST(UnicodeComposeTest, InvalidUtf8BehaviorUndefined) {
+  // Invalid UTF-8 behavior is undefined per the API contract.
+  // This test documents current behavior but does not guarantee it.
+  // The decoder replaces invalid bytes with U+FFFD, which may cause
+  // output to exceed input size.
+  char buffer[64];
+  iree_host_size_t length = 0;
+
+  // Single invalid byte 0xFF - decoder returns U+FFFD (3 bytes: EF BF BD).
+  // With capacity = 1, this would fail; with larger capacity it may succeed.
+  const char invalid_input[] = "\xFF";
+
+  // We document that behavior is undefined, so we just verify it doesn't crash.
+  // The actual result depends on implementation details.
+  iree_status_t status = iree_unicode_compose(
+      iree_make_string_view(invalid_input, sizeof(invalid_input) - 1), buffer,
+      sizeof(buffer), &length);
+
+  // Either succeeds (with replacement char) or fails (capacity issues).
+  // We don't assert on the result, just that it doesn't crash.
+  iree_status_ignore(status);
 }
 
 }  // namespace

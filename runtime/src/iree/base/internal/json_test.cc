@@ -612,8 +612,10 @@ TEST(JsonLookupObjectValueTest, Found) {
 
 TEST(JsonLookupObjectValueTest, NotFound) {
   iree_string_view_t value;
-  IREE_ASSERT_OK(iree_json_lookup_object_value(IREE_SV("{\"key\": 123}"),
-                                               IREE_SV("missing"), &value));
+  iree_status_t status = iree_json_lookup_object_value(
+      IREE_SV("{\"key\": 123}"), IREE_SV("missing"), &value);
+  EXPECT_TRUE(iree_status_is_not_found(status));
+  iree_status_ignore(status);
   EXPECT_EQ(value.size, 0);
 }
 
@@ -629,6 +631,128 @@ TEST(JsonLookupObjectValueTest, StringValue) {
   IREE_ASSERT_OK(iree_json_lookup_object_value(IREE_SV("{\"key\": \"value\"}"),
                                                IREE_SV("key"), &value));
   EXPECT_SV_EQ(value, IREE_SV("value"));
+}
+
+//===----------------------------------------------------------------------===//
+// Try Lookup Object Value Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonTryLookupObjectValueTest, Found) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_object_value(IREE_SV("{\"key\": 123}"),
+                                                   IREE_SV("key"), &value));
+  EXPECT_SV_EQ(value, IREE_SV("123"));
+}
+
+TEST(JsonTryLookupObjectValueTest, NotFoundReturnsOkWithEmpty) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_object_value(IREE_SV("{\"key\": 123}"),
+                                                   IREE_SV("missing"), &value));
+  EXPECT_EQ(value.size, 0);
+}
+
+TEST(JsonTryLookupObjectValueTest, EmptyObject) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(
+      iree_json_try_lookup_object_value(IREE_SV("{}"), IREE_SV("key"), &value));
+  EXPECT_EQ(value.size, 0);
+}
+
+//===----------------------------------------------------------------------===//
+// String Lookup Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonTryLookupStringTest, SimpleString) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_try_lookup_string(
+      IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"), iree_string_view_empty(),
+      buffer, sizeof(buffer), &length));
+  EXPECT_EQ(length, 5);
+  EXPECT_EQ(std::string(buffer, length), "hello");
+}
+
+TEST(JsonTryLookupStringTest, StringWithEscapes) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_try_lookup_string(
+      IREE_SV("{\"key\": \"hello\\nworld\"}"), IREE_SV("key"),
+      iree_string_view_empty(), buffer, sizeof(buffer), &length));
+  EXPECT_EQ(length, 11);
+  EXPECT_EQ(std::string(buffer, length), "hello\nworld");
+}
+
+TEST(JsonTryLookupStringTest, NullValueUsesDefault) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{\"key\": null}"),
+                                             IREE_SV("key"), IREE_SV("default"),
+                                             buffer, sizeof(buffer), &length));
+  EXPECT_EQ(length, 7);
+  EXPECT_EQ(std::string(buffer, length), "default");
+}
+
+TEST(JsonTryLookupStringTest, MissingKeyUsesDefault) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{\"other\": \"value\"}"),
+                                             IREE_SV("key"), IREE_SV("default"),
+                                             buffer, sizeof(buffer), &length));
+  EXPECT_EQ(length, 7);
+  EXPECT_EQ(std::string(buffer, length), "default");
+}
+
+TEST(JsonTryLookupStringTest, EmptyObjectUsesDefault) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{}"), IREE_SV("key"),
+                                             IREE_SV("default"), buffer,
+                                             sizeof(buffer), &length));
+  EXPECT_EQ(length, 7);
+  EXPECT_EQ(std::string(buffer, length), "default");
+}
+
+TEST(JsonTryLookupStringTest, StringLiteralNullIsNotJsonNull) {
+  // String "null" is different from JSON null.
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{\"key\": \"null\"}"),
+                                             IREE_SV("key"), IREE_SV("default"),
+                                             buffer, sizeof(buffer), &length));
+  // Should get the string "null", not the default.
+  EXPECT_EQ(length, 4);
+  EXPECT_EQ(std::string(buffer, length), "null");
+}
+
+TEST(JsonTryLookupStringTest, EmptyString) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{\"key\": \"\"}"),
+                                             IREE_SV("key"), IREE_SV("default"),
+                                             buffer, sizeof(buffer), &length));
+  EXPECT_EQ(length, 0);
+}
+
+TEST(JsonTryLookupStringTest, NumberValueReturnsError) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  iree_status_t status = iree_json_try_lookup_string(
+      IREE_SV("{\"key\": 123}"), IREE_SV("key"), iree_string_view_empty(),
+      buffer, sizeof(buffer), &length);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonTryLookupStringTest, BufferTooSmall) {
+  char buffer[3];
+  iree_host_size_t length = 0;
+  iree_status_t status = iree_json_try_lookup_string(
+      IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"), iree_string_view_empty(),
+      buffer, sizeof(buffer), &length);
+  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
+  // Length should still indicate required size.
+  EXPECT_EQ(length, 5);
+  iree_status_ignore(status);
 }
 
 //===----------------------------------------------------------------------===//
@@ -711,6 +835,297 @@ TEST(JsonEnumerateArrayTest, WhitespaceBeforeClose) {
   ASSERT_EQ(entries.size(), 2);
   EXPECT_EQ(entries[0].value, "1");
   EXPECT_EQ(entries[1].value, "2");
+}
+
+//===----------------------------------------------------------------------===//
+// Typed Array Enumeration Tests
+//===----------------------------------------------------------------------===//
+
+struct TypedArrayEntry {
+  iree_host_size_t index;
+  iree_json_value_type_t type;
+  std::string value;
+};
+
+static iree_status_t CollectTypedArrayEntries(void* user_data,
+                                              iree_host_size_t index,
+                                              iree_json_value_type_t type,
+                                              iree_string_view_t value) {
+  auto* entries = static_cast<std::vector<TypedArrayEntry>*>(user_data);
+  entries->push_back({index, type, std::string(value.data, value.size)});
+  return iree_ok_status();
+}
+
+TEST(JsonEnumerateArrayTypedTest, Empty) {
+  std::vector<TypedArrayEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_array_typed(
+      IREE_SV("[]"), CollectTypedArrayEntries, &entries));
+  EXPECT_TRUE(entries.empty());
+}
+
+TEST(JsonEnumerateArrayTypedTest, AllTypes) {
+  // Test all JSON value types in a single array.
+  std::vector<TypedArrayEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_array_typed(
+      IREE_SV(
+          R"(["string", 123, -45.6, {"key": 1}, [1,2], true, false, null])"),
+      CollectTypedArrayEntries, &entries));
+  ASSERT_EQ(entries.size(), 8);
+
+  EXPECT_EQ(entries[0].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[0].value, "string");
+
+  EXPECT_EQ(entries[1].type, IREE_JSON_VALUE_TYPE_NUMBER);
+  EXPECT_EQ(entries[1].value, "123");
+
+  EXPECT_EQ(entries[2].type, IREE_JSON_VALUE_TYPE_NUMBER);
+  EXPECT_EQ(entries[2].value, "-45.6");
+
+  EXPECT_EQ(entries[3].type, IREE_JSON_VALUE_TYPE_OBJECT);
+  EXPECT_EQ(entries[3].value, R"({"key": 1})");
+
+  EXPECT_EQ(entries[4].type, IREE_JSON_VALUE_TYPE_ARRAY);
+  EXPECT_EQ(entries[4].value, "[1,2]");
+
+  EXPECT_EQ(entries[5].type, IREE_JSON_VALUE_TYPE_TRUE);
+  EXPECT_EQ(entries[5].value, "true");
+
+  EXPECT_EQ(entries[6].type, IREE_JSON_VALUE_TYPE_FALSE);
+  EXPECT_EQ(entries[6].value, "false");
+
+  EXPECT_EQ(entries[7].type, IREE_JSON_VALUE_TYPE_NULL);
+  EXPECT_EQ(entries[7].value, "null");
+}
+
+TEST(JsonEnumerateArrayTypedTest, StringStartingWithBracket) {
+  // Critical test: string "[ i" must be STRING type, not ARRAY.
+  // This is the case that caused BPE merge parsing issues.
+  std::vector<TypedArrayEntry> entries;
+  IREE_ASSERT_OK(
+      iree_json_enumerate_array_typed(IREE_SV(R"(["[ i", "[", "[]", "[{]"])"),
+                                      CollectTypedArrayEntries, &entries));
+  ASSERT_EQ(entries.size(), 4);
+
+  // All should be STRING type, not ARRAY.
+  EXPECT_EQ(entries[0].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[0].value, "[ i");
+
+  EXPECT_EQ(entries[1].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[1].value, "[");
+
+  EXPECT_EQ(entries[2].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[2].value, "[]");
+
+  EXPECT_EQ(entries[3].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[3].value, "[{]");
+}
+
+TEST(JsonEnumerateArrayTypedTest, NestedArrays) {
+  // Nested arrays should be detected correctly.
+  std::vector<TypedArrayEntry> entries;
+  IREE_ASSERT_OK(
+      iree_json_enumerate_array_typed(IREE_SV(R"([["a", "b"], [1, 2], []])"),
+                                      CollectTypedArrayEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+
+  EXPECT_EQ(entries[0].type, IREE_JSON_VALUE_TYPE_ARRAY);
+  EXPECT_EQ(entries[0].value, R"(["a", "b"])");
+
+  EXPECT_EQ(entries[1].type, IREE_JSON_VALUE_TYPE_ARRAY);
+  EXPECT_EQ(entries[1].value, "[1, 2]");
+
+  EXPECT_EQ(entries[2].type, IREE_JSON_VALUE_TYPE_ARRAY);
+  EXPECT_EQ(entries[2].value, "[]");
+}
+
+TEST(JsonEnumerateArrayTypedTest, MixedMergeFormats) {
+  // Simulate BPE merge array with mixed formats.
+  // Some tokenizers use string format "a b", others use array ["a", "b"].
+  std::vector<TypedArrayEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_array_typed(
+      IREE_SV(R"(["hello world", ["a", "b"], "[ i", ["[", "x"]])"),
+      CollectTypedArrayEntries, &entries));
+  ASSERT_EQ(entries.size(), 4);
+
+  EXPECT_EQ(entries[0].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[0].value, "hello world");
+
+  EXPECT_EQ(entries[1].type, IREE_JSON_VALUE_TYPE_ARRAY);
+  EXPECT_EQ(entries[1].value, R"(["a", "b"])");
+
+  EXPECT_EQ(entries[2].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[2].value, "[ i");
+
+  EXPECT_EQ(entries[3].type, IREE_JSON_VALUE_TYPE_ARRAY);
+  EXPECT_EQ(entries[3].value, R"(["[", "x"])");
+}
+
+TEST(JsonEnumerateArrayTypedTest, PrettyPrintedWithWhitespace) {
+  // Pretty-printed JSON with significant whitespace around elements.
+  std::vector<TypedArrayEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_array_typed(
+      IREE_SV("[\n  \"string\",\n  123,\n  [\n    1\n  ]\n]"),
+      CollectTypedArrayEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+
+  EXPECT_EQ(entries[0].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[0].value, "string");
+
+  EXPECT_EQ(entries[1].type, IREE_JSON_VALUE_TYPE_NUMBER);
+  EXPECT_EQ(entries[1].value, "123");
+
+  EXPECT_EQ(entries[2].type, IREE_JSON_VALUE_TYPE_ARRAY);
+}
+
+static iree_status_t StopAfterTwoTypedArray(void* user_data,
+                                            iree_host_size_t index,
+                                            iree_json_value_type_t type,
+                                            iree_string_view_t value) {
+  (void)type;
+  (void)value;
+  auto* count = static_cast<int*>(user_data);
+  (*count)++;
+  if (*count >= 2) {
+    return iree_status_from_code(IREE_STATUS_CANCELLED);
+  }
+  return iree_ok_status();
+}
+
+TEST(JsonEnumerateArrayTypedTest, EarlyTermination) {
+  int count = 0;
+  IREE_ASSERT_OK(iree_json_enumerate_array_typed(
+      IREE_SV("[1, 2, 3, 4]"), StopAfterTwoTypedArray, &count));
+  EXPECT_EQ(count, 2);
+}
+
+TEST(JsonEnumerateArrayTypedTest, ObjectsVsStringsWithBraces) {
+  // Test that objects {} are correctly distinguished from strings containing
+  // braces.
+  std::vector<TypedArrayEntry> entries;
+  IREE_ASSERT_OK(iree_json_enumerate_array_typed(
+      IREE_SV(R"([{"a": 1}, "{not_object}", "{ also string }"])"),
+      CollectTypedArrayEntries, &entries));
+  ASSERT_EQ(entries.size(), 3);
+
+  EXPECT_EQ(entries[0].type, IREE_JSON_VALUE_TYPE_OBJECT);
+  EXPECT_EQ(entries[0].value, R"({"a": 1})");
+
+  EXPECT_EQ(entries[1].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[1].value, "{not_object}");
+
+  EXPECT_EQ(entries[2].type, IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(entries[2].value, "{ also string }");
+}
+
+//===----------------------------------------------------------------------===//
+// JSON Value Type Inference Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonValueTypeTest, InferValueType) {
+  // Test the inline helper function directly.
+  EXPECT_EQ(iree_json_infer_value_type('"'), IREE_JSON_VALUE_TYPE_STRING);
+  EXPECT_EQ(iree_json_infer_value_type('{'), IREE_JSON_VALUE_TYPE_OBJECT);
+  EXPECT_EQ(iree_json_infer_value_type('['), IREE_JSON_VALUE_TYPE_ARRAY);
+  EXPECT_EQ(iree_json_infer_value_type('t'), IREE_JSON_VALUE_TYPE_TRUE);
+  EXPECT_EQ(iree_json_infer_value_type('f'), IREE_JSON_VALUE_TYPE_FALSE);
+  EXPECT_EQ(iree_json_infer_value_type('n'), IREE_JSON_VALUE_TYPE_NULL);
+  EXPECT_EQ(iree_json_infer_value_type('0'), IREE_JSON_VALUE_TYPE_NUMBER);
+  EXPECT_EQ(iree_json_infer_value_type('1'), IREE_JSON_VALUE_TYPE_NUMBER);
+  EXPECT_EQ(iree_json_infer_value_type('9'), IREE_JSON_VALUE_TYPE_NUMBER);
+  EXPECT_EQ(iree_json_infer_value_type('-'), IREE_JSON_VALUE_TYPE_NUMBER);
+}
+
+//===----------------------------------------------------------------------===//
+// Array Length Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonArrayLengthTest, Empty) {
+  iree_host_size_t length;
+  IREE_ASSERT_OK(iree_json_array_length(IREE_SV("[]"), &length));
+  EXPECT_EQ(length, 0);
+}
+
+TEST(JsonArrayLengthTest, Single) {
+  iree_host_size_t length;
+  IREE_ASSERT_OK(iree_json_array_length(IREE_SV("[123]"), &length));
+  EXPECT_EQ(length, 1);
+}
+
+TEST(JsonArrayLengthTest, Multiple) {
+  iree_host_size_t length;
+  IREE_ASSERT_OK(iree_json_array_length(IREE_SV("[1, 2, 3, 4, 5]"), &length));
+  EXPECT_EQ(length, 5);
+}
+
+TEST(JsonArrayLengthTest, Nested) {
+  iree_host_size_t length;
+  IREE_ASSERT_OK(iree_json_array_length(
+      IREE_SV("[[1, 2], {\"a\": 3}, \"str\"]"), &length));
+  EXPECT_EQ(length, 3);
+}
+
+TEST(JsonArrayLengthTest, WithComments) {
+  iree_host_size_t length;
+  IREE_ASSERT_OK(
+      iree_json_array_length(IREE_SV("[/* c1 */1,/* c2 */2]"), &length));
+  EXPECT_EQ(length, 2);
+}
+
+//===----------------------------------------------------------------------===//
+// Array Get Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonArrayGetTest, FirstElement) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_array_get(IREE_SV("[10, 20, 30]"), 0, &value));
+  EXPECT_SV_EQ(value, IREE_SV("10"));
+}
+
+TEST(JsonArrayGetTest, MiddleElement) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_array_get(IREE_SV("[10, 20, 30]"), 1, &value));
+  EXPECT_SV_EQ(value, IREE_SV("20"));
+}
+
+TEST(JsonArrayGetTest, LastElement) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_array_get(IREE_SV("[10, 20, 30]"), 2, &value));
+  EXPECT_SV_EQ(value, IREE_SV("30"));
+}
+
+TEST(JsonArrayGetTest, OutOfRange) {
+  iree_string_view_t value;
+  iree_status_t status =
+      iree_json_array_get(IREE_SV("[10, 20, 30]"), 3, &value);
+  EXPECT_TRUE(iree_status_is_out_of_range(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonArrayGetTest, EmptyArrayOutOfRange) {
+  iree_string_view_t value;
+  iree_status_t status = iree_json_array_get(IREE_SV("[]"), 0, &value);
+  EXPECT_TRUE(iree_status_is_out_of_range(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonArrayGetTest, StringElement) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(
+      iree_json_array_get(IREE_SV("[\"hello\", \"world\"]"), 1, &value));
+  EXPECT_SV_EQ(value, IREE_SV("world"));
+}
+
+TEST(JsonArrayGetTest, ObjectElement) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(
+      iree_json_array_get(IREE_SV("[{\"a\": 1}, {\"b\": 2}]"), 0, &value));
+  EXPECT_SV_EQ(value, IREE_SV("{\"a\": 1}"));
+}
+
+TEST(JsonArrayGetTest, NestedArrayElement) {
+  iree_string_view_t value;
+  IREE_ASSERT_OK(iree_json_array_get(IREE_SV("[[1, 2], [3, 4]]"), 1, &value));
+  EXPECT_SV_EQ(value, IREE_SV("[3, 4]"));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1176,6 +1591,178 @@ TEST(JsonParseDoubleTest, NegativeExponent) {
 }
 
 //===----------------------------------------------------------------------===//
+// Parse Bool Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonParseBoolTest, True) {
+  bool value;
+  IREE_ASSERT_OK(iree_json_parse_bool(IREE_SV("true"), &value));
+  EXPECT_TRUE(value);
+}
+
+TEST(JsonParseBoolTest, False) {
+  bool value;
+  IREE_ASSERT_OK(iree_json_parse_bool(IREE_SV("false"), &value));
+  EXPECT_FALSE(value);
+}
+
+TEST(JsonParseBoolTest, Null) {
+  bool value;
+  iree_status_t status = iree_json_parse_bool(IREE_SV("null"), &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonParseBoolTest, Number) {
+  bool value;
+  iree_status_t status = iree_json_parse_bool(IREE_SV("1"), &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonParseBoolTest, String) {
+  bool value;
+  iree_status_t status = iree_json_parse_bool(IREE_SV("\"true\""), &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+//===----------------------------------------------------------------------===//
+// Try Lookup Bool Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonTryLookupBoolTest, TrueValue) {
+  bool value;
+  IREE_ASSERT_OK(iree_json_try_lookup_bool(IREE_SV("{\"key\": true}"),
+                                           IREE_SV("key"), false, &value));
+  EXPECT_TRUE(value);
+}
+
+TEST(JsonTryLookupBoolTest, FalseValue) {
+  bool value;
+  IREE_ASSERT_OK(iree_json_try_lookup_bool(IREE_SV("{\"key\": false}"),
+                                           IREE_SV("key"), true, &value));
+  EXPECT_FALSE(value);
+}
+
+TEST(JsonTryLookupBoolTest, MissingKeyUsesDefault) {
+  bool value;
+  IREE_ASSERT_OK(iree_json_try_lookup_bool(IREE_SV("{\"other\": true}"),
+                                           IREE_SV("key"), true, &value));
+  EXPECT_TRUE(value);
+}
+
+TEST(JsonTryLookupBoolTest, MissingKeyUsesFalseDefault) {
+  bool value;
+  IREE_ASSERT_OK(iree_json_try_lookup_bool(IREE_SV("{\"other\": true}"),
+                                           IREE_SV("key"), false, &value));
+  EXPECT_FALSE(value);
+}
+
+TEST(JsonTryLookupBoolTest, NullValueUsesDefault) {
+  bool value;
+  IREE_ASSERT_OK(iree_json_try_lookup_bool(IREE_SV("{\"key\": null}"),
+                                           IREE_SV("key"), true, &value));
+  EXPECT_TRUE(value);
+}
+
+TEST(JsonTryLookupBoolTest, InvalidValueReturnsError) {
+  bool value;
+  // Note: JSON string values have quotes stripped by lookup, so "yes" becomes
+  // just "yes" which is not a valid boolean.
+  iree_status_t status = iree_json_try_lookup_bool(
+      IREE_SV("{\"key\": \"yes\"}"), IREE_SV("key"), false, &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonTryLookupBoolTest, NumberValueReturnsError) {
+  bool value;
+  iree_status_t status = iree_json_try_lookup_bool(
+      IREE_SV("{\"key\": 1}"), IREE_SV("key"), false, &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+//===----------------------------------------------------------------------===//
+// Try Lookup Int64 Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonTryLookupInt64Test, PositiveValue) {
+  int64_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_int64(IREE_SV("{\"key\": 123}"),
+                                            IREE_SV("key"), 0, &value));
+  EXPECT_EQ(value, 123);
+}
+
+TEST(JsonTryLookupInt64Test, NegativeValue) {
+  int64_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_int64(IREE_SV("{\"key\": -456}"),
+                                            IREE_SV("key"), 0, &value));
+  EXPECT_EQ(value, -456);
+}
+
+TEST(JsonTryLookupInt64Test, ZeroValue) {
+  int64_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_int64(IREE_SV("{\"key\": 0}"),
+                                            IREE_SV("key"), 999, &value));
+  EXPECT_EQ(value, 0);
+}
+
+TEST(JsonTryLookupInt64Test, MissingKeyUsesDefault) {
+  int64_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_int64(IREE_SV("{\"other\": 123}"),
+                                            IREE_SV("key"), 42, &value));
+  EXPECT_EQ(value, 42);
+}
+
+TEST(JsonTryLookupInt64Test, NullValueUsesDefault) {
+  int64_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_int64(IREE_SV("{\"key\": null}"),
+                                            IREE_SV("key"), 99, &value));
+  EXPECT_EQ(value, 99);
+}
+
+TEST(JsonTryLookupInt64Test, EmptyObjectUsesDefault) {
+  int64_t value;
+  IREE_ASSERT_OK(
+      iree_json_try_lookup_int64(IREE_SV("{}"), IREE_SV("key"), -1, &value));
+  EXPECT_EQ(value, -1);
+}
+
+TEST(JsonTryLookupInt64Test, FloatValueReturnsError) {
+  int64_t value;
+  iree_status_t status = iree_json_try_lookup_int64(IREE_SV("{\"key\": 3.14}"),
+                                                    IREE_SV("key"), 0, &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonTryLookupInt64Test, NonNumericStringValueReturnsError) {
+  // Note: JSON strings have quotes stripped by lookup, so "123" becomes "123"
+  // which parses as a valid int. Use a truly non-numeric string.
+  int64_t value;
+  iree_status_t status = iree_json_try_lookup_int64(
+      IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"), 0, &value);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonTryLookupInt64Test, LargePositiveValue) {
+  int64_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_int64(
+      IREE_SV("{\"key\": 9223372036854775807}"), IREE_SV("key"), 0, &value));
+  EXPECT_EQ(value, INT64_MAX);
+}
+
+TEST(JsonTryLookupInt64Test, LargeNegativeValue) {
+  int64_t value;
+  IREE_ASSERT_OK(iree_json_try_lookup_int64(
+      IREE_SV("{\"key\": -9223372036854775808}"), IREE_SV("key"), 0, &value));
+  EXPECT_EQ(value, INT64_MIN);
+}
+
+//===----------------------------------------------------------------------===//
 // UTF-8 BOM Tests
 //===----------------------------------------------------------------------===//
 
@@ -1513,6 +2100,75 @@ TEST(JsonConsumeObjectTest, CommentInsideString) {
   IREE_ASSERT_OK(
       iree_json_lookup_object_value(value, IREE_SV("key"), &str_value));
   EXPECT_SV_EQ(str_value, IREE_SV("/* not a comment */"));
+}
+
+//===----------------------------------------------------------------------===//
+// Object Key Validation Tests
+//===----------------------------------------------------------------------===//
+
+TEST(JsonValidateObjectKeysTest, AllKeysAllowed) {
+  static const iree_string_view_t kAllowedKeys[] = {
+      IREE_SVL("type"),
+      IREE_SVL("value"),
+      IREE_SVL("name"),
+  };
+  IREE_ASSERT_OK(iree_json_validate_object_keys(
+      IREE_SV("{\"type\": \"foo\", \"value\": 123}"), kAllowedKeys,
+      IREE_ARRAYSIZE(kAllowedKeys)));
+}
+
+TEST(JsonValidateObjectKeysTest, EmptyObject) {
+  static const iree_string_view_t kAllowedKeys[] = {
+      IREE_SVL("type"),
+  };
+  IREE_ASSERT_OK(iree_json_validate_object_keys(IREE_SV("{}"), kAllowedKeys,
+                                                IREE_ARRAYSIZE(kAllowedKeys)));
+}
+
+TEST(JsonValidateObjectKeysTest, SingleUnknownKey) {
+  static const iree_string_view_t kAllowedKeys[] = {
+      IREE_SVL("type"),
+      IREE_SVL("value"),
+  };
+  iree_status_t status = iree_json_validate_object_keys(
+      IREE_SV("{\"type\": \"foo\", \"unknown\": 123}"), kAllowedKeys,
+      IREE_ARRAYSIZE(kAllowedKeys));
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonValidateObjectKeysTest, MultipleUnknownKeys) {
+  static const iree_string_view_t kAllowedKeys[] = {
+      IREE_SVL("type"),
+  };
+  iree_status_t status = iree_json_validate_object_keys(
+      IREE_SV("{\"foo\": 1, \"bar\": 2, \"type\": 3}"), kAllowedKeys,
+      IREE_ARRAYSIZE(kAllowedKeys));
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonValidateObjectKeysTest, NestedObjectsNotValidated) {
+  // Validation is shallow - nested objects are not checked.
+  static const iree_string_view_t kAllowedKeys[] = {
+      IREE_SVL("outer"),
+  };
+  IREE_ASSERT_OK(iree_json_validate_object_keys(
+      IREE_SV("{\"outer\": {\"inner_unknown\": 123}}"), kAllowedKeys,
+      IREE_ARRAYSIZE(kAllowedKeys)));
+}
+
+TEST(JsonValidateObjectKeysTest, NoAllowedKeys) {
+  // With no allowed keys, any key is unknown.
+  iree_status_t status =
+      iree_json_validate_object_keys(IREE_SV("{\"key\": 123}"), NULL, 0);
+  EXPECT_TRUE(iree_status_is_invalid_argument(status));
+  iree_status_ignore(status);
+}
+
+TEST(JsonValidateObjectKeysTest, EmptyObjectNoAllowedKeys) {
+  // Empty object with no allowed keys is valid.
+  IREE_ASSERT_OK(iree_json_validate_object_keys(IREE_SV("{}"), NULL, 0));
 }
 
 }  // namespace
