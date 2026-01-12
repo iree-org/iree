@@ -44,6 +44,44 @@ extern "C" {
 #endif
 
 //===----------------------------------------------------------------------===//
+// JSON Value Types
+//===----------------------------------------------------------------------===//
+// Value types are inferred from the first character of raw JSON text.
+// These types allow callbacks to distinguish between JSON constructs without
+// inspecting value content (which may be ambiguous after quote stripping).
+
+typedef enum iree_json_value_type_e {
+  IREE_JSON_VALUE_TYPE_STRING = 0,  // "..." - quotes stripped in value
+  IREE_JSON_VALUE_TYPE_NUMBER,      // 0-9 or - prefix
+  IREE_JSON_VALUE_TYPE_OBJECT,      // {...} - braces included in value
+  IREE_JSON_VALUE_TYPE_ARRAY,       // [...] - brackets included in value
+  IREE_JSON_VALUE_TYPE_TRUE,        // true
+  IREE_JSON_VALUE_TYPE_FALSE,       // false
+  IREE_JSON_VALUE_TYPE_NULL,        // null
+} iree_json_value_type_t;
+
+// Returns the JSON value type for the given first character.
+// Used internally by enumeration functions; exposed for testing.
+static inline iree_json_value_type_t iree_json_infer_value_type(char c) {
+  switch (c) {
+    case '"':
+      return IREE_JSON_VALUE_TYPE_STRING;
+    case '{':
+      return IREE_JSON_VALUE_TYPE_OBJECT;
+    case '[':
+      return IREE_JSON_VALUE_TYPE_ARRAY;
+    case 't':
+      return IREE_JSON_VALUE_TYPE_TRUE;
+    case 'f':
+      return IREE_JSON_VALUE_TYPE_FALSE;
+    case 'n':
+      return IREE_JSON_VALUE_TYPE_NULL;
+    default:
+      return IREE_JSON_VALUE_TYPE_NUMBER;
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Value Consumption
 //===----------------------------------------------------------------------===//
 // These functions advance |str| past a JSON value and return the consumed
@@ -90,7 +128,8 @@ iree_status_t iree_json_consume_array(iree_string_view_t* str,
 
 // Callback for object enumeration.
 // |key| is the raw key string (without quotes, may contain escape sequences).
-// |value| is the raw value span (may be any JSON type).
+// |value| is the value (strings without quotes, objects/arrays with
+// delimiters).
 // Return iree_ok_status() to continue, or any error status to abort.
 // To stop early without error, use iree_status_from_code(IREE_STATUS_CANCELLED)
 // (not iree_make_status which may allocate).
@@ -110,10 +149,23 @@ iree_status_t iree_json_enumerate_object(iree_string_view_t object_value,
 // Looks up a key in a JSON object and returns its value.
 // |object_value| must include the surrounding braces.
 // |key| is matched exactly (escape sequences are not compared semantically).
-// Returns empty string view if key is not found (not an error).
+// Returns IREE_STATUS_NOT_FOUND if the key is not present in the object.
 iree_status_t iree_json_lookup_object_value(iree_string_view_t object_value,
                                             iree_string_view_t key,
                                             iree_string_view_t* out_value);
+
+// Looks up a key in a JSON object and returns its value, with missing key OK.
+// |object_value| must include the surrounding braces.
+// |key| is matched exactly (escape sequences are not compared semantically).
+// Returns an empty string view in |out_value| if the key is not found (not an
+// error). This variant is useful for optional fields where missing is valid.
+//
+// NOTE: The returned iree_status_t MUST be handled (via IREE_RETURN_IF_ERROR or
+// iree_status_ignore) even though missing keys are not errors. Ignoring the
+// return value leaks status storage on parse errors.
+iree_status_t iree_json_try_lookup_object_value(iree_string_view_t object_value,
+                                                iree_string_view_t key,
+                                                iree_string_view_t* out_value);
 
 //===----------------------------------------------------------------------===//
 // Array Operations
@@ -137,6 +189,42 @@ typedef iree_status_t(IREE_API_PTR* iree_json_array_visitor_fn_t)(
 iree_status_t iree_json_enumerate_array(iree_string_view_t array_value,
                                         iree_json_array_visitor_fn_t visitor,
                                         void* user_data);
+
+// Extended callback for array enumeration that includes value type.
+// |index| is the zero-based element index.
+// |type| is the JSON type of the value (inferred before quote stripping).
+// |value| is the raw value span (strings without quotes, others with
+// delimiters).
+// Return iree_ok_status() to continue, or any error status to abort.
+// To stop early without error, use iree_status_from_code(IREE_STATUS_CANCELLED)
+// (not iree_make_status which may allocate).
+typedef iree_status_t(IREE_API_PTR* iree_json_array_visitor_typed_fn_t)(
+    void* user_data, iree_host_size_t index, iree_json_value_type_t type,
+    iree_string_view_t value);
+
+// Enumerates all elements in a JSON array with type information.
+// |array_value| must include the surrounding brackets.
+// The visitor is called for each element with its index and inferred type.
+// The type is determined from the first character of raw JSON before any
+// processing (e.g., before quotes are stripped from strings).
+// Returning IREE_STATUS_CANCELLED from the visitor stops enumeration early
+// (not treated as an error). Use iree_status_from_code(IREE_STATUS_CANCELLED)
+// to avoid allocation.
+iree_status_t iree_json_enumerate_array_typed(
+    iree_string_view_t array_value, iree_json_array_visitor_typed_fn_t visitor,
+    void* user_data);
+
+// Returns the number of elements in a JSON array.
+// |array_value| must include the surrounding brackets.
+iree_status_t iree_json_array_length(iree_string_view_t array_value,
+                                     iree_host_size_t* out_length);
+
+// Gets the element at |index| from a JSON array.
+// |array_value| must include the surrounding brackets.
+// Returns IREE_STATUS_OUT_OF_RANGE if |index| is beyond the array bounds.
+iree_status_t iree_json_array_get(iree_string_view_t array_value,
+                                  iree_host_size_t index,
+                                  iree_string_view_t* out_value);
 
 //===----------------------------------------------------------------------===//
 // JSONL (JSON Lines) Operations
@@ -211,6 +299,69 @@ iree_status_t iree_json_parse_uint64(iree_string_view_t value, uint64_t* out);
 // Parses a JSON number as a double-precision float.
 // Handles integers, decimals, and scientific notation.
 iree_status_t iree_json_parse_double(iree_string_view_t value, double* out);
+
+// Parses a JSON boolean ("true" or "false") to a bool.
+// Returns error for any other value including "null".
+iree_status_t iree_json_parse_bool(iree_string_view_t value, bool* out);
+
+// Looks up an optional boolean field with a default value.
+// Returns |default_value| if the key is not found or the value is "null".
+// Returns error if the value is present but not a valid boolean.
+iree_status_t iree_json_try_lookup_bool(iree_string_view_t object_value,
+                                        iree_string_view_t key,
+                                        bool default_value, bool* out);
+
+// Looks up an optional int64 field with a default value.
+// Returns |default_value| if the key is not found or the value is "null".
+// Returns error if the value is present but not a valid integer.
+iree_status_t iree_json_try_lookup_int64(iree_string_view_t object_value,
+                                         iree_string_view_t key,
+                                         int64_t default_value, int64_t* out);
+
+// Looks up an optional string field, unescapes it, and writes to buffer.
+// Returns |default_value| copied to buffer if key is not found or value is
+// "null". Returns error if value is present but not a string, or if the buffer
+// is too small for the unescaped content.
+//
+// |out_buffer| receives the unescaped UTF-8 string (not NUL-terminated).
+// |buffer_capacity| is the size of the output buffer in bytes.
+// |out_length| receives the actual length written.
+iree_status_t iree_json_try_lookup_string(iree_string_view_t object_value,
+                                          iree_string_view_t key,
+                                          iree_string_view_t default_value,
+                                          char* out_buffer,
+                                          iree_host_size_t buffer_capacity,
+                                          iree_host_size_t* out_length);
+
+//===----------------------------------------------------------------------===//
+// Object Key Validation
+//===----------------------------------------------------------------------===//
+
+// Validates that a JSON object contains only allowed keys.
+// Returns error listing unknown keys if any are found.
+// Example error: "unknown keys in object: foo, bar (supported: type, vocab)"
+//
+// |object_value| must include the surrounding braces: {"key": value, ...}
+// |allowed_keys| is an array of allowed key names.
+// |allowed_key_count| is the number of elements in the allowed_keys array.
+//
+// Keys are matched exactly (escape sequences are not compared semantically).
+iree_status_t iree_json_validate_object_keys(
+    iree_string_view_t object_value, const iree_string_view_t* allowed_keys,
+    iree_host_size_t allowed_key_count);
+
+//===----------------------------------------------------------------------===//
+// Unicode Codepoint Parsing
+//===----------------------------------------------------------------------===//
+
+// Parses a single Unicode codepoint from a JSON string value.
+// First unescapes the string to handle \uNNNN sequences, then decodes the first
+// UTF-8 codepoint from the result.
+// Returns |default_codepoint| if |value| is empty or results in empty string.
+// Returns error if the string contains invalid UTF-8 or is too long.
+iree_status_t iree_json_parse_codepoint(iree_string_view_t value,
+                                        uint32_t default_codepoint,
+                                        uint32_t* out_codepoint);
 
 #ifdef __cplusplus
 }  // extern "C"

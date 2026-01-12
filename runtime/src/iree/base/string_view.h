@@ -103,8 +103,10 @@ static inline iree_string_pair_list_t iree_string_pair_list_empty(void) {
   return v;
 }
 
-#define iree_string_view_literal(str) \
-  { .data = (str), .size = IREE_ARRAYSIZE(str) - 1 }
+#define iree_string_view_literal(str)        \
+  { /*.data=*/                               \
+    (str), /*.size=*/IREE_ARRAYSIZE(str) - 1 \
+  }
 
 // Returns a string view initialized with the given cstring.
 #define IREE_SV(cstr) iree_make_cstring_view(cstr)
@@ -181,6 +183,27 @@ IREE_API_EXPORT iree_string_view_t iree_string_view_strip_suffix(
 // Returns true if the strip succeeded.
 IREE_API_EXPORT bool iree_string_view_consume_prefix(iree_string_view_t* value,
                                                      iree_string_view_t prefix);
+
+// Removes a single character prefix from the string view if it matches |c|.
+// Returns true if the character was consumed. This is faster than
+// iree_string_view_consume_prefix for single-character checks as it avoids
+// strncmp() overhead.
+static inline bool iree_string_view_consume_prefix_char(
+    iree_string_view_t* value, char c) {
+  if (value->size > 0 && value->data[0] == c) {
+    value->data++;
+    value->size--;
+    return true;
+  }
+  return false;
+}
+
+// Returns true if the string starts with the given character |c|.
+// Faster than iree_string_view_starts_with for single-character checks.
+static inline bool iree_string_view_starts_with_char(iree_string_view_t value,
+                                                     char c) {
+  return value.size > 0 && value.data[0] == c;
+}
 
 // Removes the given substring suffix from the string view if present in-place.
 // Returns true if the strip succeeded.

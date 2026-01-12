@@ -22,6 +22,12 @@ extern const iree_host_size_t iree_unicode_case_mappings_count;
 extern const iree_unicode_nfd_mapping_t iree_unicode_nfd_mappings[];
 extern const iree_host_size_t iree_unicode_nfd_mappings_count;
 
+extern const iree_unicode_ccc_entry_t iree_unicode_ccc_entries[];
+extern const iree_host_size_t iree_unicode_ccc_entries_count;
+
+extern const iree_unicode_nfc_pair_t iree_unicode_nfc_pairs[];
+extern const iree_host_size_t iree_unicode_nfc_pairs_count;
+
 //===----------------------------------------------------------------------===//
 // UTF-8 Codec
 //===----------------------------------------------------------------------===//
@@ -178,6 +184,53 @@ bool iree_unicode_utf8_validate(iree_string_view_t text) {
   return true;
 }
 
+iree_host_size_t iree_unicode_utf8_incomplete_tail_length(
+    const char* data, iree_host_size_t size) {
+  if (size == 0) return 0;
+
+  // Scan backwards to find a lead byte (max 3 bytes back since longest
+  // sequence is 4 bytes and we need at least 1 byte present).
+  iree_host_size_t scan_limit = size < 4 ? size : 4;
+  for (iree_host_size_t i = 1; i <= scan_limit; ++i) {
+    uint8_t byte = (uint8_t)data[size - i];
+
+    // Continuation bytes (10xxxxxx) are not lead bytes - keep scanning.
+    if ((byte & 0xC0) == 0x80) continue;
+
+    // Found a lead byte. Determine expected sequence length.
+    iree_host_size_t expected_length;
+    if ((byte & 0x80) == 0x00) {
+      // ASCII (0xxxxxxx) - 1 byte, always complete.
+      expected_length = 1;
+    } else if ((byte & 0xE0) == 0xC0) {
+      // 2-byte sequence (110xxxxx).
+      expected_length = 2;
+    } else if ((byte & 0xF0) == 0xE0) {
+      // 3-byte sequence (1110xxxx).
+      expected_length = 3;
+    } else if ((byte & 0xF8) == 0xF0) {
+      // 4-byte sequence (11110xxx).
+      expected_length = 4;
+    } else {
+      // Invalid lead byte (0xFF, 0xFE, or overlong) - treat as complete.
+      return 0;
+    }
+
+    // Available bytes from lead to end of buffer.
+    iree_host_size_t available = i;
+    if (available < expected_length) {
+      // Incomplete - return number of bytes in the partial sequence.
+      return available;
+    }
+    // Complete sequence - no incomplete tail.
+    return 0;
+  }
+
+  // Scanned 4 bytes of continuations with no lead byte - malformed, treat as
+  // complete to avoid infinite loops.
+  return 0;
+}
+
 //===----------------------------------------------------------------------===//
 // Binary search helpers
 //===----------------------------------------------------------------------===//
@@ -322,6 +375,36 @@ bool iree_unicode_is_control(uint32_t codepoint) {
   return codepoint <= 0x1F || (codepoint >= 0x7F && codepoint <= 0x9F);
 }
 
+bool iree_unicode_is_cjk(uint32_t codepoint) {
+  // CJK Unified Ideographs and related blocks.
+  return (codepoint >= 0x4E00 &&
+          codepoint <= 0x9FFF) ||  // CJK Unified Ideographs
+         (codepoint >= 0x3400 && codepoint <= 0x4DBF) ||    // CJK Extension A
+         (codepoint >= 0x20000 && codepoint <= 0x2A6DF) ||  // CJK Extension B
+         (codepoint >= 0x2A700 && codepoint <= 0x2B73F) ||  // CJK Extension C
+         (codepoint >= 0x2B740 && codepoint <= 0x2B81F) ||  // CJK Extension D
+         (codepoint >= 0x2B820 && codepoint <= 0x2CEAF) ||  // CJK Extension E
+         (codepoint >= 0xF900 &&
+          codepoint <= 0xFAFF) ||  // CJK Compatibility Ideographs
+         (codepoint >= 0x2F800 &&
+          codepoint <= 0x2FA1F);  // CJK Compat Ideographs Supp
+}
+
+bool iree_unicode_is_hiragana(uint32_t codepoint) {
+  return codepoint >= 0x3040 && codepoint <= 0x309F;
+}
+
+bool iree_unicode_is_katakana(uint32_t codepoint) {
+  return (codepoint >= 0x30A0 && codepoint <= 0x30FF) ||  // Katakana
+         (codepoint >= 0x31F0 && codepoint <= 0x31FF);  // Katakana Phonetic Ext
+}
+
+bool iree_unicode_is_hangul(uint32_t codepoint) {
+  return (codepoint >= 0xAC00 && codepoint <= 0xD7AF) ||  // Hangul Syllables
+         (codepoint >= 0x1100 && codepoint <= 0x11FF) ||  // Hangul Jamo
+         (codepoint >= 0x3130 && codepoint <= 0x318F);    // Hangul Compat Jamo
+}
+
 //===----------------------------------------------------------------------===//
 // Case Folding
 //===----------------------------------------------------------------------===//
@@ -373,4 +456,233 @@ uint32_t iree_unicode_nfd_base(uint32_t codepoint) {
     return mapping->base;
   }
   return codepoint;
+}
+
+//===----------------------------------------------------------------------===//
+// NFC Normalization
+//===----------------------------------------------------------------------===//
+
+// Binary search for codepoint in CCC entries.
+static uint8_t iree_unicode_ccc_lookup(uint32_t codepoint) {
+  iree_host_size_t low = 0;
+  iree_host_size_t high = iree_unicode_ccc_entries_count;
+  while (low < high) {
+    iree_host_size_t mid = low + (high - low) / 2;
+    const iree_unicode_ccc_entry_t* entry = &iree_unicode_ccc_entries[mid];
+    if (codepoint < entry->codepoint) {
+      high = mid;
+    } else if (codepoint > entry->codepoint) {
+      low = mid + 1;
+    } else {
+      return entry->ccc;
+    }
+  }
+  return 0;  // Not found = CCC 0 (starter).
+}
+
+uint8_t iree_unicode_ccc(uint32_t codepoint) {
+  // ASCII always has CCC 0.
+  if (codepoint < 0x80) {
+    return 0;
+  }
+  return iree_unicode_ccc_lookup(codepoint);
+}
+
+// Binary search for composition pair.
+// The table is sorted by (base, combining) for efficient lookup.
+static uint32_t iree_unicode_nfc_pair_lookup(uint32_t base,
+                                             uint32_t combining) {
+  iree_host_size_t low = 0;
+  iree_host_size_t high = iree_unicode_nfc_pairs_count;
+  while (low < high) {
+    iree_host_size_t mid = low + (high - low) / 2;
+    const iree_unicode_nfc_pair_t* pair = &iree_unicode_nfc_pairs[mid];
+    if (base < pair->base) {
+      high = mid;
+    } else if (base > pair->base) {
+      low = mid + 1;
+    } else if (combining < pair->combining) {
+      high = mid;
+    } else if (combining > pair->combining) {
+      low = mid + 1;
+    } else {
+      return pair->composed;
+    }
+  }
+  return 0;  // No composition.
+}
+
+uint32_t iree_unicode_compose_pair(uint32_t base, uint32_t combining) {
+  return iree_unicode_nfc_pair_lookup(base, combining);
+}
+
+// Canonical ordering: sort combining marks by CCC using insertion sort.
+// Stable sort is required to preserve order of marks with same CCC.
+static void iree_unicode_canonical_order(uint32_t* codepoints,
+                                         iree_host_size_t count) {
+  for (iree_host_size_t i = 1; i < count; ++i) {
+    uint32_t current = codepoints[i];
+    uint8_t current_ccc = iree_unicode_ccc(current);
+    // Only reorder combining marks (CCC > 0).
+    if (current_ccc == 0) continue;
+    iree_host_size_t j = i;
+    while (j > 0) {
+      uint8_t prev_ccc = iree_unicode_ccc(codepoints[j - 1]);
+      // Stop if prev is a starter or has lower/equal CCC.
+      if (prev_ccc == 0 || prev_ccc <= current_ccc) break;
+      codepoints[j] = codepoints[j - 1];
+      --j;
+    }
+    codepoints[j] = current;
+  }
+}
+
+// Apply canonical composition to a sequence of codepoints.
+// Modifies the array in place and returns the new count.
+static iree_host_size_t iree_unicode_compose_codepoints(
+    uint32_t* codepoints, iree_host_size_t count) {
+  if (count < 2) return count;
+
+  iree_host_size_t write_index = 0;
+  iree_host_size_t starter_index = 0;
+  uint8_t last_ccc = 0;
+
+  // First codepoint.
+  codepoints[write_index++] = codepoints[0];
+  if (iree_unicode_ccc(codepoints[0]) != 0) {
+    // First is not a starter - unusual but handle it.
+    starter_index = (iree_host_size_t)-1;
+    last_ccc = iree_unicode_ccc(codepoints[0]);
+  }
+
+  for (iree_host_size_t i = 1; i < count; ++i) {
+    uint32_t current = codepoints[i];
+    uint8_t current_ccc = iree_unicode_ccc(current);
+
+    // Try to compose with the starter.
+    bool composed = false;
+    if (starter_index != (iree_host_size_t)-1) {
+      // Can compose if:
+      // 1. Current is a starter (CCC 0), or
+      // 2. Last CCC < current CCC (not blocked)
+      if (current_ccc == 0 || last_ccc < current_ccc) {
+        uint32_t composition =
+            iree_unicode_compose_pair(codepoints[starter_index], current);
+        if (composition != 0) {
+          codepoints[starter_index] = composition;
+          composed = true;
+        }
+      }
+    }
+
+    if (!composed) {
+      if (current_ccc == 0) {
+        // New starter.
+        starter_index = write_index;
+        last_ccc = 0;
+      } else {
+        last_ccc = current_ccc;
+      }
+      codepoints[write_index++] = current;
+    }
+  }
+
+  return write_index;
+}
+
+// Maximum combining sequence length (starter + combining marks).
+// Unicode Stream-Safe Text Format limits to 30 combining characters.
+// Real-world text rarely exceeds 3-4 combining marks per base character.
+#define IREE_UNICODE_MAX_COMBINING_SEQUENCE 32
+
+// Flushes a combining sequence: applies canonical ordering and composition,
+// then encodes to output. Returns the number of bytes written, or 0 on error.
+static iree_host_size_t iree_unicode_flush_sequence(
+    uint32_t* sequence, iree_host_size_t sequence_count, char* out_buffer,
+    iree_host_size_t capacity, iree_host_size_t output_position) {
+  if (sequence_count == 0) return 0;
+
+  // Apply canonical ordering and composition.
+  iree_unicode_canonical_order(sequence, sequence_count);
+  iree_host_size_t composed_count =
+      iree_unicode_compose_codepoints(sequence, sequence_count);
+
+  // Encode to output buffer.
+  iree_host_size_t bytes_written = 0;
+  for (iree_host_size_t i = 0; i < composed_count; ++i) {
+    iree_host_size_t encoded_length =
+        iree_unicode_utf8_encoded_length(sequence[i]);
+    if (output_position + bytes_written + encoded_length > capacity) {
+      return 0;  // Would overflow.
+    }
+    bytes_written += iree_unicode_utf8_encode(
+        sequence[i], out_buffer + output_position + bytes_written);
+  }
+  return bytes_written;
+}
+
+iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
+                                   iree_host_size_t capacity,
+                                   iree_host_size_t* out_length) {
+  // Fast path: ASCII-only input needs no composition.
+  bool all_ascii = true;
+  for (iree_host_size_t i = 0; i < input.size && all_ascii; ++i) {
+    if ((uint8_t)input.data[i] > 0x7F) all_ascii = false;
+  }
+  if (all_ascii) {
+    if (input.size > capacity) {
+      return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+    }
+    memcpy(out_buffer, input.data, input.size);
+    *out_length = input.size;
+    return iree_ok_status();
+  }
+
+  // Output can only shrink (composition combines characters), so input.size
+  // is sufficient capacity.
+  if (input.size > capacity) {
+    return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+  }
+
+  // Process combining sequences one at a time using a small fixed buffer.
+  // A combining sequence is a starter (CCC=0) followed by combining marks.
+  uint32_t sequence[IREE_UNICODE_MAX_COMBINING_SEQUENCE];
+  iree_host_size_t sequence_count = 0;
+  iree_host_size_t input_position = 0;
+  iree_host_size_t output_position = 0;
+
+  while (input_position < input.size) {
+    uint32_t codepoint = iree_unicode_utf8_decode(input, &input_position);
+    uint8_t ccc = iree_unicode_ccc(codepoint);
+
+    if (ccc == 0 && sequence_count > 0) {
+      // New starter: flush the previous sequence.
+      iree_host_size_t bytes_written = iree_unicode_flush_sequence(
+          sequence, sequence_count, out_buffer, capacity, output_position);
+      if (bytes_written == 0 && sequence_count > 0) {
+        return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+      }
+      output_position += bytes_written;
+      sequence_count = 0;
+    }
+
+    // Add codepoint to current sequence.
+    if (sequence_count >= IREE_UNICODE_MAX_COMBINING_SEQUENCE) {
+      return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+    }
+    sequence[sequence_count++] = codepoint;
+  }
+
+  // Flush any remaining sequence.
+  if (sequence_count > 0) {
+    iree_host_size_t bytes_written = iree_unicode_flush_sequence(
+        sequence, sequence_count, out_buffer, capacity, output_position);
+    if (bytes_written == 0 && sequence_count > 0) {
+      return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
+    }
+    output_position += bytes_written;
+  }
+
+  *out_length = output_position;
+  return iree_ok_status();
 }
