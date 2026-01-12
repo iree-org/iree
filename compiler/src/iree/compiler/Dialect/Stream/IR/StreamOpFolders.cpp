@@ -2345,10 +2345,12 @@ namespace {
 // timeline resources before consuming them.
 static Value tryLookThroughAwait(Value operand) {
   auto awaitOp = operand.getDefiningOp<IREE::Stream::TimepointAwaitOp>();
-  if (!awaitOp)
+  if (!awaitOp) {
     return operand;
-  if (!operand.hasOneUse())
+  }
+  if (!operand.hasOneUse()) {
     return operand;
+  }
 
   // Find awaited resource (await maps timepoint + resources -> resources).
   for (auto [resource, result] :
@@ -2370,8 +2372,9 @@ static Value tryLookThroughAwait(Value operand) {
 // Returns {consumer_op, consumed_value} if single-use chain exists.
 static std::pair<Operation *, Value>
 findConsumerThroughAwait(Value timelineResult) {
-  if (!timelineResult.hasOneUse())
+  if (!timelineResult.hasOneUse()) {
     return {nullptr, nullptr};
+  }
 
   Operation *consumer = *timelineResult.getUsers().begin();
 
@@ -2412,7 +2415,7 @@ struct FoldAsyncParameterLoadResultSubview
     // Find consumer through optional await barrier (single-use chain).
     auto [consumer, consumedValue] = findConsumerThroughAwait(op.getResult());
     auto subviewOp =
-        dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(consumer);
+        dyn_cast_if_present<IREE::Stream::ResourceSubviewOp>(consumer);
     if (!subviewOp) {
       return failure();
     }

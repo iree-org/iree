@@ -2984,7 +2984,12 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
 
 def OpGroupAsyncParameterOps : OpDocGroup {
   let summary = "Async-phase resource parameter I/O ops";
-  let description = "Async-phase resource parameter I/O ops.";
+  let description = [{
+    Operations for loading and reading parameter data in the async phase.
+    `load` allocates and returns a new resource while `read` writes into an
+    existing allocation. Use `load` when the parameter data defines a new
+    resource, and `read` when populating or updating an existing one.
+  }];
 }
 
 let opDocGroup = OpGroupAsyncParameterOps in {
@@ -2998,13 +3003,13 @@ def Stream_AsyncParameterLoadOp : Stream_PureOp<"async.parameter.load", [
   ]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{Loads a resource from a parameter archive at the given offset.}];
+  let summary = [{Allocates and loads a new resource from a parameter archive.}];
   let description = [{
-    Loads a resource directly from a parameter archive file (or in-memory
-    buffer) at the specified byte offset. The loaded resource is allocated with
-    the specified size and populated with data from the parameter source. Note
-    that load operations _may_ become direct access/memory mapped resources if
-    the result resource type allows.
+    Allocates a new resource and populates it with data from a parameter archive
+    file (or in-memory buffer) at the specified byte offset. Unlike `read` which
+    writes into an existing allocation, `load` returns a freshly allocated
+    resource. The implementation may use direct access or memory mapping when
+    the result resource type allows, avoiding copies entirely.
 
     When no await_timepoint is specified the load may be hoisted and begin at
     any point prior to the first use. When an await_timepoint is specified the
@@ -3074,13 +3079,15 @@ def Stream_AsyncParameterReadOp : Stream_Op<"async.parameter.read", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{Reads a resource from a parameter archive into a target resource.}];
+  let summary = [{Reads parameter data into an existing resource allocation.}];
   let description = [{
     Reads data from a parameter archive file (or in-memory buffer) at the
-    specified byte offset into an existing target resource. This is useful for
-    partial updates or when the target resource allocation is managed
-    separately. The entire target resource is returned with the specified range
-    updated.
+    specified byte offset into an existing target resource. Unlike `load` which
+    allocates a new resource, `read` writes into a caller-provided allocation.
+    This is useful for partial updates, populating sub-regions of larger
+    resources, or when the allocation is managed separately (e.g., staging
+    buffers). The target resource is a tied operand: the input is mutated and
+    returned with the specified range updated.
 
     Example:
     ```mlir
