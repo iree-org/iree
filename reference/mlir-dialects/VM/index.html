@@ -2936,6 +2936,24 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vmcallvariadicyieldable-vmcallvariadicyieldableop" class="md-nav__link">
+    <span class="md-ellipsis">
+      vm.call.variadic.yieldable (VM::CallVariadicYieldableOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmcallyieldable-vmcallyieldableop" class="md-nav__link">
+    <span class="md-ellipsis">
+      vm.call.yieldable (VM::CallYieldableOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vmcheckeq-vmcheckeqop" class="md-nav__link">
     <span class="md-ellipsis">
       vm.check.eq (VM::CheckEQOp)
@@ -4806,7 +4824,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_46" class="md-nav__link">
+  <a href="#attributes_48" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -9010,6 +9028,24 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vmcallvariadicyieldable-vmcallvariadicyieldableop" class="md-nav__link">
+    <span class="md-ellipsis">
+      vm.call.variadic.yieldable (VM::CallVariadicYieldableOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmcallyieldable-vmcallyieldableop" class="md-nav__link">
+    <span class="md-ellipsis">
+      vm.call.yieldable (VM::CallYieldableOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vmcheckeq-vmcheckeqop" class="md-nav__link">
     <span class="md-ellipsis">
       vm.check.eq (VM::CheckEQOp)
@@ -10880,7 +10916,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_46" class="md-nav__link">
+  <a href="#attributes_48" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -11183,6 +11219,8 @@ type, with the interpretation of the type encoded on the op.</p>
 <li><a href="#vmbr_table-vmbranchtableop">vm.br_table (VM::BranchTableOp)</a></li>
 <li><a href="#vmcall-vmcallop">vm.call (VM::CallOp)</a></li>
 <li><a href="#vmcallvariadic-vmcallvariadicop">vm.call.variadic (VM::CallVariadicOp)</a></li>
+<li><a href="#vmcallvariadicyieldable-vmcallvariadicyieldableop">vm.call.variadic.yieldable (VM::CallVariadicYieldableOp)</a></li>
+<li><a href="#vmcallyieldable-vmcallyieldableop">vm.call.yieldable (VM::CallYieldableOp)</a></li>
 <li><a href="#vmcheckeq-vmcheckeqop">vm.check.eq (VM::CheckEQOp)</a></li>
 <li><a href="#vmcheckne-vmcheckneop">vm.check.ne (VM::CheckNEOp)</a></li>
 <li><a href="#vmchecknz-vmchecknzop">vm.check.nz (VM::CheckNZOp)</a></li>
@@ -11407,7 +11445,7 @@ type, with the interpretation of the type encoded on the op.</p>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_46">Attributes</a><ul>
+<li><a href="#attributes_48">Attributes</a><ul>
 <li><a href="#ordinalcountsattr">OrdinalCountsAttr</a></li>
 </ul>
 </li>
@@ -11736,7 +11774,7 @@ type, with the interpretation of the type encoded on the op.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.buffer.alloc` operands attr-dict `:` type($result)
 </code></pre></div>
 <p>Allocates a new zero-initialized buffer with the given size in bytes.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
@@ -11780,7 +11818,7 @@ type, with the interpretation of the type encoded on the op.</p>
 </code></pre></div>
 <p>Clones a range of the source buffer to produce a mutable buffer with the
 same contents.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource, MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
@@ -11831,6 +11869,7 @@ same contents.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.buffer.compare` operands attr-dict `:` type($lhs_buffer) `,` type($rhs_buffer)
 </code></pre></div>
 <p>Returns 1 if the two ranges are bitwise equivalent, somewhat like memcmp.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource, MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
@@ -11885,6 +11924,7 @@ same contents.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.buffer.copy` operands attr-dict `:` type($source_buffer) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Copies a range of one buffer to another, like memcpy.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource, MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
@@ -11925,7 +11965,7 @@ same contents.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Fills an element range of the buffer with the given value, like memset.</p>
-<p>Traits: <code>VM_ExtF32</code></p>
+<p>Traits: <code>VM_ExtF32</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
@@ -11962,7 +12002,7 @@ same contents.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Fills an element range of the buffer with the given value, like memset.</p>
-<p>Traits: <code>VM_ExtF64</code></p>
+<p>Traits: <code>VM_ExtF64</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
@@ -11999,6 +12039,7 @@ same contents.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Fills an element range of the buffer with the given value, like memset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
@@ -12035,6 +12076,7 @@ same contents.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Fills an element range of the buffer with the given value, like memset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
@@ -12071,6 +12113,7 @@ same contents.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Fills an element range of the buffer with the given value, like memset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
@@ -12107,6 +12150,7 @@ same contents.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Fills an element range of the buffer with the given value, like memset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
@@ -12143,6 +12187,7 @@ same contents.</p>
 </code></pre></div>
 <p>Computes the SipHash-2-4 of the source buffer at the given offset for
 |length| bytes using seed <code>0x0001020304...0e0f</code>.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
@@ -12231,7 +12276,7 @@ may have additional padding.</p>
               attr-dict `:` type($source_buffer) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a value from the buffer at the given element offset.</p>
-<p>Traits: <code>VM_ExtF32</code></p>
+<p>Traits: <code>VM_ExtF32</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
@@ -12275,7 +12320,7 @@ may have additional padding.</p>
               attr-dict `:` type($source_buffer) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a value from the buffer at the given element offset.</p>
-<p>Traits: <code>VM_ExtF64</code></p>
+<p>Traits: <code>VM_ExtF64</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
@@ -12319,6 +12364,7 @@ may have additional padding.</p>
               attr-dict `:` type($source_buffer) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a value from the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
@@ -12362,6 +12408,7 @@ may have additional padding.</p>
               attr-dict `:` type($source_buffer) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a value from the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
@@ -12405,6 +12452,7 @@ may have additional padding.</p>
               attr-dict `:` type($source_buffer) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a value from the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
@@ -12448,6 +12496,7 @@ may have additional padding.</p>
               attr-dict `:` type($source_buffer) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a value from the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
@@ -12491,6 +12540,7 @@ may have additional padding.</p>
               attr-dict `:` type($source_buffer) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a value from the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
@@ -12534,6 +12584,7 @@ may have additional padding.</p>
               attr-dict `:` type($source_buffer) `-&gt;` type($result)
 </code></pre></div>
 <p>Loads a value from the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
@@ -12577,7 +12628,7 @@ may have additional padding.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Stores a value to the buffer at the given element offset.</p>
-<p>Traits: <code>VM_ExtF32</code></p>
+<p>Traits: <code>VM_ExtF32</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
@@ -12610,7 +12661,7 @@ may have additional padding.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Stores a value to the buffer at the given element offset.</p>
-<p>Traits: <code>VM_ExtF64</code></p>
+<p>Traits: <code>VM_ExtF64</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
@@ -12643,6 +12694,7 @@ may have additional padding.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Stores a value to the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
@@ -12675,6 +12727,7 @@ may have additional padding.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Stores a value to the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
@@ -12707,6 +12760,7 @@ may have additional padding.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Stores a value to the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
@@ -12739,6 +12793,7 @@ may have additional padding.</p>
               attr-dict `:` type($value) `-&gt;` type($target_buffer)
 </code></pre></div>
 <p>Stores a value to the buffer at the given element offset.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
@@ -16173,6 +16228,7 @@ sizes reflect the unpadded attribute storage sizes.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.call` $callee `(` operands `)` attr-dict `:` functional-type(operands, results)
 </code></pre></div>
 <p>Calls an internal VM function with the given arguments.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>RefMoveInterface</code>, <code>VMSerializableOp</code></p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
@@ -16218,6 +16274,7 @@ sizes reflect the unpadded attribute storage sizes.</p>
 arguments may be variadic, encoded as segmented sized operand lists.</p>
 <p>Variadic arguments must be specified with a total count in the segment_sizes
 attribute.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>RefMoveInterface</code>, <code>VMSerializableOp</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
@@ -16259,6 +16316,125 @@ attribute.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="vmcallvariadicyieldable-vmcallvariadicyieldableop"><code>vm.call.variadic.yieldable</code> (VM::CallVariadicYieldableOp)<a class="headerlink" href="#vmcallvariadicyieldable-vmcallvariadicyieldableop" title="Permanent link">link</a></h4>
+<p><em>Variadic call operation that may yield.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `vm.call.variadic.yieldable` $callee `(` $operands `)` attr-dict `:` `(` type($operands) `)`
+              `-&gt;` $dest custom&lt;ResultTypeList&gt;($result_types)
+</code></pre></div>
+<p>Calls a variadic VM import function that may yield. If the call yields,
+execution resumes at the specified successor block with the call results
+as block arguments. If the call completes synchronously, control branches
+to the successor with the results.</p>
+<p>Variadic arguments must be specified with a total count in the segment_sizes
+attribute. Only imports are supported (not internal functions).</p>
+<div class="highlight"><pre><span></span><code>^bb0:
+  vm.call.variadic.yieldable @import(%a, %b, %c) {segment_sizes = dense&lt;[1, 2]&gt; : vector&lt;2xi16&gt;}
+    : (i32, i32, i32) -&gt; ^resume(i32)
+^resume(%result : i32):
+  vm.return %result
+</code></pre></div>
+<p>Traits: <code>Terminator</code>, <code>Util_YieldPoint</code>, <code>VM_MayFail</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>BranchOpInterface</code>, <code>CallOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>RefMoveInterface</code>, <code>VMSerializableOp</code></p>
+<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>callee</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>segment_sizes</code></td><td>::mlir::DenseIntElementsAttr</td><td>16-bit signless integer elements attribute</td></tr>
+<tr><td><code>segment_types</code></td><td>::mlir::ArrayAttr</td><td>type array attribute</td></tr>
+<tr><td><code>result_types</code></td><td>::mlir::ArrayAttr</td><td>type array attribute</td></tr>
+<tr><td><code>arg_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
+<tr><td><code>res_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
+</table>
+
+<h5 id="operands_107">Operands:<a class="headerlink" href="#operands_107" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>operands</code></td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+</tr>
+</tbody>
+</table>
+<h5 id="successors_3">Successors:<a class="headerlink" href="#successors_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Successor</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>dest</code></td>
+<td>any successor</td>
+</tr>
+</tbody>
+</table>
+<h4 id="vmcallyieldable-vmcallyieldableop"><code>vm.call.yieldable</code> (VM::CallYieldableOp)<a class="headerlink" href="#vmcallyieldable-vmcallyieldableop" title="Permanent link">link</a></h4>
+<p><em>Call operation that may yield.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `vm.call.yieldable` $callee `(` $arguments `)` attr-dict `:` `(` type($arguments) `)`
+              `-&gt;` $dest custom&lt;ResultTypeList&gt;($result_types)
+</code></pre></div>
+<p>Calls a VM function (internal or imported) that may yield. If the call
+yields execution resumes at the specified successor block with the call
+results as block arguments. If the call completes synchronously control
+branches to the successor with the results.</p>
+<p>This op is a terminator that combines a call with an explicit resume point,
+making the yield/resume semantics visible in the IR.</p>
+<div class="highlight"><pre><span></span><code>^bb0:
+  vm.call.yieldable @hal.fence.await(%timeout, %fence) : (i32, !vm.ref&lt;?&gt;) -&gt; ^resume(i32)
+^resume(%result : i32):
+  vm.return %result
+</code></pre></div>
+<p>Traits: <code>Terminator</code>, <code>Util_YieldPoint</code>, <code>VM_MayFail</code></p>
+<p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>BranchOpInterface</code>, <code>CallOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>RefMoveInterface</code>, <code>VMSerializableOp</code></p>
+<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>callee</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>result_types</code></td><td>::mlir::ArrayAttr</td><td>type array attribute</td></tr>
+<tr><td><code>arg_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
+<tr><td><code>res_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
+</table>
+
+<h5 id="operands_108">Operands:<a class="headerlink" href="#operands_108" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>arguments</code></td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+</tr>
+</tbody>
+</table>
+<h5 id="successors_4">Successors:<a class="headerlink" href="#successors_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Successor</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>dest</code></td>
+<td>any successor</td>
+</tr>
+</tbody>
+</table>
 <h4 id="vmcheckeq-vmcheckeqop"><code>vm.check.eq</code> (VM::CheckEQOp)<a class="headerlink" href="#vmcheckeq-vmcheckeqop" title="Permanent link">link</a></h4>
 <p><em>Raises a global failure if the condition is true.</em></p>
 <p>Syntax:</p>
@@ -16275,13 +16451,13 @@ operation.</p>
 vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
 </code></pre></div>
 <p>Traits: <code>Commutative</code>, <code>VM_PseudoOp</code></p>
-<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
+<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_107">Operands:<a class="headerlink" href="#operands_107" title="Permanent link">link</a></h5>
+<h5 id="operands_109">Operands:<a class="headerlink" href="#operands_109" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16304,84 +16480,6 @@ vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
 <p><em>Raises a global failure if the condition is true.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.check.ne` $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
-</code></pre></div>
-<p>When the condition is true this signals a runtime failure that causes the
-entire active invocation - and possibly <em>all</em> in-flight and pending
-invocations - to fail. The status will be propagated back via the available
-runtime error handling mechanisms such as semaphores or synchronous
-invocation results.</p>
-<p>This is implemented as a pseudo-op that transforms into a vm.cond_fail
-operation.</p>
-<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, &quot;a == b&quot; : i32
-vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
-</code></pre></div>
-<p>Traits: <code>Commutative</code>, <code>VM_PseudoOp</code></p>
-<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-</table>
-
-<h5 id="operands_108">Operands:<a class="headerlink" href="#operands_108" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>lhs</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>rhs</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
-</tr>
-</tbody>
-</table>
-<h4 id="vmchecknz-vmchecknzop"><code>vm.check.nz</code> (VM::CheckNZOp)<a class="headerlink" href="#vmchecknz-vmchecknzop" title="Permanent link">link</a></h4>
-<p><em>Raises a global failure if the condition is true.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.check.nz` $value (`,` $message^)? attr-dict `:` type($value)
-</code></pre></div>
-<p>When the condition is true this signals a runtime failure that causes the
-entire active invocation - and possibly <em>all</em> in-flight and pending
-invocations - to fail. The status will be propagated back via the available
-runtime error handling mechanisms such as semaphores or synchronous
-invocation results.</p>
-<p>This is implemented as a pseudo-op that transforms into a vm.cond_fail
-operation.</p>
-<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, &quot;a == b&quot; : i32
-vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
-</code></pre></div>
-<p>Traits: <code>VM_PseudoOp</code></p>
-<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-</table>
-
-<h5 id="operands_109">Operands:<a class="headerlink" href="#operands_109" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>value</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
-</tr>
-</tbody>
-</table>
-<h4 id="vmchecknearly_eq-vmchecknearlyeqop"><code>vm.check.nearly_eq</code> (VM::CheckNearlyEQOp)<a class="headerlink" href="#vmchecknearly_eq-vmchecknearlyeqop" title="Permanent link">link</a></h4>
-<p><em>Raises a global failure if the condition is true.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.check.nearly_eq` $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
 </code></pre></div>
 <p>When the condition is true this signals a runtime failure that causes the
 entire active invocation - and possibly <em>all</em> in-flight and pending
@@ -16419,6 +16517,84 @@ vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
 </tr>
 </tbody>
 </table>
+<h4 id="vmchecknz-vmchecknzop"><code>vm.check.nz</code> (VM::CheckNZOp)<a class="headerlink" href="#vmchecknz-vmchecknzop" title="Permanent link">link</a></h4>
+<p><em>Raises a global failure if the condition is true.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `vm.check.nz` $value (`,` $message^)? attr-dict `:` type($value)
+</code></pre></div>
+<p>When the condition is true this signals a runtime failure that causes the
+entire active invocation - and possibly <em>all</em> in-flight and pending
+invocations - to fail. The status will be propagated back via the available
+runtime error handling mechanisms such as semaphores or synchronous
+invocation results.</p>
+<p>This is implemented as a pseudo-op that transforms into a vm.cond_fail
+operation.</p>
+<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, &quot;a == b&quot; : i32
+vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
+</code></pre></div>
+<p>Traits: <code>VM_PseudoOp</code></p>
+<h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+</table>
+
+<h5 id="operands_111">Operands:<a class="headerlink" href="#operands_111" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>value</code></td>
+<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+</tr>
+</tbody>
+</table>
+<h4 id="vmchecknearly_eq-vmchecknearlyeqop"><code>vm.check.nearly_eq</code> (VM::CheckNearlyEQOp)<a class="headerlink" href="#vmchecknearly_eq-vmchecknearlyeqop" title="Permanent link">link</a></h4>
+<p><em>Raises a global failure if the condition is true.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `vm.check.nearly_eq` $lhs `,` $rhs (`,` $message^)? attr-dict `:` type($lhs)
+</code></pre></div>
+<p>When the condition is true this signals a runtime failure that causes the
+entire active invocation - and possibly <em>all</em> in-flight and pending
+invocations - to fail. The status will be propagated back via the available
+runtime error handling mechanisms such as semaphores or synchronous
+invocation results.</p>
+<p>This is implemented as a pseudo-op that transforms into a vm.cond_fail
+operation.</p>
+<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, &quot;a == b&quot; : i32
+vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
+</code></pre></div>
+<p>Traits: <code>Commutative</code>, <code>VM_PseudoOp</code></p>
+<h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+</table>
+
+<h5 id="operands_112">Operands:<a class="headerlink" href="#operands_112" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>lhs</code></td>
+<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>rhs</code></td>
+<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+</tr>
+</tbody>
+</table>
 <h4 id="vmcond_br-vmcondbranchop"><code>vm.cond_br</code> (VM::CondBranchOp)<a class="headerlink" href="#vmcond_br-vmcondbranchop" title="Permanent link">link</a></h4>
 <p><em>Conditional branch operation.</em></p>
 <p>Syntax:</p>
@@ -16437,7 +16613,7 @@ vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
    ...</code></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>BranchOpInterface</code>, <code>RefMoveInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="operands_111">Operands:<a class="headerlink" href="#operands_111" title="Permanent link">link</a></h5>
+<h5 id="operands_113">Operands:<a class="headerlink" href="#operands_113" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16460,7 +16636,7 @@ vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
 </tr>
 </tbody>
 </table>
-<h5 id="successors_3">Successors:<a class="headerlink" href="#successors_3" title="Permanent link">link</a></h5>
+<h5 id="successors_5">Successors:<a class="headerlink" href="#successors_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16496,14 +16672,14 @@ guarded by the condition.</p>
 %statusCode = vm.const.i32 9
 vm.cond_fail %nz, %statusCode, &quot;expected non-zero&quot;
 </code></pre></div>
-<p>Traits: <code>VM_PseudoOp</code></p>
-<h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
+<p>Traits: <code>VM_MayFail</code>, <code>VM_PseudoOp</code></p>
+<h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_112">Operands:<a class="headerlink" href="#operands_112" title="Permanent link">link</a></h5>
+<h5 id="operands_114">Operands:<a class="headerlink" href="#operands_114" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16538,15 +16714,15 @@ or pending when the failure occurs will complete.</p>
 <div class="highlight"><pre><span></span><code>%statusCode = vm.const.i32 9
 vm.fail %statusCode, &quot;oh no!&quot;
 </code></pre></div>
-<p>Traits: <code>Terminator</code></p>
+<p>Traits: <code>Terminator</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>VMSerializableOp</code></p>
-<h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
+<h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_113">Operands:<a class="headerlink" href="#operands_113" title="Permanent link">link</a></h5>
+<h5 id="operands_115">Operands:<a class="headerlink" href="#operands_115" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16571,7 +16747,7 @@ this returns false then attempting to call the imported function will result
 in a failure at runtime.</p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
+<h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>import</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -16605,7 +16781,7 @@ in a failure at runtime.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RefMoveInterface</code>, <code>RegionBranchTerminatorOpInterface</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_114">Operands:<a class="headerlink" href="#operands_114" title="Permanent link">link</a></h5>
+<h5 id="operands_116">Operands:<a class="headerlink" href="#operands_116" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16631,7 +16807,7 @@ resuming (or if a debugger is not attached) execution will continue at the
 target block.</p>
 <p>Traits: <code>Terminator</code>, <code>Util_YieldPoint</code>, <code>VM_DebugOnly</code>, <code>VM_FullBarrier</code></p>
 <p>Interfaces: <code>BranchOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="operands_115">Operands:<a class="headerlink" href="#operands_115" title="Permanent link">link</a></h5>
+<h5 id="operands_117">Operands:<a class="headerlink" href="#operands_117" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16646,7 +16822,7 @@ target block.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="successors_4">Successors:<a class="headerlink" href="#successors_4" title="Permanent link">link</a></h5>
+<h5 id="successors_6">Successors:<a class="headerlink" href="#successors_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16672,7 +16848,7 @@ provided condition is true. After resuming (or if a debugger is not
 attached) execution will continue at the target block.</p>
 <p>Traits: <code>Terminator</code>, <code>Util_YieldPoint</code>, <code>VM_DebugOnly</code>, <code>VM_FullBarrier</code></p>
 <p>Interfaces: <code>BranchOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="operands_116">Operands:<a class="headerlink" href="#operands_116" title="Permanent link">link</a></h5>
+<h5 id="operands_118">Operands:<a class="headerlink" href="#operands_118" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16691,7 +16867,7 @@ attached) execution will continue at the target block.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="successors_5">Successors:<a class="headerlink" href="#successors_5" title="Permanent link">link</a></h5>
+<h5 id="successors_7">Successors:<a class="headerlink" href="#successors_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16714,13 +16890,13 @@ attached) execution will continue at the target block.</p>
 <p>Prints the given string message and zero or more values.</p>
 <p>Traits: <code>VM_DebugOnly</code>, <code>VM_FullBarrier</code></p>
 <p>Interfaces: <code>VMSerializableOp</code></p>
-<h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
+<h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_117">Operands:<a class="headerlink" href="#operands_117" title="Permanent link">link</a></h5>
+<h5 id="operands_119">Operands:<a class="headerlink" href="#operands_119" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16745,13 +16921,13 @@ These values will be encoded into the active trace depending on the active
 trace verbosity setting.</p>
 <p>Traits: <code>VM_DebugOnly</code>, <code>VM_FullBarrier</code></p>
 <p>Interfaces: <code>VMSerializableOp</code></p>
-<h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
+<h5 id="attributes_21">Attributes:<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>event_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_118">Operands:<a class="headerlink" href="#operands_118" title="Permanent link">link</a></h5>
+<h5 id="operands_120">Operands:<a class="headerlink" href="#operands_120" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16775,7 +16951,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_119">Operands:<a class="headerlink" href="#operands_119" title="Permanent link">link</a></h5>
+<h5 id="operands_121">Operands:<a class="headerlink" href="#operands_121" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16813,7 +16989,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_120">Operands:<a class="headerlink" href="#operands_120" title="Permanent link">link</a></h5>
+<h5 id="operands_122">Operands:<a class="headerlink" href="#operands_122" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16851,7 +17027,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_121">Operands:<a class="headerlink" href="#operands_121" title="Permanent link">link</a></h5>
+<h5 id="operands_123">Operands:<a class="headerlink" href="#operands_123" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16893,7 +17069,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_122">Operands:<a class="headerlink" href="#operands_122" title="Permanent link">link</a></h5>
+<h5 id="operands_124">Operands:<a class="headerlink" href="#operands_124" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16935,7 +17111,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_123">Operands:<a class="headerlink" href="#operands_123" title="Permanent link">link</a></h5>
+<h5 id="operands_125">Operands:<a class="headerlink" href="#operands_125" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -16973,7 +17149,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_124">Operands:<a class="headerlink" href="#operands_124" title="Permanent link">link</a></h5>
+<h5 id="operands_126">Operands:<a class="headerlink" href="#operands_126" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17011,7 +17187,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_125">Operands:<a class="headerlink" href="#operands_125" title="Permanent link">link</a></h5>
+<h5 id="operands_127">Operands:<a class="headerlink" href="#operands_127" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17053,7 +17229,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_126">Operands:<a class="headerlink" href="#operands_126" title="Permanent link">link</a></h5>
+<h5 id="operands_128">Operands:<a class="headerlink" href="#operands_128" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17095,7 +17271,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_127">Operands:<a class="headerlink" href="#operands_127" title="Permanent link">link</a></h5>
+<h5 id="operands_129">Operands:<a class="headerlink" href="#operands_129" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17141,7 +17317,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_128">Operands:<a class="headerlink" href="#operands_128" title="Permanent link">link</a></h5>
+<h5 id="operands_130">Operands:<a class="headerlink" href="#operands_130" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17187,7 +17363,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_129">Operands:<a class="headerlink" href="#operands_129" title="Permanent link">link</a></h5>
+<h5 id="operands_131">Operands:<a class="headerlink" href="#operands_131" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17225,7 +17401,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_130">Operands:<a class="headerlink" href="#operands_130" title="Permanent link">link</a></h5>
+<h5 id="operands_132">Operands:<a class="headerlink" href="#operands_132" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17263,7 +17439,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_131">Operands:<a class="headerlink" href="#operands_131" title="Permanent link">link</a></h5>
+<h5 id="operands_133">Operands:<a class="headerlink" href="#operands_133" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17305,7 +17481,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_132">Operands:<a class="headerlink" href="#operands_132" title="Permanent link">link</a></h5>
+<h5 id="operands_134">Operands:<a class="headerlink" href="#operands_134" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17347,7 +17523,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_133">Operands:<a class="headerlink" href="#operands_133" title="Permanent link">link</a></h5>
+<h5 id="operands_135">Operands:<a class="headerlink" href="#operands_135" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17389,7 +17565,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_134">Operands:<a class="headerlink" href="#operands_134" title="Permanent link">link</a></h5>
+<h5 id="operands_136">Operands:<a class="headerlink" href="#operands_136" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17431,7 +17607,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_135">Operands:<a class="headerlink" href="#operands_135" title="Permanent link">link</a></h5>
+<h5 id="operands_137">Operands:<a class="headerlink" href="#operands_137" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17473,7 +17649,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_136">Operands:<a class="headerlink" href="#operands_136" title="Permanent link">link</a></h5>
+<h5 id="operands_138">Operands:<a class="headerlink" href="#operands_138" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17515,7 +17691,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_137">Operands:<a class="headerlink" href="#operands_137" title="Permanent link">link</a></h5>
+<h5 id="operands_139">Operands:<a class="headerlink" href="#operands_139" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17553,7 +17729,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_138">Operands:<a class="headerlink" href="#operands_138" title="Permanent link">link</a></h5>
+<h5 id="operands_140">Operands:<a class="headerlink" href="#operands_140" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17591,7 +17767,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_139">Operands:<a class="headerlink" href="#operands_139" title="Permanent link">link</a></h5>
+<h5 id="operands_141">Operands:<a class="headerlink" href="#operands_141" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17633,7 +17809,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_140">Operands:<a class="headerlink" href="#operands_140" title="Permanent link">link</a></h5>
+<h5 id="operands_142">Operands:<a class="headerlink" href="#operands_142" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17675,7 +17851,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_141">Operands:<a class="headerlink" href="#operands_141" title="Permanent link">link</a></h5>
+<h5 id="operands_143">Operands:<a class="headerlink" href="#operands_143" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17713,7 +17889,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_142">Operands:<a class="headerlink" href="#operands_142" title="Permanent link">link</a></h5>
+<h5 id="operands_144">Operands:<a class="headerlink" href="#operands_144" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17751,7 +17927,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_143">Operands:<a class="headerlink" href="#operands_143" title="Permanent link">link</a></h5>
+<h5 id="operands_145">Operands:<a class="headerlink" href="#operands_145" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17789,7 +17965,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_144">Operands:<a class="headerlink" href="#operands_144" title="Permanent link">link</a></h5>
+<h5 id="operands_146">Operands:<a class="headerlink" href="#operands_146" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17827,7 +18003,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_145">Operands:<a class="headerlink" href="#operands_145" title="Permanent link">link</a></h5>
+<h5 id="operands_147">Operands:<a class="headerlink" href="#operands_147" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17869,7 +18045,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_146">Operands:<a class="headerlink" href="#operands_146" title="Permanent link">link</a></h5>
+<h5 id="operands_148">Operands:<a class="headerlink" href="#operands_148" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17913,7 +18089,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_147">Operands:<a class="headerlink" href="#operands_147" title="Permanent link">link</a></h5>
+<h5 id="operands_149">Operands:<a class="headerlink" href="#operands_149" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17956,7 +18132,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_148">Operands:<a class="headerlink" href="#operands_148" title="Permanent link">link</a></h5>
+<h5 id="operands_150">Operands:<a class="headerlink" href="#operands_150" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -17999,7 +18175,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_149">Operands:<a class="headerlink" href="#operands_149" title="Permanent link">link</a></h5>
+<h5 id="operands_151">Operands:<a class="headerlink" href="#operands_151" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18042,7 +18218,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_150">Operands:<a class="headerlink" href="#operands_150" title="Permanent link">link</a></h5>
+<h5 id="operands_152">Operands:<a class="headerlink" href="#operands_152" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18085,7 +18261,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_151">Operands:<a class="headerlink" href="#operands_151" title="Permanent link">link</a></h5>
+<h5 id="operands_153">Operands:<a class="headerlink" href="#operands_153" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18128,7 +18304,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_152">Operands:<a class="headerlink" href="#operands_152" title="Permanent link">link</a></h5>
+<h5 id="operands_154">Operands:<a class="headerlink" href="#operands_154" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18171,7 +18347,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_153">Operands:<a class="headerlink" href="#operands_153" title="Permanent link">link</a></h5>
+<h5 id="operands_155">Operands:<a class="headerlink" href="#operands_155" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18214,7 +18390,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_154">Operands:<a class="headerlink" href="#operands_154" title="Permanent link">link</a></h5>
+<h5 id="operands_156">Operands:<a class="headerlink" href="#operands_156" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18257,7 +18433,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_155">Operands:<a class="headerlink" href="#operands_155" title="Permanent link">link</a></h5>
+<h5 id="operands_157">Operands:<a class="headerlink" href="#operands_157" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18300,7 +18476,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_156">Operands:<a class="headerlink" href="#operands_156" title="Permanent link">link</a></h5>
+<h5 id="operands_158">Operands:<a class="headerlink" href="#operands_158" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18343,7 +18519,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_157">Operands:<a class="headerlink" href="#operands_157" title="Permanent link">link</a></h5>
+<h5 id="operands_159">Operands:<a class="headerlink" href="#operands_159" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18386,7 +18562,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_158">Operands:<a class="headerlink" href="#operands_158" title="Permanent link">link</a></h5>
+<h5 id="operands_160">Operands:<a class="headerlink" href="#operands_160" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18429,7 +18605,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_159">Operands:<a class="headerlink" href="#operands_159" title="Permanent link">link</a></h5>
+<h5 id="operands_161">Operands:<a class="headerlink" href="#operands_161" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18472,7 +18648,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_160">Operands:<a class="headerlink" href="#operands_160" title="Permanent link">link</a></h5>
+<h5 id="operands_162">Operands:<a class="headerlink" href="#operands_162" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18515,7 +18691,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_161">Operands:<a class="headerlink" href="#operands_161" title="Permanent link">link</a></h5>
+<h5 id="operands_163">Operands:<a class="headerlink" href="#operands_163" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18558,7 +18734,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_162">Operands:<a class="headerlink" href="#operands_162" title="Permanent link">link</a></h5>
+<h5 id="operands_164">Operands:<a class="headerlink" href="#operands_164" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18601,7 +18777,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_163">Operands:<a class="headerlink" href="#operands_163" title="Permanent link">link</a></h5>
+<h5 id="operands_165">Operands:<a class="headerlink" href="#operands_165" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18644,7 +18820,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_164">Operands:<a class="headerlink" href="#operands_164" title="Permanent link">link</a></h5>
+<h5 id="operands_166">Operands:<a class="headerlink" href="#operands_166" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18687,7 +18863,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_165">Operands:<a class="headerlink" href="#operands_165" title="Permanent link">link</a></h5>
+<h5 id="operands_167">Operands:<a class="headerlink" href="#operands_167" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18730,7 +18906,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_166">Operands:<a class="headerlink" href="#operands_166" title="Permanent link">link</a></h5>
+<h5 id="operands_168">Operands:<a class="headerlink" href="#operands_168" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18773,7 +18949,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_167">Operands:<a class="headerlink" href="#operands_167" title="Permanent link">link</a></h5>
+<h5 id="operands_169">Operands:<a class="headerlink" href="#operands_169" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18816,7 +18992,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_168">Operands:<a class="headerlink" href="#operands_168" title="Permanent link">link</a></h5>
+<h5 id="operands_170">Operands:<a class="headerlink" href="#operands_170" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18859,7 +19035,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_169">Operands:<a class="headerlink" href="#operands_169" title="Permanent link">link</a></h5>
+<h5 id="operands_171">Operands:<a class="headerlink" href="#operands_171" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18902,7 +19078,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_170">Operands:<a class="headerlink" href="#operands_170" title="Permanent link">link</a></h5>
+<h5 id="operands_172">Operands:<a class="headerlink" href="#operands_172" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18945,7 +19121,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_171">Operands:<a class="headerlink" href="#operands_171" title="Permanent link">link</a></h5>
+<h5 id="operands_173">Operands:<a class="headerlink" href="#operands_173" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -18988,7 +19164,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_172">Operands:<a class="headerlink" href="#operands_172" title="Permanent link">link</a></h5>
+<h5 id="operands_174">Operands:<a class="headerlink" href="#operands_174" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19031,7 +19207,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_173">Operands:<a class="headerlink" href="#operands_173" title="Permanent link">link</a></h5>
+<h5 id="operands_175">Operands:<a class="headerlink" href="#operands_175" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19070,7 +19246,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_174">Operands:<a class="headerlink" href="#operands_174" title="Permanent link">link</a></h5>
+<h5 id="operands_176">Operands:<a class="headerlink" href="#operands_176" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19109,7 +19285,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_175">Operands:<a class="headerlink" href="#operands_175" title="Permanent link">link</a></h5>
+<h5 id="operands_177">Operands:<a class="headerlink" href="#operands_177" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19148,7 +19324,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code>, <code>VM_PseudoOp</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_176">Operands:<a class="headerlink" href="#operands_176" title="Permanent link">link</a></h5>
+<h5 id="operands_178">Operands:<a class="headerlink" href="#operands_178" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19187,7 +19363,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_177">Operands:<a class="headerlink" href="#operands_177" title="Permanent link">link</a></h5>
+<h5 id="operands_179">Operands:<a class="headerlink" href="#operands_179" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19226,7 +19402,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_178">Operands:<a class="headerlink" href="#operands_178" title="Permanent link">link</a></h5>
+<h5 id="operands_180">Operands:<a class="headerlink" href="#operands_180" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19266,7 +19442,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_179">Operands:<a class="headerlink" href="#operands_179" title="Permanent link">link</a></h5>
+<h5 id="operands_181">Operands:<a class="headerlink" href="#operands_181" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19308,7 +19484,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_180">Operands:<a class="headerlink" href="#operands_180" title="Permanent link">link</a></h5>
+<h5 id="operands_182">Operands:<a class="headerlink" href="#operands_182" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19350,7 +19526,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_181">Operands:<a class="headerlink" href="#operands_181" title="Permanent link">link</a></h5>
+<h5 id="operands_183">Operands:<a class="headerlink" href="#operands_183" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19388,7 +19564,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_182">Operands:<a class="headerlink" href="#operands_182" title="Permanent link">link</a></h5>
+<h5 id="operands_184">Operands:<a class="headerlink" href="#operands_184" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19426,7 +19602,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_183">Operands:<a class="headerlink" href="#operands_183" title="Permanent link">link</a></h5>
+<h5 id="operands_185">Operands:<a class="headerlink" href="#operands_185" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19464,7 +19640,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_184">Operands:<a class="headerlink" href="#operands_184" title="Permanent link">link</a></h5>
+<h5 id="operands_186">Operands:<a class="headerlink" href="#operands_186" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19502,7 +19678,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_185">Operands:<a class="headerlink" href="#operands_185" title="Permanent link">link</a></h5>
+<h5 id="operands_187">Operands:<a class="headerlink" href="#operands_187" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19540,7 +19716,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_186">Operands:<a class="headerlink" href="#operands_186" title="Permanent link">link</a></h5>
+<h5 id="operands_188">Operands:<a class="headerlink" href="#operands_188" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19578,7 +19754,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_187">Operands:<a class="headerlink" href="#operands_187" title="Permanent link">link</a></h5>
+<h5 id="operands_189">Operands:<a class="headerlink" href="#operands_189" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19616,7 +19792,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_188">Operands:<a class="headerlink" href="#operands_188" title="Permanent link">link</a></h5>
+<h5 id="operands_190">Operands:<a class="headerlink" href="#operands_190" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19654,7 +19830,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_189">Operands:<a class="headerlink" href="#operands_189" title="Permanent link">link</a></h5>
+<h5 id="operands_191">Operands:<a class="headerlink" href="#operands_191" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19692,7 +19868,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_190">Operands:<a class="headerlink" href="#operands_190" title="Permanent link">link</a></h5>
+<h5 id="operands_192">Operands:<a class="headerlink" href="#operands_192" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19730,7 +19906,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_191">Operands:<a class="headerlink" href="#operands_191" title="Permanent link">link</a></h5>
+<h5 id="operands_193">Operands:<a class="headerlink" href="#operands_193" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19768,7 +19944,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_192">Operands:<a class="headerlink" href="#operands_192" title="Permanent link">link</a></h5>
+<h5 id="operands_194">Operands:<a class="headerlink" href="#operands_194" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19806,7 +19982,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_193">Operands:<a class="headerlink" href="#operands_193" title="Permanent link">link</a></h5>
+<h5 id="operands_195">Operands:<a class="headerlink" href="#operands_195" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19844,7 +20020,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_194">Operands:<a class="headerlink" href="#operands_194" title="Permanent link">link</a></h5>
+<h5 id="operands_196">Operands:<a class="headerlink" href="#operands_196" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19882,7 +20058,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_195">Operands:<a class="headerlink" href="#operands_195" title="Permanent link">link</a></h5>
+<h5 id="operands_197">Operands:<a class="headerlink" href="#operands_197" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19920,7 +20096,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_196">Operands:<a class="headerlink" href="#operands_196" title="Permanent link">link</a></h5>
+<h5 id="operands_198">Operands:<a class="headerlink" href="#operands_198" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19958,7 +20134,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_197">Operands:<a class="headerlink" href="#operands_197" title="Permanent link">link</a></h5>
+<h5 id="operands_199">Operands:<a class="headerlink" href="#operands_199" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -19996,7 +20172,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_198">Operands:<a class="headerlink" href="#operands_198" title="Permanent link">link</a></h5>
+<h5 id="operands_200">Operands:<a class="headerlink" href="#operands_200" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20034,7 +20210,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_199">Operands:<a class="headerlink" href="#operands_199" title="Permanent link">link</a></h5>
+<h5 id="operands_201">Operands:<a class="headerlink" href="#operands_201" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20072,7 +20248,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_200">Operands:<a class="headerlink" href="#operands_200" title="Permanent link">link</a></h5>
+<h5 id="operands_202">Operands:<a class="headerlink" href="#operands_202" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20110,7 +20286,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_201">Operands:<a class="headerlink" href="#operands_201" title="Permanent link">link</a></h5>
+<h5 id="operands_203">Operands:<a class="headerlink" href="#operands_203" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20152,7 +20328,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_202">Operands:<a class="headerlink" href="#operands_202" title="Permanent link">link</a></h5>
+<h5 id="operands_204">Operands:<a class="headerlink" href="#operands_204" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20194,7 +20370,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_203">Operands:<a class="headerlink" href="#operands_203" title="Permanent link">link</a></h5>
+<h5 id="operands_205">Operands:<a class="headerlink" href="#operands_205" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20232,7 +20408,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_204">Operands:<a class="headerlink" href="#operands_204" title="Permanent link">link</a></h5>
+<h5 id="operands_206">Operands:<a class="headerlink" href="#operands_206" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20270,7 +20446,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_205">Operands:<a class="headerlink" href="#operands_205" title="Permanent link">link</a></h5>
+<h5 id="operands_207">Operands:<a class="headerlink" href="#operands_207" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20308,7 +20484,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_206">Operands:<a class="headerlink" href="#operands_206" title="Permanent link">link</a></h5>
+<h5 id="operands_208">Operands:<a class="headerlink" href="#operands_208" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20346,7 +20522,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_207">Operands:<a class="headerlink" href="#operands_207" title="Permanent link">link</a></h5>
+<h5 id="operands_209">Operands:<a class="headerlink" href="#operands_209" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20384,7 +20560,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_208">Operands:<a class="headerlink" href="#operands_208" title="Permanent link">link</a></h5>
+<h5 id="operands_210">Operands:<a class="headerlink" href="#operands_210" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20422,7 +20598,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_209">Operands:<a class="headerlink" href="#operands_209" title="Permanent link">link</a></h5>
+<h5 id="operands_211">Operands:<a class="headerlink" href="#operands_211" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20460,7 +20636,7 @@ trace verbosity setting.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_210">Operands:<a class="headerlink" href="#operands_210" title="Permanent link">link</a></h5>
+<h5 id="operands_212">Operands:<a class="headerlink" href="#operands_212" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20503,7 +20679,7 @@ example, ordinals for refs and byte offsets for primitive types).</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalAddressOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
+<h5 id="attributes_22">Attributes:<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -20538,7 +20714,7 @@ example, ordinals for refs and byte offsets for primitive types).</p>
 Initialized to zero unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_21">Attributes:<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h5>
+<h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -20563,7 +20739,7 @@ Initialized to zero unless an initial value is specified.</p>
 Initialized to zero unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_22">Attributes:<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h5>
+<h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -20588,7 +20764,7 @@ Initialized to zero unless an initial value is specified.</p>
 Initialized to zero unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
+<h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -20613,7 +20789,7 @@ Initialized to zero unless an initial value is specified.</p>
 Initialized to zero unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
+<h5 id="attributes_26">Attributes:<a class="headerlink" href="#attributes_26" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -20634,7 +20810,7 @@ Initialized to zero unless an initial value is specified.</p>
 <p>Loads the value of a global containing an primitive value.</p>
 <p>Traits: <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
+<h5 id="attributes_27">Attributes:<a class="headerlink" href="#attributes_27" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -20665,7 +20841,7 @@ Initialized to zero unless an initial value is specified.</p>
 <p>Loads the value of a global containing an primitive value.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_26">Attributes:<a class="headerlink" href="#attributes_26" title="Permanent link">link</a></h5>
+<h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -20695,7 +20871,7 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Loads the value of a global containing an primitive value.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_27">Attributes:<a class="headerlink" href="#attributes_27" title="Permanent link">link</a></h5>
+<h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -20725,7 +20901,7 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Loads the value of a global containing an primitive value.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
+<h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -20756,13 +20932,13 @@ Initialized to zero unless an initial value is specified.</p>
 <p>Loads the value of a global containing a primitive value.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
+<h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="operands_211">Operands:<a class="headerlink" href="#operands_211" title="Permanent link">link</a></h5>
+<h5 id="operands_213">Operands:<a class="headerlink" href="#operands_213" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20801,13 +20977,13 @@ Initialized to zero unless an initial value is specified.</p>
 <p>Loads the value of a global containing a primitive value.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
+<h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="operands_212">Operands:<a class="headerlink" href="#operands_212" title="Permanent link">link</a></h5>
+<h5 id="operands_214">Operands:<a class="headerlink" href="#operands_214" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20845,13 +21021,13 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Loads the value of a global containing a primitive value.</p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
+<h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="operands_213">Operands:<a class="headerlink" href="#operands_213" title="Permanent link">link</a></h5>
+<h5 id="operands_215">Operands:<a class="headerlink" href="#operands_215" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20889,13 +21065,13 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Loads the value of a global containing a primitive value.</p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
+<h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="operands_214">Operands:<a class="headerlink" href="#operands_214" title="Permanent link">link</a></h5>
+<h5 id="operands_216">Operands:<a class="headerlink" href="#operands_216" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20933,13 +21109,13 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Loads the value of a global containing a ref of the given type.</p>
 <p>Interfaces: <code>RefMoveInterface</code>, <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
+<h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
-<h5 id="operands_215">Operands:<a class="headerlink" href="#operands_215" title="Permanent link">link</a></h5>
+<h5 id="operands_217">Operands:<a class="headerlink" href="#operands_217" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -20977,7 +21153,7 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Loads the value of a global containing a ref of the given type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>RefMoveInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
+<h5 id="attributes_36">Attributes:<a class="headerlink" href="#attributes_36" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -21014,7 +21190,7 @@ replaced with a store or reset.
 Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
+<h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -21033,13 +21209,13 @@ Initialized to null unless an initial value is specified.</p>
 <p>Stores a primitive value value to a global.</p>
 <p>Traits: <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_36">Attributes:<a class="headerlink" href="#attributes_36" title="Permanent link">link</a></h5>
+<h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
 </table>
 
-<h5 id="operands_216">Operands:<a class="headerlink" href="#operands_216" title="Permanent link">link</a></h5>
+<h5 id="operands_218">Operands:<a class="headerlink" href="#operands_218" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21062,13 +21238,13 @@ Initialized to null unless an initial value is specified.</p>
 <p>Stores a primitive value value to a global.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
+<h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
 </table>
 
-<h5 id="operands_217">Operands:<a class="headerlink" href="#operands_217" title="Permanent link">link</a></h5>
+<h5 id="operands_219">Operands:<a class="headerlink" href="#operands_219" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21090,13 +21266,13 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a primitive value value to a global.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
+<h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
 </table>
 
-<h5 id="operands_218">Operands:<a class="headerlink" href="#operands_218" title="Permanent link">link</a></h5>
+<h5 id="operands_220">Operands:<a class="headerlink" href="#operands_220" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21118,13 +21294,13 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a primitive value value to a global.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
+<h5 id="attributes_41">Attributes:<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
 </table>
 
-<h5 id="operands_219">Operands:<a class="headerlink" href="#operands_219" title="Permanent link">link</a></h5>
+<h5 id="operands_221">Operands:<a class="headerlink" href="#operands_221" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21147,7 +21323,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Stores a primitive value to a global.</p>
 <p>Traits: <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>Util_GlobalStoreIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="operands_220">Operands:<a class="headerlink" href="#operands_220" title="Permanent link">link</a></h5>
+<h5 id="operands_222">Operands:<a class="headerlink" href="#operands_222" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21174,7 +21350,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Stores a primitive value to a global.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>Util_GlobalStoreIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="operands_221">Operands:<a class="headerlink" href="#operands_221" title="Permanent link">link</a></h5>
+<h5 id="operands_223">Operands:<a class="headerlink" href="#operands_223" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21200,7 +21376,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a primitive value to a global.</p>
 <p>Interfaces: <code>Util_GlobalStoreIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="operands_222">Operands:<a class="headerlink" href="#operands_222" title="Permanent link">link</a></h5>
+<h5 id="operands_224">Operands:<a class="headerlink" href="#operands_224" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21226,7 +21402,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a primitive value to a global.</p>
 <p>Interfaces: <code>Util_GlobalStoreIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="operands_223">Operands:<a class="headerlink" href="#operands_223" title="Permanent link">link</a></h5>
+<h5 id="operands_225">Operands:<a class="headerlink" href="#operands_225" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21252,7 +21428,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a ref<T> to a global, retaining it until the global is reset.</p>
 <p>Interfaces: <code>RefMoveInterface</code>, <code>Util_GlobalStoreIndirectOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="operands_224">Operands:<a class="headerlink" href="#operands_224" title="Permanent link">link</a></h5>
+<h5 id="operands_226">Operands:<a class="headerlink" href="#operands_226" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21278,13 +21454,13 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a ref<T> to a global, retaining it until the global is reset.</p>
 <p>Interfaces: <code>RefMoveInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code></p>
-<h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
+<h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
 </table>
 
-<h5 id="operands_225">Operands:<a class="headerlink" href="#operands_225" title="Permanent link">link</a></h5>
+<h5 id="operands_227">Operands:<a class="headerlink" href="#operands_227" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21307,7 +21483,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_226">Operands:<a class="headerlink" href="#operands_226" title="Permanent link">link</a></h5>
+<h5 id="operands_228">Operands:<a class="headerlink" href="#operands_228" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21344,7 +21520,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_227">Operands:<a class="headerlink" href="#operands_227" title="Permanent link">link</a></h5>
+<h5 id="operands_229">Operands:<a class="headerlink" href="#operands_229" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21382,7 +21558,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_228">Operands:<a class="headerlink" href="#operands_228" title="Permanent link">link</a></h5>
+<h5 id="operands_230">Operands:<a class="headerlink" href="#operands_230" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21424,7 +21600,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_229">Operands:<a class="headerlink" href="#operands_229" title="Permanent link">link</a></h5>
+<h5 id="operands_231">Operands:<a class="headerlink" href="#operands_231" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21465,7 +21641,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_230">Operands:<a class="headerlink" href="#operands_230" title="Permanent link">link</a></h5>
+<h5 id="operands_232">Operands:<a class="headerlink" href="#operands_232" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21506,7 +21682,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_231">Operands:<a class="headerlink" href="#operands_231" title="Permanent link">link</a></h5>
+<h5 id="operands_233">Operands:<a class="headerlink" href="#operands_233" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21547,7 +21723,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_232">Operands:<a class="headerlink" href="#operands_232" title="Permanent link">link</a></h5>
+<h5 id="operands_234">Operands:<a class="headerlink" href="#operands_234" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21588,7 +21764,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_233">Operands:<a class="headerlink" href="#operands_233" title="Permanent link">link</a></h5>
+<h5 id="operands_235">Operands:<a class="headerlink" href="#operands_235" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21629,7 +21805,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_234">Operands:<a class="headerlink" href="#operands_234" title="Permanent link">link</a></h5>
+<h5 id="operands_236">Operands:<a class="headerlink" href="#operands_236" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21674,7 +21850,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_235">Operands:<a class="headerlink" href="#operands_235" title="Permanent link">link</a></h5>
+<h5 id="operands_237">Operands:<a class="headerlink" href="#operands_237" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21720,7 +21896,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_236">Operands:<a class="headerlink" href="#operands_236" title="Permanent link">link</a></h5>
+<h5 id="operands_238">Operands:<a class="headerlink" href="#operands_238" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21762,7 +21938,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_237">Operands:<a class="headerlink" href="#operands_237" title="Permanent link">link</a></h5>
+<h5 id="operands_239">Operands:<a class="headerlink" href="#operands_239" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21804,7 +21980,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_238">Operands:<a class="headerlink" href="#operands_238" title="Permanent link">link</a></h5>
+<h5 id="operands_240">Operands:<a class="headerlink" href="#operands_240" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21846,7 +22022,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_239">Operands:<a class="headerlink" href="#operands_239" title="Permanent link">link</a></h5>
+<h5 id="operands_241">Operands:<a class="headerlink" href="#operands_241" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21888,7 +22064,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_240">Operands:<a class="headerlink" href="#operands_240" title="Permanent link">link</a></h5>
+<h5 id="operands_242">Operands:<a class="headerlink" href="#operands_242" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21930,7 +22106,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_241">Operands:<a class="headerlink" href="#operands_241" title="Permanent link">link</a></h5>
+<h5 id="operands_243">Operands:<a class="headerlink" href="#operands_243" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -21972,7 +22148,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_242">Operands:<a class="headerlink" href="#operands_242" title="Permanent link">link</a></h5>
+<h5 id="operands_244">Operands:<a class="headerlink" href="#operands_244" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22014,7 +22190,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_243">Operands:<a class="headerlink" href="#operands_243" title="Permanent link">link</a></h5>
+<h5 id="operands_245">Operands:<a class="headerlink" href="#operands_245" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22056,7 +22232,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_244">Operands:<a class="headerlink" href="#operands_244" title="Permanent link">link</a></h5>
+<h5 id="operands_246">Operands:<a class="headerlink" href="#operands_246" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22098,7 +22274,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>Commutative</code></p>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_245">Operands:<a class="headerlink" href="#operands_245" title="Permanent link">link</a></h5>
+<h5 id="operands_247">Operands:<a class="headerlink" href="#operands_247" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22139,7 +22315,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_246">Operands:<a class="headerlink" href="#operands_246" title="Permanent link">link</a></h5>
+<h5 id="operands_248">Operands:<a class="headerlink" href="#operands_248" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22180,7 +22356,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_247">Operands:<a class="headerlink" href="#operands_247" title="Permanent link">link</a></h5>
+<h5 id="operands_249">Operands:<a class="headerlink" href="#operands_249" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22221,7 +22397,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_248">Operands:<a class="headerlink" href="#operands_248" title="Permanent link">link</a></h5>
+<h5 id="operands_250">Operands:<a class="headerlink" href="#operands_250" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22262,7 +22438,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_249">Operands:<a class="headerlink" href="#operands_249" title="Permanent link">link</a></h5>
+<h5 id="operands_251">Operands:<a class="headerlink" href="#operands_251" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22303,7 +22479,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_250">Operands:<a class="headerlink" href="#operands_250" title="Permanent link">link</a></h5>
+<h5 id="operands_252">Operands:<a class="headerlink" href="#operands_252" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22344,7 +22520,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_251">Operands:<a class="headerlink" href="#operands_251" title="Permanent link">link</a></h5>
+<h5 id="operands_253">Operands:<a class="headerlink" href="#operands_253" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22387,7 +22563,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_252">Operands:<a class="headerlink" href="#operands_252" title="Permanent link">link</a></h5>
+<h5 id="operands_254">Operands:<a class="headerlink" href="#operands_254" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22429,7 +22605,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_253">Operands:<a class="headerlink" href="#operands_253" title="Permanent link">link</a></h5>
+<h5 id="operands_255">Operands:<a class="headerlink" href="#operands_255" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22471,7 +22647,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_254">Operands:<a class="headerlink" href="#operands_254" title="Permanent link">link</a></h5>
+<h5 id="operands_256">Operands:<a class="headerlink" href="#operands_256" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22509,7 +22685,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_255">Operands:<a class="headerlink" href="#operands_255" title="Permanent link">link</a></h5>
+<h5 id="operands_257">Operands:<a class="headerlink" href="#operands_257" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22547,7 +22723,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_256">Operands:<a class="headerlink" href="#operands_256" title="Permanent link">link</a></h5>
+<h5 id="operands_258">Operands:<a class="headerlink" href="#operands_258" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22585,7 +22761,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_257">Operands:<a class="headerlink" href="#operands_257" title="Permanent link">link</a></h5>
+<h5 id="operands_259">Operands:<a class="headerlink" href="#operands_259" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22623,7 +22799,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_258">Operands:<a class="headerlink" href="#operands_258" title="Permanent link">link</a></h5>
+<h5 id="operands_260">Operands:<a class="headerlink" href="#operands_260" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22665,7 +22841,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_259">Operands:<a class="headerlink" href="#operands_259" title="Permanent link">link</a></h5>
+<h5 id="operands_261">Operands:<a class="headerlink" href="#operands_261" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22707,7 +22883,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_260">Operands:<a class="headerlink" href="#operands_260" title="Permanent link">link</a></h5>
+<h5 id="operands_262">Operands:<a class="headerlink" href="#operands_262" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22749,7 +22925,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_261">Operands:<a class="headerlink" href="#operands_261" title="Permanent link">link</a></h5>
+<h5 id="operands_263">Operands:<a class="headerlink" href="#operands_263" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22790,9 +22966,10 @@ Initialized to null unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.alloc` operands attr-dict `:` `(` type($initial_capacity) `)` `-&gt;` type($result)
 </code></pre></div>
 <p>Allocates a new typed list with a minimum initial_capacity.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_262">Operands:<a class="headerlink" href="#operands_262" title="Permanent link">link</a></h5>
+<h5 id="operands_264">Operands:<a class="headerlink" href="#operands_264" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22828,10 +23005,10 @@ Initialized to null unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.get.f32` operands attr-dict `:` `(` type($list) `,` type($index) `)` `-&gt;` type($result)
 </code></pre></div>
 <p>Returns the value of the element at the given index.</p>
-<p>Traits: <code>VM_ExtF32</code></p>
+<p>Traits: <code>VM_ExtF32</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_263">Operands:<a class="headerlink" href="#operands_263" title="Permanent link">link</a></h5>
+<h5 id="operands_265">Operands:<a class="headerlink" href="#operands_265" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22871,10 +23048,10 @@ Initialized to null unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.get.f64` operands attr-dict `:` `(` type($list) `,` type($index) `)` `-&gt;` type($result)
 </code></pre></div>
 <p>Returns the value of the element at the given index.</p>
-<p>Traits: <code>VM_ExtF64</code></p>
+<p>Traits: <code>VM_ExtF64</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_264">Operands:<a class="headerlink" href="#operands_264" title="Permanent link">link</a></h5>
+<h5 id="operands_266">Operands:<a class="headerlink" href="#operands_266" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22914,9 +23091,10 @@ Initialized to null unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.get.i32` operands attr-dict `:` `(` type($list) `,` type($index) `)` `-&gt;` type($result)
 </code></pre></div>
 <p>Returns the value of the element at the given index.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_265">Operands:<a class="headerlink" href="#operands_265" title="Permanent link">link</a></h5>
+<h5 id="operands_267">Operands:<a class="headerlink" href="#operands_267" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22956,9 +23134,10 @@ Initialized to null unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.get.i64` operands attr-dict `:` `(` type($list) `,` type($index) `)` `-&gt;` type($result)
 </code></pre></div>
 <p>Returns the value of the element at the given index.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_266">Operands:<a class="headerlink" href="#operands_266" title="Permanent link">link</a></h5>
+<h5 id="operands_268">Operands:<a class="headerlink" href="#operands_268" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -22999,9 +23178,10 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Returns the ref value of the element at the given index. Note that the value
 may be null if the element is null or the type does not match.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>RefMoveInterface</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_267">Operands:<a class="headerlink" href="#operands_267" title="Permanent link">link</a></h5>
+<h5 id="operands_269">Operands:<a class="headerlink" href="#operands_269" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23042,9 +23222,10 @@ may be null if the element is null or the type does not match.</p>
 </code></pre></div>
 <p>Reserves storage for at least minimum_capacity elements. If the list already
 has at least the specified capacity the operation is ignored.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource, MemoryEffects::Read on ::mlir::SideEffects::DefaultResource, MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_268">Operands:<a class="headerlink" href="#operands_268" title="Permanent link">link</a></h5>
+<h5 id="operands_270">Operands:<a class="headerlink" href="#operands_270" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23071,9 +23252,10 @@ has at least the specified capacity the operation is ignored.</p>
 <p>Resizes the list to contain new_size elements. This will either truncate
 the list if the existing size is greater than new_size or extend the list
 with the default list value of 0 if storing primitives and null if refs.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_269">Operands:<a class="headerlink" href="#operands_269" title="Permanent link">link</a></h5>
+<h5 id="operands_271">Operands:<a class="headerlink" href="#operands_271" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23098,10 +23280,10 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.set.f32` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
 </code></pre></div>
 <p>Sets the element at the given index to the new value.</p>
-<p>Traits: <code>VM_ExtF32</code></p>
+<p>Traits: <code>VM_ExtF32</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_270">Operands:<a class="headerlink" href="#operands_270" title="Permanent link">link</a></h5>
+<h5 id="operands_272">Operands:<a class="headerlink" href="#operands_272" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23130,10 +23312,10 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.set.f64` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
 </code></pre></div>
 <p>Sets the element at the given index to the new value.</p>
-<p>Traits: <code>VM_ExtF64</code></p>
+<p>Traits: <code>VM_ExtF64</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_271">Operands:<a class="headerlink" href="#operands_271" title="Permanent link">link</a></h5>
+<h5 id="operands_273">Operands:<a class="headerlink" href="#operands_273" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23162,9 +23344,10 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.set.i32` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
 </code></pre></div>
 <p>Sets the element at the given index to the new value.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_272">Operands:<a class="headerlink" href="#operands_272" title="Permanent link">link</a></h5>
+<h5 id="operands_274">Operands:<a class="headerlink" href="#operands_274" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23193,9 +23376,10 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.set.i64` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
 </code></pre></div>
 <p>Sets the element at the given index to the new value.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_273">Operands:<a class="headerlink" href="#operands_273" title="Permanent link">link</a></h5>
+<h5 id="operands_275">Operands:<a class="headerlink" href="#operands_275" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23224,9 +23408,10 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.set.ref` operands attr-dict `:` `(` type($list) `,` type($index) `,` type($value) `)`
 </code></pre></div>
 <p>Sets the element at the given index to the new ref value (possibly null).</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>RefMoveInterface</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_274">Operands:<a class="headerlink" href="#operands_274" title="Permanent link">link</a></h5>
+<h5 id="operands_276">Operands:<a class="headerlink" href="#operands_276" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23255,9 +23440,10 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.list.size` operands attr-dict `:` `(` type($list) `)` `-&gt;` type($result)
 </code></pre></div>
 <p>Returns the current size of the list in elements.</p>
+<p>Traits: <code>VM_MayFail</code></p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_275">Operands:<a class="headerlink" href="#operands_275" title="Permanent link">link</a></h5>
+<h5 id="operands_277">Operands:<a class="headerlink" href="#operands_277" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23298,7 +23484,7 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_276">Operands:<a class="headerlink" href="#operands_276" title="Permanent link">link</a></h5>
+<h5 id="operands_278">Operands:<a class="headerlink" href="#operands_278" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23341,7 +23527,7 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_277">Operands:<a class="headerlink" href="#operands_277" title="Permanent link">link</a></h5>
+<h5 id="operands_279">Operands:<a class="headerlink" href="#operands_279" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23384,7 +23570,7 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>VMSerializableOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_278">Operands:<a class="headerlink" href="#operands_278" title="Permanent link">link</a></h5>
+<h5 id="operands_280">Operands:<a class="headerlink" href="#operands_280" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -23420,7 +23606,7 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <p>Specifies an exported function with an externally-visible alias. Multiple
 exports can reference the same internal functions.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code></p>
-<h5 id="attributes_41">Attributes:<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h5>
+<h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_ref</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
@@ -23434,7 +23620,7 @@ exports can reference the same internal functions.</p>
 All flow control is performed by VM ops.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
+<h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
@@ -23454,7 +23640,7 @@ imports from the module will become the required minimum version at runtime.</p>
 <p>Optional imports not present at runtime will be invalid to call and whether
 they were resolved can be queried with <code>vm.import.resolved</code>.</p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
+<h5 id="attributes_45">Attributes:<a class="headerlink" href="#attributes_45" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -23474,7 +23660,7 @@ Must not load any globals that are defined or initialized after it in the
 module.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
-<h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
+<h5 id="attributes_46">Attributes:<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
@@ -23493,7 +23679,7 @@ module.</p>
 <p>Top-level container for VM functions.</p>
 <p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::VM::ModuleTerminatorOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code></p>
 <p>Interfaces: <code>Symbol</code></p>
-<h5 id="attributes_45">Attributes:<a class="headerlink" href="#attributes_45" title="Permanent link">link</a></h5>
+<h5 id="attributes_47">Attributes:<a class="headerlink" href="#attributes_47" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -23508,7 +23694,7 @@ module.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.module_terminator` attr-dict
 </code></pre></div>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>Terminator</code></p>
-<h2 id="attributes_46">Attributes<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h2>
+<h2 id="attributes_48">Attributes<a class="headerlink" href="#attributes_48" title="Permanent link">link</a></h2>
 <h3 id="ordinalcountsattr">OrdinalCountsAttr<a class="headerlink" href="#ordinalcountsattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#vm.ordinal_counts&lt;
@@ -24130,6 +24316,16 @@ module.</p>
 <td style="text-align: center;">Yield</td>
 <td style="text-align: center;"><code>93</code></td>
 <td>Yield</td>
+</tr>
+<tr>
+<td style="text-align: center;">CallYieldable</td>
+<td style="text-align: center;"><code>135</code></td>
+<td>CallYieldable</td>
+</tr>
+<tr>
+<td style="text-align: center;">CallVariadicYieldable</td>
+<td style="text-align: center;"><code>136</code></td>
+<td>CallVariadicYieldable</td>
 </tr>
 <tr>
 <td style="text-align: center;">Trace</td>
