@@ -10,3 +10,4 @@ requests>=2.28.0
 wheel>=0.36.2
 sympy==1.12.1
 ml_dtypes>=0.5.1
+pytest

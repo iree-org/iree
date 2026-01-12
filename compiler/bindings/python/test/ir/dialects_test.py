@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import pytest
 from iree.compiler import ir
 
 
@@ -71,13 +72,13 @@ def get_index_array_attr(vals: list[int]) -> ir.ArrayAttr:
     return ir.ArrayAttr.get([get_index_attr(val) for val in vals])
 
 
-def run(fn):
+# Pytest fixture to set up IR context for each test.
+@pytest.fixture(autouse=True)
+def ir_context():
     with ir.Context(), ir.Location.unknown():
         module = ir.Module.create()
         with ir.InsertionPoint(module.body):
-            print("\nTEST:", fn.__name__)
-            fn()
-    return fn
+            yield
 
 
 # ======================================================================
@@ -85,8 +86,7 @@ def run(fn):
 # ======================================================================
 
 
-@run
-def codegen_dispatch_lowering_pass_pipeline():
+def test_codegen_dispatch_lowering_pass_pipeline():
     pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
         iree_codegen.DispatchLoweringPassPipeline.LLVMGPUTileAndFuse
     )
@@ -101,8 +101,7 @@ def codegen_dispatch_lowering_pass_pipeline():
     assert "LLVMGPUTileAndFuse" in str(pipeline_attr)
 
 
-@run
-def codegen_translation_info_minimal():
+def test_codegen_translation_info_minimal():
     pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
         iree_codegen.DispatchLoweringPassPipeline.None_
     )
@@ -116,8 +115,7 @@ def codegen_translation_info_minimal():
     assert translation_info.configuration is None
 
 
-@run
-def codegen_translation_info_with_sizes():
+def test_codegen_translation_info_with_sizes():
     pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
         iree_codegen.DispatchLoweringPassPipeline.Custom
     )
@@ -132,8 +130,7 @@ def codegen_translation_info_with_sizes():
     assert translation_info.configuration is None
 
 
-@run
-def codegen_translation_info_full():
+def test_codegen_translation_info_full():
     pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
         iree_codegen.DispatchLoweringPassPipeline.TransformDialectCodegen
     )
@@ -155,8 +152,7 @@ def codegen_translation_info_full():
 # ======================================================================
 
 
-@run
-def gpu_pipeline_options_attr():
+def test_gpu_pipeline_options_attr():
     reorder_attr = iree_gpu.ReorderWorkgroupsStrategyAttr.get(
         iree_gpu.ReorderWorkgroupsStrategy.Transpose
     )
@@ -232,8 +228,7 @@ def gpu_pipeline_options_attr():
     )
 
 
-@run
-def mma_intrinsic_attr():
+def test_mma_intrinsic_attr():
     mma_intrinsic_attr = iree_gpu.MMAIntrinsicAttr.get(
         iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16
     )
@@ -292,8 +287,7 @@ def mma_intrinsic_attr():
     assert virtual_mma_intrinsics == []
 
 
-@run
-def virtual_mma_intrinsic_attr():
+def test_virtual_mma_intrinsic_attr():
     virtual_mma_intrinsic_attr = iree_gpu.VirtualMMAIntrinsicAttr.get(
         iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16
     )
@@ -350,8 +344,7 @@ def virtual_mma_intrinsic_attr():
     assert virtual_mma_intrinsic_attr.mma == virtual_mma_attr
 
 
-@run
-def lowering_config_attr():
+def test_lowering_config_attr():
     attributes = ir.DictAttr.get(
         {
             "reduction": get_index_array_attr([]),
@@ -388,8 +381,7 @@ def lowering_config_attr():
     )
 
 
-@run
-def compilation_info():
+def test_compilation_info():
     attributes = ir.DictAttr.get({"reduction": get_index_array_attr([])})
     lowering_config = iree_gpu.LoweringConfigAttr.get(attributes)
     pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
@@ -405,8 +397,7 @@ def compilation_info():
     assert compilation_info.translation_info == translation_info
 
 
-@run
-def gpu_target_info_attribute_parsing():
+def test_gpu_target_info_attribute_parsing():
     mlir_string = """
     hal.executable private @main_dispatch_0 {
         hal.executable.variant public @rocm_hsaco_fb
@@ -446,54 +437,36 @@ def gpu_target_info_attribute_parsing():
     gpu_target_info = iree_gpu.TargetInfo.get_gpu_target_info(target)
 
     arch = gpu_target_info.arch
-    assert arch == "gfx942", f"Expected arch 'gfx942', got '{arch}'"
+    assert arch == "gfx942"
 
     workgroup_count = gpu_target_info.workgroup_count
     simds_per_workgroup = gpu_target_info.simds_per_workgroup
-    assert (
-        workgroup_count == 304
-    ), f"Expected workgroup_count 304, got {workgroup_count}"
-    assert (
-        simds_per_workgroup == 4
-    ), f"Expected simds_per_workgroup 4, got {simds_per_workgroup}"
+    assert workgroup_count == 304
+    assert simds_per_workgroup == 4
 
     subgroup_size_choices = gpu_target_info.subgroup_size_choices
-    assert subgroup_size_choices == [
-        32,
-        64,
-    ], f"Expected subgroup_size_choice [32, 64], got {subgroup_size_choices}"
+    assert subgroup_size_choices == [32, 64]
 
     max_thread_count = gpu_target_info.max_thread_count_per_workgroup
-    assert (
-        max_thread_count == 1024
-    ), f"Expected max_thread_count_per_workgroup 1024, got {max_thread_count}"
+    assert max_thread_count == 1024
 
     max_memory_bytes = gpu_target_info.max_workgroup_memory_bytes
-    assert (
-        max_memory_bytes == 65536
-    ), f"Expected max_workgroup_memory_bytes 65536, got {max_memory_bytes}"
+    assert max_memory_bytes == 65536
 
     max_workgroup_sizes = gpu_target_info.max_workgroup_sizes
-    assert max_workgroup_sizes == [
-        256,
-        512,
-        1024,
-    ], f"Expected max_workgroup_sizes [256, 512, 1024], got {max_workgroup_sizes}"
+    assert max_workgroup_sizes == [256, 512, 1024]
 
     mma_intrinsics = gpu_target_info.mma_intrinsics
     assert mma_intrinsics == [
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
         iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
-    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {mma_intrinsics}"
+    ]
 
 
-@run
-def gpu_target_info_constructor():
-    context = ir.Context()
-
+def test_gpu_target_info_constructor():
     target_info = iree_gpu.TargetInfo(
-        context=context,
+        context=ir.Context.current,
         arch="gfx942",
         subgroup_size_choices=[32, 64],
         max_workgroup_sizes=[256, 512, 1024],
@@ -508,49 +481,29 @@ def gpu_target_info_constructor():
         ],
     )
 
-    assert (
-        target_info.arch == "gfx942"
-    ), f"Expected arch 'gfx942', got '{target_info.arch}'"
-    assert target_info.subgroup_size_choices == [
-        32,
-        64,
-    ], f"Expected subgroup_size_choices [32, 64], got {target_info.subgroup_size_choices}"
-    assert target_info.max_workgroup_sizes == [
-        256,
-        512,
-        1024,
-    ], f"Expected max_workgroup_sizes [256, 512, 1024], got {target_info.max_workgroup_sizes}"
-    assert (
-        target_info.max_thread_count_per_workgroup == 1024
-    ), f"Expected max_thread_count_per_workgroup 1024, got {target_info.max_thread_count_per_workgroup}"
-    assert (
-        target_info.max_workgroup_memory_bytes == 65536
-    ), f"Expected max_workgroup_memory_bytes 65536, got {target_info.max_workgroup_memory_bytes}"
-    assert (
-        target_info.workgroup_count == 304
-    ), f"Expected workgroup_count 304, got {target_info.workgroup_count}"
-    assert (
-        target_info.simds_per_workgroup == 4
-    ), f"Expected simds_per_workgroup 4, got {target_info.simds_per_workgroup}"
+    assert target_info.arch == "gfx942"
+    assert target_info.subgroup_size_choices == [32, 64]
+    assert target_info.max_workgroup_sizes == [256, 512, 1024]
+    assert target_info.max_thread_count_per_workgroup == 1024
+    assert target_info.max_workgroup_memory_bytes == 65536
+    assert target_info.workgroup_count == 304
+    assert target_info.simds_per_workgroup == 4
     mma_intrinsics = target_info.mma_intrinsics
     assert mma_intrinsics == [
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
         iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
-    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {mma_intrinsics}"
+    ]
 
     assert isinstance(mma_intrinsics[0], iree_gpu.MMAIntrinsic)
     assert isinstance(mma_intrinsics[1], iree_gpu.MMAIntrinsic)
     assert isinstance(mma_intrinsics[2], iree_gpu.VirtualMMAIntrinsic)
 
 
-@run
-def gpu_target_info_constructor_error_cases():
-    context = ir.Context()
-
-    try:
+def test_gpu_target_info_constructor_error_cases():
+    with pytest.raises(TypeError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch=123,  # should be string.
             subgroup_size_choices=[32, 64],
             max_workgroup_sizes=[256, 512, 1024],
@@ -560,13 +513,10 @@ def gpu_target_info_constructor_error_cases():
             simds_per_workgroup=4,
             mma_intrinsics=[],
         )
-        assert False, "Expected TypeError for wrong arch type"
-    except TypeError:
-        pass
 
-    try:
+    with pytest.raises(TypeError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch="gfx942",
             subgroup_size_choices=[64.0],  # should be list of int.
             max_workgroup_sizes=[256, 512, 1024],
@@ -576,13 +526,10 @@ def gpu_target_info_constructor_error_cases():
             simds_per_workgroup=4,
             mma_intrinsics=[],
         )
-        assert False, "Expected TypeError for wrong subgroup_size_choices type"
-    except TypeError:
-        pass
 
-    try:
+    with pytest.raises(TypeError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch="gfx942",
             subgroup_size_choices=[32, 64],
             max_workgroup_sizes=[256.0, 512, 1024],  # should be list of int.
@@ -592,13 +539,10 @@ def gpu_target_info_constructor_error_cases():
             simds_per_workgroup=4,
             mma_intrinsics=[],
         )
-        assert False, "Expected TypeError for wrong max_workgroup_sizes type"
-    except TypeError:
-        pass
 
-    try:
+    with pytest.raises(TypeError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch="gfx942",
             subgroup_size_choices=[32, 64],
             max_workgroup_sizes=[256, 512, 1024],
@@ -608,13 +552,10 @@ def gpu_target_info_constructor_error_cases():
             simds_per_workgroup=4,
             mma_intrinsics=[],
         )
-        assert False, "Expected TypeError for wrong max_thread_count_per_workgroup type"
-    except TypeError:
-        pass
 
-    try:
+    with pytest.raises(TypeError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch="gfx942",
             subgroup_size_choices=[32, 64],
             max_workgroup_sizes=[256, 512, 1024],
@@ -624,13 +565,10 @@ def gpu_target_info_constructor_error_cases():
             simds_per_workgroup=4,
             mma_intrinsics=[],
         )
-        assert False, "Expected TypeError for wrong max_workgroup_memory_bytes type"
-    except TypeError:
-        pass
 
-    try:
+    with pytest.raises(TypeError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch="gfx942",
             subgroup_size_choices=[32, 64],
             max_workgroup_sizes=[256, 512, 1024],
@@ -640,13 +578,10 @@ def gpu_target_info_constructor_error_cases():
             simds_per_workgroup=4,
             mma_intrinsics=[],
         )
-        assert False, "Expected TypeError for wrong workgroup_count type"
-    except TypeError:
-        pass
 
-    try:
+    with pytest.raises(ValueError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch="gfx942",
             subgroup_size_choices=[32, 64],
             max_workgroup_sizes=[256, 512, 1024],
@@ -656,13 +591,10 @@ def gpu_target_info_constructor_error_cases():
             simds_per_workgroup=4,
             mma_intrinsics=[],
         )
-        assert False, "Expected ValueError for negative workgroup_count"
-    except ValueError:
-        pass
 
-    try:
+    with pytest.raises(TypeError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch="gfx942",
             subgroup_size_choices=[32, 64],
             max_workgroup_sizes=[256, 512, 1024],
@@ -672,13 +604,10 @@ def gpu_target_info_constructor_error_cases():
             simds_per_workgroup=4.0,  # Should be int.
             mma_intrinsics=[],
         )
-        assert False, "Expected TypeError for wrong simds_per_workgroup type"
-    except TypeError:
-        pass
 
-    try:
+    with pytest.raises(TypeError):
         iree_gpu.TargetInfo(
-            context=context,
+            context=ir.Context.current,
             arch="gfx942",
             subgroup_size_choices=[32, 64],
             max_workgroup_sizes=[256, 512, 1024],
@@ -686,9 +615,6 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_memory_bytes=65536,
             mma_intrinsics=[123],  # should be MMA intrinsic objects.
         )
-        assert False, "Expected TypeError for wrong MMA intrinsic object type"
-    except TypeError:
-        pass
 
 
 # ======================================================================
@@ -707,8 +633,7 @@ def iree_tensor_ext_smoke_test():
 # ======================================================================
 
 
-@run
-def preprocessing_transform_match_contraction_in_named_sequence():
+def test_preprocessing_transform_match_contraction_in_named_sequence():
     module_op = ir.Module.create()
     module_op.operation.attributes["transform.with_named_sequence"] = ir.UnitAttr.get()
     map_lhs = ir.AffineMap.get(
@@ -752,8 +677,7 @@ def preprocessing_transform_match_contraction_in_named_sequence():
     assert "indexing_maps = [#map, #map1, #map2]" in module_str
 
 
-@run
-def preprocessing_transform_match_convolution_in_named_sequence():
+def test_preprocessing_transform_match_convolution_in_named_sequence():
     module_op = ir.Module.create()
     module_op.operation.attributes["transform.with_named_sequence"] = ir.UnitAttr.get()
 
@@ -825,8 +749,7 @@ def preprocessing_transform_match_convolution_in_named_sequence():
     assert "indexing_maps = [#map, #map1, #map2]" in module_str
 
 
-@run
-def preprocessing_transform_match_attention_in_named_sequence():
+def test_preprocessing_transform_match_attention_in_named_sequence():
     module_op = ir.Module.create()
     module_op.operation.attributes["transform.with_named_sequence"] = ir.UnitAttr.get()
     map_query = ir.AffineMap.get(
