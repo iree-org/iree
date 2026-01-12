@@ -1,0 +1,31 @@
+// RUN: iree-tokenize %p/iree-tokenize.json "hello world" | \
+// RUN:   FileCheck %s --check-prefix=BASIC
+// RUN: iree-tokenize %p/iree-tokenize.json --no_special "hello" | \
+// RUN:   FileCheck %s --check-prefix=NOSPEC
+// RUN: iree-tokenize %p/iree-tokenize.json "日本語テスト" | \
+// RUN:   FileCheck %s --check-prefix=UNICODE
+// RUN: iree-tokenize %p/iree-tokenize.json --info | \
+// RUN:   FileCheck %s --check-prefix=INFO
+// RUN: echo "hello" | iree-tokenize %p/iree-tokenize.json --batch | \
+// RUN:   FileCheck %s --check-prefix=BATCH
+// RUN: iree-tokenize %p/iree-tokenize.json --decode "0,5,6,1" | \
+// RUN:   FileCheck %s --check-prefix=DECODE
+
+// Basic encoding with special tokens.
+// BASIC: {"ids":[0,5,6,1]}
+
+// Encoding without special tokens.
+// NOSPEC: {"ids":[5]}
+
+// Unicode (Japanese) encoding: CJK chars split individually, katakana as word.
+// UNICODE: {"ids":[0,9,10,11,12,1]}
+
+// Tokenizer info.
+// INFO: "vocab_size":13
+// INFO: "model_type":"WordPiece"
+
+// Batch mode from stdin.
+// BATCH: {"ids":[0,5,1]}
+
+// Decoding back to text.
+// DECODE: {"text":"[CLS] hello world [SEP]"}

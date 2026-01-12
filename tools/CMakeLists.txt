@@ -257,6 +257,22 @@ iree_cc_binary(
   INSTALL_COMPONENT IREETools-Runtime
 )
 
+iree_cc_binary(
+  NAME
+    iree-tokenize
+  SRCS
+    "iree-tokenize-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::base::internal::unicode
+    iree::io::file_handle
+    iree::tokenizer::tokenizer
+    iree::tokenizer::huggingface::tokenizer_json
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
 if(IREE_BUILD_COMPILER)
   if(IREE_LLVM_LINK_TARGET)
     install(
