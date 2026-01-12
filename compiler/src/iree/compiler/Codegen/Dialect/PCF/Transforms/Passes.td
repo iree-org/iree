@@ -110,4 +110,29 @@ def LowerStructuralPCFPass : Pass<"iree-pcf-lower-structural-pcf", ""> {
                            "::mlir::cf::ControlFlowDialect"];
 }
 
+def ConvertSRefToMemRefPass : Pass<"iree-pcf-convert-sref-to-memref", ""> {
+  let summary = "Converts pcf.sref types to concrete memref types";
+  let description = [{
+    Converts `pcf.sref` (shaped reference) types to `memref` types with
+    appropriate layouts and memory spaces derived from the scope attribute.
+    After this pass, there are no remaining results tied to PCF parallel ops.
+    All `pcf.sref` types are converted to concrete `memref` types, preparing
+    the IR for structural lowering of PCF ops to SCF/CF.
+
+    The input is expected to be bufferized IR where tied inputs to parallel
+    ops are already `memref` types. Layouts are derived from these parallel op
+    tied inputs and propagated via dataflow analysis.
+
+    Op conversions:
+    - `pcf.alloc` -> `memref.alloc`
+    - `pcf.write_slice` -> `memref.subview` + `memref.copy` or `vector.transfer_write`
+    - `pcf.read_slice` -> `memref.subview` + `vector.transfer_read`
+    - `pcf.generic`/`pcf.loop` region arguments become the tied memref inputs
+  }];
+  let dependentDialects = ["::mlir::iree_compiler::IREE::PCF::PCFDialect",
+                           "::mlir::arith::ArithDialect",
+                           "::mlir::memref::MemRefDialect",
+                           "::mlir::vector::VectorDialect"];
+}
+
 #endif // IREE_CODEGEN_DIALECT_PCF_TRANSFORMS_PASSES
