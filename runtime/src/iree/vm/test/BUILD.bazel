@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
@@ -59,6 +59,25 @@ iree_c_embed_data(
     c_file_output = "all_bytecode_modules.c",
     flatten = True,
     h_file_output = "all_bytecode_modules.h",
+)
+
+iree_c_embed_data(
+    name = "async_bytecode_modules_c",
+    srcs = [
+        ":async_ops.vmfb",
+    ],
+    c_file_output = "async_bytecode_modules.c",
+    flatten = True,
+    h_file_output = "async_bytecode_modules.h",
+)
+
+iree_runtime_cc_library(
+    name = "async_ops_test_module",
+    hdrs = ["async_ops_test_module.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/vm",
+    ],
 )
 
 iree_bytecode_module(
@@ -124,6 +143,14 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "assignment_ops_i64",
     src = "assignment_ops_i64.mlir",
+    flags = [
+        "--compile-mode=vm",
+    ],
+)
+
+iree_bytecode_module(
+    name = "async_ops",
+    src = "async_ops.mlir",
     flags = [
         "--compile-mode=vm",
     ],
@@ -298,24 +325,6 @@ iree_bytecode_module(
 iree_bytecode_module(
     name = "shift_ops_i64",
     src = "shift_ops_i64.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
-)
-
-iree_c_embed_data(
-    name = "async_bytecode_modules_c",
-    srcs = [
-        ":async_ops.vmfb",
-    ],
-    c_file_output = "async_bytecode_modules.c",
-    flatten = True,
-    h_file_output = "async_bytecode_modules.h",
-)
-
-iree_bytecode_module(
-    name = "async_ops",
-    src = "async_ops.mlir",
     flags = [
         "--compile-mode=vm",
     ],

@@ -68,6 +68,12 @@ public:
   }
 };
 
+template <typename ConcreteType>
+class MayFail : public OpTrait::TraitBase<ConcreteType, MayFail> {
+public:
+  static LogicalResult verifyTrait(Operation *op) { return success(); }
+};
+
 } // namespace mlir::OpTrait::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_IR_VMTRAITS_H_

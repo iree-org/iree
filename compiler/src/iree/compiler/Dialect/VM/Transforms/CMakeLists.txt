@@ -17,7 +17,9 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   SRCS
+    "AnnotateFunctions.cpp"
     "Conversion.cpp"
+    "ConvertToYieldableCalls.cpp"
     "DeduplicateRodata.cpp"
     "DropEmptyModuleInitializers.cpp"
     "DropUnusedCalls.cpp"

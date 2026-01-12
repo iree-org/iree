@@ -80,6 +80,9 @@ public:
                                      Operation::operand_range operands,
                                      int successorIndex) = 0;
 
+  // Encodes just a branch target (PC offset) without operand mappings.
+  virtual LogicalResult encodeBranchTarget(Block *targetBlock) = 0;
+
   // Encodes a branch table.
   virtual LogicalResult encodeBranchTable(SuccessorRange caseSuccessors,
                                           OperandRangeRange caseOperands,
@@ -102,6 +105,10 @@ public:
 
   // Encodes a variable list of results (by reference), including a count.
   virtual LogicalResult encodeResults(Operation::result_range values) = 0;
+
+  // Encodes result destination registers from successor block arguments.
+  // Used for operations like CallYieldable where call results go to block args.
+  virtual LogicalResult encodeBlockArgResults(Block *targetBlock) = 0;
 
   // Returns the register allocation analysis, if available.
   // Bytecode encoder provides this; other encoders (e.g., EmitC) return

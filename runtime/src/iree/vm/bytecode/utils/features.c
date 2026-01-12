@@ -10,6 +10,8 @@
 static const iree_bitfield_string_mapping_t iree_vm_bytecode_feature_mappings[] = {
   {iree_vm_FeatureBits_EXT_F32, IREE_SVL("EXT_F32")},
   {iree_vm_FeatureBits_EXT_F64, IREE_SVL("EXT_F64")},
+  {iree_vm_FeatureBits_YIELD, IREE_SVL("YIELD")},
+  {iree_vm_FeatureBits_UNWIND, IREE_SVL("UNWIND")},
 };
 // clang-format on
 
@@ -28,6 +30,11 @@ iree_vm_FeatureBits_enum_t iree_vm_bytecode_available_features(void) {
 #if IREE_VM_EXT_F64_ENABLE
   result |= iree_vm_FeatureBits_EXT_F64;
 #endif  // IREE_VM_EXT_F64_ENABLE
+  // Execution and unwinding are core runtime capabilities; keep these enabled
+  // so that function requirements can communicate behavioral constraints to
+  // tools (C export/JIT/etc) without feature mismatch failures.
+  result |= iree_vm_FeatureBits_YIELD;
+  result |= iree_vm_FeatureBits_UNWIND;
   return result;
 }
 
