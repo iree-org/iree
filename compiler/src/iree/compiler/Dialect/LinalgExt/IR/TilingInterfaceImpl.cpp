@@ -1722,9 +1722,10 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
     ArrayRef<OpFoldResult> sizes,
     const llvm::SetVector<unsigned> &reductionDims,
     ArrayRef<OpFoldResult> splitReductionIvs) {
-  if (strategy != ReductionTilingStrategy::PartialReductionOuterParallel) {
-    return failure();
-  }
+  assert(
+      (strategy == ReductionTilingStrategy::PartialReductionOuterParallel ||
+       strategy == ReductionTilingStrategy::PartialReductionOuterReduction) &&
+      "Unexpected partial reduction tiling strategy");
 
   OpBuilder::InsertionGuard guard(b);
 
@@ -1742,7 +1743,6 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
   SmallVector<Operation *> slices;
   SmallVector<Value> tiledOperands;
 
-  // Extract a slice of the input operand.
   SmallVector<OpFoldResult> strides(rank, b.getIndexAttr(1));
   Operation *inputSlice =
       getSlice(b, loc, getInputValue(), offsets, sizes, strides);
@@ -1757,53 +1757,179 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
     slices.push_back(inputIndexSlice);
   }
 
-  // Extract slices of the init operands (partial results). For split-reduction,
-  // slice along the reduction dimension to get extra parallelism.
-  SmallVector<OpFoldResult> initOffsets, initSizes, initStrides;
-  for (int64_t i = 0; i < rank; ++i) {
-    if (i == reductionDim) {
-      initOffsets.push_back(splitReductionIvs[0]);
-      initSizes.push_back(b.getIndexAttr(1));
-    } else {
-      // For non-reduction dimensions, use the same offsets/sizes as input.
-      initOffsets.push_back(offsets[i]);
-      initSizes.push_back(sizes[i]);
+  // The two strategies handle partial results differently. For arg_compare on
+  // tensor<64x4096xf32> with reduction dim=1 and tile_size=128 (32 chunks):
+  // - OuterReduction: Partial results are tensor<64x128xf32>,
+  // tensor<64x128xi32>
+  //   (tile shape). Uses scf.for iter_args to accumulate across iterations.
+  // - OuterParallel: Partial results are tensor<64x32xf32>, tensor<64x32xi32>
+  //   (one slot per chunk). Uses scf.forall with parallel_insert_slice.
+  Value initValResult, initIdxResult;
+  if (strategy == ReductionTilingStrategy::PartialReductionOuterReduction) {
+    initValResult = init[0];
+    initIdxResult = init[1];
+  } else {
+    SmallVector<OpFoldResult> initOffsets, initSizes, initStrides;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (i == reductionDim) {
+        initOffsets.push_back(splitReductionIvs[0]);
+        initSizes.push_back(b.getIndexAttr(1));
+      } else {
+        initOffsets.push_back(offsets[i]);
+        initSizes.push_back(sizes[i]);
+      }
+      initStrides.push_back(b.getIndexAttr(1));
     }
-    initStrides.push_back(b.getIndexAttr(1));
+
+    SmallVector<int64_t> resultShape;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (i == reductionDim) {
+        continue;
+      }
+      if (auto sizeAttr = dyn_cast<Attribute>(initSizes[i])) {
+        resultShape.push_back(cast<IntegerAttr>(sizeAttr).getInt());
+      } else {
+        resultShape.push_back(ShapedType::kDynamic);
+      }
+    }
+
+    auto sliceValResultType =
+        cast<RankedTensorType>(getOutputValueType().clone(resultShape));
+    auto sliceIdxResultType =
+        cast<RankedTensorType>(getOutputIndexType().clone(resultShape));
+
+    auto initValSlice =
+        tensor::ExtractSliceOp::create(b, loc, sliceValResultType, init[0],
+                                       initOffsets, initSizes, initStrides);
+    initValResult = initValSlice.getResult();
+    slices.push_back(initValSlice);
+
+    auto initIdxSlice =
+        tensor::ExtractSliceOp::create(b, loc, sliceIdxResultType, init[1],
+                                       initOffsets, initSizes, initStrides);
+    initIdxResult = initIdxSlice.getResult();
+    slices.push_back(initIdxSlice);
   }
 
-  SmallVector<int64_t> resultValShape, resultIdxShape;
-  for (int64_t i = 0; i < rank; ++i) {
-    if (i == reductionDim) {
-      continue;
+  // OuterReduction requires a different IR structure than OuterParallel. We
+  // cannot use a tiled ArgCompareOp because each iteration must compare the
+  // new tile against the accumulated result, not perform an independent
+  // reduction. Instead, we emit a linalg.generic that applies the comparator
+  // elementwise and updates both value and index accumulators.
+  if (strategy == ReductionTilingStrategy::PartialReductionOuterReduction) {
+    Value tileInput = tiledOperands[0];
+
+    // For explicit-index mode with OuterReduction, we can directly use a
+    // tiled ArgCompareOp since indices are provided explicitly.
+    if (isExplicitIndexMode) {
+      tiledOperands.push_back(initValResult);
+      tiledOperands.push_back(initIdxResult);
+
+      SmallVector<Type, 2> resultTypes;
+      if (hasPureTensorSemantics()) {
+        resultTypes = {initValResult.getType(), initIdxResult.getType()};
+      }
+
+      // Explicit-index mode: 2 inputs (value + index), no index_base.
+      ArgCompareOp tiledArgmaxOp = ArgCompareOp::create(
+          b, loc, resultTypes,
+          /*inputs=*/ValueRange{tiledOperands[0], tiledOperands[1]},
+          /*outputs=*/ValueRange{tiledOperands[2], tiledOperands[3]},
+          /*indexBase=*/nullptr, /*dimension=*/reductionDim);
+
+      Region &targetRegion = tiledArgmaxOp.getRegion();
+      Region &sourceRegion = getRegion();
+      IRMapping mapper;
+      sourceRegion.cloneInto(&targetRegion, mapper);
+
+      return TilingResult{
+          {tiledArgmaxOp}, SmallVector<Value>(tiledArgmaxOp->getResults()),
+          slices};
     }
 
-    std::optional<int64_t> size = getConstantIntValue(initSizes[i]);
-    resultValShape.push_back(size.value_or(ShapedType::kDynamic));
-    resultIdxShape.push_back(size.value_or(ShapedType::kDynamic));
+    // For implicit-index mode with OuterReduction, we emit a linalg.generic
+    // that applies the comparator elementwise and updates both value and
+    // index accumulators.
+    // All operands use identity maps: 1 input + 2 outputs (value, index).
+    AffineMap identityMap =
+        AffineMap::getMultiDimIdentityMap(rank, b.getContext());
+    SmallVector<AffineMap> indexingMaps(3, identityMap);
+    SmallVector<utils::IteratorType> iterators(rank,
+                                               utils::IteratorType::parallel);
+
+    auto genericOp = linalg::GenericOp::create(
+        b, loc, TypeRange{initValResult.getType(), initIdxResult.getType()},
+        ValueRange{tileInput}, ValueRange{initValResult, initIdxResult},
+        indexingMaps, iterators,
+        [this, reductionDim, &offsets](OpBuilder &nestedBuilder,
+                                       Location nestedLoc, ValueRange args) {
+          Value newVal = args[0];
+          Value accVal = args[1];
+          Value accIdx = args[2];
+
+          // Track the global index for each element so we can record which
+          // position held the selected value.
+          Value localIdx =
+              linalg::IndexOp::create(nestedBuilder, nestedLoc, reductionDim);
+          Value offsetVal = getValueOrCreateConstantIndexOp(
+              nestedBuilder, nestedLoc, offsets[reductionDim]);
+          Value globalIdx = arith::AddIOp::create(nestedBuilder, nestedLoc,
+                                                  offsetVal, localIdx);
+
+          if (Value indexBase = getIndexBase()) {
+            globalIdx = arith::AddIOp::create(nestedBuilder, nestedLoc,
+                                              indexBase, globalIdx);
+          }
+
+          // The index type in the output may differ from the index type used
+          // internally, so cast if necessary.
+          Type idxElemType = accIdx.getType();
+          Value newIdx = globalIdx;
+          if (!idxElemType.isIndex()) {
+            newIdx = arith::IndexCastOp::create(nestedBuilder, nestedLoc,
+                                                idxElemType, globalIdx);
+          }
+
+          // Apply the user-defined comparison logic to decide whether the new
+          // value should replace the accumulated value.
+          Block &originalBlock = getRegion().front();
+          IRMapping mapper;
+          mapper.map(originalBlock.getArgument(0), newVal);
+          mapper.map(originalBlock.getArgument(1), accVal);
+
+          for (Operation &op : originalBlock) {
+            if (op.hasTrait<OpTrait::IsTerminator>()) {
+              break;
+            }
+            nestedBuilder.clone(op, mapper);
+          }
+
+          Value predicate =
+              mapper.lookup(originalBlock.getTerminator()->getOperand(0));
+
+          Value selectedVal = arith::SelectOp::create(
+              nestedBuilder, nestedLoc, predicate, newVal, accVal);
+          Value selectedIdx = arith::SelectOp::create(
+              nestedBuilder, nestedLoc, predicate, newIdx, accIdx);
+
+          linalg::YieldOp::create(nestedBuilder, nestedLoc,
+                                  ValueRange{selectedVal, selectedIdx});
+        });
+
+    return TilingResult{
+        {genericOp}, SmallVector<Value>(genericOp->getResults()), slices};
   }
 
-  RankedTensorType sliceValResultType =
-      cast<RankedTensorType>(getOutputValueType().clone(resultValShape));
-  RankedTensorType sliceIdxResultType =
-      cast<RankedTensorType>(getOutputIndexType().clone(resultIdxShape));
-
-  auto initValSlice = tensor::ExtractSliceOp::create(
-      b, loc, sliceValResultType, init[0], initOffsets, initSizes, initStrides);
-  tiledOperands.push_back(initValSlice.getResult());
-  slices.push_back(initValSlice);
-
-  auto initIdxSlice = tensor::ExtractSliceOp::create(
-      b, loc, sliceIdxResultType, init[1], initOffsets, initSizes, initStrides);
-  tiledOperands.push_back(initIdxSlice.getResult());
-  slices.push_back(initIdxSlice);
-
+  // OuterParallel: both explicit and implicit index modes can use a regular
+  // tiled ArgCompareOp since each chunk performs an independent reduction.
+  tiledOperands.push_back(initValResult);
+  tiledOperands.push_back(initIdxResult);
   SmallVector<Type, 2> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes = {initValSlice->getResult(0).getType(),
-                   initIdxSlice->getResult(0).getType()};
+    resultTypes = {initValResult.getType(), initIdxResult.getType()};
   }
 
+  // Handle OuterParallel for both explicit and implicit index modes.
   ArgCompareOp tiledArgmaxOp;
   if (isExplicitIndexMode) {
     // Explicit-index mode: 2 inputs (value + index), no index_base.
@@ -1815,21 +1941,18 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
         /*indexBase=*/nullptr, /*dimension=*/reductionDim);
   } else {
     // Implicit-index mode: 1 input (value) + index_base.
-    // Create index_base for this chunk.
+    // Create index_base for this chunk. We adjust index_base so the indices
+    // in each chunk reflect their position in the original tensor.
     Value tileIndex =
         getValueOrCreateConstantIndexOp(b, loc, splitReductionIvs[0]);
     Value tileSize =
         getValueOrCreateConstantIndexOp(b, loc, sizes[reductionDim]);
-    Value tileStartIndex = arith::MulIOp::create(b, loc, tileIndex, tileSize);
+    Value newIndexBase = arith::MulIOp::create(b, loc, tileIndex, tileSize);
 
-    Value newIndexBase;
     if (Value globalIndexBase = getIndexBase()) {
       // Add chunk start to existing index_base.
       newIndexBase =
-          arith::AddIOp::create(b, loc, globalIndexBase, tileStartIndex);
-    } else {
-      // Use chunk start as index_base.
-      newIndexBase = tileStartIndex;
+          arith::AddIOp::create(b, loc, globalIndexBase, newIndexBase);
     }
 
     // tiledOperands layout: [value_slice, init_val, init_idx].
@@ -1840,7 +1963,6 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
         /*indexBase=*/newIndexBase, /*dimension=*/reductionDim);
   }
 
-  // Copy the region.
   Region &targetRegion = tiledArgmaxOp->getRegion(0);
   Region &sourceRegion = getRegion();
   IRMapping mapper;
@@ -1854,7 +1976,7 @@ FailureOr<MergeResult>
 ArgCompareOp::mergeReductions(OpBuilder &b, Location loc,
                               ValueRange partialReduce,
                               const llvm::SetVector<unsigned> &reductionDims) {
-  int64_t reductionDim = reductionDims.front();
+  int64_t reductionDim = getDimension();
 
   // Create arg_compare in explicit-index mode to merge the partial results.
   // Explicit-index mode: 2 inputs (value + index), no index_base.
@@ -1885,17 +2007,23 @@ LogicalResult ArgCompareOp::getPartialResultTilePosition(
     SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
   int64_t reductionDim = getDimension();
-  int64_t inputRank = getInputRank();
   resultOffsets.clear();
   resultSizes.clear();
-  for (int64_t i = 0; i < inputRank; ++i) {
+
+  bool isOuterReduction =
+      tilingStrategy == ReductionTilingStrategy::PartialReductionOuterReduction;
+
+  for (int64_t i = 0, e = getInputRank(); i < e; ++i) {
     if (i == reductionDim) {
-      resultOffsets.push_back(splitReductionIvs[0]);
-      resultSizes.push_back(b.getIndexAttr(1));
-      continue;
+      // OuterReduction accumulates in place, always writing to offset 0.
+      // OuterParallel writes each chunk to a separate slot indexed by chunkIdx.
+      resultOffsets.push_back(isOuterReduction ? b.getIndexAttr(0)
+                                               : splitReductionIvs[0]);
+      resultSizes.push_back(isOuterReduction ? sizes[i] : b.getIndexAttr(1));
+    } else {
+      resultOffsets.push_back(offsets[i]);
+      resultSizes.push_back(sizes[i]);
     }
-    resultOffsets.push_back(offsets[i]);
-    resultSizes.push_back(sizes[i]);
   }
 
   return success();
