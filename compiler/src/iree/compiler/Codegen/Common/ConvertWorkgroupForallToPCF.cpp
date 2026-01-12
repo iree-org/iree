@@ -19,8 +19,8 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-struct ConvertWorkgroupForall : public OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern<scf::ForallOp>::OpRewritePattern;
+struct ConvertWorkgroupForall : OpRewritePattern<scf::ForallOp> {
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::ForallOp op,
                                 PatternRewriter &rewriter) const override;
 };
@@ -59,8 +59,7 @@ ConvertWorkgroupForall::matchAndRewrite(scf::ForallOp op,
   }
 
   // Create a workgroup count hint to launch all workgroups along x.
-  SmallVector<OpFoldResult> counts =
-      llvm::to_vector_of<OpFoldResult>(res->getCount());
+  auto counts = llvm::to_vector_of<OpFoldResult>(res->getCount());
   rewriter.setInsertionPoint(*res);
   [[maybe_unused]] LogicalResult hintRes = createWorkgroupCountHint(
       rewriter, res->getLoc(), counts, /*maxWorkgroupParallelDims=*/1,
