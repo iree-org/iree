@@ -72,6 +72,10 @@ static int64_t calculateOperandsSharedMemoryUsedInBytes(
   int64_t tileN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
                   schedule.getTotalNSubgroupCount();
 
+  // For scaled matmul, the K dimension is split into Ko (outer) and Kb (block),
+  // where elements in a Kb block share the same scale. For lhs and rhs we
+  // account for both Ko and Kb, while for scale operands, only Ko. For regular
+  // matmul, scale bitwidth is 0 so the scale terms below have no effect.
   int64_t tileK = schedule.getTotalKSize() * schedule.getTotalKTileSize();
   int64_t tileKb = schedule.kSizes.back() * schedule.kTileSizes.back();
   int64_t tileKo = tileK / tileKb;
@@ -688,13 +692,9 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       int64_t rhsBitwidth = problem.bType.getIntOrFloatBitWidth();
       int64_t resultBitwidth = problem.cType.getIntOrFloatBitWidth();
       int64_t lhsScaleBitwidth =
-          problem.aScaleType.has_value()
-              ? problem.aScaleType->getIntOrFloatBitWidth()
-              : 0;
+          problem.aScaleType ? problem.aScaleType.getIntOrFloatBitWidth() : 0;
       int64_t rhsScaleBitwidth =
-          problem.bScaleType.has_value()
-              ? problem.bScaleType->getIntOrFloatBitWidth()
-              : 0;
+          problem.bScaleType ? problem.bScaleType.getIntOrFloatBitWidth() : 0;
       bool isAligned =
           isValidMMASchedule(problem, schedule, mustBeAligned, subgroupSize,
                              transposedLhs, transposedRhs);

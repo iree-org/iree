@@ -515,9 +515,16 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // all instances of schedule->m/nSubgroupCounts[0],
   // schedule->m/n/kTileSizes[0] and schedule->m/n/kSizes[0] need to use the
   // full list of sizes instead of just the first element.
-  GPUMatmulShapeType problem{
-      {bounds[mDim]}, {bounds[nDim]}, {bounds[kDim]}, getDimBounds(batchDims),
-      lhsElemType,    rhsElemType,    initElemType,   numHorizontallyFusedOps};
+  GPUMatmulShapeType problem{{bounds[mDim]},
+                             {bounds[nDim]},
+                             {bounds[kDim]},
+                             getDimBounds(batchDims),
+                             lhsElemType,
+                             rhsElemType,
+                             initElemType,
+                             /*aScaleType=*/nullptr,
+                             /*bScaleType=*/nullptr,
+                             numHorizontallyFusedOps};
 
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,

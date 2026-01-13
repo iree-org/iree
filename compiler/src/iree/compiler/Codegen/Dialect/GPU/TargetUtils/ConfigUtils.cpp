@@ -776,8 +776,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Type lhsElemType = getElementTypeOrSelf(operands[0]);
   Type rhsElemType = getElementTypeOrSelf(operands[1]);
   Type initElemType = getElementTypeOrSelf(operands[2]);
-  std::optional<Type> lhsScaleType, rhsScaleType;
-
+  Type lhsScaleType = nullptr;
+  Type rhsScaleType = nullptr;
   if (scaled) {
     assert(llvm::all_of(operands,
                         [](Value a) { return isa<ShapedType>(a.getType()); }) &&
@@ -800,9 +800,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              getDimBoundsNoPad(batchDims),
                              lhsElemType,
                              rhsElemType,
+                             initElemType,
                              lhsScaleType,
-                             rhsScaleType,
-                             initElemType};
+                             rhsScaleType};
 
   // Accumulator needs shared memory if:
   // - Padding requires C promotion, OR

@@ -23,9 +23,9 @@ struct GPUMatmulShapeType {
 
   Type aType;
   Type bType;
-  std::optional<Type> aScaleType;
-  std::optional<Type> bScaleType;
   Type cType;
+  Type aScaleType;
+  Type bScaleType;
 
   GemmSize gemmSize = GemmSize::NotSet;
 
@@ -41,17 +41,10 @@ struct GPUMatmulShapeType {
 
   GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
                      ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
-                     Type b, Type c, int64_t numHorizontallyFusedOps = 1)
+                     Type b, Type c, Type aScale = nullptr,
+                     Type bScale = nullptr, int64_t numHorizontallyFusedOps = 1)
       : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
-        cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
-
-  GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
-                     ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
-                     Type b, std::optional<Type> aScale,
-                     std::optional<Type> bScale, Type c,
-                     int64_t numHorizontallyFusedOps = 1)
-      : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
-        aScaleType(aScale), bScaleType(bScale), cType(c),
+        cType(c), aScaleType(aScale), bScaleType(bScale),
         numHorizontallyFusedOps(numHorizontallyFusedOps) {}
 };
 
