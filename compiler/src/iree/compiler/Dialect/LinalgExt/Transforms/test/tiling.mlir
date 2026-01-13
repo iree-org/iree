@@ -3336,6 +3336,136 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @map_gather_tensor(
+    %source: tensor<?xf32>, %output: tensor<?xf32>
+) -> tensor<?xf32> {
+  %0 = iree_linalg_ext.map_gather %source into %output {
+    ^bb0(%idx0: index):
+      %pad = arith.constant 0.0 : f32
+      iree_linalg_ext.yield %idx0, %pad : index, f32
+  } : tensor<?xf32> into tensor<?xf32> -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.map_gather"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [8] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 8)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+//      CHECK: func @map_gather_tensor
+// CHECK-SAME:    %[[SOURCE:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OUTPUT]], %[[C0]]
+//  CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.{{0+}}e+00 : f32
+//      CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[C8]]
+// CHECK-SAME:       iter_args(%[[LOOP_ARG:.+]] = %[[OUTPUT]])
+//  CHECK-DAG:     %[[TILE_SIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[D0]]]
+//  CHECK-DAG:     %[[OUTPUT_TILE:.+]] = tensor.extract_slice %[[LOOP_ARG]]
+// CHECK-SAME:       [%[[IV]]] [%[[TILE_SIZE]]] [1]
+//      CHECK:     iree_linalg_ext.map_gather %[[SOURCE]] into %[[OUTPUT_TILE]]
+// CHECK-NEXT:       ^bb0(%[[IDX:.+]]: index):
+//  CHECK-DAG:         %[[IDX_OFFSET:.+]] = affine.apply #[[MAP1]](%[[IDX]], %[[IV]])
+//      CHECK:         iree_linalg_ext.yield %[[IDX_OFFSET]], %[[PAD]]
+
+// -----
+
+func.func @map_gather_memref(%source: memref<?xf32>, %output: memref<?xf32>) {
+  iree_linalg_ext.map_gather %source into %output {
+    ^bb0(%idx0: index):
+      %pad = arith.constant 0.0 : f32
+      iree_linalg_ext.yield %idx0, %pad : index, f32
+  } : memref<?xf32> into memref<?xf32>
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.map_gather"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [8] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 8)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0 + d1)>
+//      CHECK: func @map_gather_memref
+// CHECK-SAME:    %[[SOURCE:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
+//  CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[OUTPUT]], %[[C0]]
+//  CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.{{0+}}e+00 : f32
+//      CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[C8]]
+//  CHECK-DAG:     %[[TILE_SIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[D0]]]
+//  CHECK-DAG:     %[[OUTPUT_TILE:.+]] = memref.subview %[[OUTPUT]]
+// CHECK-SAME:       [%[[IV]]] [%[[TILE_SIZE]]] [1]
+//      CHECK:     iree_linalg_ext.map_gather %[[SOURCE]] into %[[OUTPUT_TILE]]
+// CHECK-NEXT:       ^bb0(%[[IDX:.+]]: index):
+//  CHECK-DAG:         %[[IDX_OFFSET:.+]] = affine.apply #[[MAP1]](%[[IDX]], %[[IV]])
+//      CHECK:         iree_linalg_ext.yield %[[IDX_OFFSET]], %[[PAD]]
+
+// -----
+
+// Test producer fusion for map_gather (generateResultTileValue).
+// Tiles the consumer linalg.generic and fuses the producer map_gather into
+// the loop.
+func.func @map_gather_producer_fusion(
+    %source: tensor<16x16xf32>, %init: tensor<256xf32>, %out: tensor<256xf32>
+) -> tensor<256xf32> {
+  %0 = iree_linalg_ext.map_gather %source into %init {
+    ^bb0(%idx0: index):
+      %c16 = arith.constant 16 : index
+      %i = arith.divui %idx0, %c16 : index
+      %j = arith.remui %idx0, %c16 : index
+      %pad = arith.constant 0.0 : f32
+      iree_linalg_ext.yield %i, %j, %pad : index, index, f32
+  } : tensor<16x16xf32> into tensor<256xf32> -> tensor<256xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%0 : tensor<256xf32>) outs(%out : tensor<256xf32>) {
+    ^bb0(%in: f32, %o: f32):
+      %2 = arith.mulf %in, %in : f32
+      linalg.yield %2 : f32
+  } -> tensor<256xf32>
+  return %1 : tensor<256xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %producer = transform.structured.match ops{["iree_linalg_ext.map_gather"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %consumer = transform.structured.match ops{["linalg.generic"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loops = transform.structured.tile_using_forall %consumer tile_sizes [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %fused, %_ = transform.structured.fuse_into_containing_op %producer into %loops : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func @map_gather_producer_fusion
+// CHECK-SAME:    %[[SOURCE:[a-zA-Z0-9]+]]: tensor<16x16xf32>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<256xf32>
+// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<256xf32>
+//      CHECK:   scf.forall (%[[IV:.+]]) in (8)
+// CHECK-SAME:       shared_outs(%[[OUTS:.+]] = %[[OUT]])
+//      CHECK:     %[[LINEAR_IDX:.+]] = affine.apply
+// CHECK-SAME:         %[[IV]]
+//      CHECK:     %[[INIT_SLICE:.+]] = tensor.extract_slice %[[INIT]][%[[LINEAR_IDX]]] [32] [1]
+//      CHECK:     %[[GATHER:.+]] = iree_linalg_ext.map_gather %[[SOURCE]] into %[[INIT_SLICE]]
+//      CHECK:       ^bb0(%[[IDX:.+]]: index):
+//      CHECK:         affine.apply
+// CHECK-SAME:             %[[IDX]], %[[IV]]
+//      CHECK:         iree_linalg_ext.yield
+//      CHECK:       tensor<16x16xf32> into tensor<32xf32> -> tensor<32xf32>
+//      CHECK:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[OUTS]][%[[LINEAR_IDX]]] [32] [1]
+//      CHECK:     %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:         ins(%[[GATHER]] :
+// CHECK-SAME:         outs(%[[OUT_SLICE]] :
+//      CHECK:     scf.forall.in_parallel
+//      CHECK:       tensor.parallel_insert_slice %[[GENERIC]] into %[[OUTS]][%[[LINEAR_IDX]]] [32] [1]
+
+// -----
+
 func.func @concat_dynamic(%arg0 : tensor<?x64xi32>, %arg1 : tensor<?x64xi32>) -> tensor<?x128xi32> {
   %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<?x64xi32>, tensor<?x64xi32>) -> tensor<?x128xi32>
   return %0 : tensor<?x128xi32>
