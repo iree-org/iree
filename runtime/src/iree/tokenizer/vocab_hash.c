@@ -195,13 +195,17 @@ iree_status_t iree_tokenizer_vocab_hash_build(
 
 int32_t iree_tokenizer_vocab_hash_lookup(
     const iree_tokenizer_vocab_hash_t* hash, iree_string_view_t text) {
-  if (!hash) return -1;
+  if (!hash || !hash->tokens) return -1;
 
   uint32_t h = iree_tokenizer_hash(text);
   iree_host_size_t slot_index = h & hash->slot_mask;
 
   // Linear probe until we find matching hash or empty slot.
-  while (hash->slots[slot_index].hash != 0) {
+  // Limit probes to slot_count to prevent infinite loops on pathological
+  // hash collision patterns (even though 90% load factor should guarantee
+  // termination, this provides defense-in-depth).
+  iree_host_size_t probes = 0;
+  while (hash->slots[slot_index].hash != 0 && probes < hash->slot_count) {
     if (hash->slots[slot_index].hash == h) {
       // Hash matches, verify string.
       int32_t token_id = hash->slots[slot_index].token_id;
@@ -211,11 +215,14 @@ int32_t iree_tokenizer_vocab_hash_lookup(
       }
       iree_string_view_t token_string = iree_tokenizer_token_string(
           &hash->tokens[token_id], hash->string_table);
-      if (iree_string_view_equal(token_string, text)) {
+      // Explicit length check before string comparison for defense-in-depth.
+      if (token_string.size == text.size &&
+          iree_string_view_equal(token_string, text)) {
         return token_id;
       }
     }
     slot_index = (slot_index + 1) & hash->slot_mask;
+    ++probes;
   }
 
   return -1;  // Not found.

@@ -229,7 +229,16 @@ iree_status_t iree_tokenizer_vocab_import_unigram_json(
   }
 
   // Allocate builder.
-  iree_host_size_t capacity = vocab_count + added_tokens.count;
+  // Guard against addition overflow when computing capacity.
+  iree_host_size_t capacity = 0;
+  if (iree_status_is_ok(status)) {
+    if (vocab_count > IREE_HOST_SIZE_MAX - added_tokens.count) {
+      status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "vocab_count + added_tokens.count overflow");
+    } else {
+      capacity = vocab_count + added_tokens.count;
+    }
+  }
   iree_tokenizer_vocab_builder_t* builder = NULL;
   if (iree_status_is_ok(status)) {
     status =
@@ -237,10 +246,16 @@ iree_status_t iree_tokenizer_vocab_import_unigram_json(
   }
 
   // Allocate initial scores array.
+  // Guard against multiplication overflow.
   float* scores = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_allocator_malloc(allocator, capacity * sizeof(float),
-                                   (void**)&scores);
+    if (capacity > IREE_HOST_SIZE_MAX / sizeof(float)) {
+      status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "scores allocation size overflow");
+    } else {
+      status = iree_allocator_malloc(allocator, capacity * sizeof(float),
+                                     (void**)&scores);
+    }
   }
 
   // Parse vocab array.

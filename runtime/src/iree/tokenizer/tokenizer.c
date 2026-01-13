@@ -686,6 +686,9 @@ static iree_status_t iree_tokenizer_stream_handle_utf8(
 
     if (still_incomplete > 0 && still_incomplete == check_length) {
       // Still incomplete - buffer all and wait for more data.
+      // RVW: check_length cast to uint8_t truncates if > 255 (unlikely but possible
+      // RVW: with repeated partial feeds). Consider adding bounds check or using
+      // RVW: larger type. utf8_partial[4] array size should also be validated.
       memcpy(state->utf8_partial, utf8_check_buffer, check_length);
       state->utf8_partial_length = (uint8_t)check_length;
       *consumed_all = true;

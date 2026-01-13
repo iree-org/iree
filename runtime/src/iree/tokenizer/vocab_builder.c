@@ -83,6 +83,9 @@ static iree_status_t iree_tokenizer_vocab_builder_reserve_tokens(
   // the builder is left in an inconsistent state. This is acceptable since
   // allocation failure is terminal - callers must free the builder on any
   // error return.
+  // RVW: Partial realloc failure leaves tokens/scores arrays at different sizes.
+  // RVW: If caller ignores error and continues, buffer overflow can occur.
+  // RVW: Consider pre-allocating all three in one pass or using backup pointers.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_realloc(builder->allocator,
                                  new_capacity * sizeof(iree_tokenizer_token_t),

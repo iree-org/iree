@@ -245,6 +245,11 @@ iree_status_t iree_tokenizer_regex_dfa_load(
   }
 
   // Set up pointers into the binary data (zero-copy).
+  // RVW: Pointer arithmetic chain without bounds checking after each advance.
+  // RVW: If any intermediate calculation overflows or ptr exceeds data bounds,
+  // RVW: subsequent assignments will point to invalid memory. While expected_size
+  // RVW: validation at line 240 catches well-formed data, malformed binary could
+  // RVW: trigger issues. Consider adding CHECK_BOUNDS(ptr, size, data) after each step.
   const uint8_t* ptr = data.data + sizeof(iree_tokenizer_regex_dfa_header_t);
 
   out_dfa->header = header;
@@ -1010,6 +1015,11 @@ static void iree_tokenizer_regex_update_rewind_buffer(
   }
 
   // Chunk doesn't fit - shift buffer to make room.
+  // RVW: If space_left > chunk.data_length, shift_needed underflows to huge value.
+  // RVW: The condition shift_needed < rewind_buffer_length catches this, but
+  // RVW: the logic is subtle. After append, rewind_buffer_length could exceed 256
+  // RVW: if chunk.data_length > space_left and shift didn't free enough space.
+  // RVW: Consider adding explicit assertion: rewind_buffer_length <= sizeof(rewind_buffer).
   iree_host_size_t shift_needed = chunk.data_length - space_left;
   if (shift_needed < state->rewind_buffer_length) {
     // Shift out oldest bytes to make room for new chunk.

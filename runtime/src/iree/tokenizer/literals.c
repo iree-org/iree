@@ -47,8 +47,20 @@ iree_status_t iree_tokenizer_literals_add(
 
   // Grow entries array if needed.
   if (literals->count >= literals->capacity) {
-    iree_host_size_t new_capacity = literals->capacity * 2;
+    // Guard against overflow when doubling capacity.
+    iree_host_size_t new_capacity = literals->capacity;
+    if (new_capacity <= IREE_HOST_SIZE_MAX / 2) {
+      new_capacity *= 2;
+    } else {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "literals capacity overflow");
+    }
     if (new_capacity < 16) new_capacity = 16;
+    // Check multiplication overflow before allocation.
+    if (new_capacity > IREE_HOST_SIZE_MAX / sizeof(iree_tokenizer_literal_t)) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "literals allocation size overflow");
+    }
     IREE_RETURN_IF_ERROR(iree_allocator_realloc(
         literals->allocator, new_capacity * sizeof(iree_tokenizer_literal_t),
         (void**)&literals->entries));
@@ -56,10 +68,19 @@ iree_status_t iree_tokenizer_literals_add(
   }
 
   // Grow string storage if needed.
+  // Guard against addition overflow.
+  if (literals->string_storage_size > IREE_HOST_SIZE_MAX - content.size) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "string storage size overflow");
+  }
   iree_host_size_t new_string_size =
       literals->string_storage_size + content.size;
   if (new_string_size > literals->string_storage_capacity) {
-    iree_host_size_t new_capacity = literals->string_storage_capacity * 2;
+    // Guard against overflow when doubling capacity.
+    iree_host_size_t new_capacity = literals->string_storage_capacity;
+    if (new_capacity <= IREE_HOST_SIZE_MAX / 2) {
+      new_capacity *= 2;
+    }
     if (new_capacity < 256) new_capacity = 256;
     if (new_capacity < new_string_size) new_capacity = new_string_size;
     IREE_RETURN_IF_ERROR(iree_allocator_realloc(

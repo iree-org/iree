@@ -315,11 +315,18 @@ static iree_status_t iree_tokenizer_parse_split_pretokenizer(
   }
 
   // Unescape the JSON string value into a buffer.
-  char pattern_buffer[512];
+  // Buffer sized for typical tokenizer patterns; complex Unicode patterns
+  // (e.g., Llama 3's regex) may need more space.
+  char pattern_buffer[2048];
   iree_host_size_t pattern_length = 0;
-  IREE_RETURN_IF_ERROR(
+  iree_status_t pattern_status =
       iree_json_unescape_string(json_string_value, sizeof(pattern_buffer),
-                                pattern_buffer, &pattern_length));
+                                pattern_buffer, &pattern_length);
+  if (!iree_status_is_ok(pattern_status)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Split pattern too long (max %zu bytes)",
+                            sizeof(pattern_buffer));
+  }
   iree_string_view_t pattern_string =
       iree_make_string_view(pattern_buffer, pattern_length);
 

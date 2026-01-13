@@ -250,10 +250,16 @@ static iree_status_t iree_tokenizer_parse_replace_normalizer(
       iree_json_lookup_object_value(json, IREE_SV("content"), &content_value));
 
   // Unescape content (used by both paths).
-  char content_buffer[32];
+  // Buffer sized to match IREE_TOKENIZER_REPLACE_NORMALIZER_CONTENT_MAX_SIZE.
+  char content_buffer[256];
   iree_host_size_t content_length = 0;
-  IREE_RETURN_IF_ERROR(iree_json_unescape_string(
-      content_value, sizeof(content_buffer), content_buffer, &content_length));
+  iree_status_t unescape_status = iree_json_unescape_string(
+      content_value, sizeof(content_buffer), content_buffer, &content_length);
+  if (!iree_status_is_ok(unescape_status)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Replace content too long (max %zu bytes)",
+                            sizeof(content_buffer));
+  }
 
   // If String pattern not found or empty, check for Regex pattern.
   if (string_pattern.size == 0) {
@@ -262,10 +268,17 @@ static iree_status_t iree_tokenizer_parse_replace_normalizer(
         pattern_obj, IREE_SV("Regex"), &regex_pattern);
     if (iree_status_is_ok(status) && regex_pattern.size > 0) {
       // Unescape the regex pattern.
-      char regex_buffer[256];
+      // Buffer sized for typical tokenizer patterns; complex Unicode patterns
+      // may need more space.
+      char regex_buffer[1024];
       iree_host_size_t regex_length = 0;
-      IREE_RETURN_IF_ERROR(iree_json_unescape_string(
-          regex_pattern, sizeof(regex_buffer), regex_buffer, &regex_length));
+      iree_status_t regex_unescape_status = iree_json_unescape_string(
+          regex_pattern, sizeof(regex_buffer), regex_buffer, &regex_length);
+      if (!iree_status_is_ok(regex_unescape_status)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "ReplaceRegex pattern too long (max %zu bytes)",
+                                sizeof(regex_buffer));
+      }
 
       // Compile the regex pattern.
       iree_tokenizer_regex_compile_error_t compile_error = {0};
@@ -346,7 +359,13 @@ static iree_status_t iree_base64_decode(iree_string_view_t encoded,
   iree_host_size_t padding = 0;
   if (encoded.size > 0 && encoded.data[encoded.size - 1] == '=') padding++;
   if (encoded.size > 1 && encoded.data[encoded.size - 2] == '=') padding++;
-  iree_host_size_t decoded_size = (encoded.size / 4) * 3 - padding;
+  // Guard against underflow: padding can never exceed the computed base size.
+  iree_host_size_t base_decoded = (encoded.size / 4) * 3;
+  if (padding > base_decoded) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid base64 padding");
+  }
+  iree_host_size_t decoded_size = base_decoded - padding;
 
   if (out_capacity < decoded_size) {
     *out_length = decoded_size;
@@ -422,12 +441,19 @@ static iree_status_t iree_tokenizer_parse_precompiled_normalizer(
   }
 
   // Calculate decoded size.
+  // Guard against underflow: padding can never exceed the computed base size.
   iree_host_size_t padding = 0;
   if (charsmap_b64.size > 0 && charsmap_b64.data[charsmap_b64.size - 1] == '=')
     padding++;
   if (charsmap_b64.size > 1 && charsmap_b64.data[charsmap_b64.size - 2] == '=')
     padding++;
-  iree_host_size_t decoded_size = (charsmap_b64.size / 4) * 3 - padding;
+  iree_host_size_t base_decoded = (charsmap_b64.size / 4) * 3;
+  if (padding > base_decoded) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid base64 padding in precompiled charsmap");
+  }
+  iree_host_size_t decoded_size = base_decoded - padding;
 
   // Allocate temporary buffer for decoded data.
   uint8_t* decoded_data = NULL;

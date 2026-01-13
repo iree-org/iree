@@ -79,6 +79,9 @@ static iree_status_t iree_tokenizer_trie_ensure_node_capacity(
 }
 
 // Ensures edge array has capacity for at least `min_count` more edges.
+// RVW: edge_count + min_count can overflow; while loop can overflow new_capacity
+// RVW: Consider adding: if (trie->edge_count > IREE_HOST_SIZE_MAX - min_count)
+// RVW: and overflow check in the while loop like vocab_builder.c does.
 static iree_status_t iree_tokenizer_trie_ensure_edge_capacity(
     iree_tokenizer_vocab_trie_t* trie, iree_host_size_t min_count) {
   iree_host_size_t required = trie->edge_count + min_count;
@@ -109,6 +112,9 @@ static iree_status_t iree_tokenizer_trie_ensure_edge_capacity(
 }
 
 // Allocates a new node and returns its index.
+// RVW: node_count is iree_host_size_t (64-bit) but cast to uint32_t truncates.
+// RVW: If node_count > UINT32_MAX, index wraps causing memory corruption.
+// RVW: Consider adding: if (trie->node_count > UINT32_MAX) return error;
 static iree_status_t iree_tokenizer_trie_allocate_node(
     iree_tokenizer_vocab_trie_t* trie, uint32_t* out_index) {
   IREE_RETURN_IF_ERROR(iree_tokenizer_trie_ensure_node_capacity(trie));
@@ -267,6 +273,9 @@ static iree_status_t iree_tokenizer_trie_insert_token(
 }
 
 // Gets token string from token entry and string table.
+// RVW: offset + length can overflow, bypassing the bounds check.
+// RVW: Consider: if (token->string_offset > string_table.data_length ||
+// RVW:              token->string_length > string_table.data_length - token->string_offset)
 static iree_string_view_t iree_tokenizer_trie_token_string(
     const iree_tokenizer_token_t* token, iree_const_byte_span_t string_table) {
   if (token->string_offset + token->string_length > string_table.data_length) {
