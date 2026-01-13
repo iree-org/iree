@@ -417,29 +417,6 @@ add_custom_target(IREECompilerPythonDylibFiles
 add_dependencies(IREECompilerPythonModules IREECompilerPythonDylibFiles)
 
 ################################################################################
-# Windows DLL colocation fix
-# On Windows, the nanobind-mlir.dll ends up in iree/build/_mlir_libs/ but we
-# need to copy it to iree/compiler/_mlir_libs/ for the Python extensions to find
-# it at runtime.
-################################################################################
-if(WIN32)
-  set(_nanobind_src "${_PYTHON_BUILD_PREFIX}/iree/build/_mlir_libs/nanobind-mlir.dll")
-  set(_nanobind_dst "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs/nanobind-mlir.dll")
-  add_custom_command(
-    OUTPUT "${_nanobind_dst}"
-    DEPENDS "${_nanobind_src}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${_nanobind_src}" "${_nanobind_dst}"
-    COMMENT "Copying nanobind-mlir.dll to iree/compiler/_mlir_libs/ for Windows DLL loading"
-  )
-  add_custom_target(IREECompilerPythonNanobindCopy
-    DEPENDS "${_nanobind_dst}"
-  )
-  add_dependencies(IREECompilerPythonNanobindCopy IREECompilerBuildPythonModules)
-  add_dependencies(IREECompilerPythonModules IREECompilerPythonNanobindCopy)
-endif()
-
-################################################################################
 # Subdirectories
 ################################################################################
 
