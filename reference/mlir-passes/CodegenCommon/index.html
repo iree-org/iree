@@ -2941,6 +2941,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-convert-workgroup-forall-to-pcf" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-convert-workgroup-forall-to-pcf
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-convolution-to-igemm" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-convolution-to-igemm
@@ -6050,6 +6059,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-convert-workgroup-forall-to-pcf" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-convert-workgroup-forall-to-pcf
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-convolution-to-igemm" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-convolution-to-igemm
@@ -7183,6 +7201,18 @@ comprehensive bufferization pass.</p>
 <div class="highlight"><pre><span></span><code>-convert-inputs-to-destinations         : Controls whether to adjust consumers to convert one of its inputs to a destination
 -use-war-for-cooperative-matrix-codegen : WAR for failure in Cooperative matrix codegen pipelines. See #10648.
 </code></pre></div>
+<h3 id="-iree-codegen-convert-workgroup-forall-to-pcf"><code>-iree-codegen-convert-workgroup-forall-to-pcf</code><a class="headerlink" href="#-iree-codegen-convert-workgroup-forall-to-pcf" title="Permanent link">link</a></h3>
+<p><em>Converts workgroup mapped scf.forall ops to pcf.loop</em></p>
+<p>Converts <code>scf.forall</code> ops with <code>#iree_codegen.workgroup_mapping</code> attributes
+to <code>pcf.loop</code> ops with workgroup scope.</p>
+<p>The input is IR containing <code>scf.forall</code> ops mapped to workgroups via
+<code>#iree_codegen.workgroup_mapping&lt;x/y/z&gt;</code> attributes. The pass linearizes
+all workgroup IDs down to a single dimension to handle cases where multiple
+foralls have incompatible delinearization bases.</p>
+<p>The output replaces each matching forall with a <code>pcf.loop</code> using
+<code>#iree_codegen.workgroup_scope&lt;linearize&gt;</code> scope. Additionally, an
+<code>iree_codegen.workgroup_count_hint</code> is inserted before each loop to
+communicate the required workgroup count to the export's count region.</p>
 <h3 id="-iree-codegen-convolution-to-igemm"><code>-iree-codegen-convolution-to-igemm</code><a class="headerlink" href="#-iree-codegen-convolution-to-igemm" title="Permanent link">link</a></h3>
 <p><em>Transforms convolution operations into an implicit GEMM format.</em></p>
 <h3 id="-iree-codegen-debug-patch-func-ops"><code>-iree-codegen-debug-patch-func-ops</code><a class="headerlink" href="#-iree-codegen-debug-patch-func-ops" title="Permanent link">link</a></h3>
