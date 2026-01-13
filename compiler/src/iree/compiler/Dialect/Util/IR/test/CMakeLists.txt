@@ -37,6 +37,7 @@ iree_lit_test_suite(
     "structural_folding.mlir"
     "structural_inlining.mlir"
     "structural_ops.mlir"
+    "tied_operands_ops.mlir"
   TOOLS
     FileCheck
     iree-opt
