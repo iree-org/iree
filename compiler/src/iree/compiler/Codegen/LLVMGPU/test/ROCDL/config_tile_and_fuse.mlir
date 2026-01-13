@@ -1112,3 +1112,31 @@ func.func @aligned_matmul_biasadd(%lhs : tensor<512x512xf16>, %rhs : tensor<512x
 
 // CHECK-LABEL: func.func @aligned_matmul_biasadd(
 //           CHECK: promote_operands = [0, 1]
+
+// -----
+
+// Currently falls back to non-MMA path since MMA intrinsics require matching
+// operand types.
+func.func @mixed_precision_matmul_f32xbf16(%lhs: tensor<16x64xf32>, %rhs: tensor<64x32xbf16>) -> tensor<16x32xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<16x32xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<16x32xf32>) -> tensor<16x32xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<16x64xf32>, tensor<64x32xbf16>)
+    outs(%fill : tensor<16x32xf32>) {
+  ^bb0(%in: f32, %in_0: bf16, %out: f32):
+    %0 = arith.extf %in_0 : bf16 to f32
+    %1 = arith.mulf %in, %0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<16x32xf32>
+  return %result : tensor<16x32xf32>
+}
+
+// CHECK-LABEL: func.func @mixed_precision_matmul_f32xbf16(
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//   CHECK-NOT:     mma_kind
