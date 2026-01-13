@@ -22,6 +22,7 @@ iree_check_single_backend_test_suite(
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
     "pack_i8.mlir"
+    "small_float_arith.mlir"
     "softmax.mlir"
     "subbyte_to_fp.mlir"
     "unpack.mlir"
