@@ -277,7 +277,9 @@ class CTSTestBase : public BaseType, public CTSTestResources {
 
   // Check that a contains b.
   // That is the codes of a and b are equal and the message of b is contained
-  // in the message of a.
+  // in the message of a. Note: We only compare the message portion (before
+  // "; stack:") since iree_status_clone doesn't copy payloads like stack
+  // traces, so the full formatted strings will differ.
   void CheckStatusContains(iree_status_t a, iree_status_t b) {
     EXPECT_EQ(iree_status_code(a), iree_status_code(b));
     iree_allocator_t allocator = iree_allocator_system();
@@ -287,8 +289,23 @@ class CTSTestBase : public BaseType, public CTSTestResources {
     char* b_str = NULL;
     iree_host_size_t b_str_length = 0;
     EXPECT_TRUE(iree_status_to_string(b, &allocator, &b_str, &b_str_length));
-    EXPECT_TRUE(std::string_view(a_str).find(std::string_view(b_str)) !=
-                std::string_view::npos);
+    // Extract just the message portion (before stack trace) for comparison.
+    // iree_status_clone() captures a new stack at the clone site, so:
+    //   a_str: "CANCELLED; msg; stack: clone_site.c:42 ..."
+    //   b_str: "CANCELLED; msg; stack: original_site.c:10 ..."
+    // We only want to compare "CANCELLED; msg".
+    std::string_view a_view(a_str);
+    std::string_view b_view(b_str);
+    auto a_stack_pos = a_view.find("; stack:");
+    auto b_stack_pos = b_view.find("; stack:");
+    if (a_stack_pos != std::string_view::npos) {
+      a_view = a_view.substr(0, a_stack_pos);
+    }
+    if (b_stack_pos != std::string_view::npos) {
+      b_view = b_view.substr(0, b_stack_pos);
+    }
+    EXPECT_TRUE(a_view.find(b_view) != std::string_view::npos)
+        << "Expected '" << b_view << "' to be found in '" << a_view << "'";
     iree_allocator_free(allocator, a_str);
     iree_allocator_free(allocator, b_str);
   }
