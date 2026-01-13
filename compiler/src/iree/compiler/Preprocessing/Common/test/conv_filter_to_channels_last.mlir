@@ -163,6 +163,24 @@ util.func public @conv_2d_chwn_chwf_no_transpose(%arg0: tensor<16x26x18x288xf32>
 
 // -----
 
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1, d2 + d5, d3 + d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d0, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+util.func public @conv_2d_cnhw_cfhw_no_transpose(%arg0: tensor<16x288x26x18xf32>, %arg1: tensor<16x288x24x16xf32>, %arg2: tensor<288x288x3x3xf32>) -> tensor<288x288x3x3xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x288x26x18xf32>, tensor<16x288x24x16xf32>) outs(%arg2 : tensor<288x288x3x3xf32>) {
+  ^bb0(%in: f32, %in_3: f32, %out: f32):
+    %12 = arith.mulf %in, %in_3 : f32
+    %13 = arith.addf %out, %12 : f32
+    linalg.yield %13 : f32
+  } -> tensor<288x288x3x3xf32>
+  util.return %0 : tensor<288x288x3x3xf32>
+}
+
+// CHECK-FHWC-LABEL:  @conv_2d_cnhw_cfhw_no_transpose
+// CHECK-FHWC-NOT:    linalg.transpose
+
+// -----
+
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d5, d2 + d6, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
