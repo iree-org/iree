@@ -88,7 +88,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: iree-org/iree-test-suites
-          ref: 8f553c7b50992a53de33966e147ba44ee89e4772
+          ref: 6678fa7e2e644bec8e4da04c38d8d0e1827d9b22
           path: iree-test-suites
           lfs: true
 
@@ -197,7 +197,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: iree-org/iree-test-suites
-          ref: 8f553c7b50992a53de33966e147ba44ee89e4772
+          ref: 6678fa7e2e644bec8e4da04c38d8d0e1827d9b22
           path: iree-test-suites
           lfs: true
 
