@@ -4,16 +4,32 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// A simple native module for testing vm.call.yieldable to imports.
+// A native module for testing vm.call.yieldable to imports.
 // Exports a single function that yields N times before returning.
+//
+// This module provides a controlled way to test async/yield behavior:
+//   yield_n(arg: i32, yield_count: i32) -> i32
+//   Returns arg + yield_count after yielding yield_count times.
+//
+// NOTE: This module stores coroutine state (yield_count, accumulator) in module
+// state, which means it is not reentrant. Concurrent or interleaved calls on
+// the same module instance through the same VM context are not supported. This
+// is consistent with IREE's threading model where modules are thread-compatible
+// (safe for sequential use) but not thread-safe (no concurrent access).
+
+#ifndef IREE_VM_TESTING_YIELDABLE_TEST_MODULE_H_
+#define IREE_VM_TESTING_YIELDABLE_TEST_MODULE_H_
 
 #include "iree/base/api.h"
 #include "iree/vm/native_module.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //===----------------------------------------------------------------------===//
 // yieldable_test_module
 //===----------------------------------------------------------------------===//
-// Native module with a single yieldable function for testing.
 
 typedef struct yieldable_test_module_state_t {
   iree_allocator_t allocator;
@@ -37,18 +53,50 @@ static iree_status_t yieldable_test_module_yield_variadic_sum_shim(
     // Parse variadic arguments.
     // Layout: [segment_count: i32] [values: i32 * segment_count] [yield_count:
     // i32]
+
+    // Validate minimum size for segment_count field.
+    if (args_storage.data_length < sizeof(int32_t)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "argument buffer too small for segment_count; have %" PRIhsz
+          " bytes, need at least %" PRIhsz,
+          args_storage.data_length, sizeof(int32_t));
+    }
+
     const uint8_t* p = args_storage.data;
-    int32_t segment_count = *(const int32_t*)p;
+    int32_t segment_count;
+    memcpy(&segment_count, p, sizeof(int32_t));
     p += sizeof(int32_t);
+
+    // Validate segment_count is non-negative and buffer has sufficient space.
+    // Required size: segment_count (1) + values (segment_count) + yield_count
+    // (1).
+    if (segment_count < 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "segment_count must be non-negative; got %d",
+                              segment_count);
+    }
+    iree_host_size_t required_size =
+        (iree_host_size_t)(segment_count + 2) * sizeof(int32_t);
+    if (args_storage.data_length < required_size) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "argument buffer too small for %d variadic args; have %" PRIhsz
+          " bytes, need %" PRIhsz,
+          segment_count, args_storage.data_length, required_size);
+    }
 
     // Sum all variadic values.
     int32_t sum = 0;
     for (int32_t i = 0; i < segment_count; ++i) {
-      sum += *(const int32_t*)p;
+      int32_t value;
+      memcpy(&value, p, sizeof(int32_t));
+      sum += value;
       p += sizeof(int32_t);
     }
 
-    int32_t yield_count = *(const int32_t*)p;
+    int32_t yield_count;
+    memcpy(&yield_count, p, sizeof(int32_t));
 
     // Initialize state.
     state->yield_count = yield_count;
@@ -99,11 +147,22 @@ static iree_status_t yieldable_test_module_yield_n_shim(
       int32_t arg;
       int32_t yield_count;
     } args_t;
-    const args_t* args = (const args_t*)args_storage.data;
+
+    // Validate buffer size.
+    if (args_storage.data_length < sizeof(args_t)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "argument buffer too small; have %" PRIhsz
+                              " bytes, need %" PRIhsz,
+                              args_storage.data_length, sizeof(args_t));
+    }
+
+    // Use memcpy for alignment-safe access.
+    args_t args;
+    memcpy(&args, args_storage.data, sizeof(args_t));
 
     // Initialize state for coroutine.
-    state->yield_count = args->yield_count;
-    state->accumulator = args->arg;
+    state->yield_count = args.yield_count;
+    state->accumulator = args.arg;
 
     if (state->yield_count > 0) {
       state->accumulator += 1;
@@ -200,3 +259,9 @@ static iree_status_t yieldable_test_module_create(
                                       &yieldable_test_module_descriptor_,
                                       instance, allocator, out_module);
 }
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
+
+#endif  // IREE_VM_TESTING_YIELDABLE_TEST_MODULE_H_

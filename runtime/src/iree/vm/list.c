@@ -860,6 +860,9 @@ static iree_status_t iree_vm_list_get_ref(const iree_vm_list_t* list,
         return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
       }
       iree_vm_list_ref_op(ref_mode, &variant->ref, out_value);
+      if (ref_mode == IREE_VM_LIST_REF_MOVE) {
+        variant->type = iree_vm_make_undefined_type_def();
+      }
       break;
     }
     default:
@@ -978,7 +981,7 @@ static iree_status_t iree_vm_list_get_variant(const iree_vm_list_t* list,
                             "index %" PRIhsz " out of bounds (%" PRIhsz ")", i,
                             list->count);
   }
-  iree_vm_variant_reset(out_variant);
+  *out_variant = iree_vm_variant_empty();
   uintptr_t element_ptr = (uintptr_t)list->storage + i * list->element_size;
   switch (list->storage_mode) {
     case IREE_VM_LIST_STORAGE_MODE_VALUE: {
@@ -998,6 +1001,9 @@ static iree_status_t iree_vm_list_get_variant(const iree_vm_list_t* list,
       out_variant->type = variant->type;
       if (iree_vm_type_def_is_ref(variant->type)) {
         iree_vm_list_ref_op(ref_mode, &variant->ref, &out_variant->ref);
+        if (ref_mode == IREE_VM_LIST_REF_MOVE) {
+          variant->type = iree_vm_make_undefined_type_def();
+        }
       } else {
         memcpy(out_variant->value_storage, variant->value_storage,
                sizeof(variant->value_storage));
