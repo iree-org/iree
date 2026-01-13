@@ -8,15 +8,24 @@
     "--device=vulkan"
   ],
   "skip_compile_tests": [
-    "generated/test_a_t_b_float16",
-    "generated/test_a_b_plus_c_float16",
-    "generated/test_a_b_t_float16",
-    "generated/test_relu_a_b_plus_c_float16",
-    "generated/test_gelu_a_b_plus_c_float16"
+    "ATB/64x64xf16",
+    "ABPlusC/64x64xf16",
+    "ABT/64x64xf16",
+    "ReluABPlusC/64x64xf16",
+    "GeluABPlusC/64x64xf16",
+    "AB/64x64xf16",
+    "AB/Nx64xf16_64xNxf16"
   ],
-  "skip_run_tests": [
-    "generated/test_a_b_float16"
-  ],
+  "skip_run_tests": [],
   "expected_compile_failures": [],
-  "expected_run_failures": []
+  "expected_run_failures": [],
+  "golden_times_ms": {
+    "AB/8192x8192xf32_bench": 107.60851647438749,
+    "AB/1024x1024xf32_bench": 0.4509026762196051,
+    "AB/256x256xf32_bench": 0.1743873563575457,
+    "AB/128x128xf32_bench": 0.148048073505022,
+    "AB/2048x2048xf32_bench": 1.5943956199949283,
+    "AB/4096x4096xf32_bench": 10.252960922347533,
+    "AB/512x512xf32_bench": 0.23526767679662958
+  }
 }
