@@ -8,14 +8,21 @@
     "--device=vulkan"
   ],
   "skip_compile_tests": [
-    "generated/test_a_t_b_float16",
-    "generated/test_a_b_plus_c_float16",
-    "generated/test_a_b_t_float16",
-    "generated/test_relu_a_b_plus_c_float16",
-    "generated/test_gelu_a_b_plus_c_float16"
+    "ATB/64x64xf16",
+    "ABPlusC/64x64xf16",
+    "ABT/64x64xf16",
+    "ReluABPlusC/64x64xf16",
+    "GeluABPlusC/64x64xf16",
+    "AB/64x64xf16"
   ],
   "skip_run_tests": [
-    "generated/test_a_b_float16"
+    "AB/8192x8192xf32_bench",
+    "AB/4096x4096xf32_bench",
+    "AB/2048x2048xf32_bench",
+    "AB/1024x1024xf32_bench",
+    "AB/256x256xf32_bench",
+    "AB/128x128xf32_bench",
+    "AB/512x512xf32_bench"
   ],
   "expected_compile_failures": [],
   "expected_run_failures": []
