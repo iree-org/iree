@@ -148,31 +148,27 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
 ///
 /// Index computation rules for each dimension:
 ///
-/// | Condition                 | dstIdx    | srcIdx                         |
-/// |---------------------------|-----------|--------------------------------|
-/// | Gather dimension          | dimOffset | load(indices[dim][dimOffset])  |
-/// | Non-gather, non-innermost | dimOffset | dimOffset                      |
-/// | Non-gather, innermost     | dimOffset | dimOffset + laneOffset         |
+/// | Condition        | dstIdx    | srcIdx                         |
+/// |------------------|-----------|--------------------------------|
+/// | Gather dimension | dimOffset | load(indices[dim][dimOffset])  |
+/// | Non-gather       | dimOffset | dimOffset                      |
 ///
 /// Where:
 ///   - dimOffset: position in this dimension from delinearization
-///   - laneOffset: lane_id * elementsPerLane (for parallel access)
 ///   - indices[dim]: index memref mapping dest positions to source positions
 ///
-/// The innermost dimension always adds laneOffset so lanes access different
-/// elements in parallel.
+/// Lane-parallel access is achieved by incorporating the lane offset into the
+/// linearized offset BEFORE delinearization. This ensures correct distribution
+/// across all dimensions, handles overflow naturally, and provides proper
+/// per-element mapping for gather operations.
 static std::pair<SmallVector<Value>, SmallVector<Value>>
 generateGatherIndices(PatternRewriter &rewriter, Location loc,
-                      ValueRange dimOffsets, Value laneOffset,
-                      OperandRange indices) {
+                      ValueRange dimOffsets, OperandRange indices) {
   SmallVector<Value> srcIndices;
   SmallVector<Value> dstIndices;
   size_t numIndexDims = indices.size();
-  int64_t destRank = dimOffsets.size();
 
   for (auto [dim, dimOffset] : llvm::enumerate(dimOffsets)) {
-    bool isInnermost = (static_cast<int64_t>(dim) == destRank - 1);
-
     // Destination always uses the dimension offset directly.
     dstIndices.push_back(dimOffset);
 
@@ -181,17 +177,13 @@ generateGatherIndices(PatternRewriter &rewriter, Location loc,
     if (dim < numIndexDims) {
       // Gather dimension: load the source index from the index memref.
       // The index memref maps destination positions to source positions.
+      // Lane offset is already incorporated into dimOffset via delinearization.
       srcIdx = memref::LoadOp::create(rewriter, loc, indices[dim],
                                       ValueRange{dimOffset});
     } else {
       // Non-gather dimension: source and dest use the same offset.
+      // Lane offset is already incorporated via delinearization.
       srcIdx = dimOffset;
-    }
-
-    // For innermost dimension: add lane offset so each lane accesses a
-    // different element in parallel. This distributes the work across lanes.
-    if (isInnermost) {
-      srcIdx = arith::AddIOp::create(rewriter, loc, srcIdx, laneOffset);
     }
     srcIndices.push_back(srcIdx);
   }
@@ -319,18 +311,25 @@ struct LowerCoalescedGatherDMAPattern final
   }
 
 private:
-  /// Emits GatherToLDS operations with configurable linearization.
+  /// Emits GatherToLDS operations for a coalesced DMA transfer.
   ///
-  /// Iterates over the outer (rank - numLinearDims) dimensions individually,
-  /// and treats the inner numLinearDims dimensions as a single linear block.
-  /// This unified approach handles:
-  ///   - numLinearDims == rank: fully linearized (all dims contiguous)
-  ///   - numLinearDims == 1: only innermost dim linearized
-  ///   - 1 < numLinearDims < rank: hybrid (some trailing dims linearized)
+  /// The destination tensor is split into:
+  ///   - Outer dimensions: iterated individually (one element at a time)
+  ///   - Linear dimensions: the trailing `numLinearDims` dimensions are
+  ///     linearized and distributed across lanes
   ///
-  /// The number of linearized dimensions is determined by destination memory
-  /// contiguity, allowing efficient transfers while respecting layout
-  /// constraints.
+  /// For each position in the outer dimensions, the linearized portion is
+  /// transferred using multiple GatherToLDS operations. The lane offset
+  /// (precomputed as laneId * elementsPerLane) is added to the linearized
+  /// offset BEFORE delinearization. This ensures:
+  ///   1. Correct distribution across all linearized dimensions
+  ///   2. Natural overflow handling (delinearization performs the carry)
+  ///   3. Proper per-element index lookup for gather operations
+  ///
+  /// Example: shape [16, 64] with 32 lanes, 4 elements/lane:
+  ///   - Lane 16: linearOffset = 0 + 16*4 = 64
+  ///   - delinearize(64, [16, 64]) → [1, 0] (row 1, col 0)
+  ///   - Without pre-delinearization offset: would incorrectly access [0, 64]
   void emitTransfers(PatternRewriter &rewriter, Location loc, Value source,
                      Value dest, ArrayRef<int64_t> destShape,
                      int64_t numLinearDims, Type elementType,
@@ -376,9 +375,13 @@ private:
                 arith::ConstantIndexOp::create(rewriter, loc, outerOffsets[i]));
           }
 
-          // Delinearize the linear offset into the trailing dimensions.
+          // Add lane offset to linearized offset, then delinearize.
+          // This distributes lane-parallel access correctly across dimensions.
           Value linearOffsetVal =
               arith::ConstantIndexOp::create(rewriter, loc, linearOffset);
+          linearOffsetVal =
+              arith::AddIOp::create(rewriter, loc, linearOffsetVal, laneOffset);
+
           SmallVector<OpFoldResult> basis =
               getAsIndexOpFoldResult(rewriter.getContext(), linearBasis);
           auto delinearize = affine::AffineDelinearizeIndexOp::create(
@@ -387,8 +390,8 @@ private:
             dimOffsets.push_back(v);
           }
 
-          auto [srcIndices, dstIndices] = generateGatherIndices(
-              rewriter, loc, dimOffsets, laneOffset, indices);
+          auto [srcIndices, dstIndices] =
+              generateGatherIndices(rewriter, loc, dimOffsets, indices);
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
                                         dstIndices,
