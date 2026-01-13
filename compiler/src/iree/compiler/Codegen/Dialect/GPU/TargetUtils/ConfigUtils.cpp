@@ -379,8 +379,9 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     return std::nullopt;
   }
 
-  assert(problem.aType == problem.bType &&
-         "expected the same aType and bType.");
+  if (problem.aType != problem.bType) {
+    return std::nullopt;
+  }
   GemmCutoff gemmCutoffs =
       computeGemmCutoffsForAI(target, problem.aType, scaled);
 
