@@ -586,10 +586,11 @@ LogicalResult MapGatherOp::generateScalarImplementation(OpBuilder &b,
 
     // Check bounds for each source dimension. Start with true so that
     // for 0-D sources, inBounds is always true.
-    Value inBounds = arith::ConstantIntOp::create(nestedBuilder, nestedLoc,
-                                                  /*value=*/1, /*width=*/1);
+    Value inBounds = nestedBuilder.createOrFold<arith::ConstantIntOp>(
+        nestedLoc, /*value=*/1, /*width=*/1);
+    Value zero =
+        nestedBuilder.createOrFold<arith::ConstantIndexOp>(nestedLoc, 0);
     for (auto [dim, idx] : llvm::enumerate(loadIndices)) {
-      Value zero = arith::ConstantIndexOp::create(nestedBuilder, nestedLoc, 0);
       Value dimSize =
           memref::DimOp::create(nestedBuilder, nestedLoc, getSource(), dim);
 
