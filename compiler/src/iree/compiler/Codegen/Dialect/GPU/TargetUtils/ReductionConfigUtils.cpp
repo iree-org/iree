@@ -194,6 +194,10 @@ getVectorDistributeReductionConfig(
       parallelSize = kVectorDistributeReductionSizeToTargetIfDynamic;
     }
     if (parallelSize % threadLoads != 0) {
+      LDBG() << "Failed to get vector distribute config for op ("
+             << "parallelSize=" << parallelSize
+             << " is not divisible by threadLoads=" << threadLoads << "):\n"
+             << op << "\n";
       return failure();
     }
 
@@ -290,6 +294,10 @@ getVectorDistributeReductionConfig(
     lastReductionDimSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
   if (lastReductionDimSize % threadLoads != 0) {
+    LDBG() << "Failed to get vector distribute config for op ("
+           << "lastReductionDimSize=" << lastReductionDimSize
+           << " is not divisible by threadLoads=" << threadLoads << "):\n"
+           << op << "\n";
     return failure();
   }
 
@@ -438,6 +446,7 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
     return false;
   };
 
+  SmallVector<std::tuple<Operation *, LoweringConfigAttr>> loweringConfigs;
   for (linalg::LinalgOp linalgOp : computeOps) {
     if (hasReductionIterator(linalgOp) ||
         shouldAttachLoweringConfig(linalgOp)) {
@@ -447,8 +456,13 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
       if (failed(loweringConfig)) {
         return failure();
       }
-      setLoweringConfig(linalgOp, *loweringConfig);
+      loweringConfigs.push_back({linalgOp, *loweringConfig});
     }
+  }
+  // Only set lowering configs once we've sucessfully determined them for all
+  // operations, to avoid leaving the IR in an inconsistent state on failure.
+  for (auto &[linalgOp, loweringConfig] : loweringConfigs) {
+    setLoweringConfig(linalgOp, loweringConfig);
   }
   return success();
 }
