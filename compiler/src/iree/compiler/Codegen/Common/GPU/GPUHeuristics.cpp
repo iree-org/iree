@@ -65,13 +65,24 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
 
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
     const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth,
+    int64_t lhsScaleBitwidth = 0, int64_t rhsScaleBitwidth = 0,
     int64_t numRhs = 1) {
   int64_t tileM = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
                   schedule.getTotalMSubgroupCount();
   int64_t tileN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
                   schedule.getTotalNSubgroupCount();
+
   int64_t tileK = schedule.getTotalKSize() * schedule.getTotalKTileSize();
-  return (tileM * tileK * lhsBitwidth + numRhs * tileN * tileK * rhsBitwidth) /
+  int64_t tileKb = schedule.kSizes.back() * schedule.kTileSizes.back();
+  int64_t tileKo = tileK / tileKb;
+
+  int64_t lhsSharedMemoryUsed = tileM * tileK * lhsBitwidth;
+  int64_t rhsSharedMemoryUsed = numRhs * tileN * tileK * rhsBitwidth;
+  int64_t aScaleSharedMemoryUsed = tileM * tileKo * lhsScaleBitwidth;
+  int64_t bScaleSharedMemoryUsed = numRhs * tileN * tileKo * rhsScaleBitwidth;
+
+  return (lhsSharedMemoryUsed + rhsSharedMemoryUsed + aScaleSharedMemoryUsed +
+          bScaleSharedMemoryUsed) /
          8;
 }
 
@@ -673,14 +684,23 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     LDBG() << "Chosen MMA schedule:\n" << schedule;
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
-      int64_t lhsBitwidth = intrinsic.aType.getIntOrFloatBitWidth();
-      int64_t rhsBitwidth = intrinsic.bType.getIntOrFloatBitWidth();
-      int64_t resultBitwidth = intrinsic.cType.getIntOrFloatBitWidth();
+      int64_t lhsBitwidth = problem.aType.getIntOrFloatBitWidth();
+      int64_t rhsBitwidth = problem.bType.getIntOrFloatBitWidth();
+      int64_t resultBitwidth = problem.cType.getIntOrFloatBitWidth();
+      int64_t lhsScaleBitwidth =
+          problem.aScaleType.has_value()
+              ? problem.aScaleType->getIntOrFloatBitWidth()
+              : 0;
+      int64_t rhsScaleBitwidth =
+          problem.bScaleType.has_value()
+              ? problem.bScaleType->getIntOrFloatBitWidth()
+              : 0;
       bool isAligned =
           isValidMMASchedule(problem, schedule, mustBeAligned, subgroupSize,
                              transposedLhs, transposedRhs);
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
-          schedule, lhsBitwidth, rhsBitwidth, problem.numHorizontallyFusedOps);
+          schedule, lhsBitwidth, rhsBitwidth, lhsScaleBitwidth,
+          rhsScaleBitwidth, problem.numHorizontallyFusedOps);
       // Add accumulator/result memory when it uses shared memory (LDS):
       // - Result needs padding in shared memory, OR
       // - matmul_accumulate loads accumulator from global memory via shared mem

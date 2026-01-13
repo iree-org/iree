@@ -20,9 +20,13 @@ struct GPUMatmulShapeType {
   SmallVector<int64_t, 2> nSizes;
   SmallVector<int64_t, 2> kSizes;
   SmallVector<int64_t, 2> batchSizes;
+
   Type aType;
   Type bType;
+  std::optional<Type> aScaleType;
+  std::optional<Type> bScaleType;
   Type cType;
+
   GemmSize gemmSize = GemmSize::NotSet;
 
   // Number of horizontally fused operations.
@@ -34,11 +38,21 @@ struct GPUMatmulShapeType {
                      int64_t numHorizontallyFusedOps = 1)
       : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
         bType(b), cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
+
   GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
                      ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
                      Type b, Type c, int64_t numHorizontallyFusedOps = 1)
       : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
         cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
+
+  GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
+                     ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
+                     Type b, std::optional<Type> aScale,
+                     std::optional<Type> bScale, Type c,
+                     int64_t numHorizontallyFusedOps = 1)
+      : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
+        aScaleType(aScale), bScaleType(bScale), cType(c),
+        numHorizontallyFusedOps(numHorizontallyFusedOps) {}
 };
 
 /// Struct containing information about a GPU MMA intrinsic type.

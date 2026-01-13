@@ -773,24 +773,24 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   assert((operands.size() == 3 || scaled) && "expected 3 operands");
   assert((operands.size() == 5 || !scaled) && "expected 5 operands");
 
-  Value lhs = operands[0];
-  Value rhs = operands[1];
+  Type lhsElemType = getElementTypeOrSelf(operands[0]);
+  Type rhsElemType = getElementTypeOrSelf(operands[1]);
+  Type initElemType = getElementTypeOrSelf(operands[2]);
+  std::optional<Type> lhsScaleType, rhsScaleType;
 
-  Value init = operands[2];
   if (scaled) {
-    init = operands[4];
     assert(llvm::all_of(operands,
                         [](Value a) { return isa<ShapedType>(a.getType()); }) &&
            "All operands must be a shaped type");
-    assert(*getRank(lhs) > *getRank(operands[2]) &&
-           *getRank(rhs) > *getRank(operands[3]) &&
+    assert(*getRank(operands[0]) > *getRank(operands[2]) &&
+           *getRank(operands[1]) > *getRank(operands[3]) &&
            "Expected operand #0 (lhs) and operand #1 (rhs) to have a greater "
            "rank than their corresponding scales, operand #2 (lhs_scale) and "
            "operand #3 (rhs_scale)");
+    lhsScaleType = getElementTypeOrSelf(operands[2]);
+    rhsScaleType = getElementTypeOrSelf(operands[3]);
+    initElemType = getElementTypeOrSelf(operands[4]);
   }
-  Type lhsElemType = getElementTypeOrSelf(lhs);
-  Type rhsElemType = getElementTypeOrSelf(rhs);
-  Type initElemType = getElementTypeOrSelf(init);
   // Intentionally padded GEMM proved to be beneficial for performance for
   // the following layouts: 1) [M, K] x [K, N] 2) [M, K] x [N, K]
   // Therefore we disallow padding only when LHS is transposed.
@@ -800,6 +800,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              getDimBoundsNoPad(batchDims),
                              lhsElemType,
                              rhsElemType,
+                             lhsScaleType,
+                             rhsScaleType,
                              initElemType};
 
   // Accumulator needs shared memory if:
@@ -889,7 +891,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
-  MLIRContext *context = lhs.getContext();
+  MLIRContext *context = target.getContext();
   Builder b(context);
   SmallVector<NamedAttribute> attrs = {
       {"workgroup", b.getI64ArrayAttr(workgroupTileSizes)},
