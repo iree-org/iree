@@ -1,17 +1,16 @@
-// Tested by iree/vm/bytecode/dispatch_async_test.cc.
-
 vm.module @async_ops {
   //===--------------------------------------------------------------------===//
   // vm.yield
   //===--------------------------------------------------------------------===//
 
   // Tests a simple straight-line yield sequence that requires 3 resumes.
-  //
-  // Expects a result of %arg0 + 3.
-  vm.export @yield_sequence
-  vm.func @yield_sequence(%arg0: i32) -> i32 {
+  // Starts with 100, adds 1 three times across yields, expects 103.
+  vm.export @test_yield_sequence
+  vm.func @test_yield_sequence() {
     %c1 = vm.const.i32 1
-    %y0 = vm.add.i32 %arg0, %c1 : i32
+    %c100 = vm.const.i32 100
+    %c100_dno = util.optimization_barrier %c100 : i32
+    %y0 = vm.add.i32 %c100_dno, %c1 : i32
     %y0_dno = util.optimization_barrier %y0 : i32
     vm.yield ^bb1
   ^bb1:
@@ -23,25 +22,47 @@ vm.module @async_ops {
     %y2_dno = util.optimization_barrier %y2 : i32
     vm.yield ^bb3
   ^bb3:
-    vm.return %y2_dno : i32
+    %c103 = vm.const.i32 103
+    vm.check.eq %y2_dno, %c103, "100+1+1+1=103" : i32
+    vm.return
   }
 
-  // Tests a yield with data-dependent control, ensuring that we run the
-  // alternating branches and pass along branch args on resume.
-  //
-  // Expects a result of %arg0 ? %arg1 : %arg2.
-  vm.export @yield_divergent
-  vm.func @yield_divergent(%arg0: i32, %arg1: i32, %arg2: i32) -> i32 {
-    %cond = vm.cmp.nz.i32 %arg0 : i32
+  // Tests a yield with data-dependent control flow (true branch).
+  vm.export @test_yield_divergent_true
+  vm.func @test_yield_divergent_true() {
+    %c1 = vm.const.i32 1
+    %c100 = vm.const.i32 100
+    %c200 = vm.const.i32 200
+    %cond = vm.cmp.nz.i32 %c1 : i32
     vm.cond_br %cond, ^true, ^false
   ^true:
-    %arg1_dno = util.optimization_barrier %arg1 : i32
-    vm.yield ^bb3(%arg1_dno : i32)
+    %v_true = util.optimization_barrier %c100 : i32
+    vm.yield ^check(%v_true : i32)
   ^false:
-    %arg2_dno = util.optimization_barrier %arg2 : i32
-    vm.yield ^bb3(%arg2_dno: i32)
-  ^bb3(%result : i32):
-    vm.return %result : i32
+    %v_false = util.optimization_barrier %c200 : i32
+    vm.yield ^check(%v_false : i32)
+  ^check(%result : i32):
+    vm.check.eq %result, %c100, "cond=1 selects true branch" : i32
+    vm.return
+  }
+
+  // Tests a yield with data-dependent control flow (false branch).
+  vm.export @test_yield_divergent_false
+  vm.func @test_yield_divergent_false() {
+    %c0 = vm.const.i32 0
+    %c100 = vm.const.i32 100
+    %c200 = vm.const.i32 200
+    %cond = vm.cmp.nz.i32 %c0 : i32
+    vm.cond_br %cond, ^true, ^false
+  ^true:
+    %v_true = util.optimization_barrier %c100 : i32
+    vm.yield ^check(%v_true : i32)
+  ^false:
+    %v_false = util.optimization_barrier %c200 : i32
+    vm.yield ^check(%v_false : i32)
+  ^check(%result : i32):
+    vm.check.eq %result, %c200, "cond=0 selects false branch" : i32
+    vm.return
   }
 
   //===--------------------------------------------------------------------===//
@@ -69,14 +90,15 @@ vm.module @async_ops {
   }
 
   // Tests calling an internal yieldable function.
-  // The callee yields 4 times, so we need 4 resumes.
-  // Expects result of 0 + 4 = 4.
-  vm.export @call_yieldable_internal attributes {emitc.exclude}
-  vm.func @call_yieldable_internal() -> i32 {
+  // The callee yields 4 times. Expects result of 0 + 4 = 4.
+  vm.export @test_call_yieldable_internal attributes {emitc.exclude}
+  vm.func @test_call_yieldable_internal() {
     %c0 = vm.const.i32 0
     vm.call.yieldable @yield_counter(%c0) : (i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c4 = vm.const.i32 4
+    vm.check.eq %result, %c4, "0+4=4" : i32
+    vm.return
   }
 
   // Internal function that takes an input and yields once, returning input + 1.
@@ -90,12 +112,15 @@ vm.module @async_ops {
   }
 
   // Tests calling an internal yieldable function with an argument.
-  // Expects result of %arg0 + 1.
-  vm.export @call_yieldable_with_arg attributes {emitc.exclude}
-  vm.func @call_yieldable_with_arg(%arg0: i32) -> i32 {
-    vm.call.yieldable @yield_add_one(%arg0) : (i32) -> ^resume(i32)
+  // Expects result of 42 + 1 = 43.
+  vm.export @test_call_yieldable_with_arg attributes {emitc.exclude}
+  vm.func @test_call_yieldable_with_arg() {
+    %c42 = vm.const.i32 42
+    vm.call.yieldable @yield_add_one(%c42) : (i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c43 = vm.const.i32 43
+    vm.check.eq %result, %c43, "42+1=43" : i32
+    vm.return
   }
 
   //===--------------------------------------------------------------------===//
@@ -112,42 +137,51 @@ vm.module @async_ops {
   vm.import private @yieldable_test.yield_variadic_sum(%args : i32 ..., %yield_count : i32) -> i32 attributes {vm.yield}
 
   // Test: call yieldable import with 3 yields.
-  // Expected: 3 DEFERRED returns, then OK with result = arg + 3
-  vm.export @call_yieldable_import_yields_3 attributes {emitc.exclude}
-  vm.func @call_yieldable_import_yields_3(%arg0 : i32) -> i32 {
+  // Expects 100 + 3 = 103.
+  vm.export @test_call_yieldable_import_yields_3 attributes {emitc.exclude}
+  vm.func @test_call_yieldable_import_yields_3() {
+    %c100 = vm.const.i32 100
     %c3 = vm.const.i32 3
-    vm.call.yieldable @yieldable_test.yield_n(%arg0, %c3) : (i32, i32) -> ^resume(i32)
+    vm.call.yieldable @yieldable_test.yield_n(%c100, %c3) : (i32, i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c103 = vm.const.i32 103
+    vm.check.eq %result, %c103, "100+3=103" : i32
+    vm.return
   }
 
   // Test: call yieldable import with 0 yields (synchronous).
-  // Expected: immediate OK with result = arg
-  vm.export @call_yieldable_import_yields_0 attributes {emitc.exclude}
-  vm.func @call_yieldable_import_yields_0(%arg0 : i32) -> i32 {
+  // Expects immediate return with 42.
+  vm.export @test_call_yieldable_import_yields_0 attributes {emitc.exclude}
+  vm.func @test_call_yieldable_import_yields_0() {
+    %c42 = vm.const.i32 42
     %c0 = vm.const.i32 0
-    vm.call.yieldable @yieldable_test.yield_n(%arg0, %c0) : (i32, i32) -> ^resume(i32)
+    vm.call.yieldable @yieldable_test.yield_n(%c42, %c0) : (i32, i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    vm.check.eq %result, %c42, "42+0=42" : i32
+    vm.return
   }
 
   // Test: call yieldable import after internal function call.
-  // This exercises Bug 2 fix: return_registers must be cleared after internal call.
+  // This exercises return_registers clearing after internal call.
   vm.func private @internal_add_10(%x : i32) -> i32 {
     %c10 = vm.const.i32 10
     %r = vm.add.i32 %x, %c10 : i32
     vm.return %r : i32
   }
 
-  vm.export @call_yieldable_after_internal attributes {emitc.exclude}
-  vm.func @call_yieldable_after_internal(%arg0 : i32) -> i32 {
+  // Expects (5 + 10) + 2 = 17.
+  vm.export @test_call_yieldable_after_internal attributes {emitc.exclude}
+  vm.func @test_call_yieldable_after_internal() {
+    %c5 = vm.const.i32 5
     // First call an internal function (sets return_registers).
-    %v1 = vm.call @internal_add_10(%arg0) : (i32) -> i32
-    // Then call yieldable import (should see return_registers == NULL for begin).
+    %v1 = vm.call @internal_add_10(%c5) : (i32) -> i32
+    // Then call yieldable import.
     %c2 = vm.const.i32 2
     vm.call.yieldable @yieldable_test.yield_n(%v1, %c2) : (i32, i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c17 = vm.const.i32 17
+    vm.check.eq %result, %c17, "(5+10)+2=17" : i32
+    vm.return
   }
 
   //===--------------------------------------------------------------------===//
@@ -155,25 +189,25 @@ vm.module @async_ops {
   //===--------------------------------------------------------------------===//
 
   // Test: two sequential yieldable import calls in the same function.
-  // This catches bugs where the second call sees stale state from the first.
-  // Expected: 2 yields from first call + 3 yields from second call = 5 total
-  // Result: (arg + 2) + 3 = arg + 5
-  vm.export @call_yieldable_import_sequential attributes {emitc.exclude}
-  vm.func @call_yieldable_import_sequential(%arg0 : i32) -> i32 {
+  // Expects (10 + 2) + 3 = 15.
+  vm.export @test_call_yieldable_import_sequential attributes {emitc.exclude}
+  vm.func @test_call_yieldable_import_sequential() {
+    %c10 = vm.const.i32 10
     %c2 = vm.const.i32 2
     %c3 = vm.const.i32 3
-    // First yieldable import: yields 2 times, returns arg + 2
-    vm.call.yieldable @yieldable_test.yield_n(%arg0, %c2) : (i32, i32) -> ^after_first(i32)
+    // First yieldable import: yields 2 times, returns 10 + 2 = 12
+    vm.call.yieldable @yieldable_test.yield_n(%c10, %c2) : (i32, i32) -> ^after_first(i32)
   ^after_first(%v1 : i32):
-    // Second yieldable import: yields 3 times, returns v1 + 3 = arg + 5
+    // Second yieldable import: yields 3 times, returns 12 + 3 = 15
     vm.call.yieldable @yieldable_test.yield_n(%v1, %c3) : (i32, i32) -> ^done(i32)
   ^done(%result : i32):
-    vm.return %result : i32
+    %c15 = vm.const.i32 15
+    vm.check.eq %result, %c15, "(10+2)+3=15" : i32
+    vm.return
   }
 
   // Test: yieldable import nested inside an internal yieldable function.
   // The internal function yields before and after calling the import.
-  // This creates the most complex frame stack scenario.
   vm.func private @yield_then_import_then_yield(%arg0 : i32) -> i32 {
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
@@ -193,25 +227,28 @@ vm.module @async_ops {
     vm.return %v2_dno : i32
   }
 
-  // Export that calls the nested yieldable function.
-  // Expected sequence: 1 yield (internal) + 2 yields (import) + 1 yield (internal) = 4 yields
-  // Result: ((arg + 1) + 2) + 1 = arg + 4
-  vm.export @call_nested_yieldable attributes {emitc.exclude}
-  vm.func @call_nested_yieldable(%arg0 : i32) -> i32 {
-    vm.call.yieldable @yield_then_import_then_yield(%arg0) : (i32) -> ^resume(i32)
+  // Expects ((50 + 1) + 2) + 1 = 54.
+  vm.export @test_call_nested_yieldable attributes {emitc.exclude}
+  vm.func @test_call_nested_yieldable() {
+    %c50 = vm.const.i32 50
+    vm.call.yieldable @yield_then_import_then_yield(%c50) : (i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c54 = vm.const.i32 54
+    vm.check.eq %result, %c54, "((50+1)+2)+1=54" : i32
+    vm.return
   }
 
   // Test: stress test with many yields to catch state accumulation bugs.
-  // Calls yieldable import with high yield count.
-  // Expected: 10 yields, result = arg + 10
-  vm.export @call_yieldable_import_stress attributes {emitc.exclude}
-  vm.func @call_yieldable_import_stress(%arg0 : i32) -> i32 {
+  // Expects 1000 + 10 = 1010.
+  vm.export @test_call_yieldable_import_stress attributes {emitc.exclude}
+  vm.func @test_call_yieldable_import_stress() {
+    %c1000 = vm.const.i32 1000
     %c10 = vm.const.i32 10
-    vm.call.yieldable @yieldable_test.yield_n(%arg0, %c10) : (i32, i32) -> ^resume(i32)
+    vm.call.yieldable @yieldable_test.yield_n(%c1000, %c10) : (i32, i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c1010 = vm.const.i32 1010
+    vm.check.eq %result, %c1010, "1000+10=1010" : i32
+    vm.return
   }
 
   //===--------------------------------------------------------------------===//
@@ -219,58 +256,75 @@ vm.module @async_ops {
   //===--------------------------------------------------------------------===//
 
   // Test: call variadic yieldable import with 2 args and 3 yields.
-  // Expected: 3 DEFERRED returns, then OK with result = (arg0 + arg1) + 3
-  vm.export @call_variadic_yieldable_2args attributes {emitc.exclude}
-  vm.func @call_variadic_yieldable_2args(%arg0 : i32, %arg1 : i32) -> i32 {
+  // Expects (10 + 20) + 3 = 33.
+  vm.export @test_call_variadic_yieldable_2args attributes {emitc.exclude}
+  vm.func @test_call_variadic_yieldable_2args() {
+    %c10 = vm.const.i32 10
+    %c20 = vm.const.i32 20
     %c3 = vm.const.i32 3
-    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%arg0, %arg1, %c3) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^resume(i32)
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%c10, %c20, %c3) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c33 = vm.const.i32 33
+    vm.check.eq %result, %c33, "(10+20)+3=33" : i32
+    vm.return
   }
 
   // Test: call variadic yieldable import with 0 yields (synchronous).
-  // Expected: immediate OK with result = arg0 + arg1 + arg2
-  vm.export @call_variadic_yieldable_0yields attributes {emitc.exclude}
-  vm.func @call_variadic_yieldable_0yields(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
+  // Expects 5 + 10 + 15 = 30.
+  vm.export @test_call_variadic_yieldable_0yields attributes {emitc.exclude}
+  vm.func @test_call_variadic_yieldable_0yields() {
+    %c5 = vm.const.i32 5
+    %c10 = vm.const.i32 10
+    %c15 = vm.const.i32 15
     %c0 = vm.const.i32 0
-    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%arg0, %arg1, %arg2, %c0) {segment_sizes = dense<[3, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32, i32) -> ^resume(i32)
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%c5, %c10, %c15, %c0) {segment_sizes = dense<[3, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32, i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c30 = vm.const.i32 30
+    vm.check.eq %result, %c30, "5+10+15+0=30" : i32
+    vm.return
   }
 
   // Test: call variadic yieldable import with single arg.
-  // Expected: 2 yields, result = arg0 + 2
-  vm.export @call_variadic_yieldable_1arg attributes {emitc.exclude}
-  vm.func @call_variadic_yieldable_1arg(%arg0 : i32) -> i32 {
+  // Expects 100 + 2 = 102.
+  vm.export @test_call_variadic_yieldable_1arg attributes {emitc.exclude}
+  vm.func @test_call_variadic_yieldable_1arg() {
+    %c100 = vm.const.i32 100
     %c2 = vm.const.i32 2
-    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%arg0, %c2) {segment_sizes = dense<[1, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32) -> ^resume(i32)
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%c100, %c2) {segment_sizes = dense<[1, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    %c102 = vm.const.i32 102
+    vm.check.eq %result, %c102, "100+2=102" : i32
+    vm.return
   }
 
   // Test: call variadic yieldable import with empty variadic list.
-  // Expected: 1 yield, result = 0 + 1 = 1
-  vm.export @call_variadic_yieldable_empty attributes {emitc.exclude}
-  vm.func @call_variadic_yieldable_empty() -> i32 {
+  // Expects 0 + 1 = 1.
+  vm.export @test_call_variadic_yieldable_empty attributes {emitc.exclude}
+  vm.func @test_call_variadic_yieldable_empty() {
     %c1 = vm.const.i32 1
     vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%c1) {segment_sizes = dense<[0, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32) -> ^resume(i32)
   ^resume(%result : i32):
-    vm.return %result : i32
+    vm.check.eq %result, %c1, "0+1=1" : i32
+    vm.return
   }
 
   // Test: two sequential variadic yieldable calls.
-  // Expected: 2 yields from first + 1 yield from second = 3 yields total
-  // Result: ((arg0 + arg1) + 2) + (arg2) + 1 = arg0 + arg1 + arg2 + 3
-  vm.export @call_variadic_yieldable_sequential attributes {emitc.exclude}
-  vm.func @call_variadic_yieldable_sequential(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
+  // Expects ((10 + 20) + 2) + (32 + 5) + 1 = 38.
+  vm.export @test_call_variadic_yieldable_sequential attributes {emitc.exclude}
+  vm.func @test_call_variadic_yieldable_sequential() {
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
-    // First variadic yieldable: sum(arg0, arg1) + 2 yields
-    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%arg0, %arg1, %c2) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^after_first(i32)
+    %c5 = vm.const.i32 5
+    %c10 = vm.const.i32 10
+    %c20 = vm.const.i32 20
+    // First variadic yieldable: sum(10, 20) + 2 yields = 32
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%c10, %c20, %c2) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^after_first(i32)
   ^after_first(%v1 : i32):
-    // Second variadic yieldable: sum(v1, arg2) + 1 yield
-    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%v1, %arg2, %c1) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^done(i32)
+    // Second variadic yieldable: sum(32, 5) + 1 yield = 38
+    vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum(%v1, %c5, %c1) {segment_sizes = dense<[2, 1]> : vector<2xi16>, segment_types = [i32, i32]} : (i32, i32, i32) -> ^done(i32)
   ^done(%result : i32):
-    vm.return %result : i32
+    %c38 = vm.const.i32 38
+    vm.check.eq %result, %c38, "((10+20)+2)+((32+5)+1)=38" : i32
+    vm.return
   }
 }

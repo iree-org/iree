@@ -34,6 +34,7 @@ iree_c_embed_data(
         ":assignment_ops_f32.vmfb",
         ":assignment_ops_f64.vmfb",
         ":assignment_ops_i64.vmfb",
+        ":async_ops.vmfb",
         ":buffer_ops.vmfb",
         ":call_ops.vmfb",
         ":comparison_ops.vmfb",
@@ -59,25 +60,6 @@ iree_c_embed_data(
     c_file_output = "all_bytecode_modules.c",
     flatten = True,
     h_file_output = "all_bytecode_modules.h",
-)
-
-iree_c_embed_data(
-    name = "async_bytecode_modules_c",
-    srcs = [
-        ":async_ops.vmfb",
-    ],
-    c_file_output = "async_bytecode_modules.c",
-    flatten = True,
-    h_file_output = "async_bytecode_modules.h",
-)
-
-iree_runtime_cc_library(
-    name = "async_ops_test_module",
-    hdrs = ["async_ops_test_module.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/vm",
-    ],
 )
 
 iree_bytecode_module(
