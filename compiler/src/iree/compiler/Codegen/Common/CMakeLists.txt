@@ -81,6 +81,7 @@ iree_cc_library(
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "ConvertUnsupportedFloatArithPass.cpp"
+    "ConvertWorkgroupForallToPCF.cpp"
     "ConvolutionToIGEMM.cpp"
     "DecomposeAffineOpsPass.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
@@ -232,6 +233,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
     iree::compiler::Codegen::Dialect::PCF::IR
+    iree::compiler::Codegen::Dialect::PCF::Transforms
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Dialect::VectorExt::Transforms::VectorExtTransforms
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
