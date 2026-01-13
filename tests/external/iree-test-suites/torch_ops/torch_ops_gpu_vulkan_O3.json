@@ -15,15 +15,7 @@
     "GeluABPlusC/64x64xf16",
     "AB/64x64xf16"
   ],
-  "skip_run_tests": [
-    "AB/8192x8192xf32_bench",
-    "AB/4096x4096xf32_bench",
-    "AB/2048x2048xf32_bench",
-    "AB/1024x1024xf32_bench",
-    "AB/256x256xf32_bench",
-    "AB/128x128xf32_bench",
-    "AB/512x512xf32_bench"
-  ],
+  "skip_run_tests": [],
   "expected_compile_failures": [],
   "expected_run_failures": []
 }
