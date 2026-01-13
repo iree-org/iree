@@ -1739,12 +1739,8 @@ void FuncOp::print(OpAsmPrinter &p) {
 }
 
 LogicalResult FuncOp::verify() {
-  Operation *op = getOperation();
-
-  auto tiedOperandsAttr = getTiedOperandsAttr();
-  if (tiedOperandsAttr) {
-    auto functionType = cast<FunctionType>(getFunctionTypeAttr().getValue());
-    auto numInputs = functionType.getInputs().size();
+  if (auto tiedOperandsAttr = getTiedOperandsAttr()) {
+    auto numInputs = getFunctionType().getNumInputs();
 
     if (llvm::any_of(tiedOperandsAttr.getAsRange<IntegerAttr>(),
                      [numInputs](IntegerAttr attr) {
@@ -1753,7 +1749,7 @@ LogicalResult FuncOp::verify() {
                                   IREE::Util::TiedOpInterface::kUntiedIndex &&
                               (index < 0 || index >= numInputs);
                      }))
-      return op->emitError("tied_operands index out of range");
+      return emitError("tied_operands index out of range");
   }
 
   return success();
