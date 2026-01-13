@@ -17,6 +17,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/Remarks.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-heuristics"
 
@@ -662,9 +663,9 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> wgpCount, bool transposedLhs,
-    bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
-    bool doCPromotion, int64_t splitReductionTripCnt) {
+    int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
+    bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
+    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -714,7 +715,15 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
              << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
              << " bytes";
-      return isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
+
+      bool isValid = isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
+      if (isValid) {
+        // Only emit remark for the shared memory usage of the valid schedule.
+        remark::analysis(loc, remark::RemarkOpts::name("SharedMemoryUsage")
+                                  .category("deduceMMASchedule"))
+            << std::to_string(sharedMemoryUsed);
+      }
+      return isValid;
     };
     return fitScheduleInSharedMemory(schedule, isValidSchedule);
   }

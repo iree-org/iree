@@ -338,7 +338,7 @@ getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm,
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
-    IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
+    IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
     bool transposedLhs, bool transposedRhs, bool isGemm,
     bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false,
     int64_t splitReductionTripCnt = 0) {
@@ -432,7 +432,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-      wgpCount, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
+      wgpCount, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
       /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt);
   return schedule;
 }
@@ -776,8 +776,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Type lhsElemType = getElementTypeOrSelf(operands[0]);
   Type rhsElemType = getElementTypeOrSelf(operands[1]);
   Type initElemType = getElementTypeOrSelf(operands[2]);
-  Type lhsScaleType = nullptr;
-  Type rhsScaleType = nullptr;
+  Type lhsScaleType;
+  Type rhsScaleType;
   if (scaled) {
     assert(llvm::all_of(operands,
                         [](Value a) { return isa<ShapedType>(a.getType()); }) &&
@@ -811,8 +811,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       (couldNeedPadding && CPromoteIfPadding) || hasExistingAccumulator;
 
   bool mustBeAligned = true;
+  Location loc = operands[0].getLoc();
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, transposedLhs, transposedRhs, isGemm,
+      target, problem, loc, transposedLhs, transposedRhs, isGemm,
       /*mustBeAligned=*/true, doCPromotion, scaled, splitReductionTripCnt);
 
   if (!schedule && canSupportUnaligned) {
@@ -822,8 +823,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // accumulator.
     bool doCPromotionUnaligned = CPromoteIfPadding || hasExistingAccumulator;
     schedule = getMmaScheduleFromProblemAndTarget(
-        target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
-        doCPromotionUnaligned, scaled, splitReductionTripCnt);
+        target, problem, loc, transposedLhs, transposedRhs, isGemm,
+        mustBeAligned, doCPromotionUnaligned, scaled, splitReductionTripCnt);
   }
 
   if (!schedule) {
@@ -1874,17 +1875,17 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   bool transposedRhs = rhsKPos > nPos;
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, transposedLhs, transposedRhs, /*isGemm=*/false,
-      mustBeAligned, /*doCPromotion=*/false, /*scaled=*/false,
-      splitReductionTripCnt);
+      target, problem, linalgOp.getLoc(), transposedLhs, transposedRhs,
+      /*isGemm=*/false, mustBeAligned, /*doCPromotion=*/false,
+      /*scaled=*/false, splitReductionTripCnt);
 
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
     mustBeAligned = false;
     schedule = getMmaScheduleFromProblemAndTarget(
-        target, problem, transposedLhs, transposedRhs, /*isGemm=*/false,
-        mustBeAligned, /*doCPromotion=*/false, /*scaled=*/false,
-        splitReductionTripCnt);
+        target, problem, linalgOp.getLoc(), transposedLhs, transposedRhs,
+        /*isGemm=*/false, mustBeAligned, /*doCPromotion=*/false,
+        /*scaled=*/false, splitReductionTripCnt);
   }
   if (!schedule) {
     LDBG() << "Failed to deduce TileAndFuse MMA schedule";

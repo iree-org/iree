@@ -3,6 +3,12 @@
 // RUN: --iree-codegen-llvmgpu-use-igemm=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS
+
 #lhs_map = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
 #rhs_map = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
 #scale_m = affine_map<(M, N, Ko, Kb) -> (M, Ko)>
@@ -34,6 +40,10 @@ func.func @scaled_matmul(
 //  CHECK-SAME:     reduction = [0, 0, 1, 1]
 //  CHECK-SAME:     subgroup = [4, 8, 0, 0]
 //  CHECK-SAME:     workgroup = [256, 256, 0, 0]
+
+// CHECK-REMARKS: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-SAME: Remark=34816
 
 // -----
 
@@ -69,6 +79,10 @@ func.func @scaled_matmul_with_batch(
 //  CHECK-SAME:     reduction = [0, 0, 0, 1, 1]
 //  CHECK-SAME:     subgroup = [0, 4, 8, 0, 0]
 //  CHECK-SAME:     workgroup = [1, 256, 256, 0, 0]
+
+// CHECK-REMARKS: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-SAME: Remark=34816
 
 // -----
 
@@ -132,6 +146,10 @@ func.func @scaled_matmul_with_dynamic_batch(
 //  CHECK-SAME:     subgroup = [0, 4, 4, 0, 0]
 //  CHECK-SAME:     workgroup = [1, 128, 256, 0, 0]
 
+// CHECK-REMARKS: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-SAME: Remark=26112
+
 // -----
 
 #lhs_map = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
@@ -165,6 +183,10 @@ func.func @small_scaled_matmul(
 //  CHECK-SAME:     reduction = [0, 0, 1, 1]
 //  CHECK-SAME:     subgroup = [1, 1, 0, 0]
 //  CHECK-SAME:     workgroup = [16, 16, 0, 0]
+
+// CHECK-REMARKS: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-SAME: Remark=2176
 
 // -----
 
@@ -273,3 +295,7 @@ func.func @scaled_matmul_accumulate(
 //  CHECK-SAME:     reduction = [0, 0, 1, 1]
 //  CHECK-SAME:     subgroup = [2, 8, 0, 0]
 //       CHECK:     workgroup = [128, 256, 0, 0]
+
+// CHECK-REMARKS: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-SAME: Remark=157184

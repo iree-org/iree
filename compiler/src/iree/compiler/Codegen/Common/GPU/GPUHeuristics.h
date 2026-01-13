@@ -154,7 +154,7 @@ struct GPUMMASchedule {
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> cuCount,
+    int64_t subgroupSize, std::optional<int64_t> cuCount, Location loc,
     bool transposedLhs = false, bool transposedRhs = false,
     bool canUpcastAcc = false, bool mustBeAligned = true,
     bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
