@@ -122,6 +122,13 @@ struct ConvertGenericFilterToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
+    // Require non-empty filter, input and output channel dimensions.
+    if (convolutionDims->outputChannel.empty() ||
+        convolutionDims->inputChannel.empty() ||
+        convolutionDims->filterLoop.empty()) {
+      return failure();
+    }
+
     OpOperand *input = linalgOp.getDpsInputOperand(0);
     OpOperand *filter = linalgOp.getDpsInputOperand(1);
     OpOperand *output = linalgOp.getDpsInitOperand(0);
@@ -161,11 +168,10 @@ struct ConvertGenericFilterToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return positions;
     };
 
-    // Don't transpose when the input is in batch-last layout (e.g., CHWN).
+    // Don't transpose when the input is in not batch-first layout (e.g., CHWN).
     SmallVector<int64_t> batchInputPos =
         getDimPositions(convolutionDims->batch, inputMap);
-    if (!batchInputPos.empty() &&
-        batchInputPos.back() == inputShape.size() - 1) {
+    if (!batchInputPos.empty() && batchInputPos.front() != 0) {
       return failure();
     }
 
