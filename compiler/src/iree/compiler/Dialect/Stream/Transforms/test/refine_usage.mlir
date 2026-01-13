@@ -554,3 +554,22 @@ util.func public @transients_external_result(%size: index, %storage_size: index)
   // CHECK: util.return {{.+}} !stream.resource<external>
   util.return %awaited : !stream.resource<*>
 }
+
+// -----
+
+// Tests that stream.async.cast propagates its constraint to the source value.
+// The cast asserts the result must be external, so the source (splat) must also
+// become external. After refinement, the cast folds away since types match.
+
+// CHECK-LABEL: @asyncCastPropagation
+util.func public @asyncCastPropagation(%size: index) -> !stream.resource<external> {
+  %c123_i32 = arith.constant 123 : i32
+  // The splat should be refined to external due to the cast constraint.
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat %c123_i32 {{.+}} -> !stream.resource<external>
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // The cast should fold away after the source type is refined to match.
+  // CHECK-NOT: stream.async.cast
+  %cast = stream.async.cast %splat : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
+  // CHECK: util.return %[[SPLAT]] : !stream.resource<external>
+  util.return %cast : !stream.resource<external>
+}
