@@ -2202,6 +2202,15 @@ private:
         return importOp.emitError() << "failed to create call";
       }
 
+      // Release refs in argument buffer after call returns. Refs that were
+      // taken by the callee (via assign_ref+memset) will be null and release
+      // will be a no-op.
+      if (failed(releaseArgumentBuffer(
+              flattenInputTypes(importOp, segmentSizes, builder), call.value(),
+              builder, loc))) {
+        return importOp.emitError() << "failed to release argument buffer";
+      }
+
       if (failed(unpackResultBuffer(importOp.getResultTypes(), newFuncOp,
                                     call.value(), builder, loc))) {
         return importOp.emitError() << "failed to unpack result struct";
@@ -2451,10 +2460,14 @@ private:
                                              /*operand=*/uint8Ptr)
                            .getResult();
 
+        // Retain the ref into args_storage. The callee may take ownership via
+        // assign_ref+memset(0), so we must retain (not just assign/borrow).
+        // After the call returns, releaseArgumentBuffer will release any refs
+        // that weren't taken by the callee.
         emitc::CallOpaqueOp::create(builder,
                                     /*location=*/loc,
                                     /*type=*/TypeRange{},
-                                    /*callee=*/"iree_vm_ref_assign",
+                                    /*callee=*/"iree_vm_ref_retain",
                                     /*operands=*/ArrayRef<Value>{arg, refPtr});
       } else {
         auto argLValue = emitc_builders::asLValue(builder, loc, arg);
@@ -2472,6 +2485,83 @@ private:
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
+        uint8Ptr =
+            emitc::AddOp::create(builder,
+                                 /*location=*/loc, /*type=*/bytePtrType,
+                                 /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                .getResult();
+      }
+    }
+    return success();
+  }
+
+  // Releases refs in the argument buffer after an import call returns.
+  // This mirrors packArgumentBuffer but releases instead of retaining.
+  // Refs that were taken by the callee (via assign_ref+memset) will be null
+  // and release will be a no-op.
+  LogicalResult releaseArgumentBuffer(ArrayRef<Type> inputTypes,
+                                      TypedValue<emitc::LValueType> call,
+                                      OpBuilder &builder, Location loc) const {
+    // Find the last ref type index. We only need to iterate up to and including
+    // that index to release all refs. This avoids generating unused pointer
+    // arithmetic for trailing non-ref types.
+    std::optional<size_t> lastRefIndex;
+    for (size_t i = 0; i < inputTypes.size(); i++) {
+      if (isa<IREE::VM::RefType>(inputTypes[i])) {
+        lastRefIndex = i;
+      }
+    }
+    if (!lastRefIndex) {
+      return success();
+    }
+
+    auto ctx = builder.getContext();
+
+    auto arguments =
+        emitc::MemberOp::create(builder, loc,
+                                /*type=*/
+                                emitc::LValueType::get(emitc::OpaqueType::get(
+                                    ctx, "iree_byte_span_t")),
+                                /*memberName=*/"arguments",
+                                /*operand=*/call)
+            .getResult();
+
+    Type bytePtrType =
+        emitc::PointerType::get(builder.getIntegerType(8, false));
+    auto uint8Ptr = emitc_builders::structMember(builder, loc,
+                                                 /*type=*/bytePtrType,
+                                                 /*memberName=*/"data",
+                                                 /*operand=*/arguments);
+
+    // Only iterate up to and including the last ref type.
+    for (size_t i = 0; i <= *lastRefIndex; i++) {
+      Type inputType = inputTypes[i];
+
+      // Get the value type and compute alignment (must match packArgumentBuffer
+      // exactly to ensure we're releasing the correct locations).
+      Type valueType = typeConverter.convertTypeAsNonPointer(inputType);
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > 4) {
+        uint8Ptr = emitc_builders::alignPtr(builder, loc, uint8Ptr, alignment);
+      }
+
+      // Release refs. If the callee took ownership and zeroed the ref,
+      // iree_vm_ref_release on a null ref is a no-op.
+      if (isa<IREE::VM::RefType>(inputType)) {
+        Type refPtrType = emitc::PointerType::get(
+            emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
+        Value refPtr = emitc::CastOp::create(builder,
+                                             /*location=*/loc,
+                                             /*type=*/refPtrType,
+                                             /*operand=*/uint8Ptr)
+                           .getResult();
+        emitc_builders::ireeVmRefRelease(builder, loc, refPtr);
+      }
+
+      // Advance pointer to next element (only if not at the last ref).
+      if (i < *lastRefIndex) {
+        Value size =
+            emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
         uint8Ptr =
             emitc::AddOp::create(builder,
                                  /*location=*/loc, /*type=*/bytePtrType,

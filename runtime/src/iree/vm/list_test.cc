@@ -273,6 +273,61 @@ TEST_F(VMListTest, GetRefRetainOrMove) {
   iree_vm_list_release(list);
 }
 
+// Tests that moving a ref from a variant list properly marks the slot as empty.
+TEST_F(VMListTest, VariantListRefMoveMarksSlotEmpty) {
+  // Create a variant list (stores any type).
+  iree_vm_type_def_t element_type = iree_vm_make_undefined_type_def();
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/1,
+                                     iree_allocator_system(), &list));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 1));
+
+  // Set a ref into the variant slot.
+  iree_vm_ref_t ref_a = MakeRef<A>(1.0f);
+  IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, 0, &ref_a));
+
+  // Verify the slot contains a ref.
+  {
+    iree_vm_variant_t variant;
+    IREE_ASSERT_OK(iree_vm_list_get_variant_assign(list, 0, &variant));
+    EXPECT_TRUE(iree_vm_variant_is_ref(variant));
+    EXPECT_FALSE(iree_vm_variant_is_empty(variant));
+  }
+
+  // Move the ref out of the variant list.
+  iree_vm_ref_t moved{0};
+  IREE_ASSERT_OK(
+      iree_vm_list_get_ref_retain_or_move(list, 0, /*is_move=*/true, &moved));
+  EXPECT_TRUE(test_a_isa(moved));
+  iree_vm_ref_release(&moved);
+
+  // Verify the slot is now empty (type should be undefined/variant).
+  {
+    iree_vm_variant_t variant;
+    IREE_ASSERT_OK(iree_vm_list_get_variant_assign(list, 0, &variant));
+    EXPECT_TRUE(iree_vm_variant_is_empty(variant))
+        << "After move, variant slot should be empty";
+  }
+
+  // Also test get_variant_move marks the slot empty.
+  {
+    iree_vm_ref_t ref_b = MakeRef<A>(2.0f);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, 0, &ref_b));
+
+    iree_vm_variant_t moved_variant;
+    IREE_ASSERT_OK(iree_vm_list_get_variant_move(list, 0, &moved_variant));
+    EXPECT_TRUE(iree_vm_variant_is_ref(moved_variant));
+    iree_vm_ref_release(&moved_variant.ref);
+
+    iree_vm_variant_t after_move;
+    IREE_ASSERT_OK(iree_vm_list_get_variant_assign(list, 0, &after_move));
+    EXPECT_TRUE(iree_vm_variant_is_empty(after_move))
+        << "After get_variant_move, slot should be empty";
+  }
+
+  iree_vm_list_release(list);
+}
+
 // Tests simple variant list usage, mainly just for demonstration.
 // Stores any heterogeneous element type, equivalent to `!vm.list<?>`.
 TEST_F(VMListTest, UsageVariant) {
