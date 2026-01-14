@@ -22,6 +22,7 @@ iree_cc_library(
     "ConvertToYieldableCalls.cpp"
     "DeduplicateRodata.cpp"
     "DropEmptyModuleInitializers.cpp"
+    "DropOptimizationBarriers.cpp"
     "DropUnusedCalls.cpp"
     "GlobalInitialization.cpp"
     "HoistInlinedRodata.cpp"

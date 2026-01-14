@@ -29,6 +29,10 @@ struct DropCompilerHintsPass
         op.replaceAllUsesWith(op.getOperands());
         op.erase();
       } else if (auto op = dyn_cast<IREE::Util::AssumeIntOp>(genericOp)) {
+        // TODO(benvanik): #19348 was a terrible approach and this needs to be
+        // undone. If LLVMGPU wants to keep the hints it should have its own
+        // codegen op that carries the information. DropCompilerHints is meant
+        // to drop all compiler hints.
         if (keepAssumeInt)
           return;
         op.replaceAllUsesWith(op.getOperands());

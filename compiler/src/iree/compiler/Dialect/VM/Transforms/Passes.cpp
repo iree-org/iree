@@ -169,6 +169,16 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   if (targetOptions.optimizeForStackSize) {
     passManager.addNestedPass<IREE::VM::ModuleOp>(createSinkDefiningOpsPass());
   }
+
+  // Drop vm.optimization_barrier ops now that optimization is complete.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
+      createDropOptimizationBarriersPass());
+
+  // Insert explicit discard ops for ref values at their last use points.
+  // Uses edge-based placement: refs dying on control flow edges get discards
+  // inserted on those edges, refs dying mid-block get discards after last use.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
+      createMaterializeRefDiscardsPass());
 }
 
 //===----------------------------------------------------------------------===//

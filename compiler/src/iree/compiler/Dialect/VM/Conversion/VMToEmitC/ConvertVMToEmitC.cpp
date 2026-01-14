@@ -5262,6 +5262,12 @@ public:
   void runOnOperation() override {
     IREE::VM::ModuleOp moduleOp = getOperation();
 
+    // Erase vm.discard.refs ops before analysis. These are inserted by
+    // MaterializeRefDiscardsPass for the bytecode backend but are not used
+    // by EmitC. Erasing them here avoids inflating register pressure during
+    // the register allocation analysis.
+    moduleOp.walk([](IREE::VM::DiscardRefsOp op) { op.erase(); });
+
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter(moduleOp);
 

@@ -24,8 +24,10 @@ namespace {
 class V0BytecodeEncoder : public BytecodeEncoder {
 public:
   V0BytecodeEncoder(llvm::DenseMap<Type, int> *typeTable,
-                    RegisterAllocation *registerAllocation)
-      : typeTable_(typeTable), registerAllocation_(registerAllocation) {}
+                    RegisterAllocation *registerAllocation,
+                    const OrdinalAnalysis *ordinalAnalysis)
+      : typeTable_(typeTable), registerAllocation_(registerAllocation),
+        ordinalAnalysis_(ordinalAnalysis) {}
   ~V0BytecodeEncoder() = default;
 
   LogicalResult beginBlock(Block *block) override {
@@ -59,11 +61,7 @@ public:
     if (!symbolOp) {
       return currentOp_->emitOpError() << "target symbol not found: " << name;
     }
-    auto ordinalAttr = symbolOp->getAttrOfType<IntegerAttr>("ordinal");
-    if (!ordinalAttr) {
-      return symbolOp->emitOpError() << "missing ordinal";
-    }
-    int32_t ordinal = ordinalAttr.getInt();
+    int32_t ordinal = ordinalAnalysis_->getOrdinal(symbolOp);
     if (isa<IREE::VM::ImportOp>(symbolOp)) {
       // Imported functions have their MSB set.
       ordinal |= 0x80000000u;
@@ -387,6 +385,7 @@ private:
 
   llvm::DenseMap<Type, int> *typeTable_;
   RegisterAllocation *registerAllocation_;
+  const OrdinalAnalysis *ordinalAnalysis_;
 
   Operation *currentOp_ = nullptr;
 
@@ -400,7 +399,8 @@ private:
 // static
 std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-    SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase) {
+    SymbolTable &symbolTable, const OrdinalAnalysis &ordinalAnalysis,
+    DebugDatabaseBuilder &debugDatabase) {
   EncodedBytecodeFunction result;
 
   // Perform register allocation first so that we can quickly lookup values as
@@ -414,7 +414,7 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   FunctionSourceMap sourceMap;
   sourceMap.localName = funcOp.getName().str();
 
-  V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
+  V0BytecodeEncoder encoder(&typeTable, &registerAllocation, &ordinalAnalysis);
   for (auto &block : funcOp.getBlocks()) {
     size_t blockStart = encoder.getOffset();
 

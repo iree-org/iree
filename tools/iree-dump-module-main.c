@@ -336,6 +336,23 @@ static void iree_tooling_print_rwdata_segment_defs(
   }
 }
 
+// Returns the first export name for the given internal ordinal, or empty if not
+// exported.
+static iree_string_view_t iree_tooling_lookup_export_name(
+    iree_host_size_t internal_ordinal,
+    iree_vm_ExportFunctionDef_vec_t export_defs) {
+  for (size_t j = 0; j < iree_vm_ExportFunctionDef_vec_len(export_defs); ++j) {
+    iree_vm_ExportFunctionDef_table_t export_def =
+        iree_vm_ExportFunctionDef_vec_at(export_defs, j);
+    if (iree_vm_ExportFunctionDef_internal_ordinal(export_def) ==
+        internal_ordinal) {
+      const char* name = iree_vm_ExportFunctionDef_local_name(export_def);
+      return iree_make_string_view(name, strlen(name));
+    }
+  }
+  return iree_string_view_empty();
+}
+
 static void iree_tooling_print_function_descriptors(
     iree_vm_FunctionDescriptor_vec_t descriptors,
     iree_vm_ExportFunctionDef_vec_t export_defs) {
@@ -550,11 +567,23 @@ static iree_status_t iree_tooling_dump_module_disassembly(
   iree_status_t status = iree_vm_bytecode_module_create(
       instance, IREE_VM_BYTECODE_MODULE_FLAG_ALLOW_PLACEHOLDER_TYPES,
       archive_contents, iree_allocator_null(), host_allocator, &module);
+  iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
+  iree_host_size_t rodata_offset = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_vm_bytecode_archive_parse_header(
+        archive_contents, &flatbuffer_contents, &rodata_offset);
+  }
   if (iree_status_is_ok(status)) {
     iree_string_builder_t builder;
     iree_string_builder_initialize(host_allocator, &builder);
 
-    // Iterate over exported functions and build the disassembly output.
+    // Extract export names from the flatbuffer module definition.
+    iree_vm_BytecodeModuleDef_table_t module_def =
+        iree_vm_BytecodeModuleDef_as_root(flatbuffer_contents.data);
+    iree_vm_ExportFunctionDef_vec_t export_defs =
+        iree_vm_BytecodeModuleDef_exported_functions(module_def);
+
+    // Iterate over internal functions and build the disassembly output.
     iree_vm_module_signature_t signature = iree_vm_module_signature(module);
     for (iree_host_size_t i = 0; i < signature.internal_function_count; ++i) {
       iree_vm_function_t function;
@@ -562,8 +591,15 @@ static iree_status_t iree_tooling_dump_module_disassembly(
           module, IREE_VM_FUNCTION_LINKAGE_INTERNAL, i, &function);
       if (!iree_status_is_ok(status)) break;
 
+      // Get function name from exports if available, otherwise use internal
+      // name.
+      iree_string_view_t export_name =
+          iree_tooling_lookup_export_name(i, export_defs);
+      iree_string_view_t function_name = iree_string_view_is_empty(export_name)
+                                             ? iree_vm_function_name(&function)
+                                             : export_name;
+
       // Apply filter (ordinal or name) if provided.
-      iree_string_view_t function_name = iree_vm_function_name(&function);
       if (!iree_string_view_is_empty(function_filter)) {
         uint32_t filter_ordinal = -1;
         if (iree_string_view_atoi_uint32(function_filter, &filter_ordinal)) {

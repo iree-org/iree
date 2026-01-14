@@ -1742,6 +1742,18 @@ SuccessorOperands CondBreakOp::getSuccessorOperands(unsigned index) {
   return SuccessorOperands(getDestOperandsMutable());
 }
 
+//===----------------------------------------------------------------------===//
+// vm.optimization_barrier
+//===----------------------------------------------------------------------===//
+
+void OptimizationBarrierOp::build(OpBuilder &builder, OperationState &state,
+                                  ValueRange operands,
+                                  ArrayRef<NamedAttribute> attributes) {
+  state.addOperands(operands);
+  state.addTypes(llvm::to_vector(operands.getTypes()));
+  state.addAttributes(attributes);
+}
+
 } // namespace mlir::iree_compiler::IREE::VM
 
 //===----------------------------------------------------------------------===//

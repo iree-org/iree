@@ -42,10 +42,10 @@ vm.module @call_ops {
   vm.func private @test_call_r_v_preserve_ref() {
     %ref = vm.const.ref.zero : !vm.buffer
     %unused = vm.const.ref.rodata @buffer : !vm.buffer
-    %unusued_dno_1 = util.optimization_barrier %unused : !vm.buffer
+    %unusued_dno_1 = vm.optimization_barrier %unused : !vm.buffer
     vm.check.nz %unused : !vm.buffer
     vm.call @_r_v_preserve_reg(%ref, %unused) : (!vm.buffer, !vm.buffer) -> ()
-    %unusued_dno_2 = util.optimization_barrier %unused : !vm.buffer
+    %unusued_dno_2 = vm.optimization_barrier %unused : !vm.buffer
     vm.check.nz %unusued_dno_2 : !vm.buffer
     vm.return
   }
@@ -61,7 +61,7 @@ vm.module @call_ops {
   vm.export @test_call_v_r
   vm.func @test_call_v_r() {
     %ref = vm.const.ref.zero : !vm.ref<?>
-    %ref_dno = util.optimization_barrier %ref : !vm.ref<?>
+    %ref_dno = vm.optimization_barrier %ref : !vm.ref<?>
     %res = vm.call @_v_r() : () -> (!vm.ref<?>)
     vm.check.eq %ref_dno, %res, "_v_r()=NULL" : !vm.ref<?>
     vm.return
@@ -91,21 +91,21 @@ vm.module @call_ops {
 
   vm.func @_r_v(%arg : !vm.ref<?>) attributes {inlining_policy = #util.inline.never} {
     %ref = vm.const.ref.zero : !vm.ref<?>
-    %ref_dno = util.optimization_barrier %ref : !vm.ref<?>
+    %ref_dno = vm.optimization_barrier %ref : !vm.ref<?>
     vm.check.eq %arg, %ref_dno, "Expected %arg to be NULL" : !vm.ref<?>
     vm.return
   }
 
   vm.func @_r_v_reuse_reg(%arg : !vm.ref<?>, %unused : !vm.ref<?>) attributes {inlining_policy = #util.inline.never} {
     %ref = vm.const.ref.zero : !vm.ref<?>
-    %ref_dno = util.optimization_barrier %ref : !vm.ref<?>
+    %ref_dno = vm.optimization_barrier %ref : !vm.ref<?>
     vm.check.eq %arg, %ref_dno, "Expected %arg to be NULL" : !vm.ref<?>
     vm.return
   }
 
   vm.func @_r_v_preserve_reg(%arg1 : !vm.ref<?>, %arg2 : !vm.ref<?>) attributes {inlining_policy = #util.inline.never} {
     %ref = vm.const.ref.zero : !vm.ref<?>
-    %ref_dno = util.optimization_barrier %ref : !vm.ref<?>
+    %ref_dno = vm.optimization_barrier %ref : !vm.ref<?>
     vm.check.eq %arg1, %ref_dno, "Expected %arg1 to be NULL" : !vm.ref<?>
     vm.check.nz %arg2, "Expected %arg2 to be not NULL" : !vm.ref<?>
     vm.return
