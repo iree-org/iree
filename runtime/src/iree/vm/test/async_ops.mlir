@@ -9,17 +9,17 @@ vm.module @async_ops {
   vm.func @test_yield_sequence() {
     %c1 = vm.const.i32 1
     %c100 = vm.const.i32 100
-    %c100_dno = util.optimization_barrier %c100 : i32
+    %c100_dno = vm.optimization_barrier %c100 : i32
     %y0 = vm.add.i32 %c100_dno, %c1 : i32
-    %y0_dno = util.optimization_barrier %y0 : i32
+    %y0_dno = vm.optimization_barrier %y0 : i32
     vm.yield ^bb1
   ^bb1:
     %y1 = vm.add.i32 %y0_dno, %c1 : i32
-    %y1_dno = util.optimization_barrier %y1 : i32
+    %y1_dno = vm.optimization_barrier %y1 : i32
     vm.yield ^bb2
   ^bb2:
     %y2 = vm.add.i32 %y1_dno, %c1 : i32
-    %y2_dno = util.optimization_barrier %y2 : i32
+    %y2_dno = vm.optimization_barrier %y2 : i32
     vm.yield ^bb3
   ^bb3:
     %c103 = vm.const.i32 103
@@ -36,10 +36,10 @@ vm.module @async_ops {
     %cond = vm.cmp.nz.i32 %c1 : i32
     vm.cond_br %cond, ^true, ^false
   ^true:
-    %v_true = util.optimization_barrier %c100 : i32
+    %v_true = vm.optimization_barrier %c100 : i32
     vm.yield ^check(%v_true : i32)
   ^false:
-    %v_false = util.optimization_barrier %c200 : i32
+    %v_false = vm.optimization_barrier %c200 : i32
     vm.yield ^check(%v_false : i32)
   ^check(%result : i32):
     vm.check.eq %result, %c100, "cond=1 selects true branch" : i32
@@ -55,10 +55,10 @@ vm.module @async_ops {
     %cond = vm.cmp.nz.i32 %c0 : i32
     vm.cond_br %cond, ^true, ^false
   ^true:
-    %v_true = util.optimization_barrier %c100 : i32
+    %v_true = vm.optimization_barrier %c100 : i32
     vm.yield ^check(%v_true : i32)
   ^false:
-    %v_false = util.optimization_barrier %c200 : i32
+    %v_false = vm.optimization_barrier %c200 : i32
     vm.yield ^check(%v_false : i32)
   ^check(%result : i32):
     vm.check.eq %result, %c200, "cond=0 selects false branch" : i32
@@ -74,15 +74,15 @@ vm.module @async_ops {
   vm.func private @yield_counter(%start : i32) -> i32 {
     %c1 = vm.const.i32 1
     %v0 = vm.add.i32 %start, %c1 : i32
-    %v0_dno = util.optimization_barrier %v0 : i32
+    %v0_dno = vm.optimization_barrier %v0 : i32
     vm.yield ^y1
   ^y1:
     %v1 = vm.add.i32 %v0_dno, %c1 : i32
-    %v1_dno = util.optimization_barrier %v1 : i32
+    %v1_dno = vm.optimization_barrier %v1 : i32
     vm.yield ^y2
   ^y2:
     %v2 = vm.add.i32 %v1_dno, %c1 : i32
-    %v2_dno = util.optimization_barrier %v2 : i32
+    %v2_dno = vm.optimization_barrier %v2 : i32
     vm.yield ^y3
   ^y3:
     %v3 = vm.add.i32 %v2_dno, %c1 : i32
@@ -105,7 +105,7 @@ vm.module @async_ops {
   vm.func private @yield_add_one(%arg0: i32) -> i32 {
     %c1 = vm.const.i32 1
     %result = vm.add.i32 %arg0, %c1 : i32
-    %result_dno = util.optimization_barrier %result : i32
+    %result_dno = vm.optimization_barrier %result : i32
     vm.yield ^done
   ^done:
     vm.return %result_dno : i32
@@ -213,7 +213,7 @@ vm.module @async_ops {
     %c2 = vm.const.i32 2
     // Add 1 before yield
     %v0 = vm.add.i32 %arg0, %c1 : i32
-    %v0_dno = util.optimization_barrier %v0 : i32
+    %v0_dno = vm.optimization_barrier %v0 : i32
     vm.yield ^after_first_yield
   ^after_first_yield:
     // Call yieldable import (yields 2 times)
@@ -221,7 +221,7 @@ vm.module @async_ops {
   ^after_import(%v1 : i32):
     // Add 1 after import
     %v2 = vm.add.i32 %v1, %c1 : i32
-    %v2_dno = util.optimization_barrier %v2 : i32
+    %v2_dno = vm.optimization_barrier %v2 : i32
     vm.yield ^final
   ^final:
     vm.return %v2_dno : i32

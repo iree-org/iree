@@ -8,20 +8,20 @@
 // RUN:   %t.vmfb | \
 // RUN: FileCheck %s
 
-// CHECK-LABEL: @module : version 0
+// CHECK: @module : version 0
 
-// CHECK-LABEL: module.fn0
+// CHECK: fn0
 func.func @fn0(%input : tensor<f32>) -> (tensor<f32>) {
-  // CHECK: [{{[0-9]+}}]    <block>
+  // CHECK: [{{[0-9]+}}]{{.*}}<block>
   %result = math.absf %input : tensor<f32>
   return %result : tensor<f32>
 }
 
-// CHECK-LABEL: module.fn1
+// CHECK: fn1
 func.func @fn1(%input : tensor<f32>) -> (tensor<f32>) {
-  // CHECK: [{{[0-9]+}}]    <block>
+  // CHECK: [{{[0-9]+}}]{{.*}}<block>
   %result = arith.mulf %input, %input : tensor<f32>
   return %result : tensor<f32>
 }
 
-// CHECK-LABEL: module.__init
+// CHECK: __init

@@ -43,6 +43,7 @@
 #include "iree/compiler/API/Internal/Diagnostics.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
@@ -1051,6 +1052,11 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
         session.highLevelOptimizationOptions, session.dispatchCreationOptions,
         session.schedulingOptions, session.halTargetOptions, pipelineHooks,
         *passManager, compileFrom, compileTo);
+    break;
+  }
+  case IREE_COMPILER_PIPELINE_VM: {
+    IREE::VM::buildVMTransformPassPipeline(*passManager,
+                                           session.vmTargetOptions);
     break;
   }
   default:

@@ -11,14 +11,13 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VM/Analysis/OrdinalAnalysis.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/ArchiveWriter.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
-#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -33,12 +32,9 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/LocationSnapshot.h"
-#include "mlir/Transforms/Passes.h"
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
     mlir::iree_compiler::IREE::VM::BytecodeTargetOptions);
@@ -125,15 +121,16 @@ serializeEmbeddedData(Location loc, Attribute valueAttr, uint64_t alignment,
 }
 
 // Canonicalizes the module to its final form prior to emission.
-// This verifies that we only have ops we can serialize and performs any of the
-// required transformations (such as debug op stripping).
+// This verifies that we only have ops we can serialize and removes any
+// pseudo-ops and debug ops (when stripping is enabled).
+// All transformation passes should have run in the main VM transformation
+// pipeline before this is called.
 static LogicalResult
 canonicalizeModule(IREE::VM::BytecodeTargetOptions bytecodeOptions,
                    IREE::VM::ModuleOp moduleOp) {
   RewritePatternSet patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
-  target.addLegalOp<IREE::Util::OptimizationBarrierOp>();
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
@@ -145,7 +142,6 @@ canonicalizeModule(IREE::VM::BytecodeTargetOptions bytecodeOptions,
     }
 
     // Debug ops must not be present when stripping.
-    // TODO(benvanik): add RemoveDisabledDebugOp pattern.
     if (op.hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
         bytecodeOptions.stripDebugOps) {
       target.setOpAction(op, ConversionTarget::LegalizationAction::Illegal);
@@ -154,48 +150,6 @@ canonicalizeModule(IREE::VM::BytecodeTargetOptions bytecodeOptions,
 
   if (failed(applyFullConversion(moduleOp, target, std::move(patterns)))) {
     return moduleOp.emitError() << "unable to fully apply conversion to module";
-  }
-
-  PassManager passManager(context);
-  // TODO(12938): Handle or investigate failure result.
-  auto logicalRes = mlir::applyPassManagerCLOptions(passManager);
-  (void)logicalRes;
-  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-  passManager.addInstrumentation(std::make_unique<PassTracing>());
-  auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
-
-  // TODO(benvanik): these ideally happen beforehand but when performing
-  // serialization the input IR often has some of these low-level VM ops. In
-  // real workflows these have already run earlier and are no-ops.
-  modulePasses.addPass(IREE::VM::createGlobalInitializationPass());
-  modulePasses.addPass(IREE::VM::createDropEmptyModuleInitializersPass());
-
-  if (bytecodeOptions.optimize) {
-    // TODO(benvanik): run this as part of a fixed-point iteration.
-    modulePasses.addPass(mlir::createInlinerPass());
-    modulePasses.addPass(mlir::createCSEPass());
-    // TODO(benvanik): re-evaluate whether this canonicalizer pass should exist
-    // in the bytecode target. It may be removing ops (like vm.discard.refs)
-    // that were intentionally inserted by earlier passes.
-    modulePasses.addPass(mlir::createCanonicalizerPass());
-  }
-
-  modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
-
-  // Insert explicit discard ops for ref values at their last use points.
-  // Uses edge-based placement: refs dying on control flow edges get discards
-  // inserted on those edges, refs dying mid-block get discards after last use.
-  modulePasses.addPass(IREE::VM::createMaterializeRefDiscardsPass());
-
-  // Mark up the module with ordinals for each top-level op (func, etc).
-  // This will make it easier to correlate the MLIR textual output to the
-  // binary output.
-  // We don't want any more modifications after this point as they could
-  // invalidate the ordinals.
-  modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
-
-  if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
-    return moduleOp.emitError() << "failed during transform passes";
   }
 
   return success();
@@ -317,12 +271,11 @@ static iree_vm_FeatureBits_enum_t findRequiredFeatures(Operation *rootOp) {
 // has been packed into the top-level table. This results in a messier function
 // here during serialization but a much more trivial (and cache-friendly)
 // representation at runtime.
-static LogicalResult
-buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
-                      IREE::VM::BytecodeTargetOptions bytecodeOptions,
-                      IREE::VM::ModuleOp moduleOp,
-                      MutableArrayRef<RodataRef> rodataRefs,
-                      FlatbufferBuilder &fbb) {
+static LogicalResult buildFlatBufferModule(
+    IREE::VM::TargetOptions vmOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions,
+    IREE::VM::ModuleOp moduleOp, const OrdinalAnalysis &ordinalAnalysis,
+    MutableArrayRef<RodataRef> rodataRefs, FlatbufferBuilder &fbb) {
   // Start the buffer so that we can begin recording data prior to the root
   // table (which we do at the very end). This does not change the layout of the
   // file and is only used to prime the flatcc builder.
@@ -334,26 +287,22 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
   DebugDatabaseBuilder debugDatabase;
 
   SymbolTable symbolTable(moduleOp);
-  OrdinalCountsAttr ordinalCounts = moduleOp.getOrdinalCountsAttr();
-  if (!ordinalCounts) {
-    return moduleOp.emitError() << "ordinal_counts attribute not found. The "
-                                   "OrdinalAllocationPass must be run before.";
-  }
+  const auto &ordinalCounts = ordinalAnalysis.getCounts();
 
   // Find all structural ops in the module.
   std::vector<IREE::VM::ImportOp> importFuncOps;
   std::vector<IREE::VM::ExportOp> exportFuncOps;
   std::vector<IREE::VM::FuncOp> internalFuncOps;
-  importFuncOps.resize(ordinalCounts.getImportFuncs());
-  exportFuncOps.resize(ordinalCounts.getExportFuncs());
-  internalFuncOps.resize(ordinalCounts.getInternalFuncs());
+  importFuncOps.resize(ordinalCounts.importFuncs);
+  exportFuncOps.resize(ordinalCounts.exportFuncs);
+  internalFuncOps.resize(ordinalCounts.internalFuncs);
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
-      internalFuncOps[funcOp.getOrdinal()->getLimitedValue()] = funcOp;
+      internalFuncOps[ordinalAnalysis.getOrdinal(funcOp)] = funcOp;
     } else if (auto exportOp = dyn_cast<IREE::VM::ExportOp>(op)) {
-      exportFuncOps[exportOp.getOrdinal()->getLimitedValue()] = exportOp;
+      exportFuncOps[ordinalAnalysis.getOrdinal(exportOp)] = exportOp;
     } else if (auto importOp = dyn_cast<IREE::VM::ImportOp>(op)) {
-      importFuncOps[importOp.getOrdinal()->getLimitedValue()] = importOp;
+      importFuncOps[ordinalAnalysis.getOrdinal(importOp)] = importOp;
       if (!importOp.getName().contains('.')) {
         return importOp.emitOpError("must reference a function in a module "
                                     "(@module_name.func_name); got unscoped `@")
@@ -380,7 +329,7 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
   size_t totalBytecodeLength = 0;
   for (auto [i, funcOp] : llvm::enumerate(internalFuncOps)) {
     auto encodedFunction = BytecodeEncoder::encodeFunction(
-        funcOp, typeOrdinalMap, symbolTable, debugDatabase);
+        funcOp, typeOrdinalMap, symbolTable, ordinalAnalysis, debugDatabase);
     if (!encodedFunction) {
       return funcOp.emitError() << "failed to encode function bytecode";
     }
@@ -466,7 +415,7 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
         iree_vm_ExportFunctionDef_start(fbb);
         iree_vm_ExportFunctionDef_local_name_add(fbb, localNameRef);
         iree_vm_ExportFunctionDef_internal_ordinal_add(
-            fbb, funcOp.getOrdinal()->getLimitedValue());
+            fbb, ordinalAnalysis.getOrdinal(funcOp));
         return iree_vm_ExportFunctionDef_end(fbb);
       });
 
@@ -530,8 +479,8 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
   auto dependenciesRef = fbb.createOffsetVecDestructive(dependencyRefs);
   auto typesRef = fbb.createOffsetVecDestructive(typeRefs);
 
-  int32_t globalRefs = ordinalCounts.getGlobalRefs();
-  int32_t globalBytes = ordinalCounts.getGlobalBytes();
+  int32_t globalRefs = ordinalCounts.globalRefs;
+  int32_t globalBytes = ordinalCounts.globalBytes;
 
   iree_vm_ModuleStateDef_ref_t moduleStateDef = 0;
   if (globalBytes || globalRefs) {
@@ -656,15 +605,18 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
     assert(false && "unhandled output format combination");
   }
 
+  // Compute ordinals for all module-level symbols.
+  OrdinalAnalysis ordinalAnalysis(moduleOp);
+
   // Declare all rodata entries we want to end up as external data first. This
   // allows us to compute offsets if needed without having had to perform
   // serialization yet. Note that not all rodata ends up as external data: if
   // it's small (like strings) we can avoid the extra seeks and keep it more
   // local by embedding it in the FlatBuffer.
   std::vector<IREE::VM::RodataOp> rodataOps;
-  rodataOps.resize(moduleOp.getOrdinalCountsAttr().getRodatas());
+  rodataOps.resize(ordinalAnalysis.getCounts().rodatas);
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-    rodataOps[rodataOp.getOrdinal()->getLimitedValue()] = rodataOp;
+    rodataOps[ordinalAnalysis.getOrdinal(rodataOp)] = rodataOp;
   }
   SmallVector<RodataRef> rodataRefs;
   rodataRefs.resize(rodataOps.size());
@@ -699,7 +651,7 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                                                  llvm::endianness::little, os);
           });
     }
-    rodataRefs[rodataOp.getOrdinal()->getLimitedValue()] = rodataRef;
+    rodataRefs[ordinalAnalysis.getOrdinal(rodataOp)] = rodataRef;
   }
 
   // NOTE: we order things so that all of the metadata is close to the start of
@@ -708,7 +660,7 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   // can be large bulk data.
   FlatbufferBuilder fbb;
   if (failed(buildFlatBufferModule(vmOptions, bytecodeOptions, moduleOp,
-                                   rodataRefs, fbb))) {
+                                   ordinalAnalysis, rodataRefs, fbb))) {
     return failure();
   }
   if (failed(archiveWriter->flush(fbb))) {
@@ -751,11 +703,6 @@ void BytecodeTargetOptions::bindOptions(OptionsBinder &binder) {
           clEnumValN(BytecodeOutputFormat::kAnnotatedMlirText,
                      "annotated-mlir-text",
                      "MLIR module file in the VM dialect with annotations")));
-  binder.opt<bool>(
-      "iree-vm-bytecode-module-optimize", optimize,
-      llvm::cl::cat(vmBytecodeOptionsCategory),
-      llvm::cl::desc("Optimizes the VM module with CSE/inlining/etc prior to "
-                     "serialization"));
   binder.opt<std::string>(
       "iree-vm-bytecode-source-listing", sourceListing,
       llvm::cl::cat(vmBytecodeOptionsCategory),

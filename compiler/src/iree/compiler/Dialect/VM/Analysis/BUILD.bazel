@@ -55,3 +55,18 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
     ],
 )
+
+iree_compiler_cc_library(
+    name = "OrdinalAnalysis",
+    srcs = [
+        "OrdinalAnalysis.cpp",
+    ],
+    hdrs = [
+        "OrdinalAnalysis.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/IR",
+        "@llvm-project//llvm:Support",
+    ],
+)
