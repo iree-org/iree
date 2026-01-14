@@ -263,15 +263,12 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
     return signalPassFailure();
   }
 
-  // All to_buffer ops on single use constants will have already had any
-  // write conflicts resolved by the analysis, so we can safely mark them as
-  // read only.
+  // All to_buffer ops on constants can be safely marked as read only since
+  // constants are immutable and any write conflicts would have already been
+  // resolved by the bufferization analysis (which inserts copies as needed).
   funcOp->walk([](bufferization::ToBufferOp toBuffer) {
-    if (auto constant =
-            toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
-      if (constant->hasOneUse()) {
-        toBuffer.setReadOnly(true);
-      }
+    if (toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      toBuffer.setReadOnly(true);
     }
   });
 
