@@ -228,3 +228,79 @@ func.func @negzero_mul_f8E4M3FN() {
   check.expect_eq_const(%result_i8, dense<[-128, -128, -128, -128]> : tensor<4xi8>) : tensor<4xi8>
   return
 }
+
+//===----------------------------------------------------------------------===//
+// Round-to-nearest-even tests.
+// These tests verify IEEE 754 round-to-nearest-even behavior at tie points.
+// At a tie (exactly halfway between two representable values), we round to
+// the value with an even mantissa (LSB = 0).
+//
+// For f8E5M2FNUZ with exp=17 (values 2.0, 2.5, 3.0, 3.5):
+//   2.0 = 0x44 (mantissa=00, even)
+//   2.5 = 0x45 (mantissa=01, odd)
+//   3.0 = 0x46 (mantissa=10, even)
+//   3.5 = 0x47 (mantissa=11, odd)
+//
+// Tie points:
+//   2.25 (halfway between 2.0 and 2.5) → 2.0 (even)
+//   3.25 (halfway between 3.0 and 3.5) → 3.0 (even)
+//
+// Without round-to-nearest-even (e.g., round-half-away-from-zero):
+//   2.25 → 2.5 (wrong!)
+//   3.25 → 3.5 (wrong!)
+//===----------------------------------------------------------------------===//
+
+// Test: Round-to-nearest-even at tie points for f8E5M2FNUZ.
+// Input f32 values 2.25 and 3.25 are exact tie points.
+func.func @round_to_nearest_even_f8E5M2FNUZ() {
+  // Use unfoldable f32 constant to test the runtime rounding behavior
+  %tie_points = util.unfoldable_constant dense<[2.25, 3.25]> : tensor<2xf32>
+  %truncated = arith.truncf %tie_points : tensor<2xf32> to tensor<2xf8E5M2FNUZ>
+  %result_i8 = arith.bitcast %truncated : tensor<2xf8E5M2FNUZ> to tensor<2xi8>
+  // 2.25 → 2.0 = 0x44 = 68
+  // 3.25 → 3.0 = 0x46 = 70
+  check.expect_eq_const(%result_i8, dense<[68, 70]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}
+
+//===----------------------------------------------------------------------===//
+// Denormal (subnormal) handling tests.
+// These tests verify proper handling of denormal values in fp8 formats.
+//
+// For f8E5M2FNUZ (bias=16, 2 mantissa bits):
+//   Denormal values have exp=0, and value = mantissa * 2^(1-16-2) = mantissa * 2^-17
+//   Denormal encodings: 0x01 (mantissa=1), 0x02 (mantissa=2), 0x03 (mantissa=3)
+//   Values: ~7.63e-6, ~1.53e-5, ~2.29e-5
+//   Min normal: 2^-15 = ~3.05e-5
+//
+// Without proper denormal handling:
+//   ExtF: fp8 denormal → 0 (wrong, should be small nonzero f32)
+//   TruncF: small f32 → 0 (wrong, should be fp8 denormal)
+//===----------------------------------------------------------------------===//
+
+// Test: ExtF properly converts fp8 denormals to f32.
+// fp8 denormal 0x01 (mantissa=1) should become f32 7.629e-6, not 0.
+func.func @extf_denormal_f8E5M2FNUZ() {
+  // 0x01 = denormal with mantissa=1 → 1 * 2^-17 = 7.629394531e-6
+  // 0x03 = denormal with mantissa=3 → 3 * 2^-17 = 2.288818359e-5
+  %denormals = util.unfoldable_constant dense<[0x01, 0x03]> : tensor<2xf8E5M2FNUZ>
+  %extended = arith.extf %denormals : tensor<2xf8E5M2FNUZ> to tensor<2xf32>
+  // Check that values are nonzero and approximately correct.
+  check.expect_almost_eq_const(%extended, dense<[7.629394531e-6, 2.288818359e-5]> : tensor<2xf32>) : tensor<2xf32>
+  return
+}
+
+// Test: TruncF properly generates fp8 denormals from small f32 values.
+// Small f32 values below min normal should become fp8 denormals, not 0.
+// which would use APFloat (correct) instead of our emulation (being tested).
+func.func @truncf_denormal_f8E5M2FNUZ() {
+  // Values that should become denormals:
+  // 7.629e-6 → 0x01 (mantissa=1)
+  // 2.289e-5 → 0x03 (mantissa=3)
+  %small_f32 = util.unfoldable_constant dense<[7.629394531e-6, 2.288818359e-5]> : tensor<2xf32>
+  %truncated = arith.truncf %small_f32 : tensor<2xf32> to tensor<2xf8E5M2FNUZ>
+  %result_i8 = arith.bitcast %truncated : tensor<2xf8E5M2FNUZ> to tensor<2xi8>
+  // Should be denormal encodings 0x01 and 0x03, not 0.
+  check.expect_eq_const(%result_i8, dense<[1, 3]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}

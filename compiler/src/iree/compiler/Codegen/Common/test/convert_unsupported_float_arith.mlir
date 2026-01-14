@@ -67,6 +67,7 @@ func.func @expand_f8_ocp(%x: f8E5M2) -> f8E5M2 attributes
 // -----
 
 // Test CPU target with f8E4M3FNUZ - both extf and truncf should be emulated.
+//
 // CHECK-LABEL: func.func @expand_cpu_target_f8e4m3fnuz
 // CHECK-SAME:    (%[[ARG0:.*]]: f8E4M3FNUZ) -> f8E4M3FNUZ
 //
@@ -96,6 +97,7 @@ func.func @expand_cpu_target_f8e4m3fnuz(%arg0 : f8E4M3FNUZ) -> f8E4M3FNUZ attrib
 // -----
 
 // Test CPU target with f8E5M2FNUZ.
+//
 // CHECK-LABEL: func.func @expand_cpu_target_f8e5m2fnuz
 // CHECK-SAME:    (%[[ARG0:.*]]: f8E5M2FNUZ) -> f8E5M2FNUZ
 // CHECK:         %[[BITCAST_IN:.*]] = arith.bitcast %[[ARG0]] : f8E5M2FNUZ to i8
@@ -116,6 +118,7 @@ func.func @expand_cpu_target_f8e5m2fnuz(%arg0 : f8E5M2FNUZ) -> f8E5M2FNUZ attrib
 // -----
 
 // Test explicit truncf emulation for CPU target.
+//
 // CHECK-LABEL: func.func @truncf_cpu_f32_to_f8e5m2fnuz
 // CHECK-SAME:    (%[[ARG0:.*]]: f32) -> f8E5M2FNUZ
 // CHECK:         %[[BITCAST:.*]] = arith.bitcast %[[ARG0]] : f32 to i32
@@ -136,6 +139,7 @@ func.func @truncf_cpu_f32_to_f8e5m2fnuz(%arg0 : f32) -> f8E5M2FNUZ attributes
 // -----
 
 // Test explicit extf emulation for CPU target.
+//
 // CHECK-LABEL: func.func @extf_cpu_f8e5m2fnuz_to_f32
 // CHECK-SAME:    (%[[ARG0:.*]]: f8E5M2FNUZ) -> f32
 // CHECK:         %[[BITCAST:.*]] = arith.bitcast %[[ARG0]] : f8E5M2FNUZ to i8
@@ -157,6 +161,7 @@ func.func @extf_cpu_f8e5m2fnuz_to_f32(%arg0 : f8E5M2FNUZ) -> f32 attributes
 // -----
 
 // Test vector truncf emulation for CPU target.
+//
 // CHECK-LABEL: func.func @truncf_cpu_vector_f32_to_f8e5m2fnuz
 // CHECK-SAME:    (%[[ARG0:.*]]: vector<4xf32>) -> vector<4xf8E5M2FNUZ>
 // CHECK:         %[[BITCAST:.*]] = arith.bitcast %[[ARG0]] : vector<4xf32> to vector<4xi32>
@@ -191,6 +196,7 @@ func.func @extf_cpu_vector_f8e5m2fnuz_to_f32(%arg0 : vector<4xf8E5M2FNUZ>) -> ve
 // -----
 
 // Test f8E4M3FNUZ truncf emulation for CPU target.
+//
 // CHECK-LABEL: func.func @truncf_cpu_f32_to_f8e4m3fnuz
 // CHECK-SAME:    (%[[ARG0:.*]]: f32) -> f8E4M3FNUZ
 // CHECK:         %[[BITCAST:.*]] = arith.bitcast %[[ARG0]] : f32 to i32
@@ -206,6 +212,7 @@ func.func @truncf_cpu_f32_to_f8e4m3fnuz(%arg0 : f32) -> f8E4M3FNUZ attributes
 // -----
 
 // Test f8E4M3FNUZ extf emulation for CPU target.
+//
 // CHECK-LABEL: func.func @extf_cpu_f8e4m3fnuz_to_f32
 // CHECK-SAME:    (%[[ARG0:.*]]: f8E4M3FNUZ) -> f32
 // CHECK:         %[[BITCAST:.*]] = arith.bitcast %[[ARG0]] : f8E4M3FNUZ to i8
@@ -215,5 +222,90 @@ func.func @truncf_cpu_f32_to_f8e4m3fnuz(%arg0 : f32) -> f8E4M3FNUZ attributes
 func.func @extf_cpu_f8e4m3fnuz_to_f32(%arg0 : f8E4M3FNUZ) -> f32 attributes
 { hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>}{
     %0 = arith.extf %arg0 : f8E4M3FNUZ to f32
+    return %0 : f32
+}
+
+// -----
+
+// Test FNUZ NaN handling in truncf: NaN/Inf/overflow must produce 0x80, not 0.
+//
+// Background: FNUZ types encode NaN as 0x80 (sign bit set, exponent and
+// mantissa zero). This conflicts with negative zero correction, which also
+// targets 0x80. The fix is to order the select cascade so negative zero
+// correction happens BEFORE NaN/Inf/overflow handling, allowing special
+// cases to override any incorrect intermediate results.
+//
+// Key invariant: The srcIsNan select must be the LAST select before trunci,
+// ensuring NaN input produces 0x80 output regardless of other logic.
+//
+// CHECK-LABEL: func.func @truncf_fnuz_nan_handling
+// CHECK-SAME:    (%[[ARG0:.*]]: f32) -> f8E5M2FNUZ
+//
+// 0x80 (128) = FNUZ NaN encoding (sign bit set, everything else zero).
+// CHECK-DAG:     %[[C128:.*]] = arith.constant 128 : i32
+//
+// 0xFF (255) = max f32 exponent, used to detect NaN/Inf in source.
+// srcIsNan = (srcExp == 255) && (srcMant != 0)
+// CHECK-DAG:     %[[C255:.*]] = arith.constant 255 : i32
+// CHECK:         %[[EXP_IS_MAX:.*]] = arith.cmpi eq, %{{.*}}, %[[C255]] : i32
+// CHECK:         %[[MANT_NE_ZERO:.*]] = arith.cmpi ne, %{{.*}}, %{{.*}} : i32
+// CHECK:         %[[SRC_IS_NAN:.*]] = arith.andi %[[EXP_IS_MAX]], %[[MANT_NE_ZERO]] : i1
+//
+// Critical ordering check: srcIsNan select must be immediately before trunci.
+// This ensures it's the outermost select, overriding negative zero correction.
+// CHECK:         %[[FINAL:.*]] = arith.select %[[SRC_IS_NAN]], %[[C128]], %{{.*}} : i32
+// CHECK-NEXT:    arith.trunci %[[FINAL]] : i32 to i8
+func.func @truncf_fnuz_nan_handling(%arg0 : f32) -> f8E5M2FNUZ attributes
+{ hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>}{
+    %0 = arith.truncf %arg0 : f32 to f8E5M2FNUZ
+    return %0 : f8E5M2FNUZ
+}
+
+// -----
+
+// Test FNUZ NaN handling for f8E4M3FNUZ type (same invariant as E5M2 above).
+//
+// CHECK-LABEL: func.func @truncf_fnuz_nan_handling_e4m3
+// CHECK-SAME:    (%[[ARG0:.*]]: f32) -> f8E4M3FNUZ
+// 0x80 = FNUZ NaN, 0xFF = max f32 exponent
+// CHECK-DAG:     %[[C128:.*]] = arith.constant 128 : i32
+// CHECK-DAG:     %[[C255:.*]] = arith.constant 255 : i32
+// CHECK:         %[[EXP_IS_MAX:.*]] = arith.cmpi eq, %{{.*}}, %[[C255]] : i32
+// CHECK:         %[[MANT_NE_ZERO:.*]] = arith.cmpi ne, %{{.*}}, %{{.*}} : i32
+// CHECK:         %[[SRC_IS_NAN:.*]] = arith.andi %[[EXP_IS_MAX]], %[[MANT_NE_ZERO]] : i1
+// srcIsNan select must be immediately before trunci (outermost in cascade).
+// CHECK:         %[[FINAL:.*]] = arith.select %[[SRC_IS_NAN]], %[[C128]], %{{.*}} : i32
+// CHECK-NEXT:    arith.trunci %[[FINAL]] : i32 to i8
+func.func @truncf_fnuz_nan_handling_e4m3(%arg0 : f32) -> f8E4M3FNUZ attributes
+{ hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>}{
+    %0 = arith.truncf %arg0 : f32 to f8E4M3FNUZ
+    return %0 : f8E4M3FNUZ
+}
+
+// -----
+
+// Test FNUZ NaN detection in extf: 0x80 input must produce f32 NaN.
+//
+// Background: For FNUZ types, 0x80 is the NaN encoding (not negative zero
+// like in IEEE formats). When extending to f32, we must detect this pattern
+// and produce a canonical f32 NaN.
+//
+// CHECK-LABEL: func.func @extf_fnuz_nan_handling
+// CHECK-SAME:    (%[[ARG0:.*]]: f8E5M2FNUZ) -> f32
+//
+// 0x80 (128) = FNUZ NaN encoding.
+// 0x7FC00000 (2143289344) = canonical f32 quiet NaN.
+// CHECK-DAG:     %[[C128:.*]] = arith.constant 128 : i32
+// CHECK-DAG:     %[[F32_NAN:.*]] = arith.constant 2143289344 : i32
+// CHECK:         %[[BITCAST:.*]] = arith.bitcast %[[ARG0]] : f8E5M2FNUZ to i8
+// CHECK:         %[[EXT:.*]] = arith.extui %[[BITCAST]] : i8 to i32
+// isNan = (inputBits == 0x80)
+// CHECK:         %[[IS_NAN:.*]] = arith.cmpi eq, %[[EXT]], %[[C128]] : i32
+//
+// If input is FNUZ NaN (0x80), output canonical f32 NaN (0x7FC00000).
+// CHECK:         arith.select %[[IS_NAN]], %[[F32_NAN]], %{{.*}} : i32
+func.func @extf_fnuz_nan_handling(%arg0 : f8E5M2FNUZ) -> f32 attributes
+{ hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>}{
+    %0 = arith.extf %arg0 : f8E5M2FNUZ to f32
     return %0 : f32
 }

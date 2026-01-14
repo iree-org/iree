@@ -61,62 +61,102 @@ void appendTypesIf(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
 }
 
 //===----------------------------------------------------------------------===//
-// Float type format parameters
+// Floating-point format constants and type info
 //===----------------------------------------------------------------------===//
+//
+// This follows the same approach as IREE's
+// runtime/src/iree/base/internal/math.h for floating-point conversions. The
+// compiler emits equivalent logic using MLIR arith ops instead of C control
+// flow.
+//
+// IEEE 754 floating-point format: [sign | exponent | mantissa]
+//   - Sign: 1 bit (0 = positive, 1 = negative)
+//   - Exponent: biased (stored = actual + bias)
+//   - Mantissa: fractional bits with implicit leading 1 for normal values
+//
+// Special values:
+//   - Zero: exp=0, mantissa=0 (signed zero if format supports it)
+//   - Denormal: exp=0, mantissa!=0, value = mantissa * 2^(1-bias-mantissa_bits)
+//   - Inf: exp=max, mantissa=0 (IEEE types only)
+//   - NaN: exp=max, mantissa!=0 (IEEE), or special encoding (FNUZ: 0x80)
+
+// F32 format constants (IEEE 754 binary32).
+constexpr int kF32MantBits = 23;
+constexpr int kF32Bias = 127;
+constexpr int kF32MantMask = (1 << kF32MantBits) - 1;
+constexpr int kF32MaxExp = 0xFF; // All exponent bits set (255).
 
 /// Parameters describing a floating-point format for conversion.
+/// Derived from APFloat semantics at runtime to support all MLIR float types.
 struct FloatTypeInfo {
-  unsigned expBits;     // Number of exponent bits.
-  unsigned mantBits;    // Number of mantissa bits (excluding implicit bit).
-  int bias;             // Exponent bias.
-  bool hasInf;          // Whether the format supports infinity.
-  bool hasNegZero;      // Whether the format supports negative zero.
+  unsigned expBits;  // Number of exponent bits.
+  unsigned mantBits; // Number of mantissa bits (excluding implicit leading 1).
+  int bias;          // Exponent bias: stored_exp = actual_exp + bias.
+  bool hasInf;       // Format supports infinity (exp=max, mantissa=0).
+  bool hasNan;       // Format supports NaN.
+  bool hasNegZero;   // Format supports negative zero.
+  bool nanAsNegZero; // NaN encoded as 0x80 (FNUZ types).
+  unsigned signMask; // Bit mask for sign bit.
+  unsigned expMask;  // Bit mask for exponent field.
+  unsigned mantMask; // Bit mask for mantissa field.
   unsigned nanEncoding; // Bit pattern for canonical NaN.
-  unsigned infEncoding; // Bit pattern for +Inf (0 if no Inf support).
+  unsigned infEncoding; // Bit pattern for +Inf (0 if no Inf).
+  unsigned maxFinite;   // Bit pattern for max finite value.
 };
 
-/// Returns format info for a float type by querying APFloat semantics. It
-/// assumes that the type can always be casted to FloatType.
+/// Returns format info for a float type by querying APFloat semantics.
 static FloatTypeInfo getFloatTypeInfo(Type type) {
   auto floatType = cast<FloatType>(type);
   const llvm::fltSemantics &sem = floatType.getFloatSemantics();
   FloatTypeInfo info;
 
   // Derive format parameters from APFloat semantics.
-  // Precision includes the implicit bit, so mantissa bits = precision - 1.
   info.mantBits = llvm::APFloat::semanticsPrecision(sem) - 1;
   unsigned totalBits = llvm::APFloat::semanticsSizeInBits(sem);
-  // Total bits = 1 (sign) + expBits + mantBits.
   info.expBits = totalBits - 1 - info.mantBits;
 
-  // Bias = 1 - minExponent. This works for both IEEE and FNUZ formats.
-  // For f32: minExp = -126, so bias = 1 - (-126) = 127.
-  // For f8E5M2FNUZ: minExp = -15, so bias = 1 - (-15) = 16.
+  // Compute masks.
+  info.signMask = 1u << (info.expBits + info.mantBits);
+  info.mantMask = (1u << info.mantBits) - 1;
+  info.expMask = ((1u << info.expBits) - 1) << info.mantBits;
+
+  // Bias from APFloat semantics.
   int minExp = llvm::APFloat::semanticsMinExponent(sem);
   info.bias = 1 - minExp;
 
   info.hasInf = llvm::APFloat::semanticsHasInf(sem);
-  // Check for negative zero support by seeing if getZero with negative=true
-  // produces a negative zero (vs NaN in FNUZ types where 0x80 encodes NaN).
+  info.hasNan = llvm::APFloat::semanticsHasNaN(sem);
+
+  // Check for FNUZ types where NaN is encoded as negative zero (0x80).
+  // These types have no negative zero and no infinity.
   llvm::APFloat negZero = llvm::APFloat::getZero(sem, /*Negative=*/true);
   info.hasNegZero = negZero.isZero() && negZero.isNegative();
+  info.nanAsNegZero = !info.hasNegZero && !info.hasInf && info.hasNan;
 
-  // Compute NaN and Inf encodings based on format type.
+  // Compute NaN and Inf encodings.
   unsigned maxExpCode = (1u << info.expBits) - 1;
-  unsigned mantMask = (1u << info.mantBits) - 1;
-
-  if (!info.hasNegZero && !info.hasInf) {
-    // FNUZ types: NaN = 0x80 (sign bit set, all else zero), no Inf.
-    info.nanEncoding = 1u << (totalBits - 1);
-    info.infEncoding = 0;
-  } else if (info.hasInf) {
-    // IEEE types: NaN = all exp bits + some mant bits, Inf = all exp bits.
-    info.infEncoding = maxExpCode << info.mantBits;
-    info.nanEncoding = info.infEncoding | mantMask;
+  if (info.nanAsNegZero) {
+    // FNUZ types: NaN = 0x80 (sign bit set, all else zero).
+    info.nanEncoding = info.signMask;
   } else {
-    // FN types (like f8E4M3FN): No Inf, but has NaN at max exp with mant != 0.
-    info.infEncoding = 0;
-    info.nanEncoding = (maxExpCode << info.mantBits) | mantMask;
+    // IEEE and FN types: NaN = all exp bits + some mantissa bits.
+    info.nanEncoding = info.expMask | info.mantMask;
+  }
+
+  // Inf encoding: only meaningful for types with infinity.
+  info.infEncoding = info.hasInf ? info.expMask : 0;
+
+  // Max finite value: for types with infinity, it's exp=(max-1), mantissa=all
+  // 1s. For types without infinity, max exp is valid, so exp=max, mantissa=all
+  // 1s (except for FN types where max mantissa is NaN).
+  if (info.hasInf) {
+    info.maxFinite = ((maxExpCode - 1) << info.mantBits) | info.mantMask;
+  } else if (info.hasNan && !info.nanAsNegZero) {
+    // FN types: max exp is valid but max mantissa is NaN.
+    info.maxFinite = info.expMask | (info.mantMask - 1);
+  } else {
+    // FNUZ or no-NaN types: all bit patterns except NaN are valid.
+    info.maxFinite = info.expMask | info.mantMask;
   }
 
   return info;
@@ -150,44 +190,22 @@ public:
     return rewriter.createOrFold<arith::ConstantOp>(loc, i32Type, attr);
   }
 
-  /// Extracts sign, exponent, and mantissa from an i32 value.
+  /// Extracts sign, exponent, and mantissa from an f32 value (as i32 bits).
+  /// F32 format: 1 sign bit, 8 exponent bits, 23 mantissa bits.
   /// Returns {sign, biasedExp, mantissa}.
-  std::tuple<Value, Value, Value> extractFields(Value i32Val,
-                                                const FloatTypeInfo &info) {
-    Value cExpShift = createI32Const(info.mantBits);
-    Value cSignShift = createI32Const(info.expBits + info.mantBits);
-    Value cExpMask = createI32Const((1 << info.expBits) - 1);
-    Value cMantMask = createI32Const((1 << info.mantBits) - 1);
+  std::tuple<Value, Value, Value> extractF32Fields(Value i32Val) {
+    Value cMantBits = createI32Const(kF32MantBits);
+    Value cExpMask = createI32Const(kF32MaxExp);
+    Value cMantMask = createI32Const(kF32MantMask);
+    Value cSignShift = createI32Const(31);
 
     Value sign = arith::ShRUIOp::create(rewriter, loc, i32Val, cSignShift);
-    Value biasedExp = arith::ShRUIOp::create(rewriter, loc, i32Val, cExpShift);
-    biasedExp = arith::AndIOp::create(rewriter, loc, biasedExp, cExpMask);
-    Value mant = arith::AndIOp::create(rewriter, loc, i32Val, cMantMask);
+    Value biasedExp = arith::AndIOp::create(
+        rewriter, loc, arith::ShRUIOp::create(rewriter, loc, i32Val, cMantBits),
+        cExpMask);
+    Value mantissa = arith::AndIOp::create(rewriter, loc, i32Val, cMantMask);
 
-    return {sign, biasedExp, mant};
-  }
-
-  /// Packs sign, exponent, and mantissa into an i32 value.
-  Value packFields(Value sign, Value biasedExp, Value mant,
-                   const FloatTypeInfo &info) {
-    Value cExpShift = createI32Const(info.mantBits);
-    Value cSignShift = createI32Const(info.expBits + info.mantBits);
-
-    Value signShifted = arith::ShLIOp::create(rewriter, loc, sign, cSignShift);
-    Value expShifted =
-        arith::ShLIOp::create(rewriter, loc, biasedExp, cExpShift);
-    Value result = arith::OrIOp::create(rewriter, loc, signShifted, expShifted);
-    return arith::OrIOp::create(rewriter, loc, result, mant);
-  }
-
-  /// Checks if the value represents zero (exp == 0 && mant == 0).
-  Value isZero(Value biasedExp, Value mant) {
-    Value c0 = createI32Const(0);
-    Value expIsZero = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq, biasedExp, c0);
-    Value mantIsZero = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq, mant, c0);
-    return arith::AndIOp::create(rewriter, loc, expIsZero, mantIsZero);
+    return {sign, biasedExp, mantissa};
   }
 
   Type getI32Type() const { return i32Type; }
@@ -206,44 +224,24 @@ private:
 //===----------------------------------------------------------------------===//
 
 /// Emulates arith.truncf from f32 to fp8 using integer bit manipulation.
-/// This is needed because LLVM doesn't support fptrunc to fp8 types.
+/// This implementation follows IREE's runtime/src/iree/base/internal/math.h.
+///
+/// Features:
+///   - Round-to-nearest-even (IEEE 754 default rounding mode).
+///   - Proper denormal/subnormal generation for underflow cases.
+///   - Correct handling of all fp8 format variants (IEEE, FN, FNUZ).
 ///
 /// The conversion handles three categories of fp8 formats:
 ///
 /// 1. FNUZ types (f8E5M2FNUZ, f8E4M3FNUZ): No Inf, no negative zero.
-///    - NaN is encoded as 0x80 (sign=1, exp=0, mant=0).
-///    - Overflow (finite values too large) produces NaN.
-///    - Zero is always positive (0x00).
+///    - NaN is encoded as 0x80 (sign=1, exp=0, mantissa=0).
+///    - Overflow produces NaN; zero is always positive.
 ///
 /// 2. IEEE types (f8E5M2): Has Inf and negative zero.
-///    - NaN is encoded as exp=max with non-zero mantissa.
-///    - Inf is encoded as exp=max with zero mantissa.
-///    - Overflow produces signed Inf (preserves sign).
-///    - Zero preserves sign (+0.0 or -0.0).
+///    - Standard IEEE-like encoding with Inf at max exponent.
 ///
 /// 3. FN types (f8E4M3FN): No Inf, but has negative zero.
-///    - NaN is encoded at a specific bit pattern (e.g., 0x7F).
-///    - Overflow produces NaN.
-///    - Zero preserves sign (+0.0 or -0.0).
-///
-/// Special value handling priority (highest to lowest):
-///   1. Source NaN -> destination NaN (must propagate).
-///   2. Source Inf -> destination Inf (IEEE) or NaN (FNUZ/FN).
-///   3. Source zero -> destination zero (preserve sign if supported).
-///   4. Overflow -> Inf (IEEE) or NaN (FNUZ/FN).
-///   5. Underflow -> zero.
-///
-/// Denormal handling:
-///   This implementation uses flush-to-zero (FTZ) semantics for denormals.
-///   When the adjusted exponent is <= 0 (underflow), the result is flushed to
-///   zero rather than producing a denormal fp8 value. This is a known
-///   limitation that simplifies the implementation. Proper denormal support
-///   would require additional logic to compute the subnormal mantissa shift.
-///
-/// Rounding:
-///   Uses round-half-away-from-zero (adding the round bit), not IEEE 754
-///   round-half-to-even (banker's rounding). This is a simplification that
-///   may cause minor differences compared to strict IEEE 754 implementations.
+///    - Max exponent values are valid finite numbers (except NaN encoding).
 struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
   using Base::Base;
 
@@ -260,135 +258,226 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
       return failure();
     }
 
-    FloatTypeInfo srcInfo = getFloatTypeInfo(inputElemType);
     FloatTypeInfo dstInfo = getFloatTypeInfo(resultElemType);
     Location loc = op.getLoc();
     FloatEmulationHelper helper(rewriter, loc, resultType);
 
-    // Calculate format-specific constants.
-    int biasDiff = srcInfo.bias - dstInfo.bias;
-    int mantShift = srcInfo.mantBits - dstInfo.mantBits;
-    int dstMantMask = (1 << dstInfo.mantBits) - 1;
-    int roundBit = 1 << (mantShift - 1);
+    // Constants for destination format.
+    int dstMaxBiasedExp = (1 << dstInfo.expBits) - 1;
+    // Max exponent for normal values (excludes Inf/NaN encoding if applicable).
+    int dstMaxNormalBiasedExp =
+        dstInfo.hasInf ? dstMaxBiasedExp - 1 : dstMaxBiasedExp;
+    int mantShift = kF32MantBits - dstInfo.mantBits;
 
-    // For IEEE types, max normal exponent is (2^expBits - 2) because
-    // (2^expBits - 1) encodes Inf/NaN. For FNUZ types, all exponent codes
-    // except 0 (with sign=1 for NaN) are valid normal values.
-    int dstMaxNormalExp = dstInfo.hasInf ? (1 << dstInfo.expBits) - 2
-                                         : (1 << dstInfo.expBits) - 1;
-
+    // Create constants.
     Value c0 = helper.createI32Const(0);
     Value c1 = helper.createI32Const(1);
-    Value cBiasDiff = helper.createI32Const(biasDiff);
+    Value cF32MantBits = helper.createI32Const(kF32MantBits);
+    Value cF32MantMask = helper.createI32Const(kF32MantMask);
+    Value cF32MaxExp = helper.createI32Const(kF32MaxExp);
+    Value cF32Bias = helper.createI32Const(kF32Bias);
+    Value cDstBias = helper.createI32Const(dstInfo.bias);
+    Value cDstMantBits = helper.createI32Const(dstInfo.mantBits);
+    Value cDstExpShift = cDstMantBits;
+    Value cDstSignShift =
+        helper.createI32Const(dstInfo.expBits + dstInfo.mantBits);
+    Value cDstMantMask = helper.createI32Const(dstInfo.mantMask);
+    Value cDstMaxNormalExp = helper.createI32Const(dstMaxNormalBiasedExp);
     Value cMantShift = helper.createI32Const(mantShift);
-    Value cDstMaxNormalExp = helper.createI32Const(dstMaxNormalExp);
-    Value cDstMantMask = helper.createI32Const(dstMantMask);
-    Value cRoundBit = helper.createI32Const(roundBit);
-    Value cMantOverflowBit = helper.createI32Const(1 << srcInfo.mantBits);
-    Value cSrcExpMask = helper.createI32Const((1 << srcInfo.expBits) - 1);
     Value cNaN = helper.createI32Const(dstInfo.nanEncoding);
-    // Overflow produces Inf for IEEE types, NaN for FNUZ/FN types.
-    Value cOverflow = helper.createI32Const(
-        dstInfo.hasInf ? dstInfo.infEncoding : dstInfo.nanEncoding);
+    Value cDstSignMask = helper.createI32Const(dstInfo.signMask);
+
+    // For round-to-nearest-even.
+    Value cEvenBit = helper.createI32Const(1 << mantShift);
+    Value cOddBit = helper.createI32Const(1 << (mantShift - 1));
+    Value cOddBitMinus1 = helper.createI32Const((1 << (mantShift - 1)) - 1);
 
     // Bitcast f32 to i32 and extract fields.
     Value i32Val = arith::BitcastOp::create(rewriter, loc, helper.getI32Type(),
                                             op.getIn());
-    auto [sign, biasedExpSrc, mantSrc] = helper.extractFields(i32Val, srcInfo);
+    auto [f32Sign, f32Exp, f32Mant] = helper.extractF32Fields(i32Val);
 
-    // Check for NaN/Inf in source (exponent == max).
+    // Compute destination sign.
+    Value dstSign =
+        arith::ShLIOp::create(rewriter, loc, f32Sign, cDstSignShift);
+
+    // Check for NaN/Inf in source.
     Value srcIsNanOrInf = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq, biasedExpSrc, cSrcExpMask);
-    // Distinguish NaN vs Inf in source: NaN has non-zero mantissa.
+        rewriter, loc, arith::CmpIPredicate::eq, f32Exp, cF32MaxExp);
     Value srcIsNan = arith::AndIOp::create(
         rewriter, loc, srcIsNanOrInf,
-        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ne, mantSrc,
+        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ne, f32Mant,
                               c0));
     Value srcIsInf = arith::AndIOp::create(
         rewriter, loc, srcIsNanOrInf,
-        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq, mantSrc,
+        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq, f32Mant,
                               c0));
 
-    // Check for zero.
-    Value isZeroVal = helper.isZero(biasedExpSrc, mantSrc);
+    // Check for zero or subnormal in source (exp == 0).
+    Value srcExpIsZero = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq, f32Exp, c0);
 
-    // Adjust exponent bias.
-    Value biasedExpDst =
-        arith::SubIOp::create(rewriter, loc, biasedExpSrc, cBiasDiff);
+    // Compute arithmetic exponent (unbiased).
+    Value arithmeticExp =
+        arith::SubIOp::create(rewriter, loc, f32Exp, cF32Bias);
 
-    // Check for overflow (exp > dstMaxNormalExp) and underflow (exp <= 0).
+    // Check overflow: arithmetic_exp > max_normal_exp - dst_bias + dst_bias
+    // Simplified: biased_dst_exp > max_normal_exp
+    Value biasedDstExp =
+        arith::AddIOp::create(rewriter, loc, arithmeticExp, cDstBias);
     Value isOverflow =
         arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::sgt,
-                              biasedExpDst, cDstMaxNormalExp);
+                              biasedDstExp, cDstMaxNormalExp);
+
+    // Check underflow: biased_dst_exp <= 0 means subnormal or zero.
     Value isUnderflow = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::sle, biasedExpDst, c0);
+        rewriter, loc, arith::CmpIPredicate::sle, biasedDstExp, c0);
 
-    // Round mantissa and handle mantissa overflow (carry into exponent).
-    Value mantRounded =
-        arith::AddIOp::create(rewriter, loc, mantSrc, cRoundBit);
-    Value mantOverflow =
-        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::uge,
-                              mantRounded, cMantOverflowBit);
+    // === Normal case with round-to-nearest-even ===
+    // Implement round-to-nearest-even by checking the LSB (even_bit).
+    // If even_bit is set, add odd_bit (round up at tie).
+    // If even_bit is clear, add odd_bit - 1 (round down at tie).
+    Value mantHasEvenBit = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::ne,
+        arith::AndIOp::create(rewriter, loc, f32Mant, cEvenBit), c0);
+    Value roundingBias = arith::SelectOp::create(rewriter, loc, mantHasEvenBit,
+                                                 cOddBit, cOddBitMinus1);
+    Value biasedMant =
+        arith::AddIOp::create(rewriter, loc, f32Mant, roundingBias);
 
-    Value expIncr = arith::AddIOp::create(rewriter, loc, biasedExpDst, c1);
-    biasedExpDst = arith::SelectOp::create(rewriter, loc, mantOverflow, expIncr,
-                                           biasedExpDst);
-    mantRounded =
-        arith::SelectOp::create(rewriter, loc, mantOverflow, c0, mantRounded);
+    // Check if rounding caused mantissa overflow (carry into exponent).
+    Value mantOverflowed = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::ugt, biasedMant, cF32MantMask);
+    biasedDstExp = arith::SelectOp::create(
+        rewriter, loc, mantOverflowed,
+        arith::AddIOp::create(rewriter, loc, biasedDstExp, c1), biasedDstExp);
+    biasedMant =
+        arith::SelectOp::create(rewriter, loc, mantOverflowed, c0, biasedMant);
 
-    // Re-check overflow after potential exponent increment from rounding.
+    // Re-check overflow after rounding increment.
     isOverflow = arith::OrIOp::create(
         rewriter, loc, isOverflow,
         arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::sgt,
-                              biasedExpDst, cDstMaxNormalExp));
+                              biasedDstExp, cDstMaxNormalExp));
 
     // Shift mantissa to destination width.
-    Value mantDst =
-        arith::ShRUIOp::create(rewriter, loc, mantRounded, cMantShift);
-    mantDst = arith::AndIOp::create(rewriter, loc, mantDst, cDstMantMask);
+    Value dstMant =
+        arith::ShRUIOp::create(rewriter, loc, biasedMant, cMantShift);
+    dstMant = arith::AndIOp::create(rewriter, loc, dstMant, cDstMantMask);
 
-    // Pack result and handle special cases.
-    Value result = helper.packFields(sign, biasedExpDst, mantDst, dstInfo);
+    // Pack normal result.
+    Value dstExp =
+        arith::ShLIOp::create(rewriter, loc, biasedDstExp, cDstExpShift);
+    Value normalResult = arith::OrIOp::create(
+        rewriter, loc, arith::OrIOp::create(rewriter, loc, dstSign, dstExp),
+        dstMant);
 
-    // Compute sign bit position for destination format.
-    int dstSignBitPos = dstInfo.expBits + dstInfo.mantBits;
-    Value cSignShift = helper.createI32Const(dstSignBitPos);
-    Value signBit = arith::ShLIOp::create(rewriter, loc, sign, cSignShift);
+    // === Underflow case: generate subnormal or zero ===
+    // For subnormals, dst_exp = 0 and mantissa encodes the value.
+    // shift_amount = f32_mant_bits - dst_mant_bits - arithmetic_exp + (1 -
+    // dst_bias)
+    Value dstSubnormalExp = helper.createI32Const(1 - dstInfo.bias);
+    Value shiftAmount = arith::SubIOp::create(
+        rewriter, loc,
+        arith::SubIOp::create(rewriter, loc, cF32MantBits, cDstMantBits),
+        arith::SubIOp::create(rewriter, loc, arithmeticExp, dstSubnormalExp));
 
-    // For IEEE types with Inf, compute signed Inf (preserve sign on overflow).
-    // For FNUZ/FN types, overflow/Inf always produces NaN (unsigned).
-    Value signedOverflow = cOverflow;
-    if (dstInfo.hasInf) {
-      signedOverflow = arith::OrIOp::create(rewriter, loc, cOverflow, signBit);
-    }
+    // Add implicit leading 1 to f32 mantissa for the shift.
+    Value cImplicitBit = helper.createI32Const(1 << kF32MantBits);
+    Value effectiveMant =
+        arith::OrIOp::create(rewriter, loc, f32Mant, cImplicitBit);
 
-    // For types with negative zero support, compute signed zero.
-    // FNUZ types don't have negative zero, so zero is always positive.
-    Value zeroResult = c0;
-    if (dstInfo.hasNegZero) {
-      zeroResult = signBit;
-    }
+    // Compute rounding term for subnormal.
+    // NOTE: This uses simple "round to nearest" (not "round to nearest even")
+    // to match the runtime's math.h implementation. The runtime only uses
+    // round-to-nearest-even for normal values, not subnormals.
+    Value subnormalRoundBit = arith::ShLIOp::create(
+        rewriter, loc, c1,
+        arith::SubIOp::create(rewriter, loc, shiftAmount, c1));
+    Value subnormalMantRounded =
+        arith::AddIOp::create(rewriter, loc, effectiveMant, subnormalRoundBit);
 
-    // Select order matters: later selects take precedence over earlier ones.
-    // This is critical because multiple conditions can be true simultaneously.
-    // For example, f32 NaN has exp=255, so after bias adjustment (255-112=143),
-    // it exceeds dstMaxNormalExp (30), making both srcIsNan AND overflow true.
-    // If overflow were checked after srcIsNan, NaN would incorrectly become
-    // Inf.
+    // Shift to get subnormal mantissa.
+    Value subnormalMant = arith::ShRUIOp::create(
+        rewriter, loc, subnormalMantRounded, shiftAmount);
+    subnormalMant =
+        arith::AndIOp::create(rewriter, loc, subnormalMant, cDstMantMask);
+
+    // Subnormal result has exp=0.
+    Value subnormalResult =
+        arith::OrIOp::create(rewriter, loc, dstSign, subnormalMant);
+
+    // Check if shift is too large (complete underflow to zero).
+    Value shiftTooLarge = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::sgt, shiftAmount,
+        helper.createI32Const(kF32MantBits + 1));
+    subnormalResult = arith::SelectOp::create(
+        rewriter, loc, shiftTooLarge,
+        dstInfo.nanAsNegZero ? c0 : dstSign, // Zero (signed if supported)
+        subnormalResult);
+
+    // =========================================================================
+    // Select cascade for final result.
     //
-    // Order from lowest to highest priority:
-    // 1. Overflow/underflow for normal values.
-    // 2. Zero input (preserve sign for IEEE types).
-    // 3. Source Inf (takes precedence over overflow, since Inf also overflows).
-    // 4. Source NaN (highest priority, must always propagate).
-    result = arith::SelectOp::create(rewriter, loc, isOverflow, signedOverflow,
+    // Unlike runtime code which uses early returns, SSA form requires computing
+    // all paths and selecting between them. The ORDER of selects matters:
+    // later selects override earlier ones. We order from lowest to highest
+    // priority so the final select (NaN) always wins.
+    //
+    // Priority (lowest to highest):
+    //   1. Normal/subnormal computation (base case)
+    //   2. Source zero/subnormal -> zero
+    //   3. Negative zero correction (FNUZ only, must be before NaN handling!)
+    //   4. Overflow -> Inf or NaN
+    //   5. Source Inf -> Inf or NaN
+    //   6. Source NaN -> NaN (highest priority, always wins)
+    // =========================================================================
+    Value result = arith::SelectOp::create(rewriter, loc, isUnderflow,
+                                           subnormalResult, normalResult);
+
+    // F32 subnormals (exp=0) become zero in fp8 (much smaller than fp8 min).
+    Value zeroResult = dstInfo.nanAsNegZero ? c0 : dstSign;
+    result = arith::SelectOp::create(rewriter, loc, srcExpIsZero, zeroResult,
                                      result);
-    result = arith::SelectOp::create(rewriter, loc, isUnderflow, c0, result);
+
+    // FNUZ: Negative zero (0x80) must become positive zero (0x00).
+    // CRITICAL: This must happen BEFORE NaN/Inf/overflow handling!
+    // For FNUZ types, 0x80 is the NaN encoding, not negative zero.
+    // If we did this after, we would incorrectly convert NaN to zero.
+    if (dstInfo.nanAsNegZero) {
+      Value resultIsNegZero = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq, result, cDstSignMask);
+      result =
+          arith::SelectOp::create(rewriter, loc, resultIsNegZero, c0, result);
+    }
+
+    // Overflow and source Inf both map to the same result:
+    // Inf (IEEE) or NaN (FN/FNUZ) or saturate to max finite (no Inf/NaN).
+    Value infOrOverflowResult;
+    if (dstInfo.hasInf) {
+      infOrOverflowResult = arith::OrIOp::create(
+          rewriter, loc, dstSign, helper.createI32Const(dstInfo.infEncoding));
+    } else if (dstInfo.hasNan) {
+      infOrOverflowResult = cNaN;
+    } else {
+      // No Inf, no NaN: saturate to max finite.
+      infOrOverflowResult = arith::OrIOp::create(
+          rewriter, loc, dstSign, helper.createI32Const(dstInfo.maxFinite));
+    }
+    result = arith::SelectOp::create(rewriter, loc, isOverflow,
+                                     infOrOverflowResult, result);
+    result = arith::SelectOp::create(rewriter, loc, srcIsInf,
+                                     infOrOverflowResult, result);
+
+    // Handle source NaN last so it takes precedence.
+    Value nanResult;
+    if (dstInfo.hasNan) {
+      nanResult = cNaN;
+    } else {
+      nanResult = c0; // No NaN encoding: convert to +0.
+    }
     result =
-        arith::SelectOp::create(rewriter, loc, isZeroVal, zeroResult, result);
-    result = arith::SelectOp::create(rewriter, loc, srcIsInf, signedOverflow,
-                                     result);
-    result = arith::SelectOp::create(rewriter, loc, srcIsNan, cNaN, result);
+        arith::SelectOp::create(rewriter, loc, srcIsNan, nanResult, result);
 
     // Truncate to i8 and bitcast to fp8.
     result = arith::TruncIOp::create(rewriter, loc, helper.getI8Type(), result);
@@ -403,40 +492,20 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
 //===----------------------------------------------------------------------===//
 
 /// Emulates arith.extf from fp8 to f32 using integer bit manipulation.
-/// This is needed because LLVM doesn't support fpext from fp8 types.
+/// This implementation follows IREE's runtime/src/iree/base/internal/math.h.
 ///
-/// The conversion handles three categories of fp8 formats:
+/// The runtime uses ldexpf() for denormals:
+///   return sign * ldexpf(mantissa, 1 - bias - mantissa_bits);
 ///
-/// 1. FNUZ types (f8E5M2FNUZ, f8E4M3FNUZ): No Inf, no negative zero.
-///    - NaN is detected by exact bit pattern match (0x80).
-///    - Zero (exp=0, mant=0) is always positive in f32.
-///    - Note: FNUZ NaN (0x80) has exp=0, mant=0, so NaN check must take
-///      precedence over zero check.
+/// Since we can't use ldexpf in MLIR, we enumerate all possible denormal
+/// mantissa values (only 3-7 values for fp8) and compute their f32
+/// representations at pattern-match time. At runtime, we select the
+/// correct precomputed value based on the input mantissa.
 ///
-/// 2. IEEE types (f8E5M2): Has Inf and negative zero.
-///    - NaN is detected as exp=max && mant!=0 -> f32 NaN (0x7FC00000).
-///    - Inf is detected as exp=max && mant==0 -> f32 signed Inf.
-///    - Zero preserves sign (+0.0 or -0.0).
-///
-/// 3. FN types (f8E4M3FN): No Inf, but has negative zero.
-///    - NaN is detected by exact bit pattern match (e.g., 0x7F).
-///    - Other exp=max values are valid normal numbers (no Inf).
-///    - Zero preserves sign (+0.0 or -0.0).
-///
-/// Special value handling priority (highest to lowest):
-///   1. Source NaN -> f32 NaN (0x7FC00000).
-///   2. Source Inf -> f32 signed Inf (IEEE types only).
-///   3. Source zero -> f32 zero (preserve sign if supported).
-///
-/// Denormal handling:
-///   This implementation does NOT correctly handle denormal fp8 inputs
-///   (exp=0, mant!=0). Denormal values are treated as if they were normal
-///   values with biased exponent 0, which produces incorrect (larger) results.
-///   This is a known limitation. When round-tripping through this emulation,
-///   TruncFToFP8 uses FTZ so denormals won't be produced. However, fp8 data
-///   from external sources (e.g., model weights) containing denormals will not
-///   be converted correctly. Proper denormal support would require detecting
-///   exp=0 && mant!=0 and computing the appropriate f32 exponent/mantissa.
+/// For denormals (exp=0, mantissa!=0):
+///   value = mantissa * 2^(1 - bias - mantissa_bits)
+///   f32_exp = kF32Bias + 1 - src_bias - src_mantissa_bits + leading_bit_pos
+///   f32_mantissa = (mantissa - leading_bit) << (23 - leading_bit_pos)
 struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
   using Base::Base;
 
@@ -454,97 +523,175 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
     }
 
     FloatTypeInfo srcInfo = getFloatTypeInfo(inputElemType);
-    FloatTypeInfo dstInfo = getFloatTypeInfo(resultElemType);
     Location loc = op.getLoc();
     FloatEmulationHelper helper(rewriter, loc, resultType);
 
-    // Calculate format-specific constants.
-    int biasDiff = dstInfo.bias - srcInfo.bias;
-    int mantShift = dstInfo.mantBits - srcInfo.mantBits;
-    int srcMaxExp = (1 << srcInfo.expBits) - 1;
+    // Conversion parameters.
+    int srcMaxExp = (1 << srcInfo.expBits) - 1; // All exp bits set.
+    int biasDiff =
+        kF32Bias - srcInfo.bias; // Bias adjustment for normal values.
+    int mantShift =
+        kF32MantBits - srcInfo.mantBits; // Left shift to align mantissa.
 
     Value c0 = helper.createI32Const(0);
     Value cBiasDiff = helper.createI32Const(biasDiff);
     Value cMantShift = helper.createI32Const(mantShift);
     Value cSrcMaxExp = helper.createI32Const(srcMaxExp);
-    Value cF32NaN = helper.createI32Const(0x7FC00000);
-    Value cF32Inf = helper.createI32Const(0x7F800000);
-    Value cSignBit = helper.createI32Const(0x80000000);
+    Value cF32NaN = helper.createI32Const(0x7FC00000); // Canonical quiet NaN.
+    Value cF32Inf = helper.createI32Const(0x7F800000); // +Infinity.
+    Value cF32MantBits = helper.createI32Const(kF32MantBits);
 
     // Bitcast fp8 to i8, extend to i32, and extract fields.
     Value i8Val =
         arith::BitcastOp::create(rewriter, loc, helper.getI8Type(), op.getIn());
     Value i32Val =
         arith::ExtUIOp::create(rewriter, loc, helper.getI32Type(), i8Val);
-    auto [sign, biasedExpSrc, mantSrc] = helper.extractFields(i32Val, srcInfo);
+
+    // Extract fields.
+    Value cSrcMantBits = helper.createI32Const(srcInfo.mantBits);
+    Value cSrcExpMask = helper.createI32Const((1 << srcInfo.expBits) - 1);
+    Value cSrcMantMask = helper.createI32Const(srcInfo.mantMask);
+    Value cSrcSignShift =
+        helper.createI32Const(srcInfo.expBits + srcInfo.mantBits);
+
+    Value sign = arith::ShRUIOp::create(rewriter, loc, i32Val, cSrcSignShift);
+    Value biasedExpSrc = arith::AndIOp::create(
+        rewriter, loc,
+        arith::ShRUIOp::create(rewriter, loc, i32Val, cSrcMantBits),
+        cSrcExpMask);
+    Value mantSrc = arith::AndIOp::create(rewriter, loc, i32Val, cSrcMantMask);
+
+    // Compute f32 sign bit.
+    Value f32Sign =
+        arith::ShLIOp::create(rewriter, loc, sign, helper.createI32Const(31));
+
+    // Precompute mantissa comparisons (used by multiple checks below).
+    Value mantIsZero = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq, mantSrc, c0);
+    Value mantIsNonZero = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::ne, mantSrc, c0);
 
     // Detect special values based on format type.
     Value isNaN;
-    Value isInf;
-    if (!srcInfo.hasNegZero && !srcInfo.hasInf) {
-      // FNUZ: NaN = 0x80 (sign=1, exp=0, mant=0), no Inf.
+    Value isInf; // Only used for IEEE types (hasInf=true).
+    if (srcInfo.nanAsNegZero) {
+      // FNUZ: NaN = 0x80 (sign=1, exp=0, mantissa=0), no Inf.
       Value cFNUZNaN = helper.createI32Const(srcInfo.nanEncoding);
       isNaN = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq,
                                     i32Val, cFNUZNaN);
     } else if (srcInfo.hasInf) {
-      // IEEE types: NaN = exp==max && mant!=0, Inf = exp==max && mant==0.
+      // IEEE types: NaN = exp==max && mantissa!=0, Inf = exp==max &&
+      // mantissa==0.
       Value expIsMax = arith::CmpIOp::create(
           rewriter, loc, arith::CmpIPredicate::eq, biasedExpSrc, cSrcMaxExp);
-      Value mantIsZero = arith::CmpIOp::create(
-          rewriter, loc, arith::CmpIPredicate::eq, mantSrc, c0);
-      Value mantIsNonZero = arith::CmpIOp::create(
-          rewriter, loc, arith::CmpIPredicate::ne, mantSrc, c0);
       isNaN = arith::AndIOp::create(rewriter, loc, expIsMax, mantIsNonZero);
       isInf = arith::AndIOp::create(rewriter, loc, expIsMax, mantIsZero);
     } else {
-      // FN types (like f8E4M3FN): No Inf, NaN only at specific encoding.
-      // NaN = exp==max && mant==maxMant (e.g., 0x7F for f8E4M3FN).
-      // Other exp==max values with mant!=maxMant are valid normal numbers.
+      // FN types: NaN only at specific encoding, no Inf.
       Value cNaNEncoding = helper.createI32Const(srcInfo.nanEncoding);
       isNaN = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq,
                                     i32Val, cNaNEncoding);
     }
 
-    // Check for zero.
-    Value isZeroVal = helper.isZero(biasedExpSrc, mantSrc);
+    // Check for zero (exp=0, mantissa=0).
+    Value expIsZero = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq, biasedExpSrc, c0);
+    Value isZero = arith::AndIOp::create(rewriter, loc, expIsZero, mantIsZero);
 
-    // Adjust exponent bias and shift mantissa.
-    Value biasedExpDst =
+    // Check for denormal (exp=0, mantissa!=0).
+    Value isDenormal =
+        arith::AndIOp::create(rewriter, loc, expIsZero, mantIsNonZero);
+
+    // === Normal value conversion ===
+    // f32_exp = src_exp + bias_diff, f32_mant = src_mant << mant_shift
+    Value normalF32Exp =
         arith::AddIOp::create(rewriter, loc, biasedExpSrc, cBiasDiff);
-    Value mantDst = arith::ShLIOp::create(rewriter, loc, mantSrc, cMantShift);
+    Value normalF32Mant =
+        arith::ShLIOp::create(rewriter, loc, mantSrc, cMantShift);
+    Value normalResult = arith::OrIOp::create(
+        rewriter, loc, f32Sign,
+        arith::OrIOp::create(
+            rewriter, loc,
+            arith::ShLIOp::create(rewriter, loc, normalF32Exp, cF32MantBits),
+            normalF32Mant));
 
-    // Pack result and handle special cases.
-    Value result = helper.packFields(sign, biasedExpDst, mantDst, dstInfo);
+    // === Denormal value conversion ===
+    // For denormals: value = mantissa * 2^(1 - bias - mant_bits)
+    // We need to find the leading 1 bit and normalize.
+    // For small mant_bits (2-3), we can enumerate cases.
+    //
+    // The arithmetic exponent for denormals is: 1 - bias
+    // For mantissa M with leading bit at position P (0-indexed from LSB):
+    //   f32_exp = f32_bias + (1 - src_bias) + P - src_mant_bits
+    //           = f32_bias + 1 - src_bias + P - src_mant_bits
+    //   f32_mant = (M - (1 << P)) << (f32_mant_bits - P)
+    //
+    // Simplified: f32_exp = 127 + 1 - src_bias - src_mant_bits + P
+    //                     = 128 - src_bias - src_mant_bits + P
+    int denormalBaseExp = 128 - srcInfo.bias - srcInfo.mantBits;
 
-    // For types with negative zero support, compute signed zero in f32.
-    // f32 -0.0 = 0x80000000 (sign bit at position 31).
-    Value zeroResult = c0;
-    if (srcInfo.hasNegZero) {
-      Value cF32SignShift = helper.createI32Const(31);
-      Value f32SignBit =
-          arith::ShLIOp::create(rewriter, loc, sign, cF32SignShift);
-      zeroResult = f32SignBit;
+    // Enumerate all possible denormal mantissa values and precompute their f32
+    // bit representations. We use enumeration instead of ldexpf() because:
+    //   1. MLIR arith dialect has no ldexp op (would need math dialect).
+    //      However, the pass is intended to be run late in the pipeline where
+    //      math dialect ops may not be allowed.
+    //   2. Our pattern works in integer domain (bit manipulation on i32).
+    //   3. fp8 has only 3-7 possible denormal values, so enumeration is
+    //      practical.
+    // For mantissa_bits=2 (E5M2): mantissa ∈ {1, 2, 3}
+    // For mantissa_bits=3 (E4M3): mantissa ∈ {1, 2, 3, 4, 5, 6, 7}
+    Value denormalResult = c0;
+    for (int m = (1 << srcInfo.mantBits) - 1; m >= 1; --m) {
+      // Find leading bit position P (0-indexed).
+      int leadingBitPos = 0;
+      for (int i = srcInfo.mantBits - 1; i >= 0; --i) {
+        if (m & (1 << i)) {
+          leadingBitPos = i;
+          break;
+        }
+      }
+
+      // Compute f32 representation for this denormal mantissa.
+      int f32Exp = denormalBaseExp + leadingBitPos;
+      // Remove leading 1 bit and shift to f32 mantissa position.
+      int mantWithoutLeading = m - (1 << leadingBitPos);
+      int f32Mant = mantWithoutLeading << (kF32MantBits - leadingBitPos);
+      int f32Bits = (f32Exp << kF32MantBits) | f32Mant;
+
+      Value cMantVal = helper.createI32Const(m);
+      Value cF32Bits = helper.createI32Const(f32Bits);
+      Value mantMatches = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq, mantSrc, cMantVal);
+
+      // Add sign to the f32 value.
+      Value signedF32Bits =
+          arith::OrIOp::create(rewriter, loc, f32Sign, cF32Bits);
+      denormalResult = arith::SelectOp::create(rewriter, loc, mantMatches,
+                                               signedF32Bits, denormalResult);
     }
 
-    // Handle zero first (before NaN check for non-FNUZ types).
-    // For FNUZ, zero check must come after NaN check since NaN (0x80) has
-    // exp=0, mant=0 which looks like zero except for sign bit.
-    result =
-        arith::SelectOp::create(rewriter, loc, isZeroVal, zeroResult, result);
+    // =========================================================================
+    // Select cascade for final result (same ordering logic as TruncF).
+    // Later selects override earlier ones. NaN must be last (highest priority).
+    // =========================================================================
+    Value result = arith::SelectOp::create(rewriter, loc, isDenormal,
+                                           denormalResult, normalResult);
 
-    // Handle Inf (IEEE types only): preserve sign.
+    // Zero: use signed zero if format supports negative zero, else +0.
+    Value zeroResult = srcInfo.hasNegZero ? f32Sign : c0;
+    result = arith::SelectOp::create(rewriter, loc, isZero, zeroResult, result);
+
+    // Inf (IEEE types only): preserve sign.
     if (srcInfo.hasInf) {
-      Value signedInf = arith::SelectOp::create(
-          rewriter, loc,
-          arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ne, sign,
-                                c0),
-          arith::OrIOp::create(rewriter, loc, cF32Inf, cSignBit), cF32Inf);
+      Value signedInf = arith::OrIOp::create(rewriter, loc, f32Sign, cF32Inf);
       result = arith::SelectOp::create(rewriter, loc, isInf, signedInf, result);
     }
 
-    // Handle NaN last so it takes precedence over zero for FNUZ types. Then
-    // bitcast it back to f32.
+    // NaN: always canonical quiet NaN (sign bit ignored).
+    // Must be last to take precedence over zero for FNUZ (where 0x80 is NaN).
     result = arith::SelectOp::create(rewriter, loc, isNaN, cF32NaN, result);
+
+    // Bitcast to f32.
     result = arith::BitcastOp::create(rewriter, loc, resultType, result);
     rewriter.replaceOp(op, result);
 
@@ -564,7 +711,8 @@ struct ConvertUnsupportedFloatArithPass final
 static void populateCPUSourceAndTargetType(MLIRContext *ctx, Operation *op,
                                            SmallVectorImpl<Type> &sourceTypes,
                                            Type &targetType) {
-  // For CPU backend, we emulate all the fp8 types to fp32.
+  // For CPU backend, we emulate all the fp8 types to fp32. This supports any
+  // future new fp8 types automatically.
   appendTypesIf<
 #define GET_TYPEDEF_LIST
 #include "mlir/IR/BuiltinTypes.cpp.inc"
