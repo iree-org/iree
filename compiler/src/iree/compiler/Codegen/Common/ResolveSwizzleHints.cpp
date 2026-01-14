@@ -157,8 +157,14 @@ static void swizzleGatherToLDS(RewriterBase &rewriter,
   });
 }
 
-static bool verifyFlatSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
-  return cast<MemRefType>(hintOp.getOperand().getType()).getRank() == 1;
+static LogicalResult
+verifyFlatSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
+  if (cast<MemRefType>(hintOp.getOperand().getType()).getRank() == 1) {
+    return success();
+  }
+  hintOp.emitError() << "swizzle hint operand must be a flat memref, got "
+                     << hintOp.getOperand().getType();
+  return failure();
 }
 
 /// Resolves all hints. Walks all direct users and splits them into loads and
@@ -193,7 +199,7 @@ static void resolveHintOp(RewriterBase &rewriter,
     }
     if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
       // Ignore swizzleHint on Dst Operand. Gather_to_lds writes elements of a
-      // subgroup contiguously in order of lane ID
+      // subgroup contiguously in order of lane ID.
       if (gatherToLDSOp.getDst() == hintOp) {
         continue;
       }
@@ -246,11 +252,8 @@ void ResolveSwizzleHintsPass::runOnOperation() {
   // silently pass through for that hint.
   IRRewriter rewriter(funcOp->getContext());
   for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
-    if (!verifyFlatSwizzleHintOp(hintOp)) {
-      hintOp.emitError() << "swizzle hint operand must be a flat memref, got "
-                         << hintOp.getOperand().getType();
-      signalPassFailure();
-      return;
+    if (verifyFlatSwizzleHintOp(hintOp).failed()) {
+      return signalPassFailure();
     }
     resolveHintOp(rewriter, hintOp);
   }

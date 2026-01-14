@@ -1,4 +1,4 @@
-// Copyright 2025 The IREE Authors
+// Copyright 2026 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler {
@@ -17,13 +18,29 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct FlattenSwizzleHintAllocsPass final
-    : public impl::FlattenSwizzleHintAllocsPassBase<
-          FlattenSwizzleHintAllocsPass> {
+    : impl::FlattenSwizzleHintAllocsPassBase<FlattenSwizzleHintAllocsPass> {
   using Base::Base;
   void runOnOperation() override;
 };
 } // namespace
 
+/// This pass flattens swizzle hint ops that operate on allocations of rank > 1.
+/// This is required since swizzle hint op indices require flat memrefs.
+///
+/// Example:
+/// ```
+/// %0 = iree.alloc() : tensor<512x32xf4E2M1FN>
+/// %1 = iree.swizzle_hint %0 : tensor<512x32xf4E2M1FN> ->
+/// tensor<512x32xf4E2M1FN>
+/// ```
+///
+/// is flattened to:
+/// ```
+/// %0 = iree.alloc() : tensor<16384xf4E2M1FN>
+/// %1 = iree.swizzle_hint %0 : tensor<16384xf4E2M1FN> -> tensor<16384xf4E2M1FN>
+/// %2 = iree.expand_shape %1 : tensor<16384xf4E2M1FN> ->
+/// tensor<512x32xf4E2M1FN>
+/// ```
 static void flattenSwizzleHintAllocs(RewriterBase &rewriter,
                                      IREE::Codegen::SwizzleHintOp hintOp) {
   auto allocOp = hintOp.getOperand().getDefiningOp<memref::AllocOp>();
@@ -33,11 +50,14 @@ static void flattenSwizzleHintAllocs(RewriterBase &rewriter,
   if (!allocOp->hasOneUse()) {
     return;
   }
-  auto resultType = allocOp.getType();
-  if (resultType.getRank() == 1) {
+  MemRefType resultType = allocOp.getType();
+  if (resultType.getRank() == 1 || !resultType.getLayout().isIdentity() ||
+      !resultType.hasStaticShape() || !(resultType.getNumElements() > 0) ||
+      !memref::isStaticShapeAndContiguousRowMajor(resultType)) {
     return;
   }
-  auto newResultShape = SmallVector<int64_t>({resultType.getNumElements()});
+
+  SmallVector<int64_t> newResultShape = {resultType.getNumElements()};
   MemRefType newResultType =
       MemRefType::get(newResultShape, resultType.getElementType(), AffineMap(),
                       resultType.getMemorySpace());
