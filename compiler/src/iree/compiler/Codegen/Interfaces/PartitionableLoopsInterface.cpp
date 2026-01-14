@@ -300,6 +300,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
         *ctx);
     IREE::LinalgExt::MapScatterOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::MapScatterOp>>(*ctx);
+    IREE::LinalgExt::MapGatherOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::MapGatherOp>>(*ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::PadOp::attachInterface<
