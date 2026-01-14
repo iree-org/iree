@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
@@ -902,6 +903,55 @@ struct SCFIndexSwitchOpMutableRegionBranchOpInterface
   }
 };
 
+// Hoistable interface for region-containing control flow operations.
+// Control flow is hoistable if control operands are constant and
+// nested operations are hoistable (checked via atomic hoisting).
+template <typename OpTy>
+struct RegionControlFlowHoistableOpInterface
+    : public IREE::Util::HoistableOpInterface::ExternalModel<
+          RegionControlFlowHoistableOpInterface<OpTy>, OpTy> {
+  bool isHoistableOp(Operation *op) const {
+    // Control flow is hoistable if all nested operations are hoistable.
+    for (Region &region : op->getRegions()) {
+      WalkResult result = region.walk([](Operation *nestedOp) {
+        // Check if nested op is hoistable.
+        bool isHoistable = false;
+        if (auto hoistable =
+                dyn_cast<IREE::Util::HoistableOpInterface>(nestedOp)) {
+          isHoistable = hoistable.isHoistableOp();
+        } else {
+          // Ops without interface must be memory-effect-free to be hoistable.
+          isHoistable = mlir::isMemoryEffectFree(nestedOp);
+        }
+        if (!isHoistable) {
+          return WalkResult::interrupt();
+        }
+        // Don't descend into IsolatedFromAbove ops - treat them atomically.
+        return nestedOp->hasTrait<OpTrait::IsIsolatedFromAbove>()
+                   ? WalkResult::skip()
+                   : WalkResult::advance();
+      });
+      if (result.wasInterrupted()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool isHoistableLeafOp(Operation *) const { return false; }
+  bool isAtomicallyHoistableOp(Operation *) const { return true; }
+  bool isOperandHoistable(Operation *, OpOperand *) const { return true; }
+};
+
+template <typename... Ops>
+struct RegionControlFlowHoistableOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<RegionControlFlowHoistableOpInterface<Ops>>(
+         *context),
+     ...);
+  }
+};
+
 } // namespace
 
 void registerUtilExternalModels(DialectRegistry &registry) {
@@ -1022,6 +1072,7 @@ void registerUtilExternalModels(DialectRegistry &registry) {
       });
 
   // Register MutableRegionBranchOpInterface for SCF ops.
+  // Register hoistable op interfaces for SCF control flow ops.
   registry.addExtension(+[](MLIRContext *context, scf::SCFDialect *dialect) {
     scf::ForOp::attachInterface<SCFForOpMutableRegionBranchOpInterface>(
         *context);
@@ -1030,6 +1081,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         *context);
     scf::IndexSwitchOp::attachInterface<
         SCFIndexSwitchOpMutableRegionBranchOpInterface>(*context);
+    RegionControlFlowHoistableOpInterfaceHelper<
+        scf::ForOp, scf::IfOp, scf::WhileOp>::registerOpInterface(context);
   });
 }
 

@@ -15,12 +15,14 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "encode_parameters.mlir"
     "export_parameters.mlir"
     "generate_splat_archive.mlir"
   TOOLS
     FileCheck
     iree-compile
     iree-dump-parameters
+    iree-encode-parameters
     iree-run-module
   LABELS
     "driver=local-task"

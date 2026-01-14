@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "encode_parameters.mlir",
             "export_parameters.mlir",
             "generate_splat_archive.mlir",
         ],
@@ -29,6 +30,7 @@ iree_lit_test_suite(
     tools = [
         "//tools:iree-compile",
         "//tools:iree-dump-parameters",
+        "//tools:iree-encode-parameters",
         "//tools:iree-run-module",
         "@llvm-project//llvm:FileCheck",
     ],
