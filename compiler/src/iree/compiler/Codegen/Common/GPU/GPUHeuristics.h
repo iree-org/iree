@@ -139,6 +139,31 @@ struct GPUMMASchedule {
   }
 };
 
+/// Struct containing quantization inefficiency metrics for a schedule.
+/// Quantization inefficiency measures WGP underutilization in the last wave:
+///   inefficiency = (ceil(WG/WGP) - WG/WGP) / ceil(WG/WGP)
+/// where WG = number of workgroups, WGP = number of workgroup processors.
+struct QuantizationInefficiency {
+  float inefficiency = 0.0f;
+  int64_t numWorkgroups = 0;
+  int64_t numWGPs = 0;
+  int64_t numWaves = 0;
+  // Formula components: WG = batch * numWGsM * numWGsN
+  int64_t batch = 1;
+  int64_t numWGsM = 0;
+  int64_t numWGsN = 0;
+};
+
+/// Computes quantization inefficiency for a given problem, schedule, and
+/// WGP count. This measures the fraction of idle WGPs in the last wave.
+QuantizationInefficiency
+computeQuantizationInefficiency(const GPUMatmulShapeType &problem,
+                                const GPUMMASchedule &schedule,
+                                int64_t wgpCount);
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const QuantizationInefficiency &inefficiency);
+
 /// Returns a schedule for using one of the given MMA |intrinsics| to target the
 /// input |problem|. Returns std::nullopt if we cannot find such a schedule.
 FailureOr<GPUMMASchedule> deduceMMASchedule(
