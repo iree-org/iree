@@ -62,11 +62,70 @@ def write_platform(bazelrc):
         detect_unix_platform_config(bazelrc)
 
 
+def cmake_bool_is_true(value):
+    """Check if a CMake-style bool value is true."""
+    if not value:
+        return False
+    return value.upper() in ("ON", "YES", "TRUE", "Y", "1")
+
+
+def get_hal_driver_defaults():
+    """Get HAL driver defaults matching CMake logic (CMakeLists.txt:275-318)."""
+    defaults_enabled = True  # IREE_HAL_DRIVER_DEFAULTS
+
+    return {
+        "AMDGPU": False,
+        "CUDA": False,
+        "HIP": False,
+        "LOCAL_SYNC": defaults_enabled,
+        "LOCAL_TASK": defaults_enabled,
+        "METAL": platform.system() == "Darwin" and defaults_enabled,
+        "NULL": False,  # Special: OFF in tests, ON otherwise
+        "VULKAN": defaults_enabled and platform.system() not in ("Android", "iOS"),
+    }
+
+
+def env_var_to_bazel_tag(name):
+    """Convert env var name to Bazel tag format.
+
+    Bazel tags use hyphens: local-task, vulkan-spirv
+    Env vars use underscores: IREE_HAL_DRIVER_LOCAL_TASK
+    """
+    if name.startswith("IREE_HAL_DRIVER_"):
+        tag_name = name[len("IREE_HAL_DRIVER_") :]
+    else:
+        tag_name = name
+    return tag_name.lower().replace("_", "-")
+
+
+def write_iree_hal_driver_options(bazelrc):
+    """Write HAL driver configuration to bazelrc."""
+
+    # Get defaults matching CMake
+    hal_drivers = get_hal_driver_defaults()
+
+    # Apply environment overrides
+    enabled_drivers = []
+    for driver, default in hal_drivers.items():
+        env_var = f"IREE_HAL_DRIVER_{driver}"
+        env_value = os.environ.get(env_var)
+        enabled = cmake_bool_is_true(env_value) if env_value is not None else default
+
+        if enabled:
+            enabled_drivers.append(env_var_to_bazel_tag(env_var))
+
+    # Write --iree_drivers flag (controls what gets built and linked)
+    if enabled_drivers:
+        print(f'build --iree_drivers={",".join(enabled_drivers)}', file=bazelrc)
+        print(f'test --iree_drivers={",".join(enabled_drivers)}', file=bazelrc)
+
+
 if len(sys.argv) > 1:
     local_bazelrc = sys.argv[1]
 else:
     local_bazelrc = os.path.join(os.path.dirname(__file__), "configured.bazelrc")
 with open(local_bazelrc, "wt") as bazelrc:
     write_platform(bazelrc)
+    write_iree_hal_driver_options(bazelrc)
 
 print("Wrote", local_bazelrc)
