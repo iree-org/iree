@@ -462,6 +462,12 @@ struct DistributeTransferReadToSingleRead final
       return rewriter.notifyMatchFailure(readOp, "0-d vector not supported");
     }
 
+    // Require the original read to be in-bounds in all dimensions.
+    if (!llvm::all_of(readOp.getInBoundsValues(), [](bool &b) { return b; })) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "potential out-of-bounds access");
+    }
+
     if (readOp.getMask()) {
       // TODO(sommerlukas): Can we support masks here?
       return rewriter.notifyMatchFailure(readOp, "masks not supported");
@@ -472,6 +478,20 @@ struct DistributeTransferReadToSingleRead final
     if (!memrefTy) {
       return rewriter.notifyMatchFailure(readOp,
                                          "distribution expects memrefs");
+    }
+
+    // We have to fall back to the simpler pattern for multi-dimensional LDS.
+    // Later passes may introduce padding to reduce bank conflicts into
+    // multi-dimensional LDS allocations, which would render the strides that we
+    // calculate here for the reinterpret cast incorrect.
+    if (vectorLayout.getRank() > 1) {
+      if (auto addressSpaceAttr =
+              llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(
+                  memrefTy.getMemorySpace())) {
+        if (addressSpaceAttr.getValue() == gpu::AddressSpace::Workgroup) {
+          return failure();
+        }
+      }
     }
 
     // We require the memref to  have static shape and stride in the last

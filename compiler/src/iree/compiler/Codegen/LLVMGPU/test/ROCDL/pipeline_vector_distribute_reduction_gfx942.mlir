@@ -166,11 +166,10 @@ hal.executable private @matvec_fp16_promote_rhs {
 //     CHECK-LABEL: func.func @matvec_fp16_promote_rhs
 //          CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<4x516xf16, #gpu.address_space<workgroup>>
 //          CHECK:    scf.for {{.*}} = %c0 to %c4096 step %c512
-//          CHECK:      %[[REINTERPRET_CAST:.+]] = memref.reinterpret_cast %[[ALLOC]]
-//          CHECK:      %[[TRANSPOSE:.+]] = memref.transpose %[[REINTERPRET_CAST]] {{.*}} : memref<{{.*}}xf16, {{.*}}, #gpu.address_space<workgroup>> to memref<{{.*}}xf16, {{.*}}, #gpu.address_space<workgroup>>
-//          CHECK:      %[[RHS_SHARED_READ:.+]] = vector.transfer_read %[[TRANSPOSE]]{{.*}} : memref<{{.*}}xf16, {{.*}}, #gpu.address_space<workgroup>>, vector<1x1x1x1x1x8xf16>
+//          CHECK:      %[[RHS_SHARED_READ:.+]] = vector.transfer_read %alloc
+//          CHECK:      %[[RHS_INSERT:.+]] = vector.insert_strided_slice %[[RHS_SHARED_READ]]
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      %{{.*}}, %[[RHS_SHARED_READ]], %{{.*}} : vector<1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1xf16>
+//     CHECK-SAME:      %{{.*}}, %[[RHS_INSERT]], %{{.*}} : vector<1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
 //          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
 
