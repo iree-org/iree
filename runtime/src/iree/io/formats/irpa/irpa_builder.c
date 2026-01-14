@@ -49,6 +49,14 @@ iree_io_parameter_archive_builder_storage_offset(
 }
 
 IREE_API_EXPORT iree_io_physical_size_t
+iree_io_parameter_archive_builder_header_size(
+    const iree_io_parameter_archive_builder_t* builder) {
+  IREE_ASSERT_ARGUMENT(builder);
+  return (iree_io_physical_size_t)
+      iree_io_parameter_archive_builder_storage_offset(builder);
+}
+
+IREE_API_EXPORT iree_io_physical_size_t
 iree_io_parameter_archive_builder_total_size(
     const iree_io_parameter_archive_builder_t* builder) {
   IREE_ASSERT_ARGUMENT(builder);
