@@ -349,8 +349,7 @@ static SmallVector<Value> computeTransposeLoadIndices(
   auto delinOp = affine::AffineDelinearizeIndexOp::create(
       rewriter, loc, linearElemIdx, analysis.rowSizes,
       /*hasOuterBound=*/true);
-  rowIndices.assign(delinOp.getResults().begin(),
-                    delinOp.getResults().end());
+  rowIndices.assign(delinOp.getResults().begin(), delinOp.getResults().end());
 
   // Build the full index list for the memref
   // Start with original indices, then update row and column dimensions
