@@ -34,6 +34,7 @@ iree_compiler_cc_library(
     name = "Utils",
     srcs = [
         "ConversionUtils.cpp",
+        "EncodingUtils.cpp",
         "EquivalenceUtils.cpp",
         "FlatbufferUtils.cpp",
         "Indexing.cpp",
@@ -49,6 +50,7 @@ iree_compiler_cc_library(
     hdrs = [
         "ConversionUtils.h",
         "EmbeddedDataDirectory.h",
+        "EncodingUtils.h",
         "EquivalenceUtils.h",
         "FlatbufferUtils.h",
         "Folding.h",
