@@ -181,8 +181,9 @@ struct TransposeLoadAnalysis {
   int64_t unrollCount;           // Number of transpose_loads needed
 };
 
-/// Analyzes a transfer_read to determine if it can be lowered to transpose_load.
-/// Returns analysis result if the transfer_read is suitable, std::nullopt otherwise.
+/// Analyzes a transfer_read to determine if it can be lowered to
+/// transpose_load. Returns analysis result if the transfer_read is suitable,
+/// std::nullopt otherwise.
 ///
 /// Requirements:
 /// - Source must be workgroup (LDS) memory
@@ -225,8 +226,7 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
   if (!opResult) {
     return std::nullopt;
   }
-  auto indexHintOp =
-      dyn_cast<IREE::Codegen::IndexHintOp>(opResult.getOwner());
+  auto indexHintOp = dyn_cast<IREE::Codegen::IndexHintOp>(opResult.getOwner());
   if (!indexHintOp) {
     return std::nullopt;
   }
@@ -244,8 +244,8 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
   if (laneIncrement.getGroupSize() % kTransposeLoadLaneGroupSize != 0) {
     LLVM_DEBUG(llvm::dbgs()
                << "Column index lane_increment group_size "
-               << laneIncrement.getGroupSize()
-               << " is not a multiple of " << kTransposeLoadLaneGroupSize << "\n");
+               << laneIncrement.getGroupSize() << " is not a multiple of "
+               << kTransposeLoadLaneGroupSize << "\n");
     return std::nullopt;
   }
   if (laneIncrement.getStep() != 1) {
@@ -349,8 +349,7 @@ static SmallVector<Value> computeTransposeLoadIndices(
   auto delinOp = affine::AffineDelinearizeIndexOp::create(
       rewriter, loc, linearElemIdx, analysis.rowSizes,
       /*hasOuterBound=*/true);
-  rowIndices.assign(delinOp.getResults().begin(),
-                    delinOp.getResults().end());
+  rowIndices.assign(delinOp.getResults().begin(), delinOp.getResults().end());
 
   // Build the full index list for the memref
   // Start with original indices, then update row and column dimensions
@@ -601,7 +600,8 @@ struct PropagateHintThroughDelinearize
         })
         // Case 2: lane_increment splits across results based on basis.
         // We process from innermost to outermost, computing group sizes from
-        // static bases. Dynamic bases are pessimized to 1 (their minimum value).
+        // static bases. Dynamic bases are pessimized to 1 (their minimum
+        // value).
         .Case<IREE::GPU::LaneIncrementAttr>([&](auto laneIncrement) {
           if (basis.empty()) {
             return failure();
@@ -695,8 +695,7 @@ struct PropagateHintThroughDelinearize
 /// seedThreadIdHints + PropagateHintThroughDelinearize). The greedy driver
 /// iterates until fixpoint, so hints will propagate through all delinearize
 /// ops before this pattern can match.
-struct TransferReadToTransposeLoad
-    : OpRewritePattern<vector::TransferReadOp> {
+struct TransferReadToTransposeLoad : OpRewritePattern<vector::TransferReadOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp transferOp,
