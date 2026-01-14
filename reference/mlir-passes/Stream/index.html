@@ -2755,6 +2755,30 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-split-parameter-encoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-split-parameter-encoder
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-stream-split-parameter-encoder">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-sync-initializers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-sync-initializers
@@ -5312,6 +5336,30 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-split-parameter-encoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-split-parameter-encoder
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-stream-split-parameter-encoder">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-sync-initializers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-sync-initializers
@@ -5741,6 +5789,16 @@ updates bindings with resolved layouts.</p>
   so it can updates the types without accessing any other dialects.
 - All the encodings attached on the types have to implement
   SerializableAttr. Because the pass updates the encodings using interfaces.</p>
+<h3 id="-iree-stream-split-parameter-encoder"><code>-iree-stream-split-parameter-encoder</code><a class="headerlink" href="#-iree-stream-split-parameter-encoder" title="Permanent link">link</a></h3>
+<p><em>Splits out a parameter encoder module for compatible hoisted expressions.</em></p>
+<h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-mode                        : Controls how the encoder manages parameters.
+-output-scope                : Parameter scope for the output parameters. Omit for global.
+-output-file                 : .mlir/.mlirbc file path to write the split parameter encoder module to.
+-hoist-parameter-expressions : Enable hoisting parameter transformation expressions.
+-hoist-constant-expressions  : Enable hoisting pure constant expressions with transformations.
+-max-encoding-growth-factor  : Maximum ratio of output size to input parameter size.
+</code></pre></div>
 <h3 id="-iree-stream-sync-initializers"><code>-iree-stream-sync-initializers</code><a class="headerlink" href="#-iree-stream-sync-initializers" title="Permanent link">link</a></h3>
 <p><em>Makes all initializer-produced timepoints synchronously wait before proceeding.</em></p>
 <p>Gathers all global timepoint stores within each initializer and converts

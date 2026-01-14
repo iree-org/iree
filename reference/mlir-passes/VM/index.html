@@ -2548,6 +2548,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-vm-drop-optimization-barriers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-vm-drop-optimization-barriers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-vm-drop-unused-calls" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-vm-drop-unused-calls
@@ -4805,6 +4814,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-vm-drop-optimization-barriers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-vm-drop-optimization-barriers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-vm-drop-unused-calls" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-vm-drop-unused-calls
@@ -4932,6 +4950,11 @@ with vm.yield based on call graph analysis.</p>
 <p><em>Deduplicates vm.rodata ops in the module.</em></p>
 <h3 id="-iree-vm-drop-empty-module-initializers"><code>-iree-vm-drop-empty-module-initializers</code><a class="headerlink" href="#-iree-vm-drop-empty-module-initializers" title="Permanent link">link</a></h3>
 <p><em>Drops __init/__deinit functions that have no ops.</em></p>
+<h3 id="-iree-vm-drop-optimization-barriers"><code>-iree-vm-drop-optimization-barriers</code><a class="headerlink" href="#-iree-vm-drop-optimization-barriers" title="Permanent link">link</a></h3>
+<p><em>Drops vm.optimization_barrier ops.</em></p>
+<p>Removes vm.optimization_barrier ops by replacing them with their operands.
+This pass should run after all optimization passes that could fold through
+the barriers.</p>
 <h3 id="-iree-vm-drop-unused-calls"><code>-iree-vm-drop-unused-calls</code><a class="headerlink" href="#-iree-vm-drop-unused-calls" title="Permanent link">link</a></h3>
 <p><em>Drops vm.call ops that have no side effects and are unused.</em></p>
 <h3 id="-iree-vm-global-initialization"><code>-iree-vm-global-initialization</code><a class="headerlink" href="#-iree-vm-global-initialization" title="Permanent link">link</a></h3>
