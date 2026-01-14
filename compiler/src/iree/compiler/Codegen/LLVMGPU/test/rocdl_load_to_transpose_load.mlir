@@ -203,7 +203,22 @@ func.func @no_transform_row_from_block_arg(%src: memref<128x256xf16, #gpu.addres
 
 // Test: Basic f16 4x1 transformation - row from lane_constant, column from lane_increment
 // CHECK-LABEL: func.func @transform_basic_f16_4x1
-// CHECK: %[[LOAD:.+]] = amdgpu.transpose_load %{{.*}}[%{{.*}}] : memref<128x256xf16, #gpu.address_space<workgroup>> -> vector<4xf16>
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG: %[[ROW:.+]] = iree_codegen.index_hint %{{.*}}(#iree_gpu.lane_constant<16>) : index
+// CHECK-DAG: %[[COL:.+]] = iree_codegen.index_hint %{{.*}}(#iree_gpu.lane_increment<16, aligned>) : index
+// CHECK: %[[LANE_ID:.+]] = gpu.lane_id
+// Index arithmetic for transpose load:
+//   row_offset = (lane_id % 16) / 4
+//   col_base = col - (lane_id % 16) + ((lane_id % 16) % 4) * 4
+// CHECK: %[[REM16:.+]] = arith.remui %[[LANE_ID]], %[[C16]] : index
+// CHECK: %[[DIV4:.+]] = arith.divui %[[REM16]], %[[C4]] : index
+// CHECK: %[[SUB:.+]] = arith.subi %[[COL]], %[[REM16]] : index
+// CHECK: %[[REM4:.+]] = arith.remui %[[REM16]], %[[C4]] : index
+// CHECK: %[[MUL:.+]] = arith.muli %[[REM4]], %[[C4]] : index
+// CHECK: %[[NEW_COL:.+]] = arith.addi %[[SUB]], %[[MUL]] : index
+// CHECK: %[[NEW_ROW:.+]] = arith.addi %[[ROW]], %[[DIV4]] : index
+// CHECK: %[[LOAD:.+]] = amdgpu.transpose_load %{{.*}}[%[[NEW_ROW]], %[[NEW_COL]]] : memref<128x256xf16, #gpu.address_space<workgroup>> -> vector<4xf16>
 // CHECK: %[[CAST:.+]] = vector.shape_cast %[[LOAD]] : vector<4xf16> to vector<4x1xf16>
 // CHECK: return %[[CAST]]
 func.func @transform_basic_f16_4x1(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
@@ -265,9 +280,24 @@ func.func @transform_row_affine_apply(%src: memref<128x256xf16, #gpu.address_spa
 
 // Test: i8 8x1 transformation (intrinsic size 8 for 8-bit types)
 // CHECK-LABEL: func.func @transform_i8_8x1
-// CHECK: amdgpu.transpose_load
-// CHECK-SAME: -> vector<8xi8>
-// CHECK: vector.shape_cast
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG: %[[ROW:.+]] = iree_codegen.index_hint %{{.*}}(#iree_gpu.lane_constant<16>) : index
+// CHECK-DAG: %[[COL:.+]] = iree_codegen.index_hint %{{.*}}(#iree_gpu.lane_increment<16, aligned>) : index
+// CHECK: %[[LANE_ID:.+]] = gpu.lane_id
+// Index arithmetic for i8 transpose load (intrinsic size = 8):
+//   row_offset = (lane_id % 16) / 2
+//   col_base = col - (lane_id % 16) + ((lane_id % 16) % 2) * 8
+// CHECK: %[[REM16:.+]] = arith.remui %[[LANE_ID]], %[[C16]] : index
+// CHECK: %[[DIV2:.+]] = arith.divui %[[REM16]], %[[C2]] : index
+// CHECK: %[[SUB:.+]] = arith.subi %[[COL]], %[[REM16]] : index
+// CHECK: %[[REM2:.+]] = arith.remui %[[REM16]], %[[C2]] : index
+// CHECK: %[[MUL:.+]] = arith.muli %[[REM2]], %[[C8]] : index
+// CHECK: %[[NEW_COL:.+]] = arith.addi %[[SUB]], %[[MUL]] : index
+// CHECK: %[[NEW_ROW:.+]] = arith.addi %[[ROW]], %[[DIV2]] : index
+// CHECK: %[[LOAD:.+]] = amdgpu.transpose_load %{{.*}}[%[[NEW_ROW]], %[[NEW_COL]]] : memref<128x256xi8, #gpu.address_space<workgroup>> -> vector<8xi8>
+// CHECK: vector.shape_cast %[[LOAD]] : vector<8xi8> to vector<8x1xi8>
 func.func @transform_i8_8x1(%src: memref<128x256xi8, #gpu.address_space<workgroup>>) -> vector<8x1xi8> {
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
@@ -284,8 +314,25 @@ func.func @transform_i8_8x1(%src: memref<128x256xi8, #gpu.address_space<workgrou
 
 // Test: f16 8x1 unrolling (2x transpose_load when row size > intrinsic size)
 // CHECK-LABEL: func.func @transform_unroll_f16_8x1
-// CHECK: %[[L0:.+]] = amdgpu.transpose_load {{.*}} -> vector<4xf16>
-// CHECK: %[[L1:.+]] = amdgpu.transpose_load {{.*}} -> vector<4xf16>
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG: %[[ROW:.+]] = iree_codegen.index_hint %{{.*}}(#iree_gpu.lane_constant<16>) : index
+// CHECK-DAG: %[[COL:.+]] = iree_codegen.index_hint %{{.*}}(#iree_gpu.lane_increment<16, aligned>) : index
+// CHECK: %[[LANE_ID:.+]] = gpu.lane_id
+// Index arithmetic computed once for both loads:
+// CHECK: %[[REM16:.+]] = arith.remui %[[LANE_ID]], %[[C16]] : index
+// CHECK: %[[DIV4:.+]] = arith.divui %[[REM16]], %[[C4]] : index
+// CHECK: %[[SUB:.+]] = arith.subi %[[COL]], %[[REM16]] : index
+// CHECK: %[[REM4:.+]] = arith.remui %[[REM16]], %[[C4]] : index
+// CHECK: %[[MUL:.+]] = arith.muli %[[REM4]], %[[C4]] : index
+// CHECK: %[[NEW_COL:.+]] = arith.addi %[[SUB]], %[[MUL]] : index
+// First load at row + row_offset:
+// CHECK: %[[ROW0:.+]] = arith.addi %[[ROW]], %[[DIV4]] : index
+// CHECK: %[[L0:.+]] = amdgpu.transpose_load %{{.*}}[%[[ROW0]], %[[NEW_COL]]] : memref<128x256xf16, #gpu.address_space<workgroup>> -> vector<4xf16>
+// Second load at row + row_offset + 4:
+// CHECK: %[[ROW_OFFSET:.+]] = arith.addi %[[DIV4]], %[[C4]] : index
+// CHECK: %[[ROW1:.+]] = arith.addi %[[ROW]], %[[ROW_OFFSET]] : index
+// CHECK: %[[L1:.+]] = amdgpu.transpose_load %{{.*}}[%[[ROW1]], %[[NEW_COL]]] : memref<128x256xf16, #gpu.address_space<workgroup>> -> vector<4xf16>
 // CHECK: vector.insert_strided_slice %[[L0]], {{.*}} {offsets = [0], strides = [1]}
 // CHECK: vector.insert_strided_slice %[[L1]], {{.*}} {offsets = [4], strides = [1]}
 // CHECK: vector.shape_cast {{.*}} : vector<8xf16> to vector<8x1xf16>
