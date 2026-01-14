@@ -17,6 +17,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/Remarks.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-heuristics"
 
@@ -65,13 +66,28 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
 
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
     const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth,
+    int64_t lhsScaleBitwidth = 0, int64_t rhsScaleBitwidth = 0,
     int64_t numRhs = 1) {
   int64_t tileM = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
                   schedule.getTotalMSubgroupCount();
   int64_t tileN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
                   schedule.getTotalNSubgroupCount();
+
+  // For scaled matmul, the K dimension is split into Ko (outer) and Kb (block),
+  // where elements in a Kb block share the same scale. For lhs and rhs we
+  // account for both Ko and Kb, while for scale operands, only Ko. For regular
+  // matmul, scale bitwidth is 0 so the scale terms below have no effect.
   int64_t tileK = schedule.getTotalKSize() * schedule.getTotalKTileSize();
-  return (tileM * tileK * lhsBitwidth + numRhs * tileN * tileK * rhsBitwidth) /
+  int64_t tileKb = schedule.kSizes.back() * schedule.kTileSizes.back();
+  int64_t tileKo = tileK / tileKb;
+
+  int64_t lhsSharedMemoryUsed = tileM * tileK * lhsBitwidth;
+  int64_t rhsSharedMemoryUsed = numRhs * tileN * tileK * rhsBitwidth;
+  int64_t aScaleSharedMemoryUsed = tileM * tileKo * lhsScaleBitwidth;
+  int64_t bScaleSharedMemoryUsed = numRhs * tileN * tileKo * rhsScaleBitwidth;
+
+  return (lhsSharedMemoryUsed + rhsSharedMemoryUsed + aScaleSharedMemoryUsed +
+          bScaleSharedMemoryUsed) /
          8;
 }
 
@@ -647,9 +663,9 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> wgpCount, bool transposedLhs,
-    bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
-    bool doCPromotion, int64_t splitReductionTripCnt) {
+    int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
+    bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
+    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -673,14 +689,19 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     LDBG() << "Chosen MMA schedule:\n" << schedule;
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
-      int64_t lhsBitwidth = intrinsic.aType.getIntOrFloatBitWidth();
-      int64_t rhsBitwidth = intrinsic.bType.getIntOrFloatBitWidth();
-      int64_t resultBitwidth = intrinsic.cType.getIntOrFloatBitWidth();
+      int64_t lhsBitwidth = problem.aType.getIntOrFloatBitWidth();
+      int64_t rhsBitwidth = problem.bType.getIntOrFloatBitWidth();
+      int64_t resultBitwidth = problem.cType.getIntOrFloatBitWidth();
+      int64_t lhsScaleBitwidth =
+          problem.aScaleType ? problem.aScaleType.getIntOrFloatBitWidth() : 0;
+      int64_t rhsScaleBitwidth =
+          problem.bScaleType ? problem.bScaleType.getIntOrFloatBitWidth() : 0;
       bool isAligned =
           isValidMMASchedule(problem, schedule, mustBeAligned, subgroupSize,
                              transposedLhs, transposedRhs);
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
-          schedule, lhsBitwidth, rhsBitwidth, problem.numHorizontallyFusedOps);
+          schedule, lhsBitwidth, rhsBitwidth, lhsScaleBitwidth,
+          rhsScaleBitwidth, problem.numHorizontallyFusedOps);
       // Add accumulator/result memory when it uses shared memory (LDS):
       // - Result needs padding in shared memory, OR
       // - matmul_accumulate loads accumulator from global memory via shared mem
@@ -694,7 +715,15 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
              << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
              << " bytes";
-      return isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
+
+      bool isValid = isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
+      if (isValid) {
+        // Only emit remark for the shared memory usage of the valid schedule.
+        remark::analysis(loc, remark::RemarkOpts::name("SharedMemoryUsage")
+                                  .category("deduceMMASchedule"))
+            << std::to_string(sharedMemoryUsed);
+      }
+      return isValid;
     };
     return fitScheduleInSharedMemory(schedule, isValidSchedule);
   }

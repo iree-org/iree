@@ -926,9 +926,9 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   bool transposedRhs =
       nIndex != cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
-  FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
-                        subgroupSize, transposedLhs, transposedRhs);
+  FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, sharedMemoryLimitInBytes, subgroupSize,
+      /*cuCount=*/std::nullopt, op.getLoc(), transposedLhs, transposedRhs);
   if (failed(schedule))
     return failure();
   assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
