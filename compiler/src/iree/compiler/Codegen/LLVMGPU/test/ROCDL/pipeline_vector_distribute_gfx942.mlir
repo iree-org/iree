@@ -714,13 +714,20 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 // Validate that VMFMA do 2 interleaved reads, combine them for every MFMA:
 
-// CHECK:       %[[TRANSPOSE_LHS:.+]] = memref.transpose {{.*}} : memref<{{.*}}xf8E4M3FNUZ, {{.*}}, #gpu.address_space<workgroup>> to memref<{{.*}}xf8E4M3FNUZ, {{.*}}, #gpu.address_space<workgroup>>
-// CHECK:       %[[READ_LHS:.+]] = vector.transfer_read %[[TRANSPOSE_LHS]]{{.*}} : memref<{{.*}}xf8E4M3FNUZ, {{.*}}, #gpu.address_space<workgroup>>, vector<1x4x1x2x1x4xf8E4M3FNUZ>
-// CHECK:       %[[TRANSPOSE_RHS:.+]] = memref.transpose {{.*}} : memref<{{.*}}xf8E4M3FNUZ, {{.*}}, #gpu.address_space<workgroup>> to memref<{{.*}}xf8E4M3FNUZ, {{.*}}, #gpu.address_space<workgroup>>
-// CHECK:       %[[READ_RHS:.+]] = vector.transfer_read %[[TRANSPOSE_RHS]]{{.*}} : memref<{{.*}}xf8E4M3FNUZ, {{.*}}, #gpu.address_space<workgroup>>, vector<4x1x2x1x4x1xf8E4M3FNUZ>
+// CHECK-COUNT-6: vector.transfer_read %[[ALLOC_LHS]]
+// CHECK:       %[[SLICE_LHS_0:.+]] = vector.transfer_read %[[ALLOC_LHS]]
+// CHECK:       %[[VECTOR_LHS_0:.+]] = vector.insert_strided_slice %[[SLICE_LHS_0]], %{{.*}}
+// CHECK:       %[[SLICE_LHS_1:.+]] = vector.transfer_read %[[ALLOC_LHS]]
+// CHECK:       %[[VECTOR_LHS_1:.+]] = vector.insert_strided_slice %[[SLICE_LHS_1]], %[[VECTOR_LHS_0]] {{.*}} : vector<1x4xf8E4M3FNUZ> into vector<1x4x1x2x1x4xf8E4M3FNUZ>
 
-// CHECK:       %[[EXTRACT_LHS:.+]] = vector.extract %[[READ_LHS]][{{.*}}, {{.*}}] : vector<1x2x1x4xf8E4M3FNUZ> from vector<1x4x1x2x1x4xf8E4M3FNUZ>
-// CHECK:       %[[EXTRACT_RHS:.+]] = vector.extract %[[READ_RHS]][{{.*}}, {{.*}}] : vector<2x1x4x1xf8E4M3FNUZ> from vector<4x1x2x1x4x1xf8E4M3FNUZ>
+// CHECK-COUNT-6: vector.transfer_read %[[ALLOC_RHS]]
+// CHECK:       %[[SLICE_RHS_0:.+]] = vector.transfer_read %[[ALLOC_RHS]]
+// CHECK:       %[[VECTOR_RHS_0:.+]] = vector.insert_strided_slice %[[SLICE_RHS_0]], %{{.*}}
+// CHECK:       %[[SLICE_RHS_1:.+]] = vector.transfer_read %[[ALLOC_RHS]]
+// CHECK:       %[[VECTOR_RHS_1:.+]] = vector.insert_strided_slice %[[SLICE_RHS_1]], %[[VECTOR_RHS_0]] {{.*}} : vector<4x1xf8E4M3FNUZ> into vector<4x1x2x1x4x1xf8E4M3FNUZ>
+
+// CHECK:       %[[EXTRACT_LHS:.+]] = vector.extract %[[VECTOR_LHS_1]][{{.*}}, {{.*}}] : vector<1x2x1x4xf8E4M3FNUZ> from vector<1x4x1x2x1x4xf8E4M3FNUZ>
+// CHECK:       %[[EXTRACT_RHS:.+]] = vector.extract %[[VECTOR_RHS_1]][{{.*}}, {{.*}}] : vector<2x1x4x1xf8E4M3FNUZ> from vector<4x1x2x1x4x1xf8E4M3FNUZ>
 
 // CHECK:       %[[LHS_CAST:.+]] = vector.shape_cast %[[EXTRACT_LHS]] : vector<1x2x1x4xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
 // CHECK:       %[[RHS_CAST:.+]] = vector.shape_cast %[[EXTRACT_RHS]] : vector<2x1x4x1xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
