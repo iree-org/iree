@@ -20,9 +20,13 @@ struct GPUMatmulShapeType {
   SmallVector<int64_t, 2> nSizes;
   SmallVector<int64_t, 2> kSizes;
   SmallVector<int64_t, 2> batchSizes;
+
   Type aType;
   Type bType;
   Type cType;
+  Type aScaleType;
+  Type bScaleType;
+
   GemmSize gemmSize = GemmSize::NotSet;
 
   // Number of horizontally fused operations.
@@ -34,11 +38,14 @@ struct GPUMatmulShapeType {
                      int64_t numHorizontallyFusedOps = 1)
       : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
         bType(b), cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
+
   GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
                      ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
-                     Type b, Type c, int64_t numHorizontallyFusedOps = 1)
+                     Type b, Type c, Type aScale = nullptr,
+                     Type bScale = nullptr, int64_t numHorizontallyFusedOps = 1)
       : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
-        cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
+        cType(c), aScaleType(aScale), bScaleType(bScale),
+        numHorizontallyFusedOps(numHorizontallyFusedOps) {}
 };
 
 /// Struct containing information about a GPU MMA intrinsic type.
@@ -147,7 +154,7 @@ struct GPUMMASchedule {
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, std::optional<int64_t> cuCount,
+    int64_t subgroupSize, std::optional<int64_t> cuCount, Location loc,
     bool transposedLhs = false, bool transposedRhs = false,
     bool canUpcastAcc = false, bool mustBeAligned = true,
     bool doCPromotion = false, int64_t splitReductionTripCnt = 0);

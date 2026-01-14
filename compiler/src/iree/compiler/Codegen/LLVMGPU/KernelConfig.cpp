@@ -330,12 +330,12 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // First try to find a schedule with an exactly matching intrinsic.
   FailureOr<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, wgpCount);
+                        targetSubgroupSize, wgpCount, op.getLoc());
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, wgpCount,
+                          targetSubgroupSize, wgpCount, op.getLoc(),
                           /*transposedLhs*/ false, /*transposedRhs*/ false,
                           /*canUpcastAcc=*/true);
   }
@@ -515,9 +515,16 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // all instances of schedule->m/nSubgroupCounts[0],
   // schedule->m/n/kTileSizes[0] and schedule->m/n/kSizes[0] need to use the
   // full list of sizes instead of just the first element.
-  GPUMatmulShapeType problem{
-      {bounds[mDim]}, {bounds[nDim]}, {bounds[kDim]}, getDimBounds(batchDims),
-      lhsElemType,    rhsElemType,    initElemType,   numHorizontallyFusedOps};
+  GPUMatmulShapeType problem{{bounds[mDim]},
+                             {bounds[nDim]},
+                             {bounds[kDim]},
+                             getDimBounds(batchDims),
+                             lhsElemType,
+                             rhsElemType,
+                             initElemType,
+                             /*aScaleType=*/nullptr,
+                             /*bScaleType=*/nullptr,
+                             numHorizontallyFusedOps};
 
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
@@ -582,13 +589,13 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                        targetSubgroupSize, wgpCount);
+                        targetSubgroupSize, wgpCount, op.getLoc());
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(problem, intrinsics, seeds,
-                                 maxSharedMemoryBytes, targetSubgroupSize,
-                                 wgpCount, transposedLhs, transposedRhs,
-                                 /*canUpcastAcc=*/true);
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, wgpCount, op.getLoc(),
+                          transposedLhs, transposedRhs, /*canUpcastAcc=*/true);
   }
 
   if (!schedule) {
