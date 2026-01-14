@@ -4,6 +4,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-bubbling-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=BUBBLE
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation-through-conv=true}))" --split-input-file %s | FileCheck %s --check-prefix=CONV
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-edge-reshape-propagation=true}))" %s -o - --split-input-file | FileCheck %s --check-prefix=ENABLE-EDGE-PROP
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-sink-transpose-through-pad=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK-PAD
 
 util.func public @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
                                    %empty : tensor<3x2x1xf32>) -> tensor<3x2x1xf32> {
@@ -1040,6 +1041,7 @@ util.func public @bubble_transpose_through_truncf_and_fuse_with_conv(
 //       BUBBLE:   linalg.generic
 //       BUBBLE:   } -> tensor<16x2x2x4xbf16>
 //   BUBBLE-NOT:   linalg.transpose
+//       BUBBLE:   util.return
 
 // With enable-aggressive-propagation-through-conv, transpose is fully fused with conv.
 // CONV-LABEL: util.func public @bubble_transpose_through_truncf_and_fuse_with_conv
@@ -1050,3 +1052,58 @@ util.func public @bubble_transpose_through_truncf_and_fuse_with_conv(
 //       CONV:   } -> tensor<16x2x2x4xbf16>
 //   CONV-NOT:   linalg.transpose
 //       CONV:   util.return %[[TRUNCF]]
+
+// -----
+
+util.func public @sink_transpose_through_pad(%arg0: tensor<16x64x64x128xf16>) -> tensor<16x128x66x66xf16> {
+  %cst = arith.constant 0.000000e+00 : f16
+  %empty = tensor.empty() : tensor<16x128x64x64xf16>
+  %transposed = linalg.transpose ins(%arg0 : tensor<16x64x64x128xf16>) outs(%empty : tensor<16x128x64x64xf16>) permutation = [0, 3, 1, 2]
+  %padded = tensor.pad %transposed low[0, 0, 1, 1] high[0, 0, 1, 1] {
+  ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index):
+    tensor.yield %cst : f16
+  } : tensor<16x128x64x64xf16> to tensor<16x128x66x66xf16>
+  util.return %padded : tensor<16x128x66x66xf16>
+}
+// With enable-sink-transpose-through-pad=true, transpose sinks through pad.
+// SINK-PAD-LABEL: util.func public @sink_transpose_through_pad
+//       SINK-PAD:   %[[PAD:.+]] = tensor.pad
+//       SINK-PAD:   %[[TRANSPOSE:.+]] = linalg.transpose
+//  SINK-PAD-SAME:     ins(%[[PAD]]
+//       SINK-PAD:   util.return %[[TRANSPOSE]]
+
+// Without the flag, transpose does not sink through pad.
+// SINK-LABEL: util.func public @sink_transpose_through_pad
+//       SINK:   %[[TRANSPOSE:.+]] = linalg.transpose
+//       SINK:   %[[PAD:.+]] = tensor.pad %[[TRANSPOSE]]
+//       SINK:   util.return %[[PAD]]
+
+// -----
+
+util.func public @sink_transpose_through_expand_shape_and_pad(%arg0: tensor<16x2x48x32x288xbf16>) -> tensor<16x3x96x4x48x32xbf16> {
+  %cst = arith.constant 0.000000e+00 : bf16
+  %empty = tensor.empty() : tensor<16x288x2x48x32xbf16>
+  %transposed = linalg.transpose ins(%arg0 : tensor<16x2x48x32x288xbf16>) outs(%empty : tensor<16x288x2x48x32xbf16>) permutation = [0, 4, 1, 2, 3]
+  %expanded = tensor.expand_shape %transposed [[0], [1, 2], [3], [4], [5]] output_shape [16, 3, 96, 2, 48, 32] : tensor<16x288x2x48x32xbf16> into tensor<16x3x96x2x48x32xbf16>
+  %padded = tensor.pad %expanded low[0, 0, 0, 1, 0, 0] high[0, 0, 0, 1, 0, 0] {
+  ^bb0(%arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index):
+    tensor.yield %cst : bf16
+  } : tensor<16x3x96x2x48x32xbf16> to tensor<16x3x96x4x48x32xbf16>
+  util.return %padded : tensor<16x3x96x4x48x32xbf16>
+}
+// With enable-sink-transpose-through-pad=true, transpose sinks through both
+// expand_shape and pad.
+// SINK-PAD-LABEL: util.func public @sink_transpose_through_expand_shape_and_pad
+//       SINK-PAD:   %[[EXPAND:.+]] = tensor.expand_shape %arg0
+//       SINK-PAD:   %[[PAD:.+]] = tensor.pad %[[EXPAND]]
+//       SINK-PAD:   %[[TRANSPOSE:.+]] = linalg.transpose
+//  SINK-PAD-SAME:     ins(%[[PAD]]
+//       SINK-PAD:   util.return %[[TRANSPOSE]]
+
+// Without the flag, transpose sinks through expand_shape but not pad.
+// SINK-LABEL: util.func public @sink_transpose_through_expand_shape_and_pad
+//       SINK:   %[[EXPAND:.+]] = tensor.expand_shape %arg0
+//       SINK:   %[[TRANSPOSE:.+]] = linalg.transpose
+//  SINK-SAME:     ins(%[[EXPAND]]
+//       SINK:   %[[PAD:.+]] = tensor.pad %[[TRANSPOSE]]
+//       SINK:   util.return %[[PAD]]

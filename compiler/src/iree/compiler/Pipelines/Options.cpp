@@ -183,6 +183,11 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "Enables propagation of transpose ops through convolutions."),
       llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-global-opt-enable-sink-transpose-through-pad",
+      sinkTransposeThroughPad,
+      llvm::cl::desc("Enables sinking transpose through pad operations."),
+      llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-outer-dim-concat", outerDimConcat,
                    {init_at_opt(llvm::OptimizationLevel::O0, false),
                     init_at_opt(llvm::OptimizationLevel::O1, true)},
