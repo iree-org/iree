@@ -565,6 +565,71 @@ FailureOr<TilingResult> MapGatherOp::getTiledImplementationFromOperandTiles(
   return getTiledImplementation(b, mappedOffsets, mappedSizes);
 }
 
+/// The body of the transformation_region is inlined, and the yielded indices
+/// are used to read values from the source and write to the output. Bounds
+/// checking is performed on the source indices, and the padding value is used
+/// if the indices are out of bounds.
+LogicalResult MapGatherOp::generateScalarImplementation(OpBuilder &b,
+                                                        Location loc,
+                                                        ValueRange ivs) {
+  // The scalar implementation is currently only implemented for buffer
+  // semantics.
+  if (!hasPureBufferSemantics()) {
+    return failure();
+  }
+
+  auto bodyBuilder = [&](OpBuilder nestedBuilder, Location nestedLoc,
+                         ArrayRef<Value> yieldedValues) {
+    // The last yielded Value is the padding, the rest are source indices.
+    Value paddingValue = yieldedValues.back();
+    ArrayRef<Value> loadIndices = yieldedValues.drop_back();
+
+    // Check bounds for each source dimension. Start with true so that
+    // for 0-D sources, inBounds is always true.
+    Value inBounds = nestedBuilder.createOrFold<arith::ConstantIntOp>(
+        nestedLoc, /*value=*/1, /*width=*/1);
+    Value zero =
+        nestedBuilder.createOrFold<arith::ConstantIndexOp>(nestedLoc, 0);
+    for (auto [dim, idx] : llvm::enumerate(loadIndices)) {
+      Value dimSize =
+          memref::DimOp::create(nestedBuilder, nestedLoc, getSource(), dim);
+
+      // Check: idx >= 0
+      Value geZero = arith::CmpIOp::create(
+          nestedBuilder, nestedLoc, arith::CmpIPredicate::sge, idx, zero);
+      // Check: idx < dimSize
+      Value ltDim = arith::CmpIOp::create(
+          nestedBuilder, nestedLoc, arith::CmpIPredicate::slt, idx, dimSize);
+      // Combine: idx >= 0 && idx < dimSize
+      Value dimInBounds =
+          arith::AndIOp::create(nestedBuilder, nestedLoc, geZero, ltDim);
+
+      inBounds = arith::AndIOp::create(nestedBuilder, nestedLoc, inBounds,
+                                       dimInBounds);
+    }
+
+    // Create if-else: if in bounds, load from source; else use padding.
+    // The if yields the value to store.
+    auto ifOp = scf::IfOp::create(nestedBuilder, nestedLoc,
+                                  TypeRange{paddingValue.getType()}, inBounds,
+                                  /*addThenBlock=*/true, /*addElseBlock=*/true);
+    {
+      auto thenBuilder = ifOp.getThenBodyBuilder();
+      Value loaded = memref::LoadOp::create(thenBuilder, nestedLoc, getSource(),
+                                            loadIndices);
+      scf::YieldOp::create(thenBuilder, nestedLoc, loaded);
+    }
+    {
+      auto elseBuilder = ifOp.getElseBodyBuilder();
+      scf::YieldOp::create(elseBuilder, nestedLoc, paddingValue);
+    }
+    memref::StoreOp::create(nestedBuilder, nestedLoc, ifOp.getResult(0),
+                            getOutput(), ivs);
+  };
+  inlineMapGatherBody(b, loc, ivs, bodyBuilder);
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // MapScatterOp
 //===----------------------------------------------------------------------===//
