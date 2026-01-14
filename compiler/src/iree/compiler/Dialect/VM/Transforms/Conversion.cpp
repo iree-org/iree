@@ -144,6 +144,8 @@ class ConversionPass
     // legalization when types need conversion (e.g., index -> i32).
     conversionTarget.addIllegalOp<IREE::Util::AssumeIntOp>();
     patterns.add<DropAssumeIntPattern>(typeConverter, context);
+    // Convert util.optimization_barrier to vm.optimization_barrier.
+    conversionTarget.addIllegalOp<IREE::Util::OptimizationBarrierOp>();
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
                              importTable, patterns);
 

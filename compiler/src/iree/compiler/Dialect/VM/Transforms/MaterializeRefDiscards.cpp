@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
@@ -183,10 +184,20 @@ class MaterializeRefDiscardsPass
       // Get the operands being passed to succ on this edge.
       SuccessorOperands succOperands = branchOp.getSuccessorOperands(succIndex);
       SmallVector<Value> operandValues(succOperands.getForwardedOperands());
+      unsigned producedCount = succOperands.getProducedOperandCount();
 
-      // Add block arguments to newBlock to receive the operands.
+      // Add block arguments to newBlock to receive the forwarded operands.
       for (Value operand : operandValues) {
         newBlock->addArgument(operand.getType(), operand.getLoc());
+      }
+
+      // Add block arguments for produced operands (e.g., vm.call.yieldable
+      // results). These are created by the terminator at runtime and must be
+      // forwarded through the new block to the original successor.
+      for (unsigned i = 0; i < producedCount; ++i) {
+        // Produced operands come after forwarded operands in succ's arguments.
+        Type type = succ->getArgument(operandValues.size() + i).getType();
+        newBlock->addArgument(type, loc);
       }
 
       // Update predecessor's terminator to go to new block instead of succ.
@@ -224,8 +235,10 @@ class MaterializeRefDiscardsPass
 
     OpBuilder builder(funcOp.getContext());
 
-    // Collect all refs in the function.
-    llvm::DenseSet<Value> allRefs;
+    // Collect all refs in the function in deterministic order.
+    // Walk blocks and operations in order and insert into SetVector, which
+    // maintains insertion order for deterministic iteration.
+    llvm::SetVector<Value> allRefs;
     for (Block &block : funcOp.getBlocks()) {
       for (BlockArgument arg : block.getArguments()) {
         if (isa<IREE::VM::RefType>(arg.getType())) {
@@ -352,6 +365,19 @@ class MaterializeRefDiscardsPass
               if (op.hasTrait<OpTrait::IsTerminator>()) {
                 continue;
               }
+
+              // Skip refs that are MOVE operands of RefMoveInterface
+              // operations. When an operand is movable and this is its last
+              // use, the MOVE bit will be set by the register allocator and
+              // ownership transfers to the operation (e.g., vm.call,
+              // vm.call.variadic). Inserting a discard would be incorrect as
+              // the ref is consumed by the operation.
+              if (auto refMoveOp = dyn_cast<IREE::VM::RefMoveInterface>(&op)) {
+                if (refMoveOp.isRefOperandMovable(operand.getOperandNumber())) {
+                  continue;
+                }
+              }
+
               // Group by insertion point.
               auto it = opToIndex.find(&op);
               if (it == opToIndex.end()) {

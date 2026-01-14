@@ -158,6 +158,16 @@ def DropUnusedCallsPass :
   let summary = "Drops vm.call ops that have no side effects and are unused.";
 }
 
+def DropOptimizationBarriersPass :
+    Pass<"iree-vm-drop-optimization-barriers", "IREE::VM::ModuleOp"> {
+  let summary = "Drops vm.optimization_barrier ops.";
+  let description = [{
+    Removes vm.optimization_barrier ops by replacing them with their operands.
+    This pass should run after all optimization passes that could fold through
+    the barriers.
+  }];
+}
+
 def SinkDefiningOpsPass :
     Pass<"iree-vm-sink-defining-ops", "IREE::VM::ModuleOp"> {
   let summary = "Sinks defining ops with few uses to their use-sites.";

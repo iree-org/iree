@@ -89,6 +89,14 @@ function(iree_c_module)
     DEPENDS ${_COMPILE_TOOL} ${_SRC_PATH}
   )
 
+  # Generated EmitC code may have unused variables from optimization
+  # barriers and other cases where an SSA value is consumed by an op
+  # that produces a new value. Suppress this warning for Clang/GCC.
+  iree_select_compiler_opts(_EMITC_SUPPRESS_OPTS
+    CLANG_OR_GCC
+      "-Wno-unused-but-set-variable"
+  )
+
   iree_cc_library(
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
@@ -96,11 +104,20 @@ function(iree_c_module)
     INCLUDES "${CMAKE_CURRENT_BINARY_DIR}"
     COPTS
       "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
+      ${_EMITC_SUPPRESS_OPTS}
       "${_TESTONLY_ARG}"
     DEPS
       # Include paths and options for the runtime sources.
       iree_defs
   )
+
+  # Apply warning suppression to consumers (tests, etc.) that include the
+  # generated headers.
+  iree_package_name(_PACKAGE_NAME)
+  set(_TARGET "${_PACKAGE_NAME}_${_RULE_NAME}")
+  if(_EMITC_SUPPRESS_OPTS)
+    target_compile_options(${_TARGET} INTERFACE ${_EMITC_SUPPRESS_OPTS})
+  endif()
 
   if(_RULE_NO_RUNTIME)
     return()
