@@ -180,6 +180,8 @@ void buildGlobalOptimizationPassPipeline(
                                transformOptions.aggressiveTransposePropagation;
                            options.enableConvolutionPropagation =
                                transformOptions.propagateTransposesThroughConv;
+                           options.enableSinkTransposeThroughPad =
+                               transformOptions.sinkTransposeThroughPad;
                            options.enableAttentionVTranspose =
                                clEnableAttentionVTranspose;
                            options.enableEdgeReshapePropagation =

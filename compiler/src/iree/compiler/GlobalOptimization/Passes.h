@@ -71,6 +71,12 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
           "Enables propagation of transpose ops through convolutions"),
       llvm::cl::init(false),
   };
+  Option<bool> sinkTransposeThroughPad{
+      *this,
+      "sink-transpose-through-pad",
+      llvm::cl::desc("Enables sinking transpose through pad operations"),
+      llvm::cl::init(false),
+  };
   Option<bool> outerDimConcat{
       *this,
       "outer-dim-concat",
