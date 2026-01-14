@@ -369,24 +369,22 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   //   ub = resultSize
   // and for a well-formed pad, resultSize = srcSize + low + high, so:
   //   ub - lb = high
-  // Therefore "lb >= ub" => "high == 0". Expressing the check in terms of lb/ub
+  // Therefore "lb >= ub" -> "high == 0". Expressing the check in terms of lb/ub
   // keeps it robust even when pad amount has been rewritten into a complex
   // form.
   auto proveEmptyRange = [&](RewriterBase &rewriter, Location loc, Value lb,
                              Value ub) -> bool {
-    using presburger::BoundType;
-
     // Model diff = ub - lb  as an affine map (d0, d1) -> (d0 - d1)
     // and ask for a constant upper bound on diff.
-    // If we can prove UB(diff) <= 0, then diff <= 0 => ub - lb <= 0 => lb >=
-    // ub.
+    // If we can prove UB(diff) <= 0, then "diff <= 0" -> "ub - lb <= 0" -> 
+    // "lb >= ub".
     MLIRContext *ctx = rewriter.getContext();
     auto diffMap = AffineMap::get(
         /*dimCount=*/2, /*symbolCount=*/0,
         {getAffineDimExpr(0, ctx) - getAffineDimExpr(1, ctx)}, ctx);
 
     auto ubConstantBound = ValueBoundsConstraintSet::computeConstantBound(
-        BoundType::UB,
+        presburger::BoundType::UB,
         ValueBoundsConstraintSet::Variable(diffMap, ValueRange{ub, lb}),
         /*stopCondition=*/stopConditionFn,
         /*addConservativeSemiAffineBounds=*/true);
@@ -400,10 +398,9 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   // prove v == 0 exactly, it returns failure and we treat v as "not provably
   // zero".
   auto proveEqZero = [&](Value v) -> bool {
-    using presburger::BoundType;
 
     FailureOr<int64_t> eq = ValueBoundsConstraintSet::computeConstantBound(
-        BoundType::EQ, ValueBoundsConstraintSet::Variable(v),
+        presburger::BoundType::EQ, ValueBoundsConstraintSet::Variable(v),
         /*stopCondition=*/stopConditionFn,
         /*addConservativeSemiAffineBounds=*/true);
 
@@ -411,12 +408,9 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   };
 
   auto isProvablyZeroOfr = [&](OpFoldResult ofr) -> bool {
-    // static 0?
     if (isConstantIntValue(ofr, 0)) {
       return true;
     }
-
-    // dynamic %v == 0?
     if (auto v = dyn_cast<Value>(ofr)) {
       return proveEqZero(v);
     }
@@ -458,7 +452,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   // computation in order to have a more simplified kernel.
   for (auto [idx, low, high] :
        llvm::enumerate(padOp.getMixedLowPad(), padOp.getMixedHighPad())) {
-    // Create a distributed loop for the low padding if low pad is non-zero
+    // Create a distributed loop for the low padding if low pad is non-zero.
     if (!isProvablyZeroOfr(low)) {
       SmallVector<OpFoldResult> ubs(padResultSizes);
       SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
@@ -477,7 +471,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
       continue;
     }
 
-    // Create a distributed loop for the high padding
+    // Create a distributed loop for the high padding.
     SmallVector<OpFoldResult> ubs(padResultSizes);
     SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
     SmallVector<int64_t> shape(padOp.getSourceType().getShape());
@@ -699,7 +693,8 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
     DenseSet<Dialect *> dialectsInIR;
     DenseSet<OperationName> opsInIR;
     funcOp->walk([&](Operation *op) {
-      dialectsInIR.insert(op->getDialect());
+      if (Dialect *dialect = op->getDialect())
+        dialectsInIR.insert(dialect);
       opsInIR.insert(op->getName());
     });
 

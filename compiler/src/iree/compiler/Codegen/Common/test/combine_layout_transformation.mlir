@@ -453,7 +453,7 @@ func.func @unpack_no_padding_no_masking(%dim : index, %result : memref<?x16384xf
 // -----
 
 // Tests that no padding scf.forall loops are emitted when
-// padding in linalg.pack is effectively a no-op
+// padding in linalg.pack is effectively a no-op.
 
 func.func @pack_dynamic_dim_tile_size_1_no_pad_loop(%source : tensor<16x?x128xf16>, %result : memref<16x8x?x16x1xf16>) {
   %cst = arith.constant 0.000000e+00 : f16
@@ -470,7 +470,7 @@ func.func @pack_dynamic_dim_tile_size_1_no_pad_loop(%source : tensor<16x?x128xf1
 }
 // DISPATCH-SCOPE-LABEL: @pack_dynamic_dim_tile_size_1_no_pad_loop
 //       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
-// Verify no padding loops are generated
+// Verify no padding loops are generated.
 //   DISPATCH-SCOPE-NOT:   scf.forall
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer
 
@@ -490,6 +490,6 @@ func.func @pack_divisible_static_dim_tile_size_8_no_pad_loop(%source : tensor<16
 }
 // DISPATCH-SCOPE-LABEL: @pack_divisible_static_dim_tile_size_8_no_pad_loop
 //       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
-// Verify no padding loops are generated
+// Verify no padding loops are generated.
 //   DISPATCH-SCOPE-NOT:   scf.forall
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer
