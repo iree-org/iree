@@ -121,6 +121,8 @@ def PropagateLinalgTransposePass :
             /*default=*/"false", "enable propagation through convolutions">,
     Option<"enableEdgeReshapePropagation", "enable-edge-reshape-propagation", "bool",
             /*default=*/"false", "Enable propagation of reshapes on the edges of the program">,
+    Option<"enableSinkTransposeThroughPad", "enable-sink-transpose-through-pad", "bool",
+            /*default=*/"false", "Enable sinking transpose through pad operations">,
   ];
 }
 
