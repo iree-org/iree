@@ -37,21 +37,6 @@ constexpr llvm::StringLiteral kPassLocalHintAttr = "__pass_local_hint";
 // Validation Helpers
 //===----------------------------------------------------------------------===//
 
-/// Returns true if the given memory space is workgroup (LDS) memory.
-static bool isWorkgroupMemory(MemRefType memrefType) {
-  Attribute memSpace = memrefType.getMemorySpace();
-  if (!memSpace) {
-    return false;
-  }
-  if (auto intMemSpace = dyn_cast<IntegerAttr>(memSpace)) {
-    return intMemSpace.getInt() == 3;
-  }
-  if (auto gpuMemSpace = dyn_cast<gpu::AddressSpaceAttr>(memSpace)) {
-    return gpuMemSpace.getValue() == gpu::AddressSpace::Workgroup;
-  }
-  return false;
-}
-
 /// Returns the required vector size for transpose_load given an element type.
 /// Returns std::nullopt if the element type is not supported.
 /// TODO(Max191): Add and test 4-bit and 6-bit element type support.
@@ -333,34 +318,6 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
 // Transformation Logic
 //===----------------------------------------------------------------------===//
 
-/// Delinearize a linear element index into N-D indices.
-/// Given sizes [S_0, S_1, ..., S_k] and a linear index, returns indices
-/// [Idx_0, Idx_1, ..., Idx_k] such that:
-///   linearIdx = Idx_0 * (S_1 * S_2 * ... * S_k) + Idx_1 * (S_2 * ... * S_k) +
-///   ... + Idx_k
-static SmallVector<Value> delinearizeIndex(Value linearIdx,
-                                           ArrayRef<int64_t> sizes,
-                                           RewriterBase &rewriter,
-                                           Location loc) {
-  if (sizes.empty()) {
-    return {};
-  }
-
-  SmallVector<Value> indices(sizes.size());
-  Value remaining = linearIdx;
-
-  // Process from innermost to outermost dimension
-  for (int64_t i = sizes.size() - 1; i >= 0; --i) {
-    Value size = arith::ConstantIndexOp::create(rewriter, loc, sizes[i]);
-    indices[i] = arith::RemUIOp::create(rewriter, loc, remaining, size);
-    if (i > 0) {
-      remaining = arith::DivUIOp::create(rewriter, loc, remaining, size);
-    }
-  }
-
-  return indices;
-}
-
 /// Computes all memref indices for a single transpose_load op during unrolling.
 ///
 /// The transformation converts implicit vector element indices into explicit
@@ -387,8 +344,13 @@ static SmallVector<Value> computeTransposeLoadIndices(
       arith::AddIOp::create(rewriter, loc, cUnrollBase, rowGroupIdx);
 
   // Delinearize to get indices for each row dimension
-  SmallVector<Value> rowIndices =
-      delinearizeIndex(linearElemIdx, analysis.rowSizes, rewriter, loc);
+  SmallVector<Value> rowIndices;
+  assert(!analysis.rowSizes.empty() && "expected at least one row dim");
+  auto delinOp = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, linearElemIdx, analysis.rowSizes,
+      /*hasOuterBound=*/true);
+  rowIndices.assign(delinOp.getResults().begin(),
+                    delinOp.getResults().end());
 
   // Build the full index list for the memref
   // Start with original indices, then update row and column dimensions
@@ -744,7 +706,7 @@ struct TransferReadToTransposeLoad : OpRewritePattern<vector::TransferReadOp> {
 
     // Validate memory space.
     auto memrefType = cast<MemRefType>(transferOp.getBase().getType());
-    if (!isWorkgroupMemory(memrefType)) {
+    if (!hasSharedMemoryAddressSpace(memrefType)) {
       LLVM_DEBUG(llvm::dbgs() << "  -> Source is not workgroup memory\n");
       return failure();
     }
@@ -787,7 +749,7 @@ struct ROCDLLoadToTransposeLoadPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
-    // Check if target supports transpose_load (gfx950 only)
+    // Check if target supports transpose_load (currently gfx950 only)
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     if (!target) {
       return;
