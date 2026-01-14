@@ -105,28 +105,58 @@ struct PreprocessingOptions {
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };
 
-// Options controlling high level optimizations.
-struct GlobalOptimizationOptions {
-  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
+// Defines the mode for parameter encoding.
+enum class ParameterEncoderMode {
+  // Merge all encoded and original parameters into a single consolidated scope.
+  Consolidate = 0,
+  // Only produce encoded parameters and leave original parameters untouched.
+  Overlay = 1,
+};
+
+// Options controlling parameter management (import/export and encoding).
+struct ParameterOptions {
+  //===--------------------------------------------------------------------===//
+  // Parameter Import/Export
+  //===--------------------------------------------------------------------===//
 
   // File paths to archives to import parameters from with an optional
   // `scope=` prefix.
-  std::vector<std::string> parameterImportPaths;
+  std::vector<std::string> importPaths;
   // List of parameter keys to import. Any matching keys from any scope will be
   // imported.
-  std::vector<std::string> parameterImportKeys;
+  std::vector<std::string> importKeys;
   // Maximum size of parameters to import or 0 to disable automatic import.
-  int64_t parameterImportMaximumSize = 0;
+  int64_t importMaximumSize = 0;
 
   // File path to an archive to export parameters to with an optional
   // `scope=` prefix.
-  std::string parameterExportPath;
+  std::string exportPath;
   // Minimum size of constants to export as parameters.
-  int64_t parameterExportMinimumSize = 0;
+  int64_t exportMinimumSize = 0;
 
   // File path to create a splat parameter archive out of all parameters in the
   // module.
-  std::string parameterSplatExportFile = "";
+  std::string splatPath = "";
+
+  //===--------------------------------------------------------------------===//
+  // Parameter Encoder
+  //===--------------------------------------------------------------------===//
+
+  // Controls how the encoder manages parameters.
+  ParameterEncoderMode encoderMode = ParameterEncoderMode::Consolidate;
+  // .mlir/.mlirbc file path to write the split parameter encoder module to
+  // (empty = disabled).
+  std::string encoderOutputFile;
+  // Parameter scope for the encoder output parameters.
+  std::string encoderOutputScope = "encoded";
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<ParameterOptions>;
+};
+
+// Options controlling high level optimizations.
+struct GlobalOptimizationOptions {
+  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
 
   // Enables aggressive propagation of transposes to the inputs of named ops,
   // rewriting named ops as fused generics.

@@ -298,7 +298,7 @@ static void updateExportFuncOp(mlir::FunctionOpInterface funcOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// --iree-hal-pack-dispatch-operands
+// --iree-stream-pack-dispatch-operands
 //===----------------------------------------------------------------------===//
 
 struct PackDispatchOperandsPass

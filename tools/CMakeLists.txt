@@ -221,6 +221,30 @@ iree_cc_binary(
   INSTALL_COMPONENT IREETools-Runtime
 )
 
+iree_cc_binary(
+  NAME
+    iree-encode-parameters
+  SRCS
+    "iree-encode-parameters-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::hal
+    iree::io::file_handle
+    iree::io::formats::irpa
+    iree::io::parameter_index
+    iree::io::parameter_index_provider
+    iree::io::scope_map
+    iree::io::stream
+    iree::modules::hal
+    iree::tooling::context_util
+    iree::tooling::function_util
+    iree::tooling::parameter_util
+    iree::vm
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
 # Only enable fatelf tool when we're compiling it in.
 # Currently it requires that the host and target both support embedded ELFs as
 # the ELF implementation is only compiled when the target supports it.

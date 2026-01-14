@@ -58,6 +58,9 @@ def Util_ListType : Util_TypeDef<"List"> {
   );
 
   let builders = [
+    TypeBuilder<(ins), [{
+      return $_get($_ctxt, IREE::Util::VariantType::get($_ctxt));
+    }]>,
     TypeBuilderWithInferredContext<(ins
       "Type":$element_type
     ), [{

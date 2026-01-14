@@ -499,6 +499,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyGenericOp<IREE::Util::CallOp>,
                   ApplyGenericOp<mlir::scf::ConditionOp>,
                   ApplyGenericOp<mlir::scf::YieldOp>,
+                  ApplyGenericOp<IREE::Stream::ResourceDeallocaOp>,
                   ApplyGenericOp<IREE::Stream::TimepointAwaitOp>,
                   ApplyGenericOp<IREE::Stream::TimepointBarrierOp>>(context,
                                                                     analysis);
