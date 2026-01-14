@@ -542,6 +542,48 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
+    def iree_cc_fuzz(
+        self,
+        name,
+        srcs=None,
+        data=None,
+        deps=None,
+        copts=None,
+        defines=None,
+        linkopts=None,
+        tags=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(tags=tags, **kwargs):
+            return
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_srcs_block(srcs)
+        data_block = self._convert_target_list_block("DATA", data)
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+        defines_block = self._convert_string_list_block("DEFINES", defines)
+        linkopts_block = self._convert_string_list_block("LINKOPTS", linkopts)
+        labels_block = self._convert_string_list_block("LABELS", tags)
+
+        self._converter.body += (
+            f"iree_cc_fuzz(\n"
+            f"{name_block}"
+            f"{srcs_block}"
+            f"{data_block}"
+            f"{deps_block}"
+            f"{copts_block}"
+            f"{defines_block}"
+            f"{linkopts_block}"
+            f"{labels_block}"
+            f")\n\n"
+        )
+
+    def iree_runtime_cc_fuzz(self, **kwargs):
+        self.iree_cc_fuzz(**kwargs)
+
+    def iree_compiler_cc_fuzz(self, **kwargs):
+        self.iree_cc_fuzz(**kwargs)
+
     def iree_c_embed_data(
         self,
         name,

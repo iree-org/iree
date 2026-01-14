@@ -670,4 +670,80 @@ TEST(StringViewTest, ParseDeviceSizeInvalid) {
   EXPECT_THAT(ParseDeviceSize("abc"), StatusIs(StatusCode::kInvalidArgument));
 }
 
+TEST(StringViewTest, MatchPattern) {
+  auto match = [](const char* value, const char* pattern) -> bool {
+    return iree_string_view_match_pattern(iree_make_cstring_view(value),
+                                          iree_make_cstring_view(pattern));
+  };
+
+  // Empty patterns and values.
+  EXPECT_TRUE(match("", ""));
+  EXPECT_FALSE(match("a", ""));
+  EXPECT_FALSE(match("", "a"));
+
+  // Exact matches.
+  EXPECT_TRUE(match("abc", "abc"));
+  EXPECT_FALSE(match("abc", "abd"));
+  EXPECT_FALSE(match("abc", "ab"));
+  EXPECT_FALSE(match("ab", "abc"));
+
+  // Single character wildcard (?).
+  EXPECT_TRUE(match("a", "?"));
+  EXPECT_TRUE(match("abc", "a?c"));
+  EXPECT_TRUE(match("abc", "???"));
+  EXPECT_FALSE(match("ab", "???"));
+  EXPECT_FALSE(match("abcd", "???"));
+
+  // Multi-character wildcard (*).
+  EXPECT_TRUE(match("", "*"));
+  EXPECT_TRUE(match("a", "*"));
+  EXPECT_TRUE(match("abc", "*"));
+  EXPECT_TRUE(match("abc", "a*"));
+  EXPECT_TRUE(match("abc", "*c"));
+  EXPECT_TRUE(match("abc", "a*c"));
+  EXPECT_TRUE(match("abxyzc", "a*c"));
+  EXPECT_FALSE(match("abc", "a*d"));
+
+  // Combined wildcards.
+  EXPECT_TRUE(match("abc", "?*"));
+  EXPECT_TRUE(match("abc", "*?"));
+  EXPECT_TRUE(match("abc", "?*?"));
+  EXPECT_TRUE(match("abcdef", "a?c*f"));
+
+  // Consecutive wildcards (tests coalescing to avoid exponential backtracking).
+  EXPECT_TRUE(match("abc", "**"));
+  EXPECT_TRUE(match("abc", "***"));
+  EXPECT_TRUE(match("abc", "a**c"));
+  EXPECT_TRUE(match("abc", "**c"));
+  EXPECT_TRUE(match("abc", "a**"));
+
+  // Pathological pattern that would cause exponential backtracking without
+  // coalescing: many wildcards followed by a non-matching suffix.
+  // This must complete in reasonable time (milliseconds, not seconds).
+  EXPECT_FALSE(match("aaaaaaaaaaaaaaaaaaaab", "**************c"));
+  EXPECT_TRUE(match("aaaaaaaaaaaaaaaaaaaab", "**************b"));
+
+  // Alternating ?* patterns - also pathological without normalization.
+  // ?* means "1 or more chars", ?*?* means "2 or more chars", etc.
+  EXPECT_TRUE(match("ab", "?*"));
+  EXPECT_TRUE(match("abc", "?*?"));
+  EXPECT_TRUE(match("abc", "?*?*"));
+  EXPECT_TRUE(match("abcd", "?*?*"));
+  EXPECT_FALSE(match("a", "?*?*"));  // Need at least 2 chars.
+
+  // Pathological alternating patterns - must complete quickly.
+  EXPECT_FALSE(match("aaaaaaaaaaaaaaaaaaaab", "?*?*?*?*?*?*?*c"));
+  EXPECT_TRUE(match("aaaaaaaaaaaaaaaaaaaab", "?*?*?*?*?*?*?*b"));
+  EXPECT_FALSE(match("aaaaaaaaaaaaaaaaaaaab", "*?*?*?*?*?*?*?c"));
+  EXPECT_TRUE(match("aaaaaaaaaaaaaaaaaaaab", "*?*?*?*?*?*?*?b"));
+
+  // Patterns with too many wildcards are rejected (returns false).
+  // Limit is 16 wildcards to prevent O(n^2) blowup.
+  EXPECT_TRUE(match("abcdefghijklmnop", "????????????????"));  // 16 - ok
+  EXPECT_FALSE(
+      match("abcdefghijklmnopq", "?????????????????"));  // 17 - rejected
+  EXPECT_FALSE(
+      match("anything", "?*?*?*?*?*?*?*?*?*"));  // 18 wildcards - rejected
+}
+
 }  // namespace
