@@ -395,6 +395,15 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_fuzz(
+  NAME
+    unicode_fuzz
+  SRCS
+    "unicode_fuzz.cc"
+  DEPS
+    ::unicode
+)
+
 iree_cc_test(
   NAME
     unicode_test
