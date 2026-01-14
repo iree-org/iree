@@ -52,6 +52,23 @@ build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:li
 build --flag_alias=iree_enable_runtime_tracing=//runtime/src/iree/base/tracing:tracing_provider
 
 ###############################################################################
+# Local development configuration.
+# Use with: bazel build --config=localdev //...
+#
+# Combines several optimizations for faster local iteration:
+# - Skymeld (merged analysis/execution for faster multi-target builds)
+# - Ramdisk sandbox on Linux (reduces I/O bottleneck with many cores)
+#
+# Note: Disk cache is configured in user.bazelrc (created by iree-bazel-configure).
+###############################################################################
+
+build:localdev --experimental_merged_skyframe_analysis_execution
+
+# Linux: use ramdisk for sandbox to reduce I/O with many cores.
+# This is a no-op on other platforms.
+build:localdev --sandbox_base=/dev/shm
+
+###############################################################################
 # Options for "generic_gcc" builds
 ###############################################################################
 
@@ -139,9 +156,24 @@ build:generic_clang --copt=-Wthread-safety-beta
 build:generic_clang --copt=-Wunused-comparison
 build:generic_clang --copt=-Wvla
 
-# Treat backrefs during linking as errors.
-build:generic_clang --linkopt=-Wl,--warn-backrefs
+###############################################################################
+# Linker options.
+###############################################################################
+
+# Treat linker warnings as errors (supported by all linkers).
 build:generic_clang --linkopt=-Wl,--fatal-warnings
+
+# Mold linker (faster linking for local development).
+build:mold --linkopt=-fuse-ld=mold
+
+###############################################################################
+# CI configuration.
+# Use --config=generic_clang_ci to replicate CI builds locally.
+###############################################################################
+
+build:generic_clang_ci --config=generic_clang
+# Warn on link order issues (not supported by all linkers, so CI-only).
+build:generic_clang_ci --linkopt=-Wl,--warn-backrefs
 
 ###############################################################################
 # Additional options for MacOS based clang builds.

@@ -174,15 +174,36 @@ bazel test -k //... \
 In general, build artifacts will be under the `bazel-bin` directory at the top
 level.
 
-## :octicons-gear-16: Recommended `user.bazelrc`
+## :octicons-gear-16: Local development configuration
 
-You can put a user.bazelrc at the root of the repository and it will be ignored
-by git.
+For faster local development iteration, use the `--config=localdev` flag:
+
+```shell
+bazel build --config=localdev //tools/...
+bazel test --config=localdev //runtime/...
+```
+
+This enables several optimizations:
+
+- **Persistent disk cache** at `~/.cache/bazel-iree/` (survives reboots, shared
+  across worktrees)
+- **Skymeld** (merged analysis/execution phases for faster multi-target builds)
+- **Ramdisk sandbox** on Linux (reduces I/O bottleneck with many CPU cores)
+
+The `localdev` config is defined in
+[`build_tools/bazel/iree.bazelrc`](https://github.com/iree-org/iree/blob/main/build_tools/bazel/iree.bazelrc)
+and works on all platforms.
+
+## :octicons-pencil-16: Optional `user.bazelrc`
+
+You can put a `user.bazelrc` at the root of the repository for personal
+customizations (ignored by git). For example, to always use localdev settings:
 
 === ":fontawesome-brands-linux: Linux"
 
     ```shell
-    build --disk_cache=/tmp/bazel-cache
+    # Always use localdev optimizations
+    build --config=localdev
 
     # Use --config=debug to compile IREE and LLVM without optimizations
     # and with assertions enabled.
@@ -196,7 +217,8 @@ by git.
 === ":fontawesome-brands-apple: macOS"
 
     ```shell
-    build --disk_cache=/tmp/bazel-cache
+    # Always use localdev optimizations
+    build --config=localdev
 
     # Use --config=debug to compile IREE and LLVM without optimizations
     # and with assertions enabled.
@@ -210,7 +232,13 @@ by git.
 === ":fontawesome-brands-windows: Windows"
 
     ```shell
-    build --disk_cache=c:/bazelcache
+    # Always use localdev optimizations
+    build --config=localdev
+
+    # Override disk cache path to avoid Windows path length issues.
+    # The default ~/.cache/bazel-iree can exceed the 260 character limit.
+    build:localdev --disk_cache=c:/bazelcache
+
     build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=never
     ```
 
