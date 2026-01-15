@@ -25,8 +25,9 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
   }
 
   // Skip else getBitReversalOrder produces invalid dense elements attr.
-  if (!operandType.getElementType().isF32())
+  if (!operandType.getElementType().isF32()) {
     return rewriter.notifyMatchFailure(op, "expected F32 types");
+  }
 
   ImplicitLocOpBuilder b(loc, rewriter);
 

@@ -222,12 +222,14 @@ public:
   LogicalResult encodeBranchTable(SuccessorRange caseSuccessors,
                                   OperandRangeRange caseOperands,
                                   int baseSuccessorIndex) override {
-    if (failed(writeUint16(caseSuccessors.size())))
+    if (failed(writeUint16(caseSuccessors.size()))) {
       return failure();
+    }
     for (auto [successor, operands] :
          llvm::zip_equal(caseSuccessors, caseOperands)) {
-      if (failed(encodeBranch(successor, operands, ++baseSuccessorIndex)))
+      if (failed(encodeBranch(successor, operands, ++baseSuccessorIndex))) {
         return failure();
+      }
     }
     return success();
   }
@@ -321,11 +323,13 @@ public:
   LogicalResult ensureAlignment(size_t alignment) {
     size_t paddedSize = (bytecode_.size() + (alignment - 1)) & ~(alignment - 1);
     size_t padding = paddedSize - bytecode_.size();
-    if (padding == 0)
+    if (padding == 0) {
       return success();
+    }
     static const uint8_t kZeros[32] = {0};
-    if (padding > sizeof(kZeros))
+    if (padding > sizeof(kZeros)) {
       return failure();
+    }
     return writeBytes(kZeros, padding);
   }
 

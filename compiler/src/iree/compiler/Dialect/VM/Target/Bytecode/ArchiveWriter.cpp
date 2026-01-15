@@ -670,8 +670,9 @@ LogicalResult ZIPArchiveWriter::flush(FlatbufferBuilder &fbb) {
           return success();
         },
         os);
-    if (!zipFile.has_value())
+    if (!zipFile.has_value()) {
       return failure();
+    }
     fileRefs.push_back(*zipFile);
   }
 

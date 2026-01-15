@@ -65,8 +65,9 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp,
   // Gather all of the resource globals in the root.
   for (auto &region : rootOp->getRegions()) {
     for (auto globalOp : region.getOps<IREE::Util::GlobalOp>()) {
-      if (!isResourceType(globalOp.getType()))
+      if (!isResourceType(globalOp.getType())) {
         continue;
+      }
       expandedGlobals[globalOp.getName()].resourceOp = globalOp;
     }
   }
@@ -127,8 +128,9 @@ static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
 // Expands resources in the given |types| list to (resource, size, offset, len).
 // This could be changed to some iterator magic to avoid the alloc.
 static SmallVector<Type> expandTypes(TypeRange types) {
-  if (types.empty())
+  if (types.empty()) {
     return {};
+  }
   SmallVector<Type> newTypes;
   newTypes.reserve(types.size() * 2);
   for (auto type : types) {
@@ -221,14 +223,16 @@ static void expandSubranges(Operation *op, SymbolTable &symbolTable,
 static void expandRegion(Region &region, bool canModifyEntryBlock,
                          SymbolTable &symbolTable, ExpandedGlobalMap &globalMap,
                          IndexSet &indexSet, SubrangeMap subrangeMap) {
-  if (region.empty())
+  if (region.empty()) {
     return;
+  }
 
   // Update all block arguments.
   auto indexType = IndexType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
-    if (!llvm::any_of(block.getArgumentTypes(), isResourceType))
+    if (!llvm::any_of(block.getArgumentTypes(), isResourceType)) {
       continue;
+    }
 
     // Entry blocks that we can't modify are fully handled by
     // MutableRegionBranchOpInterface (via wrapExpandedBlockArgFn callback).
@@ -245,8 +249,9 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
     // Insert new arguments for each resource argument.
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto arg = block.getArgument(i);
-      if (!isResourceType(arg.getType()))
+      if (!isResourceType(arg.getType())) {
         continue;
+      }
       Subrange subrange;
       subrange.resource = arg;
       subrange.resourceSize =
@@ -306,10 +311,12 @@ static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
   // Ignore ops that are already in the map (we likely inserted them ourselves
   // earlier).
   auto resultResource = op.getSubrangeResult();
-  if (!resultResource)
+  if (!resultResource) {
     return;
-  if (subrangeMap.count(resultResource))
+  }
+  if (subrangeMap.count(resultResource)) {
     return;
+  }
 
   // Get the subrange of the source resource which we should have by way of the
   // other insertions (func/block args, etc).
@@ -317,8 +324,9 @@ static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
   builder.setInsertionPointAfter(op);
   auto sourceSubrange = consumeSubrange(op.getLoc(), op.getSubrangeResource(),
                                         subrangeMap, indexSet, builder);
-  if (op.getSubrangeResource() == sourceSubrange.resource)
+  if (op.getSubrangeResource() == sourceSubrange.resource) {
     return;
+  }
 
   // Update the subrange in the map by adding the source offset and the local
   // offset from the op. Future ops that consume subranges will reference back
@@ -347,8 +355,9 @@ static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
 static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
                                ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                                SubrangeMap &subrangeMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto &expandedGlobal = globalMap[op.getGlobalName()];
@@ -386,8 +395,9 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
 static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet, SubrangeMap &subrangeMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto subrange = consumeSubrange(op.getLoc(), op.getStoredGlobalValue(),
@@ -460,13 +470,15 @@ static void expandFuncOp(IREE::Util::FuncOp op, SymbolTable &symbolTable,
 //  %2 = stream.resource.subview %r[%ro] : {%rsz} -> {%rl}
 static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
                          IndexSet &indexSet, SubrangeMap &subrangeMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
 
   // Ignore calls to public/external functions.
   auto calleeOp = symbolTable.lookup<CallableOpInterface>(op.getCallee());
-  if (IREE::Util::isPublicOrExternal(calleeOp))
+  if (IREE::Util::isPublicOrExternal(calleeOp)) {
     return;
+  }
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
@@ -518,10 +530,13 @@ static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
 //  util.return %0, %sz, %o, %l
 static void expandReturnOp(IREE::Util::ReturnOp op, IndexSet &indexSet,
                            SubrangeMap &subrangeMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
-  if (IREE::Util::isPublicOrExternal(op->getParentOfType<IREE::Util::FuncOp>()))
+  }
+  if (IREE::Util::isPublicOrExternal(
+          op->getParentOfType<IREE::Util::FuncOp>())) {
     return;
+  }
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), subrangeMap,
                                  indexSet, builder);
@@ -551,8 +566,9 @@ static void expandBranchOp(mlir::cf::BranchOp op, IndexSet &indexSet,
 
 static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
                                SubrangeMap &subrangeMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   mlir::cf::CondBranchOp::create(
       builder, op.getLoc(), op.getCondition(), op.getTrueDest(),
@@ -568,8 +584,9 @@ static ValueRange asValueRange(ArrayRef<Value> values) { return values; }
 
 static void expandSwitchOp(mlir::cf::SwitchOp op, IndexSet &indexSet,
                            SubrangeMap &subrangeMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   auto caseOperands = llvm::to_vector(
       llvm::map_range(op.getCaseOperands(), [&](ValueRange operands) {
@@ -742,8 +759,9 @@ public:
       // NOTE: the callable may be empty (like when an extern) - we still want
       // to process it but don't need an IndexSet.
       auto *region = callableOp.getCallableRegion();
-      if (!region || region->empty())
+      if (!region || region->empty()) {
         continue;
+      }
       IndexSet indexSet(callableOp.getLoc(),
                         OpBuilder::atBlockBegin(&region->front()));
       SubrangeMap subrangeMap;

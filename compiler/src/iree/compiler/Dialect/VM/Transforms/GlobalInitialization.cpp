@@ -96,8 +96,9 @@ static void fixupGlobalMutability(Operation *moduleOp,
   explorer.initialize();
   SmallVector<Operation *> deadOps;
   explorer.forEachGlobal([&](const Explorer::GlobalInfo *globalInfo) {
-    if (globalInfo->uses.empty())
+    if (globalInfo->uses.empty()) {
       return;
+    }
     // TODO(benvanik): verify we want this behavior - we likely want to change
     // this to be mutable only if stores exist outside of initializers.
     //

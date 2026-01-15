@@ -99,8 +99,9 @@ struct ConvertOpToUnsigned : public OpRewritePattern<Signed> {
 
   LogicalResult matchAndRewrite(Signed op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(staticallyLegalToConvertToUnsignedOp(solver, op)))
+    if (failed(staticallyLegalToConvertToUnsignedOp(solver, op))) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<Unsigned>(op, op->getResultTypes(),
                                           op->getOperands(), op->getAttrs());
     return success();
@@ -135,15 +136,18 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
                                 PatternRewriter &rewriter) const override {
     Type inType = origIndexOp.getIn().getType();
     Type outType = origIndexOp.getOut().getType();
-    if (!inType.isSignlessInteger(64) || !isa<IndexType>(outType))
+    if (!inType.isSignlessInteger(64) || !isa<IndexType>(outType)) {
       return failure();
+    }
 
     Operation *producer = origIndexOp.getIn().getDefiningOp();
-    if (!producer)
+    if (!producer) {
       return failure();
+    }
     auto producerResult = producer->getResult(0);
-    if (!producerResult.hasOneUse())
+    if (!producerResult.hasOneUse()) {
       return failure();
+    }
 
     auto pred = [&](Value v) -> bool {
       auto *result = solver.lookupState<IntegerValueRangeLattice>(v);
@@ -163,17 +167,20 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
 
     if (!isa_and_present<arith::AddIOp, arith::CeilDivUIOp, arith::DivUIOp,
                          arith::MaxUIOp, arith::MinUIOp, arith::MulIOp,
-                         arith::RemUIOp, arith::SubIOp>(producer))
+                         arith::RemUIOp, arith::SubIOp>(producer)) {
       return failure();
-    if (!isOpStaticallyLegal(producer))
+    }
+    if (!isOpStaticallyLegal(producer)) {
       return failure();
+    }
 
     // Make modifications.
     rewriter.modifyOpInPlace(producer, [&]() {
       rewriter.setInsertionPoint(producer);
       for (auto &operand : producer->getOpOperands()) {
-        if (operand.get().getType() != inType)
+        if (operand.get().getType() != inType) {
           continue;
+        }
         Value newOperand = arith::IndexCastUIOp::create(
             rewriter, producer->getLoc(), outType, operand.get());
         operand.set(newOperand);
@@ -204,20 +211,24 @@ struct RemoveIndexCastForAssumeOfI32
                                 PatternRewriter &rewriter) const override {
     llvm::SmallBitVector needNarrowing(op.getNumOperands(), false);
     for (auto [idx, arg] : llvm::enumerate(op.getOperands())) {
-      if (!arg.getType().isIndex())
+      if (!arg.getType().isIndex()) {
         continue;
+      }
       auto castOp = arg.getDefiningOp<arith::IndexCastUIOp>();
-      if (!castOp)
+      if (!castOp) {
         continue;
+      }
       Value castIn = castOp.getIn();
       Type intType = castIn.getType();
-      if (intType.getIntOrFloatBitWidth() > 32)
+      if (intType.getIntOrFloatBitWidth() > 32) {
         continue;
+      }
 
       needNarrowing[idx] = true;
     }
-    if (needNarrowing.none())
+    if (needNarrowing.none()) {
       return failure();
+    }
 
     SmallVector<Value> newArgs;
     newArgs.reserve(op.getNumOperands());
@@ -267,22 +278,27 @@ struct NarrowSCFForIvToI32 : public OpRewritePattern<scf::ForOp> {
     Location loc = forOp.getLoc();
     Value iv = forOp.getInductionVar();
     Type srcType = iv.getType();
-    if (!srcType.isIndex() && !srcType.isInteger(64))
+    if (!srcType.isIndex() && !srcType.isInteger(64)) {
       return rewriter.notifyMatchFailure(forOp, "IV isn't an index or i64");
-    if (!staticallyLegalToConvertToUnsigned(solver, iv))
+    }
+    if (!staticallyLegalToConvertToUnsigned(solver, iv)) {
       return rewriter.notifyMatchFailure(forOp, "IV isn't non-negative");
-    if (!staticallyLegalToConvertToUnsigned(solver, forOp.getStep()))
+    }
+    if (!staticallyLegalToConvertToUnsigned(solver, forOp.getStep())) {
       return rewriter.notifyMatchFailure(forOp, "Step isn't non-negative");
+    }
     auto *ivState = solver.lookupState<IntegerValueRangeLattice>(iv);
-    if (ivState->getValue().getValue().smax().getActiveBits() > 31)
+    if (ivState->getValue().getValue().smax().getActiveBits() > 31) {
       return rewriter.notifyMatchFailure(forOp, "IV won't fit in signed int32");
+    }
 
     Type i32 = rewriter.getI32Type();
     auto doCastDown = [&](Value v) -> Value {
-      if (srcType.isIndex())
+      if (srcType.isIndex()) {
         return arith::IndexCastUIOp::create(rewriter, loc, i32, v);
-      else
+      } else {
         return arith::TruncIOp::create(rewriter, loc, i32, v);
+      }
     };
     Value newLb = doCastDown(forOp.getLowerBound());
     Value newUb = doCastDown(forOp.getUpperBound());
@@ -322,9 +338,10 @@ static LogicalResult getDivisibility(DataFlowSolver &solver, Operation *op,
                                      Value value, PatternRewriter &rewriter,
                                      ConstantIntDivisibility &out) {
   auto *div = solver.lookupState<IntegerDivisibilityLattice>(value);
-  if (!div || div->getValue().isUninitialized())
+  if (!div || div->getValue().isUninitialized()) {
     return rewriter.notifyMatchFailure(op,
                                        "divisibility could not be determined");
+  }
 
   out = div->getValue().getValue();
   LLVM_DEBUG(dbgs() << "  * Resolved divisibility: " << out << "\n");
@@ -338,17 +355,20 @@ struct RemUIDivisibilityByConstant : public OpRewritePattern<arith::RemUIOp> {
   LogicalResult matchAndRewrite(arith::RemUIOp op,
                                 PatternRewriter &rewriter) const override {
     APInt rhsConstant;
-    if (!matchPattern(op.getRhs(), m_ConstantInt(&rhsConstant)))
+    if (!matchPattern(op.getRhs(), m_ConstantInt(&rhsConstant))) {
       return rewriter.notifyMatchFailure(op, "rhs is not constant");
+    }
 
     ConstantIntDivisibility lhsDiv;
-    if (failed(getDivisibility(solver, op, op.getLhs(), rewriter, lhsDiv)))
+    if (failed(getDivisibility(solver, op, op.getLhs(), rewriter, lhsDiv))) {
       return failure();
+    }
 
     uint64_t rhsValue = rhsConstant.getZExtValue();
     if (rhsValue > 0 && lhsDiv.udiv() > 0) {
-      if (lhsDiv.udiv() % rhsValue != 0)
+      if (lhsDiv.udiv() % rhsValue != 0) {
         return rewriter.notifyMatchFailure(op, "rhs does not divide lhs");
+      }
 
       rewriter.replaceOpWithNewOp<arith::ConstantOp>(
           op, rewriter.getZeroAttr(op.getResult().getType()));
@@ -397,10 +417,12 @@ struct ElideTruncOfIndexCast : public OpRewritePattern<arith::TruncIOp> {
   LogicalResult matchAndRewrite(arith::TruncIOp truncOp,
                                 PatternRewriter &rewriter) const override {
     Operation *producer = truncOp.getOperand().getDefiningOp();
-    if (!producer)
+    if (!producer) {
       return failure();
-    if (!isa<arith::IndexCastOp, arith::IndexCastUIOp>(producer))
+    }
+    if (!isa<arith::IndexCastOp, arith::IndexCastUIOp>(producer)) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<arith::IndexCastUIOp>(
         truncOp, truncOp.getResult().getType(), producer->getOperand(0));
     return success();
@@ -418,8 +440,9 @@ public:
 protected:
   void notifyOperationErased(Operation *op) override {
     s.eraseState(s.getProgramPointAfter(op));
-    for (Value res : op->getResults())
+    for (Value res : op->getResults()) {
       s.eraseState(res);
+    }
   }
 
   void notifyOperationModified(Operation *op) override {
@@ -463,8 +486,9 @@ class OptimizeIntArithmeticPass
     // Populate canonicalization patterns.
     auto arithDialect = ctx->getOrLoadDialect<arith::ArithDialect>();
     for (const RegisteredOperationName &name : ctx->getRegisteredOperations()) {
-      if (&name.getDialect() == arithDialect)
+      if (&name.getDialect() == arithDialect) {
         name.getCanonicalizationPatterns(patterns, ctx);
+      }
     }
 
     // General optimization patterns.
@@ -513,8 +537,9 @@ class OptimizeIntArithmeticPass
         return signalPassFailure();
       }
 
-      if (!changed)
+      if (!changed) {
         break;
+      }
     }
   }
 };

@@ -36,11 +36,13 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
 
   auto defs = recordKeeper.getAllDerivedDefinitions("VM_Op");
   for (const auto *def : defs) {
-    if (def->isValueUnset("encoding"))
+    if (def->isValueUnset("encoding")) {
       continue;
+    }
     auto encodingExprs = def->getValueAsListOfDefs("encoding");
-    if (encodingExprs.empty())
+    if (encodingExprs.empty()) {
       continue;
+    }
 
     Operator op(def);
     tblgen::DialectNamespaceEmitter emitter(os, op.getDialect());

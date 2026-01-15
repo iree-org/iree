@@ -258,15 +258,17 @@ public:
       : logicalBitWidth(logicalBitWidth), endian(endian), os(os) {}
 
   void write(const uint64_t value) {
-    if (bitOffset + logicalBitWidth > physicalBitWidth)
+    if (bitOffset + logicalBitWidth > physicalBitWidth) {
       flush();
+    }
     physicalBuffer |= value << bitOffset;
     bitOffset += logicalBitWidth;
   }
 
   void flush() {
-    if (bitOffset == 0)
+    if (bitOffset == 0) {
       return;
+    }
     physicalType physicalValue =
         llvm::support::endian::byte_swap<physicalType>(physicalBuffer, endian);
     os.write((const char *)&physicalValue, sizeof(physicalValue));
@@ -533,8 +535,9 @@ LogicalResult BytePatternAttr::serializeToStream(Location loc,
 //===----------------------------------------------------------------------===//
 
 Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess()))
+  if (failed(p.parseLess())) {
     return {};
+  }
 
   // TODO(benvanik): support the range syntax; the dialect asm parser fights
   // with it though by checking for proper []/() nesting.
@@ -573,8 +576,9 @@ Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
     return {};
   }
 
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
 
   start = startInclusive ? start : start + 1;
   end = endInclusive ? end : end - 1;
@@ -912,8 +916,9 @@ void HoistableAttrInterface::gatherHoistableAttrs(Operation *fromOp,
       }
     }
   }
-  if (auto *parentOp = fromOp->getParentOp())
+  if (auto *parentOp = fromOp->getParentOp()) {
     gatherHoistableAttrs(parentOp, dialectAttrs);
+  }
 }
 
 // static
@@ -923,8 +928,9 @@ void HoistableAttrInterface::gatherHoistableAttrs(Operation *fromOp,
   // precedence over any from ancestors. We also want to preserve any
   // non-hoistable attrs when we reassign the dialect attrs.
   NamedAttrList dialectAttrs;
-  for (auto attr : toOp->getDialectAttrs())
+  for (auto attr : toOp->getDialectAttrs()) {
     dialectAttrs.push_back(attr);
+  }
 
   // Gather attributes from the op and its parents, only adding ones not already
   // set on the op.

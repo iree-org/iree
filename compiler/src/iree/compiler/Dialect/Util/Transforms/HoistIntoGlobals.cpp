@@ -49,8 +49,9 @@ static std::string getHoistedName(Type type) {
     type.print(os);
   }
   str = sanitizeSymbolName(str);
-  if (str.substr(str.size() - 1) == "_")
+  if (str.substr(str.size() - 1) == "_") {
     str = str.substr(0, str.size() - 1); // strip trailing _
+  }
   return str;
 }
 
@@ -107,14 +108,16 @@ public:
     // yet.
     for (auto funcOp : getOperation().getOps<FunctionOpInterface>()) {
       // Ignore initializers.
-      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation()))
+      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation())) {
         continue;
+      }
       auto walkRes = funcOp.walk<WalkOrder::PreOrder>([&](Operation *iterOp) {
         // We only want to look at const-expr ops (non roots) since they may
         // have interesting escapes. Early exit here for efficiency.
         auto *iterInfo = constExprs.lookup(iterOp);
-        if (!iterInfo)
+        if (!iterInfo) {
           return WalkResult::advance();
+        }
         for (Value constExprResult : iterOp->getResults()) {
           auto *resultInfo = constExprs.lookup(constExprResult);
           assert(resultInfo && "must have const-expr info");
@@ -129,8 +132,9 @@ public:
         }
         return WalkResult::advance();
       });
-      if (walkRes.wasInterrupted())
+      if (walkRes.wasInterrupted()) {
         return signalPassFailure();
+      }
     }
 
     // Apply any remaining RAUW cleanups. We have to do these at the cleanup
@@ -167,8 +171,9 @@ public:
   Operation *getTopLevelOp(Operation *childOp) {
     auto *moduleBlock = getOperation().getBody();
     auto *op = childOp;
-    while (op->getBlock() != moduleBlock)
+    while (op->getBlock() != moduleBlock) {
       op = op->getParentOp();
+    }
     return op;
   }
 
@@ -176,8 +181,9 @@ public:
                                SymbolTable &moduleSymbols,
                                const ConstExprAnalysis &constExprs) {
     IREE::Util::GlobalOp existingGlobal = hoistedMap.lookup(originalValue);
-    if (existingGlobal)
+    if (existingGlobal) {
       return success();
+    }
 
     // Gather any dialect attributes we may need to preserve.
     auto *topLevelOp = getTopLevelOp(originalValue.getDefiningOp());
@@ -213,8 +219,9 @@ public:
                         const ConstExprAnalysis::ConstValueInfo *producerInfo,
                         HoistedValueMap &hoistedMap, IRMapping &cloneMapping,
                         const ConstExprAnalysis &constExprs) {
-    if (cloneMapping.contains(producerInfo->constValue))
+    if (cloneMapping.contains(producerInfo->constValue)) {
       return;
+    }
 
     // We either have a global associated already or we need to traverse
     // down and materialize producers.
@@ -331,8 +338,9 @@ public:
     // longer be valid after this point.
     for (auto funcOp : getOperation().getOps<FunctionOpInterface>()) {
       // Ignore initializers.
-      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation()))
+      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation())) {
         continue;
+      }
       funcOp.walk<WalkOrder::PostOrder, ReverseIterator>(
           [&](Operation *iterOp) {
             if (allOps.contains(iterOp) && iterOp->use_empty()) {
