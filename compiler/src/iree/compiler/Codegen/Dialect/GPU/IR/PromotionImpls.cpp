@@ -94,23 +94,30 @@ std::optional<Value> promotionImpl(OpBuilder &builder, OpOperand &operand,
 /// Inserts a `linalg.copy` directly before the given operation on the
 /// specified operand, for example with operand index = 1:
 ///
+/// ```mlir
 ///   %2 = linalg.matmul ins(%0, %1)
+/// ```
 ///
 /// becomes
 ///
+/// ```mlir
 ///   %empty = tensor.empty()
 ///   %copy = linalg.copy %1 to %empty {
 ///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
 ///   linalg.matmul ins(%0, %copy)
+/// ```
 ///
 /// If the producer is already a tilable op, the producer is just annotated with
 /// the underlying attribute.
 /// Additionally we can also promote results so in above example we will
 /// generate for index = 2 :
+///
+/// ```mlir
 ///   %out_buffer = bufferization.alloc_tensor
 ///   %copy1 = linalg.copy %2 to %out_buffer
 ///   %copy2 = linalg.copy %copy1 to %empty {
 ///     lowering_config = #iree_gpu.derived_thread_config}
+/// ```
 Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr) {
   std::optional<Value> promotedValue = promotionImpl(builder, operand, attr);
