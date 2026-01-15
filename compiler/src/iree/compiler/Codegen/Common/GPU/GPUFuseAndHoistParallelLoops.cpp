@@ -175,6 +175,11 @@ struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
       tileableProducer = forallOp.getTiedLoopInit(iterArg)
                              ->get()
                              .getDefiningOp<TilingInterface>();
+      // Pad fusion is handled separately as we dont want zero slice guards that
+      // happen by default.
+      if (tileableProducer && isa<tensor::PadOp>(tileableProducer)) {
+        tileableProducer = nullptr;
+      }
       if (tileableProducer) {
         break;
       }
