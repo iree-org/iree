@@ -100,8 +100,9 @@ struct CmpI32OpConversion : public OpConversionPattern<arith::CmpIOp> {
   LogicalResult
   matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isInteger(32))
+    if (!adaptor.getLhs().getType().isInteger(32)) {
       return failure();
+    }
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
     case arith::CmpIPredicate::eq:
@@ -155,8 +156,9 @@ struct CmpI64OpConversion : public OpConversionPattern<arith::CmpIOp> {
   LogicalResult
   matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isInteger(64))
+    if (!adaptor.getLhs().getType().isInteger(64)) {
       return failure();
+    }
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
     case arith::CmpIPredicate::eq:
@@ -210,8 +212,9 @@ struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
   LogicalResult
   matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isF32())
+    if (!adaptor.getLhs().getType().isF32()) {
       return failure();
+    }
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
     case arith::CmpFPredicate::AlwaysFalse: // 0
@@ -300,8 +303,9 @@ struct CmpF64OpConversion : public OpConversionPattern<arith::CmpFOp> {
   LogicalResult
   matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isF64())
+    if (!adaptor.getLhs().getType().isF64()) {
       return failure();
+    }
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
     case arith::CmpFPredicate::AlwaysFalse: // 0
@@ -623,13 +627,15 @@ struct ExtendFOpConversion : public OpConversionPattern<arith::ExtFOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto srcType = dyn_cast_if_present<FloatType>(srcOp.getIn().getType());
     auto resultType = dyn_cast_if_present<FloatType>(srcOp.getType());
-    if (!srcType || !resultType)
+    if (!srcType || !resultType) {
       return failure();
+    }
     auto dstType = getTypeConverter()->convertType(resultType);
     auto srcBits = srcType.getWidth();
     auto resultBits = resultType.getWidth();
-    if (srcBits != 32 || resultBits != 64)
+    if (srcBits != 32 || resultBits != 64) {
       return rewriter.notifyMatchFailure(srcOp, "unsupported extf conversion");
+    }
     rewriter.replaceOpWithNewOp<IREE::VM::ExtF32F64Op>(srcOp, dstType,
                                                        adaptor.getIn());
     return success();

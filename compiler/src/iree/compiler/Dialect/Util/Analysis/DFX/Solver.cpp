@@ -113,8 +113,9 @@ LogicalResult Solver::runTillFixpoint(int maxIterations) {
 
       // Use the invalidElements vector to propagate invalid states fast
       // transitively without requiring updates.
-      if (!elementState.isValidState())
+      if (!elementState.isValidState()) {
         invalidElements.insert(element);
+      }
     }
 
     // Add elements to the changed set if they have been created in the last
@@ -140,8 +141,9 @@ LogicalResult Solver::runTillFixpoint(int maxIterations) {
   SmallPtrSet<AbstractElement *, 32> visitedElements;
   for (size_t i = 0; i < changedElements.size(); i++) {
     auto *changedElement = changedElements[i];
-    if (!visitedElements.insert(changedElement).second)
+    if (!visitedElements.insert(changedElement).second) {
       continue;
+    }
 
     auto &elementState = changedElement->getState();
     if (!elementState.isAtFixpoint()) {
@@ -183,8 +185,9 @@ ChangeStatus Solver::updateElement(AbstractElement &element) {
     // will not change and we can indicate that right away.
     elementState.indicateOptimisticFixpoint();
   }
-  if (!elementState.isAtFixpoint())
+  if (!elementState.isAtFixpoint()) {
     rememberDependencies();
+  }
 
   // Verify the stack is balanced by ensuring we pop the vector we pushed above.
   auto *poppedDependencies = dependencyStack.pop_back_val();
@@ -198,15 +201,18 @@ ChangeStatus Solver::updateElement(AbstractElement &element) {
 void Solver::recordDependency(const AbstractElement &fromElement,
                               const AbstractElement &toElement,
                               Resolution resolution) {
-  if (resolution == Resolution::NONE)
+  if (resolution == Resolution::NONE) {
     return;
+  }
   // If we are outside of an update, thus before the actual fixpoint iteration
   // started (= when we create elements), we do not track dependencies because
   // we will put all elements into the initial worklist anyway.
-  if (dependencyStack.empty())
+  if (dependencyStack.empty()) {
     return;
-  if (fromElement.getState().isAtFixpoint())
+  }
+  if (fromElement.getState().isAtFixpoint()) {
     return;
+  }
   // NOTE: this may record several of the same dependency as there is no
   // deduplication. Deduplication is more expensive than the rarer case of
   // duplication, though, so we deal with it.

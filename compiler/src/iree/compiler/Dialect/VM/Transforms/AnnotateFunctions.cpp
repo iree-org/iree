@@ -50,11 +50,13 @@ static FuncInfo analyzeFunction(IREE::VM::FuncOp funcOp,
   funcOp.walk([&](Operation *op) {
     // Collect callees.
     if (auto callOp = dyn_cast<IREE::VM::CallOp>(op)) {
-      if (auto callee = symbolTable.lookup(callOp.getCallee()))
+      if (auto callee = symbolTable.lookup(callOp.getCallee())) {
         info.callees.push_back(callee);
+      }
     } else if (auto callOp = dyn_cast<IREE::VM::CallVariadicOp>(op)) {
-      if (auto callee = symbolTable.lookup(callOp.getCallee()))
+      if (auto callee = symbolTable.lookup(callOp.getCallee())) {
         info.callees.push_back(callee);
+      }
     }
     // Check for yield ops.
     if (isa<IREE::VM::YieldOp>(op)) {
@@ -127,8 +129,9 @@ public:
       bool sccUnwind = false;
 
       for (CallGraphNode *node : scc) {
-        if (node->isExternal())
+        if (node->isExternal()) {
           continue;
+        }
         Operation *op = node->getCallableRegion()->getParentOp();
         auto it = funcInfos.find(op);
         if (it != funcInfos.end()) {
@@ -139,17 +142,20 @@ public:
 
       // Propagate from callees (already processed, outside this SCC).
       for (CallGraphNode *node : scc) {
-        if (node->isExternal())
+        if (node->isExternal()) {
           continue;
+        }
         Operation *op = node->getCallableRegion()->getParentOp();
         auto it = funcInfos.find(op);
-        if (it == funcInfos.end())
+        if (it == funcInfos.end()) {
           continue;
+        }
 
         for (Operation *calleeOp : it->second.callees) {
           auto calleeIt = funcInfos.find(calleeOp);
-          if (calleeIt == funcInfos.end())
+          if (calleeIt == funcInfos.end()) {
             continue;
+          }
 
           // Only propagate from callees outside this SCC (they have final
           // bits).
@@ -170,8 +176,9 @@ public:
 
       // Apply to all nodes in this SCC.
       for (CallGraphNode *node : scc) {
-        if (node->isExternal())
+        if (node->isExternal()) {
           continue;
+        }
         Operation *op = node->getCallableRegion()->getParentOp();
         auto it = funcInfos.find(op);
         if (it != funcInfos.end()) {
@@ -184,8 +191,9 @@ public:
     // Phase 4: Apply attributes to functions.
     for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
       auto it = funcInfos.find(funcOp);
-      if (it == funcInfos.end())
+      if (it == funcInfos.end()) {
         continue;
+      }
 
       if (it->second.needsYield && !funcOp->hasAttr("vm.yield")) {
         funcOp->setAttr("vm.yield", UnitAttr::get(funcOp.getContext()));

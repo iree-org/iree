@@ -63,19 +63,22 @@ static Type legalizeStorageElementTypeImpl(Type elementType,
                                            bool isPackedStorage) {
   // Only handle integers; floats in MLIR all have aligned widths (today).
   auto intType = dyn_cast<IntegerType>(elementType);
-  if (!intType)
+  if (!intType) {
     return elementType;
+  }
 
   // For sub-byte elements, default to pack them into bytes.
   unsigned bitWidth = intType.getWidth();
-  if (needToPackSubByteElementBitWidthImpl(bitWidth, isPackedStorage))
+  if (needToPackSubByteElementBitWidthImpl(bitWidth, isPackedStorage)) {
     return elementType;
+  }
 
   // Otherwise, extend them to the next power-of-two bit width.
   unsigned alignedBitWidth =
       IREE::Util::getRoundedElementByteWidth(intType) * 8;
-  if (alignedBitWidth == bitWidth)
+  if (alignedBitWidth == bitWidth) {
     return elementType;
+  }
   return IntegerType::get(elementType.getContext(), alignedBitWidth,
                           intType.getSignedness());
 }
@@ -115,8 +118,9 @@ Value calculateStorageElementCountInBytes(Location loc,
   }
 
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {
-    if (!shapedType.isDynamicDim(i))
+    if (!shapedType.isDynamicDim(i)) {
       staticCount *= shapedType.getDimSize(i);
+    }
   }
   // Scale by dynamic dims, if present.
   auto value =

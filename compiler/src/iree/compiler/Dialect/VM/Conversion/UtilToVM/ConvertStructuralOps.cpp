@@ -89,16 +89,18 @@ class FuncOpConversion : public OpConversionPattern<IREE::Util::FuncOp> {
   matchAndRewrite(IREE::Util::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Handled by import-specific conversion.
-    if (srcOp.isExternal())
+    if (srcOp.isExternal()) {
       return failure();
+    }
 
     // Convert function signature.
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
     auto newFuncType = convertFuncSignature(srcOp, *getTypeConverter(),
                                             signatureConversion, rewriter);
-    if (failed(newFuncType))
+    if (failed(newFuncType)) {
       return failure();
+    }
 
     // Create new function with converted argument and result types.
     // Note that attributes are dropped. Consider preserving some if needed.
@@ -165,8 +167,9 @@ class ExternalFuncOpConversion
   matchAndRewrite(IREE::Util::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Handled by internal-specific conversion.
-    if (!srcOp.isExternal())
+    if (!srcOp.isExternal()) {
       return failure();
+    }
 
     // If the user declared an intended signature then we can use that instead
     // of running conversion ourselves. This can be used in cases where the
@@ -186,8 +189,9 @@ class ExternalFuncOpConversion
           srcOp.getNumArguments());
       auto convertedSignature = convertFuncSignature(
           srcOp, *getTypeConverter(), signatureConversion, rewriter);
-      if (failed(convertedSignature))
+      if (failed(convertedSignature)) {
         return failure();
+      }
       newSignature = *convertedSignature;
     }
 
@@ -328,8 +332,9 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
     rewriter.setInsertionPointToStart(fallbackBlock);
     auto fallbackResults = convertCallOp(rootOp, loc, fallbackName, operands,
                                          resultTypes, rewriter);
-    if (failed(fallbackResults))
+    if (failed(fallbackResults)) {
       return failure();
+    }
     IREE::VM::BranchOp::create(rewriter, loc, exitBlock, *fallbackResults);
 
     return exitResults;

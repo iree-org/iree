@@ -120,11 +120,13 @@ private:
 
     // Extract segment info.
     SmallVector<int16_t> segmentSizes;
-    for (auto val : callOp.getSegmentSizes())
+    for (auto val : callOp.getSegmentSizes()) {
       segmentSizes.push_back(val.getSExtValue());
+    }
     SmallVector<Type> segmentTypes;
-    for (auto typeAttr : callOp.getSegmentTypes())
+    for (auto typeAttr : callOp.getSegmentTypes()) {
       segmentTypes.push_back(cast<TypeAttr>(typeAttr).getValue());
+    }
 
     // Create the vm.call.variadic.yieldable op and erase the original call.
     builder.setInsertionPoint(callOp);
