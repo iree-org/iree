@@ -285,8 +285,9 @@ public:
     rewriter.replaceOp(transposeOp, newGenericOp->getResult(resultIndex));
     for (auto [oldRes, newRes] :
          llvm::zip_equal(genericOp.getResults(), newGenericOp->getResults())) {
-      if (oldRes.getResultNumber() == resultIndex)
+      if (oldRes.getResultNumber() == resultIndex) {
         continue;
+      }
       rewriter.replaceAllUsesWith(oldRes, newRes);
     }
     return success();

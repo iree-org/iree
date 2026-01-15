@@ -287,8 +287,9 @@ void FuseMultiUseElementwiseProducerPass::runOnOperation() {
       funcOp->emitError("failed to fuse multi-use producers");
       return signalPassFailure();
     }
-    if (numOfFusableCandidates.value() == 0)
+    if (numOfFusableCandidates.value() == 0) {
       break;
+    }
   }
 }
 

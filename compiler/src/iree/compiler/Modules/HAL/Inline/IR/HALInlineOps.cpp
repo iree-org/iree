@@ -103,8 +103,9 @@ void BufferStorageOp::getAsmResultNames(
 
 OpFoldResult BufferStorageOp::fold(FoldAdaptor operands) {
   auto *definingOp = getBuffer().getDefiningOp();
-  if (!definingOp)
+  if (!definingOp) {
     return {};
+  }
   if (auto sourceOp = dyn_cast_if_present<IREE::HAL::Inline::BufferAllocateOp>(
           definingOp)) {
     return sourceOp.getStorage();
@@ -168,8 +169,9 @@ struct FoldBufferViewCreateSubspan
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
+    if (!needsUpdate) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);

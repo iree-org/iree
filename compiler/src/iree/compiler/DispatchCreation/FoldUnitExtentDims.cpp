@@ -390,8 +390,9 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
   }
   auto newGlobalType = globalType.clone(newShape);
   auto initialValue = global.getGlobalInitialValue();
-  if (!initialValue)
+  if (!initialValue) {
     return success();
+  }
   // TODO: Handle other cases
   auto newInitialValue =
       llvm::TypeSwitch<Attribute, Attribute>(initialValue)

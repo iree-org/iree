@@ -22,10 +22,12 @@ namespace mlir::iree_compiler::embed {
 namespace {
 /// Return a processable CallSiteLoc from the given location.
 std::optional<CallSiteLoc> getCallSiteLoc(Location loc) {
-  if (auto callLoc = dyn_cast<CallSiteLoc>(loc))
+  if (auto callLoc = dyn_cast<CallSiteLoc>(loc)) {
     return callLoc;
-  if (auto nameLoc = dyn_cast<NameLoc>(loc))
+  }
+  if (auto nameLoc = dyn_cast<NameLoc>(loc)) {
     return getCallSiteLoc(cast<NameLoc>(loc).getChildLoc());
+  }
   if (auto fusedLoc = dyn_cast<FusedLoc>(loc)) {
     for (auto subLoc : cast<FusedLoc>(loc).getLocations()) {
       if (auto callLoc = getCallSiteLoc(subLoc)) {
@@ -49,9 +51,11 @@ std::optional<Location> findLocToShow(Location loc) {
       .Case([&](FusedLoc fusedLoc) -> std::optional<Location> {
         // Fused location is unique in that we try to find a sub-location to
         // show, rather than the top-level location itself.
-        for (Location childLoc : fusedLoc.getLocations())
-          if (std::optional<Location> showableLoc = findLocToShow(childLoc))
+        for (Location childLoc : fusedLoc.getLocations()) {
+          if (std::optional<Location> showableLoc = findLocToShow(childLoc)) {
             return showableLoc;
+          }
+        }
         return std::nullopt;
       })
       .Case([&](NameLoc nameLoc) -> std::optional<Location> {
@@ -105,8 +109,9 @@ LogicalResult FormattingDiagnosticHandler::emit(Diagnostic &diag) {
   // Assemble location fragments.
   SmallVector<std::pair<Location, StringRef>> locationStack;
   auto addLocToStack = [&](Location loc, StringRef locContext) {
-    if (std::optional<Location> showableLoc = findLocToShow(loc))
+    if (std::optional<Location> showableLoc = findLocToShow(loc)) {
       locationStack.emplace_back(*showableLoc, locContext);
+    }
   };
 
   // Add locations to display for this diagnostic.
@@ -121,10 +126,11 @@ LogicalResult FormattingDiagnosticHandler::emit(Diagnostic &diag) {
     const unsigned callStackLimit = 50;
     for (unsigned curDepth = 0; curDepth < callStackLimit; ++curDepth) {
       addLocToStack(loc, "called from");
-      if ((callLoc = getCallSiteLoc(loc)))
+      if ((callLoc = getCallSiteLoc(loc))) {
         loc = callLoc->getCaller();
-      else
+      } else {
         break;
+      }
     }
   }
 
@@ -134,8 +140,9 @@ LogicalResult FormattingDiagnosticHandler::emit(Diagnostic &diag) {
     appendDiag(diag.getLocation(), diag.str(), diag.getSeverity());
   } else {
     appendDiag(locationStack.front().first, diag.str(), diag.getSeverity());
-    for (auto &it : llvm::drop_begin(locationStack))
+    for (auto &it : llvm::drop_begin(locationStack)) {
       appendDiag(it.first, it.second, DiagnosticSeverity::Note);
+    }
   }
 
   // Append each of the notes.

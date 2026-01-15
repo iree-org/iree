@@ -22,8 +22,9 @@ namespace {
 
 LogicalResult handleRuntimeError(Location loc, iree_status_t status,
                                  bool freeStatus = true) {
-  if (iree_status_is_ok(status))
+  if (iree_status_is_ok(status)) {
     return success();
+  }
   std::string statusString = iree::Status::ToString(status);
   if (freeStatus) {
     iree_status_ignore(status);
@@ -213,8 +214,9 @@ FunctionCall::importSerializableAttr(
 LogicalResult FunctionCall::addBufferArgumentAttr(
     Location loc, IREE::Util::SerializableAttrInterface serializableAttr) {
   auto buffer = importSerializableAttr(loc, serializableAttr);
-  if (failed(buffer))
+  if (failed(buffer)) {
     return failure();
+  }
   return handleRuntimeError(
       loc, iree_vm_list_push_ref_move(inputs.get(), std::move(*buffer)));
 }
@@ -230,14 +232,16 @@ LogicalResult FunctionCall::addBufferViewArgumentAttr(
     shape[i] = shapedType.getDimSize(i);
   }
   iree_hal_element_type_t elementType = IREE_HAL_ELEMENT_TYPE_NONE;
-  if (failed(
-          convertToElementType(loc, shapedType.getElementType(), &elementType)))
+  if (failed(convertToElementType(loc, shapedType.getElementType(),
+                                  &elementType))) {
     return failure();
+  }
 
   // Import buffer contents.
   auto buffer = importSerializableAttr(loc, serializableAttr);
-  if (failed(buffer))
+  if (failed(buffer)) {
     return failure();
+  }
 
   // Construct buffer view.
   iree::vm::ref<iree_hal_buffer_view_t> bufferView;
@@ -245,8 +249,9 @@ LogicalResult FunctionCall::addBufferViewArgumentAttr(
           loc,
           iree_hal_buffer_view_create(buffer->get(), rank, shape, elementType,
                                       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-                                      iree_allocator_system(), &bufferView))))
+                                      iree_allocator_system(), &bufferView)))) {
     return failure();
+  }
 
   return handleRuntimeError(
       loc, iree_vm_list_push_ref_move(inputs.get(), std::move(bufferView)));
@@ -351,12 +356,14 @@ LogicalResult FunctionCall::getResultAsAttr(Location loc, size_t index,
                                             Type mlirType, TypedAttr &outAttr) {
   iree_vm_variant_t variant = iree_vm_variant_empty();
   if (failed(handleRuntimeError(loc, iree_vm_list_get_variant_assign(
-                                         outputs.get(), index, &variant))))
+                                         outputs.get(), index, &variant)))) {
     return failure();
+  }
 
   outAttr = binary.convertVariantToAttribute(loc, variant, mlirType);
-  if (!outAttr)
+  if (!outAttr) {
     return failure();
+  }
 
   return success();
 }
@@ -400,8 +407,9 @@ TypedAttr CompiledBinary::convertVariantToAttribute(Location loc,
       iree_hal_element_type_t halElementType =
           iree_hal_buffer_view_element_type(bufferView);
       Type elementType = mapElementType(loc, halElementType);
-      if (!elementType)
+      if (!elementType) {
         return {};
+      }
 
       auto tensorType = RankedTensorType::get(shape, elementType);
 

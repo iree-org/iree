@@ -335,8 +335,9 @@ private:
     auto shapeType = dynamicDims.tensorType;
     unsigned dynamicDimIdx = 0;
     for (unsigned i = 0; i < shapeType.getRank(); ++i) {
-      if (!shapeType.isDynamicDim(i))
+      if (!shapeType.isDynamicDim(i)) {
         continue;
+      }
       auto dimValue = IREE::Util::ListGetOp::create(
                           builder, loc, builder.getIndexType(), listValue,
                           builder.createOrFold<arith::ConstantIndexOp>(loc, i))
@@ -492,8 +493,9 @@ private:
     wrapperFuncOp.setAllResultAttrs(resultAttrDict);
 
     populateReflectionAttrs(entryFuncOp, wrapperFuncOp);
-    if (auto affinityAttr = entryFuncOp->getAttr("stream.affinity"))
+    if (auto affinityAttr = entryFuncOp->getAttr("stream.affinity")) {
       wrapperFuncOp->setAttr("stream.affinity", affinityAttr);
+    }
 
     // Call the entryFuncOp and return the results.
     // If we wanted to perform additional work here to invalidate cached shapes
