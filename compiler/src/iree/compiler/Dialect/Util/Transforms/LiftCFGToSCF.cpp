@@ -207,7 +207,7 @@ struct LiftCFGToSCFPass final : impl::LiftCFGToSCFPassBase<LiftCFGToSCFPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
 
-    // Process all callable ops (util.func, util.intializer, etc).
+    // Process all callable ops (util.func, util.initializer, etc).
     // Note that we only walk the top-level ops so that we don't go into
     // executables.
     //
