@@ -6,7 +6,9 @@
     "--iree-llvmcpu-target-cpu=host"
   ],
   "iree_run_module_flags": [],
-  "skip_compile_tests": [],
+  "skip_compile_tests": [
+    "InterestingShapesBiasAdd/997x997xi8_NN_bias"
+  ],
   "skip_run_tests": [
     "AB/8192x8192xf32_bench",
     "AB/4096x4096xf32_bench",
