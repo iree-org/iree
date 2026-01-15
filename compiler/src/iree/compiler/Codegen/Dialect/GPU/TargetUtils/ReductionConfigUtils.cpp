@@ -128,13 +128,15 @@ static LogicalResult checkSingleCombiner(linalg::LinalgOp op) {
     SmallVector<Operation *> combinerOps;
     if (matchReduction(op.getRegionOutputArgs(), index, combinerOps) &&
         combinerOps.size() == 1) {
-      if (foundSingleReductionOutput)
+      if (foundSingleReductionOutput) {
         return failure();
+      }
       foundSingleReductionOutput = true;
       continue;
     }
-    if (!op.getMatchingIndexingMap(&initOpOperand).isIdentity())
+    if (!op.getMatchingIndexingMap(&initOpOperand).isIdentity()) {
       return failure();
+    }
   }
   if (!foundSingleReductionOutput) {
     return failure();
@@ -666,8 +668,9 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  if (subgroupSize == 0)
+  if (subgroupSize == 0) {
     return failure();
+  }
 
   FailureOr<int64_t> bitWidth = getBitWidth(op);
   if (failed(bitWidth)) {

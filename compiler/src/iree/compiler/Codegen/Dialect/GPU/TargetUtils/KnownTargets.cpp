@@ -110,8 +110,9 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 
   SmallVector<MMAAttr, 8> mmaAttrs;
   mmaAttrs.reserve(wgp->mmaCount);
-  for (int i = 0; i < wgp->mmaCount; ++i)
+  for (int i = 0; i < wgp->mmaCount; ++i) {
     mmaAttrs.push_back(MMAAttr::get(context, wgp->mmaOps[i]));
+  }
 
   SmallVector<ScaledMMAAttr, 8> scaledMmaAttrs;
   scaledMmaAttrs.reserve(wgp->scaledMmaCount);
@@ -814,10 +815,12 @@ std::optional<TargetDetails> getARMGPUTargetDetails(StringRef target) {
 }
 
 StringRef normalizeARMGPUTarget(StringRef target) {
-  if (target == "valhall")
+  if (target == "valhall") {
     return "valhall1";
-  if (target.starts_with("valhall"))
+  }
+  if (target.starts_with("valhall")) {
     return target;
+  }
 
   return llvm::StringSwitch<StringRef>(target.lower())
       .Cases({"mali-g715", "mali-g615"}, "valhall4")
@@ -954,15 +957,19 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
 }
 
 StringRef normalizeNVIDIAGPUTarget(StringRef target) {
-  if (target.starts_with("sm_"))
+  if (target.starts_with("sm_")) {
     return target;
+  }
 
-  if (target.starts_with("rtx40"))
+  if (target.starts_with("rtx40")) {
     return "sm_89";
-  if (target.starts_with("rtx30"))
+  }
+  if (target.starts_with("rtx30")) {
     return "sm_86";
-  if (target.starts_with("rtx20"))
+  }
+  if (target.starts_with("rtx20")) {
     return "sm_75";
+  }
 
   return llvm::StringSwitch<StringRef>(target.lower())
       .Case("a100", "sm_80")
@@ -1002,22 +1009,26 @@ const WgpDetails *getAdrenoWgpDetails() {
 }
 
 bool verifyQualcommGPUTarget(StringRef target) {
-  if (target == "adreno")
+  if (target == "adreno") {
     return true;
+  }
 
   StringRef t = target;
-  if (!t.consume_front("adreno-"))
+  if (!t.consume_front("adreno-")) {
     return false;
+  }
 
   // The can exist an optional L at the end.
-  if (t.ends_with("l"))
+  if (t.ends_with("l")) {
     t = t.drop_back();
+  }
 
   // Check whether we have a product number
   unsigned number = 0;
   // StringRef::consumeInteger() returns true to signify errors.
-  if (t.size() != 3 || t.consumeInteger(10, number))
+  if (t.size() != 3 || t.consumeInteger(10, number)) {
     return false;
+  }
 
   return true;
 }
@@ -1036,8 +1047,9 @@ std::optional<TargetDetails> getQualcommGPUTargetDetails(StringRef target) {
   // Adreno-750: https://vulkan.gpuinfo.org/displayreport.php?id=27414
   // Adreno-740: https://vulkan.gpuinfo.org/displayreport.php?id=19218
   // Adreno-730: https://vulkan.gpuinfo.org/displayreport.php?id=19382
-  if (verifyQualcommGPUTarget(target))
+  if (verifyQualcommGPUTarget(target)) {
     return TargetDetails{adrenoWgp, nullptr};
+  }
 
   return std::nullopt;
 }
@@ -1103,9 +1115,11 @@ TargetAttr getMetalTargetDetails(MLIRContext *context) {
 
 TargetAttr getCUDATargetDetails(StringRef target, StringRef features,
                                 MLIRContext *context) {
-  if (std::optional<TargetDetails> details = getNVIDIAGPUTargetDetails(target))
+  if (std::optional<TargetDetails> details =
+          getNVIDIAGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
                             features, context);
+  }
   return nullptr;
 }
 
@@ -1147,8 +1161,9 @@ StringRef normalizeHIPTarget(StringRef target) {
 StringRef normalizeVulkanAMDGPUTarget(StringRef target) {
   // We cannot accept rdnaN as a target for LLVM AMDGPU backend; so the
   // following is only meant for Vulkan but not HIP.
-  if (target.starts_with("rdna"))
+  if (target.starts_with("rdna")) {
     return target;
+  }
   return normalizeAMDGPUTarget(target);
 }
 

@@ -94,8 +94,9 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
 
   bool needsBarrier = hasSharedMemoryAddressSpace(fromType) ||
                       hasSharedMemoryAddressSpace(toType);
-  if (needsBarrier)
+  if (needsBarrier) {
     gpu::BarrierOp::create(builder, loc);
+  }
   Operation *copy = memref::CopyOp::create(builder, loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());

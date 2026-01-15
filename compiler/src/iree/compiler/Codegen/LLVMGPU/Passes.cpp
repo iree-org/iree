@@ -171,8 +171,9 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   if (hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
-  if (needsBarrier)
+  if (needsBarrier) {
     gpu::BarrierOp::create(builder, loc);
+  }
   Operation *copy = memref::CopyOp::create(builder, loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
@@ -188,14 +189,16 @@ static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
   if (!target) {
     return failure();
   }
-  if (target.getBackend() != "rocm")
+  if (target.getBackend() != "rocm") {
     return success();
+  }
 
   // Workgroup reordering on ROCm currently requires all workgrup counts to be
   // static.
   SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
-  if (llvm::any_of(workgroupCounts, ShapedType::isDynamic))
+  if (llvm::any_of(workgroupCounts, ShapedType::isDynamic)) {
     return failure();
+  }
 
   // This is further restricted to 2D+ grids as we reorder along the X and Y
   // workgroup IDs.
@@ -690,8 +693,9 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
   if (hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
-  if (needsBarrier)
+  if (needsBarrier) {
     gpu::BarrierOp::create(builder, loc);
+  }
   VectorType vectorType =
       VectorType::get(fromType.getShape(), fromType.getElementType());
   Value c0 = arith::ConstantIndexOp::create(builder, loc, 0);

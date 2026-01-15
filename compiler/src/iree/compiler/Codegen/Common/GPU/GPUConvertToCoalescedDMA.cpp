@@ -108,8 +108,9 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   // Find minimum elements per transfer across all DMA sizes.
   int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
   for (int64_t dmaSize : dmaSizes) {
-    if (dmaSize % elementBits != 0)
+    if (dmaSize % elementBits != 0) {
       continue;
+    }
     int64_t elementsPerLane = dmaSize / elementBits;
     int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
     minElementsPerTransfer =
@@ -424,8 +425,9 @@ struct ConvertGatherToCoalescedDMA
 
     int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
     for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0)
+      if (dmaSize % elementBits != 0) {
         continue;
+      }
       int64_t elementsPerLane = dmaSize / elementBits;
       int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
       minElementsPerTransfer =
@@ -611,20 +613,23 @@ private:
                                                       OpTy op) {
     MLIRContext *context = &getContext();
     auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
-    if (!dmaConfig)
+    if (!dmaConfig) {
       return failure();
+    }
 
     // Get the function containing this operation.
     auto funcOp = op->template getParentOfType<FunctionOpInterface>();
-    if (!funcOp)
+    if (!funcOp) {
       return failure();
+    }
 
     // Get workgroup size and subgroup size from translation_info.
     std::optional<SmallVector<int64_t>> workgroupSize =
         getWorkgroupSize(funcOp);
     std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!workgroupSize || !subgroupSize)
+    if (!workgroupSize || !subgroupSize) {
       return failure();
+    }
 
     // Calculate number of subgroups per dimension.
     // workgroupSize is [X, Y, Z], and we divide by subgroupSize to get warps.
@@ -670,8 +675,9 @@ private:
     // We need innermostDim >= subgroupSize * minElementsPerLane.
     int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
     for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0)
+      if (dmaSize % elementBits != 0) {
         continue;
+      }
       int64_t elementsPerLane = dmaSize / elementBits;
       int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
       minElementsPerTransfer =
@@ -688,8 +694,9 @@ private:
     auto [tileSizes, numTiledDims] =
         computeSubgroupTileSizes(rewriter, shape, numWarps);
 
-    if (numTiledDims == 0)
+    if (numTiledDims == 0) {
       return failure();
+    }
 
     scf::SCFTilingOptions tilingOptions;
     tilingOptions.setTileSizes(tileSizes);
@@ -735,8 +742,9 @@ private:
               })
               .Default([](Operation *) { return failure(); });
 
-      if (failed(tilingResult))
+      if (failed(tilingResult)) {
         continue;
+      }
 
       // Replace the original op with the tiled version.
       rewriter.replaceOp(op, tilingResult->replacements);

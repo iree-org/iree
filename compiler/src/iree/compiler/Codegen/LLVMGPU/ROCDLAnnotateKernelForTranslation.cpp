@@ -102,16 +102,19 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
   // attribute.
   FailureOr<amdgpu::Chipset> chipset =
       getChipsetVersion(builder.getContext(), targetAttr);
-  if (failed(chipset))
+  if (failed(chipset)) {
     return variantOp.emitError() << "failed to parse amdgpu chipset";
+  }
 
-  if (chipset->majorVersion != 9 || *chipset < amdgpu::Chipset(9, 4, 0))
+  if (chipset->majorVersion != 9 || *chipset < amdgpu::Chipset(9, 4, 0)) {
     return success();
+  }
 
   auto inRegAttrName =
       builder.getStringAttr(LLVM::LLVMDialect::getInRegAttrName());
-  for (unsigned i = 0, e = funcOp.getNumArguments(); i < e; ++i)
+  for (unsigned i = 0, e = funcOp.getNumArguments(); i < e; ++i) {
     funcOp.setArgAttr(i, inRegAttrName, unitAttr);
+  }
 
   return success();
 }
@@ -142,8 +145,9 @@ struct ROCDLAnnotateKernelForTranslationPass final
 
     // Un-exported functions are library functions or otherwise not kernels, so
     // don't need these annotations.
-    if (!exportOp)
+    if (!exportOp) {
       return;
+    }
 
     if (failed(annotateKernelForTranslation(funcOp, variantOp, exportOp))) {
       return signalPassFailure();

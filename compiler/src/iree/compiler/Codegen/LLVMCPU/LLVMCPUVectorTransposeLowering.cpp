@@ -24,8 +24,9 @@ static bool has16x16Transpose(mlir::FunctionOpInterface funcOp) {
   bool res = false;
   funcOp.walk([&](vector::TransposeOp op) {
     auto srcGtOneDims = isTranspose2DSlice(op);
-    if (failed(srcGtOneDims))
+    if (failed(srcGtOneDims)) {
       return WalkResult::advance();
+    }
     VectorType srcType = op.getSourceVectorType();
     int64_t m = srcType.getDimSize(std::get<0>(srcGtOneDims.value()));
     int64_t n = srcType.getDimSize(std::get<1>(srcGtOneDims.value()));

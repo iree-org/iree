@@ -42,8 +42,9 @@ LogicalResult ExtractStridedMetadataOp::inferReturnTypes(
     ExtractStridedMetadataOp::Adaptor adaptor,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   auto sourceType = dyn_cast<MemRefType>(adaptor.getSource().getType());
-  if (!sourceType)
+  if (!sourceType) {
     return failure();
+  }
 
   unsigned sourceRank = sourceType.getRank();
   IndexType indexType = IndexType::get(context);
@@ -55,8 +56,9 @@ LogicalResult ExtractStridedMetadataOp::inferReturnTypes(
   // Offset.
   inferredReturnTypes.push_back(indexType);
   // Sizes and strides.
-  for (unsigned i = 0; i < sourceRank * 2; ++i)
+  for (unsigned i = 0; i < sourceRank * 2; ++i) {
     inferredReturnTypes.push_back(indexType);
+  }
   return success();
 }
 
@@ -282,8 +284,9 @@ LogicalResult InnerTiledOp::verify() {
   SmallVector<AffineMap, 4> indexingMaps = getIndexingMapsArray();
 
   // Verify that an indexing map was specified for each operand.
-  if (indexingMaps.size() != expectedNumIns + expectedNumOuts)
+  if (indexingMaps.size() != expectedNumIns + expectedNumOuts) {
     return emitOpError("expected an indexing map for each operand");
+  }
 
   // Verify that each index map has 'numIterators' inputs, no symbols, and
   // that the number of map outputs equals the rank of its associated
@@ -292,9 +295,10 @@ LogicalResult InnerTiledOp::verify() {
   for (const auto &it : llvm::enumerate(indexingMaps)) {
     auto index = it.index();
     auto map = it.value();
-    if (map.getNumSymbols() != 0)
+    if (map.getNumSymbols() != 0) {
       return emitOpError("expected indexing map ")
              << index << " to have no symbols";
+    }
     auto shapedType = opTypes[index];
     unsigned rank = shapedType.getRank();
     // Verify that the map has the right number of inputs, outputs, and indices.
@@ -370,9 +374,11 @@ LogicalResult InnerTiledOp::verify() {
 }
 
 static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {
-  for (int64_t i = 0, e = map.getNumResults(); i < e; ++i)
-    if (targetExpr == map.getResult(i))
+  for (int64_t i = 0, e = map.getNumResults(); i < e; ++i) {
+    if (targetExpr == map.getResult(i)) {
       return i;
+    }
+  }
   return -1;
 }
 

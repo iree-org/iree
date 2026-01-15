@@ -127,15 +127,18 @@ public:
 void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
   mlir::FunctionOpInterface funcOp = getOperation();
-  if (!isEntryPoint(funcOp))
+  if (!isEntryPoint(funcOp)) {
     return;
+  }
 
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
-  if (failed(threadTileComputeFn))
+  if (failed(threadTileComputeFn)) {
     return signalPassFailure();
+  }
   auto reductionTileComputeFn = getSPIRVScfTileSizeComputeFn(funcOp, 2);
-  if (failed(reductionTileComputeFn))
+  if (failed(reductionTileComputeFn)) {
     return signalPassFailure();
+  }
 
   { // Tile and distribute to invocations.
     if (failed(tileToInvocation(funcOp, *threadTileComputeFn))) {

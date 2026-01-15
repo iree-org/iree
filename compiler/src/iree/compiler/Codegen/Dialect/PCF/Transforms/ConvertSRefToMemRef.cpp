@@ -1115,8 +1115,10 @@ struct ConvertWhileOp final : OpConversionPattern<scf::WhileOp> {
     auto newOp =
         scf::WhileOp::create(rewriter, op.getLoc(), resultTypes, inits);
     for (auto i : {0u, 1u}) {
-      if (failed(rewriter.convertRegionTypes(&op.getRegion(i), *typeConverter)))
+      if (failed(
+              rewriter.convertRegionTypes(&op.getRegion(i), *typeConverter))) {
         return failure();
+      }
       auto &dstRegion = newOp.getRegion(i);
       rewriter.inlineRegionBefore(op.getRegion(i), dstRegion, dstRegion.end());
     }
@@ -1159,17 +1161,20 @@ void ConvertSRefToMemRefPass::runOnOperation() {
   // only implements context specific conversions.
   auto isLegallyTypedOp = [&](Operation *op) -> bool {
     for (Type type : op->getResultTypes()) {
-      if (isIllegalType(type))
+      if (isIllegalType(type)) {
         return false;
+      }
     }
     for (Type type : op->getOperandTypes()) {
-      if (isIllegalType(type))
+      if (isIllegalType(type)) {
         return false;
+      }
     }
     for (Region &region : op->getRegions()) {
       for (Type type : region.getArgumentTypes()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
     }
     if (auto funcInterface = dyn_cast<FunctionOpInterface>(op)) {

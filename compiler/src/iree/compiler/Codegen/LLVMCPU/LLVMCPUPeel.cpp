@@ -30,8 +30,9 @@ namespace {
 // stages.
 void collectLoopsToPeel(Operation *op,
                         llvm::SmallSetVector<scf::ForOp, 8> &loopsToPeel) {
-  if (!iree_compiler::getLoweringConfig(op))
+  if (!iree_compiler::getLoweringConfig(op)) {
     return;
+  }
 
   int maxNumLoopsToPeel = TypeSwitch<Operation *, int>(op)
                               .Case<linalg::LinalgOp>([](auto linalgOp) {
@@ -44,8 +45,9 @@ void collectLoopsToPeel(Operation *op,
   for (int i = 0; i < maxNumLoopsToPeel; ++i) {
     op = op->getParentOfType<scf::ForOp>();
     auto loop = cast_or_null<scf::ForOp>(op);
-    if (!loop || iree_compiler::isTiledAndDistributedLoop(loop))
+    if (!loop || iree_compiler::isTiledAndDistributedLoop(loop)) {
       break;
+    }
 
     LDBG() << "Loop to peel\n  " << *op;
     loopsToPeel.insert(loop);
