@@ -142,30 +142,37 @@ public:
       return success();
     };
     int unpackedBitWidth;
-    if (failed(getConstantIntegerFromDefiningOp(bitWidth, unpackedBitWidth)))
+    if (failed(getConstantIntegerFromDefiningOp(bitWidth, unpackedBitWidth))) {
       return failure();
+    }
 
     auto rhsType = dyn_cast<torch::Torch::ValueTensorType>(rhs.getType());
-    if (!rhsType)
+    if (!rhsType) {
       return failure();
+    }
 
-    if (!rhsType.hasDtype())
+    if (!rhsType.hasDtype()) {
       return failure();
+    }
 
     Type dType = rhsType.getDtype();
     int dTypeWidth = dType.getIntOrFloatBitWidth();
     // If the dtype width already matches the target width, nothing to do.
-    if (dTypeWidth == unpackedBitWidth)
+    if (dTypeWidth == unpackedBitWidth) {
       return failure();
+    }
 
-    if (!rhsType.hasSizes())
+    if (!rhsType.hasSizes()) {
       return failure();
+    }
 
     SmallVector<int64_t> tensorShape(rhsType.getSizes());
     // Constants should have constant shape.
-    if (llvm::any_of(tensorShape,
-                     [](int64_t s) { return s == torch::Torch::kUnknownSize; }))
+    if (llvm::any_of(tensorShape, [](int64_t s) {
+          return s == torch::Torch::kUnknownSize;
+        })) {
       return failure();
+    }
     int packRatio = dTypeWidth / unpackedBitWidth;
 
     tensorShape[tensorShape.size() - 1] *= packRatio;
@@ -185,10 +192,11 @@ public:
 
     // Cast back to the (un)signed torch tensor type to inform later lowerings.
     Type unpackedElementType;
-    if (dType.isSignedInteger())
+    if (dType.isSignedInteger()) {
       unpackedElementType = rewriter.getIntegerType(unpackedBitWidth, true);
-    else
+    } else {
       unpackedElementType = rewriter.getIntegerType(unpackedBitWidth, false);
+    }
     torch::Torch::ValueTensorType newRhsType =
         torch::Torch::ValueTensorType::get(rewriter.getContext(), tensorShape,
                                            unpackedElementType);
@@ -215,8 +223,9 @@ class BitCastTensorPass final
     patterns.add<BitCastMatmul, BitCastViewDtype>(context);
     patterns.add<BitCastViewComplex<torch::Torch::AtenViewAsComplexOp>,
                  BitCastViewComplex<torch::Torch::AtenViewAsRealOp>>(context);
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();
+    }
   }
 };
 } // namespace

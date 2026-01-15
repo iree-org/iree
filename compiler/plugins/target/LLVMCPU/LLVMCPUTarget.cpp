@@ -272,8 +272,9 @@ public:
     // multi-threading issues.
     llvm::LLVMContext context;
     auto maybeTarget = getVariantTarget(variantOp);
-    if (!maybeTarget)
+    if (!maybeTarget) {
       return failure();
+    }
     const LLVMTarget &target = *maybeTarget;
     LLVM_DEBUG(dbgs() << "LLVM-CPU SerializeExecutable:\n"
                       << "-----------------------------\n";
@@ -384,8 +385,9 @@ public:
     for (auto exportOp : variantOp.getBlock().getOps<ExecutableExportOp>()) {
       // Find the matching function in the LLVM module.
       auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
-      if (!llvmFunc)
+      if (!llvmFunc) {
         continue;
+      }
       llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
       llvmFunc->setDSOLocal(true);
 
@@ -595,8 +597,9 @@ public:
     // Strip any compiler identifiers that may have snuck in. We let the linker
     // tag the module.
     auto *llvmIdent = llvmModule->getNamedMetadata("llvm.ident");
-    if (llvmIdent)
+    if (llvmIdent) {
       llvmIdent->clearOperands();
+    }
 
     // Dump all linked bitcode prior to optimization.
     if (!options.dumpIntermediatesPath.empty()) {

@@ -23,14 +23,16 @@ public:
   std::string getSystemToolPath() const override {
     // First check for setting the linker explicitly.
     auto toolPath = LinkerTool::getSystemToolPath();
-    if (!toolPath.empty())
+    if (!toolPath.empty()) {
       return toolPath;
+    }
 
     // No explicit linker specified, search the executable directory (i.e. our
     // own build or install directories) for common tools.
     toolPath = findToolFromExecutableDir({"lld-link"});
-    if (!toolPath.empty())
+    if (!toolPath.empty()) {
       return toolPath;
+    }
 
     llvm::errs() << "No Windows linker tool specified or discovered\n";
     return "";
@@ -273,8 +275,9 @@ public:
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine)))
+    if (failed(runLinkCommand(commandLine))) {
       return std::nullopt;
+    }
 
     // PDB file gets generated wtih the same path + .pdb.
     artifacts.debugFile =
