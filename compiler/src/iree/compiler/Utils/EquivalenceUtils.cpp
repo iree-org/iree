@@ -30,7 +30,7 @@ void mapVscaleOpToConstant(Operation &op, OpBuilder &builder, IRMapping &bvm,
   if (isa<vector::VectorScaleOp>(op)) {
     vscaleOps.push_back(&op);
     auto newCstVscaleOp =
-        builder.create<arith::ConstantIndexOp>(op.getLoc(), clVscaleValue);
+        arith::ConstantIndexOp::create(builder, op.getLoc(), clVscaleValue);
     bvm.map(op.getResult(0), newCstVscaleOp->getResult(0));
   }
 }
