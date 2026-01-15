@@ -67,26 +67,31 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
                                 PatternRewriter &rewriter) const override {
     auto extractOp =
         extOp.getIn().getDefiningOp<vector::ExtractStridedSliceOp>();
-    if (!extractOp)
+    if (!extractOp) {
       return failure();
+    }
 
     auto bitCastOp = extractOp.getSource().getDefiningOp<vector::BitCastOp>();
-    if (!bitCastOp)
+    if (!bitCastOp) {
       return failure();
+    }
 
     VectorType extractSrcType = extractOp.getSourceVectorType();
     VectorType extractDstType = extractOp.getType();
     // We expect high-D vectors are broken down into 1-D ones so here we only
     // handle 1-D vectors.
-    if (extractSrcType.getRank() != 1 || extractDstType.getRank() != 1)
+    if (extractSrcType.getRank() != 1 || extractDstType.getRank() != 1) {
       return failure();
+    }
     // We only have power-of-two bitwidth cases for now.
     if (!llvm::isPowerOf2_64(extractSrcType.getNumElements()) ||
-        !llvm::isPowerOf2_64(extractDstType.getNumElements()))
+        !llvm::isPowerOf2_64(extractDstType.getNumElements())) {
       return failure();
+    }
     // We only handle not directly supported vector sizes.
-    if (extractSrcType.getNumElements() <= 4)
+    if (extractSrcType.getNumElements() <= 4) {
       return failure();
+    }
 
     int64_t srcElemBitwidth =
         bitCastOp.getSourceVectorType().getElementTypeBitWidth();

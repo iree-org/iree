@@ -36,12 +36,14 @@ class EraseStorageBufferStaticShapePass final
 bool is1DStaticShapedStorageBuffer(
     IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
   auto type = dyn_cast<MemRefType>(subspanOp.getType());
-  if (!type)
+  if (!type) {
     return false;
+  }
   auto attr =
       dyn_cast_if_present<IREE::HAL::DescriptorTypeAttr>(type.getMemorySpace());
-  if (!attr)
+  if (!attr) {
     return false;
+  }
   return type.hasStaticShape() && type.getRank() == 1 &&
          attr.getValue() == IREE::HAL::DescriptorType::StorageBuffer;
 }

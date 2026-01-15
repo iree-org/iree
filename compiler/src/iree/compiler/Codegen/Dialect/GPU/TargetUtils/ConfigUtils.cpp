@@ -348,10 +348,12 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     for (IREE::GPU::ScaledMMAAttr smma : target.getWgp().getScaledMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
-      if (!smma.getDistributionMappingKind())
+      if (!smma.getDistributionMappingKind()) {
         continue;
-      if (smma.getSubgroupSize() != targetSubgroupSize)
+      }
+      if (smma.getSubgroupSize() != targetSubgroupSize) {
         continue;
+      }
 
       auto [m, n, k, kB] = smma.getScaledMNKShape();
       SmallVector<Type> elementTypes;
@@ -365,10 +367,12 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
-      if (!mma.getDistributionMappingKind())
+      if (!mma.getDistributionMappingKind()) {
         continue;
-      if (mma.getSubgroupSize() != targetSubgroupSize)
+      }
+      if (mma.getSubgroupSize() != targetSubgroupSize) {
         continue;
+      }
 
       auto [mSize, nSize, kSize] = mma.getMNKShape();
       auto [aType, bType, cType] = mma.getABCElementTypes();
@@ -1554,8 +1558,9 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     int64_t lossFactor = 32;
 
     for (; lossFactor >= 1; lossFactor >>= 1) {
-      if (distributeToThreads(numThreads, lossFactor) == 1)
+      if (distributeToThreads(numThreads, lossFactor) == 1) {
         break;
+      }
     }
   }
 
@@ -1733,8 +1738,9 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  if (target.getWgp().getMma().empty())
+  if (target.getWgp().getMma().empty()) {
     return failure();
+  }
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
