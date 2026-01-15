@@ -19,6 +19,7 @@ ALL_SRCS = enforce_glob(
         "attention.mlir",
         "attention_i1_mask_encoding.mlir",
         "gather.mlir",
+        "map_gather.mlir",
         "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
@@ -69,6 +70,7 @@ VMVX_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "gather.mlir",
+        "map_gather.mlir",
         "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
@@ -109,6 +111,7 @@ LLVM_GPU_SRCS = enforce_glob(
         "attention.mlir",
         "attention_i1_mask.mlir",
         "attention_i1_mask_encoding.mlir",
+        "map_gather.mlir",
         "map_scatter.mlir",
     ],
 )
@@ -134,6 +137,7 @@ ROCM_HIP_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "gather.mlir",
+        "map_gather.mlir",
         "map_scatter.mlir",
         "scan.mlir",
         "scatter.mlir",
@@ -175,6 +179,7 @@ iree_check_single_backend_test_suite(
             "attention.mlir",
             "attention_i1_mask.mlir",
             "attention_i1_mask_encoding.mlir",
+            "map_gather.mlir",
             "map_scatter.mlir",
             "top-k.mlir",
         ],
@@ -201,6 +206,7 @@ iree_check_single_backend_test_suite(
             "attention.mlir",
             "attention_i1_mask.mlir",
             "attention_i1_mask_encoding.mlir",
+            "map_gather.mlir",
             "map_scatter.mlir",
             "top-k.mlir",
         ],
