@@ -13,6 +13,7 @@ package(
 )
 
 ALL_SRCS = enforce_glob(
+    # keep sorted
     [
         "abs.mlir",
         "add.mlir",

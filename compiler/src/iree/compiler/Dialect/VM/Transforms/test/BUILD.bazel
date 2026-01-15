@@ -15,6 +15,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "annotate_functions.mlir",
             "convert_to_yieldable_calls.mlir",

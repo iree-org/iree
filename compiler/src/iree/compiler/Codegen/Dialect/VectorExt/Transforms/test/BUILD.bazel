@@ -17,6 +17,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "vector_ext_fold_unit_extent_dims.mlir",
             "vectorize_vector_ext_ops.mlir",

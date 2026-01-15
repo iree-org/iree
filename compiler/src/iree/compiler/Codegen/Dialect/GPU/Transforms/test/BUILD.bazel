@@ -17,6 +17,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "combine_barrier_regions.mlir",
             "distribute_inner_tiled_to_lanes.mlir",
