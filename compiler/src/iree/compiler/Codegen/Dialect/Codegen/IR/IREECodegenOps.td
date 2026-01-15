@@ -173,9 +173,9 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     is otherwise perfectly legal.
   }];
 
-  let arguments = (ins RankedTensorOrMemRefOf<[AnyType], [1]>:$operand,
+  let arguments = (ins AnyRankedTensorOrMemRef:$operand,
                        IREECodegen_AnySwizzleAttr:$swizzle);
-  let results = (outs RankedTensorOrMemRefOf<[AnyType], [1]>:$result);
+  let results = (outs AnyRankedTensorOrMemRef:$result);
 
   let assemblyFormat = [{
     $operand `[` $swizzle attr-dict `]` `:` type($result)
