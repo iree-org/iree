@@ -20,8 +20,9 @@ namespace {
 /// Flatten the given value ranges into a single vector of values.
 static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
   SmallVector<Value> result;
-  for (const auto &vals : values)
+  for (const auto &vals : values) {
     llvm::append_range(result, vals);
+  }
   return result;
 }
 

@@ -60,8 +60,9 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
 static RankedTensorType alignTensorType(RankedTensorType originalType) {
   Type elementType = originalType.getElementType();
   Type alignedType = legalizeStorageElementType(originalType);
-  if (alignedType == elementType)
+  if (alignedType == elementType) {
     return originalType;
+  }
   return RankedTensorType::get(originalType.getShape(), alignedType,
                                originalType.getEncoding());
 }
@@ -79,8 +80,9 @@ static Value makeTensorDim(Location loc, RankedTensorType tensorType,
   // Map from absolute dimension index to the compact dynamic index.
   unsigned di = 0;
   for (unsigned j = 0; j < i; ++j) {
-    if (tensorType.isDynamicDim(j))
+    if (tensorType.isDynamicDim(j)) {
       ++di;
+    }
   }
   return dynamicDims[di];
 }
@@ -661,8 +663,9 @@ alignDispatchTensorType(IREE::TensorExt::DispatchTensorType originalType) {
   Type elementType = originalType.getBoundElementType();
   Type alignedType =
       legalizeStorageElementType(originalType.asRankedTensorType());
-  if (alignedType == elementType)
+  if (alignedType == elementType) {
     return originalType;
+  }
   return IREE::TensorExt::DispatchTensorType::get(
       originalType.getAccess(), originalType.getShape(), alignedType);
 }
@@ -688,8 +691,9 @@ struct EncodeBindingSubspanOp
     // Align the element type, if needed.
     IREE::TensorExt::DispatchTensorType alignedType =
         alignDispatchTensorType(originalType);
-    if (originalType == alignedType)
+    if (originalType == alignedType) {
       return failure(); // already aligned.
+    }
 
     // Directly swap the type with the one, changing all uses in the IR.
     // This works because
@@ -713,8 +717,9 @@ struct EncodeDispatchTensorLoadOp
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(targetType);
-    if (targetType == alignedType)
+    if (targetType == alignedType) {
       return failure(); // already aligned.
+    }
 
     // Loads always truncate from an byte aligned type to a sub-byte one.
     assert(targetType.getElementTypeBitWidth() <
@@ -747,8 +752,9 @@ struct EncodeDispatchTensorStoreOp
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(sourceType);
-    if (sourceType == alignedType)
+    if (sourceType == alignedType) {
       return failure(); // already aligned.
+    }
 
     // Stores always extend from a sub-byte aligned type to a byte aligned one.
     assert(sourceType.getElementTypeBitWidth() <

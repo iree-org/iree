@@ -132,8 +132,9 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Returns true if a change was made.
   bool applyArgTransition(BlockArgument arg, PatternRewriter &rewriter) const {
     auto oldType = dyn_cast<IREE::Stream::ResourceType>(arg.getType());
-    if (!oldType)
+    if (!oldType) {
       return false;
+    }
     auto newUsage = analysis.lookupResourceUsage(arg);
     auto newLifetime = convertUsageToLifetime(newUsage);
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
@@ -155,8 +156,9 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   bool applyResultTransition(Operation *op, Value result,
                              PatternRewriter &rewriter) const {
     auto oldType = dyn_cast<IREE::Stream::ResourceType>(result.getType());
-    if (!oldType)
+    if (!oldType) {
       return false;
+    }
     auto newUsage = analysis.lookupResourceUsage(result);
     auto newLifetime = convertUsageToLifetime(newUsage);
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
@@ -193,8 +195,9 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
                              IREE::Stream::AffinityAttr affinityAttr,
                              PatternRewriter &rewriter) const {
     auto oldType = dyn_cast<IREE::Stream::ResourceType>(result.getType());
-    if (!oldType)
+    if (!oldType) {
       return false;
+    }
     auto newUsage = analysis.lookupResourceUsage(result);
     auto newLifetime = convertUsageToLifetime(newUsage);
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
@@ -335,8 +338,9 @@ struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
     }
 
     // Blocks and nested operations:
-    if (this->applyRegionTransitions(op, rewriter))
+    if (this->applyRegionTransitions(op, rewriter)) {
       didChange = true;
+    }
 
     return success(didChange);
   }
@@ -350,8 +354,9 @@ struct ApplyScfIfOp : public UsageRefinementPattern<mlir::scf::IfOp> {
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
       if (isa<IREE::Stream::ResourceType>(result.getType())) {
-        if (this->applyResultTransition(op, result, rewriter))
+        if (this->applyResultTransition(op, result, rewriter)) {
           didChange |= true;
+        }
       }
     }
 
@@ -367,8 +372,9 @@ struct ApplyScfForOp : public UsageRefinementPattern<mlir::scf::ForOp> {
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
       if (isa<IREE::Stream::ResourceType>(result.getType())) {
-        if (this->applyResultTransition(op, result, rewriter))
+        if (this->applyResultTransition(op, result, rewriter)) {
           didChange |= true;
+        }
       }
     }
     return success(didChange);
@@ -383,8 +389,9 @@ struct ApplyScfWhileOp : public UsageRefinementPattern<mlir::scf::WhileOp> {
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
       if (isa<IREE::Stream::ResourceType>(result.getType())) {
-        if (this->applyResultTransition(op, result, rewriter))
+        if (this->applyResultTransition(op, result, rewriter)) {
           didChange |= true;
+        }
       }
     }
 
@@ -406,8 +413,9 @@ struct ApplyGenericOp : public UsageRefinementPattern<Op> {
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
       if (isa<IREE::Stream::ResourceType>(result.getType())) {
-        if (this->applyResultTransition(op, result, rewriter))
+        if (this->applyResultTransition(op, result, rewriter)) {
           didChange = true;
+        }
       }
     }
     if (didChange) {
@@ -535,8 +543,9 @@ struct RefineUsagePass
     : public IREE::Stream::impl::RefineUsagePassBase<RefineUsagePass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
-    if (moduleOp.getBody()->empty())
+    if (moduleOp.getBody()->empty()) {
       return;
+    }
 
     // Run analysis on the entire module.
     ResourceUsageAnalysis analysis(moduleOp);

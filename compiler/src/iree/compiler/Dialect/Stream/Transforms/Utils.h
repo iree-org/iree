@@ -25,8 +25,9 @@ SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
   for (auto dialect : moduleOp.getContext()->getLoadedDialects()) {
     auto *dialectInterface = dialect->getRegisteredInterface<T>();
-    if (!dialectInterface)
+    if (!dialectInterface) {
       continue;
+    }
     resultSet.insert(dialectInterface);
   }
 

@@ -786,8 +786,9 @@ public:
         // Seed FenceCoverage for fence values that might be relevant.
         // This includes fences from timeline-aware ops and imported fences.
         for (auto op : block.getOps<IREE::Stream::TimelineAwareOpInterface>()) {
-          if (!op.participatesInTimeline())
+          if (!op.participatesInTimeline()) {
             continue;
+          }
           if (Value signalFence = op.getSignalFence()) {
             solver.getOrCreateElementFor<FenceCoverage>(
                 Position::forValue(signalFence));
@@ -828,8 +829,9 @@ public:
     };
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
-      if (!region || region->empty())
+      if (!region || region->empty()) {
         continue;
+      }
       seedRegion(*region);
     }
 
@@ -846,8 +848,9 @@ public:
 
   // Returns true if |value| is known to be immediately resolved.
   bool isImmediate(Value value) {
-    if (isDefinedImmediate(value))
+    if (isDefinedImmediate(value)) {
       return true;
+    }
     auto &isImmediate =
         solver.getOrCreateElementFor<IsImmediate>(Position::forValue(value));
     return isImmediate.isValidState() && isImmediate.isKnown();
@@ -881,8 +884,9 @@ public:
   bool unionTransitivelyReachedTimepoints(Value value, SetVector<Value> &set) {
     auto coverage = solver.getOrCreateElementFor<TimepointCoverage>(
         Position::forValue(value));
-    if (!coverage.isValidState() || coverage.isUndefContained())
+    if (!coverage.isValidState() || coverage.isUndefContained()) {
       return false;
+    }
     for (auto reached : coverage.getAssumedSet()) {
       set.insert(reached);
     }
@@ -914,8 +918,9 @@ buildRequiredCoverageSet(SmallVector<Value> possibleTimepoints,
     if (isValid) {
       for (auto reachedTimepoint : reachedTimepoints) {
         // TODO(benvanik): avoid self-references so we don't need this check.
-        if (reachedTimepoint == possibleTimepoint)
+        if (reachedTimepoint == possibleTimepoint) {
           continue;
+        }
         ++coverageMap[reachedTimepoint];
       }
     }
@@ -1036,8 +1041,9 @@ static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
           llvm::dbgs() << "[ElideTimepoints] sinking await into scf.if ";
           bool first = true;
           for (Region *region : regionsWithDirectUse) {
-            if (!first)
+            if (!first) {
               llvm::dbgs() << " and ";
+            }
             if (region == &ifOp.getThenRegion()) {
               llvm::dbgs() << "then";
             } else {
@@ -1066,8 +1072,9 @@ static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
           bool first = true;
           auto caseRegions = switchOp.getCaseRegions();
           for (Region *region : regionsWithDirectUse) {
-            if (!first)
+            if (!first) {
               llvm::dbgs() << ", ";
+            }
             // Find which case this is.
             bool foundCase = false;
             for (auto [idx, caseRegion] : llvm::enumerate(caseRegions)) {
@@ -1532,8 +1539,9 @@ static bool tryElideTimepointsInRegion(Region &region,
   // Elides |elidedTimepoint| by replacing all its uses by |op| with an
   // immediate timepoint value.
   auto elideTimepointOperand = [&](Operation *op, Value elidedTimepoint) {
-    if (isDefinedImmediate(elidedTimepoint))
+    if (isDefinedImmediate(elidedTimepoint)) {
       return; // already immediate
+    }
     auto immediateTimepoint = makeImmediate(elidedTimepoint, OpBuilder(op));
     elidedTimepoint.replaceUsesWithIf(
         immediateTimepoint,
@@ -1544,10 +1552,12 @@ static bool tryElideTimepointsInRegion(Region &region,
   // Elides all timepoint operands of |op| that are immediately resolved.
   auto elideTimepointOperands = [&](Operation *op) {
     for (auto operand : llvm::make_early_inc_range(op->getOperands())) {
-      if (!isa<IREE::Stream::TimepointType>(operand.getType()))
+      if (!isa<IREE::Stream::TimepointType>(operand.getType())) {
         continue;
-      if (isDefinedImmediate(operand))
+      }
+      if (isDefinedImmediate(operand)) {
         continue;
+      }
       if (analysis.isImmediate(operand)) {
         LLVM_DEBUG({
           llvm::dbgs() << "  >>> eliding known-immediate operand ";
@@ -1562,10 +1572,12 @@ static bool tryElideTimepointsInRegion(Region &region,
   // Elides |elidedTimepoint| by replacing all its uses with an immediate
   // timepoint value. The original value will end up with zero uses.
   auto elideTimepointResult = [&](Operation *op, Value elidedTimepoint) {
-    if (elidedTimepoint.use_empty())
+    if (elidedTimepoint.use_empty()) {
       return; // no-op
-    if (isDefinedImmediate(elidedTimepoint))
+    }
+    if (isDefinedImmediate(elidedTimepoint)) {
       return; // already immediate
+    }
     OpBuilder afterBuilder(op);
     afterBuilder.setInsertionPointAfterValue(elidedTimepoint);
     Value immediateTimepoint = IREE::Stream::TimepointImmediateOp::create(
@@ -1583,10 +1595,12 @@ static bool tryElideTimepointsInRegion(Region &region,
     //  %imm0 = immediate
     //  %imm1 = immediate
     for (auto result : llvm::reverse(op->getResults())) {
-      if (!isa<IREE::Stream::TimepointType>(result.getType()))
+      if (!isa<IREE::Stream::TimepointType>(result.getType())) {
         continue;
-      if (isDefinedImmediate(result))
+      }
+      if (isDefinedImmediate(result)) {
         continue;
+      }
       if (analysis.isImmediate(result)) {
         LLVM_DEBUG({
           llvm::dbgs() << "  >>> eliding known-immediate result ";
@@ -1604,8 +1618,9 @@ static bool tryElideTimepointsInRegion(Region &region,
   auto processTimelineOp = [&](IREE::Stream::TimelineOpInterface op) {
     auto resultTimepoint = op.getResultTimepoint();
     auto awaitTimepoints = op.getAwaitTimepoints();
-    if (awaitTimepoints.empty())
+    if (awaitTimepoints.empty()) {
       return;
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "[ElideTimepoints] pruning " << op->getName()
@@ -1652,8 +1667,9 @@ static bool tryElideTimepointsInRegion(Region &region,
     }
 
     // If there's only one timepoint we don't have to worry with coverage.
-    if (possibleTimepoints.size() <= 1)
+    if (possibleTimepoints.size() <= 1) {
       return;
+    }
 
     // Perform the analysis on the possible timepoints to find which are covered
     // by others and elide all of those known-covered.
@@ -1761,8 +1777,9 @@ struct ElideTimepointsPass
     : public IREE::Stream::impl::ElideTimepointsPassBase<ElideTimepointsPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
-    if (moduleOp.getBody()->empty())
+    if (moduleOp.getBody()->empty()) {
       return;
+    }
 
     // Perform whole-program analysis to find for each timepoint what other
     // timepoints are known to be reached.
@@ -1793,8 +1810,9 @@ struct ElideTimepointsPass
           tryElideTimepointsInRegion(*region, analysis, domInfo) || didChange;
     }
 
-    if (didChange)
+    if (didChange) {
       signalFixedPointModified(moduleOp);
+    }
   }
 };
 

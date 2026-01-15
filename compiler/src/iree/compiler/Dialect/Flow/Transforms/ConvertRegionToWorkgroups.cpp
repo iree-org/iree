@@ -36,8 +36,9 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   }
 
   for (auto dim : llvm::enumerate(tensorType.getShape())) {
-    if (ShapedType::isStatic(dim.value()))
+    if (ShapedType::isStatic(dim.value())) {
       continue;
+    }
     argumentDims.push_back(
         b.createOrFold<tensor::DimOp>(loc, tensor, dim.index()));
   }
@@ -50,8 +51,9 @@ findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
                                     Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {
-    if (isa<OpResult>(v))
+    if (isa<OpResult>(v)) {
       return !regionOp->isAncestor(v.getDefiningOp());
+    }
     assert(isa<BlockArgument>(v) && "expected bbArg");
     // DispatchRegionOp does not have block arguments.
     return true;
@@ -107,8 +109,9 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   SmallVector<Value> argumentDims;
   for (Value tensor : argumentsSet) {
     auto tensorType = dyn_cast<RankedTensorType>(tensor.getType());
-    if (!tensorType)
+    if (!tensorType) {
       continue;
+    }
     appendDynamicDims(rewriter, loc, argumentDims, tensor);
   }
 
@@ -129,13 +132,15 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
          llvm::enumerate(origTerminators.front()->getOperands())) {
       auto tiedArgument =
           findFirstTiedValueOutsideOfRegionOp(regionOp, it.value());
-      if (!tiedArgument.has_value())
+      if (!tiedArgument.has_value()) {
         continue;
+      }
       assert(argumentsSet.contains(*tiedArgument) &&
              "expected that tiedArgument is already an argument");
       // Do not tie an argument to multiple results.
-      if (tiedArgumentsSet.contains(*tiedArgument))
+      if (tiedArgumentsSet.contains(*tiedArgument)) {
         continue;
+      }
       tiedArgumentsSet.insert(*tiedArgument);
       tiedArguments[it.index()] = std::distance(
           argumentsSet.begin(), llvm::find(argumentsSet, *tiedArgument));

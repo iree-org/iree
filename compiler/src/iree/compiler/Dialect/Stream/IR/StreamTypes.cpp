@@ -100,8 +100,9 @@ bool AsyncAccessRange::mayOverlap(const AsyncAccessRange &lhs,
                                   const AsyncAccessRange &rhs) {
   // Different resources do not overlap for this purpose. They may still alias
   // at various points but that's beyond the analysis we can do here.
-  if (lhs.resource != rhs.resource)
+  if (lhs.resource != rhs.resource) {
     return false;
+  }
 
   // Check for adjacent but not overlapping.
   if (lhs.end == rhs.start || lhs.start == rhs.end) {
@@ -167,8 +168,9 @@ void printParameterReference(AsmPrinter &p, StringAttr scopeAttr,
 
 // static
 Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess()) || failed(p.parseLBrace()))
+  if (failed(p.parseLess()) || failed(p.parseLBrace())) {
     return {};
+  }
 
   int64_t maxAllocationSize = 0;
   int64_t minBufferOffsetAlignment = 0;
@@ -183,43 +185,53 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
       return {};
     }
     if (key == "max_allocation_size") {
-      if (failed(p.parseInteger(maxAllocationSize)))
+      if (failed(p.parseInteger(maxAllocationSize))) {
         return {};
+      }
     } else if (key == "min_buffer_offset_alignment") {
-      if (failed(p.parseInteger(minBufferOffsetAlignment)))
+      if (failed(p.parseInteger(minBufferOffsetAlignment))) {
         return {};
+      }
     } else if (key == "max_buffer_range") {
-      if (failed(p.parseInteger(maxBufferRange)))
+      if (failed(p.parseInteger(maxBufferRange))) {
         return {};
+      }
     } else if (key == "min_buffer_range_alignment") {
-      if (failed(p.parseInteger(minBufferRangeAlignment)))
+      if (failed(p.parseInteger(minBufferRangeAlignment))) {
         return {};
+      }
     } else if (key == "index_bits") {
-      if (failed(p.parseInteger(indexBits)))
+      if (failed(p.parseInteger(indexBits))) {
         return {};
+      }
     } else if (key == "alias_mutable_bindings") {
       StringRef value;
-      if (failed(p.parseKeyword(&value)))
+      if (failed(p.parseKeyword(&value))) {
         return {};
-      if (value == "true")
+      }
+      if (value == "true") {
         aliasMutableBindings = true;
-      else if (value == "false")
+      } else if (value == "false") {
         aliasMutableBindings = false;
-      else
+      } else {
         return {};
+      }
     } else if (key == "memory_model") {
       StringRef value;
-      if (failed(p.parseKeyword(&value)))
+      if (failed(p.parseKeyword(&value))) {
         return {};
+      }
       auto enumValue = symbolizeMemoryModel(value);
-      if (!enumValue.has_value())
+      if (!enumValue.has_value()) {
         return {};
+      }
       memoryModel = enumValue.value();
     }
     (void)p.parseOptionalComma();
   }
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
 
   return ResourceConfigAttr::get(p.getContext(), maxAllocationSize,
                                  minBufferOffsetAlignment, maxBufferRange,
@@ -245,10 +257,12 @@ void ResourceConfigAttr::print(AsmPrinter &p) const {
 ResourceConfigAttr
 ResourceConfigAttr::intersectBufferConstraints(ResourceConfigAttr lhs,
                                                ResourceConfigAttr rhs) {
-  if (!lhs)
+  if (!lhs) {
     return rhs;
-  if (!rhs)
+  }
+  if (!rhs) {
     return lhs;
+  }
   Builder b(lhs.getContext());
   return ResourceConfigAttr::get(
       b.getContext(),
@@ -285,15 +299,17 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
   while (op) {
     // Use an override if specified.
     auto attr = op->getAttrOfType<ResourceConfigAttr>(attrId);
-    if (attr)
+    if (attr) {
       return attr;
+    }
     // See if the affinity specified provides a resource configuration.
     if (auto affinityOp = dyn_cast<AffinityOpInterface>(op)) {
       auto affinityAttr = affinityOp.getAffinityAttr();
       if (affinityAttr) {
         auto attr = affinityAttr.getResourceConfigAttr();
-        if (attr)
+        if (attr) {
           return attr;
+        }
       }
     }
     op = op->getParentOp();
@@ -325,13 +341,15 @@ int64_t NamedParameterAttr::getStorageSize() const {
 
 Attribute TimepointAttr::parse(AsmParser &p, Type type) {
   StringRef timeStr;
-  if (failed(p.parseLess()))
+  if (failed(p.parseLess())) {
     return {};
+  }
   if (failed(p.parseKeyword(&timeStr))) {
     return {};
   }
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
   if (timeStr != "immediate") {
     p.emitError(p.getCurrentLocation(),
                 "only immediate timepoint attrs are supported");
@@ -389,8 +407,9 @@ AffinityAttr AffinityAttr::lookupOrDefault(Operation *fromOp) {
 // static
 bool AffinityAttr::areCompatible(AffinityAttr desiredAffinity,
                                  AffinityAttr requiredAffinity) {
-  if (desiredAffinity == requiredAffinity)
+  if (desiredAffinity == requiredAffinity) {
     return true;
+  }
   if ((desiredAffinity && !requiredAffinity) ||
       (requiredAffinity && !desiredAffinity)) {
     return true;
@@ -401,10 +420,12 @@ bool AffinityAttr::areCompatible(AffinityAttr desiredAffinity,
 
 // static
 bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
-  if (lhs == rhs)
+  if (lhs == rhs) {
     return true;
-  if ((lhs && !rhs) || (rhs && !lhs))
+  }
+  if ((lhs && !rhs) || (rhs && !lhs)) {
     return true;
+  }
   return lhs.isExecutableWith(rhs);
 }
 
@@ -429,15 +450,17 @@ AffinityAttr AffinityAttr::joinOR(ArrayRef<AffinityAttr> affinityAttrs) {
 
 Attribute PartitioningConfigAttr::parse(AsmParser &p, Type type) {
   std::string favorStr;
-  if (failed(p.parseLess()))
+  if (failed(p.parseLess())) {
     return {};
+  }
   if (succeeded(p.parseOptionalStar())) {
     favorStr = "size";
   } else if (failed(p.parseString(&favorStr))) {
     return {};
   }
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
   auto favor = symbolizeFavor(favorStr);
   if (!favor.has_value()) {
     p.emitError(p.getNameLoc(), "unknown favor value: ") << favorStr;
@@ -458,8 +481,9 @@ PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
   auto attrId = StringAttr::get(op->getContext(), "stream.partitioning");
   while (op) {
     auto attr = op->getAttrOfType<PartitioningConfigAttr>(attrId);
-    if (attr)
+    if (attr) {
       return attr;
+    }
     op = op->getParentOp();
   }
   // No config found; use defaults.
@@ -499,15 +523,17 @@ static void printLifetime(Lifetime lifetime, llvm::raw_ostream &os) {
 
 Type ResourceType::parse(AsmParser &p) {
   StringRef lifetimeStr;
-  if (failed(p.parseLess()))
+  if (failed(p.parseLess())) {
     return {};
+  }
   if (succeeded(p.parseOptionalStar())) {
     lifetimeStr = "*";
   } else if (failed(p.parseKeyword(&lifetimeStr))) {
     return {};
   }
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
   auto lifetime = parseLifetime(lifetimeStr);
   if (!lifetime.has_value()) {
     p.emitError(p.getNameLoc(), "unknown lifetime value: ") << lifetimeStr;
