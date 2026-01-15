@@ -229,8 +229,9 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
 
   auto isZeroOffsetAndFullSize = [](OpFoldResult offset, OpFoldResult sliceSize,
                                     OpFoldResult size) {
-    if (!isZeroInteger(offset))
+    if (!isZeroInteger(offset)) {
       return false;
+    }
     FailureOr<bool> maybeEqual =
         ValueBoundsConstraintSet::areEqual(sliceSize, size);
     return llvm::succeeded(maybeEqual) && maybeEqual.value();
@@ -275,8 +276,9 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
     // Offset = cumulative product of leading unit extracted dims.
     for (; i < e; ++i) {
       int64_t expandedDim = indices[i];
-      if (!isOneInteger(sizes[expandedDim]))
+      if (!isOneInteger(sizes[expandedDim])) {
         break;
+      }
 
       basis.push_back(outputShape[expandedDim]);
       delinOffsets.push_back(offsets[expandedDim]);
@@ -719,8 +721,9 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
     for (; idx < reassocGroupSize; ++idx) {
       int64_t expandedShapeSize = srcShape[reversedReassocIndices[idx]];
 
-      if (currentCollapsedsize < expandedShapeSize)
+      if (currentCollapsedsize < expandedShapeSize) {
         break;
+      }
 
       // We need to make sure that the slice size can be set to the shape size
       // and the offset to 0.

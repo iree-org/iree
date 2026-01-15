@@ -21,8 +21,9 @@ struct StripFuncOpTranslationInfo final
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(mlir::FunctionOpInterface funcOp,
                                 PatternRewriter &rewriter) const final {
-    if (!getTranslationInfo(funcOp))
+    if (!getTranslationInfo(funcOp)) {
       return failure();
+    }
 
     rewriter.modifyOpInPlace(funcOp, [&]() {
       // If the function has translation info, erase it.
@@ -38,8 +39,9 @@ struct StripLinalgOpCompilationInfo final
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const final {
-    if (!getCompilationInfo(linalgOp) && !getLoweringConfig(linalgOp))
+    if (!getCompilationInfo(linalgOp) && !getLoweringConfig(linalgOp)) {
       return failure();
+    }
     rewriter.modifyOpInPlace(linalgOp, [&]() {
       if (getCompilationInfo(linalgOp)) {
         // Erase the compilation info configuration if it exists.

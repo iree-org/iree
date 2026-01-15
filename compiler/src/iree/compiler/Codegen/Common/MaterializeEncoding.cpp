@@ -204,8 +204,9 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
           // the pipeline.
           if (isa<linalg::PackOp, linalg::UnPackOp>(consumer) &&
               isa_and_nonnull<TilingInterface>(producer) &&
-              !producer->hasOneUse())
+              !producer->hasOneUse()) {
             return false;
+          }
           return true;
         });
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
