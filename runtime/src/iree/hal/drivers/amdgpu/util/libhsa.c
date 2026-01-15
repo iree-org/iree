@@ -254,7 +254,8 @@ static bool iree_string_builder_append_status(iree_string_builder_t* builder,
                                               iree_status_t status) {
   // Calculate total length minus the NUL terminator.
   iree_host_size_t buffer_length = 0;
-  if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
+  if (IREE_UNLIKELY(!iree_status_format(status, IREE_STATUS_FORMAT_FLAG_NONE,
+                                        /*buffer_capacity=*/0,
                                         /*buffer=*/NULL, &buffer_length))) {
     return false;
   }
@@ -273,7 +274,8 @@ static bool iree_string_builder_append_status(iree_string_builder_t* builder,
   }
 
   // Format into the buffer.
-  return iree_status_format(status, buffer_length + 1, buffer, &buffer_length);
+  return iree_status_format(status, IREE_STATUS_FORMAT_FLAG_NONE,
+                            buffer_length + 1, buffer, &buffer_length);
 }
 
 static bool iree_hal_amdgpu_libhsa_try_load_library_from_file(

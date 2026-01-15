@@ -253,11 +253,11 @@ const std::string& ErrorInstance::message() const {
     std::string buffer;
     iree_host_size_t actual_len;
     buffer.resize(1024);  // TODO: Actually reallocate to full size on trunc.
-    if (!iree_status_format(status_, buffer.size(), buffer.data(),
-                            &actual_len)) {
+    if (!iree_status_format(status_, IREE_STATUS_FORMAT_FLAG_NONE,
+                            buffer.size(), buffer.data(), &actual_len)) {
       buffer.resize(actual_len);
-      if (!iree_status_format(status_, buffer.size(), buffer.data(),
-                              &actual_len)) {
+      if (!iree_status_format(status_, IREE_STATUS_FORMAT_FLAG_NONE,
+                              buffer.size(), buffer.data(), &actual_len)) {
         actual_len = 0;
       }
     }

@@ -659,6 +659,7 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 
 static bool iree_status_format_message(iree_status_t status,
+                                       iree_status_format_flags_t flags,
                                        iree_host_size_t buffer_capacity,
                                        char* buffer,
                                        iree_host_size_t* out_buffer_length,
@@ -707,6 +708,13 @@ static bool iree_status_format_message(iree_status_t status,
       continue;
     }
 
+    // Skip stack trace payloads if requested.
+    if ((flags & IREE_STATUS_FORMAT_FLAG_SKIP_STACK_TRACE) &&
+        payload->type == IREE_STATUS_PAYLOAD_TYPE_STACK_TRACE) {
+      payload = payload->next;
+      continue;
+    }
+
     // Append newline to join with message above and other payloads.
     if (buffer) {
       if (2 >= buffer_capacity - buffer_length) {
@@ -737,6 +745,7 @@ static bool iree_status_format_message(iree_status_t status,
 }
 
 IREE_API_EXPORT bool iree_status_format(iree_status_t status,
+                                        iree_status_format_flags_t flags,
                                         iree_host_size_t buffer_capacity,
                                         char* buffer,
                                         iree_host_size_t* out_buffer_length) {
@@ -773,7 +782,7 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
 
   iree_host_size_t message_buffer_length = 0;
   bool ret = iree_status_format_message(
-      status, buffer ? buffer_capacity - prefix_buffer_length : 0,
+      status, flags, buffer ? buffer_capacity - prefix_buffer_length : 0,
       buffer ? buffer + prefix_buffer_length : NULL, &message_buffer_length,
       /*has_prefix=*/true);
   if (!ret) {
@@ -801,7 +810,7 @@ iree_status_freeze(iree_status_t status) {
   // handled separately.
   iree_host_size_t message_buffer_size = 0;
   if (IREE_UNLIKELY(!iree_status_format_message(
-          status, /*buffer_capacity=*/0,
+          status, IREE_STATUS_FORMAT_FLAG_NONE, /*buffer_capacity=*/0,
           /*buffer=*/NULL, &message_buffer_size, /*has_prefix=*/false))) {
     iree_status_free(status);
     return iree_status_from_code(code);
@@ -841,9 +850,9 @@ iree_status_freeze(iree_status_t status) {
   char* message_data = (char*)new_storage + sizeof(iree_status_storage_t);
   size_t res_length;
   // Format the status message directly into the region allocated for it.
-  bool ret =
-      iree_status_format_message(status, message_buffer_size, message_data,
-                                 &res_length, /*has_prefix=*/false);
+  bool ret = iree_status_format_message(status, IREE_STATUS_FORMAT_FLAG_NONE,
+                                        message_buffer_size, message_data,
+                                        &res_length, /*has_prefix=*/false);
   new_storage->message.size = message_buffer_size - 1;
   new_storage->message.data =
       (const char*)new_storage + sizeof(iree_status_storage_t);
@@ -874,11 +883,12 @@ iree_status_freeze(iree_status_t status) {
 #endif  // has any IREE_STATUS_FEATURES
 
 IREE_API_EXPORT bool iree_status_to_string(
-    iree_status_t status, const iree_allocator_t* allocator, char** out_buffer,
+    iree_status_t status, iree_status_format_flags_t flags,
+    const iree_allocator_t* allocator, char** out_buffer,
     iree_host_size_t* out_buffer_length) {
   *out_buffer_length = 0;
   iree_host_size_t buffer_length = 0;
-  if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
+  if (IREE_UNLIKELY(!iree_status_format(status, flags, /*buffer_capacity=*/0,
                                         /*buffer=*/NULL, &buffer_length))) {
     return false;
   }
@@ -891,8 +901,8 @@ IREE_API_EXPORT bool iree_status_to_string(
     iree_status_ignore(malloc_status);
     return false;
   }
-  bool ret =
-      iree_status_format(status, buffer_length + 1, buffer, out_buffer_length);
+  bool ret = iree_status_format(status, flags, buffer_length + 1, buffer,
+                                out_buffer_length);
   if (ret) {
     *out_buffer = buffer;
     return true;
@@ -908,8 +918,8 @@ IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status) {
   iree_allocator_t allocator = iree_allocator_system();
   char* status_buffer = NULL;
   iree_host_size_t status_buffer_length = 0;
-  if (iree_status_to_string(status, &allocator, &status_buffer,
-                            &status_buffer_length)) {
+  if (iree_status_to_string(status, IREE_STATUS_FORMAT_FLAG_NONE, &allocator,
+                            &status_buffer, &status_buffer_length)) {
     fprintf(file, "%.*s\n", (int)status_buffer_length, status_buffer);
     iree_allocator_free(allocator, status_buffer);
   } else {

@@ -512,14 +512,28 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
 // Status string conversion and printing
 //===----------------------------------------------------------------------===//
 
+// Flags controlling status string formatting.
+// The contents/format of the status string depends on which status features
+// (e.g., IREE_STATUS_FEATURE_STACK_TRACE) are enabled at compile time. These
+// flags allow callers to exclude certain parts from the formatted output.
+typedef uint32_t iree_status_format_flags_t;
+enum iree_status_format_flag_bits_e {
+  IREE_STATUS_FORMAT_FLAG_NONE = 0,
+  // Excludes stack trace payloads from the formatted output.
+  IREE_STATUS_FORMAT_FLAG_SKIP_STACK_TRACE = 1u << 0,
+};
+
 // Formats the status as a multi-line string containing all associated payloads.
 // Note that this may contain PII such as file paths and must only be used for
 // presenting errors to users and not sent to a logs aggregation service.
+//
+// |flags| controls which parts of the status are included in the output.
 //
 // If |buffer_capacity| is insufficient, then |out_buffer_length| is the
 // number of characters that would have been written if |buffer_capacity|
 // had been sufficiently large, not counting the terminating null character.
 IREE_API_EXPORT bool iree_status_format(iree_status_t status,
+                                        iree_status_format_flags_t flags,
                                         iree_host_size_t buffer_capacity,
                                         char* buffer,
                                         iree_host_size_t* out_buffer_length);
@@ -527,6 +541,8 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
 // Converts the status to an allocated string value using the given allocator.
 // |out_buffer| will contain |out_buffer_length| characters as well as a NUL
 // terminator. The caller must free the buffer with |allocator|.
+//
+// |flags| controls which parts of the status are included in the output.
 //
 // NOTE: |allocator| is passed as a pointer to avoid a circular dependency with
 // iree/base/allocator.h (which uses this file a lot more than this file uses
@@ -536,7 +552,8 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
 //  iree_allocator_t allocator = iree_allocator_system();
 //  char* buffer = NULL;
 //  iree_host_size_t length = 0;
-//  if (iree_status_to_string(status, &allocator, &buffer, &length)) {
+//  if (iree_status_to_string(status, IREE_STATUS_FORMAT_FLAG_NONE, &allocator,
+//                            &buffer, &length)) {
 //    // |buffer| is NUL terminated but if possible use the length.
 //    LOG_MESSAGE("%.*s", (int)length, buffer);
 //    iree_allocator_free(allocator, buffer);
@@ -545,6 +562,7 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
 //    LOG_MESSAGE("failed to convert status to string");
 //  }
 IREE_API_EXPORT bool iree_status_to_string(iree_status_t status,
+                                           iree_status_format_flags_t flags,
                                            const iree_allocator_t* allocator,
                                            char** out_buffer,
                                            iree_host_size_t* out_buffer_length);

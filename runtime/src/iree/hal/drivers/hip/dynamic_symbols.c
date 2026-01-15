@@ -63,7 +63,8 @@ static bool iree_hal_hip_try_load_dylib(const char* file_path,
 
   char* buffer = NULL;
   iree_host_size_t length = 0;
-  if (iree_status_to_string(status, &allocator, &buffer, &length)) {
+  if (iree_status_to_string(status, IREE_STATUS_FORMAT_FLAG_NONE, &allocator,
+                            &buffer, &length)) {
     iree_status_ignore(iree_string_builder_append_format(
         error_builder, "\n  Tried: %s\n    %.*s", file_path, (int)length,
         buffer));
