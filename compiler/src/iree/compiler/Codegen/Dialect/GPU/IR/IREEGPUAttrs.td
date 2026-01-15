@@ -139,32 +139,40 @@ def IREEGPU_SwizzleOperand :
     ]> {
   let mnemonic = "swizzle_operand";
   let summary = [{
-    Indicate promotion of an operand with setting a xor swizzle value.
+    Indicate promotion of an operand with setting an xor swizzle value.
   }];
   let description = [{
-    When promoting, this will create a swizzle hint op on the alloc associated
-    with the input operand. For example,
+    During matmul operand promotion, we generate copies associated to a
+    particular matmul operand with specific lowering configuration optimized
+    for coalesced loads. This attribute carries information on how accesses to
+    memrefs or tensors associated to a particular copy should be swizzled.
 
-    ```
+    This information is used to create a swizzle hint op on the alloc
+    associated with the copy. Ultimately, this aims to modify memory accesses
+    to minimize bank conflicts. For example,
+
+    ```mlir
     %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
     %1 = linalg.matmul ins(%0, ...)
     ```
 
     Becomes with `#iree_gpu.swizzle_operand<#iree_gpu.use_global_load_dma>`
 
-    ```
+    ```mlir
     %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
     %1 = tensor.empty()
-    %2 = swizzle_hint_op %1 xor_shuffle(8192, 32)
+    %2 = swizzle_hint_op %1 xor_shuffle(256, 32)
     %3 = linalg.copy lowering_config = #iree_gpu.use_global_load_dma ins(%0) outs(%1)
     %4 = linalg.matmul ins(%3, ...)
     ```
+
+    With intelligent selection of `row_width` and `access_width`, this should
+    minimize bank conflicts.
   }];
   let assemblyFormat = "`<` struct(params) `>`";
   let parameters = (ins
     "Attribute":$copy_config,
-    AttrParameter<"int64_t", "">:$row_width,
-    AttrParameter<"int64_t", "">:$access_width
+    IREECodegen_SwizzleAttrParameter:$swizzle
   );
 }
 

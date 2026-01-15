@@ -37,30 +37,27 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
 
 // Helper to insert a swizzle hint op and flatten the associated alloc.
 Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v,
-                          Attribute attr, int64_t rowWidth,
-                          int64_t accessWidth) {
+                          Attribute attr,
+                          Codegen::SwizzleAttrInterface swizzle) {
   auto tensorType = cast<RankedTensorType>(v.getType());
-  SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
-  if (!tensorType.hasStaticShape()) {
-    LDBG() << "Cannot create swizzle_hint op for non static shapes";
-    Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
-                                          tensorType.getElementType());
-    auto copy = linalg::CopyOp::create(builder, loc, v, empty);
-    setLoweringConfig(copy, attr);
-    return copy.getResult(0);
-  }
   int64_t numElements = tensorType.getNumElements();
-  Value empty = tensor::EmptyOp::create(builder, loc, {numElements},
-                                        tensorType.getElementType());
-  IREE::Codegen::SwizzleAttrInterface swizzle =
-      IREE::Codegen::XORShuffleAttr::get(builder.getContext(), rowWidth,
-                                         accessWidth, int64_t(), int64_t());
-  Value swizzled =
-      IREE::Codegen::SwizzleHintOp::create(builder, loc, empty, swizzle);
-  Value expanded = tensor::ExpandShapeOp::create(
-      builder, loc, tensorType, swizzled,
-      {llvm::to_vector(llvm::seq(tensorType.getRank()))});
-  auto copy = linalg::CopyOp::create(builder, loc, v, expanded);
+  SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(builder, loc, v);
+  bool hasStaticShape = tensorType.hasStaticShape();
+  if (hasStaticShape) {
+    sizes = {builder.getIndexAttr(numElements)};
+  }
+  Value alloc =
+      tensor::EmptyOp::create(builder, loc, sizes, tensorType.getElementType());
+
+  // Only generate a swizzle hint op if the shape is static.
+  if (hasStaticShape) {
+    Value swizzled =
+        IREE::Codegen::SwizzleHintOp::create(builder, loc, alloc, swizzle);
+    alloc = tensor::ExpandShapeOp::create(
+        builder, loc, tensorType, swizzled,
+        {llvm::to_vector(llvm::seq(tensorType.getRank()))});
+  }
+  auto copy = linalg::CopyOp::create(builder, loc, v, alloc);
   setLoweringConfig(copy, attr);
   return copy.getResult(0);
 }
@@ -140,14 +137,14 @@ Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
 ///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
 ///   linalg.matmul ins(%0, %copy)
 Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
-                           Attribute attr, int64_t rowWidth,
-                           int64_t accessWidth) {
+                           Attribute attr,
+                           Codegen::SwizzleAttrInterface swizzle) {
   std::optional<Value> promotedValue = promotionImpl(builder, operand, attr);
   if (promotedValue.has_value()) {
     return promotedValue.value();
   }
   return swizzlePromoteValue(builder, operand.getOwner()->getLoc(),
-                             operand.get(), attr, rowWidth, accessWidth);
+                             operand.get(), attr, swizzle);
 }
 
 /// Inserts a `linalg.copy` directly before the given operation on the

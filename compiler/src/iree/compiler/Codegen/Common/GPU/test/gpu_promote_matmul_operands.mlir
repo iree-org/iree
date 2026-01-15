@@ -311,8 +311,8 @@ func.func @promote_with_cache_swizzle_f4_no_stride(%a: tensor<2x34x34x129xf4E2M1
 #lowering_config = #iree_gpu.lowering_config<{
   promote_operands = [0, 1],
   promotion_types = [
-    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, row_width = 128, access_width = 16>,
-    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, row_width = 256, access_width = 32>]}>
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<128, 16>>,
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]}>
 
 func.func @promote_with_swizzle_operand(%a: tensor<32x64xf32>, %b: tensor<64x128xf32>) -> tensor<32x128xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -347,7 +347,7 @@ func.func @promote_with_swizzle_operand(%a: tensor<32x64xf32>, %b: tensor<64x128
 #lowering_config = #iree_gpu.lowering_config<{
   promote_operands = [1],
   promotion_types = [
-    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, row_width = 64, access_width = 8>]}>
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<64, 8>>]}>
 
 func.func @promote_with_swizzle_operand_f16(%a: tensor<32x64xf16>, %b: tensor<64x128xf16>) -> tensor<32x128xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -375,7 +375,7 @@ func.func @promote_with_swizzle_operand_f16(%a: tensor<32x64xf16>, %b: tensor<64
 #lowering_config = #iree_gpu.lowering_config<{
   promote_operands = [0],
   promotion_types = [
-    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, row_width = 128, access_width = 16>]}>
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<128, 16>>]}>
 
 func.func @swizzle_operand_no_promote_fill(%b: tensor<128x128xf32>) -> tensor<4x128xf32> {
   %cst = arith.constant 0.000000e+00 : f32
