@@ -45,8 +45,9 @@ namespace {
 static bool doesOperationNeedWrapping(Operation *op) {
   return llvm::any_of(op->getOperands(),
                       [](Value operand) {
-                        if (!isa<TensorType>(operand.getType()))
+                        if (!isa<TensorType>(operand.getType())) {
                           return false;
+                        }
                         return !isa_and_nonnull<TensorExportOp>(
                             operand.getDefiningOp());
                       }) ||

@@ -148,8 +148,9 @@ findCorrelatedBindings(unsigned bindingCount,
   llvm::BitVector handledBindings(bindingCount, /*t=*/false);
   for (unsigned i = 0; i < bindingCount; ++i) {
     // Ignore bindings we've already covered earlier during iteration.
-    if (handledBindings.test(i))
+    if (handledBindings.test(i)) {
       continue;
+    }
 
     // Build new binding.
     Binding binding;
@@ -316,8 +317,9 @@ fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
                      IREE::Stream::ExecutableExportOp exportOp,
                      ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
                      MemoizedCmdZeros &memoizedZeros) {
-  if (dispatchOps.empty())
+  if (dispatchOps.empty()) {
     return; // no-op if no dispatches
+  }
   auto anyDispatchOp = dispatchOps.front();
   unsigned bindingCount = anyDispatchOp.getResources().size();
 
@@ -443,8 +445,9 @@ struct FuseDispatchBindingsPass
     MemoizedCmdZeros memoizedZeros;
     for (auto executableOp :
          getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
-      if (!executableOp.getInnerModule())
+      if (!executableOp.getInnerModule()) {
         continue;
+      }
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         fuseDispatchBindings(executableOp, exportOp, entryDispatchMap[exportOp],

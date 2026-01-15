@@ -89,8 +89,9 @@ loadBitcodeObject(IREE::HAL::ExecutableObjectAttr objectAttr,
   llvm::MemoryBufferRef bitcodeBufferRef(objectData.value(),
                                          objectAttr.getPath());
   auto bitcodeModuleValue = llvm::parseBitcodeFile(bitcodeBufferRef, context);
-  if (!bitcodeModuleValue)
+  if (!bitcodeModuleValue) {
     return bitcodeModuleValue;
+  }
   // NOTE: at this point the bitcode may not have the expected data layout!
   return std::move(bitcodeModuleValue.get());
 }

@@ -34,8 +34,9 @@ struct CleanupTensorShapesPass
             foundBadOps = true;
           }
         });
-    if (foundBadOps)
+    if (foundBadOps) {
       return signalPassFailure();
+    }
   }
 };
 

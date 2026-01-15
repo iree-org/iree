@@ -156,8 +156,9 @@ LogicalResult Partition::verify(Location loc) {
   for (auto in : ins) {
     // Only check ops, not bare values.
     auto definingOp = in.getDefiningOp();
-    if (!definingOp)
+    if (!definingOp) {
       continue;
+    }
 
     // Collect all values used by this input op (including nested regions).
     SetVector<Value> inputConsumedValues;
@@ -216,8 +217,9 @@ LogicalResult PartitionSet::verify(Location loc) {
 }
 
 void PartitionSet::topologicalSort() {
-  if (partitions.empty())
+  if (partitions.empty()) {
     return;
+  }
 
   SetVector<Partition *> unsortedSet;
   DenseMap<Value, SmallVector<Partition *>> consumers;
@@ -246,8 +248,9 @@ void PartitionSet::topologicalSort() {
       }
     }
   };
-  for (auto *partition : unsortedSet)
+  for (auto *partition : unsortedSet) {
     postorderWalk(partition);
+  }
 
   SmallVector<Partition> sortedSet;
   sortedSet.reserve(partitions.size());
