@@ -459,7 +459,19 @@ struct DistributeTransferReadToSingleRead final
     // Fall back to the simpler pattern for 0-d vectors, which will only create
     // a single transfer_read anyway.
     if (vectorLayout.getRank() == 0) {
-      return rewriter.notifyMatchFailure(readOp, "0-d vector not supported");
+      return rewriter.notifyMatchFailure(readOp, "fallback for 0-d vector");
+    }
+
+    // Fall back to the simpler pattern if only a single element tile is read
+    // per thread, i.e., when batch and outer tile are both all-ones. The simple
+    // pattern will also generate a single read in that case.
+    auto allOnes = [](ArrayRef<int64_t> strides) -> bool {
+      return llvm::all_of(strides, [](int64_t s) { return s == 1; });
+    };
+    if (allOnes(vectorLayout.getBatchTile()) &&
+        allOnes(vectorLayout.getOuterTile())) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "fallback for single tile case");
     }
 
     // Require the original read to be in-bounds in all dimensions.

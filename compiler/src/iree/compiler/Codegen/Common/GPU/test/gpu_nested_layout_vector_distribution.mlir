@@ -286,12 +286,9 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[DELIN:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 16) : index, index, index
-// CHECK: %[[RECAST:.+]] = memref.reinterpret_cast %arg0 to offset: [0]
-// CHECK-SAME: sizes: [32, 2, 1, 1, 1, 4, 4], strides: [32, 16, 16, 16, 16, 4, 1]
-// CHECK-SAME: memref<32x32xf16> to memref<32x2x1x1x1x4x4xf16, strided<[32, 16, 16, 16, 16, 4, 1]>>
-// CHECK: %[[READ:.+]] = vector.transfer_read %[[RECAST]][%c0, %c0, %c0, %c0, %c0, %[[DELIN]]#1, %c0], {{.*}}
-// CHECK: iree_vector_ext.to_simd %[[READ]] : vector<1x1x4xf16> -> vector<16xf16>
+// CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 16)
+// CHECK: %[[LANEY:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %c0] by (4, 4)
+// CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x32xf16>, vector<4xf16>
 
 // -----
 
@@ -325,13 +322,10 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[DELIN0:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64) : index, index, index
-// CHECK: %[[DELIN1:.+]]:2 = affine.delinearize_index %[[IDX]] into (16) : index, index
-// CHECK: %[[RECAST:.+]] = memref.reinterpret_cast %arg0 to offset: [0]
-// CHECK-SAME: sizes: [32, 1, 2, 1, 1, 16, 4], strides: [128, 128, 64, 64, 64, 4, 1]
-// CHECK-SAME: memref<32x128xf16> to memref<32x1x2x1x1x16x4xf16, strided<[128, 128, 64, 64, 64, 4, 1]>>
-// CHECK: %[[READ:.+]] = vector.transfer_read %[[RECAST]][%c0, %c0, %[[DELIN0]]#1, %c0, %c0, %[[DELIN1]]#1, %c0], {{.*}}
-// CHECK: iree_vector_ext.to_simd %[[READ]] : vector<1x1x4xf16> -> vector<128xf16>
+// CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
+// CHECK: %[[SUBGROUP:.+]]:2 = affine.delinearize_index %[[IDX]] into (16)
+// CHECK: %[[LANEY:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %[[SUBGROUP]]#1, %c0] by (2, 16, 4)
+// CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x128xf16>, vector<4xf16>
 
 // -----
 
@@ -614,25 +608,16 @@ func.func @mfma_64x128x8_read(%mem: memref<128x8xf16>,
   // CHECK-DAG: %[[LANE:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 32)
 
   // A: 128x8 with layout_a
-  // CHECK: %[[RECAST_A:.+]] = memref.reinterpret_cast %arg0 to offset: [0]
-  // CHECK-SAME: sizes: [1, 4, 1, 1, 32, 1, 1, 1, 1, 1, 2, 4], strides: [1024, 256, 256, 256, 8, 8, 8, 8, 8, 8, 4, 1]
-  // CHECK-SAME: memref<128x8xf16> to memref<1x4x1x1x32x1x1x1x1x1x2x4xf16, strided<[1024, 256, 256, 256, 8, 8, 8, 8, 8, 8, 4, 1]>>
-  // CHECK: %[[TRANSPOSE_A:.+]] = memref.transpose %[[RECAST_A]]
-  // CHECK-SAME: (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11) -> (d0, d6, d1, d7, d2, d8, d3, d9, d4, d10, d5, d11)
-  // CHECK-SAME: to memref<1x1x4x1x1x1x1x1x32x2x1x4xf16, strided<[1024, 8, 256, 8, 256, 8, 256, 8, 8, 4, 8, 1]>>
-  // CHECK: %[[READ_A:.+]] = vector.transfer_read %[[TRANSPOSE_A]][%c0, %c0, %[[WG]]#1, %c0, %c0, %c0, %c0, %c0, %[[LANE]]#2, %[[LANE]]#1, %c0, %c0], {{.*}} : {{.*}}, vector<1x1x1x1x1x4xf16>
-  // CHECK: %[[A:.+]] = iree_vector_ext.to_simd %[[READ_A]] : vector<1x1x1x1x1x4xf16> -> vector<128x8xf16>
+  // CHECK-DAG: %[[LHSM:.+]] = affine.linearize_index disjoint [%[[WG]]#1, %[[LANE]]#2]
+  // LHSK = RHSK
+  // CHECK-DAG: %[[LHSK:.+]] = affine.linearize_index disjoint [%[[LANE]]#1, %c0] by (2, 4)
+  // CHECK-DAG: transfer_read %{{.*}}[%[[LHSM]], %[[LHSK]]]
 
   // B: 8x64 with layout_b
-  // CHECK: %[[WG_N:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
-  // CHECK: %[[RECAST_B:.+]] = memref.reinterpret_cast %arg1 to offset: [0]
-  // CHECK-SAME: sizes: [1, 1, 1, 1, 2, 4, 1, 2, 1, 1, 32, 1], strides: [512, 512, 512, 512, 256, 64, 64, 32, 32, 32, 1, 1]
-  // CHECK-SAME: memref<8x64xf16> to memref<1x1x1x1x2x4x1x2x1x1x32x1xf16, strided<[512, 512, 512, 512, 256, 64, 64, 32, 32, 32, 1, 1]>>
-  // CHECK: %[[TRANSPOSE_B:.+]] = memref.transpose %[[RECAST_B]]
-  // CHECK-SAME: (d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11) -> (d0, d6, d1, d7, d2, d8, d3, d9, d4, d10, d5, d11)
-  // CHECK-SAME: to memref<1x1x1x2x1x1x1x1x2x32x4x1xf16, strided<[512, 64, 512, 32, 512, 32, 512, 32, 256, 1, 64, 1]>>
-  // CHECK: %[[READ_B:.+]] = vector.transfer_read %[[TRANSPOSE_B]][%c0, %c0, %c0, %[[WG_N]]#1, %c0, %c0, %c0, %c0, %[[LANE]]#1, %[[LANE]]#2, %c0, %c0], {{.*}} : {{.*}}, vector<1x1x1x1x4x1xf16>
-  // CHECK: %[[B:.+]] = iree_vector_ext.to_simd %[[READ_B]] : vector<1x1x1x1x4x1xf16> -> vector<8x64xf16>
+  // This doesn't canonicalize away currently, but could be equivalent to %WG
+  // CHECK-DAG: %[[WG_N:.+]]:3 = affine.delinearize_index %[[IDX]] into (2, 64)
+  // CHECK-DAG: %[[RHSN_DUP_WG:.+]] = affine.linearize_index disjoint [%[[WG_N]]#1, %[[LANE]]#2] by (2, 32)
+  // CHECK-DAG: transfer_read %{{.*}}[%[[LHSK]], %[[RHSN_DUP_WG]]]
 
   // C: 128x64 with layout_c
   // CHECK: %[[RECAST_C:.+]] = memref.reinterpret_cast %arg2 to offset: [0]
