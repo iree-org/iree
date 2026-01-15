@@ -21,6 +21,7 @@ exports_files([
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "IREECPUAttrs.td",
             "IREECPUDialect.td",

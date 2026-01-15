@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     timeout = "moderate",
     srcs = enforce_glob(
+        # keep sorted
         [
             "compile_regressions.mlir",
             "failing.mlir",
