@@ -53,8 +53,9 @@ Type FlowDialect::parseType(DialectAsmParser &parser) const {
   Type type;
   OptionalParseResult parseResult =
       generatedTypeParser(parser, &mnemonic, type);
-  if (parseResult.has_value())
+  if (parseResult.has_value()) {
     return type;
+  }
   parser.emitError(parser.getCurrentLocation())
       << "unknown Flow type: " << mnemonic;
   return {};

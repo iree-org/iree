@@ -69,8 +69,9 @@ struct StripResourceConversionCastPattern
   LogicalResult matchAndRewrite(UnrealizedConversionCastOp castOp,
                                 PatternRewriter &rewriter) const override {
     auto result = castOp.getResult(0);
-    if (!isa<IREE::Stream::ResourceType>(result.getType()))
+    if (!isa<IREE::Stream::ResourceType>(result.getType())) {
       return failure();
+    }
     assert(castOp.getNumOperands() == 2 &&
            "expect resource, index -> resource");
     auto resourceValue = castOp.getOperand(0);

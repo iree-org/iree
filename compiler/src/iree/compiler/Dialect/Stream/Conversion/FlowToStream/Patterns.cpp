@@ -85,8 +85,9 @@ public:
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto attrType = dyn_cast<RankedTensorType>(constantOp.getValue().getType());
-    if (!attrType)
+    if (!attrType) {
       return failure();
+    }
     auto resultType = constantOp.getType();
 
     // If the op is acting as a dynamic value then preserve that behavior by
@@ -355,13 +356,16 @@ struct ConvertTensorUpdateOp
 };
 
 static bool isScalarTensor(RankedTensorType type) {
-  if (type.getRank() == 0)
+  if (type.getRank() == 0) {
     return true; // tensor<i32>
-  if (!type.hasStaticShape())
+  }
+  if (!type.hasStaticShape()) {
     return false; // tensor<...?...xi32>
+  }
   int64_t elementCount = 1;
-  for (int64_t dim : type.getShape())
+  for (int64_t dim : type.getShape()) {
     elementCount *= dim;
+  }
   return elementCount == 1; // tensor<1xi32> or tensor<1x1x1xi32>
 }
 
@@ -1002,8 +1006,9 @@ static bool insertBindingOp(BlockArgument arg,
                             IREE::TensorExt::DispatchTensorType tensorType,
                             Value zero, OpBuilder &builder) {
   // No uses: don't need a binding op.
-  if (arg.use_empty())
+  if (arg.use_empty()) {
     return true;
+  }
 
   // Find the dynamic dimension SSA values of the argument within the region.
   // If the flow dialect properly modeled dimension associations we wouldn't
@@ -1018,8 +1023,9 @@ static bool insertBindingOp(BlockArgument arg,
     IREE::Flow::DispatchTieShapeOp tieShapeOp;
     for (auto user : arg.getUsers()) {
       tieShapeOp = dyn_cast<IREE::Flow::DispatchTieShapeOp>(user);
-      if (tieShapeOp)
+      if (tieShapeOp) {
         break;
+      }
     }
     if (tieShapeOp) {
       // Found a tie shape op - we'll insert ourselves there.
@@ -1125,8 +1131,9 @@ struct ConvertExecutableOp
       // Dispatch tensor arguments become bindings and all others are preserved
       // as adaptor. Note that we only touch public (exported) functions.
       for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-        if (!funcOp.isPublic())
+        if (!funcOp.isPublic()) {
           continue;
+        }
 
         SmallVector<Type> newTypes;
         newTypes.reserve(funcOp.getNumArguments());

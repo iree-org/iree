@@ -64,8 +64,9 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp,
   // Gather all of the resource globals in the root.
   for (auto &region : rootOp->getRegions()) {
     for (auto globalOp : region.getOps<IREE::Util::GlobalOp>()) {
-      if (!isa<IREE::Stream::ResourceType>(globalOp.getType()))
+      if (!isa<IREE::Stream::ResourceType>(globalOp.getType())) {
         continue;
+      }
       expandedGlobals[globalOp.getName()].resourceOp = globalOp;
     }
   }
@@ -113,8 +114,9 @@ static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
 // Expands resources in the given |types| list to (timepoint, resource).
 // This could be changed to some iterator magic to avoid the alloc.
 static SmallVector<Type> expandTypes(TypeRange types) {
-  if (types.empty())
+  if (types.empty()) {
     return {};
+  }
   SmallVector<Type> newTypes;
   newTypes.reserve(types.size() * 2);
   for (auto type : types) {
@@ -199,8 +201,9 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
   if (auto sizeAwareOp = dyn_cast_if_present<IREE::Util::SizeAwareOpInterface>(
           resourceValue.getDefiningOp())) {
     auto sizeValue = sizeAwareOp.getResultSizeFromValue(resourceValue);
-    if (sizeValue)
+    if (sizeValue) {
       return sizeValue;
+    }
   }
 
   // Try first to scan uses in the IR. Since we carry the shape in most ops we
@@ -208,11 +211,13 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
   for (auto &use : resourceValue.getUses()) {
     auto sizeAwareOp =
         dyn_cast<IREE::Util::SizeAwareOpInterface>(use.getOwner());
-    if (!sizeAwareOp)
+    if (!sizeAwareOp) {
       continue;
+    }
     auto sizeValue = sizeAwareOp.getOperandSize(use.getOperandNumber());
-    if (!sizeValue)
+    if (!sizeValue) {
       continue;
+    }
     if (sizeValue.getParentRegion()->isProperAncestor(
             builder.getInsertionBlock()->getParent())) {
       // Size value found and implicitly captured; we can reuse (could be
@@ -242,16 +247,19 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
 static void expandRegion(Region &region, bool canModifyEntryBlock,
                          SymbolTable &symbolTable, ExpandedGlobalMap &globalMap,
                          IRMapping &resourceTimepointMap) {
-  if (region.empty())
+  if (region.empty()) {
     return;
+  }
 
   // Update all block arguments.
   auto timepointType = IREE::Stream::TimepointType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
-    if (!llvm::any_of(block.getArgumentTypes(), isResourceType))
+    if (!llvm::any_of(block.getArgumentTypes(), isResourceType)) {
       continue;
-    if (block.isEntryBlock() && !canModifyEntryBlock)
+    }
+    if (block.isEntryBlock() && !canModifyEntryBlock) {
       continue;
+    }
 
     // Insert and build a list of expanded (timepoint, resource) pairs.
     // Don't add mappings here - we need to check if wrapExpandedBlockArgFn
@@ -259,8 +267,9 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
     SmallVector<std::pair<Value, Value>> expansions;
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto resourceArg = block.getArgument(i);
-      if (!isResourceType(resourceArg.getType()))
+      if (!isResourceType(resourceArg.getType())) {
         continue;
+      }
       auto timepointArg =
           block.insertArgument(i + 1, timepointType, resourceArg.getLoc());
       expansions.push_back(std::make_pair(timepointArg, resourceArg));
@@ -272,8 +281,9 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
       // If the resource already has an associated timepoint mapping from the
       // region branch expansion (wrapExpandedBlockArgFn), defer awaiting to
       // the consumer to avoid over-synchronization at block boundaries.
-      if (resourceTimepointMap.contains(resource))
+      if (resourceTimepointMap.contains(resource)) {
         continue;
+      }
       // Add the mapping for this block arg since we're inserting an await.
       resourceTimepointMap.map(resource, timepoint);
       // If we can look down the chain and see the size then we can use that.
@@ -325,8 +335,9 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
 static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
                                ExpandedGlobalMap &globalMap,
                                IRMapping &resourceTimepointMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   auto &expandedGlobal = globalMap[op.getGlobalName()];
   auto timepoint = expandedGlobal.timepointOp.createLoadOp(op.getLoc(), builder)
@@ -369,8 +380,9 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
 static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
                                 ExpandedGlobalMap &globalMap,
                                 IRMapping &resourceTimepointMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   auto timepointOperand = consumeTimepoint(
       op.getLoc(), op.getStoredGlobalValue(), resourceTimepointMap, builder);
@@ -433,13 +445,15 @@ static void expandFuncOp(IREE::Util::FuncOp op, SymbolTable &symbolTable,
 //  stream.timepoint.await %rt, %t
 static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
                          IRMapping &resourceTimepointMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
 
   // Ignore calls to public/external functions.
   auto calleeOp = symbolTable.lookup<CallableOpInterface>(op.getCallee());
-  if (IREE::Util::isPublicOrExternal(calleeOp))
+  if (IREE::Util::isPublicOrExternal(calleeOp)) {
     return;
+  }
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
@@ -490,10 +504,13 @@ static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
 //  util.return %t, %0
 static void expandReturnOp(IREE::Util::ReturnOp op,
                            IRMapping &resourceTimepointMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
-  if (IREE::Util::isPublicOrExternal(op->getParentOfType<IREE::Util::FuncOp>()))
+  }
+  if (IREE::Util::isPublicOrExternal(
+          op->getParentOfType<IREE::Util::FuncOp>())) {
     return;
+  }
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(),
                                  resourceTimepointMap, builder);
@@ -514,8 +531,9 @@ static void expandReturnOp(IREE::Util::ReturnOp op,
 //    %1 = stream.timepoint.await %bb_t, %bb_0
 static void expandBranchOp(mlir::cf::BranchOp op,
                            IRMapping &resourceTimepointMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getDestOperands(),
                                  resourceTimepointMap, builder);
@@ -525,8 +543,9 @@ static void expandBranchOp(mlir::cf::BranchOp op,
 
 static void expandCondBranchOp(mlir::cf::CondBranchOp op,
                                IRMapping &resourceTimepointMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   mlir::cf::CondBranchOp::create(
       builder, op.getLoc(), op.getCondition(), op.getTrueDest(),
@@ -540,8 +559,9 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op,
 
 static void expandSwitchOp(mlir::cf::SwitchOp op,
                            IRMapping &resourceTimepointMap) {
-  if (!usesResources(op))
+  if (!usesResources(op)) {
     return;
+  }
   OpBuilder builder(op);
   auto caseOperands = llvm::to_vector(
       llvm::map_range(op.getCaseOperands(), [&](ValueRange operands) {
@@ -577,8 +597,9 @@ static void expandAwaitOp(IREE::Stream::TimepointAwaitOp op,
     // mappings to leak between sibling regions (e.g., scf.if then/else
     // branches), leading to invalid IR where one branch tries to use a
     // timepoint defined in another branch.
-    if (isa<BlockArgument>(inputOperand))
+    if (isa<BlockArgument>(inputOperand)) {
       continue;
+    }
     resourceTimepointMap.map(inputOperand, op.getAwaitTimepoint());
   }
 }

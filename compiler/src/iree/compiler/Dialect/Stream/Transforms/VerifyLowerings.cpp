@@ -122,15 +122,17 @@ public:
 
       // Check types for operands/results.
       for (auto operandType : llvm::enumerate(op->getOperandTypes())) {
-        if (isTypeLegal(operandType.value()))
+        if (isTypeLegal(operandType.value())) {
           continue;
+        }
         emitIllegalTypeError(op, "operand", operandType.index(),
                              operandType.value());
         foundAnyIllegal = true;
       }
       for (auto resultType : llvm::enumerate(op->getResultTypes())) {
-        if (isTypeLegal(resultType.value()))
+        if (isTypeLegal(resultType.value())) {
           continue;
+        }
         emitIllegalTypeError(op, "result", resultType.index(),
                              resultType.value());
         foundAnyIllegal = true;
@@ -358,8 +360,9 @@ struct VerifyLoweringToAsyncPass
           }
 
           // Allow metadata ops outside of execution regions.
-          if (op.isMetadata())
+          if (op.isMetadata()) {
             return Verifier::Legality::LEGAL;
+          }
 
           // TODO(benvanik): execution region interface to make this generic.
           if (!op->template getParentOfType<IREE::Stream::AsyncExecuteOp>()) {

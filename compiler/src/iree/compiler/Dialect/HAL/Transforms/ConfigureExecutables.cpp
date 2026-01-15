@@ -49,8 +49,9 @@ class ConfigureTargetExecutableVariantsPass
 
   void runOnOperation() override {
     IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-    if (variantOp.getTarget().getBackend().getValue() != target)
+    if (variantOp.getTarget().getBackend().getValue() != target) {
       return;
+    }
 
     auto targetBackend = targetRegistry->getTargetBackend(target);
     if (!targetBackend) {

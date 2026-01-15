@@ -91,8 +91,9 @@ struct ElideRedundantCommandsPass
           stateMap[commandBuffer].previousFullBarrier = {};
         };
         for (auto &op : llvm::make_early_inc_range(block.getOperations())) {
-          if (!op.getDialect())
+          if (!op.getDialect()) {
             continue;
+          }
           TypeSwitch<Operation *>(&op)
               .Case([&](IREE::HAL::CommandBufferFinalizeOp op) {
                 invalidateState(op.getCommandBuffer());

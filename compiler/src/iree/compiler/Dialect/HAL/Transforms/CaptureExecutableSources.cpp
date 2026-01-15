@@ -35,8 +35,9 @@ static void insertDictionaryAttrEntry(Operation *op, StringRef dictionaryName,
                                       StringRef key, Attribute value) {
   NamedAttrList attrs;
   auto dictionaryAttr = op->getAttrOfType<DictionaryAttr>(dictionaryName);
-  if (dictionaryAttr)
+  if (dictionaryAttr) {
     attrs.assign(dictionaryAttr.getValue());
+  }
   attrs.set(key, value);
   op->setAttr(dictionaryName, DictionaryAttr::get(op->getContext(), attrs));
 }
@@ -67,15 +68,17 @@ struct CaptureExecutableSourcesPass
       for (auto variantOp :
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
         // Skip externally defined variants as there's no source to capture.
-        if (variantOp.isExternal())
+        if (variantOp.isExternal()) {
           continue;
+        }
 
         // Ignore if there is already source assigned.
         auto fileName = (moduleName + "_" + executableOp.getName() + "_" +
                          variantOp.getName() + "." + stage + ".mlir")
                             .str();
-        if (hasDictionaryAttrEntry(variantOp, "sources", fileName))
+        if (hasDictionaryAttrEntry(variantOp, "sources", fileName)) {
           continue;
+        }
 
         // Create a standalone executable with just the variant being captured.
         // This allows the source to be passed to iree-compile in the

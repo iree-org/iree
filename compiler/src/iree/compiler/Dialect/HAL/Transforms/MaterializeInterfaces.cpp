@@ -295,8 +295,9 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
                     IREE::HAL::PipelineLayoutAttr pipelineLayoutAttr,
                     int64_t bindingOrdinal,
                     IREE::HAL::PipelineBindingAttr bindingAttr) {
-  if (arg.use_empty())
+  if (arg.use_empty()) {
     return; // no-op
+  }
   for (auto &use : llvm::make_early_inc_range(arg.getUses())) {
     auto oldOp = dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner());
     assert(oldOp && "bindings are only usable by stream.binding.subspan");
