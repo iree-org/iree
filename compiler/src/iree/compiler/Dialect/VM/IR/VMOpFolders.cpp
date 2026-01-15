@@ -44,8 +44,9 @@ Attribute oneOfType(Type type) {
   } else if (isa<RankedTensorType, VectorType>(type)) {
     auto vtType = cast<ShapedType>(type);
     auto element = oneOfType(vtType.getElementType());
-    if (!element)
+    if (!element) {
       return {};
+    }
     return DenseElementsAttr::get(vtType, element);
   }
   return {};
@@ -64,8 +65,9 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getBody().getBlocks().size() != 1)
+    if (op.getBody().getBlocks().size() != 1) {
       return failure();
+    }
     auto &block = op.getBody().front();
     if (block.empty() || isa<ReturnOp>(block.front())) {
       rewriter.eraseOp(op);
@@ -85,12 +87,14 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
                                 PatternRewriter &rewriter) const override {
     SmallVector<Operation *> deadOps;
     op.walk([&](Operation *op) {
-      if (!isGlobalStoreOp(op))
+      if (!isGlobalStoreOp(op)) {
         return;
+      }
       auto value = op->getOperand(0);
       Attribute valueAttr;
-      if (!matchPattern(value, m_Constant(&valueAttr)))
+      if (!matchPattern(value, m_Constant(&valueAttr))) {
         return;
+      }
       auto globalRefAttr = op->getAttrOfType<SymbolRefAttr>("global");
       assert(globalRefAttr);
       auto globalOp =
@@ -100,10 +104,12 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
           globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
       deadOps.push_back(op);
     });
-    if (deadOps.empty())
+    if (deadOps.empty()) {
       return failure();
-    for (auto deadOp : deadOps)
+    }
+    for (auto deadOp : deadOps) {
       rewriter.eraseOp(deadOp);
+    }
     return success();
   }
 
@@ -135,14 +141,17 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getInitialValue().has_value())
+    if (!op.getInitialValue().has_value()) {
       return failure();
+    }
     if (auto value = dyn_cast<IntegerAttr>(op.getInitialValueAttr())) {
-      if (value.getValue() != 0)
+      if (value.getValue() != 0) {
         return failure();
+      }
     } else if (auto value = dyn_cast<FloatAttr>(op.getInitialValueAttr())) {
-      if (value.getValue().isNonZero())
+      if (value.getValue().isNonZero()) {
         return failure();
+      }
     }
     auto visibility = op.getVisibility();
     auto newOp = rewriter.replaceOpWithNewOp<T>(
@@ -488,8 +497,9 @@ static Attribute constFoldUnaryOp(Attribute rawOperand,
                  dyn_cast_if_present<SplatElementsAttr>(rawOperand)) {
     auto elementResult = constFoldUnaryOp<AttrElementT>(
         {operand.getSplatValue<Attribute>()}, calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     return DenseElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand = dyn_cast_if_present<ElementsAttr>(rawOperand)) {
     return cast<DenseIntOrFPElementsAttr>(operand).mapValues(
@@ -511,8 +521,9 @@ constFoldFloatUnaryOp(Attribute rawOperand,
                  dyn_cast_if_present<SplatElementsAttr>(rawOperand)) {
     auto elementResult =
         constFoldFloatUnaryOp({operand.getSplatValue<Attribute>()}, calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     return DenseElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand = dyn_cast_if_present<ElementsAttr>(rawOperand)) {
     return cast<DenseIntOrFPElementsAttr>(operand).mapValues(
@@ -535,33 +546,38 @@ static TypedAttr constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
                                    const CalculationT &calculate) {
   if (auto lhs = dyn_cast_if_present<AttrElementT>(rawLhs)) {
     auto rhs = dyn_cast_if_present<AttrElementT>(rawRhs);
-    if (!rhs)
+    if (!rhs) {
       return {};
+    }
     return AttrElementT::get(lhs.getType(),
                              calculate(lhs.getValue(), rhs.getValue()));
   } else if (auto lhs = dyn_cast_if_present<SplatElementsAttr>(rawLhs)) {
     // TODO(benvanik): handle splat/otherwise.
     auto rhs = dyn_cast_if_present<SplatElementsAttr>(rawRhs);
-    if (!rhs || lhs.getType() != rhs.getType())
+    if (!rhs || lhs.getType() != rhs.getType()) {
       return {};
+    }
     auto elementResult = constFoldBinaryOp<AttrElementT>(
         lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>(),
         calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     return DenseElementsAttr::get(lhs.getType(), elementResult);
   } else if (auto lhs = dyn_cast_if_present<ElementsAttr>(rawLhs)) {
     auto rhs = dyn_cast_if_present<ElementsAttr>(rawRhs);
-    if (!rhs || lhs.getType() != rhs.getType())
+    if (!rhs || lhs.getType() != rhs.getType()) {
       return {};
+    }
     auto lhsIt = lhs.getValues<AttrElementT>().begin();
     auto rhsIt = rhs.getValues<AttrElementT>().begin();
     SmallVector<Attribute> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldBinaryOp<AttrElementT>(*lhsIt, *rhsIt, calculate);
-      if (!resultAttrs[i])
+      if (!resultAttrs[i]) {
         return {};
+      }
       ++lhsIt;
       ++rhsIt;
     }
@@ -597,8 +613,9 @@ static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
     auto elementResult = constFoldTernaryOp<AttrElementT>(
         a.getSplatValue<Attribute>(), b.getSplatValue<Attribute>(),
         c.getSplatValue<Attribute>(), calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     return DenseElementsAttr::get(a.getType(), elementResult);
   } else if (auto a = dyn_cast_if_present<ElementsAttr>(rawA)) {
     auto b = dyn_cast_if_present<ElementsAttr>(rawB);
@@ -613,8 +630,9 @@ static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
     for (int64_t i = 0; i < a.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldTernaryOp<AttrElementT>(*aIt, *bIt, *cIt, calculate);
-      if (!resultAttrs[i])
+      if (!resultAttrs[i]) {
         return {};
+      }
       ++aIt;
       ++bIt;
       ++cIt;
@@ -669,14 +687,16 @@ static OpFoldResult foldAddOp(ADD op, Attribute lhs, Attribute rhs) {
   if (auto subOp = dyn_cast_if_present<SUB>(op.getLhs().getDefiningOp())) {
     // t = vm.sub x, y
     //   = vm.add t, z
-    if (subOp.getRhs() == op.getRhs()) // y == z:
-      return subOp.getLhs();           // (x - y) + y = x
+    if (subOp.getRhs() == op.getRhs()) { // y == z:
+      return subOp.getLhs();             // (x - y) + y = x
+    }
   } else if (auto subOp =
                  dyn_cast_if_present<SUB>(op.getRhs().getDefiningOp())) {
     // t = vm.sub x, y
     //   = vm.add z, t
-    if (subOp.getRhs() == op.getLhs()) // y == z:
-      return subOp.getLhs();           // y + (x - y) = x
+    if (subOp.getRhs() == op.getLhs()) { // y == z:
+      return subOp.getLhs();             // y + (x - y) = x
+    }
   }
   return constFoldBinaryOp<AttrElementT>(
       lhs, rhs,
@@ -716,10 +736,12 @@ static OpFoldResult foldSubOp(SUB op, Attribute lhs, Attribute rhs) {
   if (auto addOp = dyn_cast_if_present<ADD>(op.getLhs().getDefiningOp())) {
     // t = vm.add x, y
     //   = vm.sub t, z
-    if (addOp.getLhs() == op.getRhs()) // x == z:
-      return addOp.getRhs();           // (x + y) - x = y
-    if (addOp.getRhs() == op.getRhs()) // y == z:
-      return addOp.getLhs();           // (x + y) - y = x
+    if (addOp.getLhs() == op.getRhs()) { // x == z:
+      return addOp.getRhs();             // (x + y) - x = y
+    }
+    if (addOp.getRhs() == op.getRhs()) { // y == z:
+      return addOp.getLhs();             // (x + y) - y = x
+    }
   }
   return constFoldBinaryOp<AttrElementT>(
       lhs, rhs,
@@ -764,8 +786,9 @@ struct FoldConstantMulOperand : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     AttrElementT c1, c2;
-    if (!matchPattern(op.getRhs(), m_Constant(&c1)))
+    if (!matchPattern(op.getRhs(), m_Constant(&c1))) {
       return failure();
+    }
     if (auto mulOp = dyn_cast_if_present<T>(op.getLhs().getDefiningOp())) {
       if (matchPattern(mulOp.getRhs(), m_Constant(&c2))) {
         auto c = rewriter.createOrFold<CONST_OP>(
@@ -980,8 +1003,9 @@ OpFoldResult AbsI64Op::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MinI32SOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::smin(lhs, rhs);
@@ -989,8 +1013,9 @@ OpFoldResult MinI32SOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MinI64SOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::smin(lhs, rhs);
@@ -998,8 +1023,9 @@ OpFoldResult MinI64SOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MinI32UOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::umin(lhs, rhs);
@@ -1007,8 +1033,9 @@ OpFoldResult MinI32UOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MinI64UOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::umin(lhs, rhs);
@@ -1016,8 +1043,9 @@ OpFoldResult MinI64UOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxI32SOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::smax(lhs, rhs);
@@ -1025,8 +1053,9 @@ OpFoldResult MaxI32SOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxI64SOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::smax(lhs, rhs);
@@ -1034,8 +1063,9 @@ OpFoldResult MaxI64SOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxI32UOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::umax(lhs, rhs);
@@ -1043,8 +1073,9 @@ OpFoldResult MaxI32UOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxI64UOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::umax(lhs, rhs);
@@ -1274,16 +1305,18 @@ OpFoldResult MinF64Op::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxF32Op::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<FloatAttr>(
       operands.getLhs(), operands.getRhs(),
       [](const APFloat &a, const APFloat &b) { return llvm::maxnum(a, b); });
 }
 
 OpFoldResult MaxF64Op::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<FloatAttr>(
       operands.getLhs(), operands.getRhs(),
       [](const APFloat &a, const APFloat &b) { return llvm::maxnum(a, b); });
@@ -1810,8 +1843,9 @@ struct FoldCastRefIntoOpResult : public OpRewritePattern<CastOp> {
                                 PatternRewriter &rewriter) const override {
     auto zeroOp = dyn_cast_if_present<ConstRefZeroOp>(
         castOp.getOperand().getDefiningOp());
-    if (!zeroOp)
+    if (!zeroOp) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<ConstRefZeroOp>(castOp,
                                                 castOp.getResult().getType());
     return success();
@@ -1821,8 +1855,9 @@ struct FoldCastRefIntoOpResult : public OpRewritePattern<CastOp> {
 } // namespace
 
 OpFoldResult CastAnyRefOp::fold(FoldAdaptor operands) {
-  if (getOperand().getType() == getResult().getType())
+  if (getOperand().getType() == getResult().getType()) {
     return getOperand();
+  }
   if (auto castOp =
           dyn_cast_if_present<CastRefAnyOp>(getOperand().getDefiningOp())) {
     if (castOp.getOperand().getType() == getResult().getType()) {
@@ -1838,8 +1873,9 @@ void CastAnyRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 OpFoldResult CastRefAnyOp::fold(FoldAdaptor operands) {
-  if (getOperand().getType() == getResult().getType())
+  if (getOperand().getType() == getResult().getType()) {
     return getOperand();
+  }
   if (auto castOp =
           dyn_cast_if_present<CastAnyRefOp>(getOperand().getDefiningOp())) {
     if (castOp.getOperand().getType() == getResult().getType()) {
@@ -1894,8 +1930,9 @@ static Attribute constFoldBinaryCmpOp(Attribute rawLhs, Attribute rawRhs,
                                       const CalculationT &calculate) {
   if (auto lhs = dyn_cast_if_present<AttrElementT>(rawLhs)) {
     auto rhs = dyn_cast_if_present<AttrElementT>(rawRhs);
-    if (!rhs)
+    if (!rhs) {
       return {};
+    }
     auto boolType = IntegerType::get(lhs.getContext(), 32);
     return AttrElementT::get(boolType,
                              calculate(lhs.getValue(), rhs.getValue()));
@@ -2321,35 +2358,40 @@ static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
                                        const CalculationT &calculate) {
   if (auto lhs = dyn_cast_if_present<AttrElementT>(rawLhs)) {
     auto rhs = dyn_cast_if_present<AttrElementT>(rawRhs);
-    if (!rhs)
+    if (!rhs) {
       return {};
+    }
     return IntegerAttr::get(IntegerType::get(lhs.getContext(), 32),
                             calculate(lhs.getValue(), rhs.getValue()));
   } else if (auto lhs = dyn_cast_if_present<SplatElementsAttr>(rawLhs)) {
     // TODO(benvanik): handle splat/otherwise.
     auto rhs = dyn_cast_if_present<SplatElementsAttr>(rawRhs);
-    if (!rhs || lhs.getType() != rhs.getType())
+    if (!rhs || lhs.getType() != rhs.getType()) {
       return {};
+    }
     auto elementResult = constFoldBinaryCmpFOp<AttrElementT>(
         lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>(),
         calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     auto resultType =
         lhs.getType().clone({}, IntegerType::get(lhs.getContext(), 32));
     return DenseElementsAttr::get(resultType, elementResult);
   } else if (auto lhs = dyn_cast_if_present<ElementsAttr>(rawLhs)) {
     auto rhs = dyn_cast_if_present<ElementsAttr>(rawRhs);
-    if (!rhs || lhs.getType() != rhs.getType())
+    if (!rhs || lhs.getType() != rhs.getType()) {
       return {};
+    }
     auto lhsIt = lhs.getValues<AttrElementT>().begin();
     auto rhsIt = rhs.getValues<AttrElementT>().begin();
     SmallVector<Attribute> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldBinaryCmpFOp<AttrElementT>(*lhsIt, *rhsIt, calculate);
-      if (!resultAttrs[i])
+      if (!resultAttrs[i]) {
         return {};
+      }
       ++lhsIt;
       ++rhsIt;
     }
@@ -2979,22 +3021,27 @@ static LogicalResult collapseBranch(Block *&successor,
     return failure();
   }
   // Check that the successor only contains a unconditional branch.
-  if (std::next(successor->begin()) != successor->end())
+  if (std::next(successor->begin()) != successor->end()) {
     return failure();
+  }
   // Check that the terminator is an unconditional branch.
   BranchOp successorBranch = dyn_cast<BranchOp>(successor->getTerminator());
-  if (!successorBranch)
+  if (!successorBranch) {
     return failure();
+  }
   // Check that the arguments are only used within the terminator.
   for (BlockArgument arg : successor->getArguments()) {
-    for (Operation *user : arg.getUsers())
-      if (user != successorBranch)
+    for (Operation *user : arg.getUsers()) {
+      if (user != successorBranch) {
         return failure();
+      }
+    }
   }
   // Don't try to collapse branches to infinite loops.
   Block *successorDest = successorBranch.getDest();
-  if (successorDest == successor)
+  if (successorDest == successor) {
     return failure();
+  }
 
   // Update the operands to the successor. If the branch parent has no
   // arguments, we can use the branch operands directly.
@@ -3008,10 +3055,11 @@ static LogicalResult collapseBranch(Block *&successor,
   // Otherwise, we need to remap any argument operands.
   for (Value operand : operands) {
     BlockArgument argOperand = dyn_cast<BlockArgument>(operand);
-    if (argOperand && argOperand.getOwner() == successor)
+    if (argOperand && argOperand.getOwner() == successor) {
       argStorage.push_back(successorOperands[argOperand.getArgNumber()]);
-    else
+    } else {
       argStorage.push_back(operand);
+    }
   }
   successor = successorDest;
   successorOperands = argStorage;
@@ -3312,8 +3360,9 @@ struct RequiredImportResolver : public OpRewritePattern<ImportResolvedOp> {
                                 PatternRewriter &rewriter) const override {
     auto importOp = SymbolTable::lookupNearestSymbolFrom<IREE::VM::ImportOp>(
         op, op.getImportAttr());
-    if (!importOp || importOp.getIsOptional())
+    if (!importOp || importOp.getIsOptional()) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(op, 1);
     return success();
   }

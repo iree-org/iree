@@ -76,8 +76,9 @@ class MaterializeRefDiscardsPass
   // to callee).
   bool isTerminatorMoveOperand(Value value, Operation *terminator) {
     auto refMoveOp = dyn_cast<IREE::VM::RefMoveInterface>(terminator);
-    if (!refMoveOp)
+    if (!refMoveOp) {
       return false;
+    }
 
     // Check if value is forwarded to any successor - if so, it's not a "pure"
     // MOVE to callee, it's a forward to successor block.
@@ -119,14 +120,16 @@ class MaterializeRefDiscardsPass
   bool isForwardedOnEdge(Value value, Block *pred, Block *succ) {
     Operation *terminator = pred->getTerminator();
     auto branchOp = dyn_cast<BranchOpInterface>(terminator);
-    if (!branchOp)
+    if (!branchOp) {
       return false;
+    }
 
     for (unsigned i = 0; i < terminator->getNumSuccessors(); ++i) {
       if (terminator->getSuccessor(i) == succ) {
         auto operands = branchOp.getSuccessorOperands(i);
-        if (llvm::is_contained(operands.getForwardedOperands(), value))
+        if (llvm::is_contained(operands.getForwardedOperands(), value)) {
           return true;
+        }
       }
     }
     return false;
@@ -223,8 +226,9 @@ class MaterializeRefDiscardsPass
 
   LogicalResult processFunction(FuncOp funcOp) {
     // Skip empty functions.
-    if (funcOp.getBlocks().empty())
+    if (funcOp.getBlocks().empty()) {
       return success();
+    }
 
     // Compute liveness information.
     ValueLiveness liveness;
@@ -278,8 +282,9 @@ class MaterializeRefDiscardsPass
 
         SmallVector<Value> dyingRefs;
         for (Value ref : allRefs) {
-          if (escapingRefs.count(ref))
+          if (escapingRefs.count(ref)) {
             continue;
+          }
 
           // Check if ref should be discarded on this edge.
           bool isInLiveOuts = llvm::is_contained(liveOuts, ref);
@@ -294,22 +299,26 @@ class MaterializeRefDiscardsPass
           }
 
           // Skip if ref is neither in liveOuts nor forwarded on any edge.
-          if (!isInLiveOuts && !isForwardedOnAny)
+          if (!isInLiveOuts && !isForwardedOnAny) {
             continue;
+          }
 
           // Skip if ref is live-in to successor.
-          if (llvm::is_contained(succLiveIns, ref))
+          if (llvm::is_contained(succLiveIns, ref)) {
             continue;
+          }
 
           // Skip if ref is forwarded on this specific edge.
-          if (isForwardedOnEdge(ref, &block, succ))
+          if (isForwardedOnEdge(ref, &block, succ)) {
             continue;
+          }
 
           // Skip if ref is a MOVE operand of the terminator.
           // MOVE operands transfer ownership to the callee, so we must NOT
           // discard them - the callee takes responsibility for the ref.
-          if (isTerminatorMoveOperand(ref, terminator))
+          if (isTerminatorMoveOperand(ref, terminator)) {
             continue;
+          }
 
           // Ref dies on this edge.
           dyingRefs.push_back(ref);
@@ -337,17 +346,20 @@ class MaterializeRefDiscardsPass
       llvm::DenseMap<Operation *, size_t> opToIndex;
 
       for (Operation &op : block) {
-        if (isa<IREE::VM::DiscardRefsOp>(&op))
+        if (isa<IREE::VM::DiscardRefsOp>(&op)) {
           continue;
+        }
 
         for (OpOperand &operand : op.getOpOperands()) {
           Value value = operand.get();
-          if (!isa<IREE::VM::RefType>(value.getType()))
+          if (!isa<IREE::VM::RefType>(value.getType())) {
             continue;
+          }
 
           // Skip escaping refs.
-          if (escapingRefs.count(value))
+          if (escapingRefs.count(value)) {
             continue;
+          }
 
           // Check if this is the last use and value doesn't escape via
           // live-outs.
@@ -408,8 +420,9 @@ class MaterializeRefDiscardsPass
       // Unused block arguments.
       SmallVector<Value> unusedBlockArgs;
       for (BlockArgument arg : block.getArguments()) {
-        if (!isa<IREE::VM::RefType>(arg.getType()))
+        if (!isa<IREE::VM::RefType>(arg.getType())) {
           continue;
+        }
         if (arg.use_empty() && !escapingRefs.count(arg)) {
           unusedBlockArgs.push_back(arg);
         }
@@ -425,8 +438,9 @@ class MaterializeRefDiscardsPass
       llvm::DenseMap<Operation *, size_t> opToResultIndex;
       for (Operation &op : block) {
         for (Value result : op.getResults()) {
-          if (!isa<IREE::VM::RefType>(result.getType()))
+          if (!isa<IREE::VM::RefType>(result.getType())) {
             continue;
+          }
           if (result.use_empty() && !escapingRefs.count(result)) {
             auto it = opToResultIndex.find(&op);
             if (it == opToResultIndex.end()) {

@@ -36,8 +36,9 @@ LogicalResult LiveIntervals::annotateIR(IREE::VM::FuncOp funcOp) {
 
   // Annotate each block with its instruction range.
   for (auto *block : liveIntervals.getBlockOrder()) {
-    if (block->empty())
+    if (block->empty()) {
       continue;
+    }
 
     uint32_t blockStart = liveIntervals.getInstructionIndex(&block->front());
     uint32_t blockEnd = liveIntervals.getInstructionIndex(&block->back());
@@ -55,8 +56,9 @@ LogicalResult LiveIntervals::annotateIR(IREE::VM::FuncOp funcOp) {
       uint32_t opIndex = liveIntervals.getInstructionIndex(&op);
       op.setAttr("op_index", builder.getI32IntegerAttr(opIndex));
 
-      if (op.getNumResults() == 0)
+      if (op.getNumResults() == 0) {
         continue;
+      }
 
       SmallVector<std::string, 4> intervalStrs;
       for (auto result : op.getResults()) {
@@ -141,8 +143,9 @@ LogicalResult LiveIntervals::build(IREE::VM::FuncOp funcOp) {
 
 const LiveInterval *LiveIntervals::getInterval(Value value) const {
   auto it = valueToInterval_.find(value);
-  if (it == valueToInterval_.end())
+  if (it == valueToInterval_.end()) {
     return nullptr;
+  }
   return &intervals_[it->second];
 }
 
@@ -168,8 +171,9 @@ void LiveIntervals::sortBlocksInDominanceOrder(IREE::VM::FuncOp funcOp) {
   }
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
-    if (markedBlocks.count(block) > 0)
+    if (markedBlocks.count(block) > 0) {
       return;
+    }
     for (auto *childBlock : dominanceInfo.getNode(block)->children()) {
       visit(childBlock->getBlock());
     }
@@ -201,8 +205,9 @@ void LiveIntervals::buildIntervals(ValueLiveness &liveness) {
   for (auto *block : blockOrder_) {
     // Process block arguments.
     for (auto blockArg : block->getArguments()) {
-      if (valueToInterval_.count(blockArg))
+      if (valueToInterval_.count(blockArg)) {
         continue;
+      }
 
       // Block arguments are "defined" at the start of the block.
       // We use the first op's index as the start.
@@ -228,8 +233,9 @@ void LiveIntervals::buildIntervals(ValueLiveness &liveness) {
       uint32_t opIndex = opToIndex_[&op];
 
       for (auto result : op.getResults()) {
-        if (valueToInterval_.count(result))
+        if (valueToInterval_.count(result)) {
           continue;
+        }
 
         uint32_t start = opIndex;
         uint32_t end = findLastUse(result, liveness);

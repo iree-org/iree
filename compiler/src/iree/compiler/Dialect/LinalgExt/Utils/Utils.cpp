@@ -461,8 +461,9 @@ FailureOr<IGEMMGenericConvDetails>
 getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
   MLIRContext *ctx = linalgOp->getContext();
-  if (failed(convDimsOrFailure))
+  if (failed(convDimsOrFailure)) {
     return failure();
+  }
   const mlir::linalg::ConvolutionDimensions &convDims = *convDimsOrFailure;
   LLVM_DEBUG({
     llvm::dbgs() << "conv: " << linalgOp;
@@ -524,8 +525,9 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     LDBG() << "output image or output channel dim not found in output.";
     return failure();
   }
-  if (outputChannelLastDim.value() < outputImageFirstDim.value())
+  if (outputChannelLastDim.value() < outputImageFirstDim.value()) {
     isOutputChannelFirst = true;
+  }
 
   SmallVector<int64_t> filterkPos;
   for (auto reductionDim : reductionDims) {
@@ -620,8 +622,9 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   // Lambda to remap conv dim indices to igemm dimensions.
   auto remapDims = [&](ArrayRef<unsigned> dims) -> SmallVector<AffineExpr> {
     SmallVector<AffineExpr> mapped;
-    for (unsigned d : dims)
+    for (unsigned d : dims) {
       mapped.push_back(convToIgemmDimMap.at(d));
+    }
     return mapped;
   };
 
@@ -721,8 +724,9 @@ static Value getSourceSkipUnary(Value value) {
   Operation *op = value.getDefiningOp();
   while (op && op->getNumOperands() == 1) {
     auto iface = dyn_cast<MemoryEffectOpInterface>(op);
-    if (!iface || !iface.hasNoEffect())
+    if (!iface || !iface.hasNoEffect()) {
       break;
+    }
     value = op->getOperand(0);
     op = value.getDefiningOp();
   }
@@ -782,13 +786,15 @@ template <typename AddOpTy, typename MulOpTy, typename... Args>
 static bool isPairTemplateImpl(Operation *add, Operation *mul) {
   static_assert(sizeof...(Args) % 2 == 0,
                 "expected an even number of template arguments");
-  if (isa<AddOpTy>(add) && isa<MulOpTy>(mul))
+  if (isa<AddOpTy>(add) && isa<MulOpTy>(mul)) {
     return true;
+  }
 
-  if constexpr (sizeof...(Args) > 0)
+  if constexpr (sizeof...(Args) > 0) {
     return isPairTemplateImpl<Args...>(add, mul);
-  else
+  } else {
     return false;
+  }
 }
 
 /// Returns true if the block is a body of a contraction with the kinds of
@@ -918,19 +924,22 @@ bool isArgmaxOp(linalg::GenericOp genericOp) {
 
   // TODO: Add better affine map checks.
   auto indexing_maps = genericOp.getIndexingMapsArray();
-  if (!indexing_maps[0].isIdentity())
+  if (!indexing_maps[0].isIdentity()) {
     return false;
+  }
 
   // Check that initial value is negative Infinite.
   // TODO: Move this check to ukernel once we implement
   //       variant to handle non neg-Inf initial value.
   Value initVal = genericOp.getDpsInitOperand(0)->get();
   auto fillOp = initVal.getDefiningOp<linalg::FillOp>();
-  if (!fillOp)
+  if (!fillOp) {
     return false;
+  }
   Value fillVal = fillOp.getDpsInputOperand(0)->get();
-  if (!matchPattern(fillVal, m_NegInfFloat()))
+  if (!matchPattern(fillVal, m_NegInfFloat())) {
     return false;
+  }
 
   // Work back from linalg.yield and check body of genericOp.
   // The genericOp should yield the result of an arith.select,
@@ -965,13 +974,15 @@ bool isArgmaxOp(linalg::GenericOp genericOp) {
     }
     auto selectOp = cast<arith::SelectOp>(producerOutput.getDefiningOp());
     Value trueVal = selectOp.getTrueValue();
-    if (auto castOp = trueVal.getDefiningOp<arith::IndexCastOp>())
+    if (auto castOp = trueVal.getDefiningOp<arith::IndexCastOp>()) {
       trueVal = castOp.getIn();
+    }
 
     // Ensure the true value is directly produced by linalg.index.
     auto indexOp = trueVal.getDefiningOp<linalg::IndexOp>();
-    if (!indexOp)
+    if (!indexOp) {
       return false;
+    }
   }
 
   // Producer of arith.select op is arith.cmpf
@@ -1034,11 +1045,13 @@ bool isPureBatchMatmul(Operation *op) {
 // it requires a single input where the indexing maps are full permutations and
 // non-equal.
 bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
+  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
     return false;
+  }
 
-  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
+  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1) {
     return false;
+  }
   auto mapRange = linalgOp.getIndexingMapsArray();
   if (mapRange.size() != 2 || !mapRange.front().isPermutation() ||
       !mapRange.back().isPermutation() || mapRange.front() == mapRange.back()) {

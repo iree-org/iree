@@ -65,19 +65,23 @@ void setResultIntegerName(OpAsmSetValueNameFn &setNameFn, Value result,
 // (type, type, ...)
 
 ParseResult parseResultTypeList(OpAsmParser &parser, ArrayAttr &resultTypes) {
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   SmallVector<Attribute> typeAttrs;
-  if (succeeded(parser.parseOptionalRParen()))
+  if (succeeded(parser.parseOptionalRParen())) {
     goto done; // empty list
+  }
   do {
     Type type;
-    if (failed(parser.parseType(type)))
+    if (failed(parser.parseType(type))) {
       return failure();
+    }
     typeAttrs.push_back(TypeAttr::get(type));
   } while (succeeded(parser.parseOptionalComma()));
-  if (failed(parser.parseRParen()))
+  if (failed(parser.parseRParen())) {
     return failure();
+  }
 done:
   resultTypes = parser.getBuilder().getArrayAttr(typeAttrs);
   return success();
@@ -172,9 +176,10 @@ Block *FuncOp::addEntryBlock() {
 
 LogicalResult FuncOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
-  if (!isa<FunctionType>(type))
+  if (!isa<FunctionType>(type)) {
     return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
+  }
   return success();
 }
 
@@ -404,9 +409,10 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
 LogicalResult ImportOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
-  if (!isa<FunctionType>(type))
+  if (!isa<FunctionType>(type)) {
     return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
+  }
   return success();
 }
 
@@ -609,8 +615,9 @@ static bool isConstFloatBuildableWith(TypedAttr value, Type type) {
   } else if (auto elementsAttr = dyn_cast<ElementsAttr>(value)) {
     elementType = elementsAttr.getShapedType().getElementType();
   }
-  if (!elementType)
+  if (!elementType) {
     return false;
+  }
   return elementType.getIntOrFloatBitWidth() == SZ;
 }
 
@@ -920,8 +927,9 @@ static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
   llvm::raw_string_ostream os(result);
   bool lastUnderscore = true;
   for (char c : unsafeIdentifier) {
-    if (!llvm::isPrint(c))
+    if (!llvm::isPrint(c)) {
       continue;
+    }
     if (llvm::isAlnum(c)) {
       os << llvm::toLower(c);
       lastUnderscore = false;
@@ -1410,8 +1418,9 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
               }
               p << tupleOperands;
               p << ')';
-              if (i < segmentSize - 1)
+              if (i < segmentSize - 1) {
                 p << ", ";
+              }
             }
           } else {
             SmallVector<Value> segmentOperands;
@@ -1562,32 +1571,39 @@ static ParseResult parseBranchTableCases(
     SmallVectorImpl<SmallVector<OpAsmParser::UnresolvedOperand>> &caseOperands,
     SmallVectorImpl<SmallVector<Type>> &caseOperandTypes) {
   if (parser.parseKeyword("default") || parser.parseColon() ||
-      parser.parseSuccessor(defaultDestination))
+      parser.parseSuccessor(defaultDestination)) {
     return failure();
+  }
   if (succeeded(parser.parseOptionalLParen())) {
     if (parser.parseOperandList(defaultOperands, OpAsmParser::Delimiter::None,
                                 /*allowResultNumber=*/false) ||
-        parser.parseColonTypeList(defaultOperandTypes) || parser.parseRParen())
+        parser.parseColonTypeList(defaultOperandTypes) ||
+        parser.parseRParen()) {
       return failure();
+    }
   }
   while (succeeded(parser.parseOptionalComma())) {
     int64_t index = 0;
-    if (failed(parser.parseInteger(index)))
+    if (failed(parser.parseInteger(index))) {
       return failure();
-    if (index != caseDestinations.size())
+    }
+    if (index != caseDestinations.size()) {
       return failure();
+    }
     Block *destination;
     SmallVector<OpAsmParser::UnresolvedOperand> operands;
     SmallVector<Type> operandTypes;
     if (failed(parser.parseColon()) ||
-        failed(parser.parseSuccessor(destination)))
+        failed(parser.parseSuccessor(destination))) {
       return failure();
+    }
     if (succeeded(parser.parseOptionalLParen())) {
       if (failed(parser.parseOperandList(operands, OpAsmParser::Delimiter::None,
                                          /*allowResultNumber=*/false)) ||
           failed(parser.parseColonTypeList(operandTypes)) ||
-          failed(parser.parseRParen()))
+          failed(parser.parseRParen())) {
         return failure();
+      }
     }
     caseDestinations.push_back(destination);
     caseOperands.emplace_back(operands);
@@ -1628,8 +1644,9 @@ Block *BranchTableOp::getSuccessorForOperands(ArrayRef<Attribute> operands) {
   SuccessorRange caseDestinations = getCaseDestinations();
   if (auto valueAttr = dyn_cast_if_present<IntegerAttr>(operands.front())) {
     int64_t value = valueAttr.getValue().getSExtValue();
-    if (value < 0 || value >= caseDestinations.size())
+    if (value < 0 || value >= caseDestinations.size()) {
       return getDefaultDestination();
+    }
     return caseDestinations[value];
   }
   return nullptr;

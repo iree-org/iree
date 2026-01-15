@@ -20,15 +20,17 @@ namespace mlir::iree_compiler {
 namespace {
 
 static Value castToI32(Value value, OpBuilder &builder) {
-  if (value.getType().isInteger(32))
+  if (value.getType().isInteger(32)) {
     return value;
+  }
   return builder.createOrFold<IREE::VM::TruncI64I32Op>(
       value.getLoc(), builder.getI32Type(), value);
 }
 
 static Value castToIndex(Value value, OpBuilder &builder) {
-  if (value.getType().isIndex())
+  if (value.getType().isIndex()) {
     return value;
+  }
   return builder.createOrFold<arith::IndexCastOp>(
       value.getLoc(), builder.getIndexType(), value);
 }
@@ -200,8 +202,9 @@ void populateUtilListToVMPatterns(MLIRContext *context,
         } else {
           elementType = typeConverter.convertType(type.getElementType());
         }
-        if (!elementType)
+        if (!elementType) {
           return std::nullopt;
+        }
         return IREE::VM::RefType::get(IREE::VM::ListType::get(elementType));
       });
 

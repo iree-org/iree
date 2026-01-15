@@ -102,8 +102,9 @@ rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
     if (auto attrValue = op->getAttr(inputName)) {
       auto flattenedAttrs = detail::rewriteAttrToOperands(
           op.getLoc(), attrValue, inputType, builder);
-      if (!flattenedAttrs)
+      if (!flattenedAttrs) {
         return std::nullopt;
+      }
       state.addOperands(*flattenedAttrs);
       if (importOp.isFuncArgumentVariadic(input.index())) {
         segmentSizes.push_back(flattenedAttrs->size() /
@@ -162,8 +163,9 @@ rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
   for (auto [result, targetType] :
        llvm::zip_equal(callOp->getResults(), operation->getResultTypes())) {
     targetType = typeConverter.convertType(targetType);
-    if (!targetType)
+    if (!targetType) {
       return std::nullopt;
+    }
     results.push_back(castFromImportType(result, targetType, builder));
   }
   return results;
@@ -185,8 +187,9 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto results = rewriteToCall(op, adaptor, importOp,
                                  *this->getTypeConverter(), rewriter);
-    if (!results.has_value())
+    if (!results.has_value()) {
       return failure();
+    }
     rewriter.replaceOp(op, results.value());
     return success();
   }
