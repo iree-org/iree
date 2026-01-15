@@ -63,9 +63,10 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
     // type memory space; that's runtime allocations. So erase and fallback to
     // the default 0 memory space. It is fine given this is just the default
     // allocator; backends are expected to control by themselves.
-    if (isa<IREE::HAL::DescriptorTypeAttr>(storage))
+    if (isa<IREE::HAL::DescriptorTypeAttr>(storage)) {
       type = MemRefType::get(type.getShape(), type.getElementType(),
                              type.getLayout());
+    }
   }
   return memref::AllocOp::create(builder, loc, type, dynamicSizes).getResult();
 }
@@ -172,12 +173,14 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
                       const OneShotBufferizationOptions &options) {
   // Analyze IR.
   OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state)))
+  if (failed(analyzeOp(op, state))) {
     return failure();
+  }
 
   // Rewrite tensor.empty ops that are anchored on specific ops.
-  if (failed(bufferization::eliminateEmptyTensors(rewriter, op, state)))
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, op, state))) {
     return failure();
+  }
 
   return success();
 }
@@ -215,11 +218,13 @@ void EliminateEmptyTensorsPass::runOnOperation() {
   auto bufferizationOptions = getBufferizationOptions();
   OneShotAnalysisState state(funcOp, bufferizationOptions);
   // Analyze IR.
-  if (failed(analyzeOp(funcOp, state)))
+  if (failed(analyzeOp(funcOp, state))) {
     return signalPassFailure();
+  }
   // Eliminate empty tensors.
-  if (failed(bufferization::eliminateEmptyTensors(rewriter, funcOp, state)))
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, funcOp, state))) {
     return signalPassFailure();
+  }
 }
 
 // The following is copied from bufferization::runOneShotBufferize with
@@ -229,10 +234,12 @@ runIREEOneShotBufferize(Operation *op,
                         const IREEOneShotBufferizationOptions &options,
                         bufferization::BufferizationState &state) {
   OneShotAnalysisState analyzeState(op, options);
-  if (failed(analyzeOp(op, analyzeState)))
+  if (failed(analyzeOp(op, analyzeState))) {
     return failure();
-  if (options.testAnalysisOnly)
+  }
+  if (options.testAnalysisOnly) {
     return success();
+  }
   return bufferization::runOneShotBufferize(op, options, state);
 }
 
@@ -302,10 +309,12 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
-  if (!allocationFn)
+  if (!allocationFn) {
     allocationFn = defaultAllocationFn;
-  if (!memCpyFn)
+  }
+  if (!memCpyFn) {
     memCpyFn = defaultMemCpyFn;
+  }
   return std::make_unique<IREEComprehensiveBufferizePass>(allocationFn.value(),
                                                           memCpyFn.value());
 }

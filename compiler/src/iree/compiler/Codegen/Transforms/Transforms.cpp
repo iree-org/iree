@@ -45,11 +45,13 @@ namespace mlir::iree_compiler {
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
   for (auto val : nonIndexComputationOperands) {
-    if (op == val.getDefiningOp())
+    if (op == val.getDefiningOp()) {
       return false;
+    }
   }
-  if (op->isProperAncestor(baseOp))
+  if (op->isProperAncestor(baseOp)) {
     return false;
+  }
   return !isa<IREE::HAL::InterfaceConstantLoadOp>(op);
 }
 
@@ -154,16 +156,18 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
           vector::ScalableValueBoundsConstraintSet::computeScalableBound(
               value, std::nullopt, vscaleRange->vscaleMin,
               vscaleRange->vscaleMax, presburger::BoundType::UB);
-      if (failed(ub))
+      if (failed(ub)) {
         return failure();
+      }
 
       if (ub->map.isSingleConstant()) {
         auto constantBound = ub->map.getSingleConstantResult();
         return OpFoldResult(builder.getIndexAttr(constantBound));
       }
 
-      if (!vscale)
+      if (!vscale) {
         vscale = vector::VectorScaleOp::create(builder, loc);
+      }
       return affine::materializeComputedBound(
           builder, loc, ub->map, {std::make_pair(vscale, std::nullopt)});
     }
@@ -172,8 +176,9 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
         presburger::BoundType::UB, {value, std::nullopt},
         /*stopCondition=*/nullptr,
         /*closedUB=*/true);
-    if (failed(ub))
+    if (failed(ub)) {
       return failure();
+    }
 
     return OpFoldResult(builder.getIndexAttr(*ub));
   };
@@ -202,8 +207,9 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 
       Value dynamicSize = dynamicSizes[index++];
       auto ub = computeAllocationBound(dynamicSize);
-      if (failed(ub))
+      if (failed(ub)) {
         return std::nullopt;
+      }
 
       allocSizes.push_back(*ub);
       subviewSizes.push_back(dynamicSize);
@@ -270,8 +276,9 @@ void hoistStaticallyBoundAllocationsInFunc(
 
   // Collect all allocLikes that are hoistable.
   funcOp.walk([&](AllocLikeOpType allocLikeOp) {
-    if (allocLikeOp->getBlock() == &funcOp.getFunctionBody().front())
+    if (allocLikeOp->getBlock() == &funcOp.getFunctionBody().front()) {
       return;
+    }
     if (allocLikeOp.getDynamicSizes().empty()) {
       allocLikeOps.push_back(allocLikeOp);
       return;
@@ -290,8 +297,9 @@ void hoistStaticallyBoundAllocationsInFunc(
     SmallVector<memref::DeallocOp> deallocOps;
     for (Operation *user : allocLikeOp->getUsers()) {
       auto dealloc = dyn_cast<memref::DeallocOp>(user);
-      if (dealloc)
+      if (dealloc) {
         deallocOps.push_back(dealloc);
+      }
     }
 
     LLVM_DEBUG({
@@ -303,8 +311,9 @@ void hoistStaticallyBoundAllocationsInFunc(
     });
     std::optional<Value> replacement = hoistOneStaticallyBoundAllocation(
         funcOp, rewriter, allocLikeOp, vscaleRange);
-    if (!replacement)
+    if (!replacement) {
       continue;
+    }
     LLVM_DEBUG({
       llvm::dbgs() << "Replacement : ";
       replacement->dump();
@@ -312,8 +321,9 @@ void hoistStaticallyBoundAllocationsInFunc(
     Value replacementVal = replacement.value();
     rewriter.replaceOp(allocLikeOp, replacementVal);
 
-    for (memref::DeallocOp deallocOp : deallocOps)
+    for (memref::DeallocOp deallocOp : deallocOps) {
       rewriter.eraseOp(deallocOp);
+    }
   }
 }
 
@@ -751,10 +761,12 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
         // like scf.for, since the value bounds interface requires index types.
         auto maybeLb = getConstantIntValue(lb);
         auto maybeUb = getConstantIntValue(ub);
-        if (!maybeLb || !maybeUb)
+        if (!maybeLb || !maybeUb) {
           return;
-        if (*maybeLb >= *maybeUb)
+        }
+        if (*maybeLb >= *maybeUb) {
           return;
+        }
       }
     }
 
@@ -812,8 +824,9 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
         // Skip the whole analysis if any user is a subview.
         // TODO: This could be extended if needed by recursively merging
         // liveness.
-        if (isa<memref::SubViewOp>(user))
+        if (isa<memref::SubViewOp>(user)) {
           return;
+        }
         if (group.liveness.count(user)) {
           aliasGroups.push_back(i);
           break;
@@ -851,14 +864,16 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
   LLVM_DEBUG({
     for (size_t i = 0; i < groups.size(); i++) {
       llvm::dbgs() << "Alias group " << i << ":\n";
-      for (Operation *op : groups[i].allocs)
+      for (Operation *op : groups[i].allocs) {
         op->dump();
+      }
     }
   });
 
   for (size_t i = 0; i < groups.size(); i++) {
-    if (groups[i].allocs.empty())
+    if (groups[i].allocs.empty()) {
       continue;
+    }
     aliasGroups.push_back(std::move(groups[i].allocs));
   }
 }
@@ -873,8 +888,9 @@ static int64_t getAllocSize(Operation *op, DataLayout &dataLayout) {
 
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups) {
-  if (aliasGroups.empty())
+  if (aliasGroups.empty()) {
     return;
+  }
   DataLayout dataLayout = DataLayout::closest(funcOp);
   builder.setInsertionPointToStart(&(*funcOp.getFunctionBody().begin()));
   int64_t maxAlloc = 0;
@@ -1061,8 +1077,9 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
       BlockArgument destBbArg = cast<BlockArgument>(parallelInsert.getDest());
       tensor::ExtractSliceOp destSlice;
       for (auto user : destBbArg.getUsers()) {
-        if (user == parallelInsert)
+        if (user == parallelInsert) {
           continue;
+        }
         auto maybeSlice = dyn_cast<tensor::ExtractSliceOp>(user);
         if (!maybeSlice) {
           // Fail if the destination has more users than a direct insert and
@@ -1099,8 +1116,9 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
             for (auto [dim, size] : llvm::enumerate(insert.getMixedSizes())) {
               FailureOr<bool> equalDimSize = ValueBoundsConstraintSet::areEqual(
                   {size}, {insert.getDest(), static_cast<int64_t>(dim)});
-              if (failed(equalDimSize) || !*equalDimSize)
+              if (failed(equalDimSize) || !*equalDimSize) {
                 return false;
+              }
             }
             return true;
           };

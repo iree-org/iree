@@ -29,8 +29,9 @@ struct TestExecutablePreprocessingPass final
     // whatever it needed to the executable instead.
     getOperation()->walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
       auto configAttr = variantOp.getTarget().getConfiguration();
-      if (!configAttr)
+      if (!configAttr) {
         return;
+      }
       auto replacementAttr = configAttr.getAs<IntegerAttr>("replace_i64");
       if (!replacementAttr) {
         // Skip variants that don't request modification.
