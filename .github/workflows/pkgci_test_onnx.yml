@@ -47,6 +47,10 @@ jobs:
             numprocesses: 1
             config-file: onnx_ops_gpu_hip_rdna3_O3.json
             runs-on: [Linux, X64, gfx1100]
+          - name: amdgpu_hip_rdna4_O3
+            numprocesses: 1
+            config-file: onnx_ops_gpu_hip_rdna4_O3.json
+            runs-on: [Linux, X64, gfx1201]
           - name: amdgpu_vulkan_O0
             numprocesses: 1
             config-file: onnx_ops_gpu_vulkan_O0.json
@@ -154,6 +158,9 @@ jobs:
           - name: amdgpu_hip_rdna3
             config-file: onnx_models_gpu_hip_rdna3.json
             runs-on: [Linux, X64, gfx1100, persistent-cache]
+          - name: amdgpu_hip_rdna4
+            config-file: onnx_models_gpu_hip_rdna4.json
+            runs-on: [Linux, X64, gfx1201, persistent-cache]
           - name: amdgpu_vulkan
             config-file: onnx_models_gpu_vulkan.json
             # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.

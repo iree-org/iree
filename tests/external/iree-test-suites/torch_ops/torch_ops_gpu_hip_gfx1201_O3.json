@@ -1,0 +1,20 @@
+{
+  "config_name": "gpu_hip_gfx1201",
+  "iree_compile_flags": [
+    "--iree-hal-target-device=hip",
+    "--iree-hip-target=gfx1201",
+    "--iree-opt-level=O3"
+  ],
+  "iree_run_module_flags": [
+    "--device=hip"
+  ],
+  "skip_compile_tests": [],
+  "skip_run_tests": [
+    "ABPlusC/64x64xf16",
+    "ATB/64x64xf16"
+  ],
+  "expected_compile_failures": [],
+  "expected_run_failures": [],
+  "golden_times_ms": {}
+}
+

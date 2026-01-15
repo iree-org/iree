@@ -1,0 +1,68 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: PkgCI Test AMD R9700
+on:
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+
+jobs:
+  test_r9700:
+    runs-on: [Linux, X64, iree-r9700]
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      BUILD_DIR: build-tests
+      VENV_DIR: ${{ github.workspace }}/.venv
+      GH_TOKEN: ${{ github.token }}
+      IREE_CPU_DISABLE: 1
+      IREE_VULKAN_DISABLE: 0
+      IREE_CUDA_ENABLE: 0
+      IREE_HIP_ENABLE: 1
+      IREE_HIP_TEST_TARGET_CHIP: "gfx1201"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: false
+      - name: Check out runtime submodules
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup base venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build tests
+        run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
+      - name: Run GPU tests
+        env:
+          CTEST_PARALLEL_LEVEL: 1
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=hip$
+          IREE_AMD_RDNA4_TESTS_DISABLE: 0
+          IREE_NVIDIA_GPU_TESTS_DISABLE: 0
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 0
+        run: ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
+
