@@ -752,14 +752,24 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     returning both the selected value and its corresponding index. The selection
     logic is defined by a user-specified comparator region.
 
-    The comparator region receives two candidate values and returns a single `i1`
-    result indicating whether the first argument should be preferred over the second.
+    The operation supports two modes:
 
-    This region defines the sorting rule, e.g., "greater than" for argmax or
-    "less than" for argmin. It allows for generalization beyond simple argmax-style
+    1. Implicit-index mode (single input): Computes (value, index) pairs from scratch.
+       Indices are implicitly computed from the reduction dimension's iteration index
+       (using linalg.index on the reduction dimension). The comparator
+       region receives two candidate values and returns a single `i1` result indicating
+       whether the first argument should be preferred.
+
+    2. Explicit-index mode (two inputs): Reduces existing (value, index) pairs.
+       Indices are explicitly provided as input. The comparator region receives
+       two candidate values and returns `i1` to select the preferred value.
+       This mode is used to combine results from split-reduction operations.
+
+    The comparator region defines the sorting rule, e.g., "greater than" for argmax or
+    "less than" for argmin, allowing for generalization beyond simple argmax-style
     behavior.
 
-    Example (argmax over dim 1):
+    Example (implicit-index mode - argmax over dim 1):
     ```mlir
     %input = memref<2x10xf32>
     %out_val = memref<2xf32>
@@ -774,7 +784,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     }
     ```
 
-    Example with index_base = 5 (i.e., indices start counting from 5):
+    Example (implicit-index mode with index_base = 5):
     ```mlir
     %input = memref<2x10xf32>
     %out_val = memref<2xf32>
@@ -785,6 +795,22 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
       ins(%input : memref<2x10xf32>)
       outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>)
       index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+    ```
+
+    Example (explicit-index mode - combining partial results):
+    ```mlir
+    %partial_vals = memref<2x4xf32>
+    %partial_idxs = memref<2x4xi32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%partial_vals, %partial_idxs : memref<2x4xf32>, memref<2x4xi32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
       iree_linalg_ext.yield %cmp : i1
@@ -818,6 +844,19 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value getInputValue() {
       return getDpsInputOperand(0)->get();
+    }
+
+    // Returns true when the operation is in explicit-index mode, which occurs
+    // when a second input operand provides pre-computed indices.
+    bool hasExplicitIndexInput() {
+      return getInputs().size() == 2;
+    }
+
+    // Returns the index input operand. This method should only be called when
+    // the operation is in explicit-index mode.
+    Value getInputIndex() {
+      assert(hasExplicitIndexInput() && "Only valid in explicit-index mode");
+      return getDpsInputOperand(1)->get();
     }
 
     Value outputValue() {

@@ -1247,12 +1247,18 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
-  unsigned numInputVals = llvm::size(getInputs());
-  if (numInputVals != 1) {
-    return op->emitOpError(
-               "expected exactly one tensor input operand, but got ")
-           << numInputVals;
+  // The operation supports two modes based on the number of inputs:
+  // - Implicit-index mode (1 input): Computes indices from iteration variables.
+  // - Explicit-index mode (2 inputs): Uses pre-existing (value, index) pairs.
+  unsigned numInputs = llvm::size(getInputs());
+  if (numInputs < 1 || numInputs > 2) {
+    return op->emitOpError("expected 1 or 2 input operands, but got ")
+           << numInputs;
   }
+
+  bool isExplicitIndexMode = numInputs == 2;
+  ShapedType inputValueType = getInputType();
+  Type inputElemType = inputValueType.getElementType();
 
   unsigned numOutputs = getNumDpsInits();
   if (numOutputs != 2) {
@@ -1261,21 +1267,48 @@ LogicalResult ArgCompareOp::verify() {
            << numOutputs;
   }
 
-  uint64_t dim = getDimension();
-  int64_t rank = getInputRank();
-  if (dim >= rank) {
-    return op->emitOpError("reduction dimension exceeds or equals input rank. ")
-           << "got dimension: " << dim << ", but input rank is: " << rank;
-  }
-
-  ShapedType inputType = getInputType();
   auto outputValueType = getOutputValueType();
   auto outputIndexType = getOutputIndexType();
 
-  if (inputType.getElementType() != outputValueType.getElementType()) {
+  if (isExplicitIndexMode) {
+    ShapedType inputIndexType = cast<ShapedType>(getInputIndex().getType());
+
+    if (failed(verifyCompatibleShape(inputValueType, inputIndexType))) {
+      return op->emitOpError(
+                 "explicit-index mode: value and index inputs must have same "
+                 "shape. ")
+             << "Value shape: "
+             << llvm::interleaved_array(inputValueType.getShape())
+             << ", index shape: "
+             << llvm::interleaved_array(inputIndexType.getShape());
+    }
+
+    if (!isa<IntegerType, IndexType>(inputIndexType.getElementType())) {
+      return op->emitOpError(
+                 "explicit-index mode: index input must have integer or index "
+                 "element type, but got ")
+             << inputIndexType.getElementType();
+    }
+
+    if (inputIndexType.getElementType() != outputIndexType.getElementType()) {
+      return op->emitOpError(
+                 "explicit-index mode: input and output index element types "
+                 "must match. ")
+             << "Input index type: " << inputIndexType.getElementType()
+             << ", output index type: " << outputIndexType.getElementType();
+    }
+  }
+
+  if (inputValueType.getElementType() != outputValueType.getElementType()) {
     return op->emitOpError("input and output value element types must match. ")
-           << "Input type: " << inputType.getElementType()
+           << "Input type: " << inputValueType.getElementType()
            << ", output value type: " << outputValueType.getElementType();
+  }
+
+  if (!isa<IntegerType, IndexType>(outputIndexType.getElementType())) {
+    return op->emitOpError(
+               "output index must have integer or index element type, but got ")
+           << outputIndexType.getElementType();
   }
 
   if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
@@ -1286,10 +1319,17 @@ LogicalResult ArgCompareOp::verify() {
            << llvm::interleaved_array(outputIndexType.getShape());
   }
 
+  uint64_t dim = getDimension();
+  int64_t rank = getInputRank();
+  if (dim >= rank) {
+    return op->emitOpError("reduction dimension exceeds or equals input rank. ")
+           << "got dimension: " << dim << ", but input rank is: " << rank;
+  }
+
   SmallVector<int64_t> expectedShape;
   for (int64_t i = 0; i < rank; ++i) {
     if (i != dim) {
-      expectedShape.push_back(inputType.getDimSize(i));
+      expectedShape.push_back(inputValueType.getDimSize(i));
     }
   }
   if (!llvm::equal(expectedShape, outputValueType.getShape())) {
@@ -1307,13 +1347,13 @@ LogicalResult ArgCompareOp::verify() {
     return op->emitOpError("region block should have 2 arguments, but got ")
            << numArgs;
   }
-  Type inputElemType = inputType.getElementType();
+
   Type arg0Type = block.getArgument(0).getType();
   Type arg1Type = block.getArgument(1).getType();
 
   if (arg0Type != inputElemType || arg1Type != inputElemType) {
     return op->emitOpError(
-               "comparator region arguments must match input element type. ")
+               "comparator arguments must match input value element type. ")
            << "Expected: " << inputElemType << ", but got: " << arg0Type
            << " and " << arg1Type;
   }
@@ -1358,6 +1398,11 @@ SmallVector<AffineMap> IREE::LinalgExt::ArgCompareOp::getIndexingMapsArray() {
     proj.push_back(getAffineDimExpr(i, ctx));
   }
   AffineMap resultMap = AffineMap::get(rank, 0, proj, ctx);
+
+  if (hasExplicitIndexInput()) {
+    return {inputMap, inputMap, resultMap, resultMap};
+  }
+
   return {inputMap, resultMap, resultMap};
 }
 
