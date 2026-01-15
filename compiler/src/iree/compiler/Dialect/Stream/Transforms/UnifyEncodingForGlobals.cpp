@@ -813,10 +813,12 @@ struct UnifyEncodingForGlobalsPass
                [](TensorDispatchOp a, TensorDispatchOp b) {
                  std::string aStr, bStr;
                  llvm::raw_string_ostream aStream(aStr), bStream(bStr);
-                 if (auto aAffinity = a.getAffinityAttr())
+                 if (auto aAffinity = a.getAffinityAttr()) {
                    aStream << aAffinity;
-                 if (auto bAffinity = b.getAffinityAttr())
+                 }
+                 if (auto bAffinity = b.getAffinityAttr()) {
                    bStream << bAffinity;
+                 }
                  return aStr < bStr;
                });
 

@@ -173,8 +173,9 @@ public:
   const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
     auto append = [&](const char *part) {
-      if (!str.empty())
+      if (!str.empty()) {
         str += '|';
+      }
       str += part;
     };
     append(this->isAssumed(NOT_MUTATED) ? "immutable" : "mutable");
@@ -190,8 +191,9 @@ private:
   static bool isTiedUse(OpOperand &operand) {
     if (auto tiedOp =
             dyn_cast<IREE::Util::TiedOpInterface>(operand.getOwner())) {
-      if (tiedOp.isOperandTied(operand.getOperandNumber()))
+      if (tiedOp.isOperandTied(operand.getOperandNumber())) {
         return true;
+      }
     }
     return false;
   }
@@ -573,8 +575,9 @@ public:
   bool isArgMoved(BlockArgument arg) {
     auto argumentSemantics =
         solver.lookupElementFor<ArgumentSemantics>(Position::forValue(arg));
-    if (!argumentSemantics)
+    if (!argumentSemantics) {
       return false;
+    }
     return argumentSemantics->getAssumedByValue();
   }
 
@@ -1006,16 +1009,18 @@ static bool isSafeToElideSliceOp(IREE::Stream::AsyncSliceOp sliceOp,
   SmallVector<AsyncAccessRange> consumerRanges;
   SmallVector<AsyncAccessRange> queryRanges;
   for (auto user : source.getUsers()) {
-    if (user == sliceOp)
+    if (user == sliceOp) {
       continue;
+    }
     if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(user)) {
       // Async op consuming part of the resource. We can query it to see what
       // it's doing to its operands/results and filter to just the accesses of
       // the source value.
       accessOp.getAsyncAccessRanges(queryRanges);
       for (auto range : queryRanges) {
-        if (range.resource == source)
+        if (range.resource == source) {
           consumerRanges.push_back(range);
+        }
       }
       queryRanges.clear();
     } else {
@@ -1058,10 +1063,12 @@ static bool isSafeToElideSliceOp(IREE::Stream::AsyncSliceOp sliceOp,
 // arith.addi folders are terrible and don't handle adds of 0 so we handle that
 // here and then avoid doing the folding.
 static Value addOffset(Value lhs, Value rhs, OpBuilder &builder) {
-  if (matchPattern(lhs, m_Zero()))
+  if (matchPattern(lhs, m_Zero())) {
     return rhs;
-  if (matchPattern(rhs, m_Zero()))
+  }
+  if (matchPattern(rhs, m_Zero())) {
     return lhs;
+  }
   return builder.createOrFold<arith::AddIOp>(
       builder.getFusedLoc(lhs.getLoc(), rhs.getLoc()), lhs, rhs);
 }
@@ -1111,8 +1118,9 @@ static void foldSliceIntoDispatch(IREE::Stream::AsyncSliceOp sliceOp,
 // Elides a stream.async.slice op (assuming able) by folding it into consumers.
 static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
   SmallVector<std::pair<Operation *, unsigned>> consumers;
-  for (auto &use : sliceOp.getResult().getUses())
+  for (auto &use : sliceOp.getResult().getUses()) {
     consumers.push_back(std::make_pair(use.getOwner(), use.getOperandNumber()));
+  }
   for (auto [owner, operandNumberIt] : consumers) {
     unsigned operandNumber = operandNumberIt; // need C++20 to avoid this :|
     TypeSwitch<Operation *>(owner)
@@ -1222,8 +1230,9 @@ static bool isSafeToElideUpdateOp(IREE::Stream::AsyncUpdateOp updateOp,
     // the dispatch fully overwrites our update region.
     if (auto dispatchOp = dyn_cast<IREE::Stream::AsyncDispatchOp>(user)) {
       for (auto &operand : user->getOpOperands()) {
-        if (operand.get() != result)
+        if (operand.get() != result) {
           continue;
+        }
         if (dispatchOp.isOperandTied(operand.getOperandNumber())) {
           // Result is tied to dispatch - check if dispatch fully overwrites
           // the update region. If not, downstream reads might access our

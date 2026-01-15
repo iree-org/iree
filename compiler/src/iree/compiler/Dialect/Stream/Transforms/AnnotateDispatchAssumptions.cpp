@@ -54,8 +54,9 @@ public:
 
   LogicalResult run() {
     for (Operation *analysisRoot : analysisRoots) {
-      if (failed(solver.initializeAndRun(analysisRoot)))
+      if (failed(solver.initializeAndRun(analysisRoot))) {
         return failure();
+      }
     }
     return success();
   }
@@ -65,8 +66,9 @@ public:
   ArrayRef<IREE::Stream::CmdDispatchOp>
   getDispatchSites(IREE::Stream::ExecutableExportOp exportOp) {
     auto it = entryDispatchMap.find(exportOp);
-    if (it == entryDispatchMap.end())
+    if (it == entryDispatchMap.end()) {
       return {};
+    }
     return it->second;
   }
 
@@ -109,8 +111,9 @@ public:
           IREE::Util::IntAssumptionAttr::get(context, umin, umax, udiv));
     }
 
-    if (assumptions.empty())
+    if (assumptions.empty()) {
       return {};
+    }
 
     return std::make_pair(
         ArrayAttr::get(context, ArrayRef<Attribute>(assumptions.begin(),
@@ -138,8 +141,9 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
   // Operands/resources on the func are in an arbitrary order; get maps that
   // lets us go from dispatch site operand/resource to function argument.
   auto funcOp = exportOp.lookupFunctionRef();
-  if (!funcOp || funcOp.empty())
+  if (!funcOp || funcOp.empty()) {
     return;
+  }
   auto operandToArgMap =
       IREE::Stream::CmdDispatchOp::makeOperandToArgMap(funcOp);
   auto resourceToArgMap =
@@ -156,8 +160,9 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
     unsigned argIdx = operandToArgMap[operandIdx];
     Value argValue = funcOp.getArgument(argIdx);
     Type argType = argValue.getType();
-    if (!argType.isIndex() && !argType.isInteger())
+    if (!argType.isIndex() && !argType.isInteger()) {
       continue;
+    }
 
     auto [assumptions, hasNonEmpty] =
         analysis.getOperandAssumptions(exportOp, operandIdx);
@@ -168,8 +173,9 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
     }
   }
 
-  if (nonEmptyCount == 0)
+  if (nonEmptyCount == 0) {
     return;
+  }
 
   // Do the rewrite.
   OpBuilder builder = OpBuilder::atBlockBegin(&funcOp.front());
@@ -186,8 +192,9 @@ class AnnotateDispatchAssumptionsPass
           AnnotateDispatchAssumptionsPass> {
   void runOnOperation() override {
     ArgumentAnalysis analysis(getOperation());
-    if (failed(analysis.run()))
+    if (failed(analysis.run())) {
       return signalPassFailure();
+    }
     // Annotate the exported dispatch functions.
     for (auto executableOp :
          getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {

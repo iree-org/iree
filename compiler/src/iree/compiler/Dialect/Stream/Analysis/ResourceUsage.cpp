@@ -132,37 +132,50 @@ public:
 
   const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
-    if (!isValidState())
+    if (!isValidState()) {
       return "*";
+    }
     auto append = [&](const char *part) {
-      if (!str.empty())
+      if (!str.empty()) {
         str += '|';
+      }
       str += part;
     };
-    if (!this->isAssumed(NOT_INDIRECT))
+    if (!this->isAssumed(NOT_INDIRECT)) {
       append("indirect");
+    }
     append(this->isAssumed(NOT_EXTERNAL) ? "internal" : "external");
     append(this->isAssumed(NOT_MUTATED) ? "immutable" : "mutable");
-    if (!this->isAssumed(NOT_CONSTANT))
+    if (!this->isAssumed(NOT_CONSTANT)) {
       append("constant");
-    if (!this->isAssumed(NOT_TRANSFER_READ))
+    }
+    if (!this->isAssumed(NOT_TRANSFER_READ)) {
       append("transfer_read");
-    if (!this->isAssumed(NOT_TRANSFER_WRITE))
+    }
+    if (!this->isAssumed(NOT_TRANSFER_WRITE)) {
       append("transfer_write");
-    if (!this->isAssumed(NOT_STAGING_READ))
+    }
+    if (!this->isAssumed(NOT_STAGING_READ)) {
       append("staging_read");
-    if (!this->isAssumed(NOT_STAGING_WRITE))
+    }
+    if (!this->isAssumed(NOT_STAGING_WRITE)) {
       append("staging_write");
-    if (!this->isAssumed(NOT_DISPATCH_READ))
+    }
+    if (!this->isAssumed(NOT_DISPATCH_READ)) {
       append("dispatch_read");
-    if (!this->isAssumed(NOT_DISPATCH_WRITE))
+    }
+    if (!this->isAssumed(NOT_DISPATCH_WRITE)) {
       append("dispatch_write");
-    if (!this->isAssumed(NOT_GLOBAL_READ))
+    }
+    if (!this->isAssumed(NOT_GLOBAL_READ)) {
       append("global_read");
-    if (!this->isAssumed(NOT_GLOBAL_WRITE))
+    }
+    if (!this->isAssumed(NOT_GLOBAL_WRITE)) {
       append("global_write");
-    if (!this->isAssumed(NOT_GLOBAL_STORAGE))
+    }
+    if (!this->isAssumed(NOT_GLOBAL_STORAGE)) {
       append("global_storage");
+    }
     return str.empty() ? "*" : str;
   }
 
@@ -250,8 +263,9 @@ private:
   // itself is under analysis.
   void updateFromDefiningOp(Value value, OpResult result, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!isa<IREE::Stream::ResourceType>(result.getType()))
+    if (!isa<IREE::Stream::ResourceType>(result.getType())) {
       return;
+    }
 
     TypeSwitch<Operation *, void>(result.getOwner())
         .Case([&](mlir::arith::SelectOp op) {
@@ -552,8 +566,9 @@ private:
   // This walks through tied uses as well.
   void updateFromUse(Value value, OpOperand &operand, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!isa<IREE::Stream::ResourceType>(operand.get().getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.get().getType())) {
       return;
+    }
 
     auto *userOp = operand.getOwner();
     unsigned operandIdx = operand.getOperandNumber();
@@ -977,8 +992,9 @@ std::optional<ResourceUsageBitfield>
 ResourceUsageAnalysis::tryLookupResourceUsage(Value value) {
   auto resourceUsage =
       solver.lookupElementFor<ValueResourceUsage>(Position::forValue(value));
-  if (!resourceUsage)
+  if (!resourceUsage) {
     return std::nullopt;
+  }
   return resourceUsage->getAssumedUsage();
 }
 

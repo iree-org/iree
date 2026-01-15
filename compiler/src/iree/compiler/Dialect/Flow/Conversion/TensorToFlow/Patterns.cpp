@@ -402,8 +402,9 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
     SmallVector<Value> outputDynamicShapes;
     for (auto [resultShape, outputShp] : llvm::zip_equal(
              reshapeOp.getResultType().getShape(), outputShape[0])) {
-      if (ShapedType::isStatic(resultShape))
+      if (ShapedType::isStatic(resultShape)) {
         continue;
+      }
       outputDynamicShapes.push_back(getValueOrCreateConstantIndexOp(
           rewriter, reshapeOp.getLoc(), outputShp));
     }

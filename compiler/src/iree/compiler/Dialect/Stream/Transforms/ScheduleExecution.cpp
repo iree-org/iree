@@ -55,8 +55,9 @@ struct ExecutePartitionBuilder {
     // This is at the last op in the partition.
     Operation *insertionPt = nullptr;
     for (auto *op : partition->ops) {
-      if (op->getBlock() != parentBlock)
+      if (op->getBlock() != parentBlock) {
         continue;
+      }
       if (!insertionPt) {
         insertionPt = op; // first defining op
       } else if (insertionPt->isBeforeInBlock(op)) {
@@ -82,8 +83,9 @@ struct ExecutePartitionBuilder {
       resultTypes.push_back(out.getType());
       auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           fusedLoc, out, parentBuilder);
-      if (resultSize)
+      if (resultSize) {
         resultSizes.push_back(resultSize);
+      }
     }
     SmallVector<Value> operands;
     SmallVector<Type> operandTypes;
@@ -92,14 +94,16 @@ struct ExecutePartitionBuilder {
     operandTypes.reserve(partition->ins.size());
     operandSizes.reserve(partition->ins.size());
     for (auto in : partition->ins) {
-      if (!isa<IREE::Stream::ResourceType>(in.getType()))
+      if (!isa<IREE::Stream::ResourceType>(in.getType())) {
         continue;
+      }
       operands.push_back(in);
       operandTypes.push_back(in.getType());
       auto operandSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           fusedLoc, in, parentBuilder);
-      if (operandSize)
+      if (operandSize) {
         operandSizes.push_back(operandSize);
+      }
     }
 
     // Collect await timepoints from all ops being partitioned and join them.
@@ -148,8 +152,9 @@ struct ExecutePartitionBuilder {
   //
   // Returns true if the operation was cloned into the partition.
   bool visit(Operation *op) {
-    if (!partition->ops.contains(op))
+    if (!partition->ops.contains(op)) {
       return false;
+    }
 
     // Clone the op into the partition and remap it.
     auto *clonedOp = builder.clone(*op, mapping);
@@ -197,8 +202,9 @@ struct ExecutePartitionBuilder {
       results.push_back(newResult);
       auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           executeOp.getLoc(), newResult, builder);
-      if (resultSize)
+      if (resultSize) {
         resultSizes.push_back(resultSize);
+      }
     }
     IREE::Stream::YieldOp::create(builder, executeOp.getLoc(), results,
                                   resultSizes);
@@ -228,8 +234,9 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(Region &region) {
   }
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
-    if (markedBlocks.count(block) > 0)
+    if (markedBlocks.count(block) > 0) {
       return;
+    }
     for (auto *childBlock : dominanceInfo.getNode(block)->children()) {
       visit(childBlock->getBlock());
     }
@@ -322,8 +329,9 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
     // creates a lot of new IR (up to O(op*partitions)).
     SetVector<Operation *> deadOps;
     for (auto &op : *block) {
-      if (op.hasTrait<OpTrait::IsTerminator>())
+      if (op.hasTrait<OpTrait::IsTerminator>()) {
         continue;
+      }
       for (auto &partitionBuilder : partitionBuilders) {
         partitionBuilder.visit(&op);
       }
@@ -436,8 +444,9 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
         }
 
         for (auto &subregion : op.getRegions()) {
-          if (failed(processRegion(loc, context, subregion, configAttr)))
+          if (failed(processRegion(loc, context, subregion, configAttr))) {
             return failure();
+          }
         }
       }
     }
@@ -479,8 +488,9 @@ struct ScheduleExecutionPass
     // order so that we are sure if we replace values that dominate other blocks
     // they see the correct values.
     auto &region = *parentOp.getCallableRegion();
-    if (failed(processRegion(parentOp.getLoc(), context, region, configAttr)))
+    if (failed(processRegion(parentOp.getLoc(), context, region, configAttr))) {
       return signalPassFailure();
+    }
 
     // Cleanup the dead ops.
     // TODO(benvanik): less work here - maybe no patterns to just force folding?
