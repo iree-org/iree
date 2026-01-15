@@ -133,7 +133,8 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   if (auto swizzleHintOp =
           dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
     assert(swizzleHintOp->hasOneUse() &&
-           "a tensor.empty with a swizzle hint should have only one use");
+           "a tensor.empty op with a swizzle hint applied, should have the "
+           "swizzle hint as its only user");
     auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
         rewriter, loc, allocTensor.getResult(), swizzleHintOp.getSwizzle());
     return newSwizzle.getResult();
