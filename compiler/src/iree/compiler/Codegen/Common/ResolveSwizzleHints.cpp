@@ -162,21 +162,16 @@ static LogicalResult
 verifyFlatContiguousSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
   auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
   // Swizzle hints require flat (rank 1) memrefs.
-  if (memrefType.getRank() != 1) {
+  // For rank 1, allow dynamic memrefs or static contiguous row-major memrefs.
+  if ((memrefType.getRank() != 1 || !memrefType.getLayout().isIdentity()) ||
+      (memrefType.hasStaticShape() &&
+       !memref::isStaticShapeAndContiguousRowMajor(memrefType))) {
     hintOp.emitError()
         << "swizzle hint operand must be a contiguous flat memref, got "
         << hintOp.getOperand().getType();
     return failure();
   }
-  // For rank 1, allow dynamic memrefs or static contiguous row-major memrefs.
-  if (memref::isStaticShapeAndContiguousRowMajor(memrefType) ||
-      !memrefType.hasStaticShape()) {
-    return success();
-  }
-  hintOp.emitError()
-      << "swizzle hint operand must be a contiguous flat memref, got "
-      << hintOp.getOperand().getType();
-  return failure();
+  return success();
 }
 
 /// Resolves all hints. Walks all direct users and splits them into loads and

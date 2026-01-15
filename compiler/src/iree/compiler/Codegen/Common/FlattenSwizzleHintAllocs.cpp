@@ -49,7 +49,6 @@ static void flattenSwizzleHintAllocs(RewriterBase &rewriter,
   }
   MemRefType resultType = allocOp.getType();
   if (resultType.getRank() == 1 || !resultType.getLayout().isIdentity() ||
-      !(resultType.getNumElements() > 0) ||
       !memref::isStaticShapeAndContiguousRowMajor(resultType)) {
     return;
   }
