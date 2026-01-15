@@ -110,3 +110,11 @@ func.func @fold_rank_reducing_extract_slice() -> tensor<32xf32> {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<32xf32>
 //       CHECK:   %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.rotate_rows<64, 4>] : tensor<32xf32>
 //       CHECK:   return %[[SWIZZLE]]
+
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [affine_map<(m, n, k) -> (m, k)>, affine_map<(m, n, k) -> (k, n)>, affine_map<(m, n, k) -> (m, n)>], iteration_sizes = [?, ?, ?]>
+func.func @fold_swizzle_hint_of_encoding() -> tensor<16xbf16,#encoding> {
+  %empty = tensor.empty() : tensor<8x16xbf16, #encoding>
+  %swizzle = iree_codegen.swizzle_hint %empty[#iree_codegen.rotate_rows<8, 4>] : tensor<8x16xbf16, #encoding>
+  %slice = tensor.extract_slice %swizzle[0, 0] [1, 16] [1, 1] : tensor<8x16xbf16, #encoding> to tensor<16xbf16,#encoding>
+  return %slice : tensor<16xbf16,#encoding>
+}

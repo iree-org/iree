@@ -2097,9 +2097,8 @@ namespace {
 struct FoldSwizzleHintOpWithExtractSliceOp final
     : OpRewritePattern<tensor::ExtractSliceOp> {
   FoldSwizzleHintOpWithExtractSliceOp(MLIRContext *ctx,
-                                      PatternBenefit benefit = 1,
-                                      bool foldSingleUseOnly = false)
-      : OpRewritePattern(ctx, benefit), foldSingleUseOnly(foldSingleUseOnly) {}
+                                      PatternBenefit benefit = 1)
+      : OpRewritePattern(ctx, benefit) {}
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -2117,14 +2116,14 @@ struct FoldSwizzleHintOpWithExtractSliceOp final
     }
 
     // Check for single use.
-    if (foldSingleUseOnly && !emptyOp->hasOneUse()) {
+    if (!emptyOp->hasOneUse()) {
       return failure();
     }
 
     // Create new tensor.empty op. tensor.extract_slice may be rank-reducing;
     // its dynamic sizes must be preserved as well as its result type.
     Location loc = sliceOp.getLoc();
-    RankedTensorType sliceType = cast<RankedTensorType>(sliceOp.getType());
+    auto sliceType = cast<RankedTensorType>(sliceOp.getType());
     auto tensorType =
         RankedTensorType::get(sliceType.getShape(), sliceType.getElementType(),
                               sliceType.getEncoding());
@@ -2134,17 +2133,12 @@ struct FoldSwizzleHintOpWithExtractSliceOp final
         sliceOp, newEmptyOp, swizzleHintOp.getSwizzle());
     return success();
   }
-
-private:
-  bool foldSingleUseOnly = false;
 };
 
 template <typename ReshapeOp>
 struct FoldSwizzleHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
-  FoldSwizzleHintOpWithReshapeOp(MLIRContext *ctx, PatternBenefit benefit = 1,
-                                 bool foldSingleUseOnly = false)
-      : OpRewritePattern<ReshapeOp>(ctx, benefit),
-        foldSingleUseOnly(foldSingleUseOnly) {}
+  FoldSwizzleHintOpWithReshapeOp(MLIRContext *ctx, PatternBenefit benefit = 1)
+      : OpRewritePattern<ReshapeOp>(ctx, benefit) {}
 
   LogicalResult matchAndRewrite(ReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
@@ -2154,13 +2148,14 @@ struct FoldSwizzleHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
     if (!swizzleHintOp) {
       return failure();
     }
-    auto emptyOp = swizzleHintOp.getOperand().template getDefiningOp<tensor::EmptyOp>();
+    auto emptyOp =
+        swizzleHintOp.getOperand().template getDefiningOp<tensor::EmptyOp>();
     if (!emptyOp) {
       return failure();
     }
 
     // Check for single use.
-    if (foldSingleUseOnly && !emptyOp->hasOneUse()) {
+    if (!emptyOp->hasOneUse()) {
       return failure();
     }
 
@@ -2187,9 +2182,6 @@ struct FoldSwizzleHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
     }
     return success();
   }
-
-private:
-  bool foldSingleUseOnly = false;
 };
 
 } // namespace
