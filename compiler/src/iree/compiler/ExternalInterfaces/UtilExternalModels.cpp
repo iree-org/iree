@@ -175,8 +175,9 @@ struct GlobalOpInterfaceExternalModel
 
   IREE::Util::InliningPolicyAttrInterface
   getGlobalInliningPolicy(Operation *op) const {
-    if (op->hasAttr("noinline"))
+    if (op->hasAttr("noinline")) {
       return IREE::Util::InlineNeverAttr::get(op->getContext());
+    }
     return {};
   }
   void
@@ -283,8 +284,9 @@ struct LinalgOpTiedOpInterface
 
   SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
     SmallVector<int64_t> result;
-    for (unsigned i = 0; i < op->getNumResults(); ++i)
+    for (unsigned i = 0; i < op->getNumResults(); ++i) {
       result.push_back(*getTiedResultOperandIndex(op, i));
+    }
     return result;
   }
 };
