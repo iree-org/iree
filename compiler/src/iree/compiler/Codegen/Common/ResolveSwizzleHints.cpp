@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -158,12 +159,23 @@ static void swizzleGatherToLDS(RewriterBase &rewriter,
 }
 
 static LogicalResult
-verifyFlatSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
-  if (cast<MemRefType>(hintOp.getOperand().getType()).getRank() == 1) {
+verifyFlatContiguousSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
+  auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
+  // Swizzle hints require flat (rank 1) memrefs.
+  if (memrefType.getRank() != 1) {
+    hintOp.emitError()
+        << "swizzle hint operand must be a contiguous flat memref, got "
+        << hintOp.getOperand().getType();
+    return failure();
+  }
+  // For rank 1, allow dynamic memrefs or static contiguous row-major memrefs.
+  if (memref::isStaticShapeAndContiguousRowMajor(memrefType) ||
+      !memrefType.hasStaticShape()) {
     return success();
   }
-  hintOp.emitError() << "swizzle hint operand must be a flat memref, got "
-                     << hintOp.getOperand().getType();
+  hintOp.emitError()
+      << "swizzle hint operand must be a contiguous flat memref, got "
+      << hintOp.getOperand().getType();
   return failure();
 }
 
@@ -252,7 +264,7 @@ void ResolveSwizzleHintsPass::runOnOperation() {
   // silently pass through for that hint.
   IRRewriter rewriter(funcOp->getContext());
   for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
-    if (verifyFlatSwizzleHintOp(hintOp).failed()) {
+    if (failed(verifyFlatContiguousSwizzleHintOp(hintOp))) {
       return signalPassFailure();
     }
     resolveHintOp(rewriter, hintOp);

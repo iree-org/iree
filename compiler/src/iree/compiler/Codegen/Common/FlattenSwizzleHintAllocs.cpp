@@ -44,21 +44,18 @@ struct FlattenSwizzleHintAllocsPass final
 static void flattenSwizzleHintAllocs(RewriterBase &rewriter,
                                      IREE::Codegen::SwizzleHintOp hintOp) {
   auto allocOp = hintOp.getOperand().getDefiningOp<memref::AllocOp>();
-  if (!allocOp) {
-    return;
-  }
-  if (!allocOp->hasOneUse()) {
+  if (!allocOp || !allocOp->hasOneUse()) {
     return;
   }
   MemRefType resultType = allocOp.getType();
   if (resultType.getRank() == 1 || !resultType.getLayout().isIdentity() ||
-      !resultType.hasStaticShape() || !(resultType.getNumElements() > 0) ||
+      !(resultType.getNumElements() > 0) ||
       !memref::isStaticShapeAndContiguousRowMajor(resultType)) {
     return;
   }
 
   SmallVector<int64_t> newResultShape = {resultType.getNumElements()};
-  MemRefType newResultType =
+  auto newResultType =
       MemRefType::get(newResultShape, resultType.getElementType(), AffineMap(),
                       resultType.getMemorySpace());
   rewriter.setInsertionPoint(hintOp);

@@ -327,9 +327,19 @@ func.func @swizzle_raw_buffer_to_lds_ignore_dst_op(%global : memref<32768xi8, #a
 
 // Verify that swizzle_hint fails on non-flat (rank > 1) memrefs.
 func.func @swizzle_hint_non_flat_memref_error(%src: memref<32x64xf32>) -> vector<4xf32> {
-  // expected-error @+1 {{swizzle hint operand must be a flat memref, got 'memref<32x64xf32>'}}
+  // expected-error @+1 {{swizzle hint operand must be a contiguous flat memref, got 'memref<32x64xf32>'}}
   %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<32x64xf32>
   %offset = arith.constant 0 : index
   %1 = vector.load %0[%offset, %offset] : memref<32x64xf32>, vector<4xf32>
+  return %1: vector<4xf32>
+}
+
+// Verify that swizzle_hint fails on non-contiguous memrefs.
+func.func @swizzle_hint_non_contiguous_memref_error() -> vector<4xf32> {
+  %src = memref.alloc() : memref<32x64xf32, strided<[2, 1], offset: 0>>
+  // expected-error @+1 {{swizzle hint operand must be a contiguous flat memref, got 'memref<32x64xf32, strided<[2, 1]>>'}}
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<32x64xf32, strided<[2, 1], offset: 0>>
+  %offset = arith.constant 0 : index
+  %1 = vector.load %0[%offset, %offset] : memref<32x64xf32, strided<[2, 1], offset: 0>>, vector<4xf32>
   return %1: vector<4xf32>
 }
