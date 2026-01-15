@@ -2282,6 +2282,15 @@ Value PromoteWithCacheSwizzleAttr::promoteOperand(
 }
 
 //===----------------------------------------------------------------------===//
+// SwizzleOperandAttr
+//===----------------------------------------------------------------------===//
+
+Value SwizzleOperandAttr::promoteOperand(mlir::OpBuilder &builder,
+                                         mlir::OpOperand &operand) const {
+  return swizzlePromotionImpl(builder, operand, getCopyConfig(), getSwizzle());
+}
+
+//===----------------------------------------------------------------------===//
 // LaneIdAttr
 //===----------------------------------------------------------------------===//
 
