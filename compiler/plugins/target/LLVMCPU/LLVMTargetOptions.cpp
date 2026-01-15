@@ -85,8 +85,9 @@ std::optional<LLVMTarget> LLVMTarget::createForHost() {
                  << getMessage(status, triple) << "\n";
     return std::nullopt;
   }
-  if (target)
+  if (target) {
     target->populateDefaultsFromTargetMachine();
+  }
   return target;
 }
 
@@ -163,16 +164,21 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   if (!staticLibraryOutput.empty()) {
     addString("static_library_output", staticLibraryOutput);
   }
-  if (pipelineTuningOptions.LoopInterleaving != DEFAULT_LOOP_INTERLEAVING)
+  if (pipelineTuningOptions.LoopInterleaving != DEFAULT_LOOP_INTERLEAVING) {
     addBool("loop_interleaving", pipelineTuningOptions.LoopInterleaving);
-  if (pipelineTuningOptions.LoopVectorization != DEFAULT_LOOP_VECTORIZATION)
+  }
+  if (pipelineTuningOptions.LoopVectorization != DEFAULT_LOOP_VECTORIZATION) {
     addBool("loop_vectorization", pipelineTuningOptions.LoopVectorization);
-  if (pipelineTuningOptions.LoopUnrolling != DEFAULT_LOOP_UNROLLING)
+  }
+  if (pipelineTuningOptions.LoopUnrolling != DEFAULT_LOOP_UNROLLING) {
     addBool("loop_unrolling", pipelineTuningOptions.LoopUnrolling);
-  if (pipelineTuningOptions.SLPVectorization != DEFAULT_SLP_VECTORIZATION)
+  }
+  if (pipelineTuningOptions.SLPVectorization != DEFAULT_SLP_VECTORIZATION) {
     addBool("slp_vectorization", pipelineTuningOptions.SLPVectorization);
-  if (!llvmTargetOptions.MCOptions.ABIName.empty())
+  }
+  if (!llvmTargetOptions.MCOptions.ABIName.empty()) {
     addString("target_abi", llvmTargetOptions.MCOptions.ABIName);
+  }
   if (llvmTargetOptions.FloatABIType != DEFAULT_FLOAT_ABI) {
     switch (llvmTargetOptions.FloatABIType) {
     case llvm::FloatABI::Default:
@@ -186,10 +192,12 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
       break;
     }
   }
-  if (ukernels.compare(DEFAULT_ENABLE_UKERNELS) != 0)
+  if (ukernels.compare(DEFAULT_ENABLE_UKERNELS) != 0) {
     addString("ukernels", ukernels);
-  if (linkUkernelBitcode != DEFAULT_LINK_UKERNEL_BITCODE)
+  }
+  if (linkUkernelBitcode != DEFAULT_LINK_UKERNEL_BITCODE) {
     addBool("link_ukernel_bitcode", linkUkernelBitcode);
+  }
 }
 
 std::optional<LLVMTarget>
@@ -274,13 +282,13 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   target.linkStatic = getBool("link_static", DEFAULT_LINK_STATIC);
   auto sanitizer = getOptionalString("sanitizer");
   if (sanitizer) {
-    if (sanitizer == "none")
+    if (sanitizer == "none") {
       target.sanitizerKind = SanitizerKind::kNone;
-    else if (sanitizer == "address")
+    } else if (sanitizer == "address") {
       target.sanitizerKind = SanitizerKind::kAddress;
-    else if (sanitizer == "thread")
+    } else if (sanitizer == "thread") {
       target.sanitizerKind = SanitizerKind::kThread;
-    else {
+    } else {
       emitError(loc) << "executable config unexpected value for 'sanitizer': "
                      << *sanitizer;
       return {};
@@ -297,17 +305,18 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   target.pipelineTuningOptions.SLPVectorization = getBool(
       "slp_vectorization", target.pipelineTuningOptions.SLPVectorization);
   auto targetAbi = getOptionalString("target_abi");
-  if (targetAbi)
+  if (targetAbi) {
     target.llvmTargetOptions.MCOptions.ABIName = *targetAbi;
+  }
   auto floatAbi = getOptionalString("float_abi");
   if (floatAbi) {
-    if (floatAbi == "default")
+    if (floatAbi == "default") {
       target.llvmTargetOptions.FloatABIType = llvm::FloatABI::Default;
-    else if (floatAbi == "soft")
+    } else if (floatAbi == "soft") {
       target.llvmTargetOptions.FloatABIType = llvm::FloatABI::Default;
-    else if (floatAbi == "hard")
+    } else if (floatAbi == "hard") {
       target.llvmTargetOptions.FloatABIType = llvm::FloatABI::Default;
-    else {
+    } else {
       emitError(loc) << "executable config unexpected value for 'float_abi'";
       return {};
     }
@@ -389,8 +398,9 @@ createTargetMachine(const LLVMTarget &target) {
   std::string errorMessage;
   auto llvmTarget = llvm::TargetRegistry::lookupTarget(
       llvm::Triple(target.getTriple()), errorMessage);
-  if (!llvmTarget)
+  if (!llvmTarget) {
     return nullptr;
+  }
   llvm::Triple triple(target.getTriple());
   std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
       triple, target.getCpu() /* cpu e.g k8 */,

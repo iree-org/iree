@@ -65,12 +65,14 @@ struct ScfForBounds {
 std::optional<ScfForBounds> extractForBounds(mlir::stablehlo::WhileOp op) {
   Block &cond = op.getCond().front();
   Block &body = op.getBody().front();
-  if (cond.getOperations().size() != 2)
+  if (cond.getOperations().size() != 2) {
     return std::nullopt;
+  }
 
   auto matchBbArg = [](Value v, Block &block) -> std::optional<unsigned> {
-    if (!isa<BlockArgument>(v) || v.getParentBlock() != &block)
+    if (!isa<BlockArgument>(v) || v.getParentBlock() != &block) {
       return std::nullopt;
+    }
     return cast<BlockArgument>(v).getArgNumber();
   };
 
@@ -87,8 +89,9 @@ std::optional<ScfForBounds> extractForBounds(mlir::stablehlo::WhileOp op) {
   }
 
   std::optional<unsigned> iterArg = matchBbArg(compare.getLhs(), cond);
-  if (!iterArg)
+  if (!iterArg) {
     return std::nullopt;
+  }
 
   auto add = dyn_cast_if_present<mlir::stablehlo::AddOp>(
       body.getTerminator()->getOperand(*iterArg).getDefiningOp());

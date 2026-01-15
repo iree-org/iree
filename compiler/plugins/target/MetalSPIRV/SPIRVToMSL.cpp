@@ -33,8 +33,9 @@ public:
         entryName.str(), spv::ExecutionModel::ExecutionModelGLCompute);
     const auto &workgroupSize = entryPoint.workgroup_size;
     // TODO(antiagainst): support specialization constant.
-    if (workgroupSize.constant != 0)
+    if (workgroupSize.constant != 0) {
       return {0, 0, 0};
+    }
     return {workgroupSize.x, workgroupSize.y, workgroupSize.z};
   }
 
@@ -127,8 +128,9 @@ crossCompileSPIRVToMSL(IREE::HAL::MetalTargetPlatform targetPlatform,
 
   SmallVector<SPIRVToMSLCompiler::Descriptor> descriptors;
   bool hasPushConstant = false;
-  if (!spvCrossCompiler.getResources(&descriptors, &hasPushConstant))
+  if (!spvCrossCompiler.getResources(&descriptors, &hasPushConstant)) {
     return std::nullopt;
+  }
 
   // Explicitly set the argument buffer [[id(N)]] location for each SPIR-V
   // resource variable.

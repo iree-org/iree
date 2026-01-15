@@ -51,8 +51,9 @@ ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
 }
 
 static std::vector<int64_t> getIntArrayAttrValues(MlirAttribute attr) {
-  if (mlirAttributeIsNull(attr) || !mlirAttributeIsAArray(attr))
+  if (mlirAttributeIsNull(attr) || !mlirAttributeIsAArray(attr)) {
     return {};
+  }
 
   std::vector<int64_t> result;
   size_t n = mlirArrayAttrGetNumElements(attr);
@@ -261,8 +262,9 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "prefetch_num_stages",
           [](MlirAttribute self) -> std::optional<int64_t> {
             auto attr = ireeGPUPipelineOptionsAttrGetPrefetchNumStages(self);
-            if (!mlirAttributeIsNull(attr))
+            if (!mlirAttributeIsNull(attr)) {
               return mlirIntegerAttrGetValueInt(attr);
+            }
             return std::nullopt;
           })
       .def_property_readonly(
@@ -271,16 +273,18 @@ NB_MODULE(_ireeCompilerDialects, m) {
             auto attr =
                 ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts(
                     self);
-            if (!mlirAttributeIsNull(attr))
+            if (!mlirAttributeIsNull(attr)) {
               return mlirBoolAttrGetValue(attr);
+            }
             return std::nullopt;
           })
       .def_property_readonly(
           "use_igemm_convolution",
           [](MlirAttribute self) -> std::optional<bool> {
             auto attr = ireeGPUPipelineOptionsAttrGetUseIgemmConvolution(self);
-            if (!mlirAttributeIsNull(attr))
+            if (!mlirAttributeIsNull(attr)) {
               return mlirBoolAttrGetValue(attr);
+            }
             return std::nullopt;
           })
       .def_property_readonly(
@@ -288,8 +292,9 @@ NB_MODULE(_ireeCompilerDialects, m) {
           [](MlirAttribute self) -> std::optional<MlirAttribute> {
             auto attr =
                 ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy(self);
-            if (!mlirAttributeIsNull(attr))
+            if (!mlirAttributeIsNull(attr)) {
               return attr;
+            }
             return std::nullopt;
           });
 
@@ -485,8 +490,9 @@ NB_MODULE(_ireeCompilerDialects, m) {
       .def_property_readonly(
           "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {
             auto attr = ireeGPULoweringConfigAttrGetMmaKind(self);
-            if (!mlirAttributeIsNull(attr))
+            if (!mlirAttributeIsNull(attr)) {
               return attr;
+            }
             return std::nullopt;
           });
 
