@@ -10,6 +10,7 @@
 # ordering.
 BasedOnStyle: LLVM
 AlwaysBreakTemplateDeclarations: Yes
+InsertBraces: Yes
 IncludeCategories:
   - Regex:           '^<.*\.h>'
     Priority:        1
