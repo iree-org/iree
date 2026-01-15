@@ -61,6 +61,7 @@
 #include <vector>
 
 #include "benchmark/benchmark.h"
+#include "iree/base/allocator_stats.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
@@ -442,12 +443,21 @@ class IREEBenchmark {
     instance_.reset();
 
     // Tear down device last in order to get accurate statistics.
-    if (device_allocator_ && FLAG_print_statistics) {
-      IREE_IGNORE_ERROR(iree_hal_allocator_statistics_fprint(
-          stderr, device_allocator_.get()));
+    if (FLAG_print_statistics) {
+      IREE_IGNORE_ERROR(
+          iree_allocator_statistics_fprint(stderr, &host_allocator_with_stats));
+      if (device_allocator_) {
+        IREE_IGNORE_ERROR(iree_hal_allocator_statistics_fprint(
+            stderr, device_allocator_.get()));
+      }
     }
+
     device_allocator_.reset();
     device_.reset();
+
+    if (FLAG_print_statistics) {
+      iree_allocator_stats_deinit(&host_allocator_with_stats);
+    }
   };
 
   iree_hal_device_t* device() const { return device_.get(); }
@@ -474,6 +484,13 @@ class IREEBenchmark {
     IREE_TRACE_FRAME_MARK_BEGIN_NAMED("init");
 
     iree_allocator_t host_allocator = iree_allocator_system();
+
+    // If statistics are requested, wrap the host allocator.
+    if (FLAG_print_statistics) {
+      host_allocator =
+          iree_allocator_stats_init(&host_allocator_with_stats, host_allocator);
+    }
+
     IREE_RETURN_IF_ERROR(
         iree_tooling_create_instance(host_allocator, &instance_));
 
@@ -596,6 +613,7 @@ class IREEBenchmark {
     return iree_ok_status();
   }
 
+  iree_allocator_with_stats_t host_allocator_with_stats;
   iree::vm::ref<iree_vm_instance_t> instance_;
   iree::vm::ref<iree_vm_context_t> context_;
   iree::vm::ref<iree_hal_device_t> device_;

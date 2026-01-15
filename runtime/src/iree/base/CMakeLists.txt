@@ -90,6 +90,30 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    base_stats
+  HDRS
+    "allocator_stats.h"
+  SRCS
+    "allocator_stats.c"
+  DEPS
+    ::base
+    iree::base::internal::synchronization
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    base_stats_test
+  SRCS
+    "allocator_stats_test.cc"
+  DEPS
+    ::base_stats
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_test(
   NAME
     bitfield_test
