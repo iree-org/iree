@@ -63,6 +63,108 @@ IREE_API_EXPORT void iree_allocator_free(iree_allocator_t allocator,
 }
 
 //===----------------------------------------------------------------------===//
+// Array allocation helpers with overflow checking
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t
+iree_allocator_malloc_array(iree_allocator_t allocator, iree_host_size_t count,
+                            iree_host_size_t element_size, void** out_ptr) {
+  iree_host_size_t byte_length = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(count, element_size, &byte_length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "array allocation size overflow (%" PRIhsz
+                            " * %" PRIhsz ")",
+                            count, element_size);
+  }
+  return iree_allocator_malloc(allocator, byte_length, out_ptr);
+}
+
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_array_uninitialized(
+    iree_allocator_t allocator, iree_host_size_t count,
+    iree_host_size_t element_size, void** out_ptr) {
+  iree_host_size_t byte_length = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(count, element_size, &byte_length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "array allocation size overflow (%" PRIhsz
+                            " * %" PRIhsz ")",
+                            count, element_size);
+  }
+  return iree_allocator_malloc_uninitialized(allocator, byte_length, out_ptr);
+}
+
+IREE_API_EXPORT iree_status_t
+iree_allocator_realloc_array(iree_allocator_t allocator, iree_host_size_t count,
+                             iree_host_size_t element_size, void** inout_ptr) {
+  iree_host_size_t byte_length = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(count, element_size, &byte_length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "array reallocation size overflow (%" PRIhsz
+                            " * %" PRIhsz ")",
+                            count, element_size);
+  }
+  return iree_allocator_realloc(allocator, byte_length, inout_ptr);
+}
+
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_with_trailing(
+    iree_allocator_t allocator, iree_host_size_t struct_size,
+    iree_host_size_t trailing_size, void** out_ptr) {
+  iree_host_size_t aligned_struct_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_align(struct_size, iree_max_align_t,
+                                                  &aligned_struct_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "struct size alignment overflow");
+  }
+  iree_host_size_t total_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(aligned_struct_size,
+                                                trailing_size, &total_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "struct+trailing allocation size overflow "
+                            "(%" PRIhsz " + %" PRIhsz ")",
+                            aligned_struct_size, trailing_size);
+  }
+  return iree_allocator_malloc(allocator, total_size, out_ptr);
+}
+
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_struct_array(
+    iree_allocator_t allocator, iree_host_size_t struct_size,
+    iree_host_size_t count, iree_host_size_t element_size, void** out_ptr) {
+  iree_host_size_t aligned_struct_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_align(struct_size, iree_max_align_t,
+                                                  &aligned_struct_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "struct size alignment overflow");
+  }
+  iree_host_size_t total_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul_add(
+          aligned_struct_size, count, element_size, &total_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "struct+array allocation size overflow "
+                            "(%" PRIhsz " + %" PRIhsz " * %" PRIhsz ")",
+                            aligned_struct_size, count, element_size);
+  }
+  return iree_allocator_malloc(allocator, total_size, out_ptr);
+}
+
+IREE_API_EXPORT iree_status_t iree_allocator_grow_array(
+    iree_allocator_t allocator, iree_host_size_t minimum_capacity,
+    iree_host_size_t element_size, iree_host_size_t* inout_capacity,
+    void** inout_ptr) {
+  iree_host_size_t doubled_capacity = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(*inout_capacity, 2, &doubled_capacity))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "capacity overflow");
+  }
+  iree_host_size_t new_capacity = iree_max(minimum_capacity, doubled_capacity);
+  IREE_RETURN_IF_ERROR(iree_allocator_realloc_array(allocator, new_capacity,
+                                                    element_size, inout_ptr));
+  *inout_capacity = new_capacity;
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
 // Built-in iree_allocator_t implementations
 //===----------------------------------------------------------------------===//
 
@@ -93,8 +195,17 @@ static iree_status_t iree_allocator_inline_arena_alloc(
     }
   }
 
-  iree_host_size_t begin = iree_host_align(storage->length, iree_max_align_t);
-  iree_host_size_t end = begin + byte_length;
+  iree_host_size_t begin = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_align(storage->length,
+                                                  iree_max_align_t, &begin))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "inline arena alignment overflow");
+  }
+  iree_host_size_t end = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(begin, byte_length, &end))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "inline arena allocation overflow");
+  }
   if (end > storage->capacity) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "arena has reached capacity %" PRIhsz
@@ -184,16 +295,22 @@ IREE_API_EXPORT iree_status_t iree_allocator_malloc_aligned(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocations must be >0 bytes");
   }
-  const iree_host_size_t alignment = iree_max(min_alignment, iree_max_align_t);
-  if (IREE_UNLIKELY(!iree_host_size_is_power_of_two(alignment))) {
+  if (IREE_UNLIKELY(!iree_host_size_is_valid_alignment(min_alignment))) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "alignments must be powers of two (got %" PRIhsz ")", min_alignment);
   }
+  const iree_host_size_t alignment = iree_max(min_alignment, iree_max_align_t);
 
   // [base ptr] [padding...] [aligned data] [padding...]
-  const iree_host_size_t total_length =
-      sizeof(uintptr_t) + byte_length + alignment;
+  iree_host_size_t total_length = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(sizeof(uintptr_t), byte_length,
+                                                &total_length) ||
+                    !iree_host_size_checked_add(total_length, alignment,
+                                                &total_length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "aligned allocation size overflow");
+  }
   void* unaligned_ptr = NULL;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, total_length, (void**)&unaligned_ptr));
@@ -216,12 +333,12 @@ IREE_API_EXPORT iree_status_t iree_allocator_realloc_aligned(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocations must be >0 bytes");
   }
-  const iree_host_size_t alignment = iree_min(min_alignment, iree_max_align_t);
-  if (IREE_UNLIKELY(!iree_host_size_is_power_of_two(alignment))) {
+  if (IREE_UNLIKELY(!iree_host_size_is_valid_alignment(min_alignment))) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "alignments must be powers of two (got %" PRIhsz ")", min_alignment);
   }
+  const iree_host_size_t alignment = iree_max(min_alignment, iree_max_align_t);
   void* aligned_ptr = *inout_ptr;
   void* unaligned_ptr = iree_aligned_ptr_get_base(aligned_ptr);
   if (IREE_UNLIKELY(aligned_ptr !=
@@ -238,8 +355,14 @@ IREE_API_EXPORT iree_status_t iree_allocator_realloc_aligned(
   uintptr_t old_offset = (uintptr_t)aligned_ptr - (uintptr_t)unaligned_ptr;
 
   // [base ptr] [padding...] [aligned data] [padding...]
-  const iree_host_size_t total_length =
-      sizeof(uintptr_t) + byte_length + alignment;
+  iree_host_size_t total_length = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(sizeof(uintptr_t), byte_length,
+                                                &total_length) ||
+                    !iree_host_size_checked_add(total_length, alignment,
+                                                &total_length))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "aligned reallocation size overflow");
+  }
   IREE_RETURN_IF_ERROR(
       iree_allocator_realloc(allocator, total_length, (void**)&unaligned_ptr));
   aligned_ptr = iree_aligned_ptr(unaligned_ptr, alignment, offset);

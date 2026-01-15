@@ -110,6 +110,205 @@ static inline void iree_memcpy_stream_dst(void* IREE_RESTRICT dst,
 }
 
 //===----------------------------------------------------------------------===//
+// Checked arithmetic for allocation size calculations
+//===----------------------------------------------------------------------===//
+
+// Performs a checked addition of |a| and |b|, storing the result in
+// |out_result|. Returns true if the addition succeeded without overflow, false
+// if overflow occurred (|out_result| is undefined on overflow).
+static inline bool iree_host_size_checked_add(iree_host_size_t a,
+                                              iree_host_size_t b,
+                                              iree_host_size_t* out_result) {
+#if IREE_HAVE_BUILTIN(__builtin_add_overflow)
+  return !__builtin_add_overflow(a, b, out_result);
+#else
+  if (a > IREE_HOST_SIZE_MAX - b) return false;
+  *out_result = a + b;
+  return true;
+#endif
+}
+
+// Performs a checked multiplication of |a| and |b|, storing the result in
+// |out_result|. Returns true if the multiplication succeeded without overflow,
+// false if overflow occurred (|out_result| is undefined on overflow).
+static inline bool iree_host_size_checked_mul(iree_host_size_t a,
+                                              iree_host_size_t b,
+                                              iree_host_size_t* out_result) {
+#if IREE_HAVE_BUILTIN(__builtin_mul_overflow)
+  return !__builtin_mul_overflow(a, b, out_result);
+#else
+  if (b != 0 && a > IREE_HOST_SIZE_MAX / b) return false;
+  *out_result = a * b;
+  return true;
+#endif
+}
+
+// Performs checked computation of |base| + |count| * |element_size|, storing
+// the result in |out_result|. Returns true if the computation succeeded without
+// overflow, false if overflow occurred (|out_result| is undefined on overflow).
+// This is the common pattern for computing allocation sizes with a header.
+static inline bool iree_host_size_checked_mul_add(
+    iree_host_size_t base, iree_host_size_t count,
+    iree_host_size_t element_size, iree_host_size_t* out_result) {
+  iree_host_size_t product = 0;
+  if (!iree_host_size_checked_mul(count, element_size, &product)) return false;
+  return iree_host_size_checked_add(base, product, out_result);
+}
+
+// Device size variants for remote device allocations.
+
+static inline bool iree_device_size_checked_add(
+    iree_device_size_t a, iree_device_size_t b,
+    iree_device_size_t* out_result) {
+#if IREE_HAVE_BUILTIN(__builtin_add_overflow)
+  return !__builtin_add_overflow(a, b, out_result);
+#else
+  if (a > IREE_DEVICE_SIZE_MAX - b) return false;
+  *out_result = a + b;
+  return true;
+#endif
+}
+
+static inline bool iree_device_size_checked_mul(
+    iree_device_size_t a, iree_device_size_t b,
+    iree_device_size_t* out_result) {
+#if IREE_HAVE_BUILTIN(__builtin_mul_overflow)
+  return !__builtin_mul_overflow(a, b, out_result);
+#else
+  if (b != 0 && a > IREE_DEVICE_SIZE_MAX / b) return false;
+  *out_result = a * b;
+  return true;
+#endif
+}
+
+static inline bool iree_device_size_checked_mul_add(
+    iree_device_size_t base, iree_device_size_t count,
+    iree_device_size_t element_size, iree_device_size_t* out_result) {
+  iree_device_size_t product = 0;
+  if (!iree_device_size_checked_mul(count, element_size, &product)) {
+    return false;
+  }
+  return iree_device_size_checked_add(base, product, out_result);
+}
+
+// Aligns |value| up to |alignment| with overflow checking.
+// |alignment| must be a power of two.
+// Returns true if the alignment succeeded without overflow, false if overflow
+// occurred (|out_aligned| is undefined on overflow).
+static inline bool iree_host_size_checked_align(iree_host_size_t value,
+                                                iree_host_size_t alignment,
+                                                iree_host_size_t* out_aligned) {
+  iree_host_size_t padded = 0;
+  if (!iree_host_size_checked_add(value, alignment - 1, &padded)) {
+    return false;
+  }
+  *out_aligned = padded & ~(alignment - 1);
+  return true;
+}
+
+static inline bool iree_device_size_checked_align(
+    iree_device_size_t value, iree_device_size_t alignment,
+    iree_device_size_t* out_aligned) {
+  iree_device_size_t padded = 0;
+  if (!iree_device_size_checked_add(value, alignment - 1, &padded)) {
+    return false;
+  }
+  *out_aligned = padded & ~(alignment - 1);
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+// Struct layout calculation
+//===----------------------------------------------------------------------===//
+
+// Descriptor for a single field in a struct layout calculation.
+typedef struct iree_struct_field_t {
+  iree_host_size_t count;         // Number of elements (0 for padding-only).
+  iree_host_size_t element_size;  // Size of each element.
+  iree_host_size_t alignment;     // Required alignment (0 = none).
+  iree_host_size_t* out_offset;   // Output offset pointer (NULL to skip).
+} iree_struct_field_t;
+
+// Calculates the total allocation size for a struct with trailing fields.
+// Each field can optionally capture its offset and specify alignment.
+// All arithmetic is overflow-checked; returns IREE_STATUS_OUT_OF_RANGE on
+// overflow.
+//
+// Example - struct with two trailing arrays:
+//   iree_host_size_t total = 0, handles_offset = 0, fds_offset = 0;
+//   IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+//       iree_sizeof_struct(*set), &total,
+//       IREE_STRUCT_FIELD(capacity, iree_wait_handle_t, &handles_offset),
+//       IREE_STRUCT_FIELD(capacity, struct pollfd, &fds_offset)));
+//
+// Example - header with cache-aligned data:
+//   iree_host_size_t total = 0, data_offset = 0;
+//   IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+//       0, &total,
+//       IREE_STRUCT_FIELD_ALIGNED(1, header_t, iree_max_align_t, NULL),
+//       IREE_STRUCT_FIELD_ALIGNED(size, uint8_t,
+//       IREE_HAL_HEAP_BUFFER_ALIGNMENT,
+//                                 &data_offset)));
+IREE_ATTRIBUTE_ALWAYS_INLINE static inline iree_status_t
+iree_struct_layout_calculate(iree_host_size_t base_size,
+                             const iree_struct_field_t* fields,
+                             iree_host_size_t field_count,
+                             iree_host_size_t* out_total) {
+  iree_host_size_t total = base_size;
+  for (iree_host_size_t i = 0; i < field_count; ++i) {
+    const iree_struct_field_t* field = &fields[i];
+    // Align offset if required.
+    if (field->alignment > 0) {
+      if (IREE_UNLIKELY(
+              !iree_host_size_checked_align(total, field->alignment, &total))) {
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "struct layout alignment overflow");
+      }
+    }
+    // Record offset before adding this field.
+    if (field->out_offset) {
+      *field->out_offset = total;
+    }
+    // Checked multiply: count * element_size.
+    iree_host_size_t field_size = 0;
+    if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+            field->count, field->element_size, &field_size))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "struct layout field size overflow");
+    }
+    // Checked add to running total.
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(total, field_size, &total))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "struct layout total size overflow");
+    }
+  }
+  *out_total = total;
+  return iree_ok_status();
+}
+
+// Field descriptor for an unaligned array.
+#define IREE_STRUCT_FIELD(count_expr, type, out_offset_ptr) \
+  { (count_expr), sizeof(type), 0, (out_offset_ptr) }
+
+// Field descriptor for an aligned array.
+#define IREE_STRUCT_FIELD_ALIGNED(count_expr, type, align, out_offset_ptr) \
+  { (count_expr), sizeof(type), (align), (out_offset_ptr) }
+
+// Field descriptor for a flexible array member (FAM). FAMs are accessed via
+// the struct member (e.g., foo->bar[]) so no offset is needed, and they start
+// immediately after sizeof(struct) with no alignment padding.
+#define IREE_STRUCT_FIELD_FAM(count_expr, type) \
+  { (count_expr), sizeof(type), 0, NULL }
+
+// Calculates struct layout using compound literal for inline field descriptors.
+#define IREE_STRUCT_LAYOUT(base_size, out_total, ...)                         \
+  iree_struct_layout_calculate((base_size),                                   \
+                               (const iree_struct_field_t[]){__VA_ARGS__},    \
+                               sizeof((iree_struct_field_t[]){__VA_ARGS__}) / \
+                                   sizeof(iree_struct_field_t),               \
+                               (out_total))
+
+//===----------------------------------------------------------------------===//
 // Totally shady stack allocation
 //===----------------------------------------------------------------------===//
 // TODO(benvanik): remove our uses of this or make them more explicit.
@@ -233,6 +432,54 @@ iree_allocator_clone(iree_allocator_t allocator,
 
 // Frees a previously-allocated block of memory to the given allocator.
 IREE_API_EXPORT void iree_allocator_free(iree_allocator_t allocator, void* ptr);
+
+//===----------------------------------------------------------------------===//
+// Array allocation helpers with overflow checking
+//===----------------------------------------------------------------------===//
+
+// Allocates memory for |count| elements of |element_size| bytes each.
+// The contents of the returned memory is guaranteed to be zeroed.
+// Returns IREE_STATUS_OUT_OF_RANGE if the size calculation overflows.
+IREE_API_EXPORT iree_status_t
+iree_allocator_malloc_array(iree_allocator_t allocator, iree_host_size_t count,
+                            iree_host_size_t element_size, void** out_ptr);
+
+// Allocates memory for |count| elements of |element_size| bytes each.
+// The content of the buffer returned is undefined.
+// Returns IREE_STATUS_OUT_OF_RANGE if the size calculation overflows.
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_array_uninitialized(
+    iree_allocator_t allocator, iree_host_size_t count,
+    iree_host_size_t element_size, void** out_ptr);
+
+// Reallocates memory for |count| elements of |element_size| bytes each.
+// Returns IREE_STATUS_OUT_OF_RANGE if the size calculation overflows.
+IREE_API_EXPORT iree_status_t
+iree_allocator_realloc_array(iree_allocator_t allocator, iree_host_size_t count,
+                             iree_host_size_t element_size, void** inout_ptr);
+
+// Allocates memory for a structure of |struct_size| bytes followed by
+// |trailing_size| bytes of additional data. The combined allocation is
+// aligned to iree_max_align_t.
+// Returns IREE_STATUS_OUT_OF_RANGE if the size calculation overflows.
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_with_trailing(
+    iree_allocator_t allocator, iree_host_size_t struct_size,
+    iree_host_size_t trailing_size, void** out_ptr);
+
+// Allocates memory for a structure of |struct_size| bytes followed by an
+// array of |count| elements of |element_size| bytes each.
+// Returns IREE_STATUS_OUT_OF_RANGE if the size calculation overflows.
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_struct_array(
+    iree_allocator_t allocator, iree_host_size_t struct_size,
+    iree_host_size_t count, iree_host_size_t element_size, void** out_ptr);
+
+// Grows an array allocation using a 2x doubling strategy.
+// The new capacity is max(|minimum_capacity|, |*inout_capacity| * 2).
+// On success |*inout_capacity| is updated and |*inout_ptr| is reallocated.
+// Returns IREE_STATUS_OUT_OF_RANGE if the capacity calculation overflows.
+IREE_API_EXPORT iree_status_t iree_allocator_grow_array(
+    iree_allocator_t allocator, iree_host_size_t minimum_capacity,
+    iree_host_size_t element_size, iree_host_size_t* inout_capacity,
+    void** inout_ptr);
 
 //===----------------------------------------------------------------------===//
 // Built-in iree_allocator_t implementations
