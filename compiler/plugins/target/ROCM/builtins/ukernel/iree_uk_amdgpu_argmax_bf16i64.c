@@ -31,8 +31,9 @@
     float newIn = idx >= reductionSize
                       ? -FLT_MAX
                       : (float)(inputBuffer[input_offset + idx]);
-    if (newIn == laneMax)
+    if (newIn == laneMax) {
       continue;
+    }
     laneMax = __builtin_fmaxf(newIn, laneMax);
     laneResult = newIn == laneMax ? idx : laneResult;
   }
