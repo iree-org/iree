@@ -78,10 +78,12 @@ llvm::SmallVector<std::string>
 OptionsBinder::printArguments(bool nonDefaultOnly) {
   llvm::SmallVector<std::string> values;
   for (auto &[flag, info] : getOptionsStorage()) {
-    if (!info.print)
+    if (!info.print) {
       continue;
-    if (nonDefaultOnly && !info.isDefault())
+    }
+    if (nonDefaultOnly && !info.isDefault()) {
       continue;
+    }
 
     std::string s;
     llvm::raw_string_ostream os(s);

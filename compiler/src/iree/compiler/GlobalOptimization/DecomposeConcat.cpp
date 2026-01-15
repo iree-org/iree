@@ -54,8 +54,9 @@ struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
     ArrayRef<int64_t> concatShape = concatType.getShape();
     int64_t outerMostNonUnitDim = 0;
     while (outerMostNonUnitDim < concatOp.getRank()) {
-      if (concatShape[outerMostNonUnitDim] != 1)
+      if (concatShape[outerMostNonUnitDim] != 1) {
         break;
+      }
       outerMostNonUnitDim++;
     }
 

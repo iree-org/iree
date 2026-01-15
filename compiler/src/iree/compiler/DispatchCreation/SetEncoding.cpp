@@ -132,8 +132,9 @@ struct FoldFillWithSetEncoding final
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     auto fillOp = encodingOp.getSource().getDefiningOp<linalg::FillOp>();
-    if (!fillOp)
+    if (!fillOp) {
       return failure();
+    }
 
     // Create a new fill op, with outs being defined by a new `tensor.empty` op.
     RankedTensorType encodingType = encodingOp.getResultType();
