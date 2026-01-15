@@ -30,15 +30,17 @@ static bool hasAllOneValues(DenseIntElementsAttr attr) {
 
 static Value createAdd(Location loc, Value x, Value y, bool isInt,
                        OpBuilder &builder) {
-  if (isInt)
+  if (isInt) {
     return arith::AddIOp::create(builder, loc, x, y);
+  }
   return arith::AddFOp::create(builder, loc, x, y);
 }
 
 static Value createMul(Location loc, Value x, Value y, bool isInt,
                        OpBuilder &builder) {
-  if (isInt)
+  if (isInt) {
     return arith::MulIOp::create(builder, loc, x, y);
+  }
   return arith::MulFOp::create(builder, loc, x, y);
 }
 
@@ -255,11 +257,12 @@ public:
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations()))
+    if (!hasAllOneValues(convOp.getDilations())) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
         diag << "[unimplemented] "
              << "expected no dilations (expected dilations to all be one).";
       });
+    }
 
     auto loc = convOp.getLoc();
 
@@ -415,11 +418,12 @@ public:
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations()))
+    if (!hasAllOneValues(convOp.getDilations())) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
         diag << "[unimplemented] "
              << "expected no dilations (expected dilations to all be one).";
       });
+    }
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];

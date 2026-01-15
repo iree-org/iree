@@ -43,8 +43,9 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type))) {
     return nullptr;
+  }
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
     return arith::TruncFOp::create(builder, loc, type, inputs[0]);
@@ -61,8 +62,9 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
                            Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type))) {
     return nullptr;
+  }
   bool isUnsigned = eTy.isUnsignedInteger();
 
   int64_t inBitwidth = inputETy.getIntOrFloatBitWidth();
@@ -89,8 +91,9 @@ struct PrimitiveTypeConverter : public TypeConverter {
   explicit PrimitiveTypeConverter() {
     addConversion([](Type type) { return type; });
     addConversion([&](SourceType type) -> Type {
-      if (!isSourceType(type))
+      if (!isSourceType(type)) {
         return type;
+      }
       return getTargetType(type);
     });
     addConversion([&](ComplexType type) {
@@ -302,21 +305,25 @@ struct ConvertTypesPass : public Base {
         return typeConverter.isLegal(globalOp.getGlobalType());
       } else if (auto funcOp = dyn_cast<mlir::FunctionOpInterface>(op)) {
         for (Type type : funcOp.getArgumentTypes()) {
-          if (!typeConverter.isLegal(type))
+          if (!typeConverter.isLegal(type)) {
             return false;
+          }
         }
         for (Type type : funcOp.getResultTypes()) {
-          if (!typeConverter.isLegal(type))
+          if (!typeConverter.isLegal(type)) {
             return false;
+          }
         }
       }
       for (Type type : op->getResultTypes()) {
-        if (!typeConverter.isLegal(type))
+        if (!typeConverter.isLegal(type)) {
           return false;
+        }
       }
       for (Type type : op->getOperandTypes()) {
-        if (!typeConverter.isLegal(type))
+        if (!typeConverter.isLegal(type)) {
           return false;
+        }
       }
       return true;
     });

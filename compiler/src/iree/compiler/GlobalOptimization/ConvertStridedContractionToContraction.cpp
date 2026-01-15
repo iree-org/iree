@@ -27,15 +27,18 @@ public:
                                 PatternRewriter &rewriter) const override {
     // Check if the generic op satisfies all other conditions for being a
     // contraction.
-    if (op.getNumDpsInputs() != 2 || op.getNumDpsInits() != 1)
+    if (op.getNumDpsInputs() != 2 || op.getNumDpsInits() != 1) {
       return failure();
-    if (op.getNumReductionLoops() == 0)
+    }
+    if (op.getNumReductionLoops() == 0) {
       return failure();
+    }
     if (!mlir::linalg::detail::isContractionBody(
             *op.getBlock(), [](Operation *first, Operation *second) {
               if ((isa<arith::MulFOp>(first) && isa<arith::AddFOp>(second)) ||
-                  (isa<arith::MulIOp>(first) && isa<arith::AddIOp>(second)))
+                  (isa<arith::MulIOp>(first) && isa<arith::AddIOp>(second))) {
                 return true;
+              }
               return false;
             })) {
       return failure();
@@ -54,16 +57,18 @@ public:
         !resultMap.isProjectedPermutation()) {
       return failure();
     }
-    if (inputMap.isProjectedPermutation())
+    if (inputMap.isProjectedPermutation()) {
       return failure();
+    }
     SmallVector<int64_t> staticShape = op.getStaticLoopRanges();
 
     llvm::SmallDenseMap<unsigned, int64_t> strides;
     SmallVector<AffineExpr> replacementExprs;
     Value input = op.getDpsInputs()[0];
     auto inputTy = dyn_cast<RankedTensorType>(input.getType());
-    if (!inputTy)
+    if (!inputTy) {
       return failure();
+    }
     SmallVector<int64_t> inputShape(inputTy.getShape());
     replacementExprs.reserve(inputMap.getNumResults());
     // Walk through input map and look for expressions of the form `dim * cst`.
@@ -76,8 +81,9 @@ public:
       // Look at binary op expressions.
       auto binexpr = dyn_cast<AffineBinaryOpExpr>(expr);
       // Fail if we see some unexpected kind of expression.
-      if (!binexpr)
+      if (!binexpr) {
         return failure();
+      }
       auto rhs = dyn_cast<AffineConstantExpr>(binexpr.getRHS());
       auto lhs = dyn_cast<AffineDimExpr>(binexpr.getLHS());
       // Binary expressions must be of the form `dim * cst`.
@@ -87,15 +93,17 @@ public:
       }
       strides.insert(std::pair<unsigned, int64_t>(pos, rhs.getValue()));
       int64_t newSize = staticShape[lhs.getPosition()];
-      if (newSize == ShapedType::kDynamic || newSize == 0)
+      if (newSize == ShapedType::kDynamic || newSize == 0) {
         return failure();
+      }
       inputShape[pos] = newSize;
       replacementExprs.push_back(lhs);
     }
 
     // Fail if we don't have any work to do.
-    if (strides.empty())
+    if (strides.empty()) {
       return failure();
+    }
 
     mapRange[inputPos] =
         AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),

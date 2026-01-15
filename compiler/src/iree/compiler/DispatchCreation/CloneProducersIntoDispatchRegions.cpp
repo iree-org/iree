@@ -35,8 +35,9 @@ struct CloneProducersIntoDispatchRegionsPass final
     IREE::Flow::ClonableIntoDispatchOptions options;
     options.aggressive = aggressive;
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
-      if (failed(cloneProducersToRegion(rewriter, regionOp, options)))
+      if (failed(cloneProducersToRegion(rewriter, regionOp, options))) {
         return signalPassFailure();
+      }
     });
 
     funcOp->walk<WalkOrder::PostOrder, ReverseIterator>([&](Operation *op) {
@@ -58,8 +59,9 @@ struct CloneProducersIntoDispatchRegionsPass final
     // Rerun the cloning again to move still clonable operations into
     // dispatches.
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
-      if (failed(cloneProducersToRegion(rewriter, regionOp, options)))
+      if (failed(cloneProducersToRegion(rewriter, regionOp, options))) {
         return signalPassFailure();
+      }
     });
   }
 };

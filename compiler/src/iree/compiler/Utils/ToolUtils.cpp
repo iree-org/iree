@@ -109,8 +109,9 @@ std::string findToolFromExecutableDir(SmallVector<std::string> toolNames) {
 static std::string getCurrentDylibPath() {
 #if __linux__ || __APPLE__
   Dl_info dlInfo;
-  if (dladdr((void *)getCurrentDylibPath, &dlInfo) == 0)
+  if (dladdr((void *)getCurrentDylibPath, &dlInfo) == 0) {
     return {};
+  }
   return (dlInfo.dli_fname);
 #elif defined(WIN32)
   HMODULE hm = NULL;
@@ -145,8 +146,9 @@ static std::string getCurrentDylibPath() {
 std::string findToolFromDylibDir(SmallVector<std::string> toolNames) {
   const auto &normalizedToolNames = normalizeToolNames(toolNames);
   std::string dylibPath = getCurrentDylibPath();
-  if (dylibPath.empty())
+  if (dylibPath.empty()) {
     return {};
+  }
 
   SmallString<256> dylibDir(dylibPath);
   llvm::sys::path::remove_filename(dylibDir);
@@ -240,18 +242,21 @@ std::string findTool(SmallVector<std::string> toolNames) {
   // TODO(benvanik): add a test for IREE_[toolName]_PATH.
 
   std::string dylibDirPath = findToolFromDylibDir(toolNames);
-  if (!dylibDirPath.empty())
+  if (!dylibDirPath.empty()) {
     return dylibDirPath;
+  }
 
   // Search the install or build dir.
   std::string executableDirPath = findToolFromExecutableDir(toolNames);
-  if (!executableDirPath.empty())
+  if (!executableDirPath.empty()) {
     return executableDirPath;
+  }
 
   // Currently fall back on searching the environment.
   std::string environmentPath = findToolInEnvironment(toolNames);
-  if (!environmentPath.empty())
+  if (!environmentPath.empty()) {
     return environmentPath;
+  }
 
   return "";
 }
@@ -263,14 +268,16 @@ std::string findTool(std::string toolName) {
 
 std::string findPlatformLibDirectory(StringRef platformName) {
   std::string dylibPath = getCurrentDylibPath();
-  if (dylibPath.empty())
+  if (dylibPath.empty()) {
     return {};
+  }
 
   SmallString<256> path(dylibPath);
   llvm::sys::path::remove_filename(path);
   llvm::sys::path::append(path, "iree_platform_libs", platformName);
-  if (!llvm::sys::fs::is_directory(path))
+  if (!llvm::sys::fs::is_directory(path)) {
     return {};
+  }
   llvm::sys::fs::make_absolute(path);
   (void)llvm::sys::path::remove_dots(path, /*remove_dot_dot=*/true);
 

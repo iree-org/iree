@@ -268,8 +268,9 @@ struct ConvertGenericFilterToFhwc : public OpRewritePattern<linalg::GenericOp> {
 
     FailureOr<linalg::GenericOp> reorderOp =
         linalg::interchangeGenericOp(rewriter, genericOp, interchange);
-    if (failed(reorderOp))
+    if (failed(reorderOp)) {
       return failure();
+    }
 
     rewriter.replaceOp(linalgOp, reorderOp->getResults());
     return success();

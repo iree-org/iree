@@ -36,8 +36,9 @@ struct opt_initializer {
       : parentName(parentName), init(val), optLevel(opt) {}
   void apply(const llvm::OptimizationLevel inLevel, Ty &val) const {
     assert(inLevel.getSizeLevel() == 0 && "size level not implemented");
-    if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel())
+    if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel()) {
       val = init;
+    }
   }
 
   /// Append to the description string of the flag.
@@ -201,8 +202,9 @@ public:
 
   void restoreOptimizationDefaults() {
     for (auto &[_, info] : getOptionsStorage()) {
-      if (info.optOverrides)
+      if (info.optOverrides) {
         info.optOverrides->restoreBackup();
+      }
     }
   }
 
@@ -463,8 +465,9 @@ private:
     return [optionName, values](llvm::raw_ostream &os) {
       os << "--" << optionName << "=";
       for (auto it : llvm::enumerate(*values)) {
-        if (it.index() > 0)
+        if (it.index() > 0) {
           os << ",";
+        }
         os << it.value();
       }
     };
@@ -478,8 +481,9 @@ private:
         [&] {
           if constexpr (std::is_same_v<std::decay_t<Args>, llvm::cl::desc>) {
             assert(!result && "Multiple llvm::cl::desc in args");
-            if (!result)
+            if (!result) {
               result = &args;
+            }
           }
         }(),
         ...);
