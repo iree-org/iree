@@ -2273,6 +2273,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#swizzleoperandattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      SwizzleOperandAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#targetattr" class="md-nav__link">
     <span class="md-ellipsis">
       TargetAttr
@@ -5596,6 +5605,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#swizzleoperandattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      SwizzleOperandAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#targetattr" class="md-nav__link">
     <span class="md-ellipsis">
       TargetAttr
@@ -5981,6 +5999,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#scaledmmaopsarrayattr">ScaledMMAOpsArrayAttr</a></li>
 <li><a href="#storagebitwidthsattr">StorageBitwidthsAttr</a></li>
 <li><a href="#subgroupopsattr">SubgroupOpsAttr</a></li>
+<li><a href="#swizzleoperandattr">SwizzleOperandAttr</a></li>
 <li><a href="#targetattr">TargetAttr</a></li>
 <li><a href="#targetchipattr">TargetChipAttr</a></li>
 <li><a href="#targetwgpattr">TargetWgpAttr</a></li>
@@ -7266,6 +7285,55 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="swizzleoperandattr">SwizzleOperandAttr<a class="headerlink" href="#swizzleoperandattr" title="Permanent link">link</a></h3>
+<p><em>Indicate promotion of an operand with setting an xor swizzle value.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.swizzle_operand&lt;
+  Attribute,   # copy_config
+  IREE::Codegen::SwizzleAttrInterface   # swizzle
+&gt;
+</code></pre></div>
+<p>During matmul operand promotion, we generate copies associated to a
+particular matmul operand with specific lowering configuration optimized
+for coalesced loads. This attribute carries information on how accesses to
+memrefs or tensors associated to a particular copy should be swizzled.</p>
+<p>This information is used to create a swizzle hint op on the alloc
+associated with the copy. Ultimately, this aims to modify memory accesses
+to minimize bank conflicts. For example,</p>
+<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x4096xf16&gt;
+%1 = linalg.matmul ins(%0, ...)
+</code></pre></div>
+<p>Becomes with <code>#iree_gpu.swizzle_operand&lt;#iree_gpu.use_global_load_dma&gt;</code></p>
+<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x4096xf16&gt;
+%1 = tensor.empty()
+%2 = swizzle_hint_op %1 xor_shuffle(256, 32)
+%3 = linalg.copy lowering_config = #iree_gpu.use_global_load_dma ins(%0) outs(%1)
+%4 = linalg.matmul ins(%3, ...)
+</code></pre></div>
+<p>With intelligent selection of <code>row_width</code> and <code>access_width</code>, this should
+minimize bank conflicts.</p>
+<h5 id="parameters_23">Parameters:<a class="headerlink" href="#parameters_23" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">copy_config</td>
+<td style="text-align: center;"><code>Attribute</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">swizzle</td>
+<td style="text-align: center;"><code>IREE::Codegen::SwizzleAttrInterface</code></td>
+<td>swizzling descriptor attribute</td>
+</tr>
+</tbody>
+</table>
 <h3 id="targetattr">TargetAttr<a class="headerlink" href="#targetattr" title="Permanent link">link</a></h3>
 <p><em>Full GPU target attribute.</em></p>
 <p>Syntax:</p>
@@ -7284,7 +7352,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
   streaming multiprocessor
 * An optional TargetChipAttr describing GPU features for the final chip
   or product, e.g., wgp count</p>
-<h5 id="parameters_23">Parameters:<a class="headerlink" href="#parameters_23" title="Permanent link">link</a></h5>
+<h5 id="parameters_24">Parameters:<a class="headerlink" href="#parameters_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7331,7 +7399,7 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
 Here a GPU chip means the hardware functionality scope where the whole
 software compute grid is scheduled onto. A chip typically contains many
 AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
-<h5 id="parameters_24">Parameters:<a class="headerlink" href="#parameters_24" title="Permanent link">link</a></h5>
+<h5 id="parameters_25">Parameters:<a class="headerlink" href="#parameters_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7395,7 +7463,7 @@ processor (WGP) level. Here a GPU workgroup processor means the basic
 hardware functionality unit where a software workgroup is scheduled onto;
 that is, a compute unit for AMD GPUs or a streaming multiprocessor for
 NVIDIA GPUs.</p>
-<h5 id="parameters_25">Parameters:<a class="headerlink" href="#parameters_25" title="Permanent link">link</a></h5>
+<h5 id="parameters_26">Parameters:<a class="headerlink" href="#parameters_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7510,7 +7578,7 @@ in a chained-matmul operation.</p>
 is perfomed as below:</p>
 <div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
 </code></pre></div>
-<h5 id="parameters_26">Parameters:<a class="headerlink" href="#parameters_26" title="Permanent link">link</a></h5>
+<h5 id="parameters_27">Parameters:<a class="headerlink" href="#parameters_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7539,7 +7607,7 @@ is perfomed as below:</p>
   ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_27">Parameters:<a class="headerlink" href="#parameters_27" title="Permanent link">link</a></h5>
+<h5 id="parameters_28">Parameters:<a class="headerlink" href="#parameters_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
