@@ -211,8 +211,9 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
     }
   }
 
-  if (symbol != kTuningSpecEntrypointAttrName)
+  if (symbol != kTuningSpecEntrypointAttrName) {
     return success();
+  }
 
   const std::string requiredByEntrypointMessage =
       " (required by '" + std::string(kTuningSpecEntrypointAttrName) + "')";

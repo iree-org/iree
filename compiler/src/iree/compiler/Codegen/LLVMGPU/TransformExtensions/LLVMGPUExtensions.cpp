@@ -96,8 +96,9 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
           getSyncAfterDistribution());
-  if (!diag.succeeded())
+  if (!diag.succeeded()) {
     return diag;
+  }
 
   IREE::Codegen::TranslationInfoAttr updatedTranslationInfo =
       IREE::Codegen::TranslationInfoAttr::get(
@@ -161,8 +162,9 @@ replaceAllUsesOfLaneWithin(RewriterBase &b,
   Value laneId = executeOp.getLaneid();
   bool applied = false;
   for (Operation *user : llvm::make_early_inc_range(laneId.getUsers())) {
-    if (!executeOp->isProperAncestor(user))
+    if (!executeOp->isProperAncestor(user)) {
       continue;
+    }
     b.startOpModification(user);
     user->replaceUsesOfWith(laneId, zero);
     b.finalizeOpModification(user);
@@ -179,47 +181,61 @@ replaceAllUsesOfLaneWithin(RewriterBase &b,
 static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   if (!ifOp || ifOp.getNumResults() > 0 ||
       ifOp.getThenRegion().getBlocks().size() != 1 ||
-      !ifOp.getElseRegion().empty())
+      !ifOp.getElseRegion().empty()) {
     return failure();
+  }
   auto pred = ifOp.getCondition().getDefiningOp<arith::CmpIOp>();
-  if (!pred)
+  if (!pred) {
     return failure();
+  }
   auto EQ = arith::CmpIPredicate::eq;
   auto SLT = arith::CmpIPredicate::slt;
   auto SLE = arith::CmpIPredicate::sle;
   auto ULT = arith::CmpIPredicate::ult;
   auto ULE = arith::CmpIPredicate::ule;
   if (auto threadIdOp = pred.getLhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (threadIdOp.getDimension() != gpu::Dimension::x)
+    if (threadIdOp.getDimension() != gpu::Dimension::x) {
       return failure();
-    if (pred.getPredicate() == EQ && isZeroInteger(pred.getRhs()))
+    }
+    if (pred.getPredicate() == EQ && isZeroInteger(pred.getRhs())) {
       return threadIdOp;
-    if (pred.getPredicate() == SLE && isZeroInteger(pred.getRhs()))
+    }
+    if (pred.getPredicate() == SLE && isZeroInteger(pred.getRhs())) {
       return threadIdOp;
-    if (pred.getPredicate() == ULE && isZeroInteger(pred.getRhs()))
+    }
+    if (pred.getPredicate() == ULE && isZeroInteger(pred.getRhs())) {
       return threadIdOp;
-    if (pred.getPredicate() == SLT && isOneInteger(pred.getRhs()))
+    }
+    if (pred.getPredicate() == SLT && isOneInteger(pred.getRhs())) {
       return threadIdOp;
-    if (pred.getPredicate() == ULT && isOneInteger(pred.getRhs()))
+    }
+    if (pred.getPredicate() == ULT && isOneInteger(pred.getRhs())) {
       return threadIdOp;
+    }
   }
   auto SGT = arith::CmpIPredicate::sgt;
   auto SGE = arith::CmpIPredicate::sge;
   auto UGT = arith::CmpIPredicate::ugt;
   auto UGE = arith::CmpIPredicate::uge;
   if (auto threadIdOp = pred.getRhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (threadIdOp.getDimension() != gpu::Dimension::x)
+    if (threadIdOp.getDimension() != gpu::Dimension::x) {
       return failure();
-    if (pred.getPredicate() == EQ && isZeroInteger(pred.getLhs()))
+    }
+    if (pred.getPredicate() == EQ && isZeroInteger(pred.getLhs())) {
       return threadIdOp;
-    if (pred.getPredicate() == SGE && isZeroInteger(pred.getLhs()))
+    }
+    if (pred.getPredicate() == SGE && isZeroInteger(pred.getLhs())) {
       return threadIdOp;
-    if (pred.getPredicate() == UGE && isZeroInteger(pred.getLhs()))
+    }
+    if (pred.getPredicate() == UGE && isZeroInteger(pred.getLhs())) {
       return threadIdOp;
-    if (pred.getPredicate() == SGT && isOneInteger(pred.getLhs()))
+    }
+    if (pred.getPredicate() == SGT && isOneInteger(pred.getLhs())) {
       return threadIdOp;
-    if (pred.getPredicate() == UGT && isOneInteger(pred.getLhs()))
+    }
+    if (pred.getPredicate() == UGT && isOneInteger(pred.getLhs())) {
       return threadIdOp;
+    }
   }
   return failure();
 }
@@ -235,8 +251,9 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
   // Bail if cond is not `if (threadIdx.x == 0)`.
   FailureOr<gpu::ThreadIdOp> maybeThreadIdxxOp =
       isThreadIdxxZeroPredicate(ifOp);
-  if (failed(maybeThreadIdxxOp))
+  if (failed(maybeThreadIdxxOp)) {
     return failure();
+  }
 
   // All the code below will be executed on a single warp given a
   // fixed (threadIdxy, threadIdxz). Note, we reuse
@@ -384,8 +401,9 @@ static OpOperand *getWarpResult(gpu::WarpExecuteOnLane0Op warpOp,
     Value yieldValues = yieldOperand.get();
     Operation *definedOp = yieldValues.getDefiningOp();
     if (definedOp && fn(definedOp)) {
-      if (!warpOp.getResult(yieldOperand.getOperandNumber()).use_empty())
+      if (!warpOp.getResult(yieldOperand.getOperandNumber()).use_empty()) {
         return &yieldOperand;
+      }
     }
   }
   return {};
@@ -414,15 +432,17 @@ struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
   LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
     OpOperand *operand = getWarpResult(warpOp, llvm::IsaPred<memref::LoadOp>);
-    if (!operand)
+    if (!operand) {
       return failure();
+    }
     auto load = operand->get().getDefiningOp<memref::LoadOp>();
     unsigned operandIndex = operand->getOperandNumber();
     Value distributedVal = warpOp.getResult(operandIndex);
 
     auto indices = llvm::to_vector_of<Value>(load.getIndices());
-    if (!indices.empty())
+    if (!indices.empty()) {
       return failure();
+    }
 
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointAfter(warpOp);
@@ -458,17 +478,20 @@ struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(memref::AllocOp alloc,
                                 PatternRewriter &rewriter) const override {
-    if (!iree_compiler::hasSharedMemoryAddressSpace(alloc.getType()))
+    if (!iree_compiler::hasSharedMemoryAddressSpace(alloc.getType())) {
       return failure();
+    }
     auto warpParent = alloc->getParentOfType<gpu::WarpExecuteOnLane0Op>();
-    if (!warpParent)
+    if (!warpParent) {
       return failure();
+    }
     alloc->moveBefore(warpParent);
     // Conservatively move the dealloc after the warpOp. This may
     // extend the liverange of the allocation but is always correct.
     for (Operation *user : alloc->getUsers()) {
-      if (isa<memref::DeallocOp>(user))
+      if (isa<memref::DeallocOp>(user)) {
         user->moveAfter(warpParent);
+      }
     }
     return success();
   }
@@ -488,8 +511,9 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
 static AffineMap simpleDistributionFunction(Value val) {
   AffineMap map = AffineMap::get(val.getContext());
   auto vecType = dyn_cast<VectorType>(val.getType());
-  if (!vecType)
+  if (!vecType) {
     return map;
+  }
   // Create a map (d0, d1) -> (d1) to distribute along the inner
   // dimension. Once we support n-d distribution we can add more
   // complex cases.
@@ -673,15 +697,17 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
 
   auto diag = DiagnosedSilenceableFailure::success();
   if (getUseWmma()) {
-    if (failed(convertVectorToMMAOps(rewriter, target)))
+    if (failed(convertVectorToMMAOps(rewriter, target))) {
       return mlir::emitDefiniteFailure(
           target, "vector to wmma patterns failed to apply");
+    }
     return listener.checkAndResetError();
   }
 
-  if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp)))
+  if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp))) {
     return mlir::emitDefiniteFailure(target,
                                      "vector to mma patterns failed to apply");
+  }
 
   DEBUG_WITH_TYPE(DEBUG_VECTOR_TO_MMA,
                   {
@@ -694,10 +720,11 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   RewritePatternSet f32ToTF32patterns(funcOp.getContext());
   nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                           nvgpu::MmaSyncF32Lowering::TF32);
-  if (failed(
-          applyPatternsGreedily(funcOp, std::move(f32ToTF32patterns), config)))
+  if (failed(applyPatternsGreedily(funcOp, std::move(f32ToTF32patterns),
+                                   config))) {
     return mlir::emitDefiniteFailure(
         target, "vector to mma F32ToTF32 patterns failed to apply");
+  }
 
   return listener.checkAndResetError();
 }
@@ -826,8 +853,9 @@ static bool isKnownNoEffectsOpWithoutInterface(Operation *op) {
 /// Returns `true` if the op is defines the parallel region that is subject to
 /// barrier synchronization.
 static bool isParallelRegionBoundary(Operation *op) {
-  if (op->hasAttr("__parallel_region_boundary_for_test"))
+  if (op->hasAttr("__parallel_region_boundary_for_test")) {
     return true;
+  }
 
   // We consider functions inside executable variants .
   return isa<FunctionOpInterface>(op);
@@ -871,12 +899,14 @@ collectEffects(Operation *op,
                bool ignoreBarriers = true) {
   // Skip over barriers to avoid infinite recursion (those barriers would ask
   // this barrier again).
-  if (ignoreBarriers && isa<gpu::BarrierOp>(op))
+  if (ignoreBarriers && isa<gpu::BarrierOp>(op)) {
     return true;
+  }
 
   // Skip over ops that we know have no effects.
-  if (isKnownNoEffectsOpWithoutInterface(op))
+  if (isKnownNoEffectsOpWithoutInterface(op)) {
     return true;
+  }
 
   // Collect effect instances the operation. Note that the implementation of
   // getEffects erases all effect instances that have the type other than the
@@ -891,9 +921,11 @@ collectEffects(Operation *op,
   if (op->hasTrait<OpTrait::HasRecursiveMemoryEffects>()) {
     for (auto &region : op->getRegions()) {
       for (auto &block : region) {
-        for (auto &innerOp : block)
-          if (!collectEffects(&innerOp, effects, ignoreBarriers))
+        for (auto &innerOp : block) {
+          if (!collectEffects(&innerOp, effects, ignoreBarriers)) {
             return false;
+          }
+        }
       }
     }
     return true;
@@ -915,8 +947,9 @@ static bool
 getEffectsBefore(Operation *op,
                  SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
                  bool stopAtBarrier) {
-  if (!op->getBlock())
+  if (!op->getBlock()) {
     return true;
+  }
 
   // If there is a non-structured control flow, bail.
   Region *region = op->getBlock()->getParent();
@@ -930,23 +963,27 @@ getEffectsBefore(Operation *op,
     for (Operation *it = op->getPrevNode(); it != nullptr;
          it = it->getPrevNode()) {
       if (isa<gpu::BarrierOp>(it)) {
-        if (stopAtBarrier)
+        if (stopAtBarrier) {
           return true;
-        else
+        } else {
           continue;
+        }
       }
-      if (!collectEffects(it, effects))
+      if (!collectEffects(it, effects)) {
         return false;
+      }
     }
   }
 
   // Stop if reached the parallel region boundary.
-  if (isParallelRegionBoundary(op->getParentOp()))
+  if (isParallelRegionBoundary(op->getParentOp())) {
     return true;
+  }
 
   // Otherwise, keep collecting above the parent operation.
-  if (!getEffectsBefore(op->getParentOp(), effects, stopAtBarrier))
+  if (!getEffectsBefore(op->getParentOp(), effects, stopAtBarrier)) {
     return false;
+  }
 
   // If the op is loop-like, collect effects from the trailing operations until
   // we hit a barrier because they can executed before the current operation by
@@ -971,16 +1008,18 @@ getEffectsBefore(Operation *op,
   // If the parent operation is not guaranteed to execute its (single-block)
   // region once, walk the block.
   bool conservative = false;
-  if (!hasSingleExecutionBody(op->getParentOp()))
+  if (!hasSingleExecutionBody(op->getParentOp())) {
     op->getParentOp()->walk([&](Operation *in) {
-      if (conservative)
+      if (conservative) {
         return WalkResult::interrupt();
+      }
       if (!collectEffects(in, effects)) {
         conservative = true;
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
     });
+  }
 
   return !conservative;
 }
@@ -995,8 +1034,9 @@ static bool
 getEffectsAfter(Operation *op,
                 SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
                 bool stopAtBarrier) {
-  if (!op->getBlock())
+  if (!op->getBlock()) {
     return true;
+  }
 
   // If there is a non-structured control flow, bail.
   Region *region = op->getBlock()->getParent();
@@ -1006,25 +1046,30 @@ getEffectsAfter(Operation *op,
   }
 
   // Collect all effects after the op.
-  if (op != &op->getBlock()->back())
+  if (op != &op->getBlock()->back()) {
     for (Operation *it = op->getNextNode(); it != nullptr;
          it = it->getNextNode()) {
       if (isa<gpu::BarrierOp>(it)) {
-        if (stopAtBarrier)
+        if (stopAtBarrier) {
           return true;
+        }
         continue;
       }
-      if (!collectEffects(it, effects))
+      if (!collectEffects(it, effects)) {
         return false;
+      }
     }
+  }
 
   // Stop if reached the parallel region boundary.
-  if (isParallelRegionBoundary(op->getParentOp()))
+  if (isParallelRegionBoundary(op->getParentOp())) {
     return true;
+  }
 
   // Otherwise, keep collecting below the parent operation.
-  if (!getEffectsAfter(op->getParentOp(), effects, stopAtBarrier))
+  if (!getEffectsAfter(op->getParentOp(), effects, stopAtBarrier)) {
     return false;
+  }
 
   // If the op is loop-like, collect effects from the leading operations until
   // we hit a barrier because they can executed after the current operation by
@@ -1041,8 +1086,9 @@ getEffectsAfter(Operation *op,
   // operation `op2` at iteration `i-1` and the side effects must be ordered
   // appropriately.
   if (isSequentialLoopLike(op->getParentOp())) {
-    if (isa<gpu::BarrierOp>(op->getBlock()->front()))
+    if (isa<gpu::BarrierOp>(op->getBlock()->front())) {
       return true;
+    }
 
     bool exact = collectEffects(&op->getBlock()->front(), effects);
     return getEffectsAfter(&op->getBlock()->front(), effects,
@@ -1053,16 +1099,18 @@ getEffectsAfter(Operation *op,
   // If the parent operation is not guaranteed to execute its (single-block)
   // region once, walk the block.
   bool conservative = false;
-  if (!hasSingleExecutionBody(op->getParentOp()))
+  if (!hasSingleExecutionBody(op->getParentOp())) {
     op->getParentOp()->walk([&](Operation *in) {
-      if (conservative)
+      if (conservative) {
         return WalkResult::interrupt();
+      }
       if (!collectEffects(in, effects)) {
         conservative = true;
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
     });
+  }
 
   return !conservative;
 }
@@ -1071,8 +1119,9 @@ getEffectsAfter(Operation *op,
 static Value getBase(Value v) {
   while (true) {
     Operation *definingOp = v.getDefiningOp();
-    if (!definingOp)
+    if (!definingOp) {
       break;
+    }
 
     bool shouldContinue =
         TypeSwitch<Operation *, bool>(v.getDefiningOp())
@@ -1090,8 +1139,9 @@ static Value getBase(Value v) {
               return true;
             })
             .Default([](Operation *) { return false; });
-    if (!shouldContinue)
+    if (!shouldContinue) {
       break;
+    }
   }
   return v;
 }
@@ -1163,8 +1213,9 @@ static bool maybeCaptured(Value v) {
       }
 
       std::optional<bool> knownCaptureStatus = getKnownCapturingStatus(user, v);
-      if (!knownCaptureStatus || *knownCaptureStatus)
+      if (!knownCaptureStatus || *knownCaptureStatus) {
         return true;
+      }
     }
   }
 
@@ -1227,20 +1278,24 @@ static bool mayAlias(Value first, Value second) {
   // Non-equivalent distinct bases and globals cannot alias. At this point, we
   // have already filtered out based on values being equal and global name being
   // equal.
-  if ((isDistinct[0] || isGlobal[0]) && (isDistinct[1] || isGlobal[1]))
+  if ((isDistinct[0] || isGlobal[0]) && (isDistinct[1] || isGlobal[1])) {
     return false;
+  }
 
   bool isArg[] = {isFunctionArgument(first), isFunctionArgument(second)};
 
   // Distinct bases (allocations) cannot have been passed as an argument.
-  if ((isDistinct[0] && isArg[1]) || (isDistinct[1] && isArg[0]))
+  if ((isDistinct[0] && isArg[1]) || (isDistinct[1] && isArg[0])) {
     return false;
+  }
 
   // Non-captured base distinct values cannot conflict with another base value.
-  if (isDistinct[0] && !maybeCaptured(first))
+  if (isDistinct[0] && !maybeCaptured(first)) {
     return false;
-  if (isDistinct[1] && !maybeCaptured(second))
+  }
+  if (isDistinct[1] && !maybeCaptured(second)) {
     return false;
+  }
 
   // Otherwise, conservatively assume aliasing.
   DEBUG_WITH_TYPE(DEBUG_TYPE_ALIAS, DBGS_ALIAS() << "-> may alias!\n");
@@ -1263,8 +1318,9 @@ static bool mayAlias(MemoryEffects::EffectInstance a, Value v2) {
 /// cannot alias.
 static bool mayAlias(MemoryEffects::EffectInstance a,
                      MemoryEffects::EffectInstance b) {
-  if (a.getResource()->getResourceID() != b.getResource()->getResourceID())
+  if (a.getResource()->getResourceID() != b.getResource()->getResourceID()) {
     return false;
+  }
   if (Value v2 = b.getValue()) {
     return mayAlias(a, v2);
   } else if (Value v = a.getValue()) {
@@ -1287,8 +1343,9 @@ haveConflictingEffects(ArrayRef<MemoryEffects::EffectInstance> beforeEffects,
   for (const MemoryEffects::EffectInstance &before : beforeEffects) {
     for (const MemoryEffects::EffectInstance &after : afterEffects) {
       // If cannot alias, definitely no conflict.
-      if (!mayAlias(before, after))
+      if (!mayAlias(before, after)) {
         continue;
+      }
 
       // Read/read is not a conflict.
       if (isa<MemoryEffects::Read>(before.getEffect()) &&
@@ -1313,8 +1370,9 @@ haveConflictingEffects(ArrayRef<MemoryEffects::EffectInstance> beforeEffects,
       //      conflicts.
       //   2. either the program is ill-formed and we are in undefined behavior
       //      territory.
-      if (isa<MemoryEffects::Free>(before.getEffect()))
+      if (isa<MemoryEffects::Free>(before.getEffect())) {
         continue;
+      }
 
       // Other kinds of effects create a conflict, e.g. read-after-write.
       LLVM_DEBUG(

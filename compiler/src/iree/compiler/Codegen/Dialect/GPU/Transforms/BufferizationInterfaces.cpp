@@ -38,8 +38,9 @@ getBuffers(RewriterBase &rewriter, const MutableOperandRange &operands,
     if (isa<TensorType>(opOperand.get().getType())) {
       FailureOr<Value> resultBuffer =
           getBuffer(rewriter, opOperand.get(), options, state);
-      if (failed(resultBuffer))
+      if (failed(resultBuffer)) {
         return failure();
+      }
       result.push_back(*resultBuffer);
     } else {
       result.push_back(opOperand.get());
@@ -121,8 +122,9 @@ struct BarrierRegionOpBufferizationInterface
       memrefType = bufferization::getBufferType(
           barrierOp.getOperand(argNum), options, state, invocationStack);
     }
-    if (failed(memrefType))
+    if (failed(memrefType)) {
       return failure();
+    }
     return cast<BaseMemRefType>(*memrefType);
   }
 
@@ -207,8 +209,9 @@ struct ValueBarrierOpBufferizationInterface
     auto srcMemrefType = bufferization::getBufferType(
         barrierOp.getInputs()[cast<OpResult>(value).getResultNumber()], options,
         state, invocationStack);
-    if (failed(srcMemrefType))
+    if (failed(srcMemrefType)) {
       return failure();
+    }
     return cast<BaseMemRefType>(*srcMemrefType);
   }
 
@@ -280,8 +283,9 @@ struct YieldOpBufferizationInterface
       if (isa<TensorType>(value.getType())) {
         FailureOr<Value> maybeBuffer =
             getBuffer(rewriter, value, options, state);
-        if (failed(maybeBuffer))
+        if (failed(maybeBuffer)) {
           return failure();
+        }
         newResults.push_back(*maybeBuffer);
       } else {
         newResults.push_back(value);
@@ -443,8 +447,9 @@ struct BufferResourceCastOpBufferizationInterface
     assert(value.getDefiningOp() == castOp && "invalid value");
     auto srcMemrefType = bufferization::getBufferType(
         castOp.getInput(), options, state, invocationStack);
-    if (failed(srcMemrefType))
+    if (failed(srcMemrefType)) {
       return failure();
+    }
 
     auto baseMemrefType = cast<BaseMemRefType>(srcMemrefType.value());
     if (!hasStorageBufferMemSpace(baseMemrefType)) {

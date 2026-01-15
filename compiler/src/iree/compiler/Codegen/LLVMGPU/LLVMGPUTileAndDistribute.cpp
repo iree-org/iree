@@ -115,13 +115,15 @@ calculateDistributedTileSize(ArrayRef<int64_t> numElements, OpBuilder &builder,
   unsigned idIdx = 0;
   std::reverse(distributedDim.begin(), distributedDim.end());
   for (unsigned depth : partitionedLoops) {
-    if (depth >= blockTileSize.size())
+    if (depth >= blockTileSize.size()) {
       continue;
+    }
     tileSizesVal[depth] = arith::ConstantIndexOp::create(
         builder, operation->getLoc(),
         llvm::divideCeil(blockTileSize[depth], distributedDim[idIdx++]));
-    if (idIdx == kNumMaxParallelDims)
+    if (idIdx == kNumMaxParallelDims) {
       break;
+    }
   }
   return tileSizesVal;
 }

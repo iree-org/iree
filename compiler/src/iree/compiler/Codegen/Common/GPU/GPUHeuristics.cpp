@@ -207,8 +207,9 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     auto decrementIfPossible =
         [](MutableArrayRef<int64_t> sizes) -> LogicalResult {
       for (int64_t &size : sizes) {
-        if (size <= 1)
+        if (size <= 1) {
           continue;
+        }
         --size;
         return success();
       }

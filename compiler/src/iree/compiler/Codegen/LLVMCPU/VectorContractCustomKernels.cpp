@@ -853,10 +853,11 @@ private:
     // the constraints string. Not confusing at all!
     inputs.append(lhs.begin(), lhs.end());
     for (const auto &v : rhs) {
-      if (cast<VectorType>(v.getType()).getNumElements() == 1)
+      if (cast<VectorType>(v.getType()).getNumElements() == 1) {
         inputs.push_back(extract(rewriter, loc, v, 0));
-      else
+      } else {
         inputs.push_back(v);
+      }
     }
     inputs.append(acc.begin(), acc.end());
     // Create the inline asm op.
@@ -1039,8 +1040,9 @@ public:
     Value inLhs = getUnpromotedInput(I8Type, I32Type, lhs);
     Value inRhs = getUnpromotedInput(I8Type, I32Type, rhs);
 
-    if (!inLhs || !inRhs)
+    if (!inLhs || !inRhs) {
       return failure();
+    }
 
     auto loc = contractionOp.getLoc();
 

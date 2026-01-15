@@ -321,8 +321,9 @@ static void applyVectorDistribution(Operation *root,
   while (!worklist.empty()) {
     Operation *op = worklist.front();
     worklist.pop_front();
-    if (op == nullptr)
+    if (op == nullptr) {
       continue;
+    }
 
     LLVM_DEBUG(llvm::dbgs() << "Distributing: ");
     LLVM_DEBUG(op->print(llvm::dbgs(), OpPrintingFlags().skipRegions()));

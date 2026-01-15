@@ -1281,8 +1281,9 @@ convertScaledContractionToInnerTiledMma(
           lhsInnerPerm, rhsInnerPerm, sc1InnerPerm, sc2InnerPerm, accInnerPerm};
   SmallVector<int64_t> identityPerm = {0, 1};
   if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
-      accInnerPerm == identityPerm)
+      accInnerPerm == identityPerm) {
     perms = std::nullopt;
+  }
 
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
@@ -1424,8 +1425,9 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
   SmallVector<int64_t> identityPerm = {0, 1};
 
   if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
-      accInnerPerm == identityPerm)
+      accInnerPerm == identityPerm) {
     perms = std::nullopt;
+  }
 
   IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
       getLoweringConfig(linalgOp);
@@ -1875,12 +1877,15 @@ void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns) {
 //===---------------------------------------------------------------------===//
 
 static bool isLaneMappableForall(scf::ForallOp forallOp) {
-  if (forallOp.getNumResults() > 0)
+  if (forallOp.getNumResults() > 0) {
     return false;
-  if (forallOp.getRank() != 1)
+  }
+  if (forallOp.getRank() != 1) {
     return false;
-  if (!forallOp.getMapping().has_value())
+  }
+  if (!forallOp.getMapping().has_value()) {
     return false;
+  }
   Attribute mapping = *forallOp.getMapping()->getValue().begin();
   if (mapping != IREE::GPU::LaneIdAttr::get(forallOp.getContext(), 0)) {
     return false;

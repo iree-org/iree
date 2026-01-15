@@ -435,11 +435,13 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
   SmallVector<size_t> subgroupDimToResult, threadDimToResult;
 
   if (failed(basisFromSizesStrides(getSubgroupTile(), getSubgroupStrides(),
-                                   subgroupBasis, subgroupDimToResult)))
+                                   subgroupBasis, subgroupDimToResult))) {
     return {};
+  }
   if (failed(basisFromSizesStrides(getThreadTile(), getThreadStrides(),
-                                   threadBasis, threadDimToResult)))
+                                   threadBasis, threadDimToResult))) {
     return {};
+  }
 
   // Add the subgroup_size to the end of the subgroup delinearization basis.
   subgroupBasis.push_back(subgroupSize);
