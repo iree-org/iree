@@ -65,4 +65,3 @@ jobs:
           IREE_NVIDIA_SM80_TESTS_DISABLE: 1
           IREE_MULTI_DEVICE_TESTS_DISABLE: 0
         run: ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
-
