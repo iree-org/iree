@@ -160,7 +160,8 @@ static void iree_hal_amdgpu_logical_device_error_handler(void* user_data,
   IREE_TRACE({
     char buffer[1024];
     iree_host_size_t buffer_length = 0;
-    if (iree_status_format(status, sizeof(buffer), buffer, &buffer_length)) {
+    if (iree_status_format(status, IREE_STATUS_FORMAT_FLAG_NONE, sizeof(buffer),
+                           buffer, &buffer_length)) {
       IREE_TRACE_MESSAGE_DYNAMIC(ERROR, buffer, buffer_length);
     }
   });

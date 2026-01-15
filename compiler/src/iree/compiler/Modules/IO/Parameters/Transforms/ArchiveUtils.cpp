@@ -17,13 +17,15 @@ LogicalResult handleRuntimeError(Operation *op, iree_status_t status,
   if (iree_status_is_ok(status))
     return success();
   iree_host_size_t buffer_length = 0;
-  if (!iree_status_format(status, /*buffer_capacity=*/0,
-                          /*buffer=*/nullptr, &buffer_length))
+  if (!iree_status_format(status, IREE_STATUS_FORMAT_FLAG_NONE,
+                          /*buffer_capacity=*/0, /*buffer=*/nullptr,
+                          &buffer_length))
     return op->emitError() << failureMessage;
   std::string message;
   message.reserve(buffer_length);
   message.resize(buffer_length - 1);
-  iree_status_format(status, message.capacity(), &message[0], &buffer_length);
+  iree_status_format(status, IREE_STATUS_FORMAT_FLAG_NONE, message.capacity(),
+                     &message[0], &buffer_length);
   iree_status_ignore(status);
   return op->emitError() << failureMessage << "\n" << message;
 }

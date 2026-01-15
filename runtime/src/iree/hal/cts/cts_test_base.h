@@ -277,16 +277,21 @@ class CTSTestBase : public BaseType, public CTSTestResources {
 
   // Check that a contains b.
   // That is the codes of a and b are equal and the message of b is contained
-  // in the message of a.
+  // in the message of a. We exclude stack traces since iree_status_clone()
+  // captures a new stack at the clone site, so the stack traces would differ.
   void CheckStatusContains(iree_status_t a, iree_status_t b) {
     EXPECT_EQ(iree_status_code(a), iree_status_code(b));
     iree_allocator_t allocator = iree_allocator_system();
     char* a_str = NULL;
     iree_host_size_t a_str_length = 0;
-    EXPECT_TRUE(iree_status_to_string(a, &allocator, &a_str, &a_str_length));
+    EXPECT_TRUE(iree_status_to_string(a,
+                                      IREE_STATUS_FORMAT_FLAG_SKIP_STACK_TRACE,
+                                      &allocator, &a_str, &a_str_length));
     char* b_str = NULL;
     iree_host_size_t b_str_length = 0;
-    EXPECT_TRUE(iree_status_to_string(b, &allocator, &b_str, &b_str_length));
+    EXPECT_TRUE(iree_status_to_string(b,
+                                      IREE_STATUS_FORMAT_FLAG_SKIP_STACK_TRACE,
+                                      &allocator, &b_str, &b_str_length));
     EXPECT_TRUE(std::string_view(a_str).find(std::string_view(b_str)) !=
                 std::string_view::npos);
     iree_allocator_free(allocator, a_str);
