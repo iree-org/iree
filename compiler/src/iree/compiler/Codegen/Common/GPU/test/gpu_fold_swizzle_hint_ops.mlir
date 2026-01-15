@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
+// RUN: iree-opt --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
 
 // Test: tensor.extract_slice of swizzle_hint(tensor.empty) should fold
 // to swizzle_hint(tensor.empty) with the sliced shape.
@@ -13,8 +13,6 @@ func.func @fold_extract_slice_of_swizzle_hint() -> tensor<16x32xf32> {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<16x32xf32>
 //       CHECK:   %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.rotate_rows<64, 4>] : tensor<16x32xf32>
 //       CHECK:   return %[[SWIZZLE]]
-
-// -----
 
 // Test: tensor.extract_slice with dynamic sizes should fold correctly.
 func.func @fold_extract_slice_dynamic(%size0: index, %size1: index) -> tensor<?x?xf32> {
@@ -31,8 +29,6 @@ func.func @fold_extract_slice_dynamic(%size0: index, %size1: index) -> tensor<?x
 //       CHECK:   %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.xor_shuffle<128, 16>] : tensor<?x?xf32>
 //       CHECK:   return %[[SWIZZLE]]
 
-// -----
-
 // Test: tensor.expand_shape of swizzle_hint(tensor.empty) should fold
 // to swizzle_hint(tensor.empty) with the expanded shape.
 func.func @fold_expand_shape_of_swizzle_hint() -> tensor<4x16x64xf32> {
@@ -46,8 +42,6 @@ func.func @fold_expand_shape_of_swizzle_hint() -> tensor<4x16x64xf32> {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<4x16x64xf32>
 //       CHECK:   %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.rotate_rows<64, 4>] : tensor<4x16x64xf32>
 //       CHECK:   return %[[SWIZZLE]]
-
-// -----
 
 // Test: tensor.collapse_shape of swizzle_hint(tensor.empty) should fold
 // to swizzle_hint(tensor.empty) with the collapsed shape.
@@ -63,8 +57,6 @@ func.func @fold_collapse_shape_of_swizzle_hint() -> tensor<64x64xf32> {
 //       CHECK:   %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.rotate_rows<64, 4>] : tensor<64x64xf32>
 //       CHECK:   return %[[SWIZZLE]]
 
-// -----
-
 // Negative test: extract_slice of swizzle_hint without tensor.empty source
 // should NOT fold.
 func.func @no_fold_extract_slice_non_empty(%arg0: tensor<64x64xf32>) -> tensor<16x32xf32> {
@@ -78,8 +70,6 @@ func.func @no_fold_extract_slice_non_empty(%arg0: tensor<64x64xf32>) -> tensor<1
 //       CHECK:   %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[ARG0]][#iree_codegen.rotate_rows<64, 4>] : tensor<64x64xf32>
 //       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[SWIZZLE]]
 //       CHECK:   return %[[SLICE]]
-
-// -----
 
 // Negative test: expand_shape of swizzle_hint without tensor.empty source
 // should NOT fold.
@@ -95,8 +85,6 @@ func.func @no_fold_expand_shape_non_empty(%arg0: tensor<64x64xf32>) -> tensor<4x
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[SWIZZLE]]
 //       CHECK:   return %[[EXPANDED]]
 
-// -----
-
 // Test: XOR shuffle swizzle attribute is preserved through folding.
 func.func @fold_xor_shuffle_swizzle() -> tensor<8x64xf32> {
   %empty = tensor.empty() : tensor<16x128xf32>
@@ -109,8 +97,6 @@ func.func @fold_xor_shuffle_swizzle() -> tensor<8x64xf32> {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<8x64xf32>
 //       CHECK:   %[[SWIZZLE:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.xor_shuffle<128, 16>] : tensor<8x64xf32>
 //       CHECK:   return %[[SWIZZLE]]
-
-// -----
 
 // Test: Rank-reducing extract_slice should work correctly.
 func.func @fold_rank_reducing_extract_slice() -> tensor<32xf32> {

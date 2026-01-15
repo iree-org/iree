@@ -116,22 +116,26 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
 
   // Create a `bufferization.alloc_tensor` op with memory space
   // `#gpu.address_space<workgroup>`.
+  Location loc = empty->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(empty);
   Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
       rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   auto allocTensor = bufferization::AllocTensorOp::create(
-      rewriter, empty->getLoc(), cast<TensorType>(empty.getResult().getType()),
+      rewriter, loc, cast<TensorType>(empty.getResult().getType()),
       empty.getDynamicSizes(),
       /*copy=*/Value(), /*size_hint=*/Value(),
       /*memory_space=*/sharedMemoryAddrSpace);
+
   // If the original `tensor.empty` has a swizzle hint, apply it to the new
-  // allocation.
+  // allocation. Note that if there is a swizzle hint, it will be the only user
+  // of the `tensor.empty` op.
   if (auto swizzleHintOp =
           dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
+    assert(swizzleHintOp->hasOneUse() &&
+           "a tensor.empty with a swizzle hint should have only one use");
     auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
-        rewriter, empty->getLoc(), allocTensor.getResult(),
-        swizzleHintOp.getSwizzle());
+        rewriter, loc, allocTensor.getResult(), swizzleHintOp.getSwizzle());
     return newSwizzle.getResult();
   }
   return allocTensor.getResult();
@@ -2090,47 +2094,44 @@ void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
 // proven stable, we could consider upstreaming this extension.
 
 namespace {
-struct FoldSwizzleHintOpWithExtractSliceOp
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+struct FoldSwizzleHintOpWithExtractSliceOp final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   FoldSwizzleHintOpWithExtractSliceOp(MLIRContext *ctx,
                                       PatternBenefit benefit = 1,
                                       bool foldSingleUseOnly = false)
-      : OpRewritePattern<tensor::ExtractSliceOp>(ctx, benefit),
-        foldSingleUseOnly(foldSingleUseOnly) {}
+      : OpRewritePattern(ctx, benefit), foldSingleUseOnly(foldSingleUseOnly) {}
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = sliceOp.getLoc();
     // Check for swizzle_hint op source.
     auto swizzleHintOp =
-        sliceOp.getSource()
-            .template getDefiningOp<IREE::Codegen::SwizzleHintOp>();
+        sliceOp.getSource().getDefiningOp<IREE::Codegen::SwizzleHintOp>();
     if (!swizzleHintOp) {
       return failure();
     }
 
     // Check for tensor.empty source.
-    auto emptyOp =
-        swizzleHintOp.getOperand().template getDefiningOp<tensor::EmptyOp>();
+    auto emptyOp = swizzleHintOp.getOperand().getDefiningOp<tensor::EmptyOp>();
     if (!emptyOp) {
       return failure();
     }
 
     // Check for single use.
-    if (foldSingleUseOnly && !llvm::hasSingleElement(emptyOp->getUses())) {
+    if (foldSingleUseOnly && !emptyOp->hasOneUse()) {
       return failure();
     }
 
     // Create new tensor.empty op. tensor.extract_slice may be rank-reducing;
     // its dynamic sizes must be preserved as well as its result type.
-    auto tensorType = RankedTensorType::get(sliceOp.getType().getShape(),
-                                            sliceOp.getType().getElementType(),
-                                            sliceOp.getType().getEncoding());
+    Location loc = sliceOp.getLoc();
+    RankedTensorType sliceType = cast<RankedTensorType>(sliceOp.getType());
+    auto tensorType =
+        RankedTensorType::get(sliceType.getShape(), sliceType.getElementType(),
+                              sliceType.getEncoding());
     auto newEmptyOp =
         tensor::EmptyOp::create(rewriter, loc, tensorType, sliceOp.getSizes());
-    auto newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(
-        rewriter, loc, newEmptyOp, swizzleHintOp.getSwizzle());
-    rewriter.replaceOp(sliceOp, newSwizzleHintOp.getResult());
+    rewriter.replaceOpWithNewOp<IREE::Codegen::SwizzleHintOp>(
+        sliceOp, newEmptyOp, swizzleHintOp.getSwizzle());
     return success();
   }
 
@@ -2139,7 +2140,7 @@ private:
 };
 
 template <typename ReshapeOp>
-struct FoldSwizzleHintOpWithReshapeOp : public OpRewritePattern<ReshapeOp> {
+struct FoldSwizzleHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
   FoldSwizzleHintOpWithReshapeOp(MLIRContext *ctx, PatternBenefit benefit = 1,
                                  bool foldSingleUseOnly = false)
       : OpRewritePattern<ReshapeOp>(ctx, benefit),
@@ -2147,22 +2148,19 @@ struct FoldSwizzleHintOpWithReshapeOp : public OpRewritePattern<ReshapeOp> {
 
   LogicalResult matchAndRewrite(ReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
-    // Check for tensor.empty source.
     auto swizzleHintOp =
         reshapeOp.getSrc()
             .template getDefiningOp<IREE::Codegen::SwizzleHintOp>();
     if (!swizzleHintOp) {
       return failure();
     }
-    auto emptyOp =
-        swizzleHintOp.getOperand().template getDefiningOp<tensor::EmptyOp>();
+    auto emptyOp = swizzleHintOp.getOperand().template getDefiningOp<tensor::EmptyOp>();
     if (!emptyOp) {
       return failure();
     }
 
     // Check for single use.
-    if (foldSingleUseOnly &&
-        !llvm::hasSingleElement(swizzleHintOp->getUses())) {
+    if (foldSingleUseOnly && !emptyOp->hasOneUse()) {
       return failure();
     }
 
@@ -2175,10 +2173,10 @@ struct FoldSwizzleHintOpWithReshapeOp : public OpRewritePattern<ReshapeOp> {
     }
 
     // Create new tensor.empty op.
-    // TODO: Do not drop tensor type encoding.
     Value emptyTensor =
         tensor::EmptyOp::create(rewriter, loc, resultShapes[0],
-                                reshapeOp.getResultType().getElementType());
+                                reshapeOp.getResultType().getElementType(),
+                                reshapeOp.getResultType().getEncoding());
     Value newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(
         rewriter, loc, emptyTensor, swizzleHintOp.getSwizzle());
     if (newSwizzleHintOp.getType() != reshapeOp.getResultType()) {
@@ -2197,11 +2195,9 @@ private:
 } // namespace
 
 void populateFoldSwizzleHintOpPatterns(RewritePatternSet &patterns) {
-  patterns.insert<FoldSwizzleHintOpWithReshapeOp<tensor::ExpandShapeOp>>(
-      patterns.getContext());
-  patterns.insert<FoldSwizzleHintOpWithReshapeOp<tensor::CollapseShapeOp>>(
-      patterns.getContext());
-  patterns.insert<FoldSwizzleHintOpWithExtractSliceOp>(patterns.getContext());
+  patterns.add<FoldSwizzleHintOpWithReshapeOp<tensor::ExpandShapeOp>,
+               FoldSwizzleHintOpWithReshapeOp<tensor::CollapseShapeOp>,
+               FoldSwizzleHintOpWithExtractSliceOp>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
