@@ -33,8 +33,9 @@ struct DropCompilerHintsPass
         // undone. If LLVMGPU wants to keep the hints it should have its own
         // codegen op that carries the information. DropCompilerHints is meant
         // to drop all compiler hints.
-        if (keepAssumeInt)
+        if (keepAssumeInt) {
           return;
+        }
         op.replaceAllUsesWith(op.getOperands());
         op.erase();
       }

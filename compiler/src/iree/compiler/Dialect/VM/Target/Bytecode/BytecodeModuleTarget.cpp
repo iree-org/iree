@@ -159,8 +159,9 @@ canonicalizeModule(IREE::VM::BytecodeTargetOptions bytecodeOptions,
 // empty/null list).
 static iree_vm_AttrDef_vec_ref_t makeAttrDefs(DictionaryAttr attrs,
                                               FlatbufferBuilder &fbb) {
-  if (!attrs || attrs.empty())
+  if (!attrs || attrs.empty()) {
     return 0;
+  }
   SmallVector<iree_vm_AttrDef_ref_t> attrRefs;
   for (auto attr : attrs) {
     auto key = attr.getName().strref();
@@ -216,8 +217,9 @@ makeImportFunctionSignatureDef(IREE::VM::ImportOp importOp,
                                FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeImportCallingConventionString(importOp);
-  if (!cconv.has_value())
+  if (!cconv.has_value()) {
     return {};
+  }
   return createFunctionSignatureDef(importOp.getFunctionType(), typeTable,
                                     cconv.value(), /*attrsRef=*/0, fbb);
 }
@@ -229,8 +231,9 @@ makeFunctionSignatureDef(IREE::VM::FuncOp funcOp,
                          FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
-  if (!cconv.has_value())
+  if (!cconv.has_value()) {
     return {};
+  }
 
   // Encode reflection attributes.
   iree_vm_AttrDef_vec_ref_t attrsRef = makeAttrDefs(
@@ -390,8 +393,9 @@ static LogicalResult buildFlatBufferModule(
       flatbuffers_uint8_vec_ref_t embeddedRef = serializeEmbeddedData(
           rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.getValue(),
           rodataRef.alignment, rodataRef.totalSize, fbb);
-      if (!embeddedRef)
+      if (!embeddedRef) {
         return failure();
+      }
       iree_vm_RodataSegmentDef_start(fbb);
       iree_vm_RodataSegmentDef_embedded_data_add(fbb, embeddedRef);
       rodataSegmentRefs.push_back(iree_vm_RodataSegmentDef_end(fbb));
@@ -502,10 +506,12 @@ static LogicalResult buildFlatBufferModule(
   // so that we can multi-version. For now the moduleRequirements will be the OR
   // of all functions.
   iree_vm_FeatureBits_enum_t allowedFeatures = 0;
-  if (vmOptions.f32Extension)
+  if (vmOptions.f32Extension) {
     allowedFeatures |= iree_vm_FeatureBits_EXT_F32;
-  if (vmOptions.f64Extension)
+  }
+  if (vmOptions.f64Extension) {
     allowedFeatures |= iree_vm_FeatureBits_EXT_F64;
+  }
   // Yield/unwind are core VM semantics once supported by the runtime.
   allowedFeatures |= iree_vm_FeatureBits_YIELD;
   allowedFeatures |= iree_vm_FeatureBits_UNWIND;

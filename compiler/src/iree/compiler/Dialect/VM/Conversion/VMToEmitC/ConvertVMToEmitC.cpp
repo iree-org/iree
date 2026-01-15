@@ -131,8 +131,9 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   }
 
   if (failed(
-          funcOp.replaceAllSymbolUses(builder.getStringAttr(name), moduleOp)))
+          funcOp.replaceAllSymbolUses(builder.getStringAttr(name), moduleOp))) {
     return funcOp.emitError() << "unable to update symbol name in module";
+  }
 
   return success();
 }
@@ -1186,8 +1187,9 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
           rodataOp.getAlignment()
               ? static_cast<size_t>(rodataOp.getAlignment().value())
               : 0;
-      if (alignment == 0)
+      if (alignment == 0) {
         alignment = kDefaultRodataAlignment;
+      }
 
       std::string bufferName =
           moduleOp.getName().str() + "_" + rodataOp.getName().str();
@@ -1196,8 +1198,9 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
                          ") static const uint8_t " + bufferName + "[] = {";
       size_t index = 0;
       for (char value : byteBuffer) {
-        if (index++ > 0)
+        if (index++ > 0) {
           stmt += ", ";
+        }
         stmt += std::to_string(
             static_cast<unsigned int>(static_cast<unsigned char>(value)));
       }
@@ -2785,11 +2788,13 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     IREE::VM::ImportOp importOp =
         lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "callee");
 
-    if (!funcOp && !importOp)
+    if (!funcOp && !importOp) {
       return op.emitError() << "lookup of callee failed";
+    }
 
-    if (funcOp && importOp)
+    if (funcOp && importOp) {
       return op.emitError() << "lookup of callee ambiguous";
+    }
 
     const bool isImported = importOp != nullptr;
 
@@ -2881,8 +2886,9 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
       return failure();
     }
 
-    if (!funcName.has_value())
+    if (!funcName.has_value()) {
       return op->emitError() << "Couldn't build name to imported function";
+    }
 
     auto callee = moduleOp.lookupSymbol<mlir::emitc::FuncOp>(funcName.value());
     if (callee == nullptr) {
@@ -3823,8 +3829,9 @@ class BranchTableOpConversion
     {
       OpBuilder::InsertionGuard guard(rewriter);
       auto *nextBlock = rewriter.getInsertionBlock()->getNextNode();
-      for (size_t i = 0; i < caseDestinations.size(); ++i)
+      for (size_t i = 0; i < caseDestinations.size(); ++i) {
         caseBlocks.push_back(rewriter.createBlock(nextBlock));
+      }
       caseBlocks.push_back(rewriter.createBlock(nextBlock)); // default
     }
     IREE::VM::BranchOp::create(rewriter, op.getLoc(), caseBlocks.front());

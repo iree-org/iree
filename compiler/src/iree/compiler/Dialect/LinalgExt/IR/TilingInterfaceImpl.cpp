@@ -291,8 +291,9 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 
     auto dim = dimMap[i];
 
-    if (starts[dim])
+    if (starts[dim]) {
       ret = arith::AddIOp::create(b, loc, ret, starts[dim]);
+    }
     starts[dim] = ret;
   }
 
@@ -441,8 +442,9 @@ LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
     Value idx = memref::LoadOp::create(b, loc, getIndices(), loadIndices);
     Value ret = arith::IndexCastOp::create(b, loc, b.getIndexType(), idx);
     auto dim = dimMap[i];
-    if (starts[dim])
+    if (starts[dim]) {
       ret = arith::AddIOp::create(b, loc, ret, starts[dim]);
+    }
     starts[dim] = ret;
   }
 
@@ -1192,11 +1194,13 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
         scanBlkArgs.push_back(
             memref::LoadOp::create(b, loc, getOutput(), indices));
         Value i0;
-        if (!isInclusive)
+        if (!isInclusive) {
           i0 = memref::LoadOp::create(b, loc, getInput(), indices);
+        }
         indices[scanDim] = iv;
-        if (isInclusive)
+        if (isInclusive) {
           i0 = memref::LoadOp::create(b, loc, getInput(), indices);
+        }
         scanBlkArgs.push_back(i0);
       });
 
@@ -1292,8 +1296,9 @@ LogicalResult ScanOp::getResultTilePosition(
     int64_t rank = getOperandRank();
     if (rank > 1) {
       for (auto i : llvm::seq<int64_t>(0, rank)) {
-        if (i == getDimension())
+        if (i == getDimension()) {
           continue;
+        }
         resultOffsets.push_back(offsets[i]);
         resultSizes.push_back(sizes[i]);
       }
@@ -1617,8 +1622,9 @@ LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
   uint64_t reductionDim = getDimension();
   SmallVector<Value> parallelIndices;
   for (size_t i = 0, rank = ivs.size(); i < rank; ++i) {
-    if (i == reductionDim)
+    if (i == reductionDim) {
       continue;
+    }
     parallelIndices.push_back(ivs[i]);
   }
 
@@ -3572,8 +3578,9 @@ static void offsetCustomOpIndices(OpBuilder &b, CustomOp customOp,
                                   ArrayRef<OpFoldResult> offsets) {
   IRRewriter rewriter(b);
   for (auto indexOp : customOp.getBody()->getOps<IREE::LinalgExt::IndexOp>()) {
-    if (indexOp.getDim() >= offsets.size() || !offsets[indexOp.getDim()])
+    if (indexOp.getDim() >= offsets.size() || !offsets[indexOp.getDim()]) {
       continue;
+    }
     OpBuilder::InsertionGuard guard(b);
     rewriter.setInsertionPointAfter(indexOp);
     AffineExpr index, offset;

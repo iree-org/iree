@@ -260,14 +260,17 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
 
     // Handle values entering the block and dying within.
     for (auto value : blockSets.liveIn) {
-      if (blockSets.liveOut.count(value))
+      if (blockSets.liveOut.count(value)) {
         continue;
+      }
       Operation *lastUse = &block.front();
       for (auto &use : value.getUses()) {
-        if (use.getOwner()->getBlock() != &block)
+        if (use.getOwner()->getBlock() != &block) {
           continue;
-        if (lastUse == use.getOwner())
+        }
+        if (lastUse == use.getOwner()) {
           continue;
+        }
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }
@@ -277,14 +280,16 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
 
     // Handle values defined within the block and not escaping.
     for (auto value : blockSets.defined) {
-      if (blockSets.liveOut.count(value))
+      if (blockSets.liveOut.count(value)) {
         continue;
+      }
       Operation *firstUse =
           value.getDefiningOp() ? value.getDefiningOp() : &block.front();
       Operation *lastUse = firstUse;
       for (auto &use : value.getUses()) {
-        if (use.getOwner()->getBlock() != &block)
+        if (use.getOwner()->getBlock() != &block) {
           continue;
+        }
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }
@@ -386,8 +391,9 @@ bool ValueLiveness::isLastRealValueUse(Value value, Operation *useOp,
             break;
           }
         }
-        if (valueIsSuccessorOperand)
+        if (valueIsSuccessorOperand) {
           break;
+        }
       }
     }
     // Check if the value escapes to any successor blocks.

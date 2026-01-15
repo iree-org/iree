@@ -62,8 +62,9 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
                 registerAllocation.remapSuccessorRegisters(&op, i);
             auto succOperands =
                 branchOp.getSuccessorOperands(i).getForwardedOperands();
-            if (succOperands.empty())
+            if (succOperands.empty()) {
               continue;
+            }
             unsigned baseIdx = succOperands.getBeginOperandIndex();
             // remapSuccessorRegisters only returns pairs where src != dst.
             // For display, we need ALL operands with correct MOVE bits.
@@ -114,8 +115,9 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
         op.setAttr("operand_registers",
                    getStrArrayAttr(builder, operandRegStrs));
       }
-      if (op.getNumResults() == 0)
+      if (op.getNumResults() == 0) {
         continue;
+      }
       SmallVector<std::string, 8> regStrs;
       regStrs.reserve(op.getNumResults());
       for (auto result : op.getResults()) {
@@ -167,8 +169,9 @@ sortBlocksInDominanceOrder(IREE::VM::FuncOp funcOp) {
   }
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
-    if (markedBlocks.count(block) > 0)
+    if (markedBlocks.count(block) > 0) {
       return;
+    }
     for (auto *childBlock : dominanceInfo.getNode(block)->children()) {
       visit(childBlock->getBlock());
     }
@@ -369,15 +372,18 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
   llvm::DenseMap<Value, Value> coalesceSource;
 
   auto recordCoalesceCandidate = [&](Value dest, Value src) {
-    if (dest.getType() != src.getType())
+    if (dest.getType() != src.getType()) {
       return;
+    }
     auto srcInterval = liveIntervals.getInterval(src);
     auto destInterval = liveIntervals.getInterval(dest);
-    if (!srcInterval || !destInterval)
+    if (!srcInterval || !destInterval) {
       return;
+    }
     // Only coalesce if intervals meet exactly (hand-off).
-    if (srcInterval->end != destInterval->start)
+    if (srcInterval->end != destInterval->start) {
       return;
+    }
     coalesceSource[dest] = src;
   };
 
@@ -386,17 +392,20 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
     // Block arguments can coalesce with branch operands from predecessors.
     for (auto *pred : block->getPredecessors()) {
       auto branchOp = dyn_cast<BranchOpInterface>(pred->getTerminator());
-      if (!branchOp)
+      if (!branchOp) {
         continue;
+      }
       for (unsigned succIdx = 0;
            succIdx < pred->getTerminator()->getNumSuccessors(); ++succIdx) {
-        if (pred->getTerminator()->getSuccessor(succIdx) != block)
+        if (pred->getTerminator()->getSuccessor(succIdx) != block) {
           continue;
+        }
         OperandRange operands =
             branchOp.getSuccessorOperands(succIdx).getForwardedOperands();
         for (auto [idx, operand] : llvm::enumerate(operands)) {
-          if (idx >= block->getNumArguments())
+          if (idx >= block->getNumArguments()) {
             break;
+          }
           recordCoalesceCandidate(block->getArgument(idx), operand);
         }
       }
@@ -481,8 +490,9 @@ void RegisterAllocation::computeElidableDiscards(IREE::VM::FuncOp funcOp) {
   for (auto &block : funcOp.getBlocks()) {
     for (auto &op : block.getOperations()) {
       auto discardOp = dyn_cast<IREE::VM::DiscardRefsOp>(&op);
-      if (!discardOp)
+      if (!discardOp) {
         continue;
+      }
 
       SmallVector<bool> operandElidability;
       for (Value ref : discardOp.getRefs()) {
@@ -510,8 +520,9 @@ void RegisterAllocation::computeElidableDiscards(IREE::VM::FuncOp funcOp) {
               break;
             }
           }
-          if (hasPrecedingMoveUse)
+          if (hasPrecedingMoveUse) {
             break;
+          }
         }
         operandElidability.push_back(hasPrecedingMoveUse);
       }
@@ -633,18 +644,21 @@ struct FeedbackArcSet {
       SmallVector<FASEdge> outEdges;
       outEdges.reserve(node->outdegree);
       for (auto &edge : edges) {
-        if (edge.sink == node)
+        if (edge.sink == node) {
           inEdges.push_back(edge);
-        if (edge.source == node)
+        }
+        if (edge.source == node) {
           outEdges.push_back(edge);
+        }
       }
       bool collectInEdges = node->indegree <= node->outdegree;
       bool collectOutEdges = !collectInEdges;
 
       SmallVector<Edge> results;
       for (auto &edge : inEdges) {
-        if (edge.source == node)
+        if (edge.source == node) {
           continue;
+        }
         if (collectInEdges) {
           results.push_back({edge.source->id, edge.sink->id});
         }
@@ -654,8 +668,9 @@ struct FeedbackArcSet {
         assignBucket(edge.source);
       }
       for (auto &edge : outEdges) {
-        if (edge.sink == node)
+        if (edge.sink == node) {
           continue;
+        }
         if (collectOutEdges) {
           results.push_back({edge.source->id, edge.sink->id});
         }
@@ -681,11 +696,13 @@ struct FeedbackArcSet {
         ends.erase(ends.begin());
         removeNode(node);
       }
-      if (remainingNodes.empty())
+      if (remainingNodes.empty()) {
         break;
+      }
       for (ssize_t i = buckets.size() - 1; i >= 0; --i) {
-        if (buckets[i].empty())
+        if (buckets[i].empty()) {
           continue;
+        }
         auto *bucket = buckets[i].front();
         buckets[i].erase(buckets[i].begin());
         auto feedbackEdges = removeNode(bucket);
@@ -715,11 +732,13 @@ struct FeedbackArcSet {
     llvm::SmallSetVector<NodeID, 8> unmarkedNodes = acyclicNodes;
     llvm::SmallSetVector<NodeID, 8> markedNodes;
     std::function<void(NodeID)> visit = [&](NodeID node) {
-      if (markedNodes.count(node) > 0)
+      if (markedNodes.count(node) > 0) {
         return;
+      }
       for (auto &edge : acyclicEdges) {
-        if (edge.first != node)
+        if (edge.first != node) {
           continue;
+        }
         visit(edge.second);
       }
       markedNodes.insert(node);
@@ -729,8 +748,9 @@ struct FeedbackArcSet {
     }
     for (auto node : markedNodes.takeVector()) {
       for (auto &edge : acyclicEdges) {
-        if (edge.first != node)
+        if (edge.first != node) {
           continue;
+        }
         result.acyclicEdges.push_back({edge.first, edge.second});
       }
     }

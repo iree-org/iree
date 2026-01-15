@@ -55,8 +55,9 @@ public:
     }
 
     // No constants found; omit the constant block entirely.
-    if (allLoadOps.empty())
+    if (allLoadOps.empty()) {
       return;
+    }
 
     // Create global ops for each constant and replace the HAL ops so they load
     // from them. Each global will track what constant key it represents for

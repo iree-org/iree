@@ -261,8 +261,9 @@ void structDefinition(OpBuilder builder, Location location,
   std::string decl = std::string("struct ") + structName.str() + " {";
   for (auto &field : fields) {
     decl += field.type + " " + field.name;
-    if (field.isArray())
+    if (field.isArray()) {
       decl += "[" + std::to_string(field.arraySize.value()) + "]";
+    }
     decl += ";";
   }
   decl += "};";

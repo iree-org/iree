@@ -320,8 +320,9 @@ SmallVector<AffineMap> EncodingAttr::getRootMaps() const {
           return cast<AffineMapAttr>(m).getAffineMap();
         }
         if (auto mapsAttr = dyn_cast<ArrayAttr>(m)) {
-          if (mapsAttr.empty())
+          if (mapsAttr.empty()) {
             return AffineMap();
+          }
           return cast<AffineMapAttr>(mapsAttr[0]).getAffineMap();
         }
         return AffineMap();
@@ -339,8 +340,9 @@ AffineMap EncodingAttr::getLastMapForOperandIndex() const {
     return mapAttr.getAffineMap();
   }
   if (auto mapsAttr = dyn_cast<ArrayAttr>(indexingMap)) {
-    if (mapsAttr.empty())
+    if (mapsAttr.empty()) {
       return AffineMap();
+    }
     return cast<AffineMapAttr>(mapsAttr[mapsAttr.size() - 1]).getAffineMap();
   }
   return AffineMap();
