@@ -52,9 +52,10 @@ struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
   bool parse(llvm::cl::Option &O, StringRef /*argName*/, StringRef arg,
              std::optional<int64_t> &v) {
     long long w;
-    if (llvm::getAsSignedInteger(arg, 10, w))
+    if (llvm::getAsSignedInteger(arg, 10, w)) {
       return O.error("Invalid argument '" + arg +
                      "', only integer is supported.");
+    }
     v = w;
     return false;
   }
@@ -264,8 +265,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
                                          remarksOutputFile.c_str());
     }
 
-    if (!ireeCompilerInvocationParseSource(r.inv, source))
+    if (!ireeCompilerInvocationParseSource(r.inv, source)) {
       return false;
+    }
 
     // Switch on compileMode to choose a pipeline to run.
     switch (compileMode) {
@@ -377,8 +379,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       return 1;
     }
   } else {
-    if (!processBuffer(s.source))
+    if (!processBuffer(s.source)) {
       return 1;
+    }
   }
 
   ireeCompilerOutputKeep(s.output);
