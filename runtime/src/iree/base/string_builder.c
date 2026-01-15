@@ -94,9 +94,16 @@ IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
   }
 
   // Grow by 2x. Note that the current capacity may be zero.
-  iree_host_size_t new_capacity = iree_max(
-      builder->capacity * 2,
-      iree_host_align(minimum_capacity, IREE_STRING_BUILDER_ALIGNMENT));
+  iree_host_size_t doubled_capacity = 0;
+  if (!iree_host_size_checked_mul(builder->capacity, 2, &doubled_capacity)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "capacity overflow");
+  }
+  iree_host_size_t aligned_minimum = 0;
+  if (!iree_host_size_checked_align(
+          minimum_capacity, IREE_STRING_BUILDER_ALIGNMENT, &aligned_minimum)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "capacity overflow");
+  }
+  iree_host_size_t new_capacity = iree_max(doubled_capacity, aligned_minimum);
   IREE_RETURN_IF_ERROR(iree_allocator_realloc(builder->allocator, new_capacity,
                                               (void**)&builder->buffer));
   builder->buffer[builder->size] = 0;
@@ -108,8 +115,12 @@ IREE_API_EXPORT iree_status_t iree_string_builder_reserve_for_append(
     iree_string_builder_t* builder,
     iree_host_size_t minimum_additional_capacity, char** out_buffer,
     iree_host_size_t* out_capacity) {
-  iree_host_size_t new_capacity =
-      builder->size + minimum_additional_capacity + /*NUL=*/1;
+  iree_host_size_t new_capacity = 0;
+  if (!iree_host_size_checked_add(builder->size, minimum_additional_capacity,
+                                  &new_capacity) ||
+      !iree_host_size_checked_add(new_capacity, /*NUL=*/1, &new_capacity)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "capacity overflow");
+  }
   IREE_RETURN_IF_ERROR(iree_string_builder_reserve(builder, new_capacity));
   *out_buffer = builder->buffer + builder->size;
   *out_capacity = builder->capacity - builder->size - /*NUL=*/1;
@@ -130,8 +141,14 @@ IREE_API_EXPORT iree_status_t iree_string_builder_append_inline(
     iree_string_builder_t* builder, iree_host_size_t count, char** out_head) {
   *out_head = NULL;
   if (!iree_string_builder_is_calculating_size(builder)) {
-    IREE_RETURN_IF_ERROR(iree_string_builder_reserve(
-        builder, builder->size + count + /*NUL=*/1));
+    iree_host_size_t required_capacity = 0;
+    if (!iree_host_size_checked_add(builder->size, count, &required_capacity) ||
+        !iree_host_size_checked_add(required_capacity, /*NUL=*/1,
+                                    &required_capacity)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "capacity overflow");
+    }
+    IREE_RETURN_IF_ERROR(
+        iree_string_builder_reserve(builder, required_capacity));
     *out_head = &builder->buffer[builder->size];
   }
   builder->size += count;
@@ -142,8 +159,15 @@ IREE_API_EXPORT iree_status_t iree_string_builder_append_string(
     iree_string_builder_t* builder, iree_string_view_t value) {
   // Ensure capacity for the value + NUL terminator.
   if (!iree_string_builder_is_calculating_size(builder)) {
+    iree_host_size_t required_capacity = 0;
+    if (!iree_host_size_checked_add(builder->size, value.size,
+                                    &required_capacity) ||
+        !iree_host_size_checked_add(required_capacity, /*NUL=*/1,
+                                    &required_capacity)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "capacity overflow");
+    }
     IREE_RETURN_IF_ERROR(
-        iree_string_builder_reserve(builder, builder->size + value.size + 1));
+        iree_string_builder_reserve(builder, required_capacity));
     // Only copy the bytes if we are not doing a size calculation.
     memcpy(builder->buffer + builder->size, value.data, value.size);
     builder->buffer[builder->size + value.size] = 0;  // NUL
@@ -221,11 +245,9 @@ IREE_API_EXPORT void iree_string_pair_builder_deinitialize(
 IREE_API_EXPORT iree_status_t iree_string_pair_builder_add(
     iree_string_pair_builder_t* builder, iree_string_pair_t pair) {
   if (builder->pairs_size == builder->pairs_capacity) {
-    // Resize.
-    builder->pairs_capacity = iree_max(8, builder->pairs_capacity * 2);
-    IREE_RETURN_IF_ERROR(iree_allocator_realloc(
-        builder->allocator, builder->pairs_capacity * sizeof(builder->pairs[0]),
-        (void**)&builder->pairs));
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        builder->allocator, 8, sizeof(builder->pairs[0]),
+        &builder->pairs_capacity, (void**)&builder->pairs));
   }
   builder->pairs[builder->pairs_size++] = pair;
   return iree_ok_status();
@@ -246,15 +268,9 @@ iree_string_pair_builder_add_int32(iree_string_pair_builder_t* builder,
 IREE_API_EXPORT iree_status_t iree_string_pair_builder_emplace_string(
     iree_string_pair_builder_t* builder, iree_string_view_t* inout_string) {
   if (builder->temp_strings_size == builder->temp_strings_capacity) {
-    // Resize.
-    iree_host_size_t new_capacity =
-        iree_max(8, builder->temp_strings_capacity * 2);
-    char** realloced = builder->temp_strings;
-    IREE_RETURN_IF_ERROR(iree_allocator_realloc(
-        builder->allocator, new_capacity * sizeof(builder->temp_strings[0]),
-        (void**)&realloced));
-    builder->temp_strings_capacity = new_capacity;
-    builder->temp_strings = realloced;
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        builder->allocator, 8, sizeof(builder->temp_strings[0]),
+        &builder->temp_strings_capacity, (void**)&builder->temp_strings));
   }
 
   char* alloced = NULL;

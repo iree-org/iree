@@ -21,6 +21,8 @@ void iree_arena_block_pool_initialize(iree_host_size_t total_block_size,
   IREE_TRACE_ZONE_BEGIN(z0);
 
   memset(out_block_pool, 0, sizeof(*out_block_pool));
+  IREE_ASSERT(total_block_size >= sizeof(iree_arena_block_t),
+              "block size too small for header");
   out_block_pool->total_block_size = total_block_size;
   out_block_pool->usable_block_size =
       total_block_size - sizeof(iree_arena_block_t);
@@ -182,8 +184,13 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     // allocate directly from the system allocator and track it ourselves for
     // freeing during reset.
     IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_arena_allocate_oversize");
-    iree_host_size_t allocation_size =
-        sizeof(iree_arena_oversized_allocation_t) + byte_length;
+    iree_host_size_t allocation_size = 0;
+    if (!iree_host_size_checked_add(sizeof(iree_arena_oversized_allocation_t),
+                                    byte_length, &allocation_size)) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "oversized allocation size overflow");
+    }
     iree_arena_oversized_allocation_t* allocation = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0,
@@ -200,8 +207,11 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
 
   // Pad length allocated so that each pointer bump is always ending at an
   // aligned address and the next allocation will start aligned.
-  iree_host_size_t aligned_length =
-      iree_host_align(byte_length, iree_max_align_t);
+  iree_host_size_t aligned_length = 0;
+  if (!iree_host_size_checked_align(byte_length, iree_max_align_t,
+                                    &aligned_length)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "alignment overflow");
+  }
 
   // Check to see if the current block (if any) has space - if not, get another.
   if (arena->block_head == NULL ||

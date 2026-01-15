@@ -121,10 +121,16 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)capacity);
   *out_set = NULL;
 
+  // Calculate allocation size with overflow checking. handles is a FAM
+  // accessed via set->handles[].
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      IREE_STRUCT_LAYOUT(sizeof(iree_wait_set_t), &total_size,
+                         IREE_STRUCT_FIELD_FAM(capacity, iree_wait_handle_t)));
   iree_wait_set_t* set = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      allocator, sizeof(*set) + capacity * sizeof(iree_wait_handle_t),
-      (void**)&set);
+  iree_status_t status =
+      iree_allocator_malloc(allocator, total_size, (void**)&set);
   if (iree_status_is_ok(status)) {
     set->allocator = allocator;
     set->capacity = capacity;
