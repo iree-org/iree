@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -318,6 +319,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                       controlFusionFn);
     IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(patterns,
                                                                controlFusionFn);
+    IREE::Codegen::populateFoldReshapeOpsByExpansionPatterns(patterns,
+                                                             controlFusionFn);
     // Add patterns to fold `tensor.empty` operations with its consumers.
     tensor::populateFoldTensorEmptyPatterns(patterns);
     // Add some additional patterns that can simplify the IR.
@@ -366,6 +369,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                       controlFn);
     IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
+        bubbleExpandShapePatterns, controlFn);
+    IREE::Codegen::populateFoldReshapeOpsByExpansionPatterns(
         bubbleExpandShapePatterns, controlFn);
     // Add patterns to fold the "bubbled-up" `tensor.expand_shape` operation and
     // "pushed-down" `tensor.collapse_shape` operation with their interface
