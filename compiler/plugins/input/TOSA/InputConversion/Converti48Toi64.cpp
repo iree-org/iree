@@ -139,21 +139,25 @@ void Converti48Toi64Pass::runOnOperation() {
   target.markUnknownOpDynamicallyLegal([](Operation *op) {
     if (auto funcOp = dyn_cast<mlir::FunctionOpInterface>(op)) {
       for (Type type : funcOp.getArgumentTypes()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
       for (Type type : funcOp.getResultTypes()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
     }
     for (Type type : op->getResultTypes()) {
-      if (type && isIllegalType(type))
+      if (type && isIllegalType(type)) {
         return false;
+      }
     }
     for (Type type : op->getOperandTypes()) {
-      if (type && isIllegalType(type))
+      if (type && isIllegalType(type)) {
         return false;
+      }
     }
     for (auto attr : op->getAttrs()) {
       if (auto typedAttr = dyn_cast<TypedAttr>(attr.getValue())) {

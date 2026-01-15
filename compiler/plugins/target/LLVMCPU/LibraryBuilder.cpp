@@ -520,8 +520,9 @@ LibraryBuilder::buildLibraryV0ImportTable(std::string libraryName) {
     SmallVector<llvm::Constant *> symbolNameValues;
     for (auto &import : imports) {
       auto symbolName = import.symbol_name;
-      if (import.weak)
+      if (import.weak) {
         symbolName = "?" + symbolName;
+      }
       symbolNameValues.push_back(createStringConstant(symbolName, module));
     }
     symbolNames = createArrayConstant(libraryName + "_import_names",
@@ -552,8 +553,9 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
 
   // iree_hal_executable_export_table_v0_t::ptrs
   SmallVector<llvm::Constant *> exportPtrValues;
-  for (auto dispatch : exports)
+  for (auto dispatch : exports) {
     exportPtrValues.push_back(dispatch.func);
+  }
   llvm::Constant *exportPtrs = createArrayConstant(
       libraryName + "_funcs", ptrType, exportPtrValues, module);
 
@@ -603,8 +605,9 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   llvm::Constant *exportNames = llvm::Constant::getNullValue(ptrType);
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
     SmallVector<llvm::Constant *> exportNameValues;
-    for (auto dispatch : exports)
+    for (auto dispatch : exports) {
       exportNameValues.push_back(createStringConstant(dispatch.name, module));
+    }
     exportNames = createArrayConstant(libraryName + "_names", ptrType,
                                       exportNameValues, module);
   }
@@ -615,9 +618,10 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
       exports, [](auto &dispatch) { return !dispatch.tag.empty(); });
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS && hasAnyTags) {
     SmallVector<llvm::Constant *> exportTagValues;
-    for (auto dispatch : exports)
+    for (auto dispatch : exports) {
       exportTagValues.push_back(
           createStringConstantOrNull(dispatch.tag, module));
+    }
     exportTags = createArrayConstant(libraryName + "_tags", ptrType,
                                      exportTagValues, module);
   }
