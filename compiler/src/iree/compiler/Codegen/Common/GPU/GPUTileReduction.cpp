@@ -25,12 +25,14 @@ static LogicalResult tileReduction(linalg::LinalgOp op) {
   SmallVector<unsigned> dims;
   op.getReductionDims(dims);
   SmallVector<int64_t> tileSize = getTileSizes(op, 1);
-  if (tileSize.empty())
+  if (tileSize.empty()) {
     return success();
+  }
   // Make sure reduction dimensions are the innermost ones.
   for (int i = 0; i < dims.size(); ++i) {
-    if (dims[dims.size() - 1 - i] != op.getNumLoops() - 1 - i)
+    if (dims[dims.size() - 1 - i] != op.getNumLoops() - 1 - i) {
       return success();
+    }
   }
   IRRewriter rewriter(op.getContext());
   SmallVector<OpFoldResult> sizes;
@@ -40,8 +42,9 @@ static LogicalResult tileReduction(linalg::LinalgOp op) {
   rewriter.setInsertionPoint(op);
   FailureOr<scf::SCFTilingResult> results = scf::tileReductionUsingScf(
       rewriter, cast<PartialReductionOpInterface>(op.getOperation()), sizes);
-  if (failed(results))
+  if (failed(results)) {
     return failure();
+  }
   rewriter.replaceOp(op, results->replacements);
   return success();
 }
@@ -50,14 +53,16 @@ static LogicalResult tileFusedOps(linalg::LinalgOp op) {
   IRRewriter rewriter(op.getContext());
   rewriter.setInsertionPoint(op);
   SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
-  if (tileSizes.empty())
+  if (tileSizes.empty()) {
     return success();
+  }
   linalg::LinalgTilingOptions tileOption;
   tileOption.setTileSizes(tileSizes);
   FailureOr<linalg::TiledLinalgOp> tiledOps =
       linalg::tileLinalgOp(rewriter, op, tileOption);
-  if (failed(tiledOps))
+  if (failed(tiledOps)) {
     return failure();
+  }
   rewriter.replaceOp(op, tiledOps->tensorResults);
   return success();
 }

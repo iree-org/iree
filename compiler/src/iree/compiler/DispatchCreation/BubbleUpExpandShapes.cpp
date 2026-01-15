@@ -146,8 +146,9 @@ struct SwapExtractSliceOfFill final
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
                                 PatternRewriter &rewriter) const override {
     auto fillOp = extractOp.getSource().getDefiningOp<linalg::FillOp>();
-    if (!fillOp)
+    if (!fillOp) {
       return failure();
+    }
 
     auto newExtractOp = tensor::ExtractSliceOp::create(
         rewriter, extractOp.getLoc(), extractOp.getType(),

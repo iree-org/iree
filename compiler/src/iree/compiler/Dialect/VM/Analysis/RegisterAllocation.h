@@ -227,8 +227,9 @@ public:
   // operands have already been released via MOVE on preceding operations.
   bool isDiscardElidable(Operation *op) const {
     auto it = discardOperandElidability_.find(op);
-    if (it == discardOperandElidability_.end())
+    if (it == discardOperandElidability_.end()) {
       return false;
+    }
     return llvm::all_of(it->second, [](bool b) { return b; });
   }
 
@@ -238,10 +239,12 @@ public:
   bool isDiscardOperandElidable(Operation *op,
                                 unsigned operandIndex) const override {
     auto it = discardOperandElidability_.find(op);
-    if (it == discardOperandElidability_.end())
+    if (it == discardOperandElidability_.end()) {
       return false;
-    if (operandIndex >= it->second.size())
+    }
+    if (operandIndex >= it->second.size()) {
       return false;
+    }
     return it->second[operandIndex];
   }
 

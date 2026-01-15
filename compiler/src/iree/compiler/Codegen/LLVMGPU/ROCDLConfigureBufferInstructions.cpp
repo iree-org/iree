@@ -46,8 +46,9 @@ static Value stripIntegerCasts(Value val) {
 /// loads, which is a conservative approximatino for workgroup-uniformity that
 /// can be made more extensive if needed.
 static bool isDefinitelyWorkgroupUniform(Value arg) {
-  if (!arg)
+  if (!arg) {
     return true;
+  }
   SetVector<Operation *> dependencies;
   BackwardSliceOptions opts;
   arg = stripIntegerCasts(arg);
@@ -60,8 +61,9 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
       getBackwardSlice(arg, &dependencies, opts);
   assert(result.succeeded());
   return llvm::all_of(dependencies, [&](Operation *op) {
-    if (matchPattern(op, m_Constant()))
+    if (matchPattern(op, m_Constant())) {
       return true;
+    }
     if (isa<IREE::HAL::InterfaceConstantLoadOp, IREE::Util::AssumeIntOp>(op)) {
       return true;
     }
@@ -116,13 +118,15 @@ struct ROCDLConfigureBufferInstructionsPass final
     : impl::ROCDLConfigureBufferInstructionsPassBase<
           ROCDLConfigureBufferInstructionsPass> {
   void runOnOperation() override {
-    if (!clROCDLlEnableBufferInstructions)
+    if (!clROCDLlEnableBufferInstructions) {
       return;
+    }
     mlir::FunctionOpInterface funcOp = getOperation();
     // Is this really the best way to skip this pass on non-rocdl targets?
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target || !target.isAMD())
+    if (!target || !target.isAMD()) {
       return;
+    }
 
     // Initialize the DataFlowSolver with IntegerRangeAnalysis.
     DataFlowSolver solver;

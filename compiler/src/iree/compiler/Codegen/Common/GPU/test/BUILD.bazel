@@ -17,6 +17,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "amdgpu_lower_coalesced_dma_to_gather_lds.mlir",
             "decompose_horizontally_fused_gemms.mlir",

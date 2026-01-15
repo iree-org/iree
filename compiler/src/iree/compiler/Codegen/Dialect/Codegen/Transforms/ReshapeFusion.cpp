@@ -28,8 +28,9 @@ canExpandInnerTiledOp(InnerTiledOp op, OpOperand *fusedOperand,
                       ArrayRef<ReassociationIndices> reassociation) {
   // Only single result inner_tiled ops are tested or used anywhere, so restrict
   // to single result for now.
-  if (op->getNumResults() != 1)
+  if (op->getNumResults() != 1) {
     return failure();
+  }
 
   // Only outer dims can be expanded because inner dims depend on the `kind`
   // attribute's implementation.
@@ -82,9 +83,10 @@ static InnerTiledOp expandInnerTiledOp(
   // dims. Get iteration domain to query sizes of dims not in the fused operand.
   SmallVector<Range> iterationDomain = op.getIterationDomain(rewriter);
   for (int64_t i = 0; i < numIterDims; ++i) {
-    if (iterDimExpansion[i].empty())
+    if (iterDimExpansion[i].empty()) {
       iterDimExpansion[i].push_back(
           {expandedDimCounter++, iterationDomain[i].size});
+    }
   }
 
   SmallVector<AffineMap> newIndexingMaps;

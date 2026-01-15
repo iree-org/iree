@@ -162,8 +162,9 @@ void ElementwiseOpFusionPass::runOnOperation() {
         operands.insert(std::next(consumer->operand_begin(),
                                   fusedOperand->getOperandNumber() + 1),
                         consumer->operand_end());
-        if (operands.size() >= kIreeMaxOperandCount)
+        if (operands.size() >= kIreeMaxOperandCount) {
           return false;
+        }
 
         ElementwiseOpsFusabilityOptions options;
         options.fuseMultiReduction = fuseMultiReduction;

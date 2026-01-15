@@ -49,8 +49,9 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
     // scalar that is not one of the arguments of the linalg operation.
     Region &region = padTensorOp.getRegion();
     Block &block = region.front();
-    if (!llvm::hasSingleElement(block))
+    if (!llvm::hasSingleElement(block)) {
       return failure();
+    }
     auto yieldOp = cast<tensor::YieldOp>(block.getTerminator());
     Value yieldVal = yieldOp.getValue();
     if (llvm::any_of(block.getArguments(),

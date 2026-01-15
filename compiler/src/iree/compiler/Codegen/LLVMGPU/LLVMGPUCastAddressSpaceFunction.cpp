@@ -66,8 +66,9 @@ struct LLVMGPUCastAddressSpaceFunctionPass final
             SymbolTable::lookupSymbolIn(moduleOp, callee));
         if (fnDecl) {
           SmallVector<Type> callArgumentTypes;
-          for (auto op : newOperands)
+          for (auto op : newOperands) {
             callArgumentTypes.push_back(op.getType());
+          }
           FunctionType functionType = rewriter.getFunctionType(
               callArgumentTypes, fnDecl->getResultTypes());
           fnDecl.setType(functionType);

@@ -30,8 +30,9 @@ public:
     // pass finishes.
     OwningOpRef<ModuleOp> transformModule;
     if (failed(transform::detail::assembleTransformLibraryFromPaths(
-            context, transformSpecPath, transformModule)))
+            context, transformSpecPath, transformModule))) {
       return signalPassFailure();
+    }
     Operation *payloadRoot = getOperation();
     Operation *transformEntryPoint = transform::detail::findTransformEntryPoint(
         getOperation(), *transformModule, "__transform_main");

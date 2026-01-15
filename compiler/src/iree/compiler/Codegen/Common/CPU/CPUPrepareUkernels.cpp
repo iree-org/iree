@@ -60,8 +60,9 @@ static void tileNonPackedDimsFor3DPackOps(RewriterBase &rewriter,
     // Skip the tiling if the size is already 1.
     RankedTensorType srcType = packOp.getSourceType();
     for (auto [idx, val] : llvm::enumerate(tileSizes)) {
-      if (val && srcType.getDimSize(idx) == 1)
+      if (val && srcType.getDimSize(idx) == 1) {
         return;
+      }
     }
 
     auto outerDimsPerm = packOp.getOuterDimsPerm();
@@ -96,8 +97,9 @@ static void tileNonPackedDimsFor5DPUnpackOps(RewriterBase &rewriter,
     // Skip the tiling if the size is already 1.
     RankedTensorType destType = unpackOp.getDestType();
     for (auto [idx, val] : llvm::enumerate(tileSizes)) {
-      if (val && destType.getDimSize(idx) == 1)
+      if (val && destType.getDimSize(idx) == 1) {
         return;
+      }
     }
 
     auto tilingInterfaceOp = cast<TilingInterface>(unpackOp.getOperation());
@@ -157,8 +159,9 @@ dropBatchTileSize(IREE::CPU::LoweringConfigAttr config) {
   SmallVector<NamedAttribute> newItems;
   for (auto [level, tileSizes, scalableTileFlags] : tilingInfo) {
     tileSizes.erase(tileSizes.begin());
-    if (!scalableTileFlags.empty())
+    if (!scalableTileFlags.empty()) {
       scalableTileFlags.erase(scalableTileFlags.begin());
+    }
     newItems.emplace_back(
         IREE::CPU::getTilingLevelName(level),
         IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
@@ -262,16 +265,18 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
     llvm::SmallDenseSet<int64_t> s;
     s.insert(packOp.getInnerDimsPos().begin(), packOp.getInnerDimsPos().end());
     for (auto dim : llvm::seq<int64_t>(0, packOp.getSourceRank())) {
-      if (s.contains(dim))
+      if (s.contains(dim)) {
         continue;
+      }
       srcPos = dim;
       break;
     }
 
     int destPos = srcPos;
     for (auto [idx, val] : llvm::enumerate(packOp.getOuterDimsPerm())) {
-      if (val == srcPos)
+      if (val == srcPos) {
         destPos = idx;
+      }
     }
 
     if (packOp.getSourceType().getDimSize(srcPos) != 1) {
@@ -284,15 +289,17 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
     SmallVector<int64_t> newInnerDimsPos(packOp.getInnerDimsPos());
     for (auto &val : newInnerDimsPos) {
       assert(val != srcPos);
-      if (val > srcPos)
+      if (val > srcPos) {
         val--;
+      }
     }
     SmallVector<int64_t> newOuterDimsPerm(packOp.getOuterDimsPerm());
     if (!newOuterDimsPerm.empty()) {
       newOuterDimsPerm.erase(newOuterDimsPerm.begin() + destPos);
       for (auto &val : newOuterDimsPerm) {
-        if (val > srcPos)
+        if (val > srcPos) {
           val--;
+        }
       }
     }
 
@@ -341,8 +348,9 @@ struct Convert5DUnPackto4DUnPackPattern
     int64_t destPos = 0;
 
     for (auto [idx, val] : llvm::enumerate(seqOrOuterDimsPerm)) {
-      if (s.contains(val))
+      if (s.contains(val)) {
         continue;
+      }
       srcPos = idx;
       destPos = val;
       break;
@@ -361,16 +369,18 @@ struct Convert5DUnPackto4DUnPackPattern
     SmallVector<int64_t> newInnerDimsPos(unpackOp.getInnerDimsPos());
     for (auto &val : newInnerDimsPos) {
       assert(val != destPos);
-      if (val > destPos)
+      if (val > destPos) {
         val--;
+      }
     }
 
     SmallVector<int64_t> newOuterDimsPerm(unpackOp.getOuterDimsPerm());
     if (!newOuterDimsPerm.empty()) {
       newOuterDimsPerm.erase(newOuterDimsPerm.begin() + srcPos);
       for (auto &val : newOuterDimsPerm) {
-        if (val > destPos)
+        if (val > destPos) {
           val--;
+        }
       }
     }
 

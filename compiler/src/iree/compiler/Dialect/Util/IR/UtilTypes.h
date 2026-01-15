@@ -233,10 +233,12 @@ public:
 
   static IntegerDivisibility join(const IntegerDivisibility &lhs,
                                   const IntegerDivisibility &rhs) {
-    if (lhs.isUninitialized())
+    if (lhs.isUninitialized()) {
       return rhs;
-    if (rhs.isUninitialized())
+    }
+    if (rhs.isUninitialized()) {
       return lhs;
+    }
     return IntegerDivisibility(lhs.getValue().getUnion(rhs.getValue()));
   }
 

@@ -179,8 +179,9 @@ public:
 
   StridedBufferDescriptor &getDesc(OpBuilder &builder) {
     assert(isValid() && "invalid StridedBufferAnalysis");
-    if (desc)
+    if (desc) {
       return *desc;
+    }
 
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointAfterValue(buffer);
@@ -257,10 +258,12 @@ struct BinaryEmitter {
   }
 
   LogicalResult initialize(Location loc, PatternRewriter &rewriter) {
-    if (!isProjectedPermutation())
+    if (!isProjectedPermutation()) {
       return rewriter.notifyMatchFailure(loc, "not projected permutation");
-    if (maxRank() > 2)
+    }
+    if (maxRank() > 2) {
       return rewriter.notifyMatchFailure(loc, "rank > 2");
+    }
     if (!operands.first.bufferAnal.isValid() ||
         !operands.second.bufferAnal.isValid() || !result.bufferAnal.isValid()) {
       return rewriter.notifyMatchFailure(loc,
@@ -370,10 +373,12 @@ struct UnaryEmitter {
   unsigned maxRank() { return std::max(operand.getRank(), result.getRank()); }
 
   LogicalResult initialize(Location loc, PatternRewriter &rewriter) {
-    if (!isProjectedPermutation())
+    if (!isProjectedPermutation()) {
       return rewriter.notifyMatchFailure(loc, "not projected permutation");
-    if (maxRank() > 2)
+    }
+    if (maxRank() > 2) {
       return rewriter.notifyMatchFailure(loc, "rank > 2");
+    }
     if (!operand.bufferAnal.isValid() || !result.bufferAnal.isValid()) {
       return rewriter.notifyMatchFailure(loc,
                                          "could not compute buffer descriptor");
@@ -463,10 +468,12 @@ struct CopyEmitter {
   }
 
   LogicalResult initialize(Location loc, PatternRewriter &rewriter) {
-    if (!isProjectedPermutation())
+    if (!isProjectedPermutation()) {
       return rewriter.notifyMatchFailure(loc, "not projected permutation");
-    if (maxRank() > 2)
+    }
+    if (maxRank() > 2) {
       return rewriter.notifyMatchFailure(loc, "rank > 2");
+    }
 
     // Initialize buffer descriptors.
     for (auto &copy : copies) {
@@ -529,11 +536,13 @@ struct LinalgBinaryGenericConversion
                                 PatternRewriter &rewriter) const override {
     auto &children = op.getBlock()->getOperations();
     // Only match two children (op + yield).
-    if (children.size() != 2)
+    if (children.size() != 2) {
       return failure();
+    }
     // Only match parallel loops.
-    if (op.getNumParallelLoops() != op.getNumLoops())
+    if (op.getNumParallelLoops() != op.getNumLoops()) {
       return failure();
+    }
 
     // Match:
     //   %0 = someop %arg2, %arg3
@@ -548,8 +557,9 @@ struct LinalgBinaryGenericConversion
         dyn_cast<BlockArgument>(binaryOp->getOperands()[0]);
     BlockArgument operandScalar1 =
         dyn_cast<BlockArgument>(binaryOp->getOperands()[1]);
-    if (!operandScalar0 || !operandScalar1)
+    if (!operandScalar0 || !operandScalar1) {
       return failure();
+    }
 
     // Construct the emitter and start lowering.
     // Note that the operands may map to an out if the aliasing is safe,
@@ -597,8 +607,9 @@ struct LinalgBinaryGenericConversion
     // Select the op to lower to and configure the emitter.
     // Emit from the iree_ukernel_x32b_opcode_t table.
     Type resultType = binaryOp->getResult(0).getType();
-    if (!resultType.isIntOrFloat())
+    if (!resultType.isIntOrFloat()) {
       return failure();
+    }
     std::optional<BinaryEmitter> emitter =
         TypeSwitch<Operation *, std::optional<BinaryEmitter>>(binaryOp)
             .Case([&](arith::AddFOp op) -> std::optional<BinaryEmitter> {
@@ -691,8 +702,9 @@ struct LinalgBinaryGenericConversion
     if (!emitter) {
       return rewriter.notifyMatchFailure(op, "unrecognized binary op");
     }
-    if (failed(emitter->initialize(op.getLoc(), rewriter)))
+    if (failed(emitter->initialize(op.getLoc(), rewriter))) {
       return failure();
+    }
 
     emitter->emit(op.getLoc(), rewriter);
     rewriter.eraseOp(op);
@@ -709,11 +721,13 @@ struct LinalgUnaryGenericConversion
                                 PatternRewriter &rewriter) const override {
     auto &children = op.getBlock()->getOperations();
     // Only match two children (op + yield).
-    if (children.size() != 2)
+    if (children.size() != 2) {
       return failure();
+    }
     // Only match parallel loops.
-    if (op.getNumParallelLoops() != op.getNumLoops())
+    if (op.getNumParallelLoops() != op.getNumLoops()) {
       return failure();
+    }
 
     // Match:
     //   %0 = someop %arg2
@@ -726,8 +740,9 @@ struct LinalgUnaryGenericConversion
     }
     BlockArgument operandScalar0 =
         dyn_cast<BlockArgument>(unaryOp->getOperands()[0]);
-    if (!operandScalar0)
+    if (!operandScalar0) {
       return failure();
+    }
 
     // Construct the emitter and start lowering.
     // Note that the operands may map to an out if the aliasing is safe,
@@ -755,8 +770,9 @@ struct LinalgUnaryGenericConversion
     // Select the op to lower to and configure the emitter.
     // Emit from the iree_ukernel_x32b_opcode_t table.
     Type resultType = unaryOp->getResult(0).getType();
-    if (!resultType.isIntOrFloat())
+    if (!resultType.isIntOrFloat()) {
       return failure();
+    }
     std::optional<UnaryEmitter> emitter =
         TypeSwitch<Operation *, std::optional<UnaryEmitter>>(unaryOp)
             .Case([&](math::AbsFOp op) -> std::optional<UnaryEmitter> {
@@ -814,8 +830,9 @@ struct LinalgUnaryGenericConversion
     if (!emitter) {
       return rewriter.notifyMatchFailure(op, "unrecognized unary op");
     }
-    if (failed(emitter->initialize(op.getLoc(), rewriter)))
+    if (failed(emitter->initialize(op.getLoc(), rewriter))) {
       return failure();
+    }
 
     emitter->emit(op.getLoc(), rewriter);
     rewriter.eraseOp(op);
@@ -832,11 +849,13 @@ struct LinalgTrivialGenericConversion
                                 PatternRewriter &rewriter) const override {
     auto &children = op.getBlock()->getOperations();
     // Only match one child (yield).
-    if (children.size() != 1)
+    if (children.size() != 1) {
       return failure();
+    }
     // Only match parallel loops.
-    if (op.getNumParallelLoops() != op.getNumLoops())
+    if (op.getNumParallelLoops() != op.getNumLoops()) {
       return failure();
+    }
 
     // Presumed to be a yield terminator: configure the emitter.
     CopyEmitter emitter;
@@ -857,8 +876,9 @@ struct LinalgTrivialGenericConversion
       }
     }
 
-    if (failed(emitter.initialize(op.getLoc(), rewriter)))
+    if (failed(emitter.initialize(op.getLoc(), rewriter))) {
       return failure();
+    }
     emitter.emit(op.getLoc(), rewriter);
     rewriter.eraseOp(op);
     return success();

@@ -73,8 +73,9 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
       interfaceOp.getLoopIteratorTypes();
   llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
   for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() != utils::IteratorType::parallel)
+    if (iteratorType.value() != utils::IteratorType::parallel) {
       break;
+    }
     parallelLoops.set(iteratorType.index());
   }
   return parallelLoops;
@@ -565,8 +566,9 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 
   // Check that the owner is a `generic` op.
   auto genericOp = dyn_cast<linalg::GenericOp>(inOperand->getOwner());
-  if (!genericOp)
+  if (!genericOp) {
     return false;
+  }
 
   // All loops to be parallel.
   if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
@@ -574,13 +576,15 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   }
 
   /// The input operand cannot be an init operand already.
-  if (genericOp.isDpsInit(inOperand))
+  if (genericOp.isDpsInit(inOperand)) {
     return false;
+  }
 
   // If the init operand value is used it cannot be reused for the input
   // operand.
-  if (genericOp.payloadUsesValueFromOperand(initOperand))
+  if (genericOp.payloadUsesValueFromOperand(initOperand)) {
     return false;
+  }
 
   // Indexing map used to access the input and init have to match.
   if (genericOp.getMatchingIndexingMap(inOperand) !=
@@ -590,8 +594,9 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 
   // Types have to match for the input operand to reuse the buffer from the init
   // operand
-  if (inOperand->get().getType() != initOperand->get().getType())
+  if (inOperand->get().getType() != initOperand->get().getType()) {
     return false;
+  }
 
   return true;
 }
@@ -676,8 +681,9 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
       dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(producer);
   auto consumerFusionOp =
       dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(consumer);
-  if (!producerFusionOp || !consumerFusionOp)
+  if (!producerFusionOp || !consumerFusionOp) {
     return false;
+  }
 
   // Check that the consumer is all parallel.
   if (consumerFusionOp.getNumLoops() !=
@@ -727,8 +733,9 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   }
 
   for (OpOperand *inputOperand : consumerDstOp.getDpsInputOperands()) {
-    if (inputOperand->get().getDefiningOp() != producer)
+    if (inputOperand->get().getDefiningOp() != producer) {
       continue;
+    }
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
         !llvm::any_of(
             consumerDstOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
@@ -876,8 +883,9 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
-      if (!producer)
+      if (!producer) {
         continue;
+      }
       if (IREE::Flow::isClonableIntoDispatchOp(producer, clonableOptions) ||
           tracker.isFusedOp(producer) || tracker.isRootOp(producer)) {
         continue;
@@ -890,8 +898,9 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
       SmallVector<OpOperand *> fusableUses =
           getFusableUses(context, producer, dominanceInfo,
                          /*aggressiveFusion=*/options.aggressiveFusion);
-      if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate)
+      if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate) {
         continue;
+      }
 
       tracker.appendToFusionGroup(producer, fusionGroup);
       worklist.push_back(producer);
@@ -926,8 +935,9 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       }
 
       // Start with a root operation and fuse its producers.
-      if (tracker.isFusedOp(&op) || !isRootLikeOp(&op))
+      if (tracker.isFusedOp(&op) || !isRootLikeOp(&op)) {
         continue;
+      }
       FusionGroup &newGroup = tracker.createFusionGroup(context, &op);
       fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
                              tracker,
@@ -950,8 +960,9 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
-      if (tracker.isFusedOp(&op) || tracker.isRootOp(&op))
+      if (tracker.isFusedOp(&op) || tracker.isRootOp(&op)) {
         continue;
+      }
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
       // to convert them to splats. Also avoid moving dequantization-like ops

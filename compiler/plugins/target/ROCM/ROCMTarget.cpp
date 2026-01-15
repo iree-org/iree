@@ -608,8 +608,9 @@ public:
 
       for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
         llvm::Function *llvmFunc = llvmModule->getFunction(func.getName());
-        if (llvmFunc->isDeclaration())
+        if (llvmFunc->isDeclaration()) {
           continue;
+        }
 
         // Override flags as given by target func attrs.
         if (auto funcAttrs =
@@ -702,8 +703,9 @@ public:
       llvmModule->addModuleFlag(llvm::Module::Error,
                                 "amdhsa_code_object_version", abiVersion);
 
-      for (llvm::Function &f : llvmModule->functions())
+      for (llvm::Function &f : llvmModule->functions()) {
         f.addFnAttr(llvm::Attribute::AlwaysInline);
+      }
 
       // Link user-provided modules.
       llvm::Linker linker(*llvmModule);
@@ -814,8 +816,9 @@ public:
       // final FlatBuffer.
       std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
       targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
-      if (targetHSACO.empty())
+      if (targetHSACO.empty()) {
         return failure();
+      }
 
       if (options.enableRegSpillWarning) {
         checkRegisterSpilling(variantOp, targetObj);

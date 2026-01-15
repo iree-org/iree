@@ -22,8 +22,9 @@ public:
   /// TODO(Groverkss): Ownership of module should be conveyed here via
   /// mlir::OwningOpReference<ModuleOp>.
   void replaceModule(ModuleOp newModule) {
-    if (root)
+    if (root) {
       root->erase();
+    }
     root = newModule;
   }
 

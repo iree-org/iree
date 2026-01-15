@@ -155,8 +155,9 @@ bool llvm::cl::parser<TargetRegistryRef>::parse(Option &O, StringRef ArgName,
   // We ignore Arg here and just use the global registry. We could parse a list
   // of target backends and create a new registry with just that subset but
   // ownership gets tricky.
-  if (Arg != "global")
+  if (Arg != "global") {
     return true;
+  }
   Val.value = &mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal();
   return false;
 }

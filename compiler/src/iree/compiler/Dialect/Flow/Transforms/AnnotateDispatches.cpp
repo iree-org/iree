@@ -80,8 +80,9 @@ static TensorType getMainTensorForLinalgExtOp(Operation *op) {
   auto resultTypes = llvm::to_vector(op->getResultTypes());
   for (Type t : llvm::concat<Type>(operandTypes, resultTypes)) {
     auto tensorType = dyn_cast<TensorType>(t);
-    if (!tensorType)
+    if (!tensorType) {
       continue;
+    }
     if (!main) {
       main = tensorType;
     } else if (costOfDomain(tensorType.getShape()) >
@@ -182,19 +183,22 @@ static std::string getLinalgDataTypes(linalg::LinalgOp op) {
 static std::string getOpNameWithoutDialectName(Operation *op) {
   auto opName =
       op->getName().getStringRef().drop_until([](char c) { return c == '.'; });
-  if (opName.starts_with("."))
+  if (opName.starts_with(".")) {
     opName = opName.drop_front();
+  }
   return opName.str();
 }
 
 static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  if (!linalg::isaContractionOpInterface(linalgOp))
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
     return false;
+  }
 
   FailureOr<linalg::ContractionDimensions> dims =
       linalg::inferContractionDims(linalgOp);
-  if (failed(dims))
+  if (failed(dims)) {
     return false;
+  }
 
   // One of the input should have all the parallel dimensions with size one.
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
@@ -207,8 +211,9 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
       unsigned pos = cast<AffineDimExpr>(result).getPosition();
       // For a parallel dim, the bounds can be non-one if it's batch dim.
       if (iterators[pos] == utils::IteratorType::parallel && bounds[pos] != 1 &&
-          !llvm::is_contained(dims->batch, pos))
+          !llvm::is_contained(dims->batch, pos)) {
         return false;
+      }
     }
     return true;
   };
@@ -316,8 +321,9 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   if (prefix.empty()) {
     // By default, use the op name as prefix.
     auto opName = op->getName().getStringRef();
-    if (!opName.consume_front("linalg."))
+    if (!opName.consume_front("linalg.")) {
       return "";
+    }
     prefix = opName.str();
   }
 
@@ -331,8 +337,9 @@ static std::string summarizeLinalgExtOp(Operation *op) {
   auto opName = op->getName().getStringRef();
   // Currently, this utility is also invoked by Linalg::SoftmaxOp.
   if (!(opName.consume_front("iree_linalg_ext.") ||
-        opName.consume_front("linalg.")))
+        opName.consume_front("linalg."))) {
     return "";
+  }
   std::string suffix = "";
   if (TensorType mainTensor = getMainTensorForLinalgExtOp(op)) {
     llvm::raw_string_ostream sstream(suffix);
@@ -382,8 +389,9 @@ static std::string summarizeDispatchRegion(Region &region) {
     TypeSwitch<Operation *>(op)
         .Case<linalg::SoftmaxOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgSoftmaxOpCost(op);
-          if (estimatedCost < bestEstimatedCost)
+          if (estimatedCost < bestEstimatedCost) {
             return;
+          }
           bestEstimatedCost = estimatedCost;
           bestOp = op;
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
@@ -391,8 +399,9 @@ static std::string summarizeDispatchRegion(Region &region) {
         })
         .Case<linalg::LinalgOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgOpCost(op);
-          if (estimatedCost < bestEstimatedCost)
+          if (estimatedCost < bestEstimatedCost) {
             return;
+          }
           bestEstimatedCost = estimatedCost;
           bestOp = op;
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
@@ -403,8 +412,9 @@ static std::string summarizeDispatchRegion(Region &region) {
           // SetEncoding/UnsetEncoding/PackOp/UnPackOp is the bestOp only if
           // there are no other operations.
           int64_t estimatedCost = kMinEstimatedCost + 1;
-          if (estimatedCost < bestEstimatedCost)
+          if (estimatedCost < bestEstimatedCost) {
             return;
+          }
           bestEstimatedCost = estimatedCost;
           bestOp = op;
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
@@ -412,8 +422,9 @@ static std::string summarizeDispatchRegion(Region &region) {
         })
         .Case<IREE::LinalgExt::LinalgExtOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgExtOpCost(op);
-          if (estimatedCost < bestEstimatedCost)
+          if (estimatedCost < bestEstimatedCost) {
             return;
+          }
           bestEstimatedCost = estimatedCost;
           bestOp = op;
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
@@ -507,8 +518,9 @@ struct AnnotateDispatchesPass
     for (auto executableOp :
          getOperation().getBody()->getOps<IREE::Flow::ExecutableOp>()) {
       auto innerModuleOp = executableOp.getInnerModule();
-      if (!innerModuleOp)
+      if (!innerModuleOp) {
         continue;
+      }
       for (auto exportOp :
            executableOp.getBlock().getOps<ExecutableExportOp>()) {
         auto oldSymbolRefAttr = SymbolRefAttr::get(
@@ -517,11 +529,13 @@ struct AnnotateDispatchesPass
 
         auto funcOp = innerModuleOp.lookupSymbol<mlir::FunctionOpInterface>(
             exportOp.getFunctionRef());
-        if (!funcOp)
+        if (!funcOp) {
           continue; // extern module, maybe
+        }
         std::string summary = summarizeDispatchRegion(funcOp.getFunctionBody());
-        if (summary.empty())
+        if (summary.empty()) {
           continue; // unable to tell
+        }
 
         std::string newName = funcOp.getName().str() + "_" + summary;
 

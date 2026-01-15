@@ -700,8 +700,9 @@ Attribute MMAAttr::getDistributionMappingKind() const {
 
 OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
                                                  Operation *) const {
-  if (!getDistributionMappingKind())
+  if (!getDistributionMappingKind()) {
     return OpFoldResult();
+  }
   return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
 }
 
@@ -1832,8 +1833,9 @@ DataTiledScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
 
 std::optional<int> TargetAttr::getCUDAComputeCapability() const {
   StringRef arch = getArch();
-  if (!arch.starts_with("sm_"))
+  if (!arch.starts_with("sm_")) {
     return false;
+  }
   APInt version;
   if (arch.substr(3).getAsInteger(10, version)) {
     return false;
@@ -1844,14 +1846,16 @@ std::optional<int> TargetAttr::getCUDAComputeCapability() const {
 bool TargetAttr::supportsTF32InputMMAOps() const {
   // TODO: scan the list of MMA ops to decude after plumbing through support
   // for NVIDIA TensorCore MMA ops.
-  if (auto cc = getCUDAComputeCapability())
+  if (auto cc = getCUDAComputeCapability()) {
     return cc >= 80;
+  }
   return false;
 }
 
 bool TargetAttr::supportsSyncMMAOps() const {
-  if (auto cc = getCUDAComputeCapability())
+  if (auto cc = getCUDAComputeCapability()) {
     return cc >= 80;
+  }
   return false;
 }
 
@@ -1984,8 +1988,9 @@ getLoopBounds(ArrayRef<Range> loopRanges,
   for (auto [loopRange, givenTileSize] :
        llvm::zip_equal(loopRanges, givenTileSizes)) {
     // No loop if the tile size is 0.
-    if (isZeroInteger(givenTileSize))
+    if (isZeroInteger(givenTileSize)) {
       continue;
+    }
     lbs.push_back(loopRange.offset);
     ubs.push_back(loopRange.size);
     steps.push_back(givenTileSize);
@@ -2274,6 +2279,15 @@ bool UseGlobalLoadDMAAttr::hasTilingLevel(unsigned level) const {
 Value PromoteWithCacheSwizzleAttr::promoteOperand(
     mlir::OpBuilder &builder, mlir::OpOperand &operand) const {
   return cacheSwizzlePromotionImpl(builder, operand, getCopyConfig());
+}
+
+//===----------------------------------------------------------------------===//
+// SwizzleOperandAttr
+//===----------------------------------------------------------------------===//
+
+Value SwizzleOperandAttr::promoteOperand(mlir::OpBuilder &builder,
+                                         mlir::OpOperand &operand) const {
+  return swizzlePromotionImpl(builder, operand, getCopyConfig(), getSwizzle());
 }
 
 //===----------------------------------------------------------------------===//

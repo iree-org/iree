@@ -456,8 +456,9 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::CompareOp>(
     return ScalarFOp<stablehlo::CompareOp>::create(*b, loc, predicate.value(),
                                                    lhs, rhs);
   }
-  if (auto complexType = dyn_cast<ComplexType>(elementType))
+  if (auto complexType = dyn_cast<ComplexType>(elementType)) {
     return cmpComplex(loc, lhs, rhs, comparisonDirection, b);
+  }
   return nullptr;
 }
 
@@ -602,11 +603,12 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::MaxOp>(
   Value lhs = operands.front();
   Type complexTy = lhs.getType();
 
-  if (!isa<ComplexType>(complexTy))
+  if (!isa<ComplexType>(complexTy)) {
     return MapStableHloOpToScalarOpImpl<
         IsFloatType, arith::MaximumFOp, IsSignedIntegerType, arith::MaxSIOp,
         IsUnsignedIntegerType, arith::MaxUIOp>{}(loc, resultTypes, argTypes,
                                                  adaptor.getOperands(), b);
+  }
 
   assert(resultTypes.size() == 1 && "MaxOp should return a single result");
   assert(operands.size() == 2 && "MaxOp should take exactly two arguments");
@@ -626,11 +628,12 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::MinOp>(
   Value lhs = operands.front();
   Type complexTy = lhs.getType();
 
-  if (!isa<ComplexType>(complexTy))
+  if (!isa<ComplexType>(complexTy)) {
     return MapStableHloOpToScalarOpImpl<
         IsFloatType, arith::MinimumFOp, IsSignedIntegerType, arith::MinSIOp,
         IsUnsignedIntegerType, arith::MinUIOp>{}(loc, resultTypes, argTypes,
                                                  adaptor.getOperands(), b);
+  }
 
   assert(resultTypes.size() == 1 && "MinOp should return a single result");
   assert(operands.size() == 2 && "MinOp should take exactly two arguments");
@@ -646,8 +649,9 @@ template <>
 inline Value mapStableHloOpToStdScalarOp<stablehlo::RealOp>(
     Location loc, ArrayRef<Type> resultTypes, ArrayRef<Type> argTypes,
     stablehlo::RealOp::Adaptor adaptor, OpBuilder *b) {
-  if (!isa<ComplexType>(adaptor.getOperand().getType()))
+  if (!isa<ComplexType>(adaptor.getOperand().getType())) {
     return adaptor.getOperand();
+  }
   return MapStableHloOpToScalarOpImpl<complex::ReOp>{}(
       loc, resultTypes, argTypes, adaptor.getOperands(), b);
 }
@@ -656,9 +660,10 @@ template <>
 inline Value mapStableHloOpToStdScalarOp<stablehlo::ImagOp>(
     Location loc, ArrayRef<Type> resultTypes, ArrayRef<Type> argTypes,
     stablehlo::ImagOp::Adaptor adaptor, OpBuilder *b) {
-  if (!isa<ComplexType>(adaptor.getOperand().getType()))
+  if (!isa<ComplexType>(adaptor.getOperand().getType())) {
     return arith::ConstantOp::create(
         *b, loc, b->getZeroAttr(adaptor.getOperand().getType()));
+  }
   return MapStableHloOpToScalarOpImpl<complex::ImOp>{}(
       loc, resultTypes, argTypes, adaptor.getOperands(), b);
 }
@@ -813,15 +818,18 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::BitcastConvertOp>(
   Type resultType = getElementTypeOrSelf(resultTypes.front());
 
   // Skip needless casts.
-  if (argType == resultType)
+  if (argType == resultType) {
     return adaptor.getOperand();
+  }
 
   if (!isa<FloatType, IntegerType>(resultType) ||
-      !isa<FloatType, IntegerType>(argType))
+      !isa<FloatType, IntegerType>(argType)) {
     return nullptr;
+  }
 
-  if (resultType.getIntOrFloatBitWidth() != argType.getIntOrFloatBitWidth())
+  if (resultType.getIntOrFloatBitWidth() != argType.getIntOrFloatBitWidth()) {
     return nullptr;
+  }
 
   return mlir::arith::BitcastOp::create(*b, loc, resultTypes,
                                         adaptor.getOperands());

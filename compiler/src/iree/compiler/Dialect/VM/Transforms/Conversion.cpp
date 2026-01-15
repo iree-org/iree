@@ -73,11 +73,13 @@ gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
       // Generic dialect lookup.
       dialect = op->getDialect();
     }
-    if (!dialect)
+    if (!dialect) {
       return;
+    }
     auto *dialectInterface = dialect->getRegisteredInterface<T>();
-    if (!dialectInterface)
+    if (!dialectInterface) {
       return;
+    }
     resultSet.insert(dialectInterface);
   });
 
@@ -97,8 +99,9 @@ class ConversionPass
     : public IREE::VM::impl::ConversionPassBase<ConversionPass> {
   using Base::Base;
   void runOnOperation() override {
-    if (getOperation().getBody()->empty())
+    if (getOperation().getBody()->empty()) {
       return;
+    }
 
     auto targetOptions = targetOptionsFromConversionPass();
 

@@ -180,8 +180,9 @@ packDynamicSlicesConservatively(Location loc, Value baseOffset,
       SmallVector<const Slice *> slices;
       bool intersects(const Slice &slice) const {
         for (auto *binSlice : slices) {
-          if (binSlice->intersects(slice))
+          if (binSlice->intersects(slice)) {
             return true;
+          }
         }
         return false;
       }

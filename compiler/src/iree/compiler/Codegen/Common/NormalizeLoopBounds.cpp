@@ -137,8 +137,9 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter, scf::ForOp forOp) {
 LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
                                   scf::ForallOp forallOp) {
   OpBuilder::InsertionGuard g(rewriter);
-  if (forallOp.isNormalized())
+  if (forallOp.isNormalized()) {
     return success();
+  }
 
   // `scf.forall` requires that all lbs/ubs/steps/ivs are index type so no need
   // to check here.

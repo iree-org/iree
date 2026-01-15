@@ -161,8 +161,9 @@ static void updateNamedSequenceOp(
   seenNames.insert(newSeqName);
 
   // Skip updating ForeachMatchOp if the NamedSequenceOp is not used in it.
-  if (!namedSequenceToUser.contains(op))
+  if (!namedSequenceToUser.contains(op)) {
     return;
+  }
 
   ForeachMatchOp foreachMatchOp = namedSequenceToUser[op];
 

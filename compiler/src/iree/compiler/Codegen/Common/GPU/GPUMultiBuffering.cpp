@@ -32,14 +32,16 @@ struct GPUMultiBufferingPass final
     SmallVector<memref::AllocOp> allocs;
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
-      if (hasSharedMemoryAddressSpace(allocOp.getType()))
+      if (hasSharedMemoryAddressSpace(allocOp.getType())) {
         allocs.push_back(allocOp);
+      }
     });
 
     assert(funcOp.getBlocks().size() == 1);
     for (memref::AllocOp allocOp : allocs) {
-      if (allocOp->getParentOp() != funcOp)
+      if (allocOp->getParentOp() != funcOp) {
         allocOp->moveBefore(&*funcOp.begin()->begin());
+      }
     }
 
     // Then perform multibuffering transformations.
@@ -50,8 +52,9 @@ struct GPUMultiBufferingPass final
       // Skip allocations not used in a loop.
       for (Operation *user : allocOp->getUsers()) {
         auto loop = user->getParentOfType<scf::ForOp>();
-        if (!loop)
+        if (!loop) {
           return WalkResult::advance();
+        }
       }
       allocs.push_back(allocOp);
       return WalkResult::advance();

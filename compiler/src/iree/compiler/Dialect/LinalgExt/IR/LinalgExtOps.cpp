@@ -1048,8 +1048,9 @@ LogicalResult FftOp::verify() {
   // After tiling, it could be dynamic shape. (Because
   // subview/subtensor does not inference the type correctly
   // on (1 << x)) cases).
-  if (ShapedType::isDynamic(length))
+  if (ShapedType::isDynamic(length)) {
     return success();
+  }
   if (length & (length - 1)) {
     return op->emitOpError("only powers of 2 are handled currently");
   }
@@ -1287,8 +1288,9 @@ LogicalResult ArgCompareOp::verify() {
 
   SmallVector<int64_t> expectedShape;
   for (int64_t i = 0; i < rank; ++i) {
-    if (i != dim)
+    if (i != dim) {
       expectedShape.push_back(inputType.getDimSize(i));
+    }
   }
   if (!llvm::equal(expectedShape, outputValueType.getShape())) {
     return op->emitOpError("output shape must match input shape with reduction "
@@ -1392,15 +1394,18 @@ areNotFullTiles(ArrayRef<int64_t> inputShape,
                 DenseMap<int64_t, OpFoldResult> const &dimAndTileMapping) {
   int64_t rank = inputShape.size();
   for (int64_t dim = 0; dim < rank; dim++) {
-    if (ShapedType::isDynamic(inputShape[dim]))
+    if (ShapedType::isDynamic(inputShape[dim])) {
       continue;
+    }
     auto it = dimAndTileMapping.find(dim);
     if (it != dimAndTileMapping.end()) {
       std::optional<int64_t> constantTile = getConstantIntValue(it->second);
-      if (!constantTile)
+      if (!constantTile) {
         continue;
-      if (inputShape[dim] % (*constantTile) != 0)
+      }
+      if (inputShape[dim] % (*constantTile) != 0) {
         return true;
+      }
     }
   }
   return false;
@@ -2127,8 +2132,9 @@ LogicalResult AttentionOp::verify() {
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap)))
+    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap))) {
       return failure();
+    }
   }
 
   int expectedSymbols = getQueryMap().getNumInputs();
@@ -2153,14 +2159,16 @@ LogicalResult AttentionOp::verify() {
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkDomain("Mask", *maskMap)))
+    if (failed(checkDomain("Mask", *maskMap))) {
       return failure();
+    }
   }
 
   auto &block = getRegion().front();
   auto blockTys = block.getArgumentTypes();
-  if (!isa<FloatType>(blockTys[0]))
+  if (!isa<FloatType>(blockTys[0])) {
     return attnOp->emitOpError("block argument 0 should be float");
+  }
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
   if (!yieldOp) {
@@ -2304,8 +2312,9 @@ LogicalResult OnlineAttentionOp::verify() {
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap)))
+    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap))) {
       return failure();
+    }
   }
 
   int expectedSymbols = getQueryMap().getNumInputs();
@@ -2332,8 +2341,9 @@ LogicalResult OnlineAttentionOp::verify() {
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkDomain("Mask", *maskMap)))
+    if (failed(checkDomain("Mask", *maskMap))) {
       return failure();
+    }
   }
 
   Block &block = attnOp.getRegion().front();

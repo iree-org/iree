@@ -49,8 +49,9 @@ public:
 static bool canBeHoisted(LoopLikeOpInterface loopLike,
                          SubsetInsertionOpInterface insertion) {
   // Do not move terminators.
-  if (insertion->hasTrait<OpTrait::IsTerminator>())
+  if (insertion->hasTrait<OpTrait::IsTerminator>()) {
     return false;
+  }
 
   // Walk the nested operations and check that all used values are either
   // defined outside of the loop or in a nested region, but not at the level of
@@ -58,8 +59,10 @@ static bool canBeHoisted(LoopLikeOpInterface loopLike,
   auto walkFn = [&](Operation *child) {
     for (OpOperand &operand : child->getOpOperands()) {
       // Ignore values defined in a nested region.
-      if (insertion->isAncestor(operand.get().getParentRegion()->getParentOp()))
+      if (insertion->isAncestor(
+              operand.get().getParentRegion()->getParentOp())) {
         continue;
+      }
       if (!loopLike.isDefinedOutsideOfLoop(operand.get()) &&
           &operand != &insertion.getSourceOperand()) {
         return WalkResult::interrupt();
@@ -310,8 +313,9 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
                       [](Value v) { return !isZeroInteger(v); }) ||
          llvm::any_of(writeOp.getIndices(),
                       [](Value v) { return !isZeroInteger(v); })) &&
-        (op.getIndices() != writeOp.getIndices()))
+        (op.getIndices() != writeOp.getIndices())) {
       return failure();
+    }
 
     // Work only with minor identity mappings.
     if (!op.getPermutationMap().isMinorIdentity() ||

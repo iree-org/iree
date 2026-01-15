@@ -216,8 +216,9 @@ static bool verifyComputeOpsAfterDistribution(FunctionOpInterface funcOp) {
 /// for the DPS `user`. Returns false if the user is not in DPS.
 static bool isUsedAsInit(Operation *producer, Operation *user) {
   auto dpsIface = dyn_cast<DestinationStyleOpInterface>(user);
-  if (!dpsIface)
+  if (!dpsIface) {
     return false;
+  }
   ValueRange results = producer->getResults();
   return llvm::any_of(dpsIface.getDpsInits(), [&](Value operand) {
     return llvm::is_contained(results, operand);
@@ -251,8 +252,9 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     // an init of a DPS op, the user currently cannot be fused. Having a
     // replacement for it would attempt fusion and fail, so avoid such cases.
     if (llvm::any_of(op->getUsers(), [&](Operation *user) {
-          if (isUsedAsInit(op, user))
+          if (isUsedAsInit(op, user)) {
             return false;
+          }
           return dominanceInfo.properlyDominates(tilableOp, user) ||
                  !tiledAndFusedOps.contains(user);
         })) {

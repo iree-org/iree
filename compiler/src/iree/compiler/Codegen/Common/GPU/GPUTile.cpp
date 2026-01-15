@@ -64,8 +64,9 @@ collectComputeOps(mlir::FunctionOpInterface funcOp,
     computeOps = getComputeOps(funcOp);
     for (Operation *op : computeOps) {
       if (auto config =
-              getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op))
+              getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op)) {
         configs.push_back(config);
+      }
     }
     if (computeOps.size() > 1) {
       // Only keep the last compute ops.
@@ -80,8 +81,9 @@ collectComputeOps(mlir::FunctionOpInterface funcOp,
     ifOps.front()->walk([&configs](Operation *op) {
       if (isa<linalg::LinalgOp, TilingInterface>(op)) {
         if (auto config =
-                getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op))
+                getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op)) {
           configs.push_back(config);
+        }
       }
     });
 
@@ -276,8 +278,9 @@ struct GPUTilePass final : impl::GPUTilePassBase<GPUTilePass> {
     SmallVector<Operation *> computeOps;
     FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfig =
         collectComputeOps(funcOp, computeOps);
-    if (failed(loweringConfig))
+    if (failed(loweringConfig)) {
       return signalPassFailure();
+    }
     assert(computeOps.size() <= 2);
 
     // Now tile the last computation op to invocations and fuse all operand
@@ -286,8 +289,9 @@ struct GPUTilePass final : impl::GPUTilePassBase<GPUTilePass> {
     for (Operation *computeOp : computeOps) {
       auto consumerOp = dyn_cast<TilingInterface>(computeOp);
       if (!consumerOp ||
-          failed(tileAndDistributeToThreads(consumerOp, threadTileSizes)))
+          failed(tileAndDistributeToThreads(consumerOp, threadTileSizes))) {
         return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({

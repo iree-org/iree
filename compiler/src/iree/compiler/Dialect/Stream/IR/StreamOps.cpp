@@ -167,10 +167,12 @@ static LogicalResult verifyAllResourcesCaptured(Region &region) {
       availableResources.insert(result);
     }
     for (auto operand : op.getOperands()) {
-      if (!operand)
+      if (!operand) {
         continue;
-      if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+      }
+      if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
         continue;
+      }
       if (!availableResources.contains(operand)) {
         return op.emitOpError() << "used resource not listed in explicit "
                                    "captures (or produced internally)";
@@ -215,8 +217,9 @@ static void eraseStreamRegionResults(Region &region,
                                      ArrayRef<unsigned> excludedResultIndices) {
   for (auto &block : region.getBlocks()) {
     auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
-    if (!yieldOp)
+    if (!yieldOp) {
       continue;
+    }
     // HACK: there's no good way of updating the operand and size together today
     // - we should add a helper to the ClosureYieldOpInterface that checks for
     // size/shape aware traits and does this automatically.
@@ -316,8 +319,9 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
   DenseSet<Value> processedValues;
   SmallVector<Value> worklist;
   auto enqueueValue = [&](Value value) {
-    if (processedValues.contains(value))
+    if (processedValues.contains(value)) {
       return;
+    }
     processedValues.insert(value);
     worklist.push_back(value);
   };
@@ -357,8 +361,9 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
       if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user)) {
         auto tiedIndices = tiedOp.getTiedResultOperandIndices();
         for (int64_t tiedIndex : tiedIndices) {
-          if (tiedIndex == IREE::Util::TiedOpInterface::kUntiedIndex)
+          if (tiedIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
             continue;
+          }
           auto operand = user->getOperand(tiedIndex);
           if (operand == value) {
             // Tied operand.
@@ -387,16 +392,19 @@ static ParseResult parseDispatchEntryPoints(OpAsmParser &parser,
   if (succeeded(parser.parseOptionalLBrace())) {
     do {
       SymbolRefAttr entryPointAttr;
-      if (failed(parser.parseAttribute(entryPointAttr)))
+      if (failed(parser.parseAttribute(entryPointAttr))) {
         return failure();
+      }
       entryPointAttrs.push_back(entryPointAttr);
     } while (succeeded(parser.parseOptionalComma()));
-    if (failed(parser.parseRBrace()))
+    if (failed(parser.parseRBrace())) {
       return failure();
+    }
   } else {
     SymbolRefAttr entryPointAttr;
-    if (failed(parser.parseAttribute(entryPointAttr)))
+    if (failed(parser.parseAttribute(entryPointAttr))) {
       return failure();
+    }
     entryPointAttrs.push_back(entryPointAttr);
   }
   entryPointAttrsArray = parser.getBuilder().getArrayAttr(entryPointAttrs);
@@ -434,21 +442,24 @@ static ParseResult parseEncodedResourceOperands(
     TypeAttr resourceEncoding;
     if (failed(parser.parseOperand(resources.back())) ||
         failed(parser.parseColon()) ||
-        failed(parser.parseAttribute(resourceEncoding)))
+        failed(parser.parseAttribute(resourceEncoding))) {
       return failure();
+    }
     resourceEncodingAttrs.push_back(resourceEncoding);
     if (int64_t dynamicDimCount =
             cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims()) {
       if (failed(parser.parseOperandList(resourceEncodingDims, dynamicDimCount,
-                                         AsmParser::Delimiter::Braces)))
+                                         AsmParser::Delimiter::Braces))) {
         return failure();
+      }
     }
     resourceTypes.emplace_back();
     resourceSizes.emplace_back();
     if (failed(parser.parseKeyword("in")) ||
         failed(parseSizeAwareType(parser, resourceTypes.back(),
-                                  resourceSizes.back())))
+                                  resourceSizes.back()))) {
       return failure();
+    }
   } while (succeeded(parser.parseOptionalComma()));
   resourceEncodings = parser.getBuilder().getArrayAttr(resourceEncodingAttrs);
   return success();
@@ -1429,12 +1440,14 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
   p << ")";
   if (!resultTypes.empty()) {
     p << " -> ";
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1) {
       p << "(";
+    }
     printShapedResultList(p, op, operands, operandTypes, operandSizes,
                           resultTypes, resultSizes, tiedOperands);
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1) {
       p << ")";
+    }
   }
   p << " ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
@@ -1527,8 +1540,9 @@ static ParseResult parsePackSliceRanges(
   auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute> lifetimeRangeValues;
   do {
-    if (failed(parser.parseOptionalLSquare()))
+    if (failed(parser.parseOptionalLSquare())) {
       break;
+    }
     IntegerAttr lifetimeStart;
     IntegerAttr lifetimeEnd;
     OpAsmParser::UnresolvedOperand dynamicSliceSize;
@@ -1552,8 +1566,9 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
                                  ArrayAttr lifetimeIntervals,
                                  ValueRange dynamicSliceSizes,
                                  TypeRange packedOffsetTypes) {
-  if (packedOffsetTypes.empty())
+  if (packedOffsetTypes.empty()) {
     return;
+  }
   for (unsigned i = 0; i < packedOffsetTypes.size(); ++i) {
     auto lifetimeStart = lifetimeIntervals[i * 2];
     auto lifetimeEnd = lifetimeIntervals[i * 2 + 1];
@@ -1565,8 +1580,9 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
     p.printAttributeWithoutType(lifetimeEnd);
     p << "] = ";
     p.printOperand(sliceSize);
-    if (i < packedOffsetTypes.size() - 1)
+    if (i < packedOffsetTypes.size() - 1) {
       p << ",";
+    }
   }
   p.printNewline();
 }
@@ -1604,16 +1620,18 @@ static ParseResult parseConstantValueList(
 static void printConstantValueList(OpAsmPrinter &p, Operation *op,
                                    TypeRange resultTypes,
                                    ValueRange resultSizes, ArrayAttr values) {
-  if (resultTypes.empty())
+  if (resultTypes.empty()) {
     return;
+  }
   for (unsigned i = 0; i < resultTypes.size(); ++i) {
     p.printNewline();
     p << "  ";
     printSizeAwareType(p, op, resultTypes[i], resultSizes[i]);
     p << " = ";
     p.printAttribute(values[i]);
-    if (i < resultTypes.size() - 1)
+    if (i < resultTypes.size() - 1) {
       p << ",";
+    }
   }
 }
 
@@ -1667,13 +1685,15 @@ static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
 
 static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
                                       Region &body) {
-  if (body.empty())
+  if (body.empty()) {
     return;
+  }
   p << "workgroups(";
   auto args = body.getArguments();
   for (unsigned i = 0; i < args.size(); ++i) {
-    if (i > 0)
+    if (i > 0) {
       p << ", ";
+    }
     p.printRegionArgument(args[i]);
   }
   p << ")";
@@ -1695,8 +1715,9 @@ ResourceAllocOp::createSuballocations(
     bool uninitialized, AffinityAttr affinityAttr, OpBuilder &builder) {
   assert(locs.size() == storageSizes.size() &&
          "expect locs and storageSizes to match");
-  if (locs.empty())
+  if (locs.empty()) {
     return {};
+  }
   if (locs.size() == 1) {
     auto allocOp = IREE::Stream::ResourceAllocOp::create(
         builder, locs.front(), resourceType, storageSizes.front(),
@@ -1750,8 +1771,9 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
                                        OpBuilder &builder) {
   assert(locs.size() == storageSizes.size() &&
          "expect locs and storageSizes to match");
-  if (locs.empty())
+  if (locs.empty()) {
     return {};
+  }
   if (locs.size() == 1) {
     auto allocaOp = IREE::Stream::ResourceAllocaOp::create(
         builder, locs.front(), resourceType, timepointType,
@@ -2546,12 +2568,14 @@ void AsyncSplatOp::build(OpBuilder &builder, OperationState &state,
                          Type result_type, Value value, Value result_size,
                          Attribute affinity, Value await_timepoint) {
   state.addTypes(result_type);
-  if (await_timepoint)
+  if (await_timepoint) {
     state.addOperands(await_timepoint);
+  }
   state.addOperands(value);
   state.addOperands(result_size);
-  if (affinity)
+  if (affinity) {
     state.addAttribute("affinity", affinity);
+  }
 }
 
 LogicalResult AsyncSplatOp::verify() {
@@ -2748,8 +2772,9 @@ static ParseResult parseCollectiveParam(
     OpAsmParser &parser, Attribute opAttr,
     std::optional<OpAsmParser::UnresolvedOperand> &optionalParamValue) {
   const char *keyword = getCollectiveParamKeyword(opAttr);
-  if (!keyword)
+  if (!keyword) {
     return success(); // optional
+  }
   OpAsmParser::UnresolvedOperand paramValue;
   if (failed(parser.parseKeyword(keyword)) || failed(parser.parseLParen()) ||
       failed(parser.parseOperand(paramValue)) || failed(parser.parseRParen())) {
@@ -2995,16 +3020,19 @@ static ParseResult parseDispatchOperands(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceEnds,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths) {
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   // Handle the case of no operands specially.
-  if (succeeded(parser.parseOptionalRParen()))
+  if (succeeded(parser.parseOptionalRParen())) {
     return success();
+  }
   do {
     // All entries at least have an %operand.
     resourceOperands.emplace_back();
-    if (failed(parser.parseOperand(resourceOperands.back())))
+    if (failed(parser.parseOperand(resourceOperands.back()))) {
       return failure();
+    }
     // Resources have a range.
     if (succeeded(parser.parseOptionalLSquare())) {
       resourceOffsets.emplace_back();
@@ -3020,8 +3048,9 @@ static ParseResult parseDispatchOperands(
       }
     }
   } while (succeeded(parser.parseOptionalComma()));
-  if (failed(parser.parseRParen()))
+  if (failed(parser.parseRParen())) {
     return failure();
+  }
   return success();
 }
 
@@ -3090,8 +3119,9 @@ void AsyncDispatchOp::getAsyncAccessRanges(
   unsigned rangeIndex = 0;
   unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
   for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
       continue;
+    }
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
     if (!tiedResults.empty()) {
@@ -3171,12 +3201,14 @@ void AsyncFuncOp::build(OpBuilder &builder, OperationState &state,
 
 bool AsyncFuncOp::isResultTied(int resultIndex) {
   auto tiedOperandsAttr = getTiedOperandsAttr();
-  if (!tiedOperandsAttr)
+  if (!tiedOperandsAttr) {
     return false;
+  }
   auto indexAttr = dyn_cast_if_present<IntegerAttr>(
       tiedOperandsAttr.getValue()[resultIndex]);
-  if (!indexAttr)
+  if (!indexAttr) {
     return false;
+  }
   return indexAttr.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
 }
 
@@ -3246,8 +3278,9 @@ AsyncCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   }
   // auto typesCompatible = [](Type actual, Type expected) {
   auto typesCompatible = [](Type callee, Type call) {
-    if (callee == call)
+    if (callee == call) {
       return true;
+    }
     auto calleeResource = dyn_cast<IREE::Stream::ResourceType>(callee);
     auto callResource = dyn_cast<IREE::Stream::ResourceType>(call);
     if (calleeResource && callResource) {
@@ -3293,8 +3326,9 @@ void AsyncCallOp::getAsyncAccessRanges(
   unsigned rangeIndex = 0;
   unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
   for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
       continue;
+    }
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
     if (!tiedResults.empty()) {
@@ -3336,8 +3370,9 @@ void AsyncExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operands);
   state.addOperands(operandSizes);
   state.addOperands(resultSizes);
-  if (awaitTimepoint)
+  if (awaitTimepoint) {
     state.addOperands(awaitTimepoint);
+  }
   state.addAttributes(attributes);
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
@@ -3400,8 +3435,9 @@ getExecutionAsyncAccessRanges(Op op,
   for (auto [i, operand, operandSize] : llvm::zip_equal(
            llvm::seq<unsigned>(0, op.getResourceOperands().size()),
            op.getResourceOperands(), op.getResourceOperandSizes())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
       continue;
+    }
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = op.getOperandTiedResults(tiedOperandBase + i);
     if (!tiedResults.empty()) {
@@ -3479,8 +3515,9 @@ AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
 
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices)
+  for (auto i : excludedOperandIndices) {
     eraseIndices.set(i);
+  }
   block.eraseArguments(eraseIndices);
   return newOp;
 }
@@ -3598,8 +3635,9 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
   eraseStreamRegionResults(newBody, excludedResultIndices);
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices)
+  for (auto i : excludedOperandIndices) {
     eraseIndices.set(i);
+  }
   block.eraseArguments(eraseIndices);
   return newOp;
 }
@@ -3640,8 +3678,9 @@ Value AsyncParameterReadOp::getTiedResult(unsigned resultIndex) {
 
 ::std::optional<unsigned>
 AsyncParameterReadOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  if (resultIndex == 0)
-    return {0};        // result tied to target
+  if (resultIndex == 0) {
+    return {0}; // result tied to target
+  }
   return std::nullopt; // result_timepoint not tied
 }
 
@@ -3678,8 +3717,9 @@ Value AsyncParameterWriteOp::getTiedResult(unsigned resultIndex) {
 
 ::std::optional<unsigned>
 AsyncParameterWriteOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  if (resultIndex == 0)
-    return {0};        // result tied to source
+  if (resultIndex == 0) {
+    return {0}; // result tied to source
+  }
   return std::nullopt; // result_timepoint not tied
 }
 
@@ -3737,10 +3777,11 @@ Value AsyncParameterGatherOp::getTiedResult(unsigned resultIndex) {
 
 ::std::optional<unsigned>
 AsyncParameterGatherOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  if (resultIndex == 0)
+  if (resultIndex == 0) {
     return {
         getSourceOffsets()
-            .size()};  // result tied to target (after variadic source_offsets)
+            .size()}; // result tied to target (after variadic source_offsets)
+  }
   return std::nullopt; // result_timepoint not tied
 }
 
@@ -3802,8 +3843,9 @@ Value AsyncParameterScatterOp::getTiedResult(unsigned resultIndex) {
 
 ::std::optional<unsigned>
 AsyncParameterScatterOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  if (resultIndex == 0)
-    return {0};        // result tied to source
+  if (resultIndex == 0) {
+    return {0}; // result tied to source
+  }
   return std::nullopt; // result_timepoint not tied
 }
 
@@ -4109,8 +4151,9 @@ printDispatchResources(OpAsmPrinter &p, Operation *op, ValueRange resources,
     p.printOperand(resourceLength);
     p << "] : ";
     printSizeAwareType(p, op, resourceType, resourceSize);
-    if (i < resources.size() - 1)
+    if (i < resources.size() - 1) {
       p << ",";
+    }
   }
 }
 
@@ -4196,8 +4239,9 @@ static ParseResult parseDispatchFunctionArgumentList(
   SmallVector<Attribute> argAttrsVec;
   do {
     OpAsmParser::UnresolvedOperand arg;
-    if (failed(parser.parseOperand(arg)))
+    if (failed(parser.parseOperand(arg))) {
       return failure();
+    }
     bool hasOffsetLength = false;
     OpAsmParser::UnresolvedOperand offsetArg;
     OpAsmParser::UnresolvedOperand lengthArg;
@@ -4272,8 +4316,9 @@ static void printDispatchFunctionResultList(OpAsmPrinter &p, Operation *op,
         p.printOptionalAttrDict(attrs.getValue());
       }
     }
-    if (i < resultTypes.size() - 1)
+    if (i < resultTypes.size() - 1) {
       p << ", ";
+    }
   }
 }
 
@@ -4284,8 +4329,9 @@ ParseResult parseDispatchFunctionSignature(OpAsmParser &parser,
   SmallVector<OpAsmParser::UnresolvedOperand> args;
   SmallVector<Type> argTypes;
   SmallVector<Type> resultTypes;
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   if (failed(parser.parseOptionalRParen())) {
     if (failed(parseDispatchFunctionArgumentList(parser, args, argTypes,
                                                  argAttrs)) ||
@@ -4318,8 +4364,9 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
   auto functionType = cast<FunctionType>(functionTypeAttr.getValue());
   p << "(";
   for (size_t argIndex = 0; argIndex < functionType.getNumInputs();) {
-    if (argIndex)
+    if (argIndex) {
       p << ", ";
+    }
     int baseArgIndex = argIndex;
     auto type = functionType.getInput(baseArgIndex);
     p << "%arg";
@@ -4345,11 +4392,13 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
   auto resultTypes = functionType.getResults();
   if (!resultTypes.empty()) {
     p << " -> ";
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1) {
       p << "(";
+    }
     printDispatchFunctionResultList(p, op, resultTypes, resultAttrs);
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1) {
       p << ")";
+    }
   }
 }
 
@@ -4411,11 +4460,13 @@ static ParseResult parseCmdCallOperands(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths,
     ArrayAttr &resourceAccesses) {
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   // Handle the case of no operands specially.
-  if (succeeded(parser.parseOptionalRParen()))
+  if (succeeded(parser.parseOptionalRParen())) {
     return success();
+  }
   SmallVector<Attribute> accessAttrs;
   do {
     StringRef accessStr;
@@ -4454,8 +4505,9 @@ static ParseResult parseCmdCallOperands(
     }
   } while (succeeded(parser.parseOptionalComma()));
   resourceAccesses = parser.getBuilder().getArrayAttr(accessAttrs);
-  if (failed(parser.parseRParen()))
+  if (failed(parser.parseRParen())) {
     return failure();
+  }
   return success();
 }
 
@@ -4500,8 +4552,9 @@ static void printCmdCallOperands(OpAsmPrinter &p, Operation *op,
       // Primitive/custom type.
       p.printOperand(operand);
     }
-    if (i < resourceOperands.size() - 1)
+    if (i < resourceOperands.size() - 1) {
       p << ", ";
+    }
   }
   p << ")";
 }
@@ -4517,8 +4570,9 @@ void CmdExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.addTypes(IREE::Stream::TimepointType::get(builder.getContext()));
   state.addOperands(operands);
   state.addOperands(operandSizes);
-  if (awaitTimepoint)
+  if (awaitTimepoint) {
     state.addOperands(awaitTimepoint);
+  }
   state.addAttributes(attributes);
   state.attributes.erase(getOperandSegmentSizeAttr());
   state.addAttribute(getOperandSegmentSizeAttr(),
@@ -4552,8 +4606,9 @@ LogicalResult CmdExecuteOp::verify() {
     return failure();
   }
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp)))
+    if (failed(verifyCmdOp(&nestedOp))) {
       return failure();
+    }
   }
   return success();
 }
@@ -4616,8 +4671,9 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
   newBody.takeBody(getClosureBodyRegion());
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices)
+  for (auto i : excludedOperandIndices) {
     eraseIndices.set(i);
+  }
   block.eraseArguments(eraseIndices);
   return newOp;
 }
@@ -4629,8 +4685,9 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
 LogicalResult CmdSerialOp::verify() {
   CmdSerialOp op = *this;
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp)))
+    if (failed(verifyCmdOp(&nestedOp))) {
       return failure();
+    }
   }
   return success();
 }
@@ -4655,8 +4712,9 @@ void CmdSerialOp::getSuccessorRegions(
 LogicalResult CmdConcurrentOp::verify() {
   CmdConcurrentOp op = *this;
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp)))
+    if (failed(verifyCmdOp(&nestedOp))) {
       return failure();
+    }
   }
   return success();
 }
@@ -4768,8 +4826,9 @@ LogicalResult TimepointJoinOp::verify() {
 Value TimepointJoinOp::join(Location loc, ValueRange timepoints,
                             OpBuilder &builder) {
   assert(!timepoints.empty() && "must have at least one timepoint");
-  if (timepoints.size() == 1)
+  if (timepoints.size() == 1) {
     return timepoints.front();
+  }
   return IREE::Stream::TimepointJoinOp::create(
       builder, loc, builder.getType<IREE::Stream::TimepointType>(), timepoints);
 }
@@ -4967,11 +5026,13 @@ LogicalResult ExecutableExportOp::verify() {
 mlir::FunctionOpInterface ExecutableExportOp::lookupFunctionRef() {
   auto executableOp =
       this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
-  if (!executableOp)
+  if (!executableOp) {
     return {};
+  }
   auto innerModuleOp = executableOp.getInnerModule();
-  if (!innerModuleOp)
+  if (!innerModuleOp) {
     return {};
+  }
   return innerModuleOp.lookupSymbol<mlir::FunctionOpInterface>(
       getFunctionRef());
 }

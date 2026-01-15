@@ -169,8 +169,9 @@ static LogicalResult commonRunOnOperation(
             scf::tileConsumerAndFuseProducersUsingSCF(
                 rewriter, cast<TilingInterface>(op.getOperation()),
                 packOptions);
-        if (failed(tileAndFuseResult))
+        if (failed(tileAndFuseResult)) {
           return WalkResult::interrupt();
+        }
         rewriter.replaceOp(op, tileAndFuseResult->replacements[op.getResult()]);
         return WalkResult::advance();
       });
@@ -203,8 +204,9 @@ static LogicalResult commonRunOnOperation(
         FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
             rewriter, cast<TilingInterface>(op.getOperation()),
             unpackTilingOptions);
-        if (failed(tilingResult))
+        if (failed(tilingResult)) {
           return WalkResult::interrupt();
+        }
         rewriter.replaceOp(op, tilingResult->replacements);
         return WalkResult::advance();
       });

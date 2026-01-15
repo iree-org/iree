@@ -81,14 +81,16 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
       needsRewrite = true;
     }
   }
-  if (!needsRewrite)
+  if (!needsRewrite) {
     return failure();
+  }
 
   // Need to rewrite the assumption.
   auto normalizeAssumptions = [](Attribute row, bool &madeChange) {
     auto rowArray = cast<ArrayAttr>(row);
-    if (rowArray.size() <= 1)
+    if (rowArray.size() <= 1) {
       return rowArray;
+    }
 
     bool allSame = true;
     for (unsigned i = 1; i < rowArray.size(); ++i) {
@@ -98,8 +100,9 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
       }
     }
 
-    if (!allSame)
+    if (!allSame) {
       return rowArray;
+    }
 
     // All entries are the same: compress down to a single column.
     madeChange = true;
@@ -350,8 +353,9 @@ struct FoldCastIntoNullOp : public OpRewritePattern<CastOp> {
                                 PatternRewriter &rewriter) const override {
     auto nullOp =
         dyn_cast_if_present<NullOp>(castOp.getOperand().getDefiningOp());
-    if (!nullOp)
+    if (!nullOp) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<NullOp>(castOp, castOp.getResult().getType());
     return success();
   }
@@ -425,8 +429,9 @@ static OpFoldResult foldRangeOp(Type type, ValueRange operands,
   int64_t value = initialValue;
   for (auto operand : attrOperands) {
     auto intValue = dyn_cast_if_present<IntegerAttr>(operand);
-    if (!intValue)
+    if (!intValue) {
       return {};
+    }
     value = expr(value, intValue.getValue().getSExtValue());
   }
   return IntegerAttr::get(type, value);
@@ -566,8 +571,9 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
         lengths.push_back(length);
       }
     }
-    if (offsets.size() == op.getOffsets().size())
+    if (offsets.size() == op.getOffsets().size()) {
       return failure();
+    }
 
     // Preserve dynamic ranges.
     Value min;
@@ -627,8 +633,9 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
                                  op.getLengths().back(), one, rewriter);
       maxValue = arith::MaxUIOp::create(rewriter, loc, endLhs, endRhs);
     }
-    if (!minValue || !maxValue)
+    if (!minValue || !maxValue) {
       return failure();
+    }
     rewriter.replaceOp(op, {minValue, maxValue});
     return success();
   }
@@ -645,8 +652,9 @@ struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
     for (auto range : llvm::zip_equal(op.getOffsets(), op.getLengths())) {
       ranges.insert(range);
     }
-    if (ranges.size() == op.getOffsets().size())
+    if (ranges.size() == op.getOffsets().size()) {
       return failure();
+    }
 
     // Recreate with the deduplicated ranges.
     SmallVector<Value> offsets;
@@ -702,8 +710,9 @@ static bool isAlignedTo(Value value, Value alignment) {
   // If the value is produced by an align op we can check that.
   if (auto sourceAlignOp = value.getDefiningOp<IREE::Util::AlignOp>()) {
     // Check for same exact alignment - even if dynamic.
-    if (sourceAlignOp.getAlignment() == alignment)
+    if (sourceAlignOp.getAlignment() == alignment) {
       return true;
+    }
 
     // If the alignments are constant we can compare them inline.
     APInt sourceAlignment;
@@ -762,8 +771,9 @@ static bool isAlignedTo(Value value, Value alignment) {
 OpFoldResult AlignOp::fold(FoldAdaptor operands) {
   // If aligning an already-aligned value then fold if this is provably a
   // no-op. We can check this for equality even with dynamic alignments.
-  if (isAlignedTo(getValue(), getAlignment()))
+  if (isAlignedTo(getValue(), getAlignment())) {
     return getValue();
+  }
 
   // If values are static we can perform the alignment here.
   APInt staticValue;
@@ -992,8 +1002,9 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
 
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getBody().getBlocks().size() != 1)
+    if (op.getBody().getBlocks().size() != 1) {
       return failure();
+    }
     auto &block = op.getBody().front();
     // Empty block or block with only a ReturnLike terminator.
     if (block.empty() || (block.getOperations().size() == 1 &&
@@ -1128,8 +1139,9 @@ struct FoldBufferSubspanOps : public OpRewritePattern<BufferSubspanOp> {
   LogicalResult matchAndRewrite(BufferSubspanOp op,
                                 PatternRewriter &rewriter) const override {
     auto parentOp = BufferSubspanOp::findSubspanOp(op.getSource());
-    if (!parentOp)
+    if (!parentOp) {
       return failure();
+    }
     auto fusedLoc = rewriter.getFusedLoc({parentOp.getLoc(), op.getLoc()});
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(
         fusedLoc, parentOp.getSourceOffset(), op.getSourceOffset());
@@ -1159,8 +1171,9 @@ struct FoldBufferSubspanOpsIntoConsumers
     for (auto &use : llvm::make_early_inc_range(op.getResult().getUses())) {
       auto subrangeOp =
           dyn_cast<IREE::Util::SubrangeOperandOpInterface>(use.getOwner());
-      if (!subrangeOp)
+      if (!subrangeOp) {
         continue;
+      }
       didUpdateAny = true;
       rewriter.setInsertionPoint(subrangeOp);
       auto oldRange = subrangeOp.getSubrangeOperand(use.getOperandNumber());
@@ -1193,14 +1206,16 @@ struct SinkSubspanAcrossSelectOps
   using Base::Base;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!isa<IREE::Util::BufferType>(op.getType()))
+    if (!isa<IREE::Util::BufferType>(op.getType())) {
       return failure();
+    }
     auto trueSubspan = dyn_cast_if_present<IREE::Util::BufferSubspanOp>(
         op.getTrueValue().getDefiningOp());
     auto falseSubspan = dyn_cast_if_present<IREE::Util::BufferSubspanOp>(
         op.getFalseValue().getDefiningOp());
-    if (!trueSubspan || !falseSubspan)
+    if (!trueSubspan || !falseSubspan) {
       return failure();
+    }
     if (trueSubspan.getSource() != falseSubspan.getSource() ||
         trueSubspan.getResultSize() != falseSubspan.getResultSize()) {
       return failure();
@@ -1275,8 +1290,9 @@ struct SelectBufferSizeOp : public OpRewritePattern<BufferSizeOp> {
   LogicalResult matchAndRewrite(BufferSizeOp op,
                                 PatternRewriter &rewriter) const override {
     auto selectOp = op.getOperand().getDefiningOp<mlir::arith::SelectOp>();
-    if (!selectOp)
+    if (!selectOp) {
       return failure();
+    }
     auto trueSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
         op.getLoc(), selectOp.getTrueValue());
     auto falseSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
@@ -1313,8 +1329,9 @@ struct FoldSubspansIntoStorageOp : public OpRewritePattern<BufferStorageOp> {
   LogicalResult matchAndRewrite(BufferStorageOp op,
                                 PatternRewriter &rewriter) const override {
     auto subspanOp = BufferSubspanOp::findSubspanOp(op.getOperand());
-    if (!subspanOp)
+    if (!subspanOp) {
       return failure();
+    }
     auto fusedLoc = rewriter.getFusedLoc({subspanOp.getLoc(), op.getLoc()});
     rewriter.setInsertionPointAfter(op);
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(

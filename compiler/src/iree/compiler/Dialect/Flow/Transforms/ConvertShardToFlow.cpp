@@ -139,11 +139,12 @@ static bool isDefaultChannel(shard::GridOp grid,
 static Value getDefaultChannel(Location loc, shard::GridOp grid,
                                bool useNamedDefaultChannels,
                                OpBuilder &builder) {
-  if (useNamedDefaultChannels)
+  if (useNamedDefaultChannels) {
     return IREE::Flow::ChannelDefaultOp::create(builder, loc,
                                                 grid.getSymName());
-  else
+  } else {
     return IREE::Flow::ChannelDefaultOp::create(builder, loc);
+  }
 }
 
 static Value buildCachedChannelLoading(Location loc, shard::GridOp grid,
@@ -254,8 +255,9 @@ static void createChannels(ModuleOp moduleOp,
   llvm::sort(gridAndAxesSetSorted, [](auto &a, auto &b) {
     int nameCompareRes =
         std::get<0>(a).getSymName().compare(std::get<0>(b).getSymName());
-    if (nameCompareRes == 0)
+    if (nameCompareRes == 0) {
       return std::get<1>(a) < std::get<1>(b);
+    }
     return nameCompareRes < 0;
   });
   for (auto &[shard, shardAxes] : llvm::make_range(
@@ -292,8 +294,9 @@ static void removeShardOps(GridAndAxesSet &gridAndAxesSet) {
   DenseSet<shard::GridOp> gridOpsSet(std::begin(gridRange),
                                      std::end(gridRange));
   for (shard::GridOp op : gridOpsSet) {
-    if (op)
+    if (op) {
       op.erase();
+    }
   }
 }
 

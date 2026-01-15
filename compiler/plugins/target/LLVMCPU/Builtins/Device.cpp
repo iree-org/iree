@@ -17,8 +17,9 @@ namespace mlir::iree_compiler::IREE::HAL {
 static const iree_file_toc_t *lookupDeviceFile(StringRef filename) {
   for (size_t i = 0; i < iree_builtins_libdevice_bitcode_size(); ++i) {
     const auto &file_toc = iree_builtins_libdevice_bitcode_create()[i];
-    if (filename == file_toc.name)
+    if (filename == file_toc.name) {
       return &file_toc;
+    }
   }
   return nullptr;
 }
@@ -67,8 +68,9 @@ loadDeviceBitcode(llvm::TargetMachine *targetMachine,
   llvm::MemoryBufferRef bitcodeBufferRef(
       llvm::StringRef(file->data, file->size), file->name);
   auto bitcodeModuleValue = llvm::parseBitcodeFile(bitcodeBufferRef, context);
-  if (!bitcodeModuleValue)
+  if (!bitcodeModuleValue) {
     return bitcodeModuleValue;
+  }
   auto bitcodeModule = std::move(bitcodeModuleValue.get());
 
   // Clang adds its own per-function attributes that we need to strip so that
@@ -86,8 +88,9 @@ static void overridePlatformGlobal(llvm::Module &module, StringRef globalName,
                                    uint32_t newValue) {
   // NOTE: the global will not be defined if it is not used in the module.
   auto *globalValue = module.getNamedGlobal(globalName);
-  if (!globalValue)
+  if (!globalValue) {
     return;
+  }
   globalValue->setLinkage(llvm::GlobalValue::PrivateLinkage);
   globalValue->setDSOLocal(true);
   globalValue->setConstant(true);

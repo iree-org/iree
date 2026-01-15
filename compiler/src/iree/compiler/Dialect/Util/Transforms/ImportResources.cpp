@@ -102,8 +102,9 @@ public:
           }
         }
       }
-      if (updated)
+      if (updated) {
         op->setAttrs(attrs);
+      }
     });
     LLVM_DEBUG(llvm::dbgs() << "DONE CONVERTING RESOURCES\n");
   }

@@ -96,12 +96,14 @@ ElementsAttr getSplat(Builder *b, RankedTensorType ty, T constant) {
 
   if (auto complexTy = dyn_cast<ComplexType>(elementTy)) {
     auto complexElementTy = complexTy.getElementType();
-    if (complexElementTy.isF32())
+    if (complexElementTy.isF32()) {
       return DenseElementsAttr::get(ty,
                                     static_cast<std::complex<float>>(constant));
-    if (complexElementTy.isF64())
+    }
+    if (complexElementTy.isF64()) {
       return DenseElementsAttr::get(
           ty, static_cast<std::complex<double>>(constant));
+    }
   }
   llvm_unreachable("unhandled element type");
 }

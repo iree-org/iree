@@ -80,8 +80,9 @@ public:
         llvm::dbgs() << ":\n";
       });
       auto *region = callableOp.getCallableRegion();
-      if (!region)
+      if (!region) {
         continue;
+      }
       for (auto &block : *region) {
         DenseMap<Value, SmallVector<IREE::Util::GlobalStoreOpInterface>>
             valueStores;
@@ -93,8 +94,9 @@ public:
             storeOp.print(llvm::dbgs(), *asmState);
             llvm::dbgs() << "; candidate=" << global.isCandidate() << "\n";
           });
-          if (!global.isCandidate())
+          if (!global.isCandidate()) {
             continue;
+          }
           valueStores[storeOp.getStoredGlobalValue()].push_back(storeOp);
         }
         for (auto valueStore : valueStores) {

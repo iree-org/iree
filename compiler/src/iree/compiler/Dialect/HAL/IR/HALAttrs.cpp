@@ -833,8 +833,9 @@ Value IREE::HAL::DeviceSelectAttr::buildDeviceEnumeration(
     auto deviceAttr = deviceAttrs.front();
     Value tryDevice = deviceAttr.buildDeviceEnumeration(
         loc, buildDeviceTargetMatch, tryBuilder);
-    if (deviceAttrs.size() == 1)
+    if (deviceAttrs.size() == 1) {
       return tryDevice; // termination case
+    }
     Value isNull =
         IREE::Util::CmpEQOp::create(tryBuilder, loc, tryDevice, nullDevice);
     auto ifOp =
@@ -868,8 +869,9 @@ Attribute DeviceAffinityAttr::parse(AsmParser &p, Type type) {
     queueMask = 0;
     if (failed(p.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&]() {
           int64_t i = 0;
-          if (failed(p.parseInteger(i)))
+          if (failed(p.parseInteger(i))) {
             return failure();
+          }
           queueMask |= 1ll << i;
           return success();
         }))) {
@@ -991,8 +993,9 @@ Attribute DevicePromiseAttr::parse(AsmParser &p, Type type) {
     queueMask = 0;
     if (failed(p.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&]() {
           int64_t i = 0;
-          if (failed(p.parseInteger(i)))
+          if (failed(p.parseInteger(i))) {
             return failure();
+          }
           queueMask |= 1ll << i;
           return success();
         }))) {
@@ -1119,10 +1122,12 @@ bool DeviceTopologyAttr::hasTransparentAccess(
   Attribute sourceDevice = getAffinityDevice(source);
   Attribute targetDevice = getAffinityDevice(target);
 
-  if (!sourceDevice || !targetDevice)
+  if (!sourceDevice || !targetDevice) {
     return false;
-  if (sourceDevice == targetDevice)
+  }
+  if (sourceDevice == targetDevice) {
     return true; // Same device has transparent access.
+  }
 
   // Search for a matching link and check if it has transparent access.
   for (DeviceLinkAttr link : getLinks()) {
@@ -1140,10 +1145,12 @@ bool DeviceTopologyAttr::hasUnifiedMemory(
   Attribute sourceDevice = getAffinityDevice(source);
   Attribute targetDevice = getAffinityDevice(target);
 
-  if (!sourceDevice || !targetDevice)
+  if (!sourceDevice || !targetDevice) {
     return false;
-  if (sourceDevice == targetDevice)
+  }
+  if (sourceDevice == targetDevice) {
     return true; // Same device has unified memory.
+  }
 
   // Search for a matching link and check if it has unified memory.
   for (DeviceLinkAttr link : getLinks()) {

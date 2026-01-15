@@ -66,8 +66,9 @@ struct PromoteContractOperands final
   Value promoteToElementType(Location loc, RewriterBase &rewriter, Value v,
                              Type dstElementType) const {
     Type elementType = getElementTypeOrSelf(v.getType());
-    if (elementType == dstElementType)
+    if (elementType == dstElementType) {
       return v;
+    }
 
     // vector.contract only allows extension on operands.
     assert(elementType.getIntOrFloatBitWidth() <=
@@ -75,11 +76,13 @@ struct PromoteContractOperands final
            "vector.contract does not allow truncation of operands");
 
     Type promotedType = dstElementType;
-    if (auto vecType = dyn_cast<VectorType>(v.getType()))
+    if (auto vecType = dyn_cast<VectorType>(v.getType())) {
       promotedType = vecType.clone(promotedType);
+    }
 
-    if (isa<FloatType>(dstElementType))
+    if (isa<FloatType>(dstElementType)) {
       return arith::ExtFOp::create(rewriter, loc, promotedType, v);
+    }
     // For integer types, vector.contract only supports signless integer types
     // and promotion happens via sign extension.
     return arith::ExtSIOp::create(rewriter, loc, promotedType, v);
@@ -409,8 +412,9 @@ private:
 
   static std::optional<unsigned> getDimPosition(AffineMap map, unsigned dim) {
     for (unsigned i = 0, e = map.getNumResults(); i < e; i++) {
-      if (map.getDimPosition(i) == dim)
+      if (map.getDimPosition(i) == dim) {
         return i;
+      }
     }
     return std::nullopt;
   }
@@ -419,8 +423,9 @@ private:
                                                 ArrayAttr iteratorTypes) {
     SmallVector<int64_t> dimsIdx;
     for (unsigned i = 0, e = map.getNumResults(); i < e; i++) {
-      if (vector::isReductionIterator(iteratorTypes[map.getDimPosition(i)]))
+      if (vector::isReductionIterator(iteratorTypes[map.getDimPosition(i)])) {
         dimsIdx.push_back(i);
+      }
     }
     return dimsIdx;
   }
@@ -506,8 +511,10 @@ struct UnrollElementwiseOps final : public RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!OpTrait::hasElementwiseMappableTraits(op) || op->getNumResults() != 1)
+    if (!OpTrait::hasElementwiseMappableTraits(op) ||
+        op->getNumResults() != 1) {
       return failure();
+    }
 
     Location loc = op->getLoc();
     VectorType dstVecTy = dyn_cast<VectorType>(op->getResult(0).getType());

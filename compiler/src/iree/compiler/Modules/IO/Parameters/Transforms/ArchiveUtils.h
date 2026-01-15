@@ -52,10 +52,11 @@ using ScopePath = std::pair<StringRef, StringRef>;
 // If no `scope=` was specified the resulting scope string will be empty.
 static inline ScopePath splitScopePath(StringRef scopePath) {
   size_t i = scopePath.find_first_of('=');
-  if (i == StringRef::npos)
+  if (i == StringRef::npos) {
     return ScopePath("", scopePath);
-  else
+  } else {
     return ScopePath(scopePath.substr(0, i), scopePath.substr(i + 1));
+  }
 }
 
 // Helper to interpret iree status messages and print the error message.

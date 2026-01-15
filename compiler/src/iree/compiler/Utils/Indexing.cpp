@@ -33,8 +33,9 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
       stride = 1;
       size = 1;
     }
-    if (stride % previousSizes != 0)
+    if (stride % previousSizes != 0) {
       return failure();
+    }
 
     // Handle casis like threads = {4, 8}, strides = {1, 16}, which need an
     // extra basis element.
@@ -56,8 +57,9 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
   size_t basisLength = basis.size();
   dimToResult.assign(numDims, ~0);
   for (auto [reverseBasisPos, dimPos] : llvm::enumerate(basisEntryToDim)) {
-    if (!dimPos)
+    if (!dimPos) {
       continue;
+    }
     // There's an extra overflow term at the front of the delineraize results,
     // so this subtraction lands in the [1, basisLength] range we need it
     // to be in.

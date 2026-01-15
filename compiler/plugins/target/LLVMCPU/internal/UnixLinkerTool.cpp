@@ -24,8 +24,9 @@ public:
   std::string getSystemToolPath() const override {
     // First check for setting the linker explicitly.
     auto toolPath = LinkerTool::getSystemToolPath();
-    if (!toolPath.empty())
+    if (!toolPath.empty()) {
       return toolPath;
+    }
 
     // No explicit linker specified, search the environment for common tools.
     // We want LLD:
@@ -53,8 +54,9 @@ public:
       // of these, at least given current behavior.
       toolPath = findToolInEnvironment({"ld.lld", "ld"});
     }
-    if (!toolPath.empty())
+    if (!toolPath.empty()) {
       return toolPath;
+    }
 
     llvm::errs() << "No Unix linker tool found in environment.\n";
     return "";
@@ -129,8 +131,9 @@ public:
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine)))
+    if (failed(runLinkCommand(commandLine))) {
       return std::nullopt;
+    }
     return artifacts;
   }
 
