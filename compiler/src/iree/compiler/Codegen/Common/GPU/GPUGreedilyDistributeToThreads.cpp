@@ -139,8 +139,9 @@ static void processRegion(RewriterBase &rewriter, Region *region) {
       if (auto tilableOp = dyn_cast<TilingInterface>(op)) {
         // Do not distribute to threads of an op wants to use DMA.
         if (auto useDMAConfig =
-                getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op))
+                getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op)) {
           continue;
+        }
         tileToThreads(rewriter, tilableOp);
         continue;
       }

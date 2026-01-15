@@ -31,13 +31,15 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     auto constant = dyn_cast<VectorValue>(constantOp.getResult());
-    if (!constant)
+    if (!constant) {
       return failure();
+    }
 
     // Only handle splat values for now.
     auto attr = dyn_cast<SplatElementsAttr>(constantOp.getValue());
-    if (!attr)
+    if (!attr) {
       return failure();
+    }
 
     VectorLayoutInterface layout = signature[constant];
 
@@ -62,8 +64,9 @@ struct DistributePoison final : OpDistributionPattern<ub::PoisonOp> {
                                 PatternRewriter &rewriter) const override {
 
     auto poisonVal = dyn_cast<VectorValue>(poisonOp.getResult());
-    if (!poisonVal)
+    if (!poisonVal) {
       return failure();
+    }
 
     SmallVector<int64_t> distributedShape =
         signature[poisonVal].getDistributedShape();

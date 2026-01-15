@@ -157,8 +157,9 @@ LogicalResult mapToDeviceQuery(IREE::HAL::ExecutableExportOp entryPoint,
         entryPoint->getAttrOfType<ArrayAttr>("iree.spirv.coopmatrix.type");
     auto coopmatShape = entryPoint->getAttrOfType<DenseI64ArrayAttr>(
         "iree.spirv.coopmatrix.shape");
-    if (!coopmatType || !coopmatShape)
+    if (!coopmatType || !coopmatShape) {
       return failure();
+    }
 
     Type inputType = cast<TypeAttr>(coopmatType.getValue().front()).getValue();
     Type outputType = cast<TypeAttr>(coopmatType.getValue().back()).getValue();
@@ -277,8 +278,9 @@ struct SPIRVMaterializeExecutableConditionsPass final
           SPIRVMaterializeExecutableConditionsPass> {
   void runOnOperation() override {
     IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-    if (!usesSPIRVCodeGen(variantOp))
+    if (!usesSPIRVCodeGen(variantOp)) {
       return;
+    }
 
     IREE::HAL::ExecutableTargetAttr executableTarget = variantOp.getTarget();
     DictionaryAttr configuration = executableTarget.getConfiguration();

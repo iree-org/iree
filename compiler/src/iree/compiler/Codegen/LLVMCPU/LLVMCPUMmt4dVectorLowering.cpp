@@ -48,13 +48,15 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
 
   std::optional<int64_t> numLoops;
   funcOp.walk([&](vector::ContractionOp op) {
-    if (numLoops)
+    if (numLoops) {
       return signalPassFailure();
+    }
     numLoops = op.getIndexingMapsArray()[0].getNumDims();
   });
   // No vector.contract op to optimize.
-  if (!numLoops)
+  if (!numLoops) {
     return;
+  }
 
   {
     // Fold consumer add ops into the contraction op itself.
