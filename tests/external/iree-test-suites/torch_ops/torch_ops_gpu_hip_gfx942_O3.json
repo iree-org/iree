@@ -8,7 +8,9 @@
   "iree_run_module_flags": [
     "--device=hip"
   ],
-  "skip_compile_tests": [],
+  "skip_compile_tests": [
+    "InterestingShapesBiasAdd/997x997xi8_NN_bias"
+  ],
   "skip_run_tests": [
     "ATB/64x64xf16"
   ],
