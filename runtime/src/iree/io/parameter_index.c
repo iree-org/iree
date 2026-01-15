@@ -105,18 +105,13 @@ iree_io_parameter_index_count(iree_io_parameter_index_t* index) {
 static iree_status_t iree_io_parameter_index_reserve_unsafe(
     iree_io_parameter_index_t* index, iree_host_size_t new_capacity) {
   IREE_ASSERT_ARGUMENT(index);
-  if (new_capacity < index->entry_capacity) return iree_ok_status();
+  if (new_capacity <= index->entry_capacity) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, new_capacity);
 
-  iree_io_parameter_index_entry_t** new_entries = index->entries;
-  iree_status_t status = iree_allocator_realloc(
-      index->host_allocator, new_capacity * sizeof(index->entries[0]),
-      (void**)&new_entries);
-  if (iree_status_is_ok(status)) {
-    index->entry_capacity = new_capacity;
-    index->entries = new_entries;
-  }
+  iree_status_t status = iree_allocator_grow_array(
+      index->host_allocator, new_capacity, sizeof(index->entries[0]),
+      &index->entry_capacity, (void**)&index->entries);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -144,8 +139,10 @@ iree_io_parameter_index_add(iree_io_parameter_index_t* index,
   // Grow the index if needed (double each time after some initial minimum).
   iree_status_t status = iree_ok_status();
   if (index->entry_count == index->entry_capacity) {
-    status = iree_io_parameter_index_reserve_unsafe(
-        index, iree_max(16, index->entry_capacity * 2));
+    status = iree_allocator_grow_array(
+        index->host_allocator,
+        /*min_capacity=*/16, sizeof(index->entries[0]), &index->entry_capacity,
+        (void**)&index->entries);
   }
 
   // Clone the entry memory. We allocate it as a single slab and stash the
@@ -153,10 +150,18 @@ iree_io_parameter_index_add(iree_io_parameter_index_t* index,
   // reallocated so the pointers are safe to embed.
   iree_io_parameter_index_entry_t* cloned_entry = NULL;
   if (iree_status_is_ok(status)) {
-    iree_host_size_t total_size =
-        sizeof(*cloned_entry) + entry->key.size + entry->metadata.data_length;
-    status = iree_allocator_malloc(index->host_allocator, total_size,
-                                   (void**)&cloned_entry);
+    // Calculate trailing size with overflow checking. Entry sizes come from
+    // file data (untrusted input).
+    iree_host_size_t trailing_size = 0;
+    if (!iree_host_size_checked_add(
+            entry->key.size, entry->metadata.data_length, &trailing_size)) {
+      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "parameter entry size overflow");
+    } else {
+      status = iree_allocator_malloc_with_trailing(
+          index->host_allocator, sizeof(*cloned_entry), trailing_size,
+          (void**)&cloned_entry);
+    }
   }
   if (iree_status_is_ok(status)) {
     cloned_entry->key = iree_make_string_view(

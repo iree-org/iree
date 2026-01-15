@@ -712,10 +712,18 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch(
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, resource_count, resources));
 
+  // Calculate command size with overflow checking.
+  iree_host_size_t total_size = 0;
+  iree_host_size_t constants_offset = 0;
+  iree_host_size_t bindings_offset = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_hal_cmd_dispatch_t), &total_size,
+      IREE_STRUCT_FIELD_ALIGNED(constants.data_length, uint8_t,
+                                iree_max_align_t, &constants_offset),
+      IREE_STRUCT_FIELD_ALIGNED(bindings.count, iree_hal_buffer_ref_t, 1,
+                                &bindings_offset)));
+
   iree_hal_cmd_dispatch_t* cmd = NULL;
-  iree_host_size_t total_size =
-      sizeof(*cmd) + iree_host_align(constants.data_length, iree_max_align_t) +
-      bindings.count * sizeof(bindings.values[0]);
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       &command_buffer->cmd_list, IREE_HAL_CMD_DISPATCH, total_size,
       (void**)&cmd));
@@ -724,17 +732,16 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch(
   memcpy(&cmd->config, &config, sizeof(cmd->config));
   cmd->flags = flags;
 
-  uint8_t* cmd_ptr = (uint8_t*)cmd;
-  cmd_ptr += sizeof(*cmd);
+  uint8_t* cmd_base = (uint8_t*)cmd;
 
-  memcpy(cmd_ptr, constants.data, constants.data_length);
-  cmd->constants = iree_make_const_byte_span(cmd_ptr, constants.data_length);
-  cmd_ptr += iree_host_align(constants.data_length, iree_max_align_t);
+  memcpy(cmd_base + constants_offset, constants.data, constants.data_length);
+  cmd->constants = iree_make_const_byte_span(cmd_base + constants_offset,
+                                             constants.data_length);
 
   cmd->bindings.count = bindings.count;
-  memcpy(cmd_ptr, bindings.values, bindings.count * sizeof(bindings.values[0]));
-  cmd->bindings.values = (iree_hal_buffer_ref_t*)cmd_ptr;
-  cmd_ptr += bindings.count * sizeof(bindings.values[0]);
+  memcpy(cmd_base + bindings_offset, bindings.values,
+         bindings.count * sizeof(bindings.values[0]));
+  cmd->bindings.values = (iree_hal_buffer_ref_t*)(cmd_base + bindings_offset);
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
       command_buffer->resource_set, bindings.count, bindings.values,
       offsetof(iree_hal_buffer_ref_t, buffer), sizeof(iree_hal_buffer_ref_t)));

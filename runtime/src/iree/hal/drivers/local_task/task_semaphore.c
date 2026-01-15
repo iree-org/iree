@@ -367,11 +367,16 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   // call.
   iree_host_size_t timepoint_count = 0;
   iree_hal_task_timepoint_t* timepoints = NULL;
-  iree_host_size_t total_timepoint_size =
-      semaphore_list.count * sizeof(timepoints[0]);
+  iree_host_size_t total_timepoint_size = 0;
   bool needs_wait = true;
-  status =
-      iree_arena_allocate(&arena, total_timepoint_size, (void**)&timepoints);
+  if (!iree_host_size_checked_mul(semaphore_list.count, sizeof(timepoints[0]),
+                                  &total_timepoint_size)) {
+    status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "semaphore list count overflow");
+  } else {
+    status =
+        iree_arena_allocate(&arena, total_timepoint_size, (void**)&timepoints);
+  }
   if (iree_status_is_ok(status)) {
     memset(timepoints, 0, total_timepoint_size);
     for (iree_host_size_t i = 0; i < semaphore_list.count && needs_wait; ++i) {
