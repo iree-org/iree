@@ -75,12 +75,14 @@ getTensorDivisibilityInfo(const TensorDynamicDimAnalysis &dynamicDimAnalysis,
   }
 
   for (auto [index, dim] : llvm::enumerate(tensorType.getShape())) {
-    if (!tensorType.isDynamicDim(index))
+    if (!tensorType.isDynamicDim(index)) {
       continue;
+    }
     std::optional<IREE::Util::ConstantIntDivisibility> dimDivisibility =
         dynamicDimAnalysis.getDivisibilityInfo(v, index);
-    if (!dimDivisibility)
+    if (!dimDivisibility) {
       continue;
+    }
     divisibilityInfo[index] = std::move(dimDivisibility.value());
   }
 
@@ -191,14 +193,17 @@ static LogicalResult blockDynamicDimensions(
     Operation *operation, llvm::SmallDenseSet<int64_t> limitToOperandNumbers,
     llvm::SmallDenseSet<int64_t> limitToResultNumbers) {
   for (OpOperand &operand : operation->getOpOperands()) {
-    if (!limitToOperandNumbers.contains(operand.getOperandNumber()))
+    if (!limitToOperandNumbers.contains(operand.getOperandNumber())) {
       continue;
-    if (operand.get().getDefiningOp<tensor::CollapseShapeOp>())
+    }
+    if (operand.get().getDefiningOp<tensor::CollapseShapeOp>()) {
       continue;
+    }
     TensorDivisibilityInfo operandDivisibilityInfo =
         getTensorDivisibilityInfo(dynamicDimAnalysis, operand.get());
-    if (operandDivisibilityInfo.empty())
+    if (operandDivisibilityInfo.empty()) {
       continue;
+    }
     std::optional<ReshapeOps> reshapes = blockDynamicDimensionsOfValue(
         rewriter, operandDivisibilityInfo, operand.get());
     if (reshapes) {
@@ -210,12 +215,14 @@ static LogicalResult blockDynamicDimensions(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(operation);
   for (OpResult result : operation->getResults()) {
-    if (!limitToResultNumbers.contains(result.getResultNumber()))
+    if (!limitToResultNumbers.contains(result.getResultNumber())) {
       continue;
+    }
     TensorDivisibilityInfo resultDivisibilityInfo =
         getTensorDivisibilityInfo(dynamicDimAnalysis, result);
-    if (resultDivisibilityInfo.empty())
+    if (resultDivisibilityInfo.empty()) {
       continue;
+    }
     std::optional<ReshapeOps> reshapes =
         blockDynamicDimensionsOfValue(rewriter, resultDivisibilityInfo, result);
     if (reshapes) {

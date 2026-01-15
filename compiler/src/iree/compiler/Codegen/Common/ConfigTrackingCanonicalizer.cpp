@@ -77,10 +77,12 @@ public:
         GreedySimplifyRegionLevel::Normal);
 
     RewritePatternSet owningPatterns(context);
-    for (auto *dialect : context->getLoadedDialects())
+    for (auto *dialect : context->getLoadedDialects()) {
       dialect->getCanonicalizationPatterns(owningPatterns);
-    for (RegisteredOperationName op : context->getRegisteredOperations())
+    }
+    for (RegisteredOperationName op : context->getRegisteredOperations()) {
       op.getCanonicalizationPatterns(owningPatterns, context);
+    }
 
     patterns =
         std::make_shared<FrozenRewritePatternSet>(std::move(owningPatterns));
