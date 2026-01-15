@@ -32,8 +32,9 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
                              Location loc) {
   IntegerAttr attr;
   if (Value val = dyn_cast<Value>(attrOrValue)) {
-    if (val.getType().isIndex())
+    if (val.getType().isIndex()) {
       return val;
+    }
     matchPattern(val, m_Constant(&attr));
   } else {
     attr = cast<IntegerAttr>(cast<Attribute>(attrOrValue));
@@ -52,8 +53,9 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {
     // If the result shape is already static, then nothing to do.
-    if (padOp.getResultType().hasStaticShape())
+    if (padOp.getResultType().hasStaticShape()) {
       return failure();
+    }
 
     int rank = padOp.getResultType().getRank();
     SmallVector<int64_t> staticShape;
@@ -61,8 +63,9 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
 
     auto sourceIfxOp = dyn_cast_if_present<OffsetSizeAndStrideOpInterface>(
         padOp.getSource().getDefiningOp());
-    if (!sourceIfxOp)
+    if (!sourceIfxOp) {
       return failure();
+    }
 
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> source = sourceIfxOp.getMixedSizes();
@@ -111,8 +114,9 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
         affine::canonicalizeMapAndOperands(&map, &valueSizes);
         cstExpr = dyn_cast<AffineConstantExpr>(map.getResult(0));
       }
-      if (!cstExpr)
+      if (!cstExpr) {
         return failure();
+      }
 
       staticShape.push_back(cstExpr.getValue());
     }

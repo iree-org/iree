@@ -57,8 +57,9 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
   if (ShapedType::isStaticShape(staticTileSizes)) {
     if (!materializeEncodingInfo.scalableTiles ||
         llvm::none_of(materializeEncodingInfo.scalableTiles.value(),
-                      [](bool scalable) { return scalable; }))
+                      [](bool scalable) { return scalable; })) {
       return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
+    }
     // In this case, we have scalable tiles present and we have to generate the
     // necessary vscale operation and the corresponding static_size * vscale
     // values.

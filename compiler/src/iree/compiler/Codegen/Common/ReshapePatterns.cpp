@@ -99,8 +99,9 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
     auto reshapeSrcType = cast<RankedTensorType>(reshapeSrc.getType());
     auto loadOp =
         reshapeSrc.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
-    if (!loadOp)
+    if (!loadOp) {
       return failure();
+    }
 
     // Make sure we are loading the full incoming subspan. Otherwise we cannot
     // simply adjust the subspan's resultant type later.
@@ -110,8 +111,9 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
 
     auto subspanOp = loadOp.getSource()
                          .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp)
+    if (!subspanOp) {
       return failure();
+    }
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(subspanOp);
@@ -200,8 +202,9 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
 
     auto subspanOp = loadOp.getSource()
                          .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp)
+    if (!subspanOp) {
       return failure();
+    }
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(subspanOp);
@@ -305,8 +308,9 @@ struct FoldExpandShapeIntoInterfaceTensorStore
 
     auto subspanOp = storeOp.getTarget()
                          .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp)
+    if (!subspanOp) {
       return failure();
+    }
 
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(subspanOp);

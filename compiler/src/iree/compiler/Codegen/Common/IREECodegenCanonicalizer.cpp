@@ -24,8 +24,9 @@ namespace {
 /// shape is same as the size of the subview. In such cases, the subview can
 /// be folded into its source.
 static bool isTrivialSubViewOp(memref::SubViewOp subviewOp) {
-  if (subviewOp.getSourceType().getRank() != subviewOp.getType().getRank())
+  if (subviewOp.getSourceType().getRank() != subviewOp.getType().getRank()) {
     return false;
+  }
 
   if (!areAllConstantIntValue(subviewOp.getMixedOffsets(), 0) ||
       !areAllConstantIntValue(subviewOp.getMixedStrides(), 1)) {
@@ -81,8 +82,9 @@ public:
 
   LogicalResult matchAndRewrite(memref::SubViewOp subViewOp,
                                 PatternRewriter &rewriter) const override {
-    if (!isTrivialSubViewOp(subViewOp))
+    if (!isTrivialSubViewOp(subViewOp)) {
       return failure();
+    }
     if (subViewOp.getSourceType() == subViewOp.getType()) {
       rewriter.replaceOp(subViewOp, subViewOp.getSource());
       return success();
@@ -105,8 +107,9 @@ public:
         GreedySimplifyRegionLevel::Normal);
 
     RewritePatternSet owningPatterns(context);
-    for (auto *dialect : context->getLoadedDialects())
+    for (auto *dialect : context->getLoadedDialects()) {
       dialect->getCanonicalizationPatterns(owningPatterns);
+    }
     for (RegisteredOperationName op : context->getRegisteredOperations()) {
       if (op.getStringRef() == memref::CopyOp::getOperationName()) {
         owningPatterns.add<DynamicTrivialSubViewOpFolder>(context);

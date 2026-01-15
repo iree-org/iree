@@ -44,8 +44,9 @@ public:
     unsigned numNonUnitSrcDim =
         llvm::count_if(op.getSourceVectorType().getShape(),
                        [](int64_t dim) { return dim != 1; });
-    if (numNonUnitSrcDim > 1)
+    if (numNonUnitSrcDim > 1) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
         op, op.getResultVectorType(), op.getVector());
     return success();

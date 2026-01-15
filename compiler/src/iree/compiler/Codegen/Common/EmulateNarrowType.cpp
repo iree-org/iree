@@ -130,8 +130,9 @@ static Value staticallyExtractSubvector(OpBuilder &rewriter, Location loc,
 
   // When extracting all available elements, just use the source vector as the
   // result.
-  if (vectorType.getNumElements() == numElemsToExtract)
+  if (vectorType.getNumElements() == numElemsToExtract) {
     return src;
+  }
 
   auto offsets = rewriter.getI64ArrayAttr({offset});
   auto sizes = rewriter.getI64ArrayAttr({numElemsToExtract});
@@ -160,8 +161,9 @@ static Value staticallyInsertSubvector(OpBuilder &rewriter, Location loc,
          "expected source and dest to be rank-1 vector types");
 
   // If overwritting the destination vector, just return the source.
-  if (srcVecTy.getNumElements() == destVecTy.getNumElements() && offset == 0)
+  if (srcVecTy.getNumElements() == destVecTy.getNumElements() && offset == 0) {
     return src;
+  }
 
   auto offsets = rewriter.getI64ArrayAttr({offset});
   auto strides = rewriter.getI64ArrayAttr({1});
@@ -344,9 +346,10 @@ struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
                   ConversionPatternRewriter &rewriter) const override {
 
     // See #115653
-    if (op.getValueToStore().getType().getRank() != 1)
+    if (op.getValueToStore().getType().getRank() != 1) {
       return rewriter.notifyMatchFailure(op,
                                          "only 1-D vectors are supported ATM");
+    }
 
     auto loc = op.getLoc();
 

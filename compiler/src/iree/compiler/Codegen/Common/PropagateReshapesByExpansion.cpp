@@ -33,11 +33,13 @@ getExpandedShape(SmallVector<ReassociationIndices> reIndices,
                  SmallVectorImpl<int64_t> &expandedShape,
                  SmallVectorImpl<int64_t> &totalInnerSizes) {
   auto destType = dyn_cast<ShapedType>(dest.getType());
-  if (!destType)
+  if (!destType) {
     return failure();
+  }
   // TODO (nirvedhmeshram): Support rank reducing parallel_insert_slice.
-  if (reIndices.size() != destType.getShape().size())
+  if (reIndices.size() != destType.getShape().size()) {
     return failure();
+  }
   // Iterator to insert outer sizes.
   auto outerShapeIdx = 0;
   for (auto [reassociations, destSize] :
@@ -58,13 +60,15 @@ getExpandedShape(SmallVector<ReassociationIndices> reIndices,
     for (int64_t reasociation : llvm::drop_begin(reassociations)) {
       int64_t expandedInnerSize = sliceStaticSizes[reasociation];
       // It is not safe to do this pattern if inner dimensions are dynamic.
-      if (ShapedType::isDynamic(expandedInnerSize))
+      if (ShapedType::isDynamic(expandedInnerSize)) {
         return failure();
+      }
       expandedShape.push_back(expandedInnerSize);
       totalInnerSize *= expandedInnerSize;
     }
-    if (destSize % totalInnerSize != 0)
+    if (destSize % totalInnerSize != 0) {
       return failure();
+    }
     totalInnerSizes.push_back(totalInnerSize);
     // insert the outer size in front of any inner sizes.
     expandedShape.insert(expandedShape.begin() + outerShapeIdx,
@@ -88,20 +92,26 @@ static LogicalResult verifyAndCollectExpandableUsers(
       continue;
     }
     auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
-    if (!extractSliceOp)
+    if (!extractSliceOp) {
       return failure();
-    if (extractSliceOp.getMixedSizes() != parallelInsertOp.getMixedSizes())
+    }
+    if (extractSliceOp.getMixedSizes() != parallelInsertOp.getMixedSizes()) {
       return failure();
-    if (extractSliceOp.getMixedOffsets() != parallelInsertOp.getMixedOffsets())
+    }
+    if (extractSliceOp.getMixedOffsets() !=
+        parallelInsertOp.getMixedOffsets()) {
       return failure();
+    }
     for (Operation *user : extractSliceOp->getUsers()) {
       auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(user);
-      if (!expandShapeOp)
+      if (!expandShapeOp) {
         return failure();
+      }
       SmallVector<ReassociationIndices> expandReIndices =
           expandShapeOp.getReassociationIndices();
-      if (reIndices != expandReIndices)
+      if (reIndices != expandReIndices) {
         return failure();
+      }
     }
     expandableUsers.push_back(extractSliceOp);
   }
@@ -187,8 +197,9 @@ struct ExpandDestinationForallOp final
     auto collapseOp =
         parallelInsertOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
     // No collapse op to hoist out.
-    if (!collapseOp)
+    if (!collapseOp) {
       return failure();
+    }
 
     // Ignore trivially foldable collapse ops.
     if (collapseOp.getSrcType().getRank() ==
@@ -204,8 +215,9 @@ struct ExpandDestinationForallOp final
     int64_t tiedResultIdx = tiedResult.getResultNumber();
 
     auto forallOp = dyn_cast<scf::ForallOp>(tiedResult.getOwner());
-    if (!forallOp)
+    if (!forallOp) {
       return failure();
+    }
 
     SmallVector<int64_t> expandedDestShape;
     SmallVector<int64_t> totalInnerSizes;
@@ -227,16 +239,19 @@ struct ExpandDestinationForallOp final
       auto storeOp =
           dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(foralluser);
       if (storeOp && isFullSlice(storeOp, storeOp.getTargetType(),
-                                 storeOp.getTargetDims()))
+                                 storeOp.getTargetDims())) {
         continue;
+      }
       auto storeToBufferOp =
           dyn_cast<IREE::Codegen::StoreToBufferOp>(foralluser);
-      if (!storeToBufferOp)
+      if (!storeToBufferOp) {
         return failure();
+      }
       MemRefType bufferType = storeToBufferOp.getBuffer().getType();
       if (failed(memref::ExpandShapeOp::computeExpandedType(
-              bufferType, expandedDestShape, reIndices)))
+              bufferType, expandedDestShape, reIndices))) {
         return failure();
+      }
     }
 
     // This allows us to assume that the extract/inserts in the loop are
