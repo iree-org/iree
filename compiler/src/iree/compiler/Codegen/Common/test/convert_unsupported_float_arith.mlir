@@ -146,9 +146,9 @@ func.func @truncf_cpu_f32_to_f8e5m2fnuz(%arg0 : f32) -> f8E5M2FNUZ attributes
 // CHECK:         %[[EXT:.*]] = arith.extui %[[BITCAST]] : i8 to i32
 // CHECK:         arith.shrui %[[EXT]]
 // CHECK:         arith.andi
-// CHECK:         arith.addi
-// CHECK:         arith.shli
-// CHECK:         arith.ori
+// Denormal handling uses uitofp + mulf instead of enumeration.
+// CHECK:         arith.uitofp {{.*}} : i32 to f32
+// CHECK:         arith.mulf {{.*}} : f32
 // CHECK:         arith.select
 // CHECK:         %[[RESULT:.*]] = arith.bitcast %{{.*}} : i32 to f32
 // CHECK:         return %[[RESULT]] : f32
@@ -185,6 +185,9 @@ func.func @truncf_cpu_vector_f32_to_f8e5m2fnuz(%arg0 : vector<4xf32>) -> vector<
 // CHECK:         %[[EXT:.*]] = arith.extui %[[BITCAST]] : vector<4xi8> to vector<4xi32>
 // CHECK:         arith.shrui
 // CHECK:         arith.andi
+// Denormal handling uses uitofp + mulf.
+// CHECK:         arith.uitofp {{.*}} : vector<4xi32> to vector<4xf32>
+// CHECK:         arith.mulf {{.*}} : vector<4xf32>
 // CHECK:         %[[RESULT:.*]] = arith.bitcast %{{.*}} : vector<4xi32> to vector<4xf32>
 // CHECK:         return %[[RESULT]] : vector<4xf32>
 func.func @extf_cpu_vector_f8e5m2fnuz_to_f32(%arg0 : vector<4xf8E5M2FNUZ>) -> vector<4xf32> attributes
@@ -217,6 +220,9 @@ func.func @truncf_cpu_f32_to_f8e4m3fnuz(%arg0 : f32) -> f8E4M3FNUZ attributes
 // CHECK-SAME:    (%[[ARG0:.*]]: f8E4M3FNUZ) -> f32
 // CHECK:         %[[BITCAST:.*]] = arith.bitcast %[[ARG0]] : f8E4M3FNUZ to i8
 // CHECK:         %[[EXT:.*]] = arith.extui %[[BITCAST]] : i8 to i32
+// Denormal handling uses uitofp + mulf.
+// CHECK:         arith.uitofp {{.*}} : i32 to f32
+// CHECK:         arith.mulf {{.*}} : f32
 // CHECK:         %[[RESULT:.*]] = arith.bitcast %{{.*}} : i32 to f32
 // CHECK:         return %[[RESULT]] : f32
 func.func @extf_cpu_f8e4m3fnuz_to_f32(%arg0 : f8E4M3FNUZ) -> f32 attributes

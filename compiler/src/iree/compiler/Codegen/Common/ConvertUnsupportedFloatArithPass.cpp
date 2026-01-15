@@ -174,10 +174,13 @@ public:
       : rewriter(rewriter), loc(loc), vecType(dyn_cast<VectorType>(type)) {
     Type i32ScalarType = rewriter.getI32Type();
     Type i8ScalarType = rewriter.getI8Type();
+    Type f32ScalarType = rewriter.getF32Type();
     i32Type = vecType ? VectorType::get(vecType.getShape(), i32ScalarType)
                       : i32ScalarType;
     i8Type = vecType ? VectorType::get(vecType.getShape(), i8ScalarType)
                      : i8ScalarType;
+    f32Type = vecType ? VectorType::get(vecType.getShape(), f32ScalarType)
+                      : f32ScalarType;
   }
 
   /// Creates an i32 constant, splatted if working with vectors.
@@ -188,6 +191,16 @@ public:
       return rewriter.createOrFold<arith::ConstantOp>(loc, i32Type, splatAttr);
     }
     return rewriter.createOrFold<arith::ConstantOp>(loc, i32Type, attr);
+  }
+
+  /// Creates an f32 constant, splatted if working with vectors.
+  Value createF32Const(float value) {
+    auto attr = rewriter.getF32FloatAttr(value);
+    if (vecType) {
+      auto splatAttr = SplatElementsAttr::get(cast<ShapedType>(f32Type), attr);
+      return rewriter.createOrFold<arith::ConstantOp>(loc, f32Type, splatAttr);
+    }
+    return rewriter.createOrFold<arith::ConstantOp>(loc, f32Type, attr);
   }
 
   /// Extracts sign, exponent, and mantissa from an f32 value (as i32 bits).
@@ -232,6 +245,7 @@ public:
 
   Type getI32Type() const { return i32Type; }
   Type getI8Type() const { return i8Type; }
+  Type getF32Type() const { return f32Type; }
 
 private:
   RewriterBase &rewriter;
@@ -239,6 +253,7 @@ private:
   VectorType vecType;
   Type i32Type;
   Type i8Type;
+  Type f32Type;
 };
 
 //===----------------------------------------------------------------------===//
@@ -492,18 +507,12 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
 /// Emulates arith.extf from fp8 to f32 using integer bit manipulation.
 /// This implementation follows IREE's runtime/src/iree/base/internal/math.h.
 ///
-/// The runtime uses ldexpf() for denormals:
-///   return sign * ldexpf(mantissa, 1 - bias - mantissa_bits);
-///
-/// Since we can't use ldexpf in MLIR, we enumerate all possible denormal
-/// mantissa values (only 3-7 values for fp8) and compute their f32
-/// representations at pattern-match time. At runtime, we select the
-/// correct precomputed value based on the input mantissa.
+/// For normal values: adjust exponent bias and shift mantissa.
 ///
 /// For denormals (exp=0, mantissa!=0):
 ///   value = mantissa * 2^(1 - bias - mantissa_bits)
-///   f32_exp = kF32Bias + 1 - src_bias - src_mantissa_bits + leading_bit_pos
-///   f32_mantissa = (mantissa - leading_bit) << (23 - leading_bit_pos)
+/// We implement this using uitofp + mulf with a precomputed scale factor,
+/// which is simpler and more general than enumerating all possible values.
 struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
   using Base::Base;
 
@@ -614,58 +623,17 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
             normalF32Mant));
 
     // For denormals: value = mantissa * 2^(1 - bias - mant_bits)
-    // We need to find the leading 1 bit and normalize.
-    // For small mant_bits (2-3), we can enumerate cases.
-    //
-    // The arithmetic exponent for denormals is: 1 - bias
-    // For mantissa M with leading bit at position P (0-indexed from LSB):
-    //   f32_exp = f32_bias + (1 - src_bias) + P - src_mant_bits
-    //           = f32_bias + 1 - src_bias + P - src_mant_bits
-    //   f32_mant = (M - (1 << P)) << (f32_mant_bits - P)
-    //
-    // Simplified: f32_exp = 127 + 1 - src_bias - src_mant_bits + P
-    //                     = 128 - src_bias - src_mant_bits + P
-    int denormalBaseExp = 128 - srcInfo.bias - srcInfo.mantBits;
-
-    // Enumerate all possible denormal mantissa values and precompute their f32
-    // bit representations. We use enumeration instead of ldexpf() because:
-    //   1. MLIR arith dialect has no ldexp op (would need math dialect).
-    //      However, the pass is intended to be run late in the pipeline where
-    //      math dialect ops may not be allowed.
-    //   2. Our pattern works in integer domain (bit manipulation on i32).
-    //   3. fp8 has only 3-7 possible denormal values, so enumeration is
-    //      practical.
-    // For mantissa_bits=2 (E5M2): mantissa ∈ {1, 2, 3}
-    // For mantissa_bits=3 (E4M3): mantissa ∈ {1, 2, 3, 4, 5, 6, 7}
-    Value denormalResult = c0;
-    for (int m = (1 << srcInfo.mantBits) - 1; m >= 1; --m) {
-      // Find leading bit position P (0-indexed).
-      int leadingBitPos = 0;
-      for (int i = srcInfo.mantBits - 1; i >= 0; --i) {
-        if (m & (1 << i)) {
-          leadingBitPos = i;
-          break;
-        }
-      }
-
-      // Compute f32 representation for this denormal mantissa.
-      int f32Exp = denormalBaseExp + leadingBitPos;
-      // Remove leading 1 bit and shift to f32 mantissa position.
-      int mantWithoutLeading = m - (1 << leadingBitPos);
-      int f32Mant = mantWithoutLeading << (kF32MantBits - leadingBitPos);
-      int f32Bits = (f32Exp << kF32MantBits) | f32Mant;
-
-      Value cMantVal = helper.createI32Const(m);
-      Value cF32Bits = helper.createI32Const(f32Bits);
-      Value mantMatches = arith::CmpIOp::create(
-          rewriter, loc, arith::CmpIPredicate::eq, mantSrc, cMantVal);
-
-      // Add sign to the f32 value.
-      Value signedF32Bits =
-          arith::OrIOp::create(rewriter, loc, f32Sign, cF32Bits);
-      denormalResult = arith::SelectOp::create(rewriter, loc, mantMatches,
-                                               signedF32Bits, denormalResult);
-    }
+    // Use mulf with a precomputed scale factor instead of enumerating values.
+    Value mantF32 =
+        arith::UIToFPOp::create(rewriter, loc, helper.getF32Type(), mantSrc);
+    float scaleValue = std::ldexp(1.0f, 1 - srcInfo.bias - srcInfo.mantBits);
+    Value scale = helper.createF32Const(scaleValue);
+    Value denormalF32 = arith::MulFOp::create(rewriter, loc, mantF32, scale);
+    // Apply sign: bitcast to i32, OR with sign bit.
+    Value denormalI32 = arith::BitcastOp::create(
+        rewriter, loc, helper.getI32Type(), denormalF32);
+    Value denormalResult =
+        arith::OrIOp::create(rewriter, loc, f32Sign, denormalI32);
 
     // Select cascade for final result (same ordering logic as TruncF).
     // Later selects override earlier ones. NaN must be last (highest priority).
