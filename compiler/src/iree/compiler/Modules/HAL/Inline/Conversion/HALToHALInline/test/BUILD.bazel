@@ -15,6 +15,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "buffer_ops.mlir",
             "buffer_view_ops.mlir",

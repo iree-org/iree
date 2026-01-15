@@ -15,6 +15,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "sparse_interface_methods.mlir",
             "sparse_interface_methods_estimated_loop_range_fail.mlir",

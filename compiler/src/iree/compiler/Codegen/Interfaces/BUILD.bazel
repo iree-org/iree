@@ -22,11 +22,12 @@ exports_files([
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "PartitionableLoopsInterface.td",
             "ProcessorOpInterfaces.td",
-            "UKernelOpInterface.td",
             "TensorMaskingOpInterface.td",
+            "UKernelOpInterface.td",
         ],
         include = ["*.td"],
     ),
