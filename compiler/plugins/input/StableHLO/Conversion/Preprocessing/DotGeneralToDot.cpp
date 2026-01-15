@@ -65,8 +65,9 @@ Value transposeReshape(Value arg, Location loc,
   auto transposeType = RankedTensorType::get(transposedShape, elementType);
   Value transposeResult = mlir::stablehlo::TransposeOp::create(
       rewriter, loc, transposeType, arg, transposePermutationAttr);
-  if (noReshape)
+  if (noReshape) {
     return transposeResult;
+  }
 
   // Return the final result.
   auto reshapedType = RankedTensorType::get({leftSize, rightSize}, elementType);
@@ -176,12 +177,14 @@ struct GeneralDotRemoveBatch final
 
     // We no longer include the batch dimension of 1.
     llvm::SmallVector<int64_t> newLhsContractingDims;
-    for (auto dim : dimNumbers.getLhsContractingDimensions())
+    for (auto dim : dimNumbers.getLhsContractingDimensions()) {
       newLhsContractingDims.push_back(dim - 1);
+    }
 
     llvm::SmallVector<int64_t> newRhsContractingDims;
-    for (auto dim : dimNumbers.getRhsContractingDimensions())
+    for (auto dim : dimNumbers.getRhsContractingDimensions()) {
       newRhsContractingDims.push_back(dim - 1);
+    }
 
     auto lhs = mlir::stablehlo::ReshapeOp::create(
         rewriter, op.getLoc(), lhsTy.clone(lhsTy.getShape().drop_front()),
@@ -231,8 +234,9 @@ struct GeneralDotConvert final
 
     ArrayAttr precisionConfig;
     auto opPrecisionConfig = op.getPrecisionConfig();
-    if (opPrecisionConfig.has_value())
+    if (opPrecisionConfig.has_value()) {
       precisionConfig = *opPrecisionConfig;
+    }
 
     auto resultTy = cast<ShapedType>(op.getType());
 
@@ -246,8 +250,9 @@ struct GeneralDotConvert final
 
     RankedTensorType lhsTy = dyn_cast<RankedTensorType>(lhs.getType());
     RankedTensorType rhsTy = dyn_cast<RankedTensorType>(rhs.getType());
-    if (!lhsTy || !rhsTy)
+    if (!lhsTy || !rhsTy) {
       return failure();
+    }
 
     // The StableHLO dot operator directly supports a vector dot product
     // (two vectors reduce into a scalar) as well as a matrix vector
@@ -295,8 +300,9 @@ struct GeneralDotConvert final
     // For any sparse situation, don't use any of the following rules, since
     // transposing and reshaping is not without cost. Instead, rely on the
     // default linalg lowering that follows later in the pipeline.
-    if (sparse_tensor::hasAnySparseOperandOrResult(op))
+    if (sparse_tensor::hasAnySparseOperandOrResult(op)) {
       return failure();
+    }
 
     // Compute the, possibly, transposed-reshaped operands.
     lhs = cast<mlir::TypedValue<mlir::RankedTensorType>>(processDotArg(
@@ -307,8 +313,9 @@ struct GeneralDotConvert final
     // Accept only static shaped types.
     auto lhsShapeType = dyn_cast_if_present<ShapedType>(lhs.getType());
     auto rhsShapeType = dyn_cast_if_present<ShapedType>(rhs.getType());
-    if (!lhsShapeType || !rhsShapeType)
+    if (!lhsShapeType || !rhsShapeType) {
       return failure();
+    }
 
     // Generate new dot operator on expanded types.
     ShapedType newTy = RankedTensorType::get(

@@ -193,8 +193,9 @@ struct HouseholderReflectorRewriter final
           Value householder = computeHouseholderSlice(matrix, tau, iv, b);
 
           std::vector<int64_t> batch(rank - 2);
-          for (int i = 0; i < rank - 2; ++i)
+          for (int i = 0; i < rank - 2; ++i) {
             batch[i] = i;
+          }
           std::vector<int64_t> lhsContract = {rank - 1};
           std::vector<int64_t> rhsContract = {rank - 2};
 

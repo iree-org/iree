@@ -97,8 +97,9 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
                                                     OpBuilder &builder) {
   IndexSet indexSet(loc, builder);
   Value noColor = indexSet.get(-1);
-  if (!groups)
+  if (!groups) {
     return std::make_pair(noColor, noColor);
+  }
 
   auto groupsType = cast<RankedTensorType>(groups.getType());
   assert(groupsType.getRank() == 2);
@@ -311,8 +312,9 @@ static Value createChannelWithGroupInfo(
     DenseIntElementsAttr replicaGroups, std::optional<bool> useGlobalDeviceIds,
     OpBuilder &builder) {
   // Set numPartitions to 1 if not set by the user.
-  if (numPartitions == -1)
+  if (numPartitions == -1) {
     numPartitions = 1;
+  }
 
   // Base channel that may be split by the group info.
   Value baseChannel = IREE::Flow::ChannelDefaultOp::create(
@@ -854,8 +856,9 @@ struct CollectivePermuteOpConversion
     int64_t numParticipants = mode == CollectiveOpGroupMode::CrossReplica
                                   ? numReplicas
                                   : numPartitions;
-    if (numParticipants == -1)
+    if (numParticipants == -1) {
       numParticipants = 1;
+    }
     SmallVector<Attribute> replicaGroups;
     for (int64_t i = 0; i < numParticipants; ++i) {
       replicaGroups.push_back(rewriter.getI64IntegerAttr(i));

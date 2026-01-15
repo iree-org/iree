@@ -54,8 +54,9 @@ public:
     // or install directories) for common tools.
     std::string toolPath = findToolFromExecutableDir(
         {"wasm-ld", "iree-lld", "lld", "ld.lld", "lld-link"});
-    if (!toolPath.empty())
+    if (!toolPath.empty()) {
       return toolPath;
+    }
 
     llvm::errs() << "No Wasm linker tool specified or discovered\n";
     return "";
@@ -131,8 +132,9 @@ public:
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine)))
+    if (failed(runLinkCommand(commandLine))) {
       return std::nullopt;
+    }
     return artifacts;
   }
 };
