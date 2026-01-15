@@ -146,6 +146,25 @@ iree_bitcode_library(
     "-march=armv8.2-a+i8mm"
 )
 
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_arch_arm_64_sve_i8mm
+  ARCH
+    arm_64
+  INTERNAL_HDRS
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_arm_64.h"
+    "mmt4d_arm_64_internal.h"
+    "mmt4d_arm_64_tiles.inl"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
+  SRCS
+    "mmt4d_arm_64_sve_i8mm.c"
+  COPTS
+    "-march=armv8.2-a+sve+i8mm"
+)
+
 iree_link_bitcode(
   NAME
     ukernel_bitcode_arch_arm_64
@@ -157,6 +176,7 @@ iree_link_bitcode(
     "ukernel_bitcode_arch_arm_64_fp16fml.bc"
     "ukernel_bitcode_arch_arm_64_fullfp16.bc"
     "ukernel_bitcode_arch_arm_64_i8mm.bc"
+    "ukernel_bitcode_arch_arm_64_sve_i8mm.bc"
 
 )
 
@@ -194,12 +214,17 @@ iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_I8MM
   CLANG_OR_GCC
     "-march=armv8.2-a+i8mm"
 )
+iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_SVE_I8MM
+  CLANG_OR_GCC
+    "-march=armv8.2-a+sve+i8mm"
+)
 
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_FULLFP16}" IREE_UK_BUILD_ARM_64_FULLFP16)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_FP16FML}" IREE_UK_BUILD_ARM_64_FP16FML)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_BF16}" IREE_UK_BUILD_ARM_64_BF16)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_DOTPROD}" IREE_UK_BUILD_ARM_64_DOTPROD)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_I8MM}" IREE_UK_BUILD_ARM_64_I8MM)
+check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_SVE_I8MM}" IREE_UK_BUILD_ARM_64_SVE_I8MM)
 configure_file("config_arm_64.h.in" "config_arm_64.h")
 
 iree_cc_library(
@@ -283,6 +308,20 @@ iree_cc_library(
 )
 list(APPEND IREE_UK_ARM_64_DEPS "::arm_64_i8mm")
 endif()  # IREE_UK_BUILD_ARM_64_I8MM
+
+if(IREE_UK_BUILD_ARM_64_SVE_I8MM)
+iree_cc_library(
+  NAME
+    arm_64_sve_i8mm
+  SRCS
+    "mmt4d_arm_64_sve_i8mm.c"
+  COPTS
+    "${IREE_UK_COPTS_ARM_64_SVE_I8MM}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_ARM_64_DEPS "::arm_64_sve_i8mm")
+endif()  # IREE_UK_BUILD_ARM_64_SVE_I8MM
 
 iree_cc_library(
   NAME
