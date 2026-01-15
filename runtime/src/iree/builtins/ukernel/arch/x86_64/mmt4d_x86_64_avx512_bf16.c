@@ -7,7 +7,8 @@
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
 #include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_internal.h"
 
-#if defined(IREE_UK_COMPILER_CLANG) && !defined(IREE_UK_COMPILER_MSVC)
+#if defined(IREE_UK_COMPILER_CLANG) && !defined(IREE_UK_COMPILER_MSVC) && \
+    !IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(20, 0)
 // This inline-asm function is a work-around for:
 // 1. https://github.com/llvm/llvm-project/issues/68117
 //    Summary: LLVM crash affecting Clang 16-17. Fixed in Clang 18.
