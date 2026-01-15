@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -412,6 +413,8 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
       };
   linalg::populateFoldReshapeOpsByExpansionPatterns(bubbleExpandShapePatterns,
                                                     bubbleUpExpansionControlFn);
+  IREE::Codegen::populateFoldReshapeOpsByExpansionPatterns(
+      bubbleExpandShapePatterns, bubbleUpExpansionControlFn);
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
