@@ -208,6 +208,28 @@ public:
     return {sign, biasedExp, mantissa};
   }
 
+  /// Adds a bias to input for round-to-nearest-even before right-shifting.
+  /// This matches runtime/src/iree/base/internal/math.h's bias_to_nearest_even:
+  ///   even_bit = 1 << shift_amount
+  ///   odd_bit = even_bit >> 1
+  ///   bias = (input & even_bit) ? odd_bit : (odd_bit - 1)
+  ///   return input + bias
+  ///
+  /// The caller should right-shift the result by shift_amount after this call.
+  Value biasForRoundToNearestEven(Value input, Value shiftAmount) {
+    Value c0 = createI32Const(0);
+    Value c1 = createI32Const(1);
+    Value evenBit = arith::ShLIOp::create(rewriter, loc, c1, shiftAmount);
+    Value oddBit = arith::ShRUIOp::create(rewriter, loc, evenBit, c1);
+    Value oddBitMinus1 = arith::SubIOp::create(rewriter, loc, oddBit, c1);
+    Value hasEvenBit = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::ne,
+        arith::AndIOp::create(rewriter, loc, input, evenBit), c0);
+    Value bias = arith::SelectOp::create(rewriter, loc, hasEvenBit, oddBit,
+                                         oddBitMinus1);
+    return arith::AddIOp::create(rewriter, loc, input, bias);
+  }
+
   Type getI32Type() const { return i32Type; }
   Type getI8Type() const { return i8Type; }
 
@@ -287,11 +309,6 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     Value cNaN = helper.createI32Const(dstInfo.nanEncoding);
     Value cDstSignMask = helper.createI32Const(dstInfo.signMask);
 
-    // For round-to-nearest-even.
-    Value cEvenBit = helper.createI32Const(1 << mantShift);
-    Value cOddBit = helper.createI32Const(1 << (mantShift - 1));
-    Value cOddBitMinus1 = helper.createI32Const((1 << (mantShift - 1)) - 1);
-
     // Bitcast f32 to i32 and extract fields.
     Value i32Val = arith::BitcastOp::create(rewriter, loc, helper.getI32Type(),
                                             op.getIn());
@@ -333,19 +350,8 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     Value isUnderflow = arith::CmpIOp::create(
         rewriter, loc, arith::CmpIPredicate::sle, biasedDstExp, c0);
 
-    // === Normal case with round-to-nearest-even ===
-    // Implement round-to-nearest-even by checking the LSB (even_bit).
-    // If even_bit is set, add odd_bit (round up at tie).
-    // If even_bit is clear, add odd_bit - 1 (round down at tie).
-    Value mantHasEvenBit = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::ne,
-        arith::AndIOp::create(rewriter, loc, f32Mant, cEvenBit), c0);
-    Value roundingBias = arith::SelectOp::create(rewriter, loc, mantHasEvenBit,
-                                                 cOddBit, cOddBitMinus1);
-    Value biasedMant =
-        arith::AddIOp::create(rewriter, loc, f32Mant, roundingBias);
-
     // Check if rounding caused mantissa overflow (carry into exponent).
+    Value biasedMant = helper.biasForRoundToNearestEven(f32Mant, cMantShift);
     Value mantOverflowed = arith::CmpIOp::create(
         rewriter, loc, arith::CmpIPredicate::ugt, biasedMant, cF32MantMask);
     biasedDstExp = arith::SelectOp::create(
@@ -372,7 +378,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
         rewriter, loc, arith::OrIOp::create(rewriter, loc, dstSign, dstExp),
         dstMant);
 
-    // === Underflow case: generate subnormal or zero ===
+    // Underflow case: generate subnormal or zero.
     // For subnormals, dst_exp = 0 and mantissa encodes the value.
     // shift_amount = f32_mant_bits - dst_mant_bits - arithmetic_exp + (1 -
     // dst_bias)
@@ -387,15 +393,9 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     Value effectiveMant =
         arith::OrIOp::create(rewriter, loc, f32Mant, cImplicitBit);
 
-    // Compute rounding term for subnormal.
-    // NOTE: This uses simple "round to nearest" (not "round to nearest even")
-    // to match the runtime's math.h implementation. The runtime only uses
-    // round-to-nearest-even for normal values, not subnormals.
-    Value subnormalRoundBit = arith::ShLIOp::create(
-        rewriter, loc, c1,
-        arith::SubIOp::create(rewriter, loc, shiftAmount, c1));
+    // Compute round-to-nearest-even for subnormal.
     Value subnormalMantRounded =
-        arith::AddIOp::create(rewriter, loc, effectiveMant, subnormalRoundBit);
+        helper.biasForRoundToNearestEven(effectiveMant, shiftAmount);
 
     // Shift to get subnormal mantissa.
     Value subnormalMant = arith::ShRUIOp::create(
@@ -416,7 +416,6 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
         dstInfo.nanAsNegZero ? c0 : dstSign, // Zero (signed if supported)
         subnormalResult);
 
-    // =========================================================================
     // Select cascade for final result.
     //
     // Unlike runtime code which uses early returns, SSA form requires computing
@@ -427,11 +426,10 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     // Priority (lowest to highest):
     //   1. Normal/subnormal computation (base case)
     //   2. Source zero/subnormal -> zero
-    //   3. Negative zero correction (FNUZ only, must be before NaN handling!)
+    //   3. Negative zero correction (FNUZ only, must be before NaN handling.)
     //   4. Overflow -> Inf or NaN
     //   5. Source Inf -> Inf or NaN
     //   6. Source NaN -> NaN (highest priority, always wins)
-    // =========================================================================
     Value result = arith::SelectOp::create(rewriter, loc, isUnderflow,
                                            subnormalResult, normalResult);
 
@@ -441,7 +439,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
                                      result);
 
     // FNUZ: Negative zero (0x80) must become positive zero (0x00).
-    // CRITICAL: This must happen BEFORE NaN/Inf/overflow handling!
+    // CRITICAL: This must happen BEFORE NaN/Inf/overflow handling.
     // For FNUZ types, 0x80 is the NaN encoding, not negative zero.
     // If we did this after, we would incorrectly convert NaN to zero.
     if (dstInfo.nanAsNegZero) {
@@ -602,7 +600,7 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
     Value isDenormal =
         arith::AndIOp::create(rewriter, loc, expIsZero, mantIsNonZero);
 
-    // === Normal value conversion ===
+    // Normal value conversion:
     // f32_exp = src_exp + bias_diff, f32_mant = src_mant << mant_shift
     Value normalF32Exp =
         arith::AddIOp::create(rewriter, loc, biasedExpSrc, cBiasDiff);
@@ -615,7 +613,6 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
             arith::ShLIOp::create(rewriter, loc, normalF32Exp, cF32MantBits),
             normalF32Mant));
 
-    // === Denormal value conversion ===
     // For denormals: value = mantissa * 2^(1 - bias - mant_bits)
     // We need to find the leading 1 bit and normalize.
     // For small mant_bits (2-3), we can enumerate cases.
@@ -670,10 +667,8 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
                                                signedF32Bits, denormalResult);
     }
 
-    // =========================================================================
     // Select cascade for final result (same ordering logic as TruncF).
     // Later selects override earlier ones. NaN must be last (highest priority).
-    // =========================================================================
     Value result = arith::SelectOp::create(rewriter, loc, isDenormal,
                                            denormalResult, normalResult);
 

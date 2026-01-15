@@ -246,8 +246,8 @@ func.func @negzero_mul_f8E4M3FN() {
 //   3.25 (halfway between 3.0 and 3.5) → 3.0 (even)
 //
 // Without round-to-nearest-even (e.g., round-half-away-from-zero):
-//   2.25 → 2.5 (wrong!)
-//   3.25 → 3.5 (wrong!)
+//   2.25 → 2.5 (wrong)
+//   3.25 → 3.5 (wrong)
 //===----------------------------------------------------------------------===//
 
 // Test: Round-to-nearest-even at tie points for f8E5M2FNUZ.
@@ -302,5 +302,42 @@ func.func @truncf_denormal_f8E5M2FNUZ() {
   %result_i8 = arith.bitcast %truncated : tensor<2xf8E5M2FNUZ> to tensor<2xi8>
   // Should be denormal encodings 0x01 and 0x03, not 0.
   check.expect_eq_const(%result_i8, dense<[1, 3]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}
+
+//===----------------------------------------------------------------------===//
+// Round-to-nearest-even tests for denormals.
+// These tests verify IEEE 754 round-to-nearest-even for denormal generation.
+// This matches runtime/src/iree/base/internal/math.h's bias_to_nearest_even.
+//
+// For f8E4M3FN (bias=7, 3 mantissa bits):
+//   Denormal value = mantissa * 2^(1-7-3) = mantissa / 512
+//   Tie points: 1.5/512, 2.5/512, 3.5/512, etc.
+//
+// Round-to-nearest-even at tie points:
+//   1.5/512 (tie between 1 and 2) → 2 (even mantissa)
+//   2.5/512 (tie between 2 and 3) → 2 (even mantissa)
+//   3.5/512 (tie between 3 and 4) → 4 (even mantissa)
+//
+// Without round-to-nearest-even (simple round-to-nearest):
+//   2.5/512 → 3 (wrong! should be 2)
+//===----------------------------------------------------------------------===//
+
+// Test: Round-to-nearest-even for denormal generation in f8E4M3FN.
+func.func @round_to_nearest_even_denormal_f8E4M3FN() {
+  // Test values: exact denormals and tie points
+  // 1/512 = 0.001953125 → 0x01 (exact)
+  // 1.5/512 = 0.0029296875 → 0x02 (tie → even)
+  // 2/512 = 0.00390625 → 0x02 (exact)
+  // 2.5/512 = 0.0048828125 → 0x02 (tie → even, NOT 3.)
+  // 3/512 = 0.005859375 → 0x03 (exact)
+  // 3.5/512 = 0.0068359375 → 0x04 (tie → even)
+  %denormal_inputs = util.unfoldable_constant dense<[
+    0.001953125, 0.0029296875, 0.00390625, 0.0048828125, 0.005859375, 0.0068359375
+  ]> : tensor<6xf32>
+  %truncated = arith.truncf %denormal_inputs : tensor<6xf32> to tensor<6xf8E4M3FN>
+  %result_i8 = arith.bitcast %truncated : tensor<6xf8E4M3FN> to tensor<6xi8>
+  // Key test: 2.5/512 (index 3) should be 2, not 3
+  check.expect_eq_const(%result_i8, dense<[1, 2, 2, 2, 3, 4]> : tensor<6xi8>) : tensor<6xi8>
   return
 }
