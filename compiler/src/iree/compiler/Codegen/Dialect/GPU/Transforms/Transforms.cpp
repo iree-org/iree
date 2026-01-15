@@ -2097,10 +2097,7 @@ void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
 namespace {
 struct FoldSwizzleHintOpWithExtractSliceOp final
     : OpRewritePattern<tensor::ExtractSliceOp> {
-  FoldSwizzleHintOpWithExtractSliceOp(MLIRContext *ctx,
-                                      PatternBenefit benefit = 1)
-      : OpRewritePattern(ctx, benefit) {}
-
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     // Check for swizzle_hint op source.
@@ -2138,9 +2135,7 @@ struct FoldSwizzleHintOpWithExtractSliceOp final
 
 template <typename ReshapeOp>
 struct FoldSwizzleHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
-  FoldSwizzleHintOpWithReshapeOp(MLIRContext *ctx, PatternBenefit benefit = 1)
-      : OpRewritePattern<ReshapeOp>(ctx, benefit) {}
-
+  using OpRewritePattern<ReshapeOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(ReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
     auto swizzleHintOp =
