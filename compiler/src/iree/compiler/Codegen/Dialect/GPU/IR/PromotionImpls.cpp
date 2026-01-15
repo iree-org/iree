@@ -133,16 +133,17 @@ Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
 /// The difference is this also assigns a `iree_codegen.swizzle_hint` op
 /// to the generated `tensor.empty` op.
 /// For example:
-///
+/// ```mlir
 ///   %2 = linalg.matmul ins(%0, %1)
-///
+/// ```
 /// becomes
-///
+/// ```mlir
 ///   %empty = tensor.empty()
 ///   %swizzle = iree_codegen.swizzle_hint %empty[...]
 ///   %copy = linalg.copy %1 to %swizzle {
 ///     lowering_config = #iree_gpu.{derived_thread_config|use_global_dma}}
 ///   linalg.matmul ins(%0, %copy)
+/// ```
 Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr,
                            Codegen::SwizzleAttrInterface swizzle) {
