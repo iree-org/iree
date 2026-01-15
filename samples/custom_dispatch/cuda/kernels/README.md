@@ -75,11 +75,11 @@ nvcc ... (TODO, see CMakeLists.txt) -o kernels_sm_80.ptx
           #hal.pipeline.binding<storage_buffer, ReadOnly>,
           #hal.pipeline.binding<storage_buffer, ReadOnly>,
           #hal.pipeline.binding<storage_buffer>
-        ]>) attributes {workgroup_size = [64 : index, 1 : index, 1 : index]} count(%device: !hal.device, %workload: index) -> (index, index, index) {
+        ]>) count(%device: !hal.device, %workload: index) -> (index, index, index) {
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
       %c1 = arith.constant 1 : index
       hal.return %x, %c1, %c1 : index, index, index
-    }
+    } attributes {workgroup_size = [64 : index, 1 : index, 1 : index]}
   }
 ```
 

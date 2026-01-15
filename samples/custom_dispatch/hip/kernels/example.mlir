@@ -70,11 +70,7 @@ module @example attributes {hal.device.targets = [#rocm_target]} {
           #hal.pipeline.binding<storage_buffer, ReadOnly>,
           #hal.pipeline.binding<storage_buffer, ReadOnly>,
           #hal.pipeline.binding<storage_buffer>
-        ]>) attributes {
-      // Certain backends (like ROCM) require a workgroup size (aka block
-      // size) to be defined ahead of time.
-      workgroup_size = [64 : index, 1 : index, 1 : index]
-    } count(%device: !hal.device, %workload: index) -> (index, index, index) {
+        ]>) count(%device: !hal.device, %workload: index) -> (index, index, index) {
       // This host function is used to compute the XYZ workgroup count
       // dispatched at runtime. It can query the %device for capabilities
       // and limits (shared memory size, etc). The other arguments are the
@@ -83,6 +79,10 @@ module @example attributes {hal.device.targets = [#rocm_target]} {
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
       %c1 = arith.constant 1 : index
       hal.return %x, %c1, %c1 : index, index, index
+    } attributes {
+      // Certain backends (like ROCM) require a workgroup size (aka block
+      // size) to be defined ahead of time.
+      workgroup_size = [64 : index, 1 : index, 1 : index]
     }
 
     // Similar to the above but in-place by using a read/write binding.
@@ -90,12 +90,12 @@ module @example attributes {hal.device.targets = [#rocm_target]} {
         layout(#hal.pipeline.layout<constants = 1, bindings = [
           #hal.pipeline.binding<storage_buffer, ReadOnly>,
           #hal.pipeline.binding<storage_buffer>
-        ]>) attributes {
-      workgroup_size = [64 : index, 1 : index, 1 : index]
-    } count(%device: !hal.device, %workload: index) -> (index, index, index) {
+        ]>) count(%device: !hal.device, %workload: index) -> (index, index, index) {
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
       %c1 = arith.constant 1 : index
       hal.return %x, %c1, %c1 : index, index, index
+    } attributes {
+      workgroup_size = [64 : index, 1 : index, 1 : index]
     }
 
   }  // hal.executable.source
