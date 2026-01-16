@@ -852,10 +852,11 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
       return getInputs().size() == 2;
     }
 
-    // Returns the index input operand. This method should only be called when
-    // the operation is in explicit-index mode.
+    // Returns the index input operand, or nullptr if not in explicit-index mode.
     Value getInputIndex() {
-      assert(hasExplicitIndexInput() && "Only valid in explicit-index mode");
+      if (!hasExplicitIndexInput()){
+        return nullptr;
+      }
       return getDpsInputOperand(1)->get();
     }
 
@@ -877,6 +878,28 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
 
     ShapedType getOutputIndexType() {
       return cast<ShapedType>(outputIndex().getType());
+    }
+
+    // Returns the ShapedType of the index input, or nullptr if not in
+    // explicit-index mode.
+    ShapedType getInputIndexType() {
+      if (Value idx = getInputIndex()) {
+        return cast<ShapedType>(idx.getType());
+      }
+      return nullptr;
+    }
+
+    // Returns the element type of the index input, or nullptr if not in
+    // explicit-index mode.
+    Type getInputIndexElementType() {
+      if (ShapedType idxType = getInputIndexType()) {
+        return idxType.getElementType();
+      }
+      return nullptr;
+    }
+
+    Type getOutputIndexElementType() {
+      return getOutputIndexType().getElementType();
     }
 
     int64_t getInputRank() {

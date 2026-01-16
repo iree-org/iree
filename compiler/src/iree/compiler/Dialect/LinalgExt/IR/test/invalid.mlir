@@ -843,7 +843,7 @@ func.func @arg_compare_explicit_index_shape_mismatch(
     %out_val: tensor<2xf32>,
     %out_idx: tensor<2xi32>
 ) -> (tensor<2xf32>, tensor<2xi32>) {
-  // expected-error@+1 {{explicit-index mode: value and index inputs must have same shape. Value shape: [2, 10], index shape: [2, 8]}}
+  // expected-error@+1 {{explicit-index mode: value and index inputs must have the same shape. Value shape: [2, 10], index shape: [2, 8]}}
   %0:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input_val, %input_idx : tensor<2x10xf32>, tensor<2x8xi32>)

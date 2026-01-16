@@ -1251,14 +1251,13 @@ LogicalResult ArgCompareOp::verify() {
   // - Implicit-index mode (1 input): Computes indices from iteration variables.
   // - Explicit-index mode (2 inputs): Uses pre-existing (value, index) pairs.
   unsigned numInputs = llvm::size(getInputs());
-  if (numInputs < 1 || numInputs > 2) {
+  if (numInputs != 1 && numInputs != 2) {
     return op->emitOpError("expected 1 or 2 input operands, but got ")
            << numInputs;
   }
 
-  bool isExplicitIndexMode = numInputs == 2;
   ShapedType inputValueType = getInputType();
-  Type inputElemType = inputValueType.getElementType();
+  Type inputValueElemType = inputValueType.getElementType();
 
   unsigned numOutputs = getNumDpsInits();
   if (numOutputs != 2) {
@@ -1269,46 +1268,49 @@ LogicalResult ArgCompareOp::verify() {
 
   auto outputValueType = getOutputValueType();
   auto outputIndexType = getOutputIndexType();
+  Type outputIndexElemType = getOutputIndexElementType();
 
-  if (isExplicitIndexMode) {
-    ShapedType inputIndexType = cast<ShapedType>(getInputIndex().getType());
+  if (hasExplicitIndexInput()) {
+    ShapedType inputIndexType = getInputIndexType();
+    Type inputIndexElemType = getInputIndexElementType();
 
-    if (failed(verifyCompatibleShape(inputValueType, inputIndexType))) {
+    if (inputValueType.getShape() != inputIndexType.getShape()) {
       return op->emitOpError(
-                 "explicit-index mode: value and index inputs must have same "
-                 "shape. ")
+                 "explicit-index mode: value and index inputs must have "
+                 "the same shape. ")
              << "Value shape: "
              << llvm::interleaved_array(inputValueType.getShape())
              << ", index shape: "
              << llvm::interleaved_array(inputIndexType.getShape());
     }
 
-    if (!isa<IntegerType, IndexType>(inputIndexType.getElementType())) {
+    if (!isa<IntegerType, IndexType>(inputIndexElemType)) {
       return op->emitOpError(
                  "explicit-index mode: index input must have integer or index "
                  "element type, but got ")
-             << inputIndexType.getElementType();
+             << inputIndexElemType;
     }
 
-    if (inputIndexType.getElementType() != outputIndexType.getElementType()) {
+    if (inputIndexElemType != outputIndexElemType) {
       return op->emitOpError(
                  "explicit-index mode: input and output index element types "
                  "must match. ")
-             << "Input index type: " << inputIndexType.getElementType()
-             << ", output index type: " << outputIndexType.getElementType();
+             << "Input index type: " << inputIndexElemType
+             << ", output index type: " << outputIndexElemType;
     }
   }
 
-  if (inputValueType.getElementType() != outputValueType.getElementType()) {
+  Type outputValueElemType = outputValueType.getElementType();
+  if (inputValueElemType != outputValueElemType) {
     return op->emitOpError("input and output value element types must match. ")
-           << "Input type: " << inputValueType.getElementType()
-           << ", output value type: " << outputValueType.getElementType();
+           << "Input type: " << inputValueElemType
+           << ", output value type: " << outputValueElemType;
   }
 
-  if (!isa<IntegerType, IndexType>(outputIndexType.getElementType())) {
+  if (!isa<IntegerType, IndexType>(outputIndexElemType)) {
     return op->emitOpError(
                "output index must have integer or index element type, but got ")
-           << outputIndexType.getElementType();
+           << outputIndexElemType;
   }
 
   if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
@@ -1351,10 +1353,10 @@ LogicalResult ArgCompareOp::verify() {
   Type arg0Type = block.getArgument(0).getType();
   Type arg1Type = block.getArgument(1).getType();
 
-  if (arg0Type != inputElemType || arg1Type != inputElemType) {
+  if (arg0Type != inputValueElemType || arg1Type != inputValueElemType) {
     return op->emitOpError(
                "comparator arguments must match input value element type. ")
-           << "Expected: " << inputElemType << ", but got: " << arg0Type
+           << "Expected: " << inputValueElemType << ", but got: " << arg0Type
            << " and " << arg1Type;
   }
 
