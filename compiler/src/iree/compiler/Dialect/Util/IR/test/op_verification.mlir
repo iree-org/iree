@@ -43,3 +43,31 @@ util.func public @assume.int.multi_operand(%arg0 : index, %arg1 : i64) -> index,
   } : (index, i64) -> (index, i64)
   util.return %0#0, %0#1 : index, i64
 }
+
+// -----
+
+// COM: This test must use generic syntax, as custom syntax wouldn't allow a wrong tied operand.
+// expected-error @+1 {{result #0 tied to invalid operand index -2}}
+"util.func"() <{function_type = (tensor<4xi32>) -> i32, sym_name = "tied_operands_invalid_negative", sym_visibility = "public", tied_operands = [-2 : index]}> ({
+^bb0(%arg0: tensor<4xi32>):
+  %0 = "arith.constant"() <{value = 0 : i32}> : () -> i32
+  "util.return"(%0) : (i32) -> ()
+}) : () -> ()
+
+// -----
+
+// COM: This test must use generic syntax, as custom syntax wouldn't allow a wrong tied operand.
+// expected-error @+1 {{result #1 tied to invalid operand index 3}}
+"util.func"() <{function_type = (i32, tensor<4xi32>, tensor<4xf32>) -> (tensor<4xi32>, tensor<4xf32>), sym_name = "tied_operands_out_of_bounds1", sym_visibility = "public", tied_operands = [1 : index, 3 : index]}> ({
+^bb0(%arg0 : i32, %arg1: tensor<4xi32>, %arg2: tensor<4xf32>):
+  "util.return"(%arg1, %arg2) : (tensor<4xi32>, tensor<4xf32>) -> ()
+}) : () -> ()
+
+// -----
+
+// COM: This test must use generic syntax, as custom syntax wouldn't allow a wrong tied operand.
+// expected-error @+1 {{result #0 tied to invalid operand index 0}}
+"util.func"() <{function_type = () -> i32, sym_name = "tied_operands_out_of_bounds2", sym_visibility = "public", tied_operands = [0 : index]}> ({
+  %0 = "arith.constant"() <{value = 0 : i32}> : () -> i32
+  "util.return"(%0) : (i32) -> ()
+}) : () -> ()
