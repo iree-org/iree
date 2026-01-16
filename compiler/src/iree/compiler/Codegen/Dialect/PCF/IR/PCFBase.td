@@ -207,6 +207,10 @@ def PCF_TestScopeAttr
       assert(false && "why are you here?");
       return {};
     }
+    int64_t getNativeNumProcessorIds() {
+      assert(false && "why are you here?");
+      return 1;
+    }
   }];
 }
 
@@ -233,6 +237,9 @@ def PCF_SequentialAttr
       Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
       SmallVector<Value> ids(numIds, zero);
       return ids;
+    }
+    int64_t getNativeNumProcessorIds() {
+      return 1;
     }
   }];
 }

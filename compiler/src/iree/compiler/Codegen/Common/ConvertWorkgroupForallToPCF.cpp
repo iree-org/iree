@@ -53,7 +53,8 @@ ConvertWorkgroupForall::matchAndRewrite(scf::ForallOp op,
   auto scope = cast<IREE::PCF::ScopeAttrInterface>(
       IREE::Codegen::WorkgroupScopeAttr::get(rewriter.getContext(),
                                              /*linearize=*/true));
-  FailureOr<IREE::PCF::LoopOp> res = convertForallToPCF(rewriter, op, scope, 1);
+  FailureOr<IREE::PCF::LoopOp> res =
+      convertForallToPCFLoop(rewriter, op, scope, 1);
   if (failed(res)) {
     return failure();
   }
