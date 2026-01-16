@@ -47,10 +47,11 @@ jobs:
             numprocesses: 1
             config-file: onnx_ops_gpu_hip_rdna3_O3.json
             runs-on: [Linux, X64, gfx1100]
-          - name: amdgpu_hip_rdna4_O3
-            numprocesses: 1
-            config-file: onnx_ops_gpu_hip_rdna4_O3.json
-            runs-on: [Linux, X64, gfx1201]
+          # TODO(#23160): Fix the onnx ops test suite for gfx1201.
+          # - name: amdgpu_hip_rdna4_O3
+          #   numprocesses: 1
+          #   config-file: onnx_ops_gpu_hip_rdna4_O3.json
+          #   runs-on: [Linux, X64, gfx1201]
           - name: amdgpu_vulkan_O0
             numprocesses: 1
             config-file: onnx_ops_gpu_vulkan_O0.json
