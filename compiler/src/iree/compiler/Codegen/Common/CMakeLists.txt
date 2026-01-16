@@ -98,6 +98,7 @@ iree_cc_library(
     "FissionTransferOpsInControlFlow.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FlattenMemRefs.cpp"
+    "FlattenSwizzleHintAllocs.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldSplitReductionAndWorkgroupMappingLoopsPass.cpp"
     "FoldTensorExtractOpPass.cpp"
