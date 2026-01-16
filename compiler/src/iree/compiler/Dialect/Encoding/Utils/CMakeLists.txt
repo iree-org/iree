@@ -21,11 +21,13 @@ iree_cc_library(
     "Utils.cpp"
   DEPS
     LLVMSupport
+    MLIRAnalysis
     MLIRArithDialect
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
     MLIRLinalgUtils
+    MLIRTensorDialect
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::IR

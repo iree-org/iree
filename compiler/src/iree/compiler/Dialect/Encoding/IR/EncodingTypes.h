@@ -67,14 +67,19 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
 /// Bundles an encoding attribute with its associated dynamic information.
 /// This is returned by interface methods that query encoding properties
 /// from operations. Dynamic values can include runtime information needed
-/// by the encoding (e.g., M, N, K dimensions for matmul encodings).
+/// by the encoding (e.g., Batch, M, N, K dimensions for matmul encodings).
 struct EncodingProperties {
   /// The encoding attribute for the operand/result.
   Attribute encoding;
   /// Dynamic values needed by the encoding. For matmul-like operations,
-  /// these typically correspond to the iteration domain dimensions (M, N, K).
-  /// TODO(#22370): Currently empty; will be populated to support dynamic
-  /// layout decisions.
+  /// these correspond to the dynamic entries in iteration_sizes, ordered
+  /// by loop dimension index. For example:
+  /// - matmul with iteration_sizes=[?, ?, ?] -> [M, N, K]
+  /// - batch_matmul with iteration_sizes=[?, ?, ?, ?] -> [Batch, M, N, K]
+  /// - matmul with iteration_sizes=[?, 128, ?] -> [M, K] (N is static)
+  ///
+  /// The order matches the loop dimensions as they appear in the operation's
+  /// indexing maps, filtered to only include dynamic dimensions.
   SmallVector<Value> dynamicValues;
 };
 
@@ -89,6 +94,9 @@ struct OpEncodingProperties {
 struct PropagationEncoding {
   SmallVector<Attribute> operandEncodings;
   SmallVector<Attribute> resultEncodings;
+  /// Dynamic encoding dimension values (e.g., M, N, K for matmul) that should
+  /// be carried through during propagation.
+  SmallVector<Value> encodingDims;
 };
 
 struct PropagationResult {
