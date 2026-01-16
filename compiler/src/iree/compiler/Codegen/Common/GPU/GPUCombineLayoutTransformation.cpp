@@ -74,7 +74,16 @@ gpuPadDistributionConfigFn(ArrayRef<int64_t> iterationBounds,
 /// the configuration phase of Codegen, so the conditions above are based on the
 /// assumption that the relayout op chain represents the tail end of a dispatch
 /// before any tiling or distribution.
-static bool gpuRelayoutCombinationControlFn(OpResult leaf) {
+///
+/// Note: This control function currently only handles map_scatter.
+/// map_gather is not yet supported in the GPU pass.
+static bool gpuRelayoutCombinationControlFn(OpResult leaf,
+                                            RelayoutOpKind kind) {
+  // TODO: Since we changed the API to include RelayoutOpKind, only handle
+  // map_scatter. Will add support for map_gather in GPU Codegen in a future PR.
+  if (kind == RelayoutOpKind::Gather) {
+    return false;
+  }
   if (leaf.getNumUses() != 1) {
     return false;
   }
