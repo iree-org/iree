@@ -1125,10 +1125,11 @@ static bool canDistributeShape(ArrayRef<int64_t> shape, int64_t groupSize) {
 //     outs(%out : tensor<16x74x64xf32>) { ... }
 //
 // Producer tiling is defined in the producer iteration space (par: d0=16,d1=74;
-// red: d2=64). Consumer indexing maps can re-associate %red such that a producer
-// reduction dim becomes a consumer indexing dim; those dims must satisfy the
-// groupSize distribution constraint directly. Here that extent is 74, which fails
-// for group size = 32, so we bail out of the reduction pipeline.
+// red: d2=64). Consumer indexing maps can re-associate %red such that a
+// producer reduction dim becomes a consumer indexing dim; those dims must
+// satisfy the groupSize distribution constraint directly. Here that extent is
+// 74, which fails for group size = 32, so we bail out of the reduction
+// pipeline.
 static bool isConsumerCompatible(linalg::LinalgOp consumerOp, Value result,
                                  SmallVector<unsigned> reductionDims,
                                  int64_t groupSize) {

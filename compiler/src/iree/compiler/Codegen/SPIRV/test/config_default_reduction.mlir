@@ -266,3 +266,4 @@ func.func @fail_reduction_with_nondistributable_consumer(
 // CHECK-LABEL: func.func @fail_reduction_with_nondistributable_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION3]]
 // CHECK-NOT: pipeline = SPIRVSubgroupReduce
+// CHECK: return
