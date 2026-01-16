@@ -741,6 +741,7 @@ def Util_FuncOp : Util_Op<"func", [
   }];
 
   let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 def Util_CallOp : Util_Op<"call", [
