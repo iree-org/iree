@@ -29,14 +29,26 @@ class ExtractSliceOp;
 
 namespace mlir::iree_compiler::IREE::PCF {
 
-// Helper to convert scf.forall ops to pcf.loop by linearizing/delinearizing
-// ids beyond |numIds| into the slowest varying id. Uses
-// DeviceMappingAttrInterface to infer the order of ids from slowest to fastest
-// varying. If |numIds| <= 0, then no linearization/delinearization is done.
+/// Converts scf.forall ops to pcf.loop by linearizing/delinearizing ids beyond
+/// |numIds| into the slowest varying id. Uses DeviceMappingAttrInterface to
+/// infer the order of ids from slowest to fastest varying. If |numIds| <= 0,
+/// then no linearization/delinearization is done.
 FailureOr<PCF::LoopOp> convertForallToPCF(RewriterBase &rewriter,
                                           scf::ForallOp forallOp,
                                           PCF::ScopeAttrInterface scope,
                                           int64_t numIds = -1);
+
+/// Converts an scf.forall operation to a nest of pcf.generic operations with
+/// an inner scf.forall handling spillover iterations.
+///
+/// Each scope in |scopes| generates one pcf.generic op (outermost first).
+/// Worker IDs are linearized, chunk bounds computed for work distribution,
+/// and delinearized back to multi-dimensional forall bounds.
+///
+/// Returns the outermost pcf.generic op on success.
+FailureOr<PCF::GenericOp>
+convertForallToGenericNest(RewriterBase &rewriter, scf::ForallOp forallOp,
+                           ArrayRef<PCF::ScopeAttrInterface> scopes);
 
 struct ConsumerFusionParams {
   // List of operands in the consumer that are fused along.

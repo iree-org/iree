@@ -9,15 +9,16 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ConvertForallToLoopsPass : Pass<"iree-pcf-convert-forall-to-loops", ""> {
-  let summary = "Converts scf.forall ops to pcf.loop";
+def TestConvertForallToLoopsPass : Pass<"iree-pcf-test-convert-forall-to-loops", ""> {
+  let summary = "Test pass for convertForallToPCF transform";
   let description = [{
-    Test pass for converting `scf.forall` ops without mapping attributes to
-    `pcf.loop` ops with sequential scope.
+    Test pass for converting `scf.forall` ops without mapping attributes or
+    with `iree_codegen.local_mapping` attributes to `pcf.loop` ops with
+    sequential scope.
 
     The input is IR containing `scf.forall` ops with tensor results and
     `tensor.parallel_insert_slice` terminators. Only forall ops without
-    mapping attributes are converted.
+    mapping attributes or with local_mapping attributes are converted.
 
     The output replaces each matching `scf.forall` with a `pcf.loop`:
     - Iteration bounds come from the forall's upper/lower bounds and steps
@@ -152,6 +153,28 @@ def ResolveTokensPass : Pass<"iree-pcf-resolve-tokens", ""> {
     Write operations (`pcf.write_slice`) are updated to enqueue writes through
     the sync scope's interface methods.
   }];
+}
+
+def TestConvertForallToGenericNestPass :
+    InterfacePass<"iree-pcf-test-convert-forall-to-generic-nest", "mlir::FunctionOpInterface"> {
+  let summary = "Test pass for convertForallToGenericNest transform";
+  let description = [{
+    Test pass that converts `scf.forall` ops to a nest of `pcf.generic` ops
+    with an inner `scf.forall` handling spillover iterations. Each scope
+    in the provided list generates one `pcf.generic` op (outermost first).
+    Worker IDs are linearized, chunk bounds computed for work distribution,
+    and delinearized back to multi-dimensional forall bounds.
+  }];
+  let options = [
+    ListOption<"scopes", "scopes", "std::string",
+               "Comma-separated list of scope names (e.g., 'sequential')">
+  ];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::PCF::PCFDialect",
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::scf::SCFDialect"
+  ];
 }
 
 #endif // IREE_CODEGEN_DIALECT_PCF_TRANSFORMS_PASSES

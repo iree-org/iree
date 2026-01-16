@@ -154,6 +154,7 @@ iree_cc_library(
     "TensorToVectorVectorizePad.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"
+    "TestConvertForallToGenericNestWorkgroup.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileAndFuseUtils.cpp"
     "TileDispatchUsingForall.cpp"
