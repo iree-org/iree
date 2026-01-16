@@ -1106,8 +1106,8 @@ static bool canDistributeShape(ArrayRef<int64_t> shape, int64_t groupSize) {
 // Since the consumer fails distribution, the reduction is also blocked and
 // the entire chain of operations stays inside the region.
 //
-// Example: consumer indexing map reassociates dims in a way that
-// breaks distribution.
+// Example: consumer indexing map permutes dims in a way that
+// breaks producer-defined distribution.
 //
 //   %red = linalg.generic {
 //     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>,
@@ -1125,7 +1125,7 @@ static bool canDistributeShape(ArrayRef<int64_t> shape, int64_t groupSize) {
 //     outs(%out : tensor<16x74x64xf32>) { ... }
 //
 // Producer tiling is defined in the producer iteration space (par: d0=16,d1=74;
-// red: d2=64). Consumer indexing maps can re-associate %red such that a
+// red: d2=64). Consumer indexing maps can reassociate %red such that a
 // producer reduction dim becomes a consumer indexing dim; those dims must
 // satisfy the groupSize distribution constraint directly. Here that extent is
 // 74, which fails for group size = 32, so we bail out of the reduction
