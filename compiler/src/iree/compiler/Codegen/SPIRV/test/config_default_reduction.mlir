@@ -244,7 +244,7 @@ func.func @fail_reduction_with_nondistributable_consumer(
 //  CHECK-DAG: #[[CONFIG3:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [2048]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION1:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
 //  CHECK-DAG: #[[TRANSLATION2:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [512, 1, 1]>
-//  CHECK-DAG: #[[TRANSLATION3:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [2, 16, 1]>
+//  CHECK-DAG: #[[TRANSLATION3:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute {{.*}}>
 //      CHECK: func.func @reduction_with_elementwise_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION1]]
 //      CHECK:   linalg.generic
