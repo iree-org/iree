@@ -24,14 +24,12 @@ struct RemoveIndexHintsPass final
     FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp.getContext());
 
-    // Collect all index_hint operations
     SmallVector<IREE::Codegen::IndexHintOp> indexHintOps;
     funcOp.walk([&](IREE::Codegen::IndexHintOp hintOp) {
       indexHintOps.push_back(hintOp);
     });
 
     for (auto hintOp : indexHintOps) {
-      // Replace hint result with the original input (pass-through)
       hintOp.getResult().replaceAllUsesWith(hintOp.getInput());
       rewriter.eraseOp(hintOp);
     }

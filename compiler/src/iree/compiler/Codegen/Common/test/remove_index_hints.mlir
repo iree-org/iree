@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-codegen-remove-index-hints))' %s | FileCheck %s
 
-// Test: index_hint with lane_constant is removed
+// Test: index_hint with lane_constant is removed.
 // CHECK-LABEL: func.func @remove_lane_constant_hint
 // CHECK-NOT: iree_codegen.index_hint
 // CHECK: return %arg0
@@ -11,7 +11,7 @@ func.func @remove_lane_constant_hint(%arg0: index) -> index {
 
 // -----
 
-// Test: index_hint with lane_increment is removed
+// Test: index_hint with lane_increment is removed.
 // CHECK-LABEL: func.func @remove_lane_increment_hint
 // CHECK-NOT: iree_codegen.index_hint
 // CHECK: return %arg0
@@ -22,7 +22,7 @@ func.func @remove_lane_increment_hint(%arg0: index) -> index {
 
 // -----
 
-// Test: Multiple hints in sequence are all removed
+// Test: Multiple hints in sequence are all removed.
 // CHECK-LABEL: func.func @remove_multiple_hints
 // CHECK-NOT: iree_codegen.index_hint
 // CHECK: arith.addi %arg0, %arg1
