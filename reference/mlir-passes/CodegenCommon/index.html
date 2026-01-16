@@ -3178,6 +3178,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-flatten-swizzle-hint-allocs" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-flatten-swizzle-hint-allocs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fold-affinemin-in-distributed-loops" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-fold-affinemin-in-distributed-loops
@@ -6321,6 +6330,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-flatten-swizzle-hint-allocs" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-flatten-swizzle-hint-allocs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fold-affinemin-in-distributed-loops" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-fold-affinemin-in-distributed-loops
@@ -7349,6 +7367,8 @@ memref.load %new_base[%c0,...]
 <p>Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets
 on subspan ops to the consumer load/store ops, in preparation for lowering
 to backends that require linearized access.</p>
+<h3 id="-iree-codegen-flatten-swizzle-hint-allocs"><code>-iree-codegen-flatten-swizzle-hint-allocs</code><a class="headerlink" href="#-iree-codegen-flatten-swizzle-hint-allocs" title="Permanent link">link</a></h3>
+<p><em>Flattens allocations associated with iree_codegen.swizzle_hint ops</em></p>
 <h3 id="-iree-codegen-fold-affinemin-in-distributed-loops"><code>-iree-codegen-fold-affinemin-in-distributed-loops</code><a class="headerlink" href="#-iree-codegen-fold-affinemin-in-distributed-loops" title="Permanent link">link</a></h3>
 <p><em>Fold <code>affine.min</code> ops in distributed loops</em></p>
 <h3 id="-iree-codegen-fold-memref-alias-ops"><code>-iree-codegen-fold-memref-alias-ops</code><a class="headerlink" href="#-iree-codegen-fold-memref-alias-ops" title="Permanent link">link</a></h3>
