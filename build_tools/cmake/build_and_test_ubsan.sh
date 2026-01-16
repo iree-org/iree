@@ -58,17 +58,9 @@ CMAKE_ARGS=(
   "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
 )
 
-echo "::group::Configuring CMake"
 cmake "${CMAKE_ARGS[@]?}"
-echo "::endgroup::"
-
-echo "::group::Building all"
 cmake --build "${BUILD_DIR?}" -- -k 0
-echo "::endgroup::"
-
-echo "::group::Building test deps"
 cmake --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
-echo "::endgroup::"
 
 # Don't run any GPU tests for the time being.
 # These are not ubsan-warning-free yet.
@@ -77,10 +69,5 @@ export IREE_METAL_DISABLE=1
 export IREE_CUDA_DISABLE=1
 export IREE_HIP_DISABLE=1
 
-echo "::group::Running tests"
 build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-echo "::endgroup::"
-
-echo "::group::Running llvm-external-projects tests"
 cmake --build "${BUILD_DIR?}" --target check-iree-dialects -- -k 0
-echo "::endgroup::"

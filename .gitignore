@@ -18,6 +18,9 @@
 # Cursor files
 .cursor/
 
+# Claude Code user-specific settings (project-level overrides)
+.claude/settings.local.json
+
 # macOS files
 .DS_Store
 
