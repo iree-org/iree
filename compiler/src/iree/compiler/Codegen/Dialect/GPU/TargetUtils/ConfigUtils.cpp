@@ -976,7 +976,6 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   }
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
-  llvm::errs() << "loweringConfig: " << loweringConfig << "\n";
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
       ShapedType::getNumElements(schedule->nSubgroupCounts) *
