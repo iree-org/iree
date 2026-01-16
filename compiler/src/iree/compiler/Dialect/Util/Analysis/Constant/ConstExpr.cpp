@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
@@ -421,6 +422,14 @@ void ConstExprHoistingPolicy::initialize() {
   }
 }
 
+static int64_t getRoundedStorageSize(int64_t elementCount, Type elementType) {
+  if (elementType.isIndex())
+    // The wrapped IREE util returns size in bytes. We conservatively assume
+    // 64-bit indices.
+    return elementCount * 8;
+  return IREE::Util::getRoundedPhysicalStorageSize(elementCount, elementType);
+}
+
 static bool doesHoistingIncreaseSizeSignificantly(
     const ConstExprAnalysis::ConstValueInfo *info, int64_t threshold) {
   int64_t inSize = 0;
@@ -435,8 +444,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
           elementCount *= dim;
         }
       }
-      inSize +=
-          getRoundedPhysicalStorageSize(elementCount, type.getElementType());
+      inSize += getRoundedStorageSize(elementCount, type.getElementType());
     }
   }
 
@@ -451,8 +459,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
       }
       elementCount *= dim;
     }
-    outSize =
-        getRoundedPhysicalStorageSize(elementCount, type.getElementType());
+    outSize = getRoundedStorageSize(elementCount, type.getElementType());
   }
 
   return outSize > inSize + threshold;

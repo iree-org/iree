@@ -487,3 +487,55 @@ module @hoist_multiple_globals_ordered {
     util.return %extracted, %extracted : f32, f32
   }
 }
+
+// -----
+
+// CHECK-LABEL: @hoist_tensor_from_elements_const_index_transient
+module @hoist_tensor_from_elements_const_index_transient {
+  // CHECK:     util.global private @[[HOISTED_SYM:.*]] : tensor<2xi64>
+  // CHECK:     util.initializer {
+  // CHECK-DAG:   %[[IDX0:.*]] = arith.constant 0 : index
+  // CHECK-DAG:   %[[IDX1:.*]] = arith.constant 1 : index
+  // CHECK-DAG:   %[[IDX_CAST0:.*]] = arith.index_cast %[[IDX0]] : index to i64
+  // CHECK-DAG:   %[[IDX_CAST1:.*]] = arith.index_cast %[[IDX1]] : index to i64
+  // CHECK:       %[[FROM_ELEMS:.*]] = tensor.from_elements %[[IDX_CAST0]], %[[IDX_CAST1]] : tensor<2xi64>
+  // CHECK:       util.global.store %[[FROM_ELEMS]], @[[HOISTED_SYM]] : tensor<2xi64>
+  // CHECK:       util.return
+  // CHECK:     }
+  // CHECK:     util.func public @main() -> tensor<2xi64>
+  util.func public @main() -> tensor<2xi64> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %cast0 = arith.index_cast %c0 : index to i64
+    %cast1 = arith.index_cast %c1 : index to i64
+    // CHECK-NOT: tensor.from_elements
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : tensor<2xi64>
+    // CHECK: util.return %[[VAL]]
+    %0 = tensor.from_elements %cast0, %cast1 : tensor<2xi64>
+    util.return %0 : tensor<2xi64>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @hoist_tensor_from_elements_const_index_leaf
+module @hoist_tensor_from_elements_const_index_leaf {
+  // CHECK:     util.global private @[[HOISTED_SYM:.*]] : tensor<2xindex>
+  // CHECK:     util.initializer {
+  // CHECK-DAG:   %[[IDX0:.*]] = arith.constant 0 : index
+  // CHECK-DAG:   %[[IDX1:.*]] = arith.constant 1 : index
+  // CHECK:       %[[FROM_ELEMS:.*]] = tensor.from_elements %[[IDX0]], %[[IDX1]] : tensor<2xindex>
+  // CHECK:       util.global.store %[[FROM_ELEMS]], @[[HOISTED_SYM]] : tensor<2xindex>
+  // CHECK:       util.return
+  // CHECK:     }
+  // CHECK:     util.func public @main() -> tensor<2xindex>
+  util.func public @main() -> tensor<2xindex> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    // CHECK-NOT: tensor.from_elements
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : tensor<2xindex>
+    // CHECK: util.return %[[VAL]]
+    %0 = tensor.from_elements %c0, %c1 : tensor<2xindex>
+    util.return %0 : tensor<2xindex>
+  }
+}
