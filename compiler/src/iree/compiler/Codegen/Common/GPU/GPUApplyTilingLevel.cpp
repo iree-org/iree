@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -61,7 +62,6 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
 
 void GPUApplyTilingLevelPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
-
   if (!llvm::is_contained({IREE::GPU::TilingLevel::Reduction,
                            IREE::GPU::TilingLevel::Thread,
                            IREE::GPU::TilingLevel::Subgroup,
@@ -107,6 +107,7 @@ void GPUApplyTilingLevelPass::runOnOperation() {
   // Apply cleanup patterns.
   {
     RewritePatternSet patterns(context);
+    IREE::GPU::populateFoldSwizzleHintOpPatterns(patterns);
     // Merge consecutive insert/extract slice ops to simplify later loop
     // hoisting patterns.
     tensor::populateFoldTensorEmptyPatterns(patterns);
