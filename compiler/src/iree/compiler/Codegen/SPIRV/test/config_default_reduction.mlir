@@ -119,6 +119,11 @@ func.func @subgroup_reduce_dynamic(%10: tensor<8x?xf32>) -> tensor<8xf32> attrib
 #map6 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map7 = affine_map<(d0, d1, d2, d3) -> (d0)>
 #map8 = affine_map<(d0, d1) -> ()>
+#map9 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map10 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map11 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map12 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map13 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 func.func @reduction_with_elementwise_consumer(
     %input: tensor<6144xf32>,
@@ -201,11 +206,45 @@ func.func @reduction_with_distributable_elementwise_consumer(
   return %epilogue : tensor<512x12xf32>
 }
 
-//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [128]{{\]}}>
-//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 128]{{\]}}>
+func.func @fail_reduction_with_nondistributable_consumer(
+    %input: tensor<16x64x74xf32>,
+    %filled: tensor<16x74xf32>,
+    %empty_out: tensor<16x74x64xf32>
+) -> tensor<16x74x64xf32> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %cst_eps = arith.constant 9.99999974E-5 : f32
+  %cst_scale = arith.constant 8.000000e+00 : f32
+
+  %reduction = linalg.generic {
+    indexing_maps = [#map9, #map13],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%input : tensor<16x64x74xf32>) outs(%filled : tensor<16x74xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %0 = arith.mulf %in, %in : f32
+    %1 = arith.addf %out, %0 : f32
+    linalg.yield %1 : f32
+  } -> tensor<16x74xf32>
+
+  %epilogue = linalg.generic {
+    indexing_maps = [#map10, #map11, #map12],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%input, %reduction : tensor<16x64x74xf32>, tensor<16x74xf32>)
+    outs(%empty_out : tensor<16x74x64xf32>) {
+  ^bb0(%in: f32, %in_reduction: f32, %out: f32):
+    %0 = arith.maximumf %in, %in_reduction : f32
+    %1 = math.sqrt %0 : f32
+    %2 = arith.mulf %in, %cst_scale : f32
+    %3 = arith.divf %2, %1 : f32
+    linalg.yield %3 : f32
+  } -> tensor<16x74x64xf32>
+  return %epilogue : tensor<16x74x64xf32>
+}
+
+//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [256]{{\]}}>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 256]{{\]}}>
 //  CHECK-DAG: #[[CONFIG3:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [2048]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION1:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [32, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION1:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
 //  CHECK-DAG: #[[TRANSLATION2:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [512, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION3:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [2, 16, 1]>
 //      CHECK: func.func @reduction_with_elementwise_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION1]]
 //      CHECK:   linalg.generic
@@ -224,3 +263,6 @@ func.func @reduction_with_distributable_elementwise_consumer(
 // CHECK-SAME:       lowering_config = #[[CONFIG3]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG3]]
+// CHECK-LABEL: func.func @fail_reduction_with_nondistributable_consumer(
+// CHECK-SAME:     translation_info = #[[TRANSLATION3]]
+// CHECK-NOT: pipeline = SPIRVSubgroupReduce

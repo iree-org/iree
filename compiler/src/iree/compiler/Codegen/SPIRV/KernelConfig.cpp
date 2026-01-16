@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include <cstdint>
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -1083,10 +1084,10 @@ static bool canDistributeShape(ArrayRef<int64_t> shape, int64_t groupSize) {
 // be distributable, but since distribution patterns work bottom-up from the
 // yield, if a consumer shape fails distribution, it stays inside the region,
 // which keeps its operands (including the reduction) inside too. This forces
-// fallback to single thread execution. In such cases, we conservatively limit
-// the workgroup size to subgroup size.
+// fallback to single thread execution.
 //
-// Example of an incompatible consumer with groupSize=512:
+// Example: consumer broadcast shape incompatible with the proposed workgroup
+// size. Here the heuristics select workgroup size = 512.
 //
 //   %red = linalg.reduce ins(%in) outs(%init) -> tensor<f32>
 //   %consumer = linalg.generic {
@@ -1105,49 +1106,99 @@ static bool canDistributeShape(ArrayRef<int64_t> shape, int64_t groupSize) {
 //   - d1=3: 8 % 3 != 0 and 3 % 8 != 0 -> failure
 // Since the consumer fails distribution, the reduction is also blocked and
 // the entire chain of operations stays inside the region.
-static bool hasIncompatibleConsumer(linalg::LinalgOp reductionOp,
-                                    int64_t groupSize) {
+//
+// Example: consumer indexing map reassociates dims in a way that
+// breaks distribution.
+//
+//   %red = linalg.generic {
+//     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>,
+//                      affine_map<(d0, d1, d2) -> (d0, d1)>],
+//     iterator_types = ["parallel", "parallel", "reduction"]
+//   } ins(%in : tensor<16x64x74xf32>)
+//     outs(%init : tensor<16x74xf32>) { ... } -> tensor<16x74xf32>
+//
+//   %consumer = linalg.generic {
+//     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>,
+//                      affine_map<(d0, d1, d2) -> (d0, d2)>,
+//                      affine_map<(d0, d1, d2) -> (d0, d2, d1)>],
+//     iterator_types = ["parallel", "parallel", "parallel"]
+//   } ins(%in, %red : tensor<16x64x74xf32>, tensor<16x74xf32>)
+//     outs(%out : tensor<16x74x64xf32>) { ... }
+//
+// Producer tiling is defined in the producer iteration space (par: d0=16,d1=74;
+// red: d2=64). Consumer indexing maps can re-associate %red such that a producer
+// reduction dim becomes a consumer indexing dim; those dims must satisfy the
+// groupSize distribution constraint directly. Here that extent is 74, which fails
+// for group size = 32, so we bail out of the reduction pipeline.
+static bool isConsumerCompatible(linalg::LinalgOp consumerOp, Value result,
+                                 SmallVector<unsigned> reductionDims,
+                                 int64_t groupSize) {
+  // Collect dims used by operands referencing the reduction result.
+  llvm::SmallDenseSet<unsigned> usedDims;
+  for (OpOperand &operand : consumerOp->getOpOperands()) {
+    if (operand.get() != result) {
+      continue;
+    }
+    for (AffineExpr expr :
+         consumerOp.getMatchingIndexingMap(&operand).getResults()) {
+      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+        usedDims.insert(dimExpr.getPosition());
+      }
+    }
+  }
+
+  SmallVector<int64_t> usedShape, broadcastShape;
+  for (auto [i, size] : llvm::enumerate(consumerOp.getStaticLoopRanges())) {
+    // Broadcast dims are those not indexed by any use of the result.
+    if (!usedDims.contains(i)) {
+      broadcastShape.push_back(size);
+      continue;
+    }
+    // Producer reduction dims that are used by the consumer are not covered
+    // by workgroup tiling, so require them to be distributable for groupSize.
+    if (!llvm::is_contained(reductionDims, i)) {
+      continue;
+    }
+    usedShape.push_back(size);
+  }
+
+  return (usedShape.empty() || canDistributeShape(usedShape, groupSize)) &&
+         (broadcastShape.empty() ||
+          canDistributeShape(broadcastShape, groupSize));
+}
+
+static bool allConsumersCompatible(linalg::LinalgOp reductionOp,
+                                   SmallVector<unsigned> reductionDims,
+                                   int64_t groupSize, int64_t candidate) {
   for (Value result : reductionOp->getResults()) {
     for (Operation *user : result.getUsers()) {
       auto consumerOp = dyn_cast<linalg::LinalgOp>(user);
       if (!consumerOp) {
         continue;
       }
-
-      // Collect dims used by operands referencing the reduction result.
-      llvm::SmallDenseSet<unsigned> usedDims;
-      for (OpOperand &operand : consumerOp->getOpOperands()) {
-        if (operand.get() != result) {
-          continue;
-        }
-        for (AffineExpr expr :
-             consumerOp.getMatchingIndexingMap(&operand).getResults()) {
-          if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-            usedDims.insert(dimExpr.getPosition());
-          }
-        }
-      }
-
-      // Broadcast dims are those not indexed by any use of the result.
-      SmallVector<int64_t> broadcastShape;
-      for (auto [i, bound] :
-           llvm::enumerate(consumerOp.getStaticLoopRanges())) {
-        if (!usedDims.contains(i)) {
-          broadcastShape.push_back(bound);
-        }
-      }
-
-      if (broadcastShape.empty()) {
-        continue;
-      }
-
-      if (!canDistributeShape(broadcastShape, groupSize)) {
-        return true;
+      if (!isConsumerCompatible(consumerOp, result, reductionDims, candidate)) {
+        return false;
       }
     }
   }
-  return false;
-};
+  return true;
+}
+
+// Try to find a workgroup size compatible with all consumers by
+// halving from groupSize down to subgroupSize.
+static FailureOr<int>
+maybeFindConsumerCompatibleSize(linalg::LinalgOp reductionOp,
+                                SmallVector<unsigned> reductionDims,
+                                int64_t groupSize, int64_t subgroupSize) {
+  for (int64_t candidate = groupSize; candidate >= subgroupSize;
+       candidate /= 2) {
+    if (allConsumersCompatible(reductionOp, reductionDims, groupSize,
+                               candidate)) {
+      return candidate;
+    }
+  }
+  return failure();
+}
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
@@ -1319,10 +1370,16 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
 
-  if (hasIncompatibleConsumer(op, groupSize)) {
-    LDBG() << "Reduction has incompatible consumer, limiting workgroup size "
-           << "from " << groupSize << " to " << subgroupSize;
-    groupSize = subgroupSize;
+  FailureOr<int64_t> maybeCompatibleGroupSize = maybeFindConsumerCompatibleSize(
+      op, reductionDims, groupSize, subgroupSize);
+  if (failed(maybeCompatibleGroupSize)) {
+    LDBG() << "Reduction has incompatible consumer";
+    return failure();
+  }
+  if (groupSize != maybeCompatibleGroupSize.value()) {
+    LDBG() << "Reduction adjusted workgroup size from " << groupSize << " to "
+           << maybeCompatibleGroupSize.value() << " for consumer compatibility";
+    groupSize = maybeCompatibleGroupSize.value();
   }
 
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
