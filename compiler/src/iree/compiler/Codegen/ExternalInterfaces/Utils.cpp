@@ -23,6 +23,98 @@
 namespace mlir::iree_compiler::IREE {
 using IREE::Codegen::MaterializeEncodingInfo;
 
+/// Computes the original index value for a given dimension after packing.
+///
+/// After packing, the original indices need to be computed from the packed
+/// dimensions. For a dimension that is tiled:
+///   original_index = outer_dim * tile_size + inner_dim
+/// For a dimension that is not tiled:
+///   original_index = outer_dim
+///
+/// The packed generic has identity output map, so dimensions are:
+///   d0..d(outerRank-1): outer dimensions (permuted by outerDimsPerm)
+///   d(outerRank)..d(outerRank+innerRank-1): inner dimensions
+///
+/// With swizzle, inner dimensions are further expanded and permuted.
+static Value computePackedIndex(OpBuilder &builder, Location loc,
+                                int64_t origDim, int64_t origRank,
+                                const MaterializeEncodingInfo &encodingInfo,
+                                ArrayRef<int64_t> outOffsetForDimsPos,
+                                ArrayRef<int64_t> invOutSwizzlePerm) {
+  ArrayRef<int64_t> outerDimsPerm = encodingInfo.outerDimsPerm;
+  ArrayRef<int64_t> innerDimsPos = encodingInfo.innerDimsPos;
+  ArrayRef<int64_t> innerTileSizes = encodingInfo.innerTileSizes;
+
+  // Build inverse outer dims permutation for mapping original dims to packed
+  // outer dims.
+  SmallVector<int64_t> invOuterDimsPerm =
+      invertPermutationVector(outerDimsPerm);
+
+  // Find the outer packed dimension corresponding to this original dimension.
+  int64_t outerPackedDim = invOuterDimsPerm[origDim];
+  Value outerIdx =
+      linalg::IndexOp::create(builder, loc, outerPackedDim).getResult();
+
+  // Check if this dimension is tiled (in innerDimsPos).
+  auto it = llvm::find(innerDimsPos, origDim);
+  if (it == innerDimsPos.end()) {
+    // Not tiled: original_index = outer_dim.
+    return outerIdx;
+  }
+
+  // Tiled: original_index = outer_dim * tile_size + inner_dim.
+  int64_t innerIdx = std::distance(innerDimsPos.begin(), it);
+  int64_t tileSize = innerTileSizes[innerIdx];
+  Value innerIdxVal;
+  if (!encodingInfo.swizzle.has_value()) {
+    // No swizzle: inner packed dim = outerRank + innerIdx.
+    int64_t innerPackedDim = origRank + innerIdx;
+    innerIdxVal =
+        linalg::IndexOp::create(builder, loc, innerPackedDim).getResult();
+  } else {
+    // With swizzle: inner dimensions are expanded and permuted.
+    // We need to compute the inner index from the expanded dimensions.
+    const auto &swizzle = *encodingInfo.swizzle;
+    ArrayRef<IREE::Codegen::TileSwizzle::Dim> expandDims =
+        swizzle.expandShape[innerIdx];
+
+    // Compute the starting offset for this inner tile's expanded dims.
+    // The inner index is computed by combining the expanded dimensions
+    // according to their sizes, but we need to account for the swizzle
+    // permutation.
+    int64_t expandedDimOffset = origRank + outOffsetForDimsPos[innerIdx];
+    innerIdxVal = arith::ConstantIndexOp::create(builder, loc, 0).getResult();
+    int64_t stride = 1;
+
+    // Process expanded dimensions in reverse order to build the index.
+    for (int64_t i = expandDims.size() - 1; i >= 0; --i) {
+      int64_t expandedDim = expandedDimOffset + i;
+      // Find where this expanded dimension ended up after swizzle.
+      int64_t permutedDim = invOutSwizzlePerm[expandedDim];
+      Value dimIdx =
+          linalg::IndexOp::create(builder, loc, permutedDim).getResult();
+
+      if (stride > 1) {
+        Value strideVal =
+            arith::ConstantIndexOp::create(builder, loc, stride).getResult();
+        dimIdx =
+            arith::MulIOp::create(builder, loc, dimIdx, strideVal).getResult();
+      }
+      innerIdxVal =
+          arith::AddIOp::create(builder, loc, innerIdxVal, dimIdx).getResult();
+      stride *= expandDims[i].size;
+    }
+  }
+
+  // Compute outer_dim * tile_size + inner_dim.
+  Value tileSizeVal =
+      arith::ConstantIndexOp::create(builder, loc, tileSize).getResult();
+  Value outerScaled =
+      arith::MulIOp::create(builder, loc, outerIdx, tileSizeVal).getResult();
+  return arith::AddIOp::create(builder, loc, outerScaled, innerIdxVal)
+      .getResult();
+}
+
 Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
                                             OpBuilder &builder,
                                             RankedTensorType type,
@@ -404,8 +496,36 @@ Operation *lowerGenericOpWithResolvedLayouts(
       builder, genericOp.getLoc(), convertedResultTypes, convertedInputOperands,
       convertedOutputOperands, packedIndexingMaps, iteratorTypes,
       /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
+
+  // Clone the region with proper remapping of linalg.index operations.
+  // After packing, linalg.index ops need to compute the original index from
+  // the packed dimensions.
+  Block *origBlock = genericOp.getBlock();
+  int64_t origRank =
+      cast<RankedTensorType>(outputOperand->get().getType()).getRank();
+
+  // Create the entry block for the new generic op with matching argument types.
+  Region &newRegion = materializedGenericOp.getRegion();
+  Block *newBlock = builder.createBlock(
+      &newRegion, newRegion.begin(),
+      llvm::to_vector(origBlock->getArgumentTypes()),
+      SmallVector<Location>(origBlock->getNumArguments(), genericOp.getLoc()));
+
   IRMapping mapping;
-  genericOp.getRegion().cloneInto(&materializedGenericOp.getRegion(), mapping);
+  mapping.map(origBlock->getArguments(), newBlock->getArguments());
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(newBlock);
+  for (Operation &op : *origBlock) {
+    if (auto indexOp = dyn_cast<linalg::IndexOp>(&op)) {
+      Value newIndex = computePackedIndex(
+          builder, indexOp.getLoc(), indexOp.getDim(), origRank,
+          outMaterializeEncodingInfo, outOffsetForDimsPos, invOutSwizzlePerm);
+      mapping.map(indexOp.getResult(), newIndex);
+      continue;
+    }
+    builder.clone(op, mapping);
+  }
+
   return materializedGenericOp.getOperation();
 }
 

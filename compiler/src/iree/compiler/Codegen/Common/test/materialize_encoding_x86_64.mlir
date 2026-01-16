@@ -1430,3 +1430,52 @@ func.func @generic_with_0d_tensor(
 //  CHECK-SAME:     ins(%[[INPUT]], %[[INPUT_0D]]
 //  CHECK-SAME:     outs(%[[FILL]]
 //       CHECK:   return %[[GENERIC]]
+
+// -----
+
+// Test that linalg.index operations are correctly remapped when materializing
+// encodings for a generic op with data tiling. When outer dims are 1, the
+// index computation (outer * tile_size + inner) simplifies to just the inner
+// index.
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 16, 64]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple = "x86_64-xyz-xyz"}>
+func.func @generic_with_linalg_index(%arg0: tensor<16x16xf32, #encoding>) -> tensor<16x16xf32, #encoding>
+    attributes { hal.executable.target = #executable_target } {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 0xFF800000 : f32
+  %0 = tensor.empty() : tensor<16x16xf32, #encoding>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]
+  } ins(%arg0 : tensor<16x16xf32, #encoding>) outs(%0 : tensor<16x16xf32, #encoding>) {
+  ^bb0(%in: f32, %out: f32):
+    %2 = linalg.index 0 : index
+    %3 = linalg.index 1 : index
+    %4 = arith.cmpi sge, %2, %3 : index
+    %5 = arith.select %4, %cst, %cst_0 : f32
+    %6 = arith.addf %in, %5 : f32
+    linalg.yield %6 : f32
+  } -> tensor<16x16xf32, #encoding>
+  return %1 : tensor<16x16xf32, #encoding>
+}
+// CHECK-LABEL: func.func @generic_with_linalg_index
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x1x16x16xf32>
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<1x1x16x16xf32>
+// CHECK:         %[[GENERIC:.*]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<1x1x16x16xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<1x1x16x16xf32>)
+// CHECK:         ^bb0(%[[IN:.*]]: f32, %[[OUT:.*]]: f32):
+//                  Original index 0 maps to inner dim at position 2 (since outer dims are 1x1)
+// CHECK:           %[[IDX0:.*]] = linalg.index 2 : index
+//                  Original index 1 maps to inner dim at position 3
+// CHECK:           %[[IDX1:.*]] = linalg.index 3 : index
+// CHECK:           arith.cmpi sge, %[[IDX0]], %[[IDX1]] : index
+// CHECK:           arith.select
+// CHECK:           arith.addf
+// CHECK:           linalg.yield
+// CHECK:         return %[[GENERIC]]
