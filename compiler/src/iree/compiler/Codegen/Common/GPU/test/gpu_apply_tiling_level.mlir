@@ -735,3 +735,42 @@ module {
 // SERIAL: linalg.generic
 // SERIAL: scf.forall.in_parallel
 // SERIAL-NOT: mapping
+
+// -----
+
+func.func @matmul_transpose_b_with_swizzle(%5: tensor<64x64xf32>, %6: tensor<64x1280xf16>, %7: tensor<64x1280xf16>) -> tensor<64x64xf32> {
+  %c4 = arith.constant 4 : index
+  %c1280 = arith.constant 1280 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %9 = tensor.empty() : tensor<64x1280xf16>
+  %swizzle_9 = iree_codegen.swizzle_hint %9[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x1280xf16>
+  %10 = tensor.empty() : tensor<64x1280xf16>
+  %swizzle_10 = iree_codegen.swizzle_hint %10[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x1280xf16>
+  %11 = scf.for %arg0 = %c0 to %c1280 step %c4 iter_args(%arg1 = %8) -> (tensor<64x64xf32>) {
+    %extracted_slice = tensor.extract_slice %6[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
+    %extracted_slice_0 = tensor.extract_slice %swizzle_9[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
+    %12 = linalg.copy {lowering_config = #iree_gpu.lowering_config<{thread = [1, 1]}>} ins(%extracted_slice : tensor<64x4xf16>) outs(%extracted_slice_0 : tensor<64x4xf16>) -> tensor<64x4xf16>
+    %extracted_slice_1 = tensor.extract_slice %7[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
+    %extracted_slice_2 = tensor.extract_slice %swizzle_10[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
+    %13 = linalg.copy {lowering_config = #iree_gpu.lowering_config<{thread = [1, 1]}>} ins(%extracted_slice_1 : tensor<64x4xf16>) outs(%extracted_slice_2 : tensor<64x4xf16>) -> tensor<64x4xf16>
+    %14 = linalg.matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d0, d2)>,
+        affine_map<(d0, d1, d2) -> (d1, d2)>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>
+      ]
+      {lowering_config = #iree_gpu.lowering_config<{thread = [4, 4]}>}
+      ins(%12, %13 : tensor<64x4xf16>, tensor<64x4xf16>)
+      outs(%arg1 : tensor<64x64xf32>) -> tensor<64x64xf32>
+    scf.yield %14 : tensor<64x64xf32>
+  }
+  return %11 : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: func.func @matmul_transpose_b_with_swizzle
+
+// THREAD-LABEL: func.func @matmul_transpose_b_with_swizzle
+//       THREAD:     %2 = tensor.empty() : tensor<64x4xf16>
+//       THREAD:     %3 = iree_codegen.swizzle_hint %2[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x4xf16>
