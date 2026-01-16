@@ -27,6 +27,7 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_COMBINELAYOUTTRANSFORMATIONPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
+using IREE::LinalgExt::MapGatherOp;
 using IREE::LinalgExt::MapScatterOp;
 
 //===----------------------------------------------------------------------===//
@@ -75,7 +76,7 @@ static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
 }
 
 //===----------------------------------------------------------------------===//
-// Combining Layout Transformation Ops
+// Combining Layout Transformation Ops into MapScatterOp
 //===----------------------------------------------------------------------===//
 
 /// Folds an `op` that does not affect index computation into a `mapScatterOp`.
@@ -507,6 +508,212 @@ FailureOr<MapScatterOp> foldIntoMapScatter(RewriterBase &rewriter,
       .Default([](Operation *) { return failure(); });
 }
 
+//===----------------------------------------------------------------------===//
+// Combining Layout Transformation Ops into MapGatherOp
+//===----------------------------------------------------------------------===//
+
+/// Folds an `op` that does not affect index computation into a `mapGatherOp`.
+/// This is used for ops like `linalg::CopyOp`.
+static MapGatherOp foldIdentityLikeOpIntoMapGather(RewriterBase &rewriter,
+                                                   Operation *op,
+                                                   MapGatherOp mapGatherOp) {
+  assert(mapGatherOp.getSource() == op->getResult(0) &&
+         "expected op to be the producer of mapGatherOp source");
+  rewriter.modifyOpInPlace(mapGatherOp, [&]() {
+    mapGatherOp.getSourceMutable().assign(op->getOperand(0));
+  });
+  return mapGatherOp;
+}
+
+/// Fold a `transposeOp` into a consumer `mapGatherOp`, by applying the
+/// permutation to the yielded source indices.
+static MapGatherOp foldTransposeIntoMapGather(RewriterBase &rewriter,
+                                              linalg::TransposeOp transposeOp,
+                                              MapGatherOp mapGatherOp) {
+  assert(mapGatherOp.getSource() == transposeOp->getResult(0) &&
+         "expected transposeOp to be the producer of mapGatherOp source");
+
+  // For map_gather, we iterate over OUTPUT indices and yield SOURCE indices.
+  // transpose: output[i,j,k] = input[perm(i,j,k)]
+  // So: input_idx = perm^-1(output_idx)
+  // Since oldSourceIndices represents the current yielded indices (which map
+  // to the transpose result), we need to apply the permutation to get the
+  // input indices.
+  ArrayRef<int64_t> perm = transposeOp.getPermutation();
+  auto indexTransformBuilder =
+      [&](ValueRange oldSourceIndices) -> SmallVector<Value> {
+    SmallVector<Value> indexValues(oldSourceIndices);
+    return applyPermutation(indexValues, perm);
+  };
+  rewriter.modifyOpInPlace(mapGatherOp, [&]() {
+    mapGatherOp.insertTransformationAtEnd(rewriter, indexTransformBuilder);
+    mapGatherOp.getSourceMutable().assign(transposeOp.getInput());
+  });
+  return mapGatherOp;
+}
+
+/// Fold a tensor::ExpandShapeOp or tensor::CollapseShapeOp into a consumer
+/// `mapGatherOp`, by linearizing and then delinearizing the yielded source
+/// indices.
+template <typename ReshapeOpTy>
+static MapGatherOp foldReshapeIntoMapGather(RewriterBase &rewriter,
+                                            ReshapeOpTy reshapeOp,
+                                            MapGatherOp mapGatherOp) {
+  assert(mapGatherOp.getSource() == reshapeOp->getResult(0) &&
+         "expected reshapeOp to be the producer of mapGatherOp source");
+  Location loc = reshapeOp->getLoc();
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(reshapeOp);
+  SmallVector<OpFoldResult> srcDims =
+      tensor::getMixedSizes(rewriter, loc, reshapeOp.getSrc());
+  SmallVector<OpFoldResult> resultDims =
+      tensor::getMixedSizes(rewriter, loc, reshapeOp.getResult());
+
+  auto indexTransformBuilder =
+      [&](ValueRange oldSourceIndices) -> SmallVector<Value> {
+    // Linearize indices in result space, then delinearize to source space.
+    auto linearizeIndexOp = affine::AffineLinearizeIndexOp::create(
+        rewriter, mapGatherOp->getLoc(), oldSourceIndices, resultDims,
+        /*disjoint=*/true);
+    auto delinearizeIndexOp = affine::AffineDelinearizeIndexOp::create(
+        rewriter, mapGatherOp->getLoc(), linearizeIndexOp.getResult(), srcDims,
+        /*hasOuterBound=*/true);
+    return delinearizeIndexOp->getResults();
+  };
+  rewriter.modifyOpInPlace(mapGatherOp, [&]() {
+    mapGatherOp.insertTransformationAtEnd(rewriter, indexTransformBuilder);
+    mapGatherOp.getSourceMutable().assign(reshapeOp->getOperand(0));
+  });
+  return mapGatherOp;
+}
+
+/// Fold a tensor::ExpandShapeOp into a consumer `mapGatherOp`.
+static MapGatherOp
+foldExpandShapeIntoMapGather(RewriterBase &rewriter,
+                             tensor::ExpandShapeOp expandShapeOp,
+                             MapGatherOp mapGatherOp) {
+  return foldReshapeIntoMapGather(rewriter, expandShapeOp, mapGatherOp);
+}
+
+/// Fold a tensor::CollapseShapeOp into a consumer `mapGatherOp`.
+static MapGatherOp
+foldCollapseShapeIntoMapGather(RewriterBase &rewriter,
+                               tensor::CollapseShapeOp collapseShapeOp,
+                               MapGatherOp mapGatherOp) {
+  return foldReshapeIntoMapGather(rewriter, collapseShapeOp, mapGatherOp);
+}
+
+/// Fold an `extractSliceOp` into a consumer `mapGatherOp` by adding offsets
+/// to the yielded source indices.
+static FailureOr<MapGatherOp>
+foldExtractSliceIntoMapGather(RewriterBase &rewriter,
+                              tensor::ExtractSliceOp extractSliceOp,
+                              MapGatherOp mapGatherOp) {
+  assert(mapGatherOp.getSource() == extractSliceOp->getResult(0) &&
+         "expected extractSliceOp to be the producer of mapGatherOp source");
+  // TODO(Max191): Support rank-reducing slices.
+  if (extractSliceOp.getSourceType().getRank() !=
+      extractSliceOp.getResultType().getRank()) {
+    return rewriter.notifyMatchFailure(
+        extractSliceOp, "rank reducing extract_slice op is not supported");
+  }
+  // TODO(Max191): Support non-unit strides.
+  if (!areAllConstantIntValue(extractSliceOp.getMixedStrides(), 1)) {
+    return rewriter.notifyMatchFailure(extractSliceOp,
+                                       "non-unit strides are not supported");
+  }
+
+  // Check if this is an identity extract_slice (all offsets are zero and all
+  // sizes match the source). If so, just replace the source without adding
+  // any offset computation.
+  SmallVector<OpFoldResult> sliceOffsets = extractSliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sliceSizes = extractSliceOp.getMixedSizes();
+  Value source = extractSliceOp.getSource();
+  bool isIdentity = areAllConstantIntValue(sliceOffsets, 0);
+  if (isIdentity) {
+    for (auto [dim, sliceSize] : llvm::enumerate(sliceSizes)) {
+      ValueBoundsConstraintSet::Variable sourceDimVar(source, dim);
+      FailureOr<bool> areEqual =
+          ValueBoundsConstraintSet::areEqual(sliceSize, sourceDimVar);
+      if (!succeeded(areEqual) || !*areEqual) {
+        isIdentity = false;
+        break;
+      }
+    }
+  }
+
+  if (isIdentity) {
+    // Identity extract_slice: just replace the source without any changes.
+    rewriter.modifyOpInPlace(
+        mapGatherOp, [&]() { mapGatherOp.getSourceMutable().assign(source); });
+    return mapGatherOp;
+  }
+
+  Location loc = mapGatherOp->getLoc();
+  auto indexTransformBuilder =
+      [&](ValueRange oldSourceIndices) -> SmallVector<Value> {
+    SmallVector<Value> newIndices;
+    for (auto [idx, offset] : llvm::zip_equal(oldSourceIndices, sliceOffsets)) {
+      Value offsetValue =
+          getValueOrCreateConstantIndexOp(rewriter, loc, offset);
+      Value newIdx = arith::AddIOp::create(rewriter, loc, idx, offsetValue);
+      newIndices.push_back(newIdx);
+    }
+    return newIndices;
+  };
+  rewriter.modifyOpInPlace(mapGatherOp, [&]() {
+    mapGatherOp.insertTransformationAtEnd(rewriter, indexTransformBuilder);
+    mapGatherOp.getSourceMutable().assign(extractSliceOp.getSource());
+  });
+  return mapGatherOp;
+}
+
+FailureOr<MapGatherOp> foldIntoMapGather(RewriterBase &rewriter, Operation *op,
+                                         MapGatherOp mapGatherOp) {
+  return llvm::TypeSwitch<Operation *, FailureOr<MapGatherOp>>(op)
+      .Case<linalg::CopyOp>([&](linalg::CopyOp copyOp) {
+        return foldIdentityLikeOpIntoMapGather(rewriter, copyOp, mapGatherOp);
+      })
+      .Case<linalg::TransposeOp>([&](linalg::TransposeOp transposeOp) {
+        return foldTransposeIntoMapGather(rewriter, transposeOp, mapGatherOp);
+      })
+      .Case<tensor::ExpandShapeOp>([&](tensor::ExpandShapeOp expandOp) {
+        return foldExpandShapeIntoMapGather(rewriter, expandOp, mapGatherOp);
+      })
+      .Case<tensor::CollapseShapeOp>([&](tensor::CollapseShapeOp collapseOp) {
+        return foldCollapseShapeIntoMapGather(rewriter, collapseOp,
+                                              mapGatherOp);
+      })
+      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp extractSliceOp) {
+        return foldExtractSliceIntoMapGather(rewriter, extractSliceOp,
+                                             mapGatherOp);
+      })
+      .Default([](Operation *) { return failure(); });
+}
+
+// Insert identity map_gather op before the root and replace the source.
+static MapGatherOp insertIdentityMapGather(RewriterBase &rewriter,
+                                           OpResult root) {
+  Location loc = root.getLoc();
+  SetVector<OpOperand *> originalUses;
+  for (OpOperand &use : root.getUses()) {
+    originalUses.insert(&use);
+  }
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfterValue(root);
+  Type elementType = cast<RankedTensorType>(root.getType()).getElementType();
+  SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(rewriter, loc, root);
+  Value mapGatherDest =
+      tensor::EmptyOp::create(rewriter, loc, sizes, elementType);
+  auto mapGatherOp =
+      MapGatherOp::createIdentityMapGather(rewriter, loc, root, mapGatherDest);
+  rewriter.replaceUsesWithIf(
+      root, mapGatherOp.getResult(0),
+      [&](OpOperand &use) { return originalUses.contains(&use); });
+  LDBG() << "Created identity map_gather:\n" << mapGatherOp;
+  return mapGatherOp;
+}
+
 // Insert identity map_scatter op after the root and replace all uses.
 static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
                                              OpResult root) {
@@ -545,17 +752,18 @@ shouldDoReshapesByExpansion(IREE::Codegen::RelayoutCombinationScope scope) {
   return false;
 }
 
-/// Insert identity map_scatter ops after the given operation if it is a valid
-/// leaf op of a relayout op chain. A relayout op chain is a sequence of
-/// relayout ops (defined by `isSupportedRelayoutOp`) for which the only users
-/// of the ops in the chain are relayout ops, except for the leaves of the
-/// chain. The leaves are simply relayout ops that have non relayout op users.
-/// The `controlFn` is a callback on the leaf OpResult that provides control
-/// over whether or not to insert a map_scatter op.
-struct InsertMapScatterOpPattern : public RewritePattern {
-  InsertMapScatterOpPattern(MLIRContext *context,
-                            CombineRelayoutOpsControlFnRef controlFn = nullptr,
-                            PatternBenefit benefit = 1)
+/// Insert identity map_scatter or map_gather ops after the given operation if
+/// it is a valid leaf op of a relayout op chain. A relayout op chain is a
+/// sequence of relayout ops (defined by `isSupportedRelayoutOp`) for which the
+/// only users of the ops in the chain are relayout ops, except for the leaves
+/// of the chain. The leaves are simply relayout ops that have non relayout op
+/// users. The `controlFn` is a callback on the leaf OpResult that provides
+/// control over whether or not to insert a map_scatter/map_gather op.
+template <RelayoutOpKind kind>
+struct InsertIdentityMapOpPattern : public RewritePattern {
+  InsertIdentityMapOpPattern(MLIRContext *context,
+                             CombineRelayoutOpsControlFnRef controlFn = nullptr,
+                             PatternBenefit benefit = 1)
       : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
         controlFn(controlFn) {}
 
@@ -564,25 +772,49 @@ struct InsertMapScatterOpPattern : public RewritePattern {
     if (!isSupportedRelayoutOp(op)) {
       return failure();
     }
+    // For map_gather, exclude PadOp (pad folding is only supported for
+    // map_scatter).
+    if constexpr (kind == RelayoutOpKind::Gather) {
+      if (isa<tensor::PadOp>(op)) {
+        return failure();
+      }
+    }
     // Relayout ops with only relayout op users are not leaves.
-    auto isDimOrSupportedRelayoutOp = [](Operation *op) {
-      return isSupportedRelayoutOp(op) || isa<tensor::DimOp>(op);
+    // For map_gather, PadOp breaks the chain since we can't fold it into
+    // map_gather.
+    auto isDimOrSupportedRelayoutOp = [](Operation *user) {
+      if (isa<tensor::DimOp>(user)) {
+        return true;
+      }
+      if constexpr (kind == RelayoutOpKind::Gather) {
+        return isSupportedRelayoutOp(user) && !isa<tensor::PadOp>(user);
+      }
+      return isSupportedRelayoutOp(user);
     };
     if (llvm::all_of(op->getUsers(), isDimOrSupportedRelayoutOp)) {
       return failure();
     }
     // All relayout ops have a single result.
     OpResult leaf = op->getResult(0);
-    if (controlFn && !controlFn(leaf)) {
+    if (controlFn && !controlFn(leaf, kind)) {
       return failure();
     }
-    (void)insertIdentityMapScatter(rewriter, leaf);
+    if constexpr (kind == RelayoutOpKind::Scatter) {
+      (void)insertIdentityMapScatter(rewriter, leaf);
+    } else {
+      (void)insertIdentityMapGather(rewriter, leaf);
+    }
     return success();
   }
 
 private:
   CombineRelayoutOpsControlFnRef controlFn;
 };
+
+using InsertMapScatterOpPattern =
+    InsertIdentityMapOpPattern<RelayoutOpKind::Scatter>;
+using InsertMapGatherOpPattern =
+    InsertIdentityMapOpPattern<RelayoutOpKind::Gather>;
 
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
@@ -663,8 +895,12 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   }
 
   // Combine relayout operations into new the map_scatter ops.
+  // Combine relayout operations into new map_scatter and map_gather ops.
+  // - map_scatter is triggered by relayout chains ending in StoreToBufferOp
+  // - map_gather is triggered by relayout chains starting from LoadFromBufferOp
   RewritePatternSet relayoutCombinationPatterns(ctx);
   relayoutCombinationPatterns.add<InsertMapScatterOpPattern>(ctx, controlFn);
+  relayoutCombinationPatterns.add<InsertMapGatherOpPattern>(ctx, controlFn);
   populateCombineRelayoutOpPatterns(relayoutCombinationPatterns,
                                     padDistributionConfigFn);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(
@@ -678,6 +914,12 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   funcOp->walk([&](MapScatterOp mapScatterOp) {
     if (mapScatterOp.isIdentity()) {
       rewriter.replaceOp(mapScatterOp, mapScatterOp.getInput());
+    }
+  });
+  // Clean up any identity map_gather ops after combining.
+  funcOp->walk([&](MapGatherOp mapGatherOp) {
+    if (mapGatherOp.isIdentity()) {
+      rewriter.replaceOp(mapGatherOp, mapGatherOp.getSource());
     }
   });
   return success();
@@ -713,53 +955,85 @@ CombineRelayoutOpsControlFn
 getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope) {
   CombineRelayoutOpsControlFn controlFn;
   switch (scope) {
-  // Control function for Dispatch scope. Filters to only relayout ops with
-  // a single iree_codegen.store_to_buffer user.
+  // Control function for Dispatch scope. Checks based on RelayoutOpKind:
+  // - Scatter: leaf has a single StoreToBufferOp user
+  // - Gather: producer chain starts from LoadFromBufferOp
   case IREE::Codegen::RelayoutCombinationScope::Dispatch:
-    controlFn = [](OpResult leaf) {
-      if (leaf.getNumUses() != 1) {
+    controlFn = [](OpResult leaf, RelayoutOpKind kind) {
+      switch (kind) {
+      case RelayoutOpKind::Scatter:
+        // Check for scatter: leaf has StoreToBufferOp as user.
+        return leaf.getNumUses() == 1 &&
+               isa<IREE::Codegen::StoreToBufferOp>(*leaf.getUsers().begin());
+      case RelayoutOpKind::Gather:
+        // Check for gather: walk back to verify root is LoadFromBufferOp.
+        Operation *current = leaf.getDefiningOp();
+        while (current) {
+          Value input = current->getOperand(0);
+          Operation *producer = input.getDefiningOp();
+          if (!producer) {
+            return false;
+          }
+          if (isa<IREE::Codegen::LoadFromBufferOp>(producer)) {
+            return true;
+          }
+          if (!isSupportedRelayoutOp(producer) ||
+              isa<tensor::PadOp>(producer)) {
+            return false;
+          }
+          current = producer;
+        }
         return false;
       }
-      return isa<IREE::Codegen::StoreToBufferOp>(*leaf.getUsers().begin());
+      llvm_unreachable("unhandled RelayoutOpKind");
     };
     break;
-  // Control function for Workgroup scope. Filters to only relayout ops with
-  // a single tensor.parallel_insert_slice user inside of a workgroup
-  // scf.forall op. Relayout chains of only reshapes are also filtered out,
-  // because these chains can usually be handled by bufferization.
+  // Control function for Workgroup scope. For Scatter, filters to only
+  // relayout ops with a single tensor.parallel_insert_slice user inside of a
+  // workgroup scf.forall op. Relayout chains of only reshapes are also
+  // filtered out, because these chains can usually be handled by
+  // bufferization.
+  // TODO: For Gather, returns false (not supported currently in this scope).
   case IREE::Codegen::RelayoutCombinationScope::Workgroup:
-    controlFn = [](OpResult leaf) {
-      if (leaf.getNumUses() != 1) {
+    controlFn = [](OpResult leaf, RelayoutOpKind kind) {
+      switch (kind) {
+      case RelayoutOpKind::Gather:
         return false;
+      case RelayoutOpKind::Scatter:
+        if (leaf.getNumUses() != 1) {
+          return false;
+        }
+        auto parallelInsertOp =
+            dyn_cast<tensor::ParallelInsertSliceOp>(*leaf.getUsers().begin());
+        if (!parallelInsertOp) {
+          return false;
+        }
+        auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
+        if (!forallOp || !forallOp.getMapping() ||
+            !llvm::all_of(forallOp.getMapping().value(),
+                          llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
+          return false;
+        }
+        auto bbArg = dyn_cast<BlockArgument>(parallelInsertOp.getDest());
+        if (!bbArg || forallOp.getCombiningOps(bbArg).size() != 1) {
+          return false;
+        }
+        // If there are only reshape ops, then bufferization can usually handle
+        // it, so don't introduce map_scatter.
+        llvm::SetVector<Operation *> slice;
+        BackwardSliceOptions options;
+        options.filter = isSupportedRelayoutOp;
+        options.inclusive = true;
+        LogicalResult result =
+            getBackwardSlice(parallelInsertOp.getSource(), &slice, options);
+        if (failed(result)) {
+          return false;
+        }
+        return !llvm::all_of(
+            slice,
+            llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp>);
       }
-      auto parallelInsertOp =
-          dyn_cast<tensor::ParallelInsertSliceOp>(*leaf.getUsers().begin());
-      if (!parallelInsertOp) {
-        return false;
-      }
-      auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
-      if (!forallOp || !forallOp.getMapping() ||
-          !llvm::all_of(forallOp.getMapping().value(),
-                        llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
-        return false;
-      }
-      auto bbArg = dyn_cast<BlockArgument>(parallelInsertOp.getDest());
-      if (!bbArg || forallOp.getCombiningOps(bbArg).size() != 1) {
-        return false;
-      }
-      // If there are only reshape ops, then bufferization can usually handle
-      // it, so don't introduce map_scatter.
-      llvm::SetVector<Operation *> slice;
-      BackwardSliceOptions options;
-      options.filter = isSupportedRelayoutOp;
-      options.inclusive = true;
-      LogicalResult result =
-          getBackwardSlice(parallelInsertOp.getSource(), &slice, options);
-      if (failed(result)) {
-        return false;
-      }
-      return !llvm::all_of(
-          slice, llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp>);
+      llvm_unreachable("unhandled RelayoutOpKind");
     };
     break;
   }
