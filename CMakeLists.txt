@@ -529,6 +529,7 @@ option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). D
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
 option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
 option(IREE_ENABLE_POSITION_INDEPENDENT_CODE "Enable position independent code" TRUE)
+option(IREE_REVERSE_ITERATION "Reverse iteration over in unordered LLVM containers" OFF)
 
 if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
   message(SEND_ERROR
@@ -568,6 +569,10 @@ set_property(GLOBAL PROPERTY IREE_RUNTIME_COVERAGE_TARGETS "")
 # and instrumented execution don't line up enough).
 if(IREE_ENABLE_RUNTIME_COVERAGE AND NOT _UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG")
   message(FATAL_ERROR "IREE_ENABLE_*_COVERAGE requires building in Debug")
+endif()
+
+if(IREE_REVERSE_ITERATION)
+  set(LLVM_ENABLE_REVERSE_ITERATION ON CACHE BOOL "" FORCE)
 endif()
 
 #-------------------------------------------------------------------------------
