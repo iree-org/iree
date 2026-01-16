@@ -191,6 +191,10 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
             ".github/worklflows/ci_windows_x64_msvc.yml",
         ],
     ),
+    (
+        "test_torch",
+        ["tests/external/iree-test-suites/torch*"],
+    ),
 ]
 
 PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
