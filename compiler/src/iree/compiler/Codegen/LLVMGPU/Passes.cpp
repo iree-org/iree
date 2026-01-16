@@ -1146,7 +1146,8 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     FunctionLikeNest(modulePassManager)
         .addPass(
             [&] { return createLLVMGPULowerExecutableTargetPass(options); })
-        .addPass(createVerifyWorkgroupDistributionPass);
+        .addPass(createVerifyWorkgroupDistributionPass)
+        .addPass(createRemoveIndexHintsPass);
     if (clPatchFuncOps) {
       modulePassManager.addPass(createPatchFuncOpsPass());
     }
