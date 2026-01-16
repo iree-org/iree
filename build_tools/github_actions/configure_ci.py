@@ -195,14 +195,6 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
         "test_torch",
         ["tests/external/iree-test-suites/torch*"],
     ),
-    (
-        "test_onnx",
-        ["tests/external/iree-test-suites/onnx*"],
-    ),
-    (
-        "test_sharktank",
-        ["tests/external/iree-test-suites/sharktank*"],
-    ),
 ]
 
 PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
