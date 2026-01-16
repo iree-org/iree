@@ -75,7 +75,6 @@ static void appendTypesIf(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
 //   - NaN: exp=max, mantissa!=0 (IEEE), or special encoding (FNUZ: 0x80)
 
 // F32 format constants (IEEE 754 binary32).
-constexpr int kF32ExpBits = 8;
 constexpr int kF32MantBits = 23;
 constexpr int kF32Bias = 127;
 
@@ -358,9 +357,8 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
   LogicalResult matchAndRewrite(arith::TruncFOp op,
                                 PatternRewriter &rewriter) const override {
     Type resultType = op.getResult().getType();
-    Type inputType = op.getIn().getType();
     Type resultElemType = getElementTypeOrSelf(resultType);
-    Type inputElemType = getElementTypeOrSelf(inputType);
+    Type inputElemType = getElementTypeOrSelf(op.getIn().getType());
 
     // TODO(#23105): handle other fp types, e.g., fp4.
     if (!isa<Float32Type>(inputElemType) ||
