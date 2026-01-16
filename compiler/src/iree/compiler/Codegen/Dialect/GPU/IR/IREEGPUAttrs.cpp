@@ -830,8 +830,7 @@ createTransposeLoadIndexHint(OpBuilder &builder, Location loc,
     // all other results get lane-constant hints.
     Attribute hint = (i == incrementResultIdx) ? Attribute(laneIncrementAttr)
                                                : Attribute(laneConstantAttr);
-    auto hintOp =
-        IREE::Codegen::IndexHintOp::create(builder, loc, value, hint);
+    auto hintOp = IREE::Codegen::IndexHintOp::create(builder, loc, value, hint);
     results.push_back(hintOp.getResult());
   }
 
