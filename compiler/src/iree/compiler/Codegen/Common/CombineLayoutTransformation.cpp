@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -376,45 +377,18 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                              Value ub) -> bool {
     // Model diff = ub - lb  as an affine map (d0, d1) -> (d0 - d1)
     // and ask for a constant upper bound on diff.
-    // If we can prove UB(diff) <= 0, then "diff <= 0" -> "ub - lb <= 0" -> 
+    // If we can prove UB(diff) <= 0, then "diff <= 0" -> "ub - lb <= 0" ->
     // "lb >= ub".
     MLIRContext *ctx = rewriter.getContext();
     auto diffMap = AffineMap::get(
         /*dimCount=*/2, /*symbolCount=*/0,
         {getAffineDimExpr(0, ctx) - getAffineDimExpr(1, ctx)}, ctx);
-
     auto ubConstantBound = ValueBoundsConstraintSet::computeConstantBound(
         presburger::BoundType::UB,
         ValueBoundsConstraintSet::Variable(diffMap, ValueRange{ub, lb}),
         /*stopCondition=*/stopConditionFn,
         /*addConservativeSemiAffineBounds=*/true);
-
     return succeeded(ubConstantBound) && *ubConstantBound <= 0;
-  };
-
-  // Prove v == 0:
-  //
-  // This is intentionally strict (see stopConditionFn): if ValueBounds cannot
-  // prove v == 0 exactly, it returns failure and we treat v as "not provably
-  // zero".
-  auto proveEqZero = [&](Value v) -> bool {
-
-    FailureOr<int64_t> eq = ValueBoundsConstraintSet::computeConstantBound(
-        presburger::BoundType::EQ, ValueBoundsConstraintSet::Variable(v),
-        /*stopCondition=*/stopConditionFn,
-        /*addConservativeSemiAffineBounds=*/true);
-
-    return succeeded(eq) && *eq == 0;
-  };
-
-  auto isProvablyZeroOfr = [&](OpFoldResult ofr) -> bool {
-    if (isConstantIntValue(ofr, 0)) {
-      return true;
-    }
-    if (auto v = dyn_cast<Value>(ofr)) {
-      return proveEqZero(v);
-    }
-    return false;
   };
 
   // Distribute the padding of each dimension separately. This causes some
@@ -452,8 +426,8 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   // computation in order to have a more simplified kernel.
   for (auto [idx, low, high] :
        llvm::enumerate(padOp.getMixedLowPad(), padOp.getMixedHighPad())) {
-    // Create a distributed loop for the low padding if low pad is non-zero.
-    if (!isProvablyZeroOfr(low)) {
+    // Create a distributed loop for the low padding.
+    if (!(isConstantIntValue(low, 0))) {
       SmallVector<OpFoldResult> ubs(padResultSizes);
       SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
       SmallVector<int64_t> shape(padOp.getSourceType().getShape());
@@ -464,14 +438,10 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
       buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs,
                                    ubs, distConfigs, innerLoopBuilder);
     }
-
-    // Fast-path: if the pad amount is trivially/provably zero, skip generating
-    // loops.
-    if (isProvablyZeroOfr(high)) {
+    // Create a distributed loop for the high padding.
+    if (isConstantIntValue(high, 0)) {
       continue;
     }
-
-    // Create a distributed loop for the high padding.
     SmallVector<OpFoldResult> ubs(padResultSizes);
     SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
     SmallVector<int64_t> shape(padOp.getSourceType().getShape());
@@ -679,32 +649,13 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   IRRewriter rewriter(ctx);
   simplifyComplexRelayoutOps(rewriter, funcOp);
 
-  // Resolve dims aggressively and canonicalize to simplify and deduplicate the
-  // IR. This improves pattern matching and makes it easier for subsequent
+  // Resolve dims aggressively and canonicalize to simplify the IR.
+  // This improves pattern matching and makes it easier for subsequent
   // rewrites/proofs to recognize identity/no-op cases.
   {
     RewritePatternSet patterns(ctx);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-
-    // TODO(phemashekar): This collects canonicalization patterns for all
-    // ops/dialects present in the function IR. Identify the minimal required
-    // subset for the ValueBounds-driven proofs and switch to an explicit
-    // pattern list.
-    DenseSet<Dialect *> dialectsInIR;
-    DenseSet<OperationName> opsInIR;
-    funcOp->walk([&](Operation *op) {
-      if (Dialect *dialect = op->getDialect())
-        dialectsInIR.insert(dialect);
-      opsInIR.insert(op->getName());
-    });
-
-    for (Dialect *dialect : dialectsInIR) {
-      dialect->getCanonicalizationPatterns(patterns);
-    }
-
-    for (OperationName opName : opsInIR) {
-      opName.getCanonicalizationPatterns(patterns, ctx);
-    }
+    IREE::Util::AssumeIntOp::getCanonicalizationPatterns(patterns, ctx);
 
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return failure();
