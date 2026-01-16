@@ -1146,13 +1146,13 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     FunctionLikeNest(modulePassManager)
         .addPass(
             [&] { return createLLVMGPULowerExecutableTargetPass(options); })
-        .addPass(createVerifyWorkgroupDistributionPass);
+        .addPass(createVerifyWorkgroupDistributionPass)
+        .addPass(createRemoveIndexHintsPass);
     if (clPatchFuncOps) {
       modulePassManager.addPass(createPatchFuncOpsPass());
     }
   }
   {
-    variantPassManager.addPass(createRemoveIndexHintsPass());
     ReconcileTranslationInfoPassOptions options;
     options.distributeAlong = clSetWorkgroupDistributionAlong;
     variantPassManager.addPass(createReconcileTranslationInfoPass(options));
