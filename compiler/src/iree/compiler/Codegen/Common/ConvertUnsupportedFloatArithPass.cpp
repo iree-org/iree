@@ -13,11 +13,10 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include <type_traits>
-
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -36,19 +35,14 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// SFINAE (i.e., substitution failure is not an error) helper to detect if
-/// T::get(MLIRContext*) is valid.
-template <typename T, typename = void>
-struct HasContextGet : std::false_type {};
+/// Detector for T::get(MLIRContext*) used by llvm::is_detected.
 template <typename T>
-struct HasContextGet<
-    T, std::void_t<decltype(T::get(std::declval<MLIRContext *>()))>>
-    : std::true_type {};
+using hasContextGet = decltype(T::get(std::declval<MLIRContext *>()));
 
 /// Helpers to append types to a vector if they are f8 types.
 template <typename T>
-void maybeAppendType(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
-  if constexpr (HasContextGet<T>::value) {
+static void maybeAppendType(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
+  if constexpr (llvm::is_detected<hasContextGet, T>::value) {
     Type t = T::get(ctx);
     if (isa<FloatType>(t) && t.getIntOrFloatBitWidth() == 8) {
       types.push_back(t);
@@ -56,7 +50,7 @@ void maybeAppendType(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
   }
 }
 template <typename... Ts>
-void appendTypesIf(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
+static void appendTypesIf(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
   (maybeAppendType<Ts>(ctx, types), ...);
 }
 
@@ -89,8 +83,8 @@ constexpr int kF32MaxExp = 0xFF; // All exponent bits set (255).
 /// Parameters describing a floating-point format for conversion.
 /// Derived from APFloat semantics at runtime to support all MLIR float types.
 struct FloatTypeInfo {
-  unsigned expBits;  // Number of exponent bits.
-  unsigned mantBits; // Number of mantissa bits (excluding implicit leading 1).
+  int expBits;       // Number of exponent bits.
+  int mantBits;      // Number of mantissa bits (excluding implicit leading 1).
   int bias;          // Exponent bias: stored_exp = actual_exp + bias.
   bool hasInf;       // Format supports infinity (exp=max, mantissa=0).
   bool hasNan;       // Format supports NaN.
@@ -166,6 +160,13 @@ static FloatTypeInfo getFloatTypeInfo(Type type) {
 // Helper for float emulation patterns
 //===----------------------------------------------------------------------===//
 
+/// Extracted components from an f32 value stored as i32 bits.
+struct F32Fields {
+  Value sign;      // Sign bit (0 or 1) shifted to bit 0.
+  Value biasedExp; // Biased exponent (8 bits).
+  Value mantissa;  // Mantissa (23 bits, no implicit leading 1).
+};
+
 /// Helper class for emulating float conversions using integer bit manipulation.
 /// Handles both scalar and vector types uniformly.
 class FloatEmulationHelper {
@@ -205,20 +206,20 @@ public:
 
   /// Extracts sign, exponent, and mantissa from an f32 value (as i32 bits).
   /// F32 format: 1 sign bit, 8 exponent bits, 23 mantissa bits.
-  /// Returns {sign, biasedExp, mantissa}.
-  std::tuple<Value, Value, Value> extractF32Fields(Value i32Val) {
+  F32Fields extractF32Fields(Value i32Val) {
     Value cMantBits = createI32Const(kF32MantBits);
     Value cExpMask = createI32Const(kF32MaxExp);
     Value cMantMask = createI32Const(kF32MantMask);
     Value cSignShift = createI32Const(31);
 
-    Value sign = arith::ShRUIOp::create(rewriter, loc, i32Val, cSignShift);
-    Value biasedExp = arith::AndIOp::create(
+    F32Fields fields;
+    fields.sign = arith::ShRUIOp::create(rewriter, loc, i32Val, cSignShift);
+    fields.biasedExp = arith::AndIOp::create(
         rewriter, loc, arith::ShRUIOp::create(rewriter, loc, i32Val, cMantBits),
         cExpMask);
-    Value mantissa = arith::AndIOp::create(rewriter, loc, i32Val, cMantMask);
+    fields.mantissa = arith::AndIOp::create(rewriter, loc, i32Val, cMantMask);
 
-    return {sign, biasedExp, mantissa};
+    return fields;
   }
 
   /// Adds a bias to input for round-to-nearest-even before right-shifting.
@@ -261,7 +262,8 @@ private:
 //===----------------------------------------------------------------------===//
 
 /// Emulates arith.truncf from f32 to fp8 using integer bit manipulation.
-/// This implementation follows IREE's runtime/src/iree/base/internal/math.h.
+/// This implementation follows IREE's runtime/src/iree/base/internal/math.h
+/// (specifically iree_math_truncate_f32_to_bits_rounding_to_nearest_even).
 ///
 /// Features:
 ///   - Round-to-nearest-even (IEEE 754 default rounding mode).
@@ -274,7 +276,7 @@ private:
 ///    - NaN is encoded as 0x80 (sign=1, exp=0, mantissa=0).
 ///    - Overflow produces NaN; zero is always positive.
 ///
-/// 2. IEEE types (f8E5M2): Has Inf and negative zero.
+/// 2. IEEE-like types (f8E5M2): Has Inf and negative zero.
 ///    - Standard IEEE-like encoding with Inf at max exponent.
 ///
 /// 3. FN types (f8E4M3FN): No Inf, but has negative zero.
@@ -327,31 +329,34 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     // Bitcast f32 to i32 and extract fields.
     Value i32Val = arith::BitcastOp::create(rewriter, loc, helper.getI32Type(),
                                             op.getIn());
-    auto [f32Sign, f32Exp, f32Mant] = helper.extractF32Fields(i32Val);
+    F32Fields f32Fields = helper.extractF32Fields(i32Val);
 
     // Compute destination sign.
     Value dstSign =
-        arith::ShLIOp::create(rewriter, loc, f32Sign, cDstSignShift);
+        arith::ShLIOp::create(rewriter, loc, f32Fields.sign, cDstSignShift);
 
     // Check for NaN/Inf in source.
-    Value srcIsNanOrInf = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq, f32Exp, cF32MaxExp);
-    Value srcIsNan = arith::AndIOp::create(
-        rewriter, loc, srcIsNanOrInf,
-        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ne, f32Mant,
-                              c0));
-    Value srcIsInf = arith::AndIOp::create(
-        rewriter, loc, srcIsNanOrInf,
-        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq, f32Mant,
-                              c0));
+    Value srcIsNanOrInf =
+        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq,
+                              f32Fields.biasedExp, cF32MaxExp);
+    Value srcMantIsZero = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq, f32Fields.mantissa, c0);
+    Value srcIsInf =
+        arith::AndIOp::create(rewriter, loc, srcIsNanOrInf, srcMantIsZero);
+    // Derive srcIsNan from srcIsInf to avoid redundant comparison.
+    // srcIsNan = srcIsNanOrInf && !srcMantIsZero = srcIsNanOrInf && !srcIsInf
+    // Since srcIsNanOrInf is true when either is true, and srcIsInf requires
+    // srcMantIsZero, we can XOR: srcIsNan = srcIsNanOrInf XOR srcIsInf
+    Value srcIsNan =
+        arith::XOrIOp::create(rewriter, loc, srcIsNanOrInf, srcIsInf);
 
     // Check for zero or subnormal in source (exp == 0).
     Value srcExpIsZero = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq, f32Exp, c0);
+        rewriter, loc, arith::CmpIPredicate::eq, f32Fields.biasedExp, c0);
 
     // Compute arithmetic exponent (unbiased).
     Value arithmeticExp =
-        arith::SubIOp::create(rewriter, loc, f32Exp, cF32Bias);
+        arith::SubIOp::create(rewriter, loc, f32Fields.biasedExp, cF32Bias);
 
     // Check overflow: arithmetic_exp > max_normal_exp - dst_bias + dst_bias
     // Simplified: biased_dst_exp > max_normal_exp
@@ -366,7 +371,8 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
         rewriter, loc, arith::CmpIPredicate::sle, biasedDstExp, c0);
 
     // Check if rounding caused mantissa overflow (carry into exponent).
-    Value biasedMant = helper.biasForRoundToNearestEven(f32Mant, cMantShift);
+    Value biasedMant =
+        helper.biasForRoundToNearestEven(f32Fields.mantissa, cMantShift);
     Value mantOverflowed = arith::CmpIOp::create(
         rewriter, loc, arith::CmpIPredicate::ugt, biasedMant, cF32MantMask);
     biasedDstExp = arith::SelectOp::create(
@@ -406,7 +412,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     // Add implicit leading 1 to f32 mantissa for the shift.
     Value cImplicitBit = helper.createI32Const(1 << kF32MantBits);
     Value effectiveMant =
-        arith::OrIOp::create(rewriter, loc, f32Mant, cImplicitBit);
+        arith::OrIOp::create(rewriter, loc, f32Fields.mantissa, cImplicitBit);
 
     // Compute round-to-nearest-even for subnormal.
     Value subnormalMantRounded =
@@ -505,7 +511,8 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
 //===----------------------------------------------------------------------===//
 
 /// Emulates arith.extf from fp8 to f32 using integer bit manipulation.
-/// This implementation follows IREE's runtime/src/iree/base/internal/math.h.
+/// This implementation follows IREE's runtime/src/iree/base/internal/math.h
+/// (specifically iree_math_make_f32_from_bits).
 ///
 /// For normal values: adjust exponent bias and shift mantissa.
 ///

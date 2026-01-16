@@ -251,11 +251,15 @@ func.func @extf_cpu_f8e4m3fnuz_to_f32(%arg0 : f8E4M3FNUZ) -> f32 attributes
 // CHECK-DAG:     %[[C128:.*]] = arith.constant 128 : i32
 //
 // 0xFF (255) = max f32 exponent, used to detect NaN/Inf in source.
-// srcIsNan = (srcExp == 255) && (srcMant != 0)
+// srcIsNanOrInf = (srcExp == 255)
+// srcMantIsZero = (srcMant == 0)
+// srcIsInf = srcIsNanOrInf && srcMantIsZero
+// srcIsNan = srcIsNanOrInf XOR srcIsInf (avoids redundant comparison)
 // CHECK-DAG:     %[[C255:.*]] = arith.constant 255 : i32
 // CHECK:         %[[EXP_IS_MAX:.*]] = arith.cmpi eq, %{{.*}}, %[[C255]] : i32
-// CHECK:         %[[MANT_NE_ZERO:.*]] = arith.cmpi ne, %{{.*}}, %{{.*}} : i32
-// CHECK:         %[[SRC_IS_NAN:.*]] = arith.andi %[[EXP_IS_MAX]], %[[MANT_NE_ZERO]] : i1
+// CHECK:         %[[MANT_EQ_ZERO:.*]] = arith.cmpi eq, %{{.*}}, %{{.*}} : i32
+// CHECK:         %[[SRC_IS_INF:.*]] = arith.andi %[[EXP_IS_MAX]], %[[MANT_EQ_ZERO]] : i1
+// CHECK:         %[[SRC_IS_NAN:.*]] = arith.xori %[[EXP_IS_MAX]], %[[SRC_IS_INF]] : i1
 //
 // Critical ordering check: srcIsNan select must be immediately before trunci.
 // This ensures it's the outermost select, overriding negative zero correction.
@@ -277,8 +281,9 @@ func.func @truncf_fnuz_nan_handling(%arg0 : f32) -> f8E5M2FNUZ attributes
 // CHECK-DAG:     %[[C128:.*]] = arith.constant 128 : i32
 // CHECK-DAG:     %[[C255:.*]] = arith.constant 255 : i32
 // CHECK:         %[[EXP_IS_MAX:.*]] = arith.cmpi eq, %{{.*}}, %[[C255]] : i32
-// CHECK:         %[[MANT_NE_ZERO:.*]] = arith.cmpi ne, %{{.*}}, %{{.*}} : i32
-// CHECK:         %[[SRC_IS_NAN:.*]] = arith.andi %[[EXP_IS_MAX]], %[[MANT_NE_ZERO]] : i1
+// CHECK:         %[[MANT_EQ_ZERO:.*]] = arith.cmpi eq, %{{.*}}, %{{.*}} : i32
+// CHECK:         %[[SRC_IS_INF:.*]] = arith.andi %[[EXP_IS_MAX]], %[[MANT_EQ_ZERO]] : i1
+// CHECK:         %[[SRC_IS_NAN:.*]] = arith.xori %[[EXP_IS_MAX]], %[[SRC_IS_INF]] : i1
 // srcIsNan select must be immediately before trunci (outermost in cascade).
 // CHECK:         %[[FINAL:.*]] = arith.select %[[SRC_IS_NAN]], %[[C128]], %{{.*}} : i32
 // CHECK-NEXT:    arith.trunci %[[FINAL]] : i32 to i8
