@@ -55,7 +55,7 @@ static void appendTypesIf(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
 }
 
 //===----------------------------------------------------------------------===//
-// Floating-point format constants and type info
+// Helper for float emulation patterns
 //===----------------------------------------------------------------------===//
 //
 // This follows the same approach as IREE's
@@ -75,90 +75,9 @@ static void appendTypesIf(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
 //   - NaN: exp=max, mantissa!=0 (IEEE), or special encoding (FNUZ: 0x80)
 
 // F32 format constants (IEEE 754 binary32).
+constexpr int kF32ExpBits = 8;
 constexpr int kF32MantBits = 23;
 constexpr int kF32Bias = 127;
-constexpr int kF32MantMask = (1 << kF32MantBits) - 1;
-constexpr int kF32MaxExp = 0xFF; // All exponent bits set (255).
-
-/// Parameters describing a floating-point format for conversion.
-/// Derived from APFloat semantics at runtime to support all MLIR float types.
-struct FloatTypeInfo {
-  int expBits;       // Number of exponent bits.
-  int mantBits;      // Number of mantissa bits (excluding implicit leading 1).
-  int bias;          // Exponent bias: stored_exp = actual_exp + bias.
-  bool hasInf;       // Format supports infinity (exp=max, mantissa=0).
-  bool hasNan;       // Format supports NaN.
-  bool hasNegZero;   // Format supports negative zero.
-  bool nanAsNegZero; // NaN encoded as 0x80 (FNUZ types).
-  unsigned signMask; // Bit mask for sign bit.
-  unsigned expMask;  // Bit mask for exponent field.
-  unsigned mantMask; // Bit mask for mantissa field.
-  unsigned nanEncoding; // Bit pattern for canonical NaN.
-  unsigned infEncoding; // Bit pattern for +Inf (0 if no Inf).
-  unsigned maxFinite;   // Bit pattern for max finite value.
-};
-
-/// Returns format info for a float type by querying APFloat semantics.
-static FloatTypeInfo getFloatTypeInfo(Type type) {
-  auto floatType = cast<FloatType>(type);
-  const llvm::fltSemantics &sem = floatType.getFloatSemantics();
-  FloatTypeInfo info;
-
-  // Derive format parameters from APFloat semantics.
-  info.mantBits = llvm::APFloat::semanticsPrecision(sem) - 1;
-  unsigned totalBits = llvm::APFloat::semanticsSizeInBits(sem);
-  info.expBits = totalBits - 1 - info.mantBits;
-
-  // Compute masks.
-  info.signMask = 1u << (info.expBits + info.mantBits);
-  info.mantMask = (1u << info.mantBits) - 1;
-  info.expMask = ((1u << info.expBits) - 1) << info.mantBits;
-
-  // Bias from APFloat semantics.
-  int minExp = llvm::APFloat::semanticsMinExponent(sem);
-  info.bias = 1 - minExp;
-
-  info.hasInf = llvm::APFloat::semanticsHasInf(sem);
-  info.hasNan = llvm::APFloat::semanticsHasNaN(sem);
-
-  // Check for FNUZ types where NaN is encoded as negative zero (0x80).
-  // These types have no negative zero and no infinity.
-  llvm::APFloat negZero = llvm::APFloat::getZero(sem, /*Negative=*/true);
-  info.hasNegZero = negZero.isZero() && negZero.isNegative();
-  info.nanAsNegZero = !info.hasNegZero && !info.hasInf && info.hasNan;
-
-  // Compute NaN and Inf encodings.
-  unsigned maxExpCode = (1u << info.expBits) - 1;
-  if (info.nanAsNegZero) {
-    // FNUZ types: NaN = 0x80 (sign bit set, all else zero).
-    info.nanEncoding = info.signMask;
-  } else {
-    // IEEE and FN types: NaN = all exp bits + some mantissa bits.
-    info.nanEncoding = info.expMask | info.mantMask;
-  }
-
-  // Inf encoding: only meaningful for types with infinity.
-  info.infEncoding = info.hasInf ? info.expMask : 0;
-
-  // Max finite value: for types with infinity, it's exp=(max-1), mantissa=all
-  // 1s. For types without infinity, max exp is valid, so exp=max, mantissa=all
-  // 1s (except for FN types where max mantissa is NaN).
-  if (info.hasInf) {
-    info.maxFinite = ((maxExpCode - 1) << info.mantBits) | info.mantMask;
-  } else if (info.hasNan && !info.nanAsNegZero) {
-    // FN types: max exp is valid but max mantissa is NaN.
-    info.maxFinite = info.expMask | (info.mantMask - 1);
-  } else {
-    // FNUZ or no-NaN types: all bit patterns except NaN are valid.
-    info.maxFinite = info.expMask | info.mantMask;
-  }
-
-  return info;
-}
-
-//===----------------------------------------------------------------------===//
-// Helper for float emulation patterns
-//===----------------------------------------------------------------------===//
 
 /// Extracted components from an f32 value stored as i32 bits.
 struct F32Fields {
@@ -167,22 +86,49 @@ struct F32Fields {
   Value mantissa;  // Mantissa (23 bits, no implicit leading 1).
 };
 
-/// Helper class for emulating float conversions using integer bit manipulation.
-/// Handles both scalar and vector types uniformly.
+/// Helper class for emulating small float (e.g., fp8) conversions to/from f32
+/// using integer bit manipulation. Handles both scalar and vector types.
+///
+/// Takes a small float type (scalar or vector), queries its semantics via
+/// APFloat, and provides methods that return Value constants for the format
+/// parameters.
 class FloatEmulationHelper {
 public:
-  FloatEmulationHelper(RewriterBase &rewriter, Location loc, Type type)
-      : rewriter(rewriter), loc(loc), vecType(dyn_cast<VectorType>(type)) {
-    Type i32ScalarType = rewriter.getI32Type();
-    Type i8ScalarType = rewriter.getI8Type();
-    Type f32ScalarType = rewriter.getF32Type();
-    i32Type = vecType ? VectorType::get(vecType.getShape(), i32ScalarType)
-                      : i32ScalarType;
-    i8Type = vecType ? VectorType::get(vecType.getShape(), i8ScalarType)
-                     : i8ScalarType;
-    f32Type = vecType ? VectorType::get(vecType.getShape(), f32ScalarType)
-                      : f32ScalarType;
+  FloatEmulationHelper(RewriterBase &rewriter, Location loc,
+                       Type smallFloatType)
+      : rewriter(rewriter), loc(loc),
+        vecType(dyn_cast<VectorType>(smallFloatType)),
+        sem(cast<FloatType>(getElementTypeOrSelf(smallFloatType))
+                .getFloatSemantics()) {
+    // Setup scalar and vector types for i32, i8, f32.
+    Type i32Scalar = rewriter.getI32Type();
+    Type i8Scalar = rewriter.getI8Type();
+    Type f32Scalar = rewriter.getF32Type();
+    i32Type =
+        vecType ? VectorType::get(vecType.getShape(), i32Scalar) : i32Scalar;
+    i8Type = vecType ? VectorType::get(vecType.getShape(), i8Scalar) : i8Scalar;
+    f32Type =
+        vecType ? VectorType::get(vecType.getShape(), f32Scalar) : f32Scalar;
+
+    // Derive format parameters from APFloat semantics.
+    smallMantBits = llvm::APFloat::semanticsPrecision(sem) - 1;
+    int totalBits = llvm::APFloat::semanticsSizeInBits(sem);
+    smallExpBits = totalBits - 1 - smallMantBits;
+    smallBias = 1 - llvm::APFloat::semanticsMinExponent(sem);
+
+    // Query format capabilities.
+    smallHasInf = llvm::APFloat::semanticsHasInf(sem);
+    smallHasNan = llvm::APFloat::semanticsHasNaN(sem);
+
+    // Check for FNUZ types where NaN is encoded as negative zero (0x80).
+    llvm::APFloat negZero = llvm::APFloat::getZero(sem, /*Negative=*/true);
+    smallHasNegZero = negZero.isZero() && negZero.isNegative();
+    smallNanIsNegZero = !smallHasNegZero && !smallHasInf && smallHasNan;
   }
+
+  //===--------------------------------------------------------------------===//
+  // Generic constant creation
+  //===--------------------------------------------------------------------===//
 
   /// Creates an i32 constant, splatted if working with vectors.
   Value createI32Const(int64_t value) {
@@ -204,12 +150,117 @@ public:
     return rewriter.createOrFold<arith::ConstantOp>(loc, f32Type, attr);
   }
 
+  //===--------------------------------------------------------------------===//
+  // F32 format constants (as Value)
+  //===--------------------------------------------------------------------===//
+
+  Value getF32MantBitsConst() { return createI32Const(kF32MantBits); }
+  Value getF32BiasConst() { return createI32Const(kF32Bias); }
+  Value getF32MantMaskConst() {
+    return createI32Const((1 << kF32MantBits) - 1);
+  }
+  Value getF32MaxExpConst() { return createI32Const(0xFF); }
+  Value getF32ImplicitBitConst() { return createI32Const(1 << kF32MantBits); }
+  Value getF32NaNConst() { return createI32Const(0x7FC00000); }
+  Value getF32InfConst() { return createI32Const(0x7F800000); }
+
+  //===--------------------------------------------------------------------===//
+  // Small float format constants (as Value)
+  //===--------------------------------------------------------------------===//
+
+  Value getSmallMantBitsConst() { return createI32Const(smallMantBits); }
+  Value getSmallBiasConst() { return createI32Const(smallBias); }
+  Value getSmallSignShiftConst() {
+    return createI32Const(smallExpBits + smallMantBits);
+  }
+  Value getSmallMantMaskConst() {
+    return createI32Const((1u << smallMantBits) - 1);
+  }
+  Value getSmallExpMaskConst() {
+    return createI32Const(((1u << smallExpBits) - 1) << smallMantBits);
+  }
+  Value getSmallSignMaskConst() {
+    return createI32Const(1u << (smallExpBits + smallMantBits));
+  }
+  Value getSmallMaxExpConst() {
+    return createI32Const((1 << smallExpBits) - 1);
+  }
+  Value getSmallMaxNormalExpConst() {
+    int maxExp = (1 << smallExpBits) - 1;
+    return createI32Const(smallHasInf ? maxExp - 1 : maxExp);
+  }
+
+  /// Returns the mantissa shift between f32 and small float.
+  Value getMantShiftConst() {
+    return createI32Const(kF32MantBits - smallMantBits);
+  }
+
+  /// Returns the bias difference (f32_bias - small_bias).
+  Value getBiasDiffConst() { return createI32Const(kF32Bias - smallBias); }
+
+  /// Returns the subnormal exponent constant (1 - bias).
+  Value getSubnormalExpConst() { return createI32Const(1 - smallBias); }
+
+  /// Returns the NaN encoding for the small float type.
+  Value getNaNEncodingConst() {
+    if (smallNanIsNegZero) {
+      // FNUZ types: NaN = 0x80 (sign bit set, all else zero).
+      return getSmallSignMaskConst();
+    }
+    // IEEE and FN types: NaN = all exp bits + some mantissa bits.
+    unsigned expMask = ((1u << smallExpBits) - 1) << smallMantBits;
+    unsigned mantMask = (1u << smallMantBits) - 1;
+    return createI32Const(expMask | mantMask);
+  }
+
+  /// Returns the Inf encoding for the small float type (0 if no Inf support).
+  Value getInfEncodingConst() {
+    if (!smallHasInf)
+      return createI32Const(0);
+    return getSmallExpMaskConst();
+  }
+
+  /// Returns the max finite value encoding for the small float type.
+  Value getMaxFiniteConst() {
+    unsigned maxExpCode = (1u << smallExpBits) - 1;
+    unsigned mantMask = (1u << smallMantBits) - 1;
+    unsigned expMask = ((1u << smallExpBits) - 1) << smallMantBits;
+
+    if (smallHasInf) {
+      return createI32Const(((maxExpCode - 1) << smallMantBits) | mantMask);
+    }
+    if (smallHasNan && !smallNanIsNegZero) {
+      // FN types: max exp is valid but max mantissa is NaN.
+      return createI32Const(expMask | (mantMask - 1));
+    }
+    // FNUZ or no-NaN types: all bit patterns except NaN are valid.
+    return createI32Const(expMask | mantMask);
+  }
+
+  /// Returns the denormal scale factor for extf: 2^(1 - bias - mantBits).
+  Value getDenormalScaleConst() {
+    float scale = std::ldexp(1.0f, 1 - smallBias - smallMantBits);
+    return createF32Const(scale);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Format capability queries
+  //===--------------------------------------------------------------------===//
+
+  bool hasInf() const { return smallHasInf; }
+  bool hasNan() const { return smallHasNan; }
+  bool hasNegZero() const { return smallHasNegZero; }
+  bool isNanEncodedAsNegZero() const { return smallNanIsNegZero; }
+
+  //===--------------------------------------------------------------------===//
+  // F32 field extraction
+  //===--------------------------------------------------------------------===//
+
   /// Extracts sign, exponent, and mantissa from an f32 value (as i32 bits).
-  /// F32 format: 1 sign bit, 8 exponent bits, 23 mantissa bits.
   F32Fields extractF32Fields(Value i32Val) {
-    Value cMantBits = createI32Const(kF32MantBits);
-    Value cExpMask = createI32Const(kF32MaxExp);
-    Value cMantMask = createI32Const(kF32MantMask);
+    Value cMantBits = getF32MantBitsConst();
+    Value cExpMask = getF32MaxExpConst();
+    Value cMantMask = getF32MantMaskConst();
     Value cSignShift = createI32Const(31);
 
     F32Fields fields;
@@ -221,6 +272,10 @@ public:
 
     return fields;
   }
+
+  //===--------------------------------------------------------------------===//
+  // Rounding support
+  //===--------------------------------------------------------------------===//
 
   /// Adds a bias to input for round-to-nearest-even before right-shifting.
   /// This matches runtime/src/iree/base/internal/math.h's bias_to_nearest_even:
@@ -244,6 +299,10 @@ public:
     return arith::AddIOp::create(rewriter, loc, input, bias);
   }
 
+  //===--------------------------------------------------------------------===//
+  // Type accessors
+  //===--------------------------------------------------------------------===//
+
   Type getI32Type() const { return i32Type; }
   Type getI8Type() const { return i8Type; }
   Type getF32Type() const { return f32Type; }
@@ -252,9 +311,21 @@ private:
   RewriterBase &rewriter;
   Location loc;
   VectorType vecType;
+  const llvm::fltSemantics &sem;
+
+  // Derived types for scalar/vector operations.
   Type i32Type;
   Type i8Type;
   Type f32Type;
+
+  // Small float format parameters (derived from semantics).
+  int smallExpBits;
+  int smallMantBits;
+  int smallBias;
+  bool smallHasInf;
+  bool smallHasNan;
+  bool smallHasNegZero;
+  bool smallNanIsNegZero;
 };
 
 //===----------------------------------------------------------------------===//
@@ -297,34 +368,25 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
       return failure();
     }
 
-    FloatTypeInfo dstInfo = getFloatTypeInfo(resultElemType);
     Location loc = op.getLoc();
     FloatEmulationHelper helper(rewriter, loc, resultType);
 
-    // Constants for destination format.
-    int dstMaxBiasedExp = (1 << dstInfo.expBits) - 1;
-    // Max exponent for normal values (excludes Inf/NaN encoding if applicable).
-    int dstMaxNormalBiasedExp =
-        dstInfo.hasInf ? dstMaxBiasedExp - 1 : dstMaxBiasedExp;
-    int mantShift = kF32MantBits - dstInfo.mantBits;
-
-    // Create constants.
+    // Get constants from helper.
     Value c0 = helper.createI32Const(0);
     Value c1 = helper.createI32Const(1);
-    Value cF32MantBits = helper.createI32Const(kF32MantBits);
-    Value cF32MantMask = helper.createI32Const(kF32MantMask);
-    Value cF32MaxExp = helper.createI32Const(kF32MaxExp);
-    Value cF32Bias = helper.createI32Const(kF32Bias);
-    Value cDstBias = helper.createI32Const(dstInfo.bias);
-    Value cDstMantBits = helper.createI32Const(dstInfo.mantBits);
+    Value cF32MantBits = helper.getF32MantBitsConst();
+    Value cF32MantMask = helper.getF32MantMaskConst();
+    Value cF32MaxExp = helper.getF32MaxExpConst();
+    Value cF32Bias = helper.getF32BiasConst();
+    Value cDstBias = helper.getSmallBiasConst();
+    Value cDstMantBits = helper.getSmallMantBitsConst();
     Value cDstExpShift = cDstMantBits;
-    Value cDstSignShift =
-        helper.createI32Const(dstInfo.expBits + dstInfo.mantBits);
-    Value cDstMantMask = helper.createI32Const(dstInfo.mantMask);
-    Value cDstMaxNormalExp = helper.createI32Const(dstMaxNormalBiasedExp);
-    Value cMantShift = helper.createI32Const(mantShift);
-    Value cNaN = helper.createI32Const(dstInfo.nanEncoding);
-    Value cDstSignMask = helper.createI32Const(dstInfo.signMask);
+    Value cDstSignShift = helper.getSmallSignShiftConst();
+    Value cDstMantMask = helper.getSmallMantMaskConst();
+    Value cDstMaxNormalExp = helper.getSmallMaxNormalExpConst();
+    Value cMantShift = helper.getMantShiftConst();
+    Value cNaN = helper.getNaNEncodingConst();
+    Value cDstSignMask = helper.getSmallSignMaskConst();
 
     // Bitcast f32 to i32 and extract fields.
     Value i32Val = arith::BitcastOp::create(rewriter, loc, helper.getI32Type(),
@@ -344,9 +406,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     Value srcIsInf =
         arith::AndIOp::create(rewriter, loc, srcIsNanOrInf, srcMantIsZero);
     // Derive srcIsNan from srcIsInf to avoid redundant comparison.
-    // srcIsNan = srcIsNanOrInf && !srcMantIsZero = srcIsNanOrInf && !srcIsInf
-    // Since srcIsNanOrInf is true when either is true, and srcIsInf requires
-    // srcMantIsZero, we can XOR: srcIsNan = srcIsNanOrInf XOR srcIsInf
+    // srcIsNan = srcIsNanOrInf XOR srcIsInf
     Value srcIsNan =
         arith::XOrIOp::create(rewriter, loc, srcIsNanOrInf, srcIsInf);
 
@@ -358,8 +418,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     Value arithmeticExp =
         arith::SubIOp::create(rewriter, loc, f32Fields.biasedExp, cF32Bias);
 
-    // Check overflow: arithmetic_exp > max_normal_exp - dst_bias + dst_bias
-    // Simplified: biased_dst_exp > max_normal_exp
+    // Check overflow: biased_dst_exp > max_normal_exp.
     Value biasedDstExp =
         arith::AddIOp::create(rewriter, loc, arithmeticExp, cDstBias);
     Value isOverflow =
@@ -400,17 +459,16 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
         dstMant);
 
     // Underflow case: generate subnormal or zero.
-    // For subnormals, dst_exp = 0 and mantissa encodes the value.
     // shift_amount = f32_mant_bits - dst_mant_bits - arithmetic_exp + (1 -
     // dst_bias)
-    Value dstSubnormalExp = helper.createI32Const(1 - dstInfo.bias);
+    Value dstSubnormalExp = helper.getSubnormalExpConst();
     Value shiftAmount = arith::SubIOp::create(
         rewriter, loc,
         arith::SubIOp::create(rewriter, loc, cF32MantBits, cDstMantBits),
         arith::SubIOp::create(rewriter, loc, arithmeticExp, dstSubnormalExp));
 
     // Add implicit leading 1 to f32 mantissa for the shift.
-    Value cImplicitBit = helper.createI32Const(1 << kF32MantBits);
+    Value cImplicitBit = helper.getF32ImplicitBitConst();
     Value effectiveMant =
         arith::OrIOp::create(rewriter, loc, f32Fields.mantissa, cImplicitBit);
 
@@ -432,10 +490,10 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     Value shiftTooLarge = arith::CmpIOp::create(
         rewriter, loc, arith::CmpIPredicate::sgt, shiftAmount,
         helper.createI32Const(kF32MantBits + 1));
-    subnormalResult = arith::SelectOp::create(
-        rewriter, loc, shiftTooLarge,
-        dstInfo.nanAsNegZero ? c0 : dstSign, // Zero (signed if supported)
-        subnormalResult);
+    // Zero (signed if supported).
+    Value zeroValue = helper.isNanEncodedAsNegZero() ? c0 : dstSign;
+    subnormalResult = arith::SelectOp::create(rewriter, loc, shiftTooLarge,
+                                              zeroValue, subnormalResult);
 
     // Select cascade for final result.
     //
@@ -455,7 +513,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
                                            subnormalResult, normalResult);
 
     // F32 subnormals (exp=0) become zero in fp8 (much smaller than fp8 min).
-    Value zeroResult = dstInfo.nanAsNegZero ? c0 : dstSign;
+    Value zeroResult = helper.isNanEncodedAsNegZero() ? c0 : dstSign;
     result = arith::SelectOp::create(rewriter, loc, srcExpIsZero, zeroResult,
                                      result);
 
@@ -463,7 +521,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     // CRITICAL: This must happen BEFORE NaN/Inf/overflow handling.
     // For FNUZ types, 0x80 is the NaN encoding, not negative zero.
     // If we did this after, we would incorrectly convert NaN to zero.
-    if (dstInfo.nanAsNegZero) {
+    if (helper.isNanEncodedAsNegZero()) {
       Value resultIsNegZero = arith::CmpIOp::create(
           rewriter, loc, arith::CmpIPredicate::eq, result, cDstSignMask);
       result =
@@ -473,15 +531,15 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
     // Overflow and source Inf both map to the same result:
     // Inf (IEEE) or NaN (FN/FNUZ) or saturate to max finite (no Inf/NaN).
     Value infOrOverflowResult;
-    if (dstInfo.hasInf) {
-      infOrOverflowResult = arith::OrIOp::create(
-          rewriter, loc, dstSign, helper.createI32Const(dstInfo.infEncoding));
-    } else if (dstInfo.hasNan) {
+    if (helper.hasInf()) {
+      infOrOverflowResult = arith::OrIOp::create(rewriter, loc, dstSign,
+                                                 helper.getInfEncodingConst());
+    } else if (helper.hasNan()) {
       infOrOverflowResult = cNaN;
     } else {
       // No Inf, no NaN: saturate to max finite.
-      infOrOverflowResult = arith::OrIOp::create(
-          rewriter, loc, dstSign, helper.createI32Const(dstInfo.maxFinite));
+      infOrOverflowResult = arith::OrIOp::create(rewriter, loc, dstSign,
+                                                 helper.getMaxFiniteConst());
     }
     result = arith::SelectOp::create(rewriter, loc, isOverflow,
                                      infOrOverflowResult, result);
@@ -489,12 +547,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
                                      infOrOverflowResult, result);
 
     // Handle source NaN last so it takes precedence.
-    Value nanResult;
-    if (dstInfo.hasNan) {
-      nanResult = cNaN;
-    } else {
-      nanResult = c0; // No NaN encoding: convert to +0.
-    }
+    Value nanResult = helper.hasNan() ? cNaN : c0;
     result =
         arith::SelectOp::create(rewriter, loc, srcIsNan, nanResult, result);
 
@@ -536,24 +589,17 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
       return failure();
     }
 
-    FloatTypeInfo srcInfo = getFloatTypeInfo(inputElemType);
     Location loc = op.getLoc();
-    FloatEmulationHelper helper(rewriter, loc, resultType);
+    FloatEmulationHelper helper(rewriter, loc, inputType);
 
-    // Conversion parameters.
-    int srcMaxExp = (1 << srcInfo.expBits) - 1; // All exp bits set.
-    int biasDiff =
-        kF32Bias - srcInfo.bias; // Bias adjustment for normal values.
-    int mantShift =
-        kF32MantBits - srcInfo.mantBits; // Left shift to align mantissa.
-
+    // Get constants from helper.
     Value c0 = helper.createI32Const(0);
-    Value cBiasDiff = helper.createI32Const(biasDiff);
-    Value cMantShift = helper.createI32Const(mantShift);
-    Value cSrcMaxExp = helper.createI32Const(srcMaxExp);
-    Value cF32NaN = helper.createI32Const(0x7FC00000); // Canonical quiet NaN.
-    Value cF32Inf = helper.createI32Const(0x7F800000); // +Infinity.
-    Value cF32MantBits = helper.createI32Const(kF32MantBits);
+    Value cBiasDiff = helper.getBiasDiffConst();
+    Value cMantShift = helper.getMantShiftConst();
+    Value cSrcMaxExp = helper.getSmallMaxExpConst();
+    Value cF32NaN = helper.getF32NaNConst();
+    Value cF32Inf = helper.getF32InfConst();
+    Value cF32MantBits = helper.getF32MantBitsConst();
 
     // Bitcast fp8 to i8, extend to i32, and extract fields.
     Value i8Val =
@@ -561,12 +607,11 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
     Value i32Val =
         arith::ExtUIOp::create(rewriter, loc, helper.getI32Type(), i8Val);
 
-    // Extract fields.
-    Value cSrcMantBits = helper.createI32Const(srcInfo.mantBits);
-    Value cSrcExpMask = helper.createI32Const((1 << srcInfo.expBits) - 1);
-    Value cSrcMantMask = helper.createI32Const(srcInfo.mantMask);
-    Value cSrcSignShift =
-        helper.createI32Const(srcInfo.expBits + srcInfo.mantBits);
+    // Extract fields from small float.
+    Value cSrcMantBits = helper.getSmallMantBitsConst();
+    Value cSrcExpMask = helper.getSmallMaxExpConst();
+    Value cSrcMantMask = helper.getSmallMantMaskConst();
+    Value cSrcSignShift = helper.getSmallSignShiftConst();
 
     Value sign = arith::ShRUIOp::create(rewriter, loc, i32Val, cSrcSignShift);
     Value biasedExpSrc = arith::AndIOp::create(
@@ -588,12 +633,12 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
     // Detect special values based on format type.
     Value isNaN;
     Value isInf; // Only used for IEEE types (hasInf=true).
-    if (srcInfo.nanAsNegZero) {
+    if (helper.isNanEncodedAsNegZero()) {
       // FNUZ: NaN = 0x80 (sign=1, exp=0, mantissa=0), no Inf.
-      Value cFNUZNaN = helper.createI32Const(srcInfo.nanEncoding);
+      Value cFNUZNaN = helper.getNaNEncodingConst();
       isNaN = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq,
                                     i32Val, cFNUZNaN);
-    } else if (srcInfo.hasInf) {
+    } else if (helper.hasInf()) {
       // IEEE types: NaN = exp==max && mantissa!=0, Inf = exp==max &&
       // mantissa==0.
       Value expIsMax = arith::CmpIOp::create(
@@ -602,7 +647,7 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
       isInf = arith::AndIOp::create(rewriter, loc, expIsMax, mantIsZero);
     } else {
       // FN types: NaN only at specific encoding, no Inf.
-      Value cNaNEncoding = helper.createI32Const(srcInfo.nanEncoding);
+      Value cNaNEncoding = helper.getNaNEncodingConst();
       isNaN = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq,
                                     i32Val, cNaNEncoding);
     }
@@ -633,8 +678,7 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
     // Use mulf with a precomputed scale factor instead of enumerating values.
     Value mantF32 =
         arith::UIToFPOp::create(rewriter, loc, helper.getF32Type(), mantSrc);
-    float scaleValue = std::ldexp(1.0f, 1 - srcInfo.bias - srcInfo.mantBits);
-    Value scale = helper.createF32Const(scaleValue);
+    Value scale = helper.getDenormalScaleConst();
     Value denormalF32 = arith::MulFOp::create(rewriter, loc, mantF32, scale);
     // Apply sign: bitcast to i32, OR with sign bit.
     Value denormalI32 = arith::BitcastOp::create(
@@ -648,11 +692,11 @@ struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
                                            denormalResult, normalResult);
 
     // Zero: use signed zero if format supports negative zero, else +0.
-    Value zeroResult = srcInfo.hasNegZero ? f32Sign : c0;
+    Value zeroResult = helper.hasNegZero() ? f32Sign : c0;
     result = arith::SelectOp::create(rewriter, loc, isZero, zeroResult, result);
 
     // Inf (IEEE types only): preserve sign.
-    if (srcInfo.hasInf) {
+    if (helper.hasInf()) {
       Value signedInf = arith::OrIOp::create(rewriter, loc, f32Sign, cF32Inf);
       result = arith::SelectOp::create(rewriter, loc, isInf, signedInf, result);
     }
