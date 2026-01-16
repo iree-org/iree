@@ -1549,6 +1549,14 @@ static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
     SmallVectorImpl<bool> &scalableSizeFlags) {
   assert(sizes.empty() && "Pre-condition enforced by caller");
 
+  // Check we have a matrix multiplication.
+  FailureOr<linalg::ContractionDimensions> cDims =
+      linalg::inferContractionDims(op);
+  if (failed(cDims) || cDims->m.size() != 1 || cDims->n.size() != 1 ||
+      cDims->k.size() != 1) {
+    return;
+  }
+
   // Find the output element type of the matmul.
   assert(op->getResultTypes().size() == 1 &&
          "Expected single output type for matmul op");
