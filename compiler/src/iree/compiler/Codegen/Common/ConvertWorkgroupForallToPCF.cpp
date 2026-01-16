@@ -19,7 +19,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-struct ConvertWorkgroupForall : OpRewritePattern<scf::ForallOp> {
+struct ConvertWorkgroupForall final : OpRewritePattern<scf::ForallOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(scf::ForallOp op,
                                 PatternRewriter &rewriter) const override;
@@ -53,7 +53,8 @@ ConvertWorkgroupForall::matchAndRewrite(scf::ForallOp op,
   auto scope = cast<IREE::PCF::ScopeAttrInterface>(
       IREE::Codegen::WorkgroupScopeAttr::get(rewriter.getContext(),
                                              /*linearize=*/true));
-  FailureOr<IREE::PCF::LoopOp> res = convertForallToPCF(rewriter, op, scope, 1);
+  FailureOr<IREE::PCF::LoopOp> res =
+      convertForallToPCFLoop(rewriter, op, scope, 1);
   if (failed(res)) {
     return failure();
   }
