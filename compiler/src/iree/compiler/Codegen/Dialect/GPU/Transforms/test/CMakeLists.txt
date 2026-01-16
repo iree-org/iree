@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "combine_barrier_regions.mlir"
+    "convert_forall_to_generic_nest_gpu.mlir"
     "distribute_inner_tiled_to_lanes.mlir"
     "expand_undistributed_inner_tiles.mlir"
   TOOLS

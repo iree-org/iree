@@ -79,6 +79,7 @@ iree_cc_library(
     "ConvertAccGEMMToGEMMPass.cpp"
     "ConvertBf16ArithToF32.cpp"
     "ConvertBf16ToUInt16Buffers.cpp"
+    "ConvertForallToGenericNestWorkgroup.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "ConvertUnsupportedFloatArithPass.cpp"
     "ConvertWorkgroupForallToPCF.cpp"

@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-pcf-convert-forall-to-loops)" --split-input-file | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-pcf-test-convert-forall-to-loops)" --split-input-file | FileCheck %s
 
 func.func @convert_forall(%arg0: tensor<?x?xi32>, %init: tensor<?x?xi32>, %d0: index) -> tensor<?x?xi32> {
   %0 = scf.forall (%id0, %id1) in (%d0, 32) shared_outs(%iter = %init) -> (tensor<?x?xi32>) {
