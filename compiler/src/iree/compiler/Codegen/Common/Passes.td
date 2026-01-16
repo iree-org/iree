@@ -496,6 +496,11 @@ def FlattenMemRefSubspanPass : Pass<"iree-codegen-flatten-memref-subspan", "Modu
   }];
 }
 
+def FlattenSwizzleHintAllocsPass :
+    InterfacePass<"iree-codegen-flatten-swizzle-hint-allocs", "mlir::FunctionOpInterface"> {
+  let summary = "Flattens allocations associated with iree_codegen.swizzle_hint ops";
+}
+
 def FoldAffineMinInDistributedLoopsPass :
   InterfacePass<"iree-codegen-fold-affinemin-in-distributed-loops", "mlir::FunctionOpInterface"> {
   let summary = "Fold `affine.min` ops in distributed loops";
