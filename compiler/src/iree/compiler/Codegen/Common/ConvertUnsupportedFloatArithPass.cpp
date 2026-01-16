@@ -214,8 +214,9 @@ public:
 
   /// Returns the Inf encoding for the small float type (0 if no Inf support).
   Value getInfEncodingConst() {
-    if (!smallHasInf)
+    if (!smallHasInf) {
       return createI32Const(0);
+    }
     return getSmallExpMaskConst();
   }
 
