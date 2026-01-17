@@ -207,3 +207,12 @@ module {
 }
 // CHECK-LABEL: func @test_lane_increment_with_step
 //  CHECK-SAME:   lane_increment = #iree_gpu.lane_increment<16, step = 2>
+
+module {
+  func.func @test_swizzle_hint_promotion() attributes {
+      promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_swizzle_hint_promotion
+//  CHECK-SAME:   promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]

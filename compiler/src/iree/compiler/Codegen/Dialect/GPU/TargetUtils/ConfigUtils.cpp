@@ -44,6 +44,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
+constexpr int64_t kLDSBankWidthBits = 32 * 4 * 8;
 
 //===----------------------------------------------------------------------===//
 // Lowering Config Selection
@@ -914,8 +915,28 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // TODO(#22119): We don't use global load DMA for scaled matmuls, because
     // compilation doesn't support it. Once this is fixed, we should use global
     // load DMA here when possible.
-    promotionArray = {};
     promotionList.append({2, 3});
+    // The row width is the number of elements across which we want to swizzle
+    // groups over.To avoid bank conflicts, we want to set the row width to be
+    // the number of elements that fill all the cache lines.
+    auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
+    int64_t lhsBitwidth = lhsElemType.getIntOrFloatBitWidth();
+    int64_t rhsBitwidth = rhsElemType.getIntOrFloatBitWidth();
+    int64_t lhsNumRowElems = kLDSBankWidthBits / lhsBitwidth;
+    int64_t rhsNumRowElems = kLDSBankWidthBits / rhsBitwidth;
+    int64_t numAccessElems = schedule->kSizes.back();
+    auto lhsSwizzleAttr = IREE::Codegen::XORShuffleAttr::get(
+        context, lhsNumRowElems, numAccessElems, /*row_stride=*/int64_t(0),
+        /*per_phase=*/int64_t(0));
+    auto rhsSwizzleAttr = IREE::Codegen::XORShuffleAttr::get(
+        context, rhsNumRowElems, numAccessElems, /*row_stride=*/int64_t(0),
+        /*per_phase=*/int64_t(0));
+    Attribute lhsSwizzleOperand = IREE::GPU::SwizzleOperandAttr::get(
+        context, defaultConfigAttr, lhsSwizzleAttr);
+    Attribute rhsSwizzleOperand = IREE::GPU::SwizzleOperandAttr::get(
+        context, defaultConfigAttr, rhsSwizzleAttr);
+    promotionArray = {lhsSwizzleOperand, rhsSwizzleOperand, defaultConfigAttr,
+                      defaultConfigAttr};
   }
   if ((!mustBeAligned || couldNeedPadding) && CPromoteIfPadding) {
     // If needed then add C operand which would be operand 2 or 4 for unscaled
