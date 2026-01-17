@@ -1,0 +1,129 @@
+#!/bin/bash
+# Configure IREE for Bazel builds.
+#
+# Usage: iree-bazel-configure
+#
+# This script runs configure_bazel.py to detect platform/compiler and
+# creates a user.bazelrc with recommended settings.
+
+set -e
+
+# Source shared library.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/iree-bazel-lib"
+iree_bazel_init "iree-bazel-configure"
+
+show_help() {
+    cat << 'EOF'
+iree-bazel-configure - Configure IREE for Bazel builds
+
+USAGE
+    iree-bazel-configure
+    IREE_HAL_DRIVER_CUDA=ON iree-bazel-configure
+
+WHAT IT DOES
+    1. Runs configure_bazel.py to detect platform/compiler
+    2. Writes HAL driver configuration from environment variables
+    3. Creates user.bazelrc with recommended settings (if not exists)
+
+GENERATED FILES
+    configured.bazelrc    Platform detection + driver configuration
+    user.bazelrc         Local settings (disk cache, debug config)
+
+ENVIRONMENT VARIABLES
+    IREE_BAZEL_CACHE_DIR - Bazel disk cache location
+        Unix default: ~/.cache/bazel-iree
+        Windows default: c:/bazelcache (avoids path length issues)
+
+    HAL Drivers (runtime, matches CMake conventions):
+      IREE_HAL_DRIVER_CUDA=ON        - Enable CUDA driver
+      IREE_HAL_DRIVER_VULKAN=ON      - Enable Vulkan driver
+      IREE_HAL_DRIVER_HIP=ON         - Enable HIP driver
+      IREE_HAL_DRIVER_METAL=ON       - Enable Metal driver
+      IREE_HAL_DRIVER_AMDGPU=ON      - Enable AMDGPU driver
+      IREE_HAL_DRIVER_LOCAL_SYNC=ON  - Enable local-sync (default)
+      IREE_HAL_DRIVER_LOCAL_TASK=ON  - Enable local-task (default)
+      IREE_HAL_DRIVER_NULL=ON        - Enable null driver
+
+    Values: ON/YES/TRUE/Y/1 (enabled), OFF/NO/FALSE/N/0 (disabled)
+    Defaults: local-sync, local-task, vulkan enabled (matches CMake)
+
+    Note: Compiler backends are always built in Bazel (plugin architecture).
+
+EXAMPLES
+    # Configure with defaults
+    iree-bazel-configure
+
+    # Enable CUDA
+    IREE_HAL_DRIVER_CUDA=ON iree-bazel-configure
+
+    # Enable multiple drivers
+    IREE_HAL_DRIVER_CUDA=ON IREE_HAL_DRIVER_VULKAN=ON iree-bazel-configure
+
+AFTER CONFIGURATION
+    iree-bazel-build      Build IREE targets
+    iree-bazel-test       Run tests with configured drivers
+
+SEE ALSO
+    iree-bazel-build, iree-bazel-test
+EOF
+}
+
+# Handle help and agent-md before worktree check.
+case "${1:-}" in
+    -h|--help) show_help; exit 0 ;;
+    --agent-md|--agent_md) iree_show_agent_md; exit 0 ;;
+esac
+
+# Set up worktree (configure doesn't call iree_ensure_configured - it IS the configure).
+iree_require_worktree
+cd "$IREE_BAZEL_WORKTREE_DIR"
+
+iree_info "Configuring IREE for Bazel in $IREE_BAZEL_WORKTREE_DIR..."
+
+# Run platform detection.
+if [[ -f "configure_bazel.py" ]]; then
+    iree_info "Running configure_bazel.py..."
+    python3 configure_bazel.py
+else
+    iree_error "configure_bazel.py not found in $IREE_BAZEL_WORKTREE_DIR"
+    exit 1
+fi
+
+# Create user.bazelrc if it doesn't exist.
+if [[ ! -f "user.bazelrc" ]]; then
+    iree_info "Creating user.bazelrc..."
+
+    # Platform-specific cache directory defaults.
+    if [[ -n "${IREE_BAZEL_CACHE_DIR:-}" ]]; then
+        CACHE_DIR="$IREE_BAZEL_CACHE_DIR"
+    elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+        # Windows: Use shorter path to avoid 260 character limit.
+        CACHE_DIR="c:/bazelcache"
+    else
+        # Unix: Use XDG cache directory.
+        CACHE_DIR="$HOME/.cache/bazel-iree"
+    fi
+
+    cat > user.bazelrc << EOF
+# Local Bazel configuration.
+# This file is not version-controlled.
+
+# Disk cache for faster rebuilds (override with IREE_BAZEL_CACHE_DIR).
+build --disk_cache=$CACHE_DIR
+
+# Debug config: no optimizations, with assertions.
+build:debug --config=asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-O0' --strip=never
+
+# Enable assertions (optimized but with runtime checks).
+build:asserts --compilation_mode=opt '--copt=-UNDEBUG'
+EOF
+    iree_info "Created user.bazelrc with recommended settings"
+else
+    iree_info "user.bazelrc already exists, skipping"
+fi
+
+iree_info "Configuration complete!"
+echo ""
+echo "Build with:  iree-bazel-build [target]"
+echo "Test with:   iree-bazel-test [target]"

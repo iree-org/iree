@@ -1,0 +1,416 @@
+# iree-bazel-lib - Shared functions for iree-bazel-* tools
+#
+# This file is meant to be sourced, not executed directly.
+# Usage in scripts:
+#   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#   source "$SCRIPT_DIR/iree-bazel-lib"
+#   iree_bazel_init "iree-bazel-build"
+
+# Prevent double-sourcing.
+[[ -n "${_IREE_BAZEL_LIB_LOADED:-}" ]] && return 0
+_IREE_BAZEL_LIB_LOADED=1
+
+# -----------------------------------------------------------------------------
+# Colors
+# -----------------------------------------------------------------------------
+_IREE_BAZEL_COLOR_GREEN='\033[0;32m'
+_IREE_BAZEL_COLOR_YELLOW='\033[0;33m'
+_IREE_BAZEL_COLOR_RED='\033[0;31m'
+_IREE_BAZEL_COLOR_CYAN='\033[0;36m'
+_IREE_BAZEL_COLOR_NC='\033[0m'
+
+# Tool name for logging (set via iree_bazel_init).
+_IREE_BAZEL_TOOL_NAME=""
+
+# -----------------------------------------------------------------------------
+# Logging functions
+# -----------------------------------------------------------------------------
+
+# Print info message with tool name prefix (to stderr, never pollutes stdout).
+iree_info() {
+    printf "${_IREE_BAZEL_COLOR_GREEN}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "$1" >&2
+}
+
+# Print warning message with tool name prefix (to stderr).
+iree_warn() {
+    printf "${_IREE_BAZEL_COLOR_YELLOW}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "$1" >&2
+}
+
+# Print error message with tool name prefix to stderr.
+iree_error() {
+    printf "${_IREE_BAZEL_COLOR_RED}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "$1" >&2
+}
+
+# Print debug message (only if IREE_BAZEL_VERBOSE is set).
+iree_debug() {
+    [[ "${IREE_BAZEL_VERBOSE:-0}" == "1" ]] && \
+        printf "${_IREE_BAZEL_COLOR_CYAN}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "$1" >&2
+    return 0
+}
+
+# -----------------------------------------------------------------------------
+# Agent documentation
+# -----------------------------------------------------------------------------
+
+# Print a concise snippet for CLAUDE.md/AGENT.md files describing the bazel suite.
+# Called by all iree-bazel-* tools via --agent-md flag.
+iree_show_agent_md() {
+    cat << 'EOF'
+## iree-bazel-* Tools
+
+Use `iree-bazel-*` wrappers instead of raw `bazel` commands. They handle
+configuration, provide better defaults, and work from any subdirectory.
+
+**Setup (ask user before first use):**
+- Run `iree-bazel-configure` once per worktree to set up Bazel configuration
+- Tools will error with helpful message if not configured yet
+
+**Main tools:**
+- `iree-bazel-build <target> [bazel-args]` - Build targets
+- `iree-bazel-test <target> [bazel-args]` - Run tests
+- `iree-bazel-run <target> [bazel-args] [-- program-args]` - Build and run binary
+- `iree-bazel-try [options] -e 'code' [-- program-args]` - Quick C/C++ experiments
+
+**Additional tools:** `iree-bazel-query`, `iree-bazel-fuzz` (see `--help`)
+
+**Examples:**
+```shell
+iree-bazel-build //tools:iree-compile
+iree-bazel-test //runtime/src/iree/base:status_test
+iree-bazel-run //tools:iree-compile -- --help
+iree-bazel-try -e 'int main() { return 0; }'
+```
+
+**Output directories** (at repo root):
+- `bazel-bin/` - built executables and libraries
+- `bazel-testlogs/` - test outputs and logs
+
+**Important:** Use absolute labels (`//tools:target` not `:target`). Try to stay
+in the worktree directory when running commands.
+
+Run `<tool> --help` for full documentation.
+EOF
+}
+
+# -----------------------------------------------------------------------------
+# Worktree detection
+# -----------------------------------------------------------------------------
+
+# Find the IREE worktree root (directory with .git and .bazelversion).
+# Outputs the path to stdout, returns 1 if not found.
+iree_find_worktree_root() {
+    local directory="${1:-$PWD}"
+    while [[ "$directory" != "/" ]]; do
+        if [[ -e "$directory/.git" ]] && [[ -f "$directory/.bazelversion" ]]; then
+            echo "$directory"
+            return 0
+        fi
+        directory=$(dirname "$directory")
+    done
+    return 1
+}
+
+# Require being in a worktree, exit with error if not.
+# Sets IREE_BAZEL_WORKTREE_DIR on success.
+iree_require_worktree() {
+    IREE_BAZEL_WORKTREE_DIR=$(iree_find_worktree_root)
+    if [[ -z "$IREE_BAZEL_WORKTREE_DIR" ]]; then
+        iree_error "Not in an IREE worktree (no .bazelversion found)"
+        iree_error "Must be in a directory with .git and .bazelversion files"
+        exit 1
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
+
+# Check that bazel is configured, error if not.
+# Must be called after cd to worktree root.
+iree_ensure_configured() {
+    if [[ ! -f "configured.bazelrc" ]]; then
+        iree_error "Bazel is not configured for this worktree"
+        echo ""
+        echo "Run this command to configure:"
+        echo "  iree-bazel-configure"
+        echo ""
+        echo "For configuration options, run:"
+        echo "  iree-bazel-configure --help"
+        exit 1
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Initialization
+# -----------------------------------------------------------------------------
+
+# Initialize the library for a specific tool.
+# Args:
+#   $1 - Tool name (e.g., "iree-bazel-build")
+#
+# This sets up:
+#   - Tool name for logging
+#   - IREE_BAZEL_ORIG_CWD (original working directory before any cd)
+#   - IREE_BAZEL_DRY_RUN (default 0)
+#   - IREE_BAZEL_VERBOSE (default 0)
+iree_bazel_init() {
+    _IREE_BAZEL_TOOL_NAME="$1"
+    IREE_BAZEL_ORIG_CWD="$PWD"
+    IREE_BAZEL_DRY_RUN="${IREE_BAZEL_DRY_RUN:-0}"
+    IREE_BAZEL_VERBOSE="${IREE_BAZEL_VERBOSE:-0}"
+}
+
+# Set up the worktree environment.
+# Combines: require worktree + cd to it + ensure configured.
+# Must be called after parsing args (so --help can work outside worktree).
+iree_setup_worktree() {
+    iree_require_worktree
+    cd "$IREE_BAZEL_WORKTREE_DIR"
+    iree_ensure_configured
+}
+
+# Check if dry-run mode is enabled.
+iree_is_dry_run() {
+    [[ "$IREE_BAZEL_DRY_RUN" == "1" ]]
+}
+
+# Check if verbose mode is enabled.
+iree_is_verbose() {
+    [[ "$IREE_BAZEL_VERBOSE" == "1" ]]
+}
+
+# Get the bazel command to use (bazel or ibazel for watch mode).
+# Assumes bazelisk is installed as 'bazel' (standard installation pattern).
+iree_get_bazel_command() {
+    local watch_mode="${1:-0}"
+
+    if [[ "$watch_mode" == "1" ]]; then
+        if ! command -v ibazel >/dev/null 2>&1; then
+            iree_error "ibazel not found. Install with: go install github.com/bazelbuild/bazel-watcher/cmd/ibazel@latest"
+            exit 1
+        fi
+        echo "ibazel"
+    else
+        echo "bazel"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Argument preprocessing
+# -----------------------------------------------------------------------------
+
+# Expand combined short flags (e.g., -nv -> -n -v).
+# This allows Unix-style combined flags as documented in help text.
+#
+# Usage: Call before argument parsing loop to expand combined flags.
+#   eval "set -- $(iree_expand_combined_flags "$@")"
+#
+# Examples:
+#   -nv   -> -n -v
+#   -nvk  -> -n -v -k
+#   --foo -> --foo (unchanged)
+#   -n    -> -n (unchanged)
+iree_expand_combined_flags() {
+    local result=()
+    while [[ $# -gt 0 ]]; do
+        local arg="$1"
+        shift
+        # Match single dash followed by 2+ lowercase letters (no '=' or other chars).
+        if [[ "$arg" =~ ^-([a-z]{2,})$ ]]; then
+            local flags="${BASH_REMATCH[1]}"
+            for (( i=0; i<${#flags}; i++ )); do
+                result+=("-${flags:$i:1}")
+            done
+        else
+            result+=("$arg")
+        fi
+    done
+    # Print quoted args suitable for eval.
+    printf '%q ' "${result[@]}"
+}
+
+# -----------------------------------------------------------------------------
+# Default configuration flags
+# -----------------------------------------------------------------------------
+
+# Build the list of default bazel config flags.
+# These are inserted before user-provided flags so users can override.
+# Populates IREE_BAZEL_DEFAULT_CONFIGS array.
+#
+# Current defaults:
+#   --config=localdev    Local dev optimizations (disk cache, skymeld)
+#   --verbose_failures   (only in verbose mode) Show full command on failure
+#
+# Future: auto-detect hardware and enable drivers:
+#   - HIP_PATH -> --config=hip
+#   - VULKAN_SDK -> --config=vulkan
+#   - CUDA_PATH -> --config=cuda
+iree_bazel_build_default_configs() {
+    IREE_BAZEL_DEFAULT_CONFIGS=()
+
+    # Always use localdev for interactive development.
+    IREE_BAZEL_DEFAULT_CONFIGS+=(--config=localdev)
+
+    # Verbose mode: show full commands on failure.
+    if iree_is_verbose; then
+        IREE_BAZEL_DEFAULT_CONFIGS+=(--verbose_failures)
+    fi
+
+    # Use mold linker if available (significantly faster than ld/gold).
+    if command -v mold &>/dev/null; then
+        IREE_BAZEL_DEFAULT_CONFIGS+=(--config=mold)
+        iree_debug "Using mold linker"
+    fi
+
+    # TODO: Auto-detect available hardware/SDKs.
+    # if [[ -n "${HIP_PATH:-}" ]]; then
+    #     IREE_BAZEL_DEFAULT_CONFIGS+=(--config=hip)
+    # fi
+    # if [[ -n "${VULKAN_SDK:-}" ]]; then
+    #     IREE_BAZEL_DEFAULT_CONFIGS+=(--config=vulkan)
+    # fi
+
+    iree_debug "Default configs: ${IREE_BAZEL_DEFAULT_CONFIGS[*]}"
+}
+
+# -----------------------------------------------------------------------------
+# Build and execution
+# -----------------------------------------------------------------------------
+
+# Get the output file path for a bazel target.
+# Must be called from the worktree root directory.
+# Args:
+#   $1 - Bazel target label
+#   $2... - Bazel args (configs, etc.) - MUST match the build args
+# Outputs: Absolute path to built binary
+iree_bazel_get_binary_path() {
+    local target="$1"
+    shift
+    local BAZEL_BIN=$(iree_get_bazel_command)
+    local relative_path
+    # Pass all bazel args to cquery so it uses the same configuration as build.
+    relative_path=$("$BAZEL_BIN" cquery --output=files "$target" "$@" 2>/dev/null)
+    # Convert to absolute path (bazel returns paths relative to workspace).
+    if [[ -n "$relative_path" ]]; then
+        echo "$PWD/$relative_path"
+    fi
+}
+
+# Build a bazel target and execute it from the original working directory.
+# This solves the problem where bazel run changes cwd to the execroot.
+#
+# Args:
+#   $1 - Bazel target label
+#   $2 - Original working directory to run from
+#   $3... - Bazel args (everything before --)
+#   After finding "--" in args, remaining args go to the program
+#
+# Example:
+#   iree_bazel_build_and_exec "//tools:iree-compile" "$IREE_BAZEL_ORIG_CWD" \
+#       --config=debug -- input.mlir -o output.vmfb
+iree_bazel_build_and_exec() {
+    local target="$1"
+    local run_cwd="$2"
+    shift 2
+
+    local -a bazel_args=()
+    local -a program_args=()
+    local parsing_program_args=0
+
+    # Split args into bazel args and program args.
+    while [[ $# -gt 0 ]]; do
+        if [[ "$parsing_program_args" == "1" ]]; then
+            program_args+=("$1")
+        elif [[ "$1" == "--" ]]; then
+            parsing_program_args=1
+        else
+            bazel_args+=("$1")
+        fi
+        shift
+    done
+
+    iree_debug "Bazel args: ${bazel_args[*]:-<none>}"
+    iree_debug "Program args: ${program_args[*]:-<none>}"
+
+    # Build the target quietly (no output on success).
+    if ! iree_bazel_build_quiet "$target" "${bazel_args[@]}"; then
+        return $?
+    fi
+
+    # Get the binary path (pass same args so cquery uses same configuration).
+    local binary_path
+    binary_path=$(iree_bazel_get_binary_path "$target" "${bazel_args[@]}")
+    if [[ -z "$binary_path" ]] || [[ ! -x "$binary_path" ]]; then
+        iree_error "Could not find built binary for $target"
+        return 1
+    fi
+
+    iree_debug "Binary: $binary_path"
+    iree_debug "Running from: $run_cwd"
+
+    # Run from original directory.
+    cd "$run_cwd"
+    exec "$binary_path" "${program_args[@]}"
+}
+
+# Build a bazel target only (no execution).
+# Returns the binary path via stdout.
+#
+# Args:
+#   $1 - Bazel target label
+#   $2... - Bazel args
+#
+# Example:
+#   binary_path=$(iree_bazel_build_only "//tools:iree-compile" --config=debug)
+iree_bazel_build_only() {
+    local target="$1"
+    shift
+    local BAZEL_BIN=$(iree_get_bazel_command)
+    local -a bazel_args=("$@")
+
+    iree_debug "Building $target..."
+
+    if ! "$BAZEL_BIN" build "$target" "${bazel_args[@]}"; then
+        return $?
+    fi
+
+    # Pass same args so cquery uses same configuration.
+    iree_bazel_get_binary_path "$target" "${bazel_args[@]}"
+}
+
+# Build a bazel target quietly - no output on success, full output on failure.
+# Use this for run/try tools where we want clean output by default.
+#
+# Args:
+#   $1 - Bazel target label
+#   $2... - Bazel args
+#
+# Returns: exit code from bazel build
+iree_bazel_build_quiet() {
+    local target="$1"
+    shift
+    local BAZEL_BIN=$(iree_get_bazel_command)
+
+    iree_debug "Building $target..."
+
+    if iree_is_verbose; then
+        # Verbose mode: show everything.
+        "$BAZEL_BIN" build "$target" "$@"
+        return $?
+    fi
+
+    # Quiet mode: capture output, only show on failure.
+    # Force colors since we'll display to terminal on failure.
+    local log_file
+    log_file=$(mktemp)
+    trap "rm -f '$log_file'" RETURN
+
+    if "$BAZEL_BIN" build --color=yes "$target" "$@" >"$log_file" 2>&1; then
+        return 0
+    else
+        local exit_code=$?
+        # Build failed - show the captured output.
+        cat "$log_file" >&2
+        return $exit_code
+    fi
+}
