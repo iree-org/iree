@@ -240,7 +240,20 @@ runIREEOneShotBufferize(Operation *op,
   if (options.testAnalysisOnly) {
     return success();
   }
-  return bufferization::runOneShotBufferize(op, options, state);
+  if (failed(bufferization::runOneShotBufferize(op, options, state))) {
+    return failure();
+  }
+
+  // All to_buffer ops on constants can be safely marked as read only since
+  // constants are immutable and any write conflicts would have already been
+  // resolved by the bufferization analysis (which inserts copies as needed).
+  op->walk([](bufferization::ToBufferOp toBuffer) {
+    if (toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      toBuffer.setReadOnly(true);
+    }
+  });
+
+  return success();
 }
 
 /// Run comprehensive bufferize.
@@ -270,18 +283,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
     return signalPassFailure();
   }
 
-  // All to_buffer ops on single use constants will have already had any
-  // write conflicts resolved by the analysis, so we can safely mark them as
-  // read only.
-  funcOp->walk([](bufferization::ToBufferOp toBuffer) {
-    if (auto constant =
-            toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
-      if (constant->hasOneUse()) {
-        toBuffer.setReadOnly(true);
-      }
-    }
-  });
-
   // Remove redundant args and unused results.
   {
     RewritePatternSet patterns(&getContext());
@@ -303,6 +304,15 @@ void IREEBufferizeConstantsPass::runOnOperation() {
     signalPassFailure();
     return;
   }
+
+  // All to_buffer ops on constants can be safely marked as read only since
+  // constants are immutable and any write conflicts would have already been
+  // resolved by the bufferization analysis (which inserts copies as needed).
+  getOperation()->walk([](bufferization::ToBufferOp toBuffer) {
+    if (toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      toBuffer.setReadOnly(true);
+    }
+  });
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
