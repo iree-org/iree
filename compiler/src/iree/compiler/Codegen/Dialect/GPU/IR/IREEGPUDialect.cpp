@@ -6,8 +6,10 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCFInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -18,6 +20,10 @@ void IREEGPUDialect::initialize() {
 #define GET_OP_LIST
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.cpp.inc"
       >();
+
+  // Promised interface declarations for interfaces implemented externally.
+  declarePromisedInterface<PCF::ScopeAttrInterface, SubgroupScopeAttr>();
+  declarePromisedInterface<PCF::ScopeAttrInterface, LaneScopeAttr>();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
