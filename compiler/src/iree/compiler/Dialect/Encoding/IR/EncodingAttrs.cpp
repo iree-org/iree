@@ -229,9 +229,7 @@ static FailureOr<AffineMap> getComposedAffineMap(Attribute attr) {
       return AffineMap();
     }
     // All entries should have type `AffineMapAttr`.
-    if (!llvm::all_of(mapsAttr, [](Attribute attr) {
-          return isa<AffineMapAttr>(attr);
-        })) {
+    if (!llvm::all_of(mapsAttr, llvm::IsaPred<AffineMapAttr>)) {
       return failure();
     }
     AffineMap map =

@@ -413,7 +413,7 @@ static void formatIOAttr(DictionaryAttr attrs, llvm::raw_ostream &os) {
   auto shouldIncludeAttr = [](const NamedAttribute &attr) {
     return attr.getName().getValue() != "iree.abi.name";
   };
-  if (!llvm::any_of(attrs, shouldIncludeAttr)) {
+  if (llvm::none_of(attrs, shouldIncludeAttr)) {
     return;
   }
   os << " {";

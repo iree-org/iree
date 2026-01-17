@@ -737,7 +737,7 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
       continue;
     }
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
-        !llvm::any_of(
+        llvm::none_of(
             consumerDstOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
               return canUseInOperandAsInitOperand(inputOperand, &initOperand);
             })) {
@@ -979,9 +979,8 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // by the `isClonableIntoDispatchOp` call above, but for now this is done
       // as a point fix.
       if (IREE::LinalgExt::isGatherlikeOp(&op) &&
-          llvm::all_of(op.getUsers(), [](Operation *op) {
-            return isa<IREE::LinalgExt::AttentionOp>(op);
-          })) {
+          llvm::all_of(op.getUsers(),
+                       llvm::IsaPred<IREE::LinalgExt::AttentionOp>)) {
         continue;
       }
 

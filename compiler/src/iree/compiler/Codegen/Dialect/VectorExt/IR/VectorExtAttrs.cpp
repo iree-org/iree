@@ -303,9 +303,7 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
                                       ArrayRef<AffineMap> maps,
                                       AffineMap resultMap) {
   constexpr int64_t kInvalid = -1;
-  if (llvm::any_of(layouts, [](VectorLayoutInterface layout) {
-        return !isa<NestedLayoutAttr>(layout);
-      })) {
+  if (!llvm::all_of(layouts, llvm::IsaPred<NestedLayoutAttr>)) {
     return NestedLayoutAttr();
   }
   MLIRContext *context = resultMap.getContext();

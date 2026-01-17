@@ -403,9 +403,8 @@ LogicalResult isAtBoundary(Operation *op) {
       return success();
     }
   } else if (isa<linalg::UnPackOp>(op)) {
-    if (llvm::all_of(op->getUsers(), [](Operation *user) {
-          return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
-        })) {
+    if (llvm::all_of(op->getUsers(),
+                     llvm::IsaPred<IREE::TensorExt::DispatchTensorStoreOp>)) {
       return success();
     }
   }

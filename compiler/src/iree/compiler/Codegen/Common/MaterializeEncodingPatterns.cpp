@@ -734,7 +734,7 @@ void populateMaterializeEncodingPatterns(
         return resultType == typeConverter.convertType(resultType);
       });
   target.addDynamicallyLegalOp<func::ReturnOp>([](func::ReturnOp returnOp) {
-    return !llvm::any_of(returnOp.getOperandTypes(),
+    return llvm::none_of(returnOp.getOperandTypes(),
                          isRankedTensorTypeWithEncoding);
   });
 
