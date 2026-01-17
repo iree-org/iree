@@ -344,9 +344,8 @@ static LogicalResult isUnpaddedAndAtBoundary(Operation *op) {
   // If all consumers are dispatch tensor stores, then the `op` is decomposable
   // if it is an UnPackOp.
   if (isa<linalg::UnPackOp>(op) &&
-      llvm::all_of(op->getUsers(), [&](Operation *user) {
-        return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
-      })) {
+      llvm::all_of(op->getUsers(),
+                   llvm::IsaPred<IREE::TensorExt::DispatchTensorStoreOp>)) {
     return success();
   }
   return failure();

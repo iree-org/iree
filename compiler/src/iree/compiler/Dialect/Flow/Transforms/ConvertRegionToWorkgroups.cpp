@@ -101,9 +101,10 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   llvm::SetVector<Value> argumentsSet;
   mlir::getUsedValuesDefinedAbove(region, argumentsSet);
   // Unranked tensors are not supported.
-  assert(!llvm::any_of(argumentsSet, [](Value v) {
-    return isa<UnrankedTensorType>(v.getType());
-  }) && "unranked tensors are not supported");
+  assert(llvm::none_of(
+             argumentsSet,
+             [](Value v) { return isa<UnrankedTensorType>(v.getType()); }) &&
+         "unranked tensors are not supported");
 
   // Compute dimensions of tensor args.
   SmallVector<Value> argumentDims;

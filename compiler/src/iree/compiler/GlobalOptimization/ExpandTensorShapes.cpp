@@ -213,7 +213,7 @@ static void expandRegion(Region &region, SymbolTable &symbolTable,
   // Update all block arguments.
   auto indexType = IndexType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
-    if (!llvm::any_of(block.getArgumentTypes(), isDynamicTensor)) {
+    if (llvm::none_of(block.getArgumentTypes(), isDynamicTensor)) {
       continue;
     }
 

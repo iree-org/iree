@@ -485,9 +485,8 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
                              scf::ForallOp laneForallOp) {
   // Verify mappings.
   if (!warpForallOp.getMapping() ||
-      !llvm::all_of(*warpForallOp.getMapping(), [](Attribute mappingAttr) {
-        return isa<gpu::GPUWarpMappingAttr>(mappingAttr);
-      })) {
+      !llvm::all_of(*warpForallOp.getMapping(),
+                    llvm::IsaPred<gpu::GPUWarpMappingAttr>)) {
     return rewriter.notifyMatchFailure(warpForallOp, "not a warp forall op");
   }
   if (!laneForallOp.getMapping() || laneForallOp.getMapping()->size() != 1 ||

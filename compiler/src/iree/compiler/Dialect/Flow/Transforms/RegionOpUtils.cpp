@@ -643,9 +643,8 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
         return producer && producer->getParentOfType<DispatchRegionOp>();
       })) {
     rewriter.setInsertionPoint(dispatchRegionOp);
-  } else if (llvm::all_of(op->getUsers(), [&](Operation *user) {
-               return isa<IREE::Flow::ReturnOp>(user);
-             })) {
+  } else if (llvm::all_of(op->getUsers(),
+                          llvm::IsaPred<IREE::Flow::ReturnOp>)) {
     rewriter.setInsertionPointAfter(dispatchRegionOp);
   } else {
     return rewriter.notifyMatchFailure(
