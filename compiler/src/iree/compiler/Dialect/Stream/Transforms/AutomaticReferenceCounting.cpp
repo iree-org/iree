@@ -306,31 +306,40 @@ struct LastUseSet {
   }
 };
 
+// Returns the timepoints sorted by their order in the block (textual order).
+// All timepoints must be in the same block.
+static SmallVector<Value> getSortedTimepointsInBlock(TimepointSet &timepoints) {
+  auto sorted = llvm::to_vector_of<Value>(timepoints);
+  llvm::sort(sorted, [](Value a, Value b) {
+    Operation *opA = a.getDefiningOp();
+    Operation *opB = b.getDefiningOp();
+    if (!opA && !opB) {
+      // Both are block arguments, compare by argument number.
+      return cast<BlockArgument>(a).getArgNumber() <
+             cast<BlockArgument>(b).getArgNumber();
+    }
+    if (!opA) {
+      return true; // Block argument comes before operation.
+    }
+    if (!opB) {
+      return false; // Operation comes before block argument.
+    }
+    return opA->isBeforeInBlock(opB);
+  });
+  return sorted;
+}
+
 // Returns the last defined SSA value in the block in |timepoints| (textual
 // order within the block). All timepoints must be in the same block.
 static Value getLastTimepointInBlock(TimepointSet &timepoints) {
   if (timepoints.empty()) {
     return nullptr;
-  } else if (timepoints.size() == 1) {
+  }
+  if (timepoints.size() == 1) {
     return *timepoints.begin();
   }
-  Value lastTimepoint;
-  for (auto timepoint : timepoints) {
-    if (!lastTimepoint) {
-      lastTimepoint = timepoint;
-    } else {
-      auto *timepointOp = timepoint.getDefiningOp();
-      auto *lastTimepointOp = lastTimepoint.getDefiningOp();
-      if (!timepointOp) {
-        continue; // block arg
-      } else if (!lastTimepointOp) {
-        lastTimepoint = timepoint; // last found was a block arg, this isn't
-      } else if (lastTimepointOp->isBeforeInBlock(timepointOp)) {
-        lastTimepoint = timepoint;
-      }
-    }
-  }
-  return lastTimepoint;
+  SmallVector<Value> sorted = getSortedTimepointsInBlock(timepoints);
+  return sorted.back();
 }
 
 // Returns a FusedLoc with the location of all |timepoints| and the base |loc|.
@@ -595,8 +604,7 @@ static void insertDeallocations(LastUseSet &lastUseSet, AsmState *asmState,
       auto joinOp = IREE::Stream::TimepointJoinOp::create(
           builder, timepointsLoc,
           builder.getType<IREE::Stream::TimepointType>(),
-          llvm::map_to_vector(timepoints,
-                              [](Value timepoint) { return timepoint; }));
+          getSortedTimepointsInBlock(timepoints));
       auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
           builder, timepointsLoc,
           builder.getType<IREE::Stream::TimepointType>(), resource,
