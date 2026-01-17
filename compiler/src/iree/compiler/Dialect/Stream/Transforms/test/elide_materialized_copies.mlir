@@ -44,10 +44,12 @@ util.func public @kvcache_update_step(%step_input_view: !util.buffer, %kvcache_v
   %step_input = stream.tensor.import %step_input_view : !util.buffer -> tensor<1x512xf32> in !stream.resource<external>{%step_size}
 
   // Import KV cache (user-provided storage we'll read from and write to).
+  // The `consume` attribute indicates caller transfers ownership, enabling
+  // zero-copy in-place updates without protective clones.
   // CHECK: %[[CACHE_SIZE:.+]] = stream.tensor.sizeof
-  // CHECK: %[[KVCACHE:.+]] = stream.tensor.import %[[CACHE_VIEW]] : !util.buffer -> tensor<100x512xf32> in !stream.resource<external>{%[[CACHE_SIZE]]}
+  // CHECK: %[[KVCACHE:.+]] = stream.tensor.import consume %[[CACHE_VIEW]] : !util.buffer -> tensor<100x512xf32> in !stream.resource<external>{%[[CACHE_SIZE]]}
   %cache_size = stream.tensor.sizeof tensor<100x512xf32> : index
-  %kvcache = stream.tensor.import %kvcache_view : !util.buffer -> tensor<100x512xf32> in !stream.resource<external>{%cache_size}
+  %kvcache = stream.tensor.import consume %kvcache_view : !util.buffer -> tensor<100x512xf32> in !stream.resource<external>{%cache_size}
 
   // Slice out relevant cache entries for current step (read-only).
   %slice_size = stream.tensor.sizeof tensor<10x512xf32> : index
@@ -108,9 +110,10 @@ util.func public @user_provided_output_storage(%input_view: !util.buffer, %outpu
   %input = stream.tensor.import %input_view : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%input_size}
 
   // Import user-provided output storage.
-  // CHECK: %[[OUTPUT_STORAGE:.+]] = stream.tensor.import %[[OUTPUT_VIEW]]
+  // The `consume` attribute enables zero-copy in-place updates.
+  // CHECK: %[[OUTPUT_STORAGE:.+]] = stream.tensor.import consume %[[OUTPUT_VIEW]]
   %output_size = stream.tensor.sizeof tensor<1024xf32> : index
-  %output_storage = stream.tensor.import %output_view : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%output_size}
+  %output_storage = stream.tensor.import consume %output_view : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%output_size}
 
   // Compute result from input.
   // CHECK: %[[COMPUTED:.+]] = stream.async.dispatch @ex_compute_output::@compute[%c1, %c1, %c1](%[[INPUT]][%c0 to %[[INPUT_SIZE]] for %[[INPUT_SIZE]]]) : (!stream.resource<external>{%[[INPUT_SIZE]]}) -> !stream.resource<*>{{.+}}
@@ -150,12 +153,13 @@ util.func public @inplace_fill_imported_buffer(%buffer_view: !util.buffer) -> !u
   %c456_i32 = arith.constant 456 : i32
 
   // Import user buffer.
+  // The `consume` attribute enables zero-copy in-place updates.
   // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof
-  // CHECK: %[[BUFFER:.+]] = stream.tensor.import %[[BUFFER_VIEW]] : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[BUFFER:.+]] = stream.tensor.import consume %[[BUFFER_VIEW]] : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%[[SIZE]]}
   %size = stream.tensor.sizeof tensor<256xf32> : index
-  %buffer = stream.tensor.import %buffer_view : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%size}
+  %buffer = stream.tensor.import consume %buffer_view : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%size}
 
-  // Fill first region - block arg gets clone inserted, then elided.
+  // Fill first region - in-place.
   // CHECK-NOT: stream.async.clone
   // CHECK: %[[FILL1:.+]] = stream.async.fill %c123_i32, %[[BUFFER]][%c0 to %c64 for %c64] : i32 -> %[[BUFFER]] as !stream.resource<external>{%[[SIZE]]}
   %fill1 = stream.async.fill %c123_i32, %buffer[%c0 to %c64 for %c64] : i32 -> %buffer as !stream.resource<external>{%size}
@@ -201,10 +205,11 @@ util.func public @scf_for_inplace_on_imported(%buffer_view: !util.buffer, %count
   %c1 = arith.constant 1 : index
 
   // Import buffer.
+  // The `consume` attribute enables zero-copy in-place updates.
   // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof
-  // CHECK: %[[BUFFER:.+]] = stream.tensor.import %[[BUFFER_VIEW]] : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[BUFFER:.+]] = stream.tensor.import consume %[[BUFFER_VIEW]] : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%[[SIZE]]}
   %size = stream.tensor.sizeof tensor<1024xf32> : index
-  %buffer = stream.tensor.import %buffer_view : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%size}
+  %buffer = stream.tensor.import consume %buffer_view : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%size}
 
   // Loop mutates buffer in-place each iteration.
   // CHECK: %[[RESULT:.+]] = scf.for %{{.+}} = %c0 to %[[COUNT]] step %c1 iter_args(%[[ITER:.+]] = %[[BUFFER]]) -> (!stream.resource<external>) {
@@ -242,10 +247,11 @@ util.func public @scf_if_inplace_both_branches(%cond: i1, %buffer_view: !util.bu
   %c456_i32 = arith.constant 456 : i32
 
   // Import buffer.
+  // The `consume` attribute enables zero-copy in-place updates.
   // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof
-  // CHECK: %[[BUFFER:.+]] = stream.tensor.import %[[BUFFER_VIEW]] : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[BUFFER:.+]] = stream.tensor.import consume %[[BUFFER_VIEW]] : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%[[SIZE]]}
   %size = stream.tensor.sizeof tensor<256xf32> : index
-  %buffer = stream.tensor.import %buffer_view : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%size}
+  %buffer = stream.tensor.import consume %buffer_view : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%size}
 
   // Conditional in-place mutation.
   // CHECK: %[[RESULT:.+]] = scf.if %[[COND]] -> (!stream.resource<external>) {
@@ -294,10 +300,11 @@ util.func public @dispatch_aliased_buffer(%buffer_view: !util.buffer) -> !util.b
   %c1 = arith.constant 1 : index
 
   // Import buffer.
+  // The `consume` attribute enables zero-copy in-place updates.
   // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof
-  // CHECK: %[[BUFFER:.+]] = stream.tensor.import %[[BUFFER_VIEW]] : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[BUFFER:.+]] = stream.tensor.import consume %[[BUFFER_VIEW]] : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%[[SIZE]]}
   %size = stream.tensor.sizeof tensor<1024xf32> : index
-  %buffer = stream.tensor.import %buffer_view : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%size}
+  %buffer = stream.tensor.import consume %buffer_view : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%size}
 
   // Dispatch uses buffer multiple times (read) and writes to it (tied).
   // CHECK-NOT: stream.async.clone
@@ -331,10 +338,11 @@ util.func public @nested_scf_inplace(%buffer_view: !util.buffer) -> !util.buffer
   %c123_i32 = arith.constant 123 : i32
 
   // Import buffer.
+  // The `consume` attribute enables zero-copy in-place updates.
   // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof
-  // CHECK: %[[BUFFER:.+]] = stream.tensor.import %[[BUFFER_VIEW]] : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[BUFFER:.+]] = stream.tensor.import consume %[[BUFFER_VIEW]] : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%[[SIZE]]}
   %size = stream.tensor.sizeof tensor<256xf32> : index
-  %buffer = stream.tensor.import %buffer_view : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%size}
+  %buffer = stream.tensor.import consume %buffer_view : !util.buffer -> tensor<256xf32> in !stream.resource<external>{%size}
 
   // Nested loops mutating in-place.
   // CHECK: %[[OUTER:.+]] = scf.for %{{.+}} = %c0 to %c5 step %c1 iter_args(%[[OUTER_ITER:.+]] = %[[BUFFER]]) -> (!stream.resource<external>) {
@@ -488,11 +496,12 @@ util.func public @multi_device_fork_unified(%input: !util.buffer) -> (!util.buff
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
 
-  // Import on device A.
+  // Import on device A with consume (caller transfers ownership).
+  // This allows copy-on-write behavior for the fork pattern.
   // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof
-  // CHECK: %[[IMPORTED:.+]] = stream.tensor.import on(#hal.device.promise<@dev_a>) %[[INPUT]] : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[IMPORTED:.+]] = stream.tensor.import on(#hal.device.promise<@dev_a>) consume %[[INPUT]] : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%[[SIZE]]}
   %size = stream.tensor.sizeof tensor<1024xf32> : index
-  %imported = stream.tensor.import on(#hal.device.promise<@dev_a>) %input : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%size}
+  %imported = stream.tensor.import on(#hal.device.promise<@dev_a>) consume %input : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%size}
 
   // Mutations on both devices require clone to avoid conflict.
   // CHECK: %[[CLONE:.+]] = stream.async.clone on(#hal.device.promise<@dev_a>) %[[IMPORTED]] : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
