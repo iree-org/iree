@@ -263,7 +263,7 @@ func.func @fail_reduction_with_nondistributable_consumer(
 // CHECK-SAME:       lowering_config = #[[CONFIG3]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG3]]
-// CHECK-LABEL: func.func @fail_reduction_with_nondistributable_consumer(
+//      CHECK: func.func @fail_reduction_with_nondistributable_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION3]]
 // CHECK-NOT: pipeline = SPIRVSubgroupReduce
-// CHECK: return
+//      CHECK: return
