@@ -921,9 +921,9 @@ struct ScatterMaterializeInsertedDim final
       }
     }
 
-    llvm::ArrayRef<bool> toInsertDims =
+    auto toInsertDims =
         llvm::ArrayRef<bool>(isInsertDims).drop_front(frontInsertedDims);
-    if (!llvm::any_of(toInsertDims, [](auto d) { return d; })) {
+    if (llvm::none_of(toInsertDims, [](bool d) { return d; })) {
       return rewriter.notifyMatchFailure(op, "no dimensions to insert");
     }
 
@@ -931,7 +931,7 @@ struct ScatterMaterializeInsertedDim final
     SmallVector<ReassociationExprs> reassociationMap;
     reassociationMap.push_back({rewriter.getAffineDimExpr(0)});
 
-    for (auto it : llvm::enumerate(llvm::ArrayRef<bool>(toInsertDims))) {
+    for (auto it : llvm::enumerate(toInsertDims)) {
       if (!it.value()) {
         reassociationMap.push_back({});
       }

@@ -661,9 +661,8 @@ struct FoldSplitReductionForallWithWorkgroupForall
     }
     std::optional<ArrayAttr> workgroupMapping = workgroupLoop.getMapping();
     if (!workgroupMapping ||
-        llvm::any_of(workgroupMapping->getValue(), [](Attribute attr) {
-          return !isa<IREE::Codegen::WorkgroupMappingAttr>(attr);
-        })) {
+        !llvm::all_of(workgroupMapping->getValue(),
+                      llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
       return rewriter.notifyMatchFailure(
           workgroupLoop, "nested loop is not a workgroup mapping loop");
     }
