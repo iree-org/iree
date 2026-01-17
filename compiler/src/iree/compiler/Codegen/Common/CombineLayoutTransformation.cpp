@@ -427,7 +427,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   for (auto [idx, low, high] :
        llvm::enumerate(padOp.getMixedLowPad(), padOp.getMixedHighPad())) {
     // Create a distributed loop for the low padding.
-    if (!(isConstantIntValue(low, 0))) {
+    if (!isConstantIntValue(low, 0)) {
       SmallVector<OpFoldResult> ubs(padResultSizes);
       SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
       SmallVector<int64_t> shape(padOp.getSourceType().getShape());
