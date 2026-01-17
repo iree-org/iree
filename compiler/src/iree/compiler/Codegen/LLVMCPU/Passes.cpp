@@ -630,7 +630,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPredicatedPass(clInstrumentMemoryAccesses,
-                         createInstrumentMemoryAccessesPass);
+                         createInstrumentMemoryAccessesPass)
+      .addPass(createConvertUnsupportedFloatArithPass);
 
   if (enableAArch64SME) {
     FunctionLikeNest(modulePassManager).addPass([&] {

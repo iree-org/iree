@@ -29,6 +29,7 @@ LLVM_SRCS = enforce_glob(
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
         "unpack.mlir",
@@ -89,6 +90,7 @@ VMVX_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "fp4_f32_conversion.mlir",
         "large_linalg_matmul.mlir",
+        "small_float_arith.mlir",
         "subbyte_to_fp.mlir",
     ],
 )
@@ -140,6 +142,7 @@ VULKAN_SRCS = enforce_glob(
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "unpack.mlir",
     ],
 )
@@ -199,6 +202,7 @@ CUDA_SRCS = enforce_glob(
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
+        "small_float_arith.mlir",
     ],
 )
 
@@ -239,6 +243,7 @@ ROCM_SRCS = enforce_glob(
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
+        "small_float_arith.mlir",
     ],
 )
 

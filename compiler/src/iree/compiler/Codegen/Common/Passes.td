@@ -99,9 +99,21 @@ def ConvertBf16ToUInt16BuffersPass :
 def ConvertUnsupportedFloatArithPass
     : InterfacePass<"iree-convert-unsupported-float-arith",
                     "mlir::FunctionOpInterface"> {
-  let summary = "Convert arith operations on unsupported(source types) float "
-                "types to the target type. Populates the source and target "
-                "based on the target architecture.";
+  let summary = "Emulate arith operations on unsupported float types (e.g., fp8).";
+  let description = [{
+    Emulates floating-point operations on types not natively supported by the
+    target backend. The pass:
+
+    1. Wraps unsupported float operations with extf/truncf pairs to perform
+       arithmetic in a supported type (e.g., f32).
+
+    2. For CPU targets, emulates extf/truncf operations themselves using integer
+       bit manipulation, since LLVM doesn't support fpext/fptrunc for fp8 types.
+
+    The emulation follows IREE's runtime/src/iree/base/internal/math.h, including
+    IEEE 754 round-to-nearest-even semantics and proper handling of denormals,
+    NaN, Inf, and special encodings (FNUZ types).
+  }];
 }
 
 def ConvertToDestinationPassingStylePass :
