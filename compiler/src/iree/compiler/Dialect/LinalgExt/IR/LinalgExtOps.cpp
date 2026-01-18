@@ -695,6 +695,78 @@ void MapGatherOp::inlineMapGatherBody(
                                  transformBodyIndices, bodyBuilder);
 }
 
+void MapGatherOp::insertTransformationAtEnd(
+    OpBuilder &builder,
+    function_ref<SmallVector<Value>(ValueRange)> transformationBuilder) {
+  Block &transformBody = getTransformationRegion().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+
+  // Get the currently yielded source indices (excluding padding).
+  SmallVector<Value> oldSourceIndices(yieldOp.getOperands().drop_back());
+  Value padding = yieldOp.getOperands().back();
+
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPoint(yieldOp);
+
+  // Apply the transformation to get new source indices.
+  SmallVector<Value> newSourceIndices = transformationBuilder(oldSourceIndices);
+
+  // Update the yield op with the new source indices.
+  SmallVector<Value> newYieldOperands(newSourceIndices);
+  newYieldOperands.push_back(padding);
+  IREE::LinalgExt::YieldOp::create(builder, yieldOp.getLoc(), newYieldOperands);
+  yieldOp->erase();
+}
+
+bool MapGatherOp::isIdentity() {
+  if (getSourceType() != getOutputType()) {
+    return false;
+  }
+
+  // Check that the block arguments are directly yielded in the order that they
+  // are defined in the block (excluding padding).
+  Block &transformBody = getTransformationRegion().getBlocks().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  for (int i = 0; i < getSourceRank(); ++i) {
+    auto yieldedBbArg = dyn_cast<BlockArgument>(yieldOp.getOperand(i));
+    if (yieldedBbArg != transformBody.getArgument(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
+                                                 Location loc, Value source,
+                                                 Value output) {
+  assert(source.getType() == output.getType() &&
+         "expected source and output types to match");
+  SmallVector<Type> resultType;
+  if (isa<RankedTensorType>(output.getType())) {
+    resultType.push_back(output.getType());
+  }
+  auto mapGatherOp =
+      MapGatherOp::create(builder, loc, resultType, source, output);
+
+  // Add the transformation block with an identity transformation.
+  Region &region = mapGatherOp.getTransformationRegion();
+  auto outputType = cast<ShapedType>(output.getType());
+  SmallVector<Location> blockArgLocs(outputType.getRank(), loc);
+  SmallVector<Type> indexTypes(outputType.getRank(), builder.getIndexType());
+  OpBuilder::InsertionGuard guard(builder);
+  Block *block =
+      builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
+  SmallVector<Value> yieldedValues(block->getArguments());
+  // Add a zero padding value (the identity transformation shouldn't need it
+  // since source and output have the same shape).
+  Type elementType = outputType.getElementType();
+  TypedAttr zeroAttr = builder.getZeroAttr(elementType);
+  Value padding = arith::ConstantOp::create(builder, loc, zeroAttr);
+  yieldedValues.push_back(padding);
+  IREE::LinalgExt::YieldOp::create(builder, loc, yieldedValues);
+  return mapGatherOp;
+}
+
 //===----------------------------------------------------------------------===//
 // MapScatterOp
 //===----------------------------------------------------------------------===//
