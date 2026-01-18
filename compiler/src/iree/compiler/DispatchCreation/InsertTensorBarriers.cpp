@@ -21,7 +21,8 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
-// Check if an operation is a compute operation (tensor/linalg/linalgext).
+/// Check if an operation is a compute operation
+/// (linalg/linalgext/tensor/tensor_ext).
 static bool isComputeOp(Operation *op) {
   if (!op) {
     return false;
@@ -31,7 +32,8 @@ static bool isComputeOp(Operation *op) {
     return false;
   }
   return isa<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
-             tensor::TensorDialect>(dialect);
+             tensor::TensorDialect, IREE::TensorExt::IREETensorExtDialect>(
+      dialect);
 }
 
 // Traverse forward along use-def chains starting from `val` to identify values
@@ -104,7 +106,7 @@ struct InsertTensorBarriersPass final
       auto startOp = IREE::TensorExt::ComputeBarrierStartOp::create(
           builder, val.getLoc(), val);
       val.replaceUsesWithIf(startOp.getResult(), [&](OpOperand &use) {
-        return isComputeOp(use.getOwner()) &&
+        return use.getOwner() != startOp && isComputeOp(use.getOwner()) &&
                !isa<tensor::DimOp>(use.getOwner());
       });
     }
