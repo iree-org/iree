@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -516,6 +518,28 @@ void ConstExprHoistingPolicy::makeDecision(
   if (!hasLegalEscape) {
     decision->disableHoist();
     return;
+  }
+
+  // Check if this operation or any of its producers is a bit-extend operation
+  // (e.g., i8→f32 dequantization). Don't hoist these to keep quantized weights
+  // compact and avoid pulling dequantization into global initializers.
+  if (IREE::LinalgExt::isBitExtendOp(info->getOperation())) {
+    decision->disableHoist();
+    return;
+  }
+
+  // Also check if any producer is a bit-extend op - this catches the case
+  // where we're trying to hoist the result of: i8 -> sitofp -> mulf(scale)
+  for (auto *producer : info->producers) {
+    if (IREE::LinalgExt::isBitExtendOp(producer->getOperation())) {
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "[ConstExprPolicy] Detected bit-extend producer, "
+            << "disabling hoisting to keep quantized weights compact\n";
+      });
+      decision->disableHoist();
+      return;
+    }
   }
 
   // Otherwise, we can conditionally enable hoisting (based on cost model, etc).
