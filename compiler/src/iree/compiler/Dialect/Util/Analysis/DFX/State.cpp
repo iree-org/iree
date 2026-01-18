@@ -24,10 +24,12 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   if (!S.isValidState()) {
     os << "full-set";
   } else {
-    for (auto &it : S.getAssumedSet())
+    for (auto &it : S.getAssumedSet()) {
       os << it << ", ";
-    if (S.isUndefContained())
+    }
+    if (S.isUndefContained()) {
       os << "undef ";
+    }
   }
   os << "} >)";
   return os;

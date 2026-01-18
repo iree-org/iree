@@ -14,8 +14,9 @@
 namespace mlir::iree_compiler {
 
 TypedAttr convertAttributeToStream(TypedAttr attr) {
-  if (!attr)
+  if (!attr) {
     return {};
+  }
   if (auto parameterAttr = dyn_cast<IREE::Flow::NamedParameterAttr>(attr)) {
     return IREE::Stream::NamedParameterAttr::get(
         attr.getContext(), parameterAttr.getType(), parameterAttr.getScope(),

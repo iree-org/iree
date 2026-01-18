@@ -36,8 +36,9 @@ using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
 static bool isBroadcast(AffineExpr expr) {
-  if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
+  if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
     return constExpr.getValue() == 0;
+  }
   return false;
 }
 
@@ -81,8 +82,9 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
     // a constant less than `elementCount`, we can do this, unlocking
     // potential optimizations.
     bool disjoint = false;
-    if (std::optional<int64_t> offsetConst = getConstantIntValue(offset))
+    if (std::optional<int64_t> offsetConst = getConstantIntValue(offset)) {
       disjoint = *offsetConst < elementCount;
+    }
     slicedIndices[pos] =
         affine::AffineLinearizeIndexOp::create(b, loc, ids, sizes, disjoint);
   }
@@ -222,8 +224,9 @@ static LogicalResult populateWarpAndThreadIndices(
   int64_t rank = vectorLayout.getRank();
   SmallVector<Value> threadIds =
       vectorLayout.computeThreadIds(threadId, subgroupSize, rewriter);
-  if (threadIds.empty() && rank != 0)
+  if (threadIds.empty() && rank != 0) {
     return failure();
+  }
   warpIndices = SmallVector<Value>(threadIds.begin(), threadIds.begin() + rank);
   threadIndices = SmallVector<Value>(threadIds.begin() + rank,
                                      threadIds.begin() + 2 * rank);

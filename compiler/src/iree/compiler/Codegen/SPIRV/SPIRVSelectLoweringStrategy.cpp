@@ -50,8 +50,9 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
     auto loweringConfig =
         getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
-    if (!loweringConfig)
+    if (!loweringConfig) {
       return WalkResult::advance();
+    }
     return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
   });
   return failure(walkResult.wasInterrupted());

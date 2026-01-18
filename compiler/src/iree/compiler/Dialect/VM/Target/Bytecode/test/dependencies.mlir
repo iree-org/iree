@@ -32,6 +32,16 @@ vm.module @main_module attributes { version = 100 : i32 } {
   // CHECK: "flags": "OPTIONAL"
   vm.import private optional @optional.method1() attributes { minimum_version = 11 : i32 }
 
+  // Use the imports so they're not eliminated by DCE.
+  vm.export @use_imports
+  vm.func private @use_imports() {
+    vm.call @required.method0() : () -> ()
+    vm.call @required.method1() : () -> ()
+    vm.call @required.method2() : () -> ()
+    vm.call @optional.method0() : () -> ()
+    vm.call @optional.method1() : () -> ()
+    vm.return
+  }
 }
 
 // -----

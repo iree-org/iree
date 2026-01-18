@@ -56,13 +56,15 @@ static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
                                          bool useMmaSyncShape) {
   auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract)
+    if (!contract) {
       return std::nullopt;
+    }
     return gpuMmaUnrollOrder(contract);
   };
   auto getNativeShape = [useMmaSyncShape](Operation *op) {
-    if (useMmaSyncShape)
+    if (useMmaSyncShape) {
       return getMmaNativeVectorSize(op);
+    }
     return getWmmaNativeVectorSize(op);
   };
   vector::populateVectorUnrollPatterns(

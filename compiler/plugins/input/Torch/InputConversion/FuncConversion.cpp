@@ -82,8 +82,9 @@ getEnclosingWaitSignalFences(Operation *op) {
   auto parentFuncOp = dyn_cast<IREE::Util::FuncOp>(op);
   if (!parentFuncOp) {
     parentFuncOp = parentFuncOp->getParentOfType<IREE::Util::FuncOp>();
-    if (!parentFuncOp)
+    if (!parentFuncOp) {
       return {};
+    }
   }
   Block *entryBlock = &parentFuncOp.front();
   auto numArguments = entryBlock->getNumArguments();
@@ -99,8 +100,9 @@ getEnclosingWaitSignalFences(Value value) {
 
 Value convertToBuiltinTensor(OpBuilder &builder, Value possibleTorchTensor) {
   Type ty = possibleTorchTensor.getType();
-  if (isa<TensorType>(ty))
+  if (isa<TensorType>(ty)) {
     return possibleTorchTensor;
+  }
 
   if (auto defining = dyn_cast_if_present<TorchConversion::FromBuiltinTensorOp>(
           possibleTorchTensor.getDefiningOp())) {
@@ -177,8 +179,9 @@ struct ConvertedAsyncFunctionInfo {
 };
 
 LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
-  if (funcOp.isExternal())
+  if (funcOp.isExternal()) {
     return success();
+  }
 
   if (returnOps.size() != 1) {
     // Multi-exit/CFG could be supported but requires more complicated dominance
@@ -197,14 +200,17 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
        llvm::zip_equal(inputDispositions, entryArgs, torchInputTypes)) {
     switch (disp) {
     case TypeDisposition::IMMUTABLE_TENSOR: {
-      if (failed(
-              convertImmutableTensorArg(argValue, torchType, preambleBuilder)))
+      if (failed(convertImmutableTensorArg(argValue, torchType,
+                                           preambleBuilder))) {
         return failure();
+      }
       break;
     }
     case TypeDisposition::MUTABLE_TENSOR: {
-      if (failed(convertMutableTensorArg(argValue, torchType, preambleBuilder)))
+      if (failed(
+              convertMutableTensorArg(argValue, torchType, preambleBuilder))) {
         return failure();
+      }
       break;
     }
     case TypeDisposition::TORCH_PRIMITIVE: {
@@ -374,12 +380,14 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
   // it.
   bool hasNonTrivialUse = false;
   for (auto *userOp : argValue.getUsers()) {
-    if (isa<IREE::Util::ReturnOp>(userOp))
+    if (isa<IREE::Util::ReturnOp>(userOp)) {
       continue;
+    }
     hasNonTrivialUse = true;
   }
-  if (!hasNonTrivialUse)
+  if (!hasNonTrivialUse) {
     return success();
+  }
 
   // Remember original uses so we can redirect them.
   OriginalUses originalUses(argValue);
@@ -481,8 +489,9 @@ void retainFunctionAttributes(Operation *srcOp, IREE::Util::FuncOp destOp) {
   for (auto retainAttrName : retainedAttributes) {
     StringRef attrName(retainAttrName);
     Attribute attr = srcOp->getAttr(attrName);
-    if (attr)
+    if (attr) {
       destOp->setAttr(attrName, attr);
+    }
   }
 }
 
@@ -566,8 +575,9 @@ public:
     SmallVector<Operation *> eraseFuncOps;
     std::vector<ConvertedAsyncFunctionInfo> convertedFuncInfos;
     for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
-      if (!shouldConvertFunc(funcOp))
+      if (!shouldConvertFunc(funcOp)) {
         continue;
+      }
       ConvertedAsyncFunctionInfo &convertedFuncInfo =
           convertedFuncInfos.emplace_back();
       if (failed(convertFuncOp(funcOp, convertedFuncInfo))) {
@@ -594,12 +604,14 @@ public:
     // calling convention. In the future, we may support "torch externals"
     // which we convert to mate up with a torch module. We can remove/adapt
     // this when that is elaborated.
-    if (torchFunc.isExternal())
+    if (torchFunc.isExternal()) {
       return false;
+    }
 
     // Something has already converted this and told us not to touch it.
-    if (torchFunc->hasAttr("iree.abi.stub"))
+    if (torchFunc->hasAttr("iree.abi.stub")) {
       return false;
+    }
 
     return true;
   }
@@ -640,14 +652,16 @@ public:
     for (size_t i = 0; i < convertedFuncInfo.torchInputTypes.size(); ++i) {
       if (failed(convertType(loc, convertedFuncInfo.torchInputTypes[i],
                              ireeInputTypes[i],
-                             convertedFuncInfo.inputDispositions[i])))
+                             convertedFuncInfo.inputDispositions[i]))) {
         return failure();
+      }
     }
     for (size_t i = 0; i < convertedFuncInfo.torchResultTypes.size(); ++i) {
       if (failed(convertType(loc, convertedFuncInfo.torchResultTypes[i],
                              ireeResultTypes[i],
-                             convertedFuncInfo.resultDispositions[i])))
+                             convertedFuncInfo.resultDispositions[i]))) {
         return failure();
+      }
     }
 
     // Build tied operands index mapping results back to operands.

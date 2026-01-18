@@ -320,12 +320,14 @@ createFlowDispatchOp(PatternRewriter &rewriter, SymbolRefAttr exportOp,
   // Get the dynamic dims for the operands.
   for (auto operand : operands) {
     auto tensorType = dyn_cast<RankedTensorType>(operand.getType());
-    if (!tensorType)
+    if (!tensorType) {
       continue;
+    }
 
     for (auto [index, shape] : llvm::enumerate(tensorType.getShape())) {
-      if (ShapedType::isStatic(shape))
+      if (ShapedType::isStatic(shape)) {
         continue;
+      }
 
       Value dim = tensor::DimOp::create(rewriter, loc, operand, index);
       operandDynamicDims.push_back(dim);
@@ -352,8 +354,9 @@ getDynamicResultDims(PatternRewriter &rewriter, ValueRange givenResultDims) {
   SmallVector<OpFoldResult> mixedValues = getAsOpFoldResult(givenResultDims);
   for (auto ofr : mixedValues) {
     auto value = dyn_cast<Value>(ofr);
-    if (!value)
+    if (!value) {
       continue;
+    }
     dynamicResultDims.push_back(value);
   }
   return dynamicResultDims;

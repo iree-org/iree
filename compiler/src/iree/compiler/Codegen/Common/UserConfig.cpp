@@ -19,8 +19,9 @@ setUserConfig(mlir::FunctionOpInterface entryPointFn, Operation *computeOp,
   }
 
   auto info = compilationInfo.getTranslationInfo();
-  if (failed(setTranslationInfo(entryPointFn, info)))
+  if (failed(setTranslationInfo(entryPointFn, info))) {
     return failure();
+  }
 
   setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
   eraseCompilationInfo(computeOp);

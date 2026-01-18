@@ -122,7 +122,7 @@ class CustomModuleState final {
   }
 
   // Returns the length of the string in characters.
-  StatusOr<int64_t> StringLength(const vm::ref<iree_custom_string_t> string) {
+  StatusOr<int64_t> StringLength(iree_custom_string_t* string) {
     if (!string) {
       // Passed in refs may be null.
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null string arg");
@@ -135,7 +135,7 @@ class CustomModuleState final {
   }
 
   // Prints the contents of the string to stdout.
-  Status StringPrint(const vm::ref<iree_custom_string_t> string) {
+  Status StringPrint(iree_custom_string_t* string) {
     if (!string) return OkStatus();  // no-op
     fprintf(stdout, "PRINT %.*s\n", static_cast<int>(string->value.size),
             string->value.data);
@@ -144,9 +144,9 @@ class CustomModuleState final {
   }
 
   // Prints the contents of the string; only exported in debug mode.
-  Status StringDPrint(const vm::ref<iree_custom_string_t> string) {
+  Status StringDPrint(iree_custom_string_t* string) {
     if (!string) return OkStatus();  // no-op
-    return StringPrint(std::move(string));
+    return StringPrint(string);
   }
 
  private:

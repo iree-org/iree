@@ -42,8 +42,9 @@ scanSearchPath(std::string prefix, StringRef searchPath,
        dir != dir_end && !ec; dir.increment(ec)) {
     auto childPath = dir->path();
     llvm::sys::fs::file_status status;
-    if (llvm::sys::fs::status(childPath, status))
+    if (llvm::sys::fs::status(childPath, status)) {
       continue;
+    }
     switch (status.type()) {
     case llvm::sys::fs::file_type::regular_file:
     case llvm::sys::fs::file_type::symlink_file:
@@ -104,8 +105,9 @@ replaceExecutableOpWithMLIR(IREE::HAL::ExecutableOp executableOp,
   // Load the replacement IR. It may have any mix of stuff in it including
   // multiple other executables.
   auto rootOpRef = loadModuleObject(executableOp.getContext(), filePath);
-  if (!rootOpRef)
+  if (!rootOpRef) {
     return failure();
+  }
   IREE::HAL::ExecutableOp replacementOp;
   if (auto moduleOp = dyn_cast<mlir::ModuleOp>(rootOpRef.get())) {
     // We expect a `hal.executable` with the same name as the one we are
@@ -165,8 +167,9 @@ externalizeExecutableOp(IREE::HAL::ExecutableOp executableOp,
   auto fileObjectAttr = builder.getAttr<IREE::HAL::ExecutableObjectAttr>(
       builder.getStringAttr(filePath), nullptr);
   auto fileContents = fileObjectAttr.loadData();
-  if (!fileContents)
+  if (!fileContents) {
     return failure();
+  }
 
   // Link the referenced object file contents. We fully replace the existing
   // objects in case there were any as this does entire executable replacement -
@@ -243,8 +246,9 @@ struct SubstituteExecutablesPass
       uniqueSubstitutions[std::string(key)] = value;
     }
 
-    if (uniqueSubstitutions.empty())
+    if (uniqueSubstitutions.empty()) {
       return; // no-op
+    }
 
     // Walk each substitution and process the matching executable if found.
     for (auto &[executableName, filePath] : uniqueSubstitutions) {

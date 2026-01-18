@@ -37,8 +37,9 @@ LogicalResult IntegerDivisibilityAnalysis::visitOperation(
       });
   auto joinCallback = [&](Value v, const IntegerDivisibility &newDiv) {
     auto result = dyn_cast<OpResult>(v);
-    if (!result)
+    if (!result) {
       return;
+    }
     assert(llvm::is_contained(op->getResults(), result));
 
     LLVM_DEBUG(dbgs() << "Inferred divisibility " << newDiv << "\n");

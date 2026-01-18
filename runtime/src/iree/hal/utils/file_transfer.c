@@ -593,7 +593,8 @@ static iree_status_t iree_hal_transfer_operation_launch_read(
   for (iree_host_size_t i = 0; i < operation->worker_count; ++i) {
     iree_hal_transfer_worker_t* worker = &operation->workers[i];
     alloca_semaphore_list.semaphores[i] = worker->semaphore;
-    alloca_semaphore_list.payload_values[i] = ++worker->pending_timepoint;
+    uint64_t signal_timepoint = ++worker->pending_timepoint;
+    alloca_semaphore_list.payload_values[i] = signal_timepoint;
   }
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_device_queue_alloca(
@@ -666,16 +667,17 @@ static iree_status_t iree_hal_transfer_worker_copy_buffer_to_staging(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)transfer_length);
 
   // Timeline increments by one.
+  uint64_t wait_timepoint = worker->pending_timepoint;
   iree_hal_semaphore_list_t wait_semaphore_list = {
       .count = 1,
       .semaphores = &worker->semaphore,
-      .payload_values = &worker->pending_timepoint,
+      .payload_values = &wait_timepoint,
   };
-  ++worker->pending_timepoint;
+  uint64_t signal_timepoint = ++worker->pending_timepoint;
   iree_hal_semaphore_list_t signal_semaphore_list = {
       .count = 1,
       .semaphores = &worker->semaphore,
-      .payload_values = &worker->pending_timepoint,
+      .payload_values = &signal_timepoint,
   };
 
   // Track the pending copy operation so we know where to place it in the file.
@@ -692,8 +694,7 @@ static iree_status_t iree_hal_transfer_worker_copy_buffer_to_staging(
   // Wait for the copy to complete so we can write it to the file.
   if (iree_status_is_ok(status)) {
     status = iree_loop_wait_one(
-        loop,
-        iree_hal_semaphore_await(worker->semaphore, worker->pending_timepoint),
+        loop, iree_hal_semaphore_await(worker->semaphore, signal_timepoint),
         iree_infinite_timeout(), iree_hal_transfer_worker_copy_staging_to_file,
         worker);
   }
@@ -785,7 +786,8 @@ static iree_status_t iree_hal_transfer_operation_launch_write(
   for (iree_host_size_t i = 0; i < operation->worker_count; ++i) {
     iree_hal_transfer_worker_t* worker = &operation->workers[i];
     alloca_semaphore_list.semaphores[i] = worker->semaphore;
-    alloca_semaphore_list.payload_values[i] = ++worker->pending_timepoint;
+    uint64_t signal_timepoint = ++worker->pending_timepoint;
+    alloca_semaphore_list.payload_values[i] = signal_timepoint;
   }
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_device_queue_alloca(

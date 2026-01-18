@@ -49,16 +49,21 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
           "executable files (sources, benchmarks, intermediates, binaries) "
           "to."),
       llvm::cl::callback([&](const std::string &path) {
-        if (executableSourcesPath.empty())
+        if (executableSourcesPath.empty()) {
           executableSourcesPath = path;
-        if (executableConfigurationsPath.empty())
+        }
+        if (executableConfigurationsPath.empty()) {
           executableConfigurationsPath = path;
-        if (executableBenchmarksPath.empty())
+        }
+        if (executableBenchmarksPath.empty()) {
           executableBenchmarksPath = path;
-        if (executableIntermediatesPath.empty())
+        }
+        if (executableIntermediatesPath.empty()) {
           executableIntermediatesPath = path;
-        if (executableBinariesPath.empty())
+        }
+        if (executableBinariesPath.empty()) {
           executableBinariesPath = path;
+        }
       }),
       llvm::cl::cat(halTargetOptionsCategory));
 

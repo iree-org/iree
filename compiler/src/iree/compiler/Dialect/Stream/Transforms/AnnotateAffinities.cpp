@@ -137,8 +137,9 @@ struct AnnotateAffinitiesPass
 
     // Annotate all ops with derived affinities.
     for (auto &op : getOperation().getOps()) {
-      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>())
+      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
         continue;
+      }
       if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
         annotateGlobalOp(globalOp, affinityAnalysis);
       } else if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {

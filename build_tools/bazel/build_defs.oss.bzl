@@ -4,11 +4,23 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
+
+# All load statements must come first in Starlark.
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load(
+    "//build_tools/bazel:iree_cc_fuzz.bzl",
+    _iree_cc_fuzz = "iree_cc_fuzz",
+    _iree_compiler_cc_fuzz = "iree_compiler_cc_fuzz",
+    _iree_runtime_cc_fuzz = "iree_runtime_cc_fuzz",
+)
 
 """Common Bazel definitions for IREE."""
 
-load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
+# Re-export fuzz rules for external use.
+iree_cc_fuzz = _iree_cc_fuzz
+iree_compiler_cc_fuzz = _iree_compiler_cc_fuzz
+iree_runtime_cc_fuzz = _iree_runtime_cc_fuzz
 
 def defaulting_select(selector):
     """Pass through to select() with special semantics when converting to CMake.

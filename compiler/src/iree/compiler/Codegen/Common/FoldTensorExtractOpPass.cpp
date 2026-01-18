@@ -59,7 +59,8 @@ class FoldTensorExtractOpPass final
 void FoldTensorExtractOpPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   populateWithGenerated(patterns);
-  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
+  if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     signalPassFailure();
+  }
 }
 } // namespace mlir::iree_compiler

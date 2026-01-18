@@ -43,9 +43,9 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
   iree_allocator_t flatbuffer_allocator = iree_allocator_null();
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      iree_vm_bytecode_module_create(model->instance, flatbuffer_span,
-                                     flatbuffer_allocator, allocator,
-                                     &model->module),
+      iree_vm_bytecode_module_create(
+          model->instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, flatbuffer_span,
+          flatbuffer_allocator, allocator, &model->module),
       "error creating bytecode module");
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

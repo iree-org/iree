@@ -25,8 +25,9 @@ replaceUnitMappingIdsHelper(RewriterBase &rewriter, Location loc, Block *parent,
                             Value replacement,
                             ArrayRef<int64_t> availableMappingSizes) {
   parent->walk([&](gpu::ThreadIdOp idOp) {
-    if (availableMappingSizes[static_cast<int64_t>(idOp.getDimension())] == 1)
+    if (availableMappingSizes[static_cast<int64_t>(idOp.getDimension())] == 1) {
       rewriter.replaceAllUsesWith(idOp.getResult(), replacement);
+    }
   });
 }
 
@@ -51,14 +52,17 @@ DiagnosedSilenceableFailure static mapNestedForallToThreadsImpl(
     diag = mlir::transform::gpu::mapOneForallToThreadsImpl(
         rewriter, std::nullopt, forallOp, blockDims, warpSize,
         syncAfterDistribute);
-    if (diag.isDefiniteFailure())
+    if (diag.isDefiniteFailure()) {
       return WalkResult::interrupt();
-    if (diag.succeeded())
+    }
+    if (diag.succeeded()) {
       return WalkResult::skip();
+    }
     return WalkResult::advance();
   });
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return diag;
+  }
 
   // Replace ids of dimensions known to be 1 by 0 to simplify the IR.
   // Here, the result of mapping determines the available mapping sizes.
@@ -96,16 +100,19 @@ struct GPUDistributePass final
       if (!hasWorkgroupMapping) {
         result = mapNestedForallToThreadsImpl(
             rewriter, forallOp, workgroupSize.value(), subgroupSize, false);
-        if (result.isDefiniteFailure())
+        if (result.isDefiniteFailure()) {
           return WalkResult::interrupt();
-        if (result.succeeded())
+        }
+        if (result.succeeded()) {
           return WalkResult::skip();
+        }
       }
       return WalkResult::advance();
     });
 
-    if (walkResult.wasInterrupted())
+    if (walkResult.wasInterrupted()) {
       return signalPassFailure();
+    }
   }
 };
 } // namespace

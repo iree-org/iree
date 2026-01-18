@@ -60,7 +60,7 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
-    // Check if extractOp is inside a generic op
+    // Check if extractOp is inside a generic op.
     auto consumerOp =
         dyn_cast_if_present<linalg::GenericOp>(extractOp->getParentOp());
     if (!consumerOp) {
@@ -74,9 +74,12 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
           consumerOp, "expected extract operand to be a generic op");
     }
 
-    // Check if the producerOp is fusible
+    // Check if the producerOp is fusible.
+    // Allow bit extend ops or transpose ops.
+    bool isBitExtend = IREE::LinalgExt::isBitExtendOp(producerOp);
+    bool isTranspose = IREE::LinalgExt::isaTransposeOpInterface(producerOp);
     if (producerOp.getNumResults() != 1 || !isElementwise(producerOp) ||
-        !IREE::LinalgExt::isBitExtendOp(producerOp)) {
+        (!isBitExtend && !isTranspose)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }
@@ -159,8 +162,9 @@ void ElementwiseOpFusionPass::runOnOperation() {
         operands.insert(std::next(consumer->operand_begin(),
                                   fusedOperand->getOperandNumber() + 1),
                         consumer->operand_end());
-        if (operands.size() >= kIreeMaxOperandCount)
+        if (operands.size() >= kIreeMaxOperandCount) {
           return false;
+        }
 
         ElementwiseOpsFusabilityOptions options;
         options.fuseMultiReduction = fuseMultiReduction;

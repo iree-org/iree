@@ -1,0 +1,37 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_c_embed_data(
+    name = "bpe_testdata",
+    testonly = True,
+    srcs = [
+        "bpe_minimal.json",
+    ],
+    c_file_output = "bpe_testdata.c",
+    flatten = True,
+    h_file_output = "bpe_testdata.h",
+    identifier = "iree_tokenizer_bpe_testdata",
+)
+
+iree_c_embed_data(
+    name = "wordpiece_testdata",
+    testonly = True,
+    srcs = [
+        "wordpiece_minimal.json",
+    ],
+    c_file_output = "wordpiece_testdata.c",
+    flatten = True,
+    h_file_output = "wordpiece_testdata.h",
+    identifier = "iree_tokenizer_wordpiece_testdata",
+)

@@ -40,24 +40,28 @@ LogicalResult setAdrenoCodeGenConfig(IREE::GPU::TargetAttr target,
                                      Operation *rootOp) {
   int subgroupSize = target.getPreferredSubgroupSize();
 
-  if (!isa<linalg::LinalgOp>(rootOp))
+  if (!isa<linalg::LinalgOp>(rootOp)) {
     return failure();
+  }
 
   auto linalgOp = cast<linalg::LinalgOp>(rootOp);
-  if (isMatmulOrBatchMatmul(linalgOp))
+  if (isMatmulOrBatchMatmul(linalgOp)) {
     return setAdrenoMatmulConfig(linalgOp, target);
+  }
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
     // Use the result type in case of larger bitwidth for accumulators.
     auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
-    if (bitwidth > 32)
+    if (bitwidth > 32) {
       return failure();
+    }
     const int multipler = 32 / bitwidth;
 
     auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
-    if (failed(convDimsOrFailure))
+    if (failed(convDimsOrFailure)) {
       return failure();
+    }
     const int bestTilingFactor =
         (convDimsOrFailure->depth.empty() ? 32 : 16) * multipler;
     return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,

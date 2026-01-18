@@ -197,9 +197,8 @@ class CustomModuleState final {
   ~CustomModuleState() = default;
 
   StatusOr<vm::ref<iree_hal_buffer_view_t>> CallAsync(
-      const vm::ref<iree_hal_buffer_view_t> arg_view,
-      const vm::ref<iree_hal_fence_t> wait_fence,
-      const vm::ref<iree_hal_fence_t> signal_fence) {
+      iree_hal_buffer_view_t* arg_view, iree_hal_fence_t* wait_fence,
+      iree_hal_fence_t* signal_fence) {
     // TODO(benvanik): better fence helpers when timelines are not needed.
     vm::ref<iree_hal_semaphore_t> semaphore;
     IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
@@ -230,24 +229,25 @@ class CustomModuleState final {
     vm::ref<iree_hal_buffer_t> result_buffer;
     IREE_RETURN_IF_ERROR(iree_hal_device_queue_alloca(
         device_.get(), IREE_HAL_QUEUE_AFFINITY_ANY,
-        iree_hal_fence_semaphore_list(wait_fence.get()),
+        iree_hal_fence_semaphore_list(wait_fence),
         iree_hal_fence_semaphore_list(alloca_fence.get()),
         IREE_HAL_ALLOCATOR_POOL_DEFAULT, buffer_params,
-        iree_hal_buffer_view_byte_length(arg_view.get()),
-        IREE_HAL_ALLOCA_FLAG_NONE, &result_buffer));
+        iree_hal_buffer_view_byte_length(arg_view), IREE_HAL_ALLOCA_FLAG_NONE,
+        &result_buffer));
 
     // Wrap the buffer in a buffer view that provides the metadata for
     // runtime verification.
     vm::ref<iree_hal_buffer_view_t> result_view;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create_like(
-        result_buffer.get(), arg_view.get(), host_allocator_, &result_view));
+        result_buffer.get(), arg_view, host_allocator_, &result_view));
 
     // Launch the stateful async operation.
     // See the notes above - note that this is _not_ a good way of doing this!
     // Note that we should be using host_allocator_ here to create these objects
     // so that memory is properly tracked as originating from this call.
+    // We retain the borrowed pointers as AsyncOp takes ownership for async use.
     AsyncOp::Launch(vm::retain_ref(arg_view), vm::retain_ref(result_view),
-                    std::move(alloca_fence), std::move(signal_fence));
+                    std::move(alloca_fence), vm::retain_ref(signal_fence));
 
     // Note that the caller needs the buffer view back but is not allowed to
     // access its contents until we signal the signal_fence.

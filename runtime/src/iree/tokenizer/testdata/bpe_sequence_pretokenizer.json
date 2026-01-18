@@ -1,0 +1,73 @@
+{
+  "model": {
+    "type": "BPE",
+    "vocab": {
+      "<|startoftext|>": 0,
+      "<|endoftext|>": 1,
+      "h": 2,
+      "e": 3,
+      "l": 4,
+      "o": 5,
+      "he": 6,
+      "hel": 7,
+      "hell": 8,
+      "hello": 9,
+      "w": 10,
+      "r": 11,
+      "d": 12,
+      "a": 13,
+      "a</w>": 14,
+      "hello</w>": 15
+    },
+    "merges": [
+      "h e",
+      "he l",
+      "hel l",
+      "hell o"
+    ],
+    "end_of_word_suffix": "</w>"
+  },
+  "added_tokens": [
+    {"id": 0, "content": "<|startoftext|>", "special": true},
+    {"id": 1, "content": "<|endoftext|>", "special": true}
+  ],
+  "normalizer": {
+    "type": "Sequence",
+    "normalizers": [
+      {"type": "NFC"},
+      {"type": "Replace", "pattern": {"Regex": "\\s+"}, "content": " "},
+      {"type": "Lowercase"}
+    ]
+  },
+  "pre_tokenizer": {
+    "type": "Sequence",
+    "pretokenizers": [
+      {
+        "type": "Split",
+        "pattern": {"Regex": "[A-Za-z]+"},
+        "behavior": "Isolated",
+        "invert": true
+      },
+      {
+        "type": "ByteLevel",
+        "add_prefix_space": false
+      }
+    ]
+  },
+  "decoder": {
+    "type": "ByteLevel"
+  },
+  "post_processor": {
+    "type": "TemplateProcessing",
+    "single": [
+      {"SpecialToken": {"id": "<|startoftext|>", "type_id": 0}},
+      {"Sequence": {"id": "A", "type_id": 0}},
+      {"SpecialToken": {"id": "<|endoftext|>", "type_id": 0}}
+    ],
+    "pair": [],
+    "special_tokens": {
+      "<|startoftext|>": {"id": "<|startoftext|>", "ids": [0], "tokens": ["<|startoftext|>"]},
+      "<|endoftext|>": {"id": "<|endoftext|>", "ids": [1], "tokens": ["<|endoftext|>"]}
+    }
+  }
+}

@@ -35,8 +35,9 @@ static void markReferenced(SymbolRefAttr symbolRefAttr,
                              ? SymbolRefAttr::get(rootRefAttr)
                              : SymbolRefAttr::get(rootRefAttr, nestedRefAttrs);
     auto it = referenceMap.find(nestedRefAttr);
-    if (it != referenceMap.end())
+    if (it != referenceMap.end()) {
       ++it->second.count;
+    }
   };
   auto rootRefAttr = symbolRefAttr.getRootReference();
   auto nestedRefAttrs = symbolRefAttr.getNestedReferences();
@@ -47,8 +48,9 @@ static void markReferenced(SymbolRefAttr symbolRefAttr,
 
 static void processOp(Operation *op, SymbolReferenceMap &referenceMap) {
   SmallVector<Attribute> worklist;
-  for (auto namedAttr : op->getAttrs())
+  for (auto namedAttr : op->getAttrs()) {
     worklist.push_back(namedAttr.getValue());
+  }
   while (!worklist.empty()) {
     auto attr = worklist.pop_back_val();
     if (auto symbolRefAttr = dyn_cast<SymbolRefAttr>(attr)) {
@@ -107,8 +109,9 @@ struct PruneExecutablesPass
     SetVector<Attribute> exportRefAttrs;
     for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
       ignoredOps.insert(executableOp);
-      if (!executableOp.isPrivate())
+      if (!executableOp.isPrivate()) {
         continue;
+      }
       auto executableRefAttr =
           FlatSymbolRefAttr::get(executableOp.getSymNameAttr());
       referenceMap[executableRefAttr].symbolOp = executableOp;
@@ -156,8 +159,9 @@ struct PruneExecutablesPass
     // accumulate the usage counts.
     SymbolTable symbolTable(moduleOp);
     moduleOp.walk([&](Operation *op) -> WalkResult {
-      if (ignoredOps.contains(op))
+      if (ignoredOps.contains(op)) {
         return WalkResult::skip();
+      }
       processOp(op, referenceMap);
       return op->hasTrait<OpTrait::IsIsolatedFromAbove>()
                  ? WalkResult::skip()

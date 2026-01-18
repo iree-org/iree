@@ -123,3 +123,32 @@ func.func @assume_dyn_size() {
     : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf32>>{%m.assume}
   return
 }
+
+// CHECK-LABEL: @ceildiv_dyn_size
+// CHECK: iree_gpu.use_rocdl_buffer_instructions
+// CHECK: return
+func.func @ceildiv_dyn_size() {
+  %c0 = arith.constant 0 : index
+  %m.i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %m = arith.index_castui %m.i32 : i32 to index
+  %m.assume = util.assume.int %m[<umin = 128, umax = 16384, udiv = 128>] : index
+  %dim = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%m.assume]
+  %bind = hal.interface.binding.subspan layout(#pipeline_layout)
+    binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf32>>{%dim}
+  return
+}
+
+// CHECK-LABEL: @dyn_size_overflow
+// CHECK-NOT: iree_gpu.use_rocdl_buffer_instructions
+// CHECK: return
+func.func @dyn_size_overflow() {
+  %c0 = arith.constant 0 : index
+  %m.i32 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %m = arith.index_castui %m.i32 : i32 to index
+  %m.assume = util.assume.int %m[<umin = 1, umax = 9007199254740991>] : index
+  %bind = hal.interface.binding.subspan layout(#pipeline_layout)
+    binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x2x8x32x128x?xf16>>{%m.assume}
+  return
+}

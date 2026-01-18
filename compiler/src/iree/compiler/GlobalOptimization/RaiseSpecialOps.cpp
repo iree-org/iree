@@ -83,8 +83,9 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
       // Restrict to cases where the constant is 0. This is because handling
       // constants other than 0 in indexing map, may cause problems in the
       // lowering pipeline later.
-      if (constantIndex.getLimitedValue() != 0)
+      if (constantIndex.getLimitedValue() != 0) {
         return failure();
+      }
       exprs.push_back(getAffineConstantExpr(0, rewriter.getContext()));
       continue;
     }
@@ -306,8 +307,9 @@ public:
         }
 
         if (!llvm::all_of(producer.getIndexingMapsArray(),
-                          [](AffineMap map) { return map.isIdentity(); }))
+                          [](AffineMap map) { return map.isIdentity(); })) {
           return false;
+        }
 
         std::optional<CastOpInterface> castOp =
             getDefiningNonI1ExtendingCastOp(operand.get());
@@ -319,8 +321,9 @@ public:
         // preferred to fuse those with producers (and the consumer fusion is
         // arguably the less canonical form).
         auto canFoldCast = [&]() {
-          if (isa<arith::ExtFOp>(*castOp))
+          if (isa<arith::ExtFOp>(*castOp)) {
             return true;
+          }
           // Signed operations can only be folded with (implicitly) signed
           // linalg named ops
           if (isa<arith::ExtSIOp>(*castOp)) {

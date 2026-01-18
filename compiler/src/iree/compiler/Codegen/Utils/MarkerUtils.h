@@ -51,8 +51,9 @@ struct LinalgTransformationFilter {
   bool hasReplacementFilter(Operation *op) const;
 
   LinalgTransformationFilter &addFilter(const FilterFunction &f) {
-    if (f)
+    if (f) {
       filters.push_back(f);
+    }
     return *this;
   }
 

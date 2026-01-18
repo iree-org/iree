@@ -127,6 +127,8 @@ class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
     "e.encodeStrAttr(getOperation()->getAttrOfType<StringAttr>(\"" # name # "\"))">;
 class VM_EncBranch<string blockName, string operandsName, int successorIndex> : VM_EncEncodeExpr<
     "e.encodeBranch({0}(), " # operandsName # "(), " # successorIndex # ")", [blockName]>;
+class VM_EncBranchTarget<string blockName> : VM_EncEncodeExpr<
+    "e.encodeBranchTarget({0}())", [blockName]>;
 class VM_EncBranchTable<string caseBlockNames, string caseOperandsName, int baseSuccessorIndex> : VM_EncEncodeExpr<
     "e.encodeBranchTable(" # caseBlockNames # "(), " # caseOperandsName # "(), " # baseSuccessorIndex # ")">;
 class VM_EncOperand<string name, int ordinal> : VM_EncEncodeExpr<
@@ -137,6 +139,8 @@ class VM_EncResult<string name> : VM_EncEncodeExpr<
     "e.encodeResult({0}())", [name]>;
 class VM_EncVariadicResults<string name> : VM_EncEncodeExpr<
     "e.encodeResults({0}())", [name]>;
+class VM_EncBlockArgResults<string blockName> : VM_EncEncodeExpr<
+    "e.encodeBlockArgResults({0}())", [blockName]>;
 
 def VM_SerializableOpInterface : OpInterface<"VMSerializableOp"> {
   let description = [{
@@ -146,12 +150,13 @@ def VM_SerializableOpInterface : OpInterface<"VMSerializableOp"> {
 
   let methods = [
     InterfaceMethod<
-      "Encodes the op with the provided bytecode encoder.",
-      "LogicalResult",
+      [{Encodes the op with the provided bytecode encoder.
+        Returns failure() on encoding error.
+        Returns true if bytecode was emitted, false if the op was elided.}],
+      "FailureOr<bool>",
       "encode",
       (ins "SymbolTable &":$syms, "VMFuncEncoder &":$e)
     >,
-    // TODO(benvanik): decoder as a static builder method.
   ];
 }
 
@@ -248,6 +253,44 @@ def VM_ImportInterface :
   Util_InterfaceDocMetadata docMetadata = ?;
 }
 
+def VM_RefMoveInterface : VM_OpInterface<"RefMoveInterface"> {
+  let description = [{
+    Interface for VM ops that support MOVE semantics on ref operands/results.
+
+    The MOVE bit indicates "last use - runtime can invalidate register."
+    Only operands/results that return true from these methods will have
+    MOVE bits set by the register allocator.
+
+    Default implementation returns false (safe - requires explicit discard).
+    Ops that don't implement this interface will never have MOVE set.
+
+    IMPORTANT: Memory leaks result if this returns true but the runtime
+    doesn't honor the MOVE bit for that operand/result. Every implementation
+    must exactly match the runtime behavior.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      [{Returns true if the ref operand at the given index supports MOVE.
+        When true, the register allocator may set MOVE on last use and the
+        runtime will release/zero the operand register.}],
+      "bool", "isRefOperandMovable",
+      (ins "unsigned":$operandIndex),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/"return false;"
+    >,
+    InterfaceMethod<
+      [{Returns true if the ref result at the given index supports MOVE.
+        When true, the register allocator may set MOVE on the result and the
+        runtime will handle ownership transfer appropriately.}],
+      "bool", "isRefResultMovable",
+      (ins "unsigned":$resultIndex),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/"return false;"
+    >,
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // VM traits
 //===----------------------------------------------------------------------===//
@@ -275,6 +318,10 @@ def VM_FullBarrier : NativeOpTrait<"IREE::VM::FullBarrier">;
 def VM_ExtF32 : NativeOpTrait<"IREE::VM::ExtF32">;
 // Operations with this trait require the VM f64 extension.
 def VM_ExtF64 : NativeOpTrait<"IREE::VM::ExtF64">;
+
+// Operations with this trait may fail at runtime (return an error status).
+// This is used to determine which functions require stack unwinding support.
+def VM_MayFail : NativeOpTrait<"IREE::VM::MayFail">;
 
 //===----------------------------------------------------------------------===//
 // ref<T> types

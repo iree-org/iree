@@ -25,10 +25,12 @@ public:
   matchAndRewrite(IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto targetType = op.getValue().getType();
-    if (targetType.isInteger(64))
+    if (targetType.isInteger(64)) {
       return failure(); // handled natively
-    if (!targetType.isIntOrIndex())
+    }
+    if (!targetType.isIntOrIndex()) {
       return rewriter.notifyMatchFailure(op, "unsupported result type");
+    }
 
     // Query as i64.
     // Note that due to type conversion we need to handle the default logic
@@ -94,12 +96,14 @@ public:
   LogicalResult
   matchAndRewrite(IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!op.getValue().getType().isInteger(64))
+    if (!op.getValue().getType().isInteger(64)) {
       return failure();
+    }
     auto results =
         rewriteToCall(op, adaptor, importOp, *getTypeConverter(), rewriter);
-    if (!results.has_value())
+    if (!results.has_value()) {
       return failure();
+    }
     auto ok = results->front();
     auto value = results->back();
     if (op.getDefaultValue().has_value()) {

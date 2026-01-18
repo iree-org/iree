@@ -1,0 +1,12 @@
+{
+  "model": "nlpaueb/legal-bert-base-uncased",
+  "description": "Legal-BERT - legal documents",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "legal", "input": "The defendant hereby waives all rights to appeal."},
+    {"name": "citation", "input": "See Brown v. Board of Education, 347 U.S. 483 (1954)."},
+    {"name": "contract", "input": "Party A agrees to indemnify Party B against all claims."},
+    {"name": "special_chars", "input": "§ 1.1(a)(i) of the Agreement"},
+    {"name": "no_special", "input": "jurisdiction", "add_special_tokens": false}
+  ]
+}

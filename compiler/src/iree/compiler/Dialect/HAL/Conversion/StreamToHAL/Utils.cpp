@@ -104,8 +104,9 @@ lookupAllocatorAndQueueAffinityFor(Operation *op, Value memoryTypes,
 
 Value getOrCreateWaitFence(Location loc, Value timepointFence,
                            PatternRewriter &rewriter) {
-  if (timepointFence)
+  if (timepointFence) {
     return timepointFence;
+  }
   return IREE::Util::NullOp::create(rewriter, loc,
                                     rewriter.getType<IREE::HAL::FenceType>());
 }
@@ -115,18 +116,21 @@ Value getOrCreateWaitFence(Location loc, Value timepointFence,
 // it is the only consumer of the timepoint and it is removed upon return.
 static Value consumeBoundFence(Value timepoint, PatternRewriter &rewriter) {
   // Must only have one use. We can't consume a fence multiple times.
-  if (!timepoint.hasOneUse())
+  if (!timepoint.hasOneUse()) {
     return nullptr; // >1 use
+  }
 
   // The use must be an export to a fence.
   auto chainOp = dyn_cast<IREE::Stream::TimepointChainExternalOp>(
       *timepoint.getUsers().begin());
-  if (!chainOp)
+  if (!chainOp) {
     return nullptr; // non-export use
+  }
   assert(!chainOp.getExternalValues().empty());
   auto fence = chainOp.getExternalValues().front();
-  if (!fence || !isa<IREE::HAL::FenceType>(fence.getType()))
+  if (!fence || !isa<IREE::HAL::FenceType>(fence.getType())) {
     return nullptr;
+  }
 
   // Try really hard to figure out if the fence can be used. A larger analysis
   // pass running prior to conversion that did some code motion could help
@@ -147,9 +151,9 @@ static Value consumeBoundFence(Value timepoint, PatternRewriter &rewriter) {
 
 Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
                              PatternRewriter &rewriter) {
-  // Check to see if anyone is consuming the timepoint - if not then we don't
-  // need create a fence.
-  if (timepoint.use_empty()) {
+  // Handle nullptr timepoint (from TimelineOps with no result timepoint) or
+  // timepoints with no consumers by returning a null fence.
+  if (!timepoint || timepoint.use_empty()) {
     return IREE::Util::NullOp::create(rewriter, loc,
                                       rewriter.getType<IREE::HAL::FenceType>());
   }
@@ -157,8 +161,9 @@ Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
   // Check to see if the timepoint is associated with a fence. In common cases
   // when along ABI boundaries we can usually find an association.
   auto fence = consumeBoundFence(timepoint, rewriter);
-  if (fence)
+  if (fence) {
     return fence;
+  }
 
   // Create a new fence.
   return IREE::HAL::FenceCreateOp::create(

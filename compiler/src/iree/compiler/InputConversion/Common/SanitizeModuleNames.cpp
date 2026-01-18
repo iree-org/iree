@@ -30,8 +30,9 @@ public:
 
     mlir::ModuleOp moduleOp = getOperation();
     auto optionalName = moduleOp.getName();
-    if (!optionalName.has_value())
+    if (!optionalName.has_value()) {
       return;
+    }
     auto name = optionalName.value();
 
     moduleOp.setName(sanitizeSymbolName(name));

@@ -194,10 +194,12 @@ struct OutlineDispatchRegionsPass
                 })
             .Default(WalkResult::advance());
       };
-      if (funcOp.walk(outlineOps).wasInterrupted())
+      if (funcOp.walk(outlineOps).wasInterrupted()) {
         return signalPassFailure();
-      for (auto *deadOp : deadOps)
+      }
+      for (auto *deadOp : deadOps) {
         deadOp->erase();
+      }
     }
   }
 };

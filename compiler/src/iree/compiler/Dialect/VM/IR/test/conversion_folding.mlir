@@ -205,3 +205,28 @@ vm.module @cast_ref_any_folds {
     vm.return %1 : !vm.ref<?>
   }
 }
+
+// -----
+
+// CHECK-LABEL: vm.module public @float_cast_folds
+vm.module public @float_cast_folds {
+  // CHECK-LABEL: vm.func @cast_signed_to_f64
+  vm.func @cast_signed_to_f64() -> f64 {
+    // CHECK: %[[CONST_0:.*]] = vm.const.f64
+    %cst = vm.const.i64 2147483648
+    // CHECK-NOT: vm.cast.si64.f64
+    %0 = vm.cast.si64.f64 %cst : i64 -> f64
+    // CHECK: vm.return %[[CONST_0]]
+    vm.return %0 : f64
+  }
+
+  // CHECK-LABEL: vm.func @cast_unsigned_to_f64
+  vm.func @cast_unsigned_to_f64() -> f64 {
+    // CHECK: %[[CONST_1:.*]] = vm.const.f64
+    %cst = vm.const.i64 4294967295
+    // CHECK-NOT: vm.cast.ui64.f64
+    %0 = vm.cast.ui64.f64 %cst : i64 -> f64
+    // CHECK: vm.return %[[CONST_1]]
+    vm.return %0 : f64
+  }
+}

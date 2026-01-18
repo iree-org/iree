@@ -40,8 +40,9 @@ struct DistributeLoop final : OpRewritePattern<scf::ForOp> {
     // Only distribute if we see the marker attribute.
     auto numDimAttr =
         forOp->getAttrOfType<IntegerAttr>(getGPUDistributeAttrName());
-    if (!numDimAttr)
+    if (!numDimAttr) {
       return failure();
+    }
 
     // Get workgroup sizes if not using gpu.block_dim
     SmallVector<int64_t> workgroupSize;

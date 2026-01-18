@@ -23,8 +23,9 @@ struct FoldTensorLoadWithExtractSlice
     auto dispatchTensorLoadOp =
         extractSliceOp.getSource()
             .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
-    if (!dispatchTensorLoadOp)
+    if (!dispatchTensorLoadOp) {
       return failure();
+    }
 
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.extract_slice` (i.e. the producer) folds **into**
@@ -56,8 +57,9 @@ struct FoldInsertSliceWithTensorStoreOp
                   PatternRewriter &rewriter) const override {
     auto insertSliceOp =
         dispatchTensorStoreOp.getValue().getDefiningOp<tensor::InsertSliceOp>();
-    if (!insertSliceOp)
+    if (!insertSliceOp) {
       return failure();
+    }
 
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.insert_slice` (i.e. the producer) folds **into**

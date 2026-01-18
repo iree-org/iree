@@ -43,8 +43,9 @@ struct FuseElementWiseGenericOps : public OpRewritePattern<linalg::GenericOp> {
 
     // Find the first operand that is defined by another generic op on tensors.
     for (OpOperand &opOperand : genericOp->getOpOperands()) {
-      if (!linalg::areElementwiseOpsFusable(&opOperand))
+      if (!linalg::areElementwiseOpsFusable(&opOperand)) {
         continue;
+      }
       // Don't fuse if it has external capture. For e.g., the gather like
       // payload operation like 'tensor.extract' would be cloned in
       // every consumer op, which is not what we want.

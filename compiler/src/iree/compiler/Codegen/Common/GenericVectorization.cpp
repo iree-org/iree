@@ -96,8 +96,9 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         auto ty = padOp.getResultType();
         // TODO(hanchung): Infer the vector sizes for pad op after
         // maskedVectorize method allows dynamic result shapes.
-        if (!ty.hasStaticShape())
+        if (!ty.hasStaticShape()) {
           return;
+        }
         vectorSizes = SmallVector<int64_t>(ty.getShape());
       })
       .Case<IREE::LinalgExt::GatherOp>([&](IREE::LinalgExt::GatherOp gatherOp) {
@@ -121,10 +122,12 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
   int64_t maxFlatVecSize = 1;
   for (OpOperand &operand : linalgOp->getOpOperands()) {
     auto type = dyn_cast<ShapedType>(operand.get().getType());
-    if (!type)
+    if (!type) {
       continue;
-    if (!type.hasStaticShape())
+    }
+    if (!type.hasStaticShape()) {
       return failure();
+    }
     maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());
   }
   return success(maxFlatVecSize < maxVectorSize);
@@ -183,11 +186,13 @@ void GenericVectorizationPass::runOnOperation() {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
       if (enableVectorMasking) {
-        if (llvm::product_of(vectorSizes) >= maxVectorSize)
+        if (llvm::product_of(vectorSizes) >= maxVectorSize) {
           continue;
+        }
       } else {
-        if (failed(isWithinVectorSizeLimit(linalgOp, maxVectorSize)))
+        if (failed(isWithinVectorSizeLimit(linalgOp, maxVectorSize))) {
           continue;
+        }
       }
     }
     // Pad scalable dims with `false` to match the vector sizes.

@@ -173,9 +173,9 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     is otherwise perfectly legal.
   }];
 
-  let arguments = (ins RankedTensorOrMemRefOf<[AnyType], [1]>:$operand,
+  let arguments = (ins AnyRankedTensorOrMemRef:$operand,
                        IREECodegen_AnySwizzleAttr:$swizzle);
-  let results = (outs RankedTensorOrMemRefOf<[AnyType], [1]>:$result);
+  let results = (outs AnyRankedTensorOrMemRef:$result);
 
   let assemblyFormat = [{
     $operand `[` $swizzle attr-dict `]` `:` type($result)
@@ -583,6 +583,36 @@ def IREECodegen_WorkgroupCountHintOp :
       return ::mlir::getMixedValues(getStaticSizes(), getSizes(), builder);
     }
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// IndexHintOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_IndexHintOp : Op<IREECodegen_Dialect, "index_hint", [Pure]> {
+  let summary = "Compiler hint providing semantic information about an index";
+  let description = [{
+    Pure pass-through operation that annotates an index value with semantic
+    information about how it varies across parallel workers (e.g., GPU lanes).
+
+    The hint attribute describes the index behavior. Common hints include:
+    - `#iree_gpu.lane_constant<N>`: Index is uniform within groups of N lanes
+    - `#iree_gpu.lane_increment<N>`: Index increments by 1 within groups of N lanes
+
+    This operation is always safe to remove (replace with input). It exists
+    purely to guide optimization passes.
+
+    Example:
+    ```mlir
+    %row = iree_codegen.index_hint %idx(#iree_gpu.lane_constant<16>) : index
+    %col = iree_codegen.index_hint %idx(#iree_gpu.lane_increment<16>) : index
+    ```
+  }];
+
+  let arguments = (ins Index:$input, AnyAttr:$hint);
+  let results = (outs Index:$result);
+
+  let assemblyFormat = "$input `(` $hint `)` attr-dict `:` type($input)";
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS

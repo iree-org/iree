@@ -44,11 +44,20 @@ public:
   // Returns an unordered list of values live on block entry.
   ArrayRef<Value> getBlockLiveIns(Block *block);
 
+  // Returns an unordered list of values live on block exit.
+  ArrayRef<Value> getBlockLiveOuts(Block *block);
+
   // Returns true if |useOp| has the last use of |value|.
   bool isLastValueUse(Value value, Operation *useOp);
   // Returns true if |useOp|'s operand at |operandIndex| is the last use of the
   // value.
   bool isLastValueUse(Value value, Operation *useOp, int operandIndex);
+
+  // Returns true if |useOp|'s operand at |operandIndex| is the last "real" use
+  // of the value, ignoring DiscardRefsOp uses. This is used by register
+  // allocation to set the MOVE bit on the last "real" use, allowing subsequent
+  // discards to be elided when the MOVE has already released the ref.
+  bool isLastRealValueUse(Value value, Operation *useOp, int operandIndex);
 
 private:
   // Produces an op ordering for the entire function.

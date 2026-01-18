@@ -51,8 +51,9 @@ struct ScatterOpConversion
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
     auto indicesTy = op.getIndicesType();
-    if (!indicesTy.hasRank())
+    if (!indicesTy.hasRank()) {
       return failure();
+    }
 
     if (indicesTy.isDynamicDim(indicesTy.getRank() - 1)) {
       return rewriter.notifyMatchFailure(op, "number of indices is unknown");
@@ -60,8 +61,9 @@ struct ScatterOpConversion
 
     auto numIndices = indicesTy.getShape().back();
     llvm::SmallVector<int64_t> dimMap(numIndices);
-    for (int i = 0; i < numIndices; i++)
+    for (int i = 0; i < numIndices; i++) {
       dimMap[i] = i;
+    }
 
     auto updatesTy = op.getUpdateType();
 
@@ -182,8 +184,9 @@ struct AttentionOpConversion
     int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
       map = map.shiftDims(numBatches);
-      if (map.getNumResults() == 0)
+      if (map.getNumResults() == 0) {
         continue;
+      }
       for (int batch : llvm::seq<int>(numBatches)) {
         map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
       }

@@ -445,8 +445,9 @@ buildBenchmarkModule(IREE::HAL::ExecutableOp sourceExecutableOp,
   }
 
   // Skip the file when we could not generate any benchmarks.
-  if (!hasAnyBenchmarks)
+  if (!hasAnyBenchmarks) {
     return {};
+  }
 
   IRRewriter rewriter(moduleOp->getContext());
   DominanceInfo domInfo;
@@ -478,8 +479,9 @@ struct DumpExecutableBenchmarksPass
     SymbolTable symbolTable(moduleOp);
 
     DeviceAnalysis deviceAnalysis(moduleOp);
-    if (failed(deviceAnalysis.run()))
+    if (failed(deviceAnalysis.run())) {
       return signalPassFailure();
+    }
     if (deviceAnalysis.getDeviceGlobals().empty()) {
       mlir::emitRemark(moduleOp.getLoc())
           << "Executable benchmarks were requested but no devices were "
@@ -516,8 +518,9 @@ struct DumpExecutableBenchmarksPass
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
         auto benchmarkModuleOp = buildBenchmarkModule(
             executableOp, variantOp, dispatchParamsMap, deviceAnalysis);
-        if (!benchmarkModuleOp)
+        if (!benchmarkModuleOp) {
           continue;
+        }
         auto fileName = (moduleName + "_" + executableOp.getName() + "_" +
                          variantOp.getName() + "_benchmark.mlir")
                             .str();

@@ -144,8 +144,9 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
 #endif // _WIN32
   Tokenize(command, stringSaver, rawArgs, /*MarkEOLs=*/false);
   SmallVector<StringRef> args;
-  for (auto rawArg : rawArgs)
+  for (auto rawArg : rawArgs) {
     args.push_back(StringRef(rawArg));
+  }
 
   // Try to find the tool either by absolute path or by looking it up in env.
   auto tool = findTool(args[0].str());
@@ -156,8 +157,9 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
 
   LLVM_DEBUG({
     llvm::dbgs() << "Launching hal.executable preprocessor: ";
-    for (auto arg : args)
+    for (auto arg : args) {
       llvm::dbgs() << arg << " ";
+    }
     llvm::dbgs() << " 1> " << stdoutFile.str() << " 2> " << stderrFile.str()
                  << "\n";
   });
@@ -242,8 +244,9 @@ struct PreprocessExecutablesWithPipelinePass
   }
 
   void runOnOperation() override {
-    if (!pipeline.hasValue())
+    if (!pipeline.hasValue()) {
       return;
+    }
     IREE::HAL::ExecutableOp executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
     if (failed(buildPassPipeline(pipeline, passManager))) {
@@ -270,8 +273,9 @@ struct PreprocessExecutablesWithToolPass
   using IREE::HAL::impl::PreprocessExecutablesWithToolPassBase<
       PreprocessExecutablesWithToolPass>::PreprocessExecutablesWithToolPassBase;
   void runOnOperation() override {
-    if (!command.hasValue())
+    if (!command.hasValue()) {
       return;
+    }
     IREE::HAL::ExecutableOp executableOp = getOperation();
     if (failed(preprocessWithCommand(executableOp, command))) {
       llvm::errs() << "ERROR: failed to preprocess executable `"

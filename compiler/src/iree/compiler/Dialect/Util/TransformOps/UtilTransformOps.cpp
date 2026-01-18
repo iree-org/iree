@@ -75,11 +75,13 @@ IREE::Util::transform_dialect::CreateSerializedModuleOp::apply(
     DiagnosedSilenceableFailure result =
         state.applyTransform(cast<transform::TransformOpInterface>(transform));
     // TODO: Support better error propagation.
-    if (result.isSilenceableFailure())
+    if (result.isSilenceableFailure()) {
       return DiagnosedSilenceableFailure::definiteFailure();
+    }
     // Pass through the error message from definite failures.
-    if (result.isDefiniteFailure())
+    if (result.isDefiniteFailure()) {
       return result;
+    }
   }
 
   // Serialize the module as bytecode to a string.
@@ -280,13 +282,15 @@ DiagnosedSilenceableFailure IREE::Util::transform_dialect::CastAndCallOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
   SmallVector<Value> inputs;
-  if (getInputs())
+  if (getInputs()) {
     llvm::append_range(inputs, state.getPayloadValues(getInputs()));
+  }
 
   SetVector<Value> outputs;
   if (getOutputs()) {
-    for (auto output : state.getPayloadValues(getOutputs()))
+    for (auto output : state.getPayloadValues(getOutputs())) {
       outputs.insert(output);
+    }
 
     // Verify that the set of output values to be replaced is unique.
     if (outputs.size() !=
@@ -386,10 +390,11 @@ DiagnosedSilenceableFailure IREE::Util::transform_dialect::CastAndCallOp::apply(
     }
   }
 
-  if (insertAfter)
+  if (insertAfter) {
     rewriter.setInsertionPointAfter(insertionPoint);
-  else
+  } else {
     rewriter.setInsertionPoint(insertionPoint);
+  }
 
   for (auto [input, type] :
        llvm::zip_equal(inputs, targetFunction.getArgumentTypes())) {
@@ -504,12 +509,15 @@ LogicalResult IREE::Util::transform_dialect::CastAndCallOp::verify() {
 void IREE::Util::transform_dialect::CastAndCallOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getInsertionPointMutable(), effects);
-  if (getInputs())
+  if (getInputs()) {
     transform::onlyReadsHandle(getInputsMutable(), effects);
-  if (getOutputs())
+  }
+  if (getOutputs()) {
     transform::onlyReadsHandle(getOutputsMutable(), effects);
-  if (getFunction())
+  }
+  if (getFunction()) {
     transform::onlyReadsHandle(getFunctionMutable(), effects);
+  }
   transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }

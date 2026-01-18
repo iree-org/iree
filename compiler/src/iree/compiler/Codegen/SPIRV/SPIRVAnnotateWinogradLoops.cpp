@@ -25,16 +25,18 @@ public:
     mlir::FunctionOpInterface funcOp = getOperation();
     SmallVector<scf::ForOp> forOps;
     funcOp.walk([&](scf::ForOp forOp) {
-      if (!isTiledAndDistributedLoop(forOp))
+      if (!isTiledAndDistributedLoop(forOp)) {
         forOps.push_back(forOp);
+      }
     });
 
     MLIRContext *context = &getContext();
     OpBuilder builder(context);
     const char *attrName = getGPUDistributeAttrName();
     for (auto [index, forOp] : llvm::enumerate(forOps)) {
-      if (index > kNumGPUDims)
+      if (index > kNumGPUDims) {
         break;
+      }
       forOp->setAttr(attrName, builder.getIndexAttr(index));
     }
   }

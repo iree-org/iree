@@ -138,8 +138,9 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
       map = map.shiftDims(1, expandDstDim);
       std::optional<int64_t> maybeDim = map.getResultPosition(
           getAffineDimExpr(expandSrcDim, map.getContext()));
-      if (!maybeDim)
+      if (!maybeDim) {
         continue;
+      }
       map = map.insertResult(getAffineDimExpr(expandDstDim, map.getContext()),
                              maybeDim.value() + 1);
     }
@@ -158,8 +159,9 @@ getIntrinsics(linalg::LinalgOp linalgOp,
     // For LIT testing, also directly search TargetAttr around the op.
     target = getGPUTargetAttr(linalgOp);
   }
-  if (!target)
+  if (!target) {
     return {};
+  }
 
   IREE::GPU::MMAOpsArrayAttr mmaKinds = target.getWgp().getMma();
 
@@ -176,8 +178,9 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   // Early exit if cannot find intrinsics or if multiple executable targets.
   SmallVector<GPUIntrinsicType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
-  if (intrinsics.empty())
+  if (intrinsics.empty()) {
     return;
+  }
 
   // Check that conv has met conditions to go down mfma.
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
@@ -348,8 +351,9 @@ static void padContractionLikeOp(
   // Early exit if cannot find intrinsics or if multiple executable targets.
   SmallVector<GPUIntrinsicType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
-  if (intrinsics.empty())
+  if (intrinsics.empty()) {
     return;
+  }
 
   Location loc = linalgOp.getLoc();
 
@@ -377,8 +381,9 @@ static void padContractionLikeOp(
       auto operandMap = linalgOp.getMatchingIndexingMap(operand);
       std::optional<unsigned> maybeDim = operandMap.getResultPosition(
           getAffineDimExpr(targetDim, operandMap.getContext()));
-      if (maybeDim)
+      if (maybeDim) {
         return std::pair{operand->get(), maybeDim.value()};
+      }
     }
     return std::nullopt;
   };
@@ -405,8 +410,9 @@ static void padContractionLikeOp(
       OpFoldResult mSizeExpr = rewriter.getIndexAttr(mSize);
       if (ShapedType::isDynamic(mSize)) {
         auto mOperandDimPair = getSrcOperandAndDim(mDim);
-        if (!mOperandDimPair)
+        if (!mOperandDimPair) {
           return;
+        }
         auto [mOperand, mOperandDim] = mOperandDimPair.value();
         mSizeExpr = tensor::DimOp::create(rewriter, loc, mOperand, mOperandDim)
                         .getResult();
@@ -419,8 +425,9 @@ static void padContractionLikeOp(
       OpFoldResult nSizeExpr = rewriter.getIndexAttr(nSize);
       if (ShapedType::isDynamic(nSize)) {
         auto nOperandDimPair = getSrcOperandAndDim(nDim);
-        if (!nOperandDimPair)
+        if (!nOperandDimPair) {
           return;
+        }
         auto [nOperand, nOperandDim] = nOperandDimPair.value();
         nSizeExpr = tensor::DimOp::create(rewriter, loc, nOperand, nOperandDim)
                         .getResult();
@@ -433,8 +440,9 @@ static void padContractionLikeOp(
       OpFoldResult kSizeExpr = rewriter.getIndexAttr(kSize);
       if (ShapedType::isDynamic(kSize)) {
         auto kOperandDimPair = getSrcOperandAndDim(kDim);
-        if (!kOperandDimPair)
+        if (!kOperandDimPair) {
           return;
+        }
         auto [kOperand, kOperandDim] = kOperandDimPair.value();
         kSizeExpr = tensor::DimOp::create(rewriter, loc, kOperand, kOperandDim)
                         .getResult();
@@ -474,14 +482,16 @@ static void padContractionLikeOp(
   auto getOperandPadding =
       [&](AffineMap operandMap) -> SmallVector<OpFoldResult> {
     auto operandRank = operandMap.getNumResults();
-    if (operandRank == 0)
+    if (operandRank == 0) {
       return {};
+    }
     SmallVector<OpFoldResult> operandPadding(operandRank, zero);
     for (auto [targetDim, targetPad] : llvm::zip(mnkDim, mnkPadding)) {
       std::optional<unsigned> maybeDim = operandMap.getResultPosition(
           getAffineDimExpr(targetDim, operandMap.getContext()));
-      if (!maybeDim)
+      if (!maybeDim) {
         continue;
+      }
       operandPadding[maybeDim.value()] = targetPad;
     }
     return operandPadding;
@@ -541,13 +551,14 @@ static void padContractionLikeOp(
   SmallVector<OpFoldResult> offsets(resultRank, zero), strides(resultRank, one),
       sizes;
   for (auto [dimIdx, dimSize] : llvm::enumerate(resultShape)) {
-    if (ShapedType::isDynamic(dimSize))
+    if (ShapedType::isDynamic(dimSize)) {
       sizes.push_back(
           tensor::DimOp::create(rewriter, loc,
                                 linalgOp.getDpsInitOperand(0)->get(), dimIdx)
               .getResult());
-    else
+    } else {
       sizes.push_back(rewriter.getIndexAttr(dimSize));
+    }
   }
   rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(linalgOp, paddedCompute,
                                                       offsets, sizes, strides);

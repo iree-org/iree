@@ -82,3 +82,32 @@ func.func @fusion_barrier(%arg0: tensor<?xf32>) -> tensor<?xf32> {
 // CHECK-LABEL: func.func @fusion_barrier(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?xf32>
 // CHECK:         iree_codegen.fusion_barrier %[[ARG0]] : tensor<?xf32>
+
+// -----
+
+func.func @index_hint(%idx: index) -> index {
+  %hinted = iree_codegen.index_hint %idx([]) : index
+  return %hinted : index
+}
+// CHECK-LABEL: func.func @index_hint(
+// CHECK-SAME:    %[[IDX:[a-zA-Z0-9_]+]]: index
+// CHECK:         %[[HINT:.+]] = iree_codegen.index_hint %[[IDX]]([]) : index
+// CHECK:         return %[[HINT]]
+
+// -----
+
+// Test workgroup_scope attribute roundtrip.
+func.func private @workgroup_scope_attr() attributes {
+    scope = #iree_codegen.workgroup_scope
+}
+// CHECK-LABEL: func.func private @workgroup_scope_attr()
+// CHECK-SAME:    scope = #iree_codegen.workgroup_scope
+
+// -----
+
+// Test workgroup_scope attribute with linearize option.
+func.func private @workgroup_scope_attr_linearize() attributes {
+    scope = #iree_codegen.workgroup_scope<linearize>
+}
+// CHECK-LABEL: func.func private @workgroup_scope_attr_linearize()
+// CHECK-SAME:    scope = #iree_codegen.workgroup_scope<linearize>

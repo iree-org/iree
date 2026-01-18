@@ -277,14 +277,17 @@ static LogicalResult classifyOperationsIntoStages(
 
   LDBG() << "\n=== Final Stage Classification ===";
   LDBG() << "--- Read Stage (" << result.readStage.size() << " ops) ---";
-  for (Operation *op : result.readStage)
+  for (Operation *op : result.readStage) {
     LDBG() << *op;
+  }
   LDBG() << "--- Write Stage (" << result.writeStage.size() << " ops) ---";
-  for (Operation *op : result.writeStage)
+  for (Operation *op : result.writeStage) {
     LDBG() << *op;
+  }
   LDBG() << "--- Compute Stage (" << result.computeStage.size() << " ops) ---";
-  for (Operation *op : result.computeStage)
+  for (Operation *op : result.computeStage) {
     LDBG() << *op;
+  }
 
   return success();
 }
@@ -365,28 +368,35 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
                      unsigned numStages,
                      llvm::DenseMap<Operation *, unsigned> &opToStage) {
   auto assignOp = [&](Operation *op, unsigned stage) {
-    if (!op || isa<scf::YieldOp>(op))
+    if (!op || isa<scf::YieldOp>(op)) {
       return;
+    }
     opToStage[op] = stage;
   };
 
   if (numStages == 2) {
     // Two-stage pipelining: read+write in stage 0, compute in stage 1.
-    for (Operation *op : stages.readStage)
+    for (Operation *op : stages.readStage) {
       assignOp(op, /*stage=*/0);
-    for (Operation *op : stages.writeStage)
+    }
+    for (Operation *op : stages.writeStage) {
       assignOp(op, /*stage=*/0);
-    for (Operation *op : stages.computeStage)
+    }
+    for (Operation *op : stages.computeStage) {
       assignOp(op, /*stage=*/1);
+    }
   } else {
     // Three-stage pipelining: read in stage 0, write in stage 1, compute in
     // stage 2.
-    for (Operation *op : stages.readStage)
+    for (Operation *op : stages.readStage) {
       assignOp(op, /*stage=*/0);
-    for (Operation *op : stages.writeStage)
+    }
+    for (Operation *op : stages.writeStage) {
       assignOp(op, /*stage=*/1);
-    for (Operation *op : stages.computeStage)
+    }
+    for (Operation *op : stages.computeStage) {
       assignOp(op, /*stage=*/2);
+    }
   }
 }
 
@@ -513,8 +523,9 @@ invokePipelineForLoop(scf::ForOp forOp, const scf::PipeliningOption &options) {
 // Helper to check for shared memory.
 static bool hasSharedMemory(Value val) {
   auto memrefType = dyn_cast<MemRefType>(val.getType());
-  if (!memrefType)
+  if (!memrefType) {
     return false;
+  }
   auto addrSpace =
       dyn_cast_if_present<gpu::AddressSpaceAttr>(memrefType.getMemorySpace());
   return addrSpace && addrSpace.getValue() == gpu::AddressSpace::Workgroup;
@@ -587,10 +598,12 @@ static SharedBarrierState insertBarriersInRange(RewriterBase &rewriter,
       state.needBarrierBeforeWrite = false;
     }
 
-    if (hasSharedRead)
+    if (hasSharedRead) {
       state.needBarrierBeforeWrite = true;
-    if (hasSharedWrite)
+    }
+    if (hasSharedWrite) {
       state.needBarrierBeforeRead = true;
+    }
   }
 
   return state;

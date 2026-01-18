@@ -26,7 +26,6 @@ iree_lit_test_suite(
     "pad_to_intrinsics_wmma.mlir"
     "pdl_example.mlir"
     "preprocessing_match_ops.mlir"
-    "sink_transpose_through_pad.mlir"
     "transform_symbol_importing.mlir"
     "transpose_matmul.mlir"
   TOOLS

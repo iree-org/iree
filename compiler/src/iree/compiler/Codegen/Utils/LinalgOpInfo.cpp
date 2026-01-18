@@ -127,8 +127,9 @@ void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
 bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
   // (Batch) matmul should be a reduction op with 2/3 parallel dimensions.
   if (!linalg::isaContractionOpInterface(linalgOp) ||
-      !llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops()))
+      !llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops())) {
     return false;
+  }
 
   // Also exclude the case of matvec, which has only one non-unit parallel dim.
   // They should go down different pipelines.

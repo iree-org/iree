@@ -20,15 +20,17 @@ namespace mlir::iree_compiler {
 namespace {
 
 static Value castToI64(Value value, OpBuilder &builder) {
-  if (value.getType().isInteger(64))
+  if (value.getType().isInteger(64)) {
     return value;
+  }
   return builder.createOrFold<IREE::VM::ExtI32I64UOp>(
       value.getLoc(), builder.getI64Type(), value);
 }
 
 static Value castToIndex(Value value, OpBuilder &builder) {
-  if (value.getType().isIndex())
+  if (value.getType().isIndex()) {
     return value;
+  }
   return builder.createOrFold<arith::IndexCastOp>(
       value.getLoc(), builder.getIndexType(), value);
 }
@@ -161,8 +163,9 @@ struct BufferCompareOpConversion
 
 static Value unscaleOffset(Location loc, Value offset, int64_t scale,
                            OpBuilder &builder) {
-  if (scale == 1)
+  if (scale == 1) {
     return offset;
+  }
   return builder.createOrFold<IREE::VM::DivI64SOp>(
       loc, offset.getType(), offset,
       IREE::VM::ConstI64Op::create(builder, loc, scale));

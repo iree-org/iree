@@ -28,7 +28,6 @@ canonicalizeModule(IREE::VM::ModuleOp moduleOp,
   RewritePatternSet patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
-  target.addLegalOp<IREE::Util::OptimizationBarrierOp>();
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
@@ -79,13 +78,6 @@ canonicalizeModule(IREE::VM::ModuleOp moduleOp,
   modulePasses.addPass(createDropExcludedExportsPass());
   modulePasses.addPass(mlir::createSymbolDCEPass());
 
-  // In the the Bytecode module the order is:
-  // * `createDropCompilerHintsPass()`
-  // * `IREE::VM::createOrdinalAllocationPass()`
-  // Here, we have to reverse the order and run
-  // `createConvertVMToEmitCPass()` inbetween to test the EmitC pass.
-  // Otherwise, the constants get folded by the canonicalizer.
-
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
   // binary output.
@@ -93,11 +85,19 @@ canonicalizeModule(IREE::VM::ModuleOp moduleOp,
   // invalidate the ordinals.
   modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
 
+  // Drop vm.optimization_barrier ops before EmitC conversion. The barriers
+  // prevent folding during VM-level optimizations above, but EmitC doesn't
+  // have conversion patterns for vm.optimization_barrier.
+  modulePasses.addPass(IREE::VM::createDropOptimizationBarriersPass());
+
+  // Clean up dead code created by dropping barriers. The barriers prevented
+  // constant folding, so after dropping them we need to eliminate unused
+  // constants to avoid generating unused variables in EmitC.
+  modulePasses.addPass(mlir::createCanonicalizerPass());
+  modulePasses.addPass(mlir::createCSEPass());
+
   // C target specific pass
   modulePasses.addPass(createConvertVMToEmitCPass());
-
-  modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
-  modulePasses.addPass(mlir::createCanonicalizerPass());
 
   if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";

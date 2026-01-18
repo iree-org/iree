@@ -44,20 +44,25 @@ static FailureOr<IREE::Flow::DispatchWorkgroupsOp>
 wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
 
   SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-  if (failed(IREE::Flow::simplifyDimOps(rewriter, rewriter.getTensorDimOps())))
+  if (failed(
+          IREE::Flow::simplifyDimOps(rewriter, rewriter.getTensorDimOps()))) {
     return failure();
+  }
 
   // Wrap operation.
   auto regionOp = IREE::Flow::wrapOpInDispatchRegion(rewriter, op);
-  if (failed(regionOp))
+  if (failed(regionOp)) {
     return failure();
-  if (failed(cloneProducersToRegion(rewriter, *regionOp)))
+  }
+  if (failed(cloneProducersToRegion(rewriter, *regionOp))) {
     return failure();
+  }
   auto workgroupsOp =
       IREE::Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(*regionOp,
                                                                     rewriter);
-  if (failed(workgroupsOp))
+  if (failed(workgroupsOp)) {
     return failure();
+  }
   return *workgroupsOp;
 }
 
@@ -68,8 +73,9 @@ wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter,
   SmallVector<IREE::Flow::DispatchWorkgroupsOp> result;
   for (Operation *rootOp : rootOps) {
     auto workgroupsOp = wrapInWorkgroupsOp(rewriter, rootOp);
-    if (failed(workgroupsOp))
+    if (failed(workgroupsOp)) {
       return failure();
+    }
     result.push_back(*workgroupsOp);
   }
   return result;
@@ -84,8 +90,9 @@ static FailureOr<int> convertInsertSliceOps(
   // Find eligible InsertSliceOps.
   SmallVector<tensor::InsertSliceOp> insertSliceOps;
   funcOp.walk([&](tensor::InsertSliceOp op) {
-    if (!isInDispatchRegion(op))
+    if (!isInDispatchRegion(op)) {
       insertSliceOps.push_back(op);
+    }
   });
 
   // Rewrite InsertSliceOps to FlowUpdateOps.
@@ -102,8 +109,9 @@ static FailureOr<int> convertInsertSliceOps(
   // Create a DispatchWorkgroupsOp for every remaining InsertSliceOp.
   FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
       wrapInWorkgroupsOp(rewriter, remainingInsertSliceOps);
-  if (failed(newWorkgroupsOps))
+  if (failed(newWorkgroupsOps)) {
     return failure();
+  }
   workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
 
   return numRemainingInsertSliceOps;
@@ -118,8 +126,9 @@ static FailureOr<size_t> convertExtractSliceOps(
   // Find eligible ExtractSliceOps.
   SmallVector<tensor::ExtractSliceOp> extractSliceOps;
   funcOp.walk([&](tensor::ExtractSliceOp op) {
-    if (!isInDispatchRegion(op))
+    if (!isInDispatchRegion(op)) {
       extractSliceOps.push_back(op);
+    }
   });
 
   // Rewrite ExtractSliceOps to FlowSliceOps.
@@ -137,8 +146,9 @@ static FailureOr<size_t> convertExtractSliceOps(
   // Create a DispatchWorkgroupsOp for every remaining ExtractSliceOp.
   FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
       wrapInWorkgroupsOp(rewriter, remainingExtractSliceOps);
-  if (failed(newWorkgroupsOps))
+  if (failed(newWorkgroupsOps)) {
     return failure();
+  }
   workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
 
   return numRemainingExtractSliceOps;

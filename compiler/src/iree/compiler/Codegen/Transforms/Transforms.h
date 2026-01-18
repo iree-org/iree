@@ -226,10 +226,12 @@ struct LinalgBasePromotionPattern : public RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, op)))
+    if (failed(filter.checkAndNotify(rewriter, op))) {
       return failure();
-    if (failed(promoteSubviewsPrecondition(op, options)))
+    }
+    if (failed(promoteSubviewsPrecondition(op, options))) {
       return failure();
+    }
 
     // TODO: We cannot use root update here. This
     // pattern is creating other ops, so if the

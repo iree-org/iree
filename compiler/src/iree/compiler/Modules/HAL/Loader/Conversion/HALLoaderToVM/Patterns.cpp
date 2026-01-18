@@ -26,8 +26,9 @@ namespace {
 
 // Casts |value| to i32 if it is not already.
 static Value castToI32(Value value, OpBuilder &builder) {
-  if (value.getType().isInteger(32))
+  if (value.getType().isInteger(32)) {
     return value;
+  }
   return builder.createOrFold<IREE::VM::TruncI64I32Op>(
       value.getLoc(), builder.getI32Type(), value);
 }

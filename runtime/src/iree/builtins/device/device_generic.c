@@ -161,4 +161,16 @@ IREE_DEVICE_EXPORT float __truncsfhf2(float param) {
   return *((float *)&ret);
 }
 
+IREE_DEVICE_EXPORT double __extendhfdf2(float param) {
+  return (double)__extendhfsf2(param);
+}
+
+IREE_DEVICE_EXPORT float __truncdfhf2(double param) {
+  return __truncsfhf2((float)param);
+}
+
+IREE_DEVICE_EXPORT double fma(double x, double y, double z) {
+  return x * y + z;
+}
+
 #endif  // IREE_DEVICE_STANDALONE

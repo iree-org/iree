@@ -223,8 +223,9 @@ static LogicalResult verifyLoweringConfiguration(FunctionOpInterface funcOp,
       return WalkResult::advance();
     }
     auto loweringConfig = getLoweringConfig<IREE::CPU::LoweringConfigAttr>(op);
-    if (!loweringConfig)
+    if (!loweringConfig) {
       return WalkResult::advance();
+    }
     return verificationFn(op, loweringConfig);
   });
   return failure(walkResult.wasInterrupted());

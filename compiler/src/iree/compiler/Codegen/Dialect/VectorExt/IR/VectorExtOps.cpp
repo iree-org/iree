@@ -68,8 +68,9 @@ static ParseResult
 parseIndexVecs(OpAsmParser &parser,
                SmallVectorImpl<OpAsmParser::UnresolvedOperand> &indexVecs,
                SmallVectorImpl<Type> &indexVecTypes, ArrayAttr &indexed) {
-  if (parser.parseLSquare())
+  if (parser.parseLSquare()) {
     return failure();
+  }
 
   SMLoc loc;
   SmallVector<bool> indexedArr;
@@ -127,11 +128,13 @@ static void printIndexVecs(OpAsmPrinter &p, Operation *op,
 static void printTransferAttrs(OpAsmPrinter &p, VectorTransferOpInterface op,
                                SmallVector<StringRef, 3> elidedAttrs = {}) {
   elidedAttrs.push_back(TransferGatherOp::getOperandSegmentSizeAttr());
-  if (op.getPermutationMap().isMinorIdentity())
+  if (op.getPermutationMap().isMinorIdentity()) {
     elidedAttrs.push_back(op.getPermutationMapAttrName());
+  }
   // Elide in_bounds attribute if all dims are out-of-bounds.
-  if (llvm::none_of(op.getInBoundsValues(), [](bool b) { return b; }))
+  if (llvm::none_of(op.getInBoundsValues(), [](bool b) { return b; })) {
     elidedAttrs.push_back(op.getInBoundsAttrName());
+  }
   p.printOptionalAttrDict(op->getAttrs(), elidedAttrs);
 }
 
@@ -140,8 +143,9 @@ void TransferGatherOp::print(OpAsmPrinter &p) {
   printIndexVecs(p, *this, getIndexVecs(), getIndexVecs().getTypes(),
                  getIndexedAttr());
   p << ", " << getPadding();
-  if (getMask())
+  if (getMask()) {
     p << ", " << getMask();
+  }
   printTransferAttrs(p, *this, {"indexed"});
   p << " : " << getShapedType() << ", " << getType();
 }
@@ -151,9 +155,10 @@ verifyTransferOp(VectorTransferOpInterface op, ShapedType shapedType,
                  VectorType vectorType, VectorType maskType,
                  VectorType inferredMaskType, AffineMap permutationMap,
                  ArrayAttr inBounds) {
-  if (!isa<MemRefType, RankedTensorType>(shapedType))
+  if (!isa<MemRefType, RankedTensorType>(shapedType)) {
     return op->emitOpError(
         "requires source to be a memref or ranked tensor type");
+  }
 
   Type elementType = shapedType.getElementType();
   DataLayout dataLayout = DataLayout::closest(op);
@@ -272,30 +277,36 @@ LogicalResult TransferGatherOp::verify() {
                : VectorType();
   auto sourceElementType = shapedType.getElementType();
 
-  if (static_cast<int64_t>(getIndices().size()) != shapedType.getRank())
+  if (static_cast<int64_t>(getIndices().size()) != shapedType.getRank()) {
     return emitOpError("requires ") << shapedType.getRank() << " indices";
+  }
 
   if (failed(verifyTransferOp(cast<VectorTransferOpInterface>(getOperation()),
                               shapedType, vectorType, maskType,
-                              inferredMaskType, permutationMap, getInBounds())))
+                              inferredMaskType, permutationMap,
+                              getInBounds()))) {
     return failure();
+  }
 
   if (auto sourceVectorElementType = dyn_cast<VectorType>(sourceElementType)) {
     // Source has vector element type.
     // Check that 'sourceVectorElementType' and 'paddingType' types match.
-    if (sourceVectorElementType != paddingType)
+    if (sourceVectorElementType != paddingType) {
       return emitOpError(
           "requires source element type and padding type to match.");
+    }
 
   } else {
     // Check that 'paddingType' is valid to store in a vector type.
-    if (!VectorType::isValidElementType(paddingType))
+    if (!VectorType::isValidElementType(paddingType)) {
       return emitOpError("requires valid padding vector elemental type");
+    }
 
     // Check that padding type and vector element types match.
-    if (paddingType != sourceElementType)
+    if (paddingType != sourceElementType) {
       return emitOpError(
           "requires formal padding and source of the same elemental type");
+    }
   }
 
   if (failed(verifyPermutationMap(permutationMap,
@@ -353,28 +364,34 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
   OpAsmParser::UnresolvedOperand maskInfo;
   // Parsing with support for paddingValue.
   if (parser.parseOperand(sourceInfo) ||
-      parser.parseOperandList(indexInfo, OpAsmParser::Delimiter::Square))
+      parser.parseOperandList(indexInfo, OpAsmParser::Delimiter::Square)) {
     return failure();
+  }
 
   SmallVector<Type, 2> indexVecTypes;
   ArrayAttr indexed;
-  if (parseIndexVecs(parser, indexVecInfo, indexVecTypes, indexed))
+  if (parseIndexVecs(parser, indexVecInfo, indexVecTypes, indexed)) {
     return failure();
+  }
   result.addAttribute("indexed", indexed);
 
-  if (parser.parseComma() || parser.parseOperand(paddingInfo))
+  if (parser.parseComma() || parser.parseOperand(paddingInfo)) {
     return failure();
+  }
 
   ParseResult hasMask = parser.parseOptionalComma();
   if (hasMask.succeeded()) {
-    if (parser.parseOperand(maskInfo))
+    if (parser.parseOperand(maskInfo)) {
       return failure();
+    }
   }
 
   // Parse attributes and types.
   if (parser.parseOptionalAttrDict(result.attributes) ||
-      parser.getCurrentLocation(&typesLoc) || parser.parseColonTypeList(types))
+      parser.getCurrentLocation(&typesLoc) ||
+      parser.parseColonTypeList(types)) {
     return failure();
+  }
 
   // Check if number of types given are correct.
   int64_t nRequiredTypes = 2;
@@ -387,10 +404,12 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
   // sourceTy, resultTy
   auto shapedType = dyn_cast<ShapedType>(types[0]);
   VectorType vectorType = dyn_cast<VectorType>(types[1]);
-  if (!shapedType || !isa<MemRefType, RankedTensorType>(shapedType))
+  if (!shapedType || !isa<MemRefType, RankedTensorType>(shapedType)) {
     return parser.emitError(typesLoc, "requires memref or ranked tensor type");
-  if (!vectorType)
+  }
+  if (!vectorType) {
     return parser.emitError(typesLoc, "requires vector type");
+  }
   auto permMapAttrName =
       TransferGatherOp::getPermutationMapAttrName(result.name);
   Attribute permMapAttr = result.attributes.get(permMapAttrName);
@@ -414,12 +433,14 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
       parser.resolveOperands(indexVecInfo, indexVecTypes, typesLoc,
                              result.operands) ||
       parser.resolveOperand(paddingInfo, shapedType.getElementType(),
-                            result.operands))
+                            result.operands)) {
     return failure();
+  }
   if (hasMask.succeeded()) {
-    if (dyn_cast<VectorType>(shapedType.getElementType()))
+    if (dyn_cast<VectorType>(shapedType.getElementType())) {
       return parser.emitError(
           maskInfo.location, "does not support masks with vector element type");
+    }
     if (vectorType.getRank() != permMap.getNumResults()) {
       return parser.emitError(typesLoc,
                               "expected the same rank for the vector and the "
@@ -428,8 +449,9 @@ ParseResult TransferGatherOp::parse(OpAsmParser &parser,
     // Instead of adding the mask type as an op type, compute it based on the
     // vector type and the permutation map (to keep the type signature small).
     auto maskType = vector::inferTransferOpMaskType(vectorType, permMap);
-    if (parser.resolveOperand(maskInfo, maskType, result.operands))
+    if (parser.resolveOperand(maskInfo, maskType, result.operands)) {
       return failure();
+    }
   }
   result.addAttribute(TransferGatherOp::getOperandSegmentSizeAttr(),
                       builder.getDenseI32ArrayAttr(

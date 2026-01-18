@@ -98,10 +98,11 @@ void ShapedRefType::print(AsmPrinter &printer) const {
 
   ArrayRef<int64_t> shape = getShape();
   for (int64_t dim : shape) {
-    if (ShapedType::isDynamic(dim))
+    if (ShapedType::isDynamic(dim)) {
       printer << '?';
-    else
+    } else {
       printer << dim;
+    }
     printer << 'x';
   }
 

@@ -91,15 +91,17 @@ struct ExportParametersPass
     MLIRContext *context = &getContext();
 
     // Nothing to do if no path specified.
-    if (scopePath.empty())
+    if (scopePath.empty()) {
       return;
+    }
     auto [scope, path] = splitScopePath(scopePath);
 
     // Create a builder used to accumulate the parameters.
     ModuleOp moduleOp = getOperation();
     auto builder = createArchiveBuilder(moduleOp);
-    if (failed(builder))
+    if (failed(builder)) {
       return signalPassFailure();
+    }
 
     // Accumulate globals that match the pass options and add them to the index.
     SmallVector<IREE::Util::GlobalOpInterface> constantGlobalOps;
@@ -109,31 +111,36 @@ struct ExportParametersPass
       auto serializableAttr =
           dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
               globalOp.getGlobalInitialValue());
-      if (!serializableAttr)
+      if (!serializableAttr) {
         continue;
+      }
 
       // Check that the serialized size of the attribute is at least as big as
       // the pass configured minimum storage size.
       int64_t storageSize = serializableAttr.getStorageSize();
-      if (storageSize < minimumSize)
+      if (storageSize < minimumSize) {
         continue;
+      }
 
       // Add the entry with a type based on its contents.
-      if (failed(addEntry(globalOp, serializableAttr, builder->get())))
+      if (failed(addEntry(globalOp, serializableAttr, builder->get()))) {
         return signalPassFailure();
+      }
 
       constantGlobalOps.push_back(globalOp);
     }
 
     // Early exit if no parameterizable globals are present.
-    if (constantGlobalOps.empty())
+    if (constantGlobalOps.empty()) {
       return;
+    }
 
     // Create the parameter archive file opened for writing.
     auto fileStreamIndexOr =
         createParameterIndex(moduleOp, std::move(builder.value()), path);
-    if (failed(fileStreamIndexOr))
+    if (failed(fileStreamIndexOr)) {
       return signalPassFailure();
+    }
     auto [file, stream, index] = *std::move(fileStreamIndexOr);
 
     // Serialize parameters to the file.

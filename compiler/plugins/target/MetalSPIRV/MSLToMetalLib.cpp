@@ -54,8 +54,9 @@ static std::string getMetalCompileCommand(MetalTargetPlatform platform,
 static LogicalResult runSystemCommand(llvm::StringRef command) {
   LLVM_DEBUG(llvm::dbgs() << "Running system command: '" << command << "'\n");
   int exitCode = system(command.data());
-  if (exitCode == 0)
+  if (exitCode == 0) {
     return success();
+  }
   llvm::errs() << "Failed to run system command '" << command
                << "' with error code: " << exitCode << "\n";
   return failure();
@@ -78,8 +79,9 @@ compileMSLToMetalLib(MetalTargetPlatform targetPlatform,
 
   std::string command =
       getMetalCompileCommand(targetPlatform, mslFile, libFile);
-  if (failed(runSystemCommand(command)))
+  if (failed(runSystemCommand(command))) {
     return nullptr;
+  }
 
   auto fileOrErr =
       llvm::MemoryBuffer::getFileOrSTDIN(libFile, /*isText=*/false);

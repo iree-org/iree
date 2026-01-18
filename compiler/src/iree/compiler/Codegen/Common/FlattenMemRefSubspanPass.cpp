@@ -157,8 +157,9 @@ struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
   matchAndRewrite(AllocOpTy allocOp, typename AllocOpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto oldType = dyn_cast<MemRefType>(allocOp.getType());
-    if (!oldType || !oldType.getLayout().isIdentity())
+    if (!oldType || !oldType.getLayout().isIdentity()) {
       return failure();
+    }
 
     Value dynamicDim = createTotalElementCountValue(
         oldType, allocOp.getDynamicSizes(), allocOp.getLoc(), rewriter);
@@ -176,8 +177,9 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
   using Base::Base;
 
   static Attribute flattenAttribute(Attribute value, ShapedType newType) {
-    if (!value)
+    if (!value) {
       return value;
+    }
     if (auto splatAttr = dyn_cast<SplatElementsAttr>(value)) {
       return splatAttr.reshape(newType);
     } else if (auto denseAttr = dyn_cast<DenseElementsAttr>(value)) {
@@ -194,8 +196,9 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
   matchAndRewrite(memref::GlobalOp globalOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto oldType = dyn_cast<MemRefType>(globalOp.getType());
-    if (!oldType || !oldType.getLayout().isIdentity())
+    if (!oldType || !oldType.getLayout().isIdentity()) {
       return failure();
+    }
 
     auto tensorType = RankedTensorType::get({oldType.getNumElements()},
                                             oldType.getElementType());
@@ -221,13 +224,15 @@ struct FlattenGetGlobal final
   matchAndRewrite(memref::GetGlobalOp getOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto oldType = dyn_cast<MemRefType>(getOp.getType());
-    if (!oldType || !oldType.getLayout().isIdentity())
+    if (!oldType || !oldType.getLayout().isIdentity()) {
       return failure();
+    }
 
     auto globalOp = dyn_cast_if_present<memref::GlobalOp>(
         SymbolTable::lookupNearestSymbolFrom(getOp, getOp.getNameAttr()));
-    if (!globalOp)
+    if (!globalOp) {
       return failure();
+    }
 
     auto loadedValue = rewriter.createOrFold<memref::GetGlobalOp>(
         getOp.getLoc(), globalOp.getType(), getOp.getNameAttr());
@@ -250,8 +255,9 @@ struct FlattenBindingSubspan final
     auto oldType = dyn_cast<MemRefType>(subspanOp.getType());
     // IREE subspan ops only use memref types with the default identity
     // layout maps.
-    if (!oldType)
+    if (!oldType) {
       return failure();
+    }
 
     OpFoldResult linearShape;
     if (oldType.hasStaticShape()) {
@@ -441,8 +447,9 @@ struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
     }
     Type neededResultType =
         getTypeConverter()->convertType(op.getResult().getType());
-    if (!neededResultType || !isRankZeroOrOneMemRef(neededResultType))
+    if (!neededResultType || !isRankZeroOrOneMemRef(neededResultType)) {
       return failure();
+    }
     Value size = createTotalElementCountValue(op.getType(), op.getSizes(),
                                               op.getLoc(), rewriter);
     SmallVector<Value> offsets = mlir::getValueOrCreateConstantIndexOp(
@@ -651,13 +658,15 @@ struct AdjustConversionCast final
   LogicalResult
   matchAndRewrite(UnrealizedConversionCastOp castOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (castOp->getNumOperands() != 1)
+    if (castOp->getNumOperands() != 1) {
       return failure();
+    }
 
     Value input = adaptor.getOperands().front();
     // We only want to handle cases where the cast op handles memref types.
-    if (!isa<BaseMemRefType>(input.getType()))
+    if (!isa<BaseMemRefType>(input.getType())) {
       return failure();
+    }
 
     if (!isRankZeroOrOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
@@ -695,8 +704,9 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
     Type newSourceType = adaptor.getSrc().getType();
     Type neededResultType =
         typeConverter->convertType(op.getResult().getType());
-    if (!neededResultType)
+    if (!neededResultType) {
       return failure();
+    }
     if (newSourceType == neededResultType) {
       rewriter.replaceOp(op, adaptor.getSrc());
       return success();
@@ -769,8 +779,9 @@ struct FlattenMemRefSubspanPass final
         [](MemRefType type) -> std::optional<Type> {
           // 0-D MemRef types can be used to represent raw pointers for
           // micro-kernel ABI purposes. Specially allow it.
-          if (isRankZeroMemRef(type))
+          if (isRankZeroMemRef(type)) {
             return type;
+          }
 
           // Fall back to the default conversion flow.
           return std::nullopt;
@@ -786,8 +797,9 @@ struct FlattenMemRefSubspanPass final
     internalTypeConverter.addConversion(
         [](MemRefType type) -> std::optional<Type> {
           // 0-D or 1-D MemRef types are okay.
-          if (isRankZeroOrOneMemRef(type))
+          if (isRankZeroOrOneMemRef(type)) {
             return type;
+          }
 
           // Fall back to the default conversion flow.
           return std::nullopt;
@@ -857,8 +869,9 @@ struct FlattenMemRefSubspanPass final
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
         [](UnrealizedConversionCastOp castOp) {
-          if (castOp->getNumOperands() != 1)
+          if (castOp->getNumOperands() != 1) {
             return false;
+          }
 
           Type inputType = castOp->getOperandTypes().front();
           return !isa<BaseMemRefType>(inputType) ||

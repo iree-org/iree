@@ -24,4 +24,30 @@ LogicalResult verifySparseCastOpInterface(SparseCastOpInterface sparseOp);
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOpInterfaces.h.inc" // IWYU pragma: keep
 // clang-format on: must be included after all LLVM/MLIR headers
 
-#endif
+namespace mlir::iree_compiler::IREE::TensorExt {
+
+/// If a `Range` is defined using the result of an operation that implements the
+/// `SparseCastOpInterface`, the operation needs to be used to resolve this
+/// range (either to an estimated range or generate code that iterates over the
+/// exact sparse range). This struct holds information of the sparse operation
+/// that has to be used for the resolution, and the result dimension that
+/// defines the range.
+struct SparseRangeResolver {
+  SparseCastOpInterface sparseOp;
+  int64_t resultDim;
+};
+
+/// For a given Range retrieve the SparseRangeResolver if it is defined by a
+/// sparse operation.
+std::optional<SparseRangeResolver> getSparseRangeResolver(Range range);
+
+/// For a list of Ranges retrieve the SparseRangeResolvers if they are defined
+/// by sparse operations. The returned vector has the same size as the input
+/// ranges. If a resolver cannot be found for any of the ranges, and empty
+/// resolver is returned at that position.
+SmallVector<SparseRangeResolver>
+getSparseRangeResolvers(ArrayRef<Range> ranges);
+
+} // namespace mlir::iree_compiler::IREE::TensorExt
+
+#endif // IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXTOPINTERFACES_H_

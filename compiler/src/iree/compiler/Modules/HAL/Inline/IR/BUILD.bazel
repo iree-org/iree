@@ -18,6 +18,7 @@ exports_files(["HALInlineOps.td"])
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "HALInlineBase.td",
             "HALInlineOps.td",

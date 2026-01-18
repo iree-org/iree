@@ -47,8 +47,9 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     outerToInnerMap[operand] = arg;
   }
   for (auto result : dispatchOp.getResults()) {
-    if (dispatchOp.getTiedResultOperand(result))
+    if (dispatchOp.getTiedResultOperand(result)) {
       continue; // ignored tied
+    }
     auto arg = entryBlock->getArgument(argIdx++);
     outerToInnerMap[result] = arg;
   }
@@ -59,16 +60,19 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   auto captureTensorDims = [&](Value externalValue, Value internalValue) {
     auto tensorType =
         dyn_cast<IREE::TensorExt::DispatchTensorType>(internalValue.getType());
-    if (!tensorType)
+    if (!tensorType) {
       return;
-    if (tensorType.hasStaticShape())
+    }
+    if (tensorType.hasStaticShape()) {
       return;
+    }
 
     // Find the dimensions in the parent.
     auto maybeDynamicDims = IREE::Util::findDynamicDims(
         externalValue, dispatchOp->getBlock(), Block::iterator(dispatchOp));
-    if (!maybeDynamicDims.has_value())
+    if (!maybeDynamicDims.has_value()) {
       return;
+    }
     // Convert to a vector -- we cannot use the ValueRange directly because
     // it might point into the operand list of this op, which we might mutate
     // in-place.
@@ -116,8 +120,9 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     captureTensorDims(operand, outerToInnerMap[operand]);
   }
   for (auto result : dispatchOp.getResults()) {
-    if (dispatchOp.getTiedResultOperand(result))
+    if (dispatchOp.getTiedResultOperand(result)) {
       continue; // ignore tied
+    }
     captureTensorDims(result, outerToInnerMap[result]);
   }
 }
@@ -141,19 +146,22 @@ static void captureDims(scf::ForOp forOp) {
        llvm::zip_equal(forOp.getInitArgs(), forOp.getYieldedValues(),
                        forOp.getRegionIterArgs(), forOp.getResults())) {
     auto tensorType = dyn_cast<TensorType>(init.getType());
-    if (!tensorType || tensorType.hasStaticShape())
+    if (!tensorType || tensorType.hasStaticShape()) {
       continue;
+    }
 
     // Make the transform idempotent by not caring about tensors only used
     // within 'flow.tensor.tie_shape' operations.
-    if (llvm::all_of(bbArg.getUsers(), llvm::IsaPred<Flow::TensorTieShapeOp>))
+    if (llvm::all_of(bbArg.getUsers(), llvm::IsaPred<Flow::TensorTieShapeOp>)) {
       continue;
+    }
 
     dynamicTensorIterables.push_back({init, iter, bbArg, result});
   }
 
-  if (dynamicTensorIterables.empty())
+  if (dynamicTensorIterables.empty()) {
     return;
+  }
 
   // Create the new dimension loop variables. Since the dynamic tensors may be
   // of different types with varying number of dynamic dimensions, 'dimBounds'
@@ -169,26 +177,31 @@ static void captureDims(scf::ForOp forOp) {
     dimBounds.push_back(newIterables.size());
     std::optional<ValueRange> initDynamicDims = IREE::Util::findDynamicDims(
         init, forOp->getBlock(), Block::iterator(forOp));
-    if (!initDynamicDims)
+    if (!initDynamicDims) {
       continue;
+    }
 
     std::optional<ValueRange> iterDynamicDims = IREE::Util::findDynamicDims(
         iter, forOp.getBody(),
         Block::iterator(forOp.getBody()->getTerminator()));
-    if (!iterDynamicDims)
+    if (!iterDynamicDims) {
       continue;
+    }
 
-    if (iterDynamicDims->size() != initDynamicDims->size())
+    if (iterDynamicDims->size() != initDynamicDims->size()) {
       continue;
+    }
 
     for (auto [initDim, iterDim] :
-         llvm::zip_equal(*initDynamicDims, *iterDynamicDims))
+         llvm::zip_equal(*initDynamicDims, *iterDynamicDims)) {
       newIterables.push_back({initDim, iterDim});
+    }
   }
   dimBounds.push_back(newIterables.size());
 
-  if (newIterables.empty())
+  if (newIterables.empty()) {
     return;
+  }
 
   // A new 'scf.for' has to be created to replace the old one as new results
   // are being added.
@@ -223,8 +236,9 @@ static void captureDims(scf::ForOp forOp) {
     auto dims =
         ArrayRef(newIterables)
             .slice(dimBounds[index], dimBounds[index + 1] - dimBounds[index]);
-    if (dims.empty())
+    if (dims.empty()) {
       continue;
+    }
 
     Value tied = Flow::TensorTieShapeOp::create(
         builder, forOp.getLoc(), tensor.bbArg,
@@ -242,8 +256,9 @@ static void captureDims(scf::ForOp forOp) {
     auto dims =
         ArrayRef(newIterables)
             .slice(dimBounds[index], dimBounds[index + 1] - dimBounds[index]);
-    if (dims.empty())
+    if (dims.empty()) {
       continue;
+    }
 
     Value &replacement = results[tensor.result.getResultNumber()];
     replacement = Flow::TensorTieShapeOp::create(

@@ -1,0 +1,11 @@
+{
+  "model": "distilbert/distilbert-base-uncased",
+  "description": "DistilBERT - smaller, faster BERT",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "unicode", "input": "Héllo wörld! café"},
+    {"name": "special_chars", "input": "Code: `x = 1` and $100"},
+    {"name": "sentence", "input": "This is a test sentence."},
+    {"name": "no_special", "input": "hello world", "add_special_tokens": false}
+  ]
+}

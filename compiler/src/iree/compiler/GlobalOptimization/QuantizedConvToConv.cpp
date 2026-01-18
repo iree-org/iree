@@ -103,8 +103,9 @@ void GetDynamicDym(ImplicitLocOpBuilder &builder,
                    int64_t dim) {
   ShapedType ty = cast<ShapedType>(value.getType());
   dims.push_back(ty.getDimSize(dim));
-  if (ty && ty.isDynamicDim(dim))
+  if (ty && ty.isDynamicDim(dim)) {
     dynDims.push_back(tensor::DimOp::create(builder, value, dim));
+  }
 }
 
 Value multiplyDims(ImplicitLocOpBuilder &builder, Value value,
@@ -178,8 +179,9 @@ struct QuantizedConvToConv
 
       // Materialize a length-1 dimension at the end of the summation.
       SmallVector<ReassociationExprs> reassociationMap(3);
-      for (int i = 0; i < 3; i++)
+      for (int i = 0; i < 3; i++) {
         reassociationMap[i].push_back(builder.getAffineDimExpr(i));
+      }
       reassociationMap.back().push_back(builder.getAffineDimExpr(3));
 
       auto expandTy =

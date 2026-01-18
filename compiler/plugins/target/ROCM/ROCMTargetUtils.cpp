@@ -50,8 +50,9 @@ loadIRModule(Location loc, const std::string &filename,
 
 static LogicalResult linkWithBitcodeFiles(Location loc, llvm::Module *module,
                                           ArrayRef<std::string> bitcodePaths) {
-  if (bitcodePaths.empty())
+  if (bitcodePaths.empty()) {
     return success();
+  }
   llvm::Linker linker(*module);
   for (auto &bitcodePath : bitcodePaths) {
     if (!llvm::sys::fs::exists(bitcodePath)) {
@@ -62,8 +63,9 @@ static LogicalResult linkWithBitcodeFiles(Location loc, llvm::Module *module,
     }
     std::unique_ptr<llvm::Module> bitcodeModule =
         loadIRModule(loc, bitcodePath, &module->getContext());
-    if (!bitcodeModule)
+    if (!bitcodeModule) {
       return failure();
+    }
     // Ignore the data layout of the module we're importing. This avoids a
     // warning from the linker.
     bitcodeModule->setDataLayout(module->getDataLayout());
@@ -107,8 +109,9 @@ static void overridePlatformGlobal(llvm::Module *module, StringRef globalName,
                                    uint32_t newValue, llvm::Type *globalTy) {
   // NOTE: the global will not be defined if it is not used in the module.
   auto *globalValue = module->getNamedGlobal(globalName);
-  if (!globalValue)
+  if (!globalValue) {
     return;
+  }
   globalValue->setDSOLocal(true);
   globalValue->setConstant(true);
   globalValue->setInitializer(llvm::ConstantInt::get(
@@ -160,10 +163,11 @@ LogicalResult linkHIPBitcodeIfNeeded(Location loc, llvm::Module *module,
   for (const llvm::Function &function : module->functions()) {
     if (!function.isIntrinsic() && function.isDeclaration()) {
       auto functionName = function.getName();
-      if (functionName.starts_with("__ocml_"))
+      if (functionName.starts_with("__ocml_")) {
         usesOCML = true;
-      else if (functionName.starts_with("__ockl_"))
+      } else if (functionName.starts_with("__ockl_")) {
         usesOCKL = true;
+      }
     }
   }
 

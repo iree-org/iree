@@ -36,8 +36,9 @@ void HoistStaticallyBoundAllocationsPass::runOnOperation() {
   IRRewriter rewriter(funcOp->getContext());
 
   std::optional<vector::VscaleRange> vscaleRange;
-  if (this->vscaleMax != 0 && this->vscaleMin <= this->vscaleMax)
+  if (this->vscaleMax != 0 && this->vscaleMin <= this->vscaleMax) {
     vscaleRange = {this->vscaleMin, this->vscaleMax};
+  }
 
   hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(rewriter, funcOp,
                                                           vscaleRange);

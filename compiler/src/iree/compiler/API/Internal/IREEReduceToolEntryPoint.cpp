@@ -84,9 +84,10 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
   // and the process "appears to be stuck". Print a message to let the user know
   // about it!
   if (inputFilename == "-" &&
-      sys::Process::FileDescriptorIsDisplayed(fileno(stdin)))
+      sys::Process::FileDescriptorIsDisplayed(fileno(stdin))) {
     llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to "
                     "interrupt)\n";
+  }
 
   OwningOpRef<Operation *> module = loadModule(registry, inputFilename);
 

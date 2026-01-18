@@ -95,8 +95,9 @@ public:
   matchAndRewrite(ml_program::GlobalOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type newType = typeConverter->convertType(srcOp.getType());
-    if (!newType)
+    if (!newType) {
       return failure();
+    }
 
     std::map<StringRef, ml_program::ExternAttr> externs;
 
@@ -115,12 +116,14 @@ public:
     globalOp.setVisibility(SymbolTable::Visibility::Private);
     globalOp->setDialectAttrs(srcOp->getDialectAttrs());
 
-    if (isExtern)
+    if (isExtern) {
       externGlobals.emplace_back(srcOp.getName(), newType);
+    }
 
     // No more work needed if not public global.
-    if (visibility != SymbolTable::Visibility::Public)
+    if (visibility != SymbolTable::Visibility::Public) {
       return success();
+    }
 
     ModuleOp module = srcOp->getParentOfType<ModuleOp>();
 
@@ -140,12 +143,15 @@ public:
       StringRef s = format;
       // Verify only single replacement of 0th index.
       s = s.drop_until([](char c) { return c == '{'; });
-      if (s.empty() || !s.consume_front("{"))
+      if (s.empty() || !s.consume_front("{")) {
         return failure();
-      if (!s.consume_front("0"))
+      }
+      if (!s.consume_front("0")) {
         return failure();
-      if (!s.consume_front("}"))
+      }
+      if (!s.consume_front("}")) {
         return failure();
+      }
       s = s.drop_until([](char c) { return c == '{'; });
       return success(s.empty());
     };
@@ -157,15 +163,17 @@ public:
         v ? dyn_cast_if_present<StringAttr>(v.get("get")) : nullptr;
     {
       const std::string getFormat = get ? get.str() : "global${0}$get";
-      if (failed(verifyFormat(getFormat)))
+      if (failed(verifyFormat(getFormat))) {
         return failure();
+      }
       getterName = llvm::formatv(getFormat.c_str(), globalOp.getSymName());
     }
     auto set = v ? dyn_cast_if_present<StringAttr>(v.get("set")) : nullptr;
     {
       const std::string setFormat = set ? set.str() : "global${0}$set";
-      if (failed(verifyFormat(setFormat)))
+      if (failed(verifyFormat(setFormat))) {
         return failure();
+      }
       setterName = llvm::formatv(setFormat.c_str(), globalOp.getSymName());
     }
 
@@ -258,12 +266,15 @@ void ImportMLProgramPass::runOnOperation() {
   ONE_TO_ONE(ml_program::GlobalLoadConstOp, IREE::Util::GlobalLoadOp);
   ONE_TO_ONE(ml_program::GlobalStoreOp, IREE::Util::GlobalStoreOp);
 
-  if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))
+  if (failed(
+          applyFullConversion(getOperation(), target, std::move(patterns)))) {
     signalPassFailure();
+  }
 
   if (!externGlobals.empty() &&
-      failed(createExternInitFunction(getOperation(), externGlobals)))
+      failed(createExternInitFunction(getOperation(), externGlobals))) {
     signalPassFailure();
+  }
 }
 
 } // namespace mlir::iree_compiler::InputConversion

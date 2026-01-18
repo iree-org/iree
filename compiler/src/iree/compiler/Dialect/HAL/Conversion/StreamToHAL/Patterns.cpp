@@ -703,8 +703,9 @@ convertCollectiveAttr(IREE::Stream::CollectiveAttr sourceAttr) {
   auto convertReductionOp =
       [](std::optional<IREE::Stream::CollectiveReductionOp> op)
       -> std::optional<IREE::HAL::CollectiveReductionOp> {
-    if (!op.has_value())
+    if (!op.has_value()) {
       return std::nullopt;
+    }
     return static_cast<IREE::HAL::CollectiveReductionOp>(op.value());
   };
   return IREE::HAL::CollectiveAttr::get(
@@ -1201,11 +1202,13 @@ static void insertSerializationBarriers(Location loc, Block &block,
   // Note that we can't mutate the block while iterating it so we first grab
   // all the original ops.
   SmallVector<Operation *> serialOps;
-  for (auto &op : block)
+  for (auto &op : block) {
     serialOps.push_back(&op);
+  }
   for (auto *op : serialOps) {
-    if (op->hasTrait<OpTrait::IsTerminator>())
+    if (op->hasTrait<OpTrait::IsTerminator>()) {
       continue;
+    }
     builder.setInsertionPointAfter(op);
     IREE::HAL::CommandBufferExecutionBarrierOp::create(
         builder, loc, commandBuffer, sourceStage, targetStage, flags);
@@ -1711,10 +1714,12 @@ struct GlobalTimepointConversionPattern
   matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto initialValue = op.getInitialValue();
-    if (!initialValue.has_value())
+    if (!initialValue.has_value()) {
       return failure();
-    if (!isa<IREE::Stream::TimepointAttr>(*initialValue))
+    }
+    if (!isa<IREE::Stream::TimepointAttr>(*initialValue)) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() { op.removeInitialValueAttr(); });
     return success();
   }

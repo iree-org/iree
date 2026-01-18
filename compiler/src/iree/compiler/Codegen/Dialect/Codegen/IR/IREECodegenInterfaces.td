@@ -619,6 +619,11 @@ def IREECodegen_AnySwizzleAttr : Attr<Or<[
   let convertFromStorage = "$_self";
 }
 
+// Parameter type for use in AttrDef parameters lists.
+def IREECodegen_SwizzleAttrParameter : AttrParameter<
+  "IREE::Codegen::SwizzleAttrInterface",
+  "swizzling descriptor attribute">;
+
 def IREECodegen_UKernelProviderInterface :
   AttrInterface<"UKernelProviderInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";

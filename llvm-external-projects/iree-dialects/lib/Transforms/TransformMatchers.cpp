@@ -114,8 +114,7 @@ bool transform_ext::CapturingOpMatcher::checkAllTilableMatched(
 }
 
 bool transform_ext::CapturingOpMatcher::match(Operation *op) {
-  auto debugRAII =
-      llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
+  auto debugRAII = llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
   LLVM_DEBUG(DBGS() << "matching: " << *op << "\n");
 
   if (getCaptured()) {
@@ -327,8 +326,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 } // namespace
 
 bool transform_ext::CapturingValueMatcher::match(Value value) {
-  auto debugRAII =
-      llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
+  auto debugRAII = llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
   LLVM_DEBUG(DBGS() << "matching " << DebugPrintValueWrapper{value} << "\n");
 
   if (getCaptured()) {
@@ -627,14 +625,14 @@ transform_ext::StructuredOpMatcher::StructuredOpMatcher(
   addPredicate([&A, &B](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "start recursive lhs OR match {\n");
     {
-      auto debugRAII = llvm::make_scope_exit(
+      auto debugRAII = llvm::scope_exit(
           [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
       if (A.match(linalgOp))
         return true;
     }
     LLVM_DEBUG(DBGS() << "start recursive rhs OR match {\n");
     {
-      auto debugRAII = llvm::make_scope_exit(
+      auto debugRAII = llvm::scope_exit(
           [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
       if (B.match(linalgOp))
         return true;
@@ -682,8 +680,8 @@ void transform_ext::StructuredOpMatcher::addInputMatcher(
     // We MUST run the matcher at this point, even if the match is optional,
     // to allow for capture.
     LLVM_DEBUG(DBGS() << "start recursive match {\n");
-    auto debugRAII = llvm::make_scope_exit(
-        [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+    auto debugRAII =
+        llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
     if (matcher(linalgOp.getDpsInputOperand(transformedPosition)->get()))
       return true;
     return optional.value;
@@ -915,8 +913,8 @@ void transform_ext::StructuredOpMatcher::addOutputMatcher(
     // We MUST run the matcher at this point, even if the match is optional,
     // to allow for capture.
     LLVM_DEBUG(DBGS() << "start recursive match {\n");
-    auto debugRAII = llvm::make_scope_exit(
-        [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+    auto debugRAII =
+        llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
     if (matcher(definingOp))
       return true;
     return optional.value;
@@ -1076,8 +1074,8 @@ void transform_ext::StructuredOpMatcher::addResultMatcher(
     // We MUST run the matcher at this point, even if the match is optional,
     // to allow for capture.
     LLVM_DEBUG(DBGS() << "start recursive match {\n");
-    auto debugRAII = llvm::make_scope_exit(
-        [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+    auto debugRAII =
+        llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
     if (llvm::any_of(linalgOp->getResult(updatedPosition).getUsers(),
                      [&matcher](Operation *op) { return matcher(op); })) {
       return true;
@@ -1177,8 +1175,8 @@ transform_ext::StructuredOpMatcher::hasContractionBody(
   return addPredicate([=](linalg::LinalgOp linalgOp) {
     LLVM_DEBUG(DBGS() << "op region is a " << elemOpName << "/"
                       << reductionOpName << " contraction (");
-    auto scopeExitPrinter = llvm::make_scope_exit(
-        [] { LLVM_DEBUG(llvm::dbgs() << " check failed)"); });
+    auto scopeExitPrinter =
+        llvm::scope_exit([] { LLVM_DEBUG(llvm::dbgs() << " check failed)"); });
 
     Block *body = linalgOp.getBlock();
     if (!llvm::hasNItems(*body, 3)) {

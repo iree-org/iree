@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
@@ -23,7 +24,14 @@ endif()
     inline = True,
 )
 
-ukernel_patterns_mlir_files = glob(["ukernel_patterns_*.mlir"])
+ukernel_patterns_mlir_files = enforce_glob(
+    # keep sorted
+    [
+        "ukernel_patterns_gfx942.mlir",
+        "ukernel_patterns_gfx950.mlir",
+    ],
+    include = ["ukernel_patterns_*.mlir"],
+)
 
 iree_c_embed_data(
     name = "iree_mlir_ukernel_patterns_amdgpu",
@@ -49,6 +57,7 @@ iree_c_embed_data(
     srcs = [
         "iree_uk_amdgpu_dt_matmul_f16.mlir",
         "iree_uk_amdgpu_dt_matmul_f8E4M3FNUZ.mlir",
+        "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN.mlir",
         "iree_uk_amdgpu_matmul_bf16.mlir",
         "iree_uk_amdgpu_matmul_f16.mlir",
         "iree_uk_amdgpu_matmul_f8E4M3FN.mlir",
@@ -66,6 +75,7 @@ iree_lit_test_suite(
     srcs = [
         "iree_uk_amdgpu_dt_matmul_f16.mlir",
         "iree_uk_amdgpu_dt_matmul_f8E4M3FNUZ.mlir",
+        "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN.mlir",
         "iree_uk_amdgpu_matmul_bf16.mlir",
         "iree_uk_amdgpu_matmul_f16.mlir",
         "iree_uk_amdgpu_matmul_f8E4M3FN.mlir",

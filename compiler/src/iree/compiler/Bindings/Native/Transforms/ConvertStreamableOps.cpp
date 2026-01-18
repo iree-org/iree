@@ -280,8 +280,9 @@ static LogicalResult convertStreamableCall(StreamableFunc &streamableFunc,
     for (auto [i, resultType] : llvm::enumerate(callOp.getResultTypes())) {
       if (auto shapedType = dyn_cast<ShapedType>(resultType)) {
         const auto &resultDimArgs = streamableFunc.resultDimArgs[i];
-        if (resultDimArgs.empty())
+        if (resultDimArgs.empty()) {
           continue;
+        }
         if (resultDimArgs.front() == kTiedDim) {
           // Source from a tied operand. Types must match exactly.
           assert(streamableFunc.tiedOperands[i] !=
@@ -360,8 +361,9 @@ public:
     for (auto originalFuncOp : originalFuncOps) {
       auto streamableFuncOr =
           convertStreamableFunc(moduleOp, originalFuncOp, symbolTable);
-      if (!streamableFuncOr.has_value())
+      if (!streamableFuncOr.has_value()) {
         return signalPassFailure();
+      }
       auto streamableFunc = std::move(streamableFuncOr).value();
       streamableFuncs[streamableFunc.funcOp.getName()] =
           std::move(streamableFunc);

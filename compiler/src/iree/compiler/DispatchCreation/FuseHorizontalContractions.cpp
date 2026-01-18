@@ -253,7 +253,7 @@ static bool isHorizontalToGroup(Operation *op,
   llvm::SetVector<Operation *> slice;
   [[maybe_unused]] LogicalResult result = getBackwardSlice(op, &slice, options);
   assert(result.succeeded());
-  return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
+  return llvm::none_of(currGroup, [&](Operation *groupedOp) {
     return slice.contains(groupedOp);
   });
 }

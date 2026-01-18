@@ -136,8 +136,9 @@ LogicalResult PluginManagerSession::initializePlugins() {
     }
 
     // Skip if already initialized.
-    if (!initializedIds.insert(it.first()).second)
+    if (!initializedIds.insert(it.first()).second) {
       continue;
+    }
 
     if (options.printPluginInfo) {
       llvm::errs() << "[IREE plugins]: Initializing default '" << it.first()
@@ -156,8 +157,9 @@ LogicalResult PluginManagerSession::initializePlugins() {
     }
 
     // Skip if already initialized.
-    if (!initializedIds.insert(pluginId).second)
+    if (!initializedIds.insert(pluginId).second) {
       continue;
+    }
 
     if (options.printPluginInfo) {
       llvm::errs() << "[IREE plugins]: Initializing plugin '" << pluginId
@@ -187,8 +189,9 @@ void PluginManagerSession::registerDialects(DialectRegistry &registry) {
 
 LogicalResult PluginManagerSession::activatePlugins(MLIRContext *context) {
   for (auto *s : initializedSessions) {
-    if (failed(s->activate(context)))
+    if (failed(s->activate(context))) {
       return failure();
+    }
   }
   return success();
 }

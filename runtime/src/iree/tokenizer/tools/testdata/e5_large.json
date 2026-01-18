@@ -1,0 +1,27 @@
+{
+  "model": "intfloat/e5-large",
+  "description": "E5 Large - Multilingual text embedding model (2.8M+ downloads)",
+  "tests": [
+    {
+      "name": "simple",
+      "input": "Hello, world!"
+    },
+    {
+      "name": "unicode",
+      "input": "Héllo wörld! café résumé"
+    },
+    {
+      "name": "query",
+      "input": "query: What is the capital of France?"
+    },
+    {
+      "name": "passage",
+      "input": "passage: Paris is the capital of France, known for the Eiffel Tower."
+    },
+    {
+      "name": "no_special",
+      "input": "hello world",
+      "add_special_tokens": false
+    }
+  ]
+}

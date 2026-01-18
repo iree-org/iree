@@ -91,8 +91,9 @@ struct ConcatenateOpConversion final
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
       auto op = v.getDefiningOp<arith::ConstantIndexOp>();
-      if (!op)
+      if (!op) {
         return v;
+      }
       return op.getValue();
     };
 
@@ -233,8 +234,9 @@ static bool isValidFuncAttr(DictionaryAttr attrs) {
   // TODO: switch to using a dialect-based exclusion list or some other way that
   // is not a big string table.
   for (auto attr : attrs) {
-    if (attr.getName() == "tf.aliasing_output")
+    if (attr.getName() == "tf.aliasing_output") {
       return false;
+    }
   }
   return true;
 }
@@ -246,13 +248,15 @@ static void setFuncEncodings(func::FuncOp funcOp, FunctionType oldFuncType,
   auto encodingName = StringAttr::get(funcOp.getContext(), "iree.abi.encoding");
   for (auto [i, oldType, newType] :
        llvm::enumerate(oldFuncType.getInputs(), newFuncType.getInputs())) {
-    if (oldType != newType)
+    if (oldType != newType) {
       funcOp.setArgAttr(i, encodingName, TypeAttr::get(oldType));
+    }
   }
   for (auto [i, oldType, newType] :
        llvm::enumerate(oldFuncType.getResults(), newFuncType.getResults())) {
-    if (oldType != newType)
+    if (oldType != newType) {
       funcOp.setResultAttr(i, encodingName, TypeAttr::get(oldType));
+    }
   }
 }
 
@@ -347,11 +351,13 @@ struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto oldType = cast<ShapedType>(op.getType());
     auto newType = getTypeConverter()->convertType(oldType);
-    if (newType == oldType)
+    if (newType == oldType) {
       return failure();
+    }
 
-    if (!newType)
+    if (!newType) {
       return rewriter.notifyMatchFailure(op, "result type conversion failed");
+    }
 
     rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
         op, oldType.getShape(),
@@ -369,8 +375,9 @@ struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
                   ConversionPatternRewriter &rewriter) const override {
     Type oldType = globalOp.getType();
     Type newType = getTypeConverter()->convertType(oldType);
-    if (newType == oldType)
+    if (newType == oldType) {
       return failure();
+    }
     if (!newType) {
       return rewriter.notifyMatchFailure(globalOp,
                                          "result type conversion failed");
@@ -452,21 +459,24 @@ static void stripFrontendAttrs(mlir::ModuleOp moduleOp) {
   auto filterOpAttrs = [&](Operation *op) {
     SmallVector<NamedAttribute> newAttrs;
     for (auto attr : op->getDialectAttrs()) {
-      if (!isAttrFiltered(attr))
+      if (!isAttrFiltered(attr)) {
         newAttrs.push_back(attr);
+      }
     }
     op->setDialectAttrs(newAttrs);
   };
   auto filterAttrDicts = [&](ArrayAttr allOldAttrs,
                              SmallVectorImpl<DictionaryAttr> &newAttrs) {
-    if (!allOldAttrs)
+    if (!allOldAttrs) {
       return false;
+    }
     for (auto oldAttrs : allOldAttrs.getAsRange<DictionaryAttr>()) {
       SmallVector<NamedAttribute> preservedAttrs;
       preservedAttrs.reserve(oldAttrs.size());
       for (auto attr : oldAttrs) {
-        if (!isAttrFiltered(attr))
+        if (!isAttrFiltered(attr)) {
           preservedAttrs.push_back(attr);
+        }
       }
       newAttrs.push_back(
           DictionaryAttr::get(allOldAttrs.getContext(), preservedAttrs));
@@ -554,12 +564,14 @@ struct ConvertStableHloToIreeInputDialects final
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
     auto isLegallyTypedOp = [&](Operation *op) -> bool {
       for (Type type : op->getResultTypes()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
       for (Type type : op->getOperandTypes()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
       return true;
     };
@@ -582,17 +594,20 @@ struct ConvertStableHloToIreeInputDialects final
         }
       }
       for (Type type : funcOp.getFunctionType().getInputs()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
       for (Type type : funcOp.getFunctionType().getResults()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
       for (Block &block : funcOp.getFunctionBody()) {
         for (Type type : block.getArgumentTypes()) {
-          if (isIllegalType(type))
+          if (isIllegalType(type)) {
             return false;
+          }
         }
       }
       return true;

@@ -11,9 +11,18 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/DenseSet.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/Operation.h"
 
 namespace mlir::iree_compiler {
+
+struct LiveInterval;
+class LiveIntervals;
+
+namespace IREE::VM {
+class RegisterBank;
+} // namespace IREE::VM
 
 // Represents a register value at a particular usage.
 //
@@ -139,7 +148,7 @@ public:
 private:
   Register(bool isRef, bool isMove, size_t byteWidth, int ordinal)
       : null_(0), tombstone_(0), isRef_(isRef), isMove_(isMove),
-        byteWidth_(byteWidth), ordinal_(ordinal) {}
+        byteWidth_(byteWidth), reserved_(0), ordinal_(ordinal) {}
 
   union {
     struct {
@@ -158,7 +167,7 @@ private:
 // Analysis that performs VM register allocation on the given function op and
 // its children. Once calculated value usages can be mapped to VM register
 // reference bytes.
-class RegisterAllocation {
+class RegisterAllocation : public VMRegisterAllocation {
 public:
   // Annotates the IR with the register mappings. This is only required if the
   // register mappings are interesting to persist beyond just encoding, such as
@@ -174,7 +183,7 @@ public:
   RegisterAllocation(const RegisterAllocation &) = delete;
   RegisterAllocation &operator=(const RegisterAllocation &) = delete;
 
-  // Recalculates the register allocation.
+  // Recalculates the register allocation using linear scan.
   LogicalResult recalculate(IREE::VM::FuncOp funcOp);
 
   // Maximum allocated register ordinals.
@@ -188,7 +197,7 @@ public:
 
   // Maps a |value| to a register with no move bit set.
   // Prefer mapUseToRegister when a move is desired.
-  Register mapToRegister(Value value);
+  Register mapToRegister(Value value) const;
 
   // Maps a |value| to a register as calculated during allocation. The returned
   // register will have the proper type and move bits set.
@@ -196,12 +205,52 @@ public:
 
   // Remaps branch successor operands to the target block argument registers.
   // Returns a list of source to target register mappings. Source ref registers
-  // may have their move bit set.
+  // may have their move bit set based on liveness analysis (MOVE indicates
+  // ownership transfer on the last use of a ref).
   SmallVector<std::pair<Register, Register>, 8>
   remapSuccessorRegisters(Operation *op, int successorIndex);
+
+  // Legacy overload without branch op context - does not set MOVE bits.
   SmallVector<std::pair<Register, Register>, 8>
   remapSuccessorRegisters(Location loc, Block *targetBlock,
                           OperandRange targetOperands);
+
+private:
+  // Internal implementation that handles MOVE bit computation.
+  SmallVector<std::pair<Register, Register>, 8>
+  remapSuccessorRegisters(Operation *branchOp, Block *targetBlock,
+                          OperandRange targetOperands,
+                          unsigned baseOperandIndex);
+
+public:
+  // Returns true if the given discard op can be fully elided because all its
+  // operands have already been released via MOVE on preceding operations.
+  bool isDiscardElidable(Operation *op) const {
+    auto it = discardOperandElidability_.find(op);
+    if (it == discardOperandElidability_.end()) {
+      return false;
+    }
+    return llvm::all_of(it->second, [](bool b) { return b; });
+  }
+
+  // Returns true if the operand at |operandIndex| of the given discard op can
+  // be elided because it was already released via MOVE on a preceding
+  // operation.
+  bool isDiscardOperandElidable(Operation *op,
+                                unsigned operandIndex) const override {
+    auto it = discardOperandElidability_.find(op);
+    if (it == discardOperandElidability_.end()) {
+      return false;
+    }
+    if (operandIndex >= it->second.size()) {
+      return false;
+    }
+    return it->second[operandIndex];
+  }
+
+  int mapValueToRegisterOrdinal(Value value) const override {
+    return mapToRegister(value).ordinal();
+  }
 
 private:
   int maxI32RegisterOrdinal_ = -1;
@@ -209,11 +258,39 @@ private:
   int scratchI32RegisterCount_ = 0;
   int scratchRefRegisterCount_ = 0;
 
+  // Identifies discard ops that can be elided because all operands have MOVE
+  // on their last real use.
+  void computeElidableDiscards(IREE::VM::FuncOp funcOp);
+
+  // Runs linear scan allocation for a single register bank.
+  LogicalResult
+  runLinearScan(IREE::VM::FuncOp funcOp, const LiveIntervals &liveIntervals,
+                IREE::VM::RegisterBank &bank,
+                SmallVectorImpl<const LiveInterval *> &active,
+                const llvm::DenseMap<Value, Value> &coalesceSource,
+                bool isRefBank, int &maxOrdinal);
+
   // Cached liveness information.
   ValueLiveness liveness_;
 
+  // Cached dominance information for back-edge detection.
+  std::optional<DominanceInfo> dominanceInfo_;
+
   // Mapping from all values within the operation to registers.
   llvm::DenseMap<Value, Register> map_;
+
+  // Per-operand elidability for discard ops. Each entry maps a discard op to
+  // a vector of booleans indicating whether each operand can be elided (true
+  // means the operand was already released via MOVE on a preceding operation).
+  llvm::DenseMap<Operation *, SmallVector<bool>> discardOperandElidability_;
+
+  // Allocation metadata for live intervals (separate from immutable interval
+  // data to keep LiveIntervals const-correct).
+  struct IntervalAllocation {
+    int32_t assigned = -1;   // Assigned register ordinal (-1 = unassigned).
+    int32_t preference = -1; // Coalescing hint (-1 = no preference).
+  };
+  llvm::DenseMap<const LiveInterval *, IntervalAllocation> intervalAllocations_;
 };
 
 } // namespace mlir::iree_compiler

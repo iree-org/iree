@@ -149,9 +149,10 @@ getDefaultTuningSpec(ModuleOp module,
 
 #ifndef NDEBUG
   if (succeeded(defaultTransformLibrary) &&
-      failed(mlir::verify(*defaultTransformLibrary)))
+      failed(mlir::verify(*defaultTransformLibrary))) {
     return (*defaultTransformLibrary).emitError()
            << "Default tuning spec from " << storageAttr << " failed to verify";
+  }
 #endif
 
   return defaultTransformLibrary;

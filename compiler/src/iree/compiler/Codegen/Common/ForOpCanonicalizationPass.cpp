@@ -158,8 +158,9 @@ struct CanonicalizeForOpInductionVarShape final
       mapping.map(loopIndVar, start);
       initArgs[index] = rewriter.clone(*finalIvUser, mapping)->getResult(0);
     }
-    if (iteratorFolded.empty())
+    if (iteratorFolded.empty()) {
       return failure();
+    }
 
     auto newLoop =
         scf::ForOp::create(rewriter, forOp.getLoc(), forOp.getLowerBound(),
@@ -230,8 +231,9 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
         targetTypes.push_back(targetType);
       }
     }
-    if (ivIndices.empty())
+    if (ivIndices.empty()) {
       return failure();
+    }
 
     // Bit cast all init values to the smaller vector (fewer elements).
     auto ivInitValues = llvm::to_vector<8>(forOp.getInitArgs());
@@ -287,8 +289,9 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     yieldOp->setOperands(ivRetValues);
 
     SmallVector<Value, 8> forRetValues;
-    for (Value result : newLoop.getResults())
+    for (Value result : newLoop.getResults()) {
       forRetValues.push_back(result);
+    }
 
     // Bit cast return values to the old type to fix for op uses.
     rewriter.setInsertionPointAfter(newLoop);

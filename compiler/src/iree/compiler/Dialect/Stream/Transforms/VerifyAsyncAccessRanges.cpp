@@ -23,11 +23,13 @@ namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 static std::optional<int64_t> matchConstant(Value value) {
-  if (!value)
+  if (!value) {
     return std::nullopt;
+  }
   APInt constant;
-  if (!matchPattern(value, m_ConstantInt(&constant)))
+  if (!matchPattern(value, m_ConstantInt(&constant))) {
     return std::nullopt;
+  }
   return constant.getSExtValue();
 }
 

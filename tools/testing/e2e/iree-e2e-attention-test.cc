@@ -356,8 +356,8 @@ class AttentionTestModuleState final {
   // The pseudorandom values are reproducible both across runs and across
   // machines.
   StatusOr<vm::ref<iree_hal_buffer_view_t>> GenerateRandom3dTensor(
-      const vm::ref<iree_hal_device_t> device, int64_t dim0, int64_t dim1,
-      int64_t dim2, iree_hal_element_type_t element_type, int32_t seed) {
+      iree_hal_device_t* device, int64_t dim0, int64_t dim1, int64_t dim2,
+      iree_hal_element_type_t element_type, int32_t seed) {
     iree_hal_dim_t dims[3] = {
         (iree_hal_dim_t)dim0,
         (iree_hal_dim_t)dim1,
@@ -376,9 +376,8 @@ class AttentionTestModuleState final {
         seed,
     };
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
-        device.get(), iree_hal_device_allocator(device.get()),
-        IREE_ARRAYSIZE(dims), dims, element_type,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
+        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(dims), dims,
+        element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
         +[](iree_hal_buffer_mapping_t* mapping, void* user_data) {
           callback_state_t callback_state = *(callback_state_t*)user_data;
           iree_byte_span_t span = mapping->contents;
@@ -406,17 +405,17 @@ class AttentionTestModuleState final {
     return std::move(result_view);
   }
 
-  Status CheckAttentionResults(
-      const vm::ref<iree_hal_device_t> device, int64_t b, int64_t m, int64_t k1,
-      int64_t k2, int64_t n, const vm::ref<iree_hal_buffer_view_t> query,
-      const vm::ref<iree_hal_buffer_view_t> key,
-      const vm::ref<iree_hal_buffer_view_t> value,
-      const vm::ref<iree_hal_buffer_view_t> actual_result) {
+  Status CheckAttentionResults(iree_hal_device_t* device, int64_t b, int64_t m,
+                               int64_t k1, int64_t k2, int64_t n,
+                               iree_hal_buffer_view_t* query,
+                               iree_hal_buffer_view_t* key,
+                               iree_hal_buffer_view_t* value,
+                               iree_hal_buffer_view_t* actual_result) {
     attention_results_t results = {};
     IREE_RETURN_IF_ERROR(attention_results_initialize(
-        device.get(), (iree_hal_dim_t)b, (iree_hal_dim_t)m, (iree_hal_dim_t)k1,
-        (iree_hal_dim_t)k2, (iree_hal_dim_t)n, query.get(), key.get(),
-        value.get(), actual_result.get(), host_allocator_, &results));
+        device, (iree_hal_dim_t)b, (iree_hal_dim_t)m, (iree_hal_dim_t)k1,
+        (iree_hal_dim_t)k2, (iree_hal_dim_t)n, query, key, value, actual_result,
+        host_allocator_, &results));
     iree_status_t status = check_attention_results(stderr, &results);
     attention_results_deinitialize(&results);
     return status;

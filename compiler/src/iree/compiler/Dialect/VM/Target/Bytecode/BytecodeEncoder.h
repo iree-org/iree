@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEENCODER_H_
 #define IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEENCODER_H_
 
+#include "iree/compiler/Dialect/VM/Analysis/OrdinalAnalysis.h"
 #include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/DebugDatabaseBuilder.h"
@@ -34,7 +35,7 @@ struct EncodedBytecodeFunction {
 class BytecodeEncoder : public VMFuncEncoder {
 public:
   // Matches IREE_VM_BYTECODE_VERSION_MAJOR.
-  static constexpr uint32_t kVersionMajor = 15;
+  static constexpr uint32_t kVersionMajor = 17;
   // Matches IREE_VM_BYTECODE_VERSION_MINOR.
   static constexpr uint32_t kVersionMinor = 0;
   static constexpr uint32_t kVersion = (kVersionMajor << 16) | kVersionMinor;
@@ -43,7 +44,9 @@ public:
   // Returns None on failure.
   static std::optional<EncodedBytecodeFunction>
   encodeFunction(IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-                 SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase);
+                 SymbolTable &symbolTable,
+                 const OrdinalAnalysis &ordinalAnalysis,
+                 DebugDatabaseBuilder &debugDatabase);
 
   BytecodeEncoder() = default;
   ~BytecodeEncoder() = default;

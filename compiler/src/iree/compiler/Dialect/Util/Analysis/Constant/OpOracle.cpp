@@ -97,8 +97,9 @@ static bool isEligibleConstExpr(Operation *op) {
   Operation *parent = op;
   while (auto hoistableParent =
              parent->getParentOfType<IREE::Util::HoistableOpInterface>()) {
-    if (hoistableParent.isAtomicallyHoistableOp())
+    if (hoistableParent.isAtomicallyHoistableOp()) {
       return false;
+    }
     parent = hoistableParent;
   }
 
@@ -154,8 +155,9 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
   // If implementing the HoistableOpInterface, check whether the op is legal to
   // hoist. We still need to check for type legality afterwards though.
   if (auto hoistableOp = dyn_cast<IREE::Util::HoistableOpInterface>(op)) {
-    if (!hoistableOp.isHoistableLeafOp())
+    if (!hoistableOp.isHoistableLeafOp()) {
       return false;
+    }
   }
 
   // If implementing the HoistableTypeInterface, at this point we can just

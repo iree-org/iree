@@ -45,8 +45,9 @@ LogicalResult verifyAllOperationsAreLegal(Operation *op,
       illegalOps.insert(op);
     }
   });
-  if (illegalOps.empty())
+  if (illegalOps.empty()) {
     return success();
+  }
   emitLegalizationErrors(op->getLoc(), illegalOps);
   return failure();
 }
@@ -60,14 +61,16 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
 
   // Return the same attribute if it doesn't have a type.
   auto typedOldAttr = dyn_cast<TypedAttr>(oldAttr);
-  if (!typedOldAttr)
+  if (!typedOldAttr) {
     return oldAttr;
+  }
 
   // Convert the attribute type - if it's the same then it's already legal.
   auto oldType = typedOldAttr.getType();
   auto newType = typeConverter.convertType(oldType);
-  if (oldType == newType)
+  if (oldType == newType) {
     return typedOldAttr;
+  }
 
   if (auto intAttr = dyn_cast<IntegerAttr>(typedOldAttr)) {
     APInt value = intAttr.getValue();

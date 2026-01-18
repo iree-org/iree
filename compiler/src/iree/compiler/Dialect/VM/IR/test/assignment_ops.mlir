@@ -1,5 +1,49 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file %s | FileCheck %s
 
+// CHECK-LABEL: @discard_refs_empty
+vm.module @my_module {
+  vm.func @discard_refs_empty() {
+    // CHECK: vm.discard.refs
+    vm.discard.refs
+    vm.return
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @discard_refs_single
+vm.module @my_module {
+  vm.func @discard_refs_single(%arg0: !vm.buffer) {
+    // CHECK: vm.discard.refs %arg0 : !vm.buffer
+    vm.discard.refs %arg0 : !vm.buffer
+    vm.return
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @discard_refs_multiple
+vm.module @my_module {
+  vm.func @discard_refs_multiple(%arg0: !vm.buffer, %arg1: !vm.buffer) {
+    // CHECK: vm.discard.refs %arg0, %arg1 : !vm.buffer, !vm.buffer
+    vm.discard.refs %arg0, %arg1 : !vm.buffer, !vm.buffer
+    vm.return
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @discard_refs_opaque
+vm.module @my_module {
+  vm.func @discard_refs_opaque(%arg0: !vm.ref<?>) {
+    // CHECK: vm.discard.refs %arg0 : !vm.ref<?>
+    vm.discard.refs %arg0 : !vm.ref<?>
+    vm.return
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @select_i32
 vm.module @my_module {
   vm.func @select_i32(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {

@@ -55,8 +55,9 @@ struct TransferGatherOpInterface
            "only tensor types expected");
     FailureOr<Value> buffer =
         getBuffer(rewriter, gatherOp.getBase(), options, state);
-    if (failed(buffer))
+    if (failed(buffer)) {
       return failure();
+    }
     replaceOpWithNewBufferizedOp<IREE::VectorExt::TransferGatherOp>(
         rewriter, gatherOp, gatherOp.getVectorType(), *buffer,
         gatherOp.getIndices(), gatherOp.getIndexVecs(), gatherOp.getIndexed(),

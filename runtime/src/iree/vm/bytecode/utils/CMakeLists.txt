@@ -18,6 +18,8 @@ iree_cc_library(
     "features.h"
     "generated/op_table.h"
     "isa.h"
+    "isa_decoder.h"
+    "isa_decoder.inl"
   SRCS
     "block_list.c"
     "features.c"

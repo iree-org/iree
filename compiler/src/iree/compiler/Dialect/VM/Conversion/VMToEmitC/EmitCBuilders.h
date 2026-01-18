@@ -86,6 +86,16 @@ void memcpy(OpBuilder builder, Location location, Value dest, Value src,
 void memset(OpBuilder builder, Location location, Value dest, int ch,
             Value count);
 
+/// Aligns a size value up to the specified alignment (must be power of 2).
+/// Generates: iree_host_align(size, alignment)
+Value alignTo(OpBuilder builder, Location location, Value size,
+              size_t alignment);
+
+/// Aligns a uint8_t pointer up to the specified alignment.
+/// Generates: (uint8_t*)iree_host_align((uintptr_t)ptr, alignment)
+Value alignPtr(OpBuilder builder, Location location, Value ptr,
+               size_t alignment);
+
 Value arrayElement(OpBuilder builder, Location location, size_t index,
                    TypedValue<emitc::PointerType> operand);
 

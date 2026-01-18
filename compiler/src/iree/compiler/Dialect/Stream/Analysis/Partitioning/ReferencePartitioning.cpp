@@ -64,8 +64,9 @@ struct PartitionBuilder {
                           : affinityOp.getAffinityAttr();
     }
     opInfo.membership.set(ordinal);
-    if (opInfo.hazards.size() > ordinal)
+    if (opInfo.hazards.size() > ordinal) {
       opInfo.hazards.reset(ordinal);
+    }
     ops.insert(op);
     hazards |= opInfo.hazards;
     hazards |= opInfo.nestedRegionHazards;
@@ -497,8 +498,9 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     // First see which partitions are consuming this that we can also safely
     // move in to.
     consumers &= candidates;
-    if (consumers.any())
+    if (consumers.any()) {
       candidates = consumers;
+    }
 
     opInfo.membership.reserve(builders.size() + 1);
     opInfo.membership.resize(builders.size(), /*t=*/false);

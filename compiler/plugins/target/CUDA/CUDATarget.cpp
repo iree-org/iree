@@ -122,14 +122,17 @@ static constexpr char kPtxasCompilerName[] = "ptxas";
 static FailureOr<std::string> findPtxasCompiler(const CUDAOptions &options,
                                                 std::string *message) {
   std::string ptxasCompiler;
-  if (!options.clUsePtxasFrom.empty())
+  if (!options.clUsePtxasFrom.empty()) {
     ptxasCompiler = options.clUsePtxasFrom;
-  if (llvm::sys::fs::exists(ptxasCompiler))
+  }
+  if (llvm::sys::fs::exists(ptxasCompiler)) {
     return ptxasCompiler;
+  }
 
   ptxasCompiler = findTool(kPtxasCompilerName);
-  if (llvm::sys::fs::exists(ptxasCompiler))
+  if (llvm::sys::fs::exists(ptxasCompiler)) {
     return ptxasCompiler;
+  }
 
   *message = std::string(
       "Could not find ptxas compiler. Try passing it explicitly with "
@@ -181,8 +184,9 @@ static FailureOr<std::string> compileWithPtxas(StringRef ptxasCompiler,
   llvm::StringSaver stringSaver(scratchAllocator);
   SmallVector<const char *> rawArgs;
   Tokenize(ptxasParams, stringSaver, rawArgs, /*MarkEOLs=*/false);
-  for (auto rawArg : rawArgs)
+  for (auto rawArg : rawArgs) {
     ArgVector.push_back(StringRef(rawArg));
+  }
 
   std::optional<StringRef> redirects[] = {
       stdinFile.str(),
@@ -233,8 +237,9 @@ static FailureOr<std::string> compileWithPtxas(StringRef ptxasCompiler,
 static std::string produceGpuImage(const CUDAOptions &options,
                                    StringRef targetArch,
                                    std::string &ptxImage) {
-  if (!options.clUsePtxas)
+  if (!options.clUsePtxas) {
     return ptxImage;
+  }
 
   std::string message;
   FailureOr<std::string> ptxasCompiler = findPtxasCompiler(options, &message);
@@ -243,8 +248,9 @@ static std::string produceGpuImage(const CUDAOptions &options,
     FailureOr<std::string> maybeCubinImage =
         compileWithPtxas(ptxasCompiler.value(), targetArch,
                          options.clUsePtxasParams, ptxImage, &message);
-    if (succeeded(maybeCubinImage))
+    if (succeeded(maybeCubinImage)) {
       return maybeCubinImage.value();
+    }
   }
 
   llvm::WithColor::warning()
@@ -414,8 +420,9 @@ public:
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
-    if (failed(options.verify(b)))
+    if (failed(options.verify(b))) {
       return nullptr;
+    }
 
     if (auto target = GPU::getCUDATargetDetails(
             options.clTarget, options.clTargetFeatures, context)) {

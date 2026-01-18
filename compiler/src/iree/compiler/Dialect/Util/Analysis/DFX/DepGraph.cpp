@@ -49,8 +49,9 @@ void DepGraph::dumpGraph() {
 
   std::error_code ec;
   llvm::raw_fd_ostream file(filename, ec, llvm::sys::fs::OF_TextWithCRLF);
-  if (!ec)
+  if (!ec) {
     llvm::WriteGraph(file, this);
+  }
 
   callTimes++;
 }

@@ -45,8 +45,9 @@ static OpFoldResult computeProduct(Location loc, OpBuilder &builder,
   SmallVector<Value> dynamicPart;
   AffineExpr result = builder.getAffineConstantExpr(1);
   for (OpFoldResult term : terms) {
-    if (!term)
+    if (!term) {
       return term;
+    }
     std::optional<int64_t> maybeConst = getConstantIntValue(term);
     if (maybeConst) {
       result = result * builder.getAffineConstantExpr(*maybeConst);
@@ -55,8 +56,9 @@ static OpFoldResult computeProduct(Location loc, OpBuilder &builder,
       result = result * builder.getAffineSymbolExpr(nDynamic++);
     }
   }
-  if (auto constant = dyn_cast<AffineConstantExpr>(result))
+  if (auto constant = dyn_cast<AffineConstantExpr>(result)) {
     return getAsIndexOpFoldResult(builder.getContext(), constant.getValue());
+  }
   return affine::AffineApplyOp::create(builder, loc, result, dynamicPart)
       .getResult();
 }
@@ -245,9 +247,10 @@ struct MemRefRewritePatternBase : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     Value memref = getTargetMemref<T>(op);
-    if (!needFlattenning(memref) || !checkLayout(memref))
+    if (!needFlattenning(memref) || !checkLayout(memref)) {
       return rewriter.notifyMatchFailure(op,
                                          "nothing to do or unsupported layout");
+    }
     auto &&[flatMemref, offset] = getFlattenMemrefAndOffset(
         rewriter, op->getLoc(), memref, op.getIndices());
     replaceOp<T>(op, rewriter, flatMemref, offset);
@@ -301,11 +304,13 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
   LogicalResult matchAndRewrite(memref::SubViewOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getSource();
-    if (!needFlattenning(memref))
+    if (!needFlattenning(memref)) {
       return rewriter.notifyMatchFailure(op, "nothing to do");
+    }
 
-    if (!checkLayout(memref))
+    if (!checkLayout(memref)) {
       return rewriter.notifyMatchFailure(op, "unsupported layout");
+    }
 
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> subOffsets = op.getMixedOffsets();
@@ -327,8 +332,9 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
     finalStrides.reserve(subRank);
 
     for (auto i : llvm::seq(0u, static_cast<unsigned>(srcType.getRank()))) {
-      if (droppedDims.test(i))
+      if (droppedDims.test(i)) {
         continue;
+      }
 
       finalSizes.push_back(subSizes[i]);
       finalStrides.push_back(strides[i]);
@@ -354,8 +360,9 @@ struct DecomposeMemrefsPass
 
     mlir::iree_compiler::populateDecomposeMemrefsPatterns(patterns);
 
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))))
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
+    }
   }
 };
 

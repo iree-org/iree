@@ -85,8 +85,9 @@ class OrdinalAllocationPass
     int globalBytes = 0;
     for (auto sizeGlobalOps : llvm::enumerate(primitiveGlobalOps)) {
       size_t storageSize = sizeGlobalOps.index();
-      if (sizeGlobalOps.value().empty())
+      if (sizeGlobalOps.value().empty()) {
         continue;
+      }
       nextGlobalBytesOrdinal =
           llvm::alignTo(nextGlobalBytesOrdinal, storageSize);
       for (auto &globalOp : sizeGlobalOps.value()) {

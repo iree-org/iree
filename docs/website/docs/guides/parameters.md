@@ -319,3 +319,9 @@ file for usage examples.
 #### :octicons-code-16: Using the C API
 
 !!! TODO "TODO: `iree_io_parameters_module_create()` sample code"
+
+### :material-link: Related tools
+
+For LLM workloads, text must be tokenized before inference. The
+[`iree-tokenize`](../developers/general/developer-overview.md#iree-tokenize)
+tool provides HuggingFace-compatible tokenization for preprocessing text inputs.

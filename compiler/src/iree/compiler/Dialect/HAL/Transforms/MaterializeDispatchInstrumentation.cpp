@@ -28,8 +28,9 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 static std::string getAttrStr(Attribute attr) {
-  if (!attr)
+  if (!attr) {
     return "";
+  }
   std::string result;
   llvm::raw_string_ostream os(result);
   attr.print(os, /*elideType=*/true);
@@ -69,8 +70,9 @@ static Value createChunkHeader(Location loc, iree_idbts_chunk_type_t type,
 static Value createPadding(Location loc, uint64_t unalignedLength,
                            OpBuilder &builder) {
   uint64_t padding = llvm::alignTo(unalignedLength, 16) - unalignedLength;
-  if (!padding)
+  if (!padding) {
     return nullptr;
+  }
   auto i8Type = builder.getI8Type();
   auto zeroAttr = IntegerAttr::get(i8Type, 0);
   auto dataAttr = DenseElementsAttr::get(
@@ -107,8 +109,9 @@ struct MaterializeDispatchInstrumentationPass
       MaterializeDispatchInstrumentationPassBase;
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
-    if (moduleOp.getBody()->empty())
+    if (moduleOp.getBody()->empty()) {
       return;
+    }
 
     auto moduleBuilder = OpBuilder(&moduleOp.getBody()->front());
     auto i8Type = moduleBuilder.getI8Type();
@@ -170,8 +173,9 @@ struct MaterializeDispatchInstrumentationPass
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         auto funcOp = exportOp.lookupFunctionRef();
-        if (!funcOp)
+        if (!funcOp) {
           continue;
+        }
 
         // Capture the source before we mess with it.
         auto originalSource = getOpStr(funcOp);
@@ -256,8 +260,9 @@ struct MaterializeDispatchInstrumentationPass
               break;
             }
           }
-          if (!functionId)
+          if (!functionId) {
             return; // not instrumented
+          }
 
           // Append dispatch site ID to correlate this op with where it lives in
           // the program and what is being dispatched. Note that multiple

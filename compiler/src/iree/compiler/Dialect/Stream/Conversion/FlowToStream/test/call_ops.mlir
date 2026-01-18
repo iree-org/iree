@@ -53,3 +53,14 @@ util.func public @inplaceTypeChangeCall(%arg0: tensor<?x4xf32>, %dim0: index) ->
   // CHECK: util.return %[[CALL]], %[[SIZE0]]
   util.return %call : tensor<4x?xi32>
 }
+
+// -----
+
+// Externs that only have argument attributes or result attributes, but not
+// both. Here we test correct handling of the attributes.
+
+// CHECK: stream.async.func private @externArg2Attrs(%arg0: !stream.resource<*> {arg.attr0}, %arg1: i32 {arg.attr1}) -> !util.buffer
+flow.func private @externArg2Attrs(%arg0: tensor<4x?xi32> {arg.attr0}, %arg1: i32 {arg.attr1}) -> !util.buffer
+
+// CHECK: stream.async.func private @externRet1Attrs(%arg0: !hal.device, %arg1: i64) -> (!stream.resource<*> {ret.attr})
+flow.func private @externRet1Attrs(%arg0: !hal.device, %arg1: i64) -> (tensor<4x?xi32> {ret.attr})

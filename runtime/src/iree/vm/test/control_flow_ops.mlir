@@ -26,7 +26,7 @@ vm.module @control_flow_ops {
   vm.export @test_check_eq_always
   vm.func @test_check_eq_always() {
     %c1 = vm.const.i32 1
-    %c1dno = util.optimization_barrier %c1 : i32
+    %c1dno = vm.optimization_barrier %c1 : i32
     vm.check.eq %c1, %c1dno, "error!" : i32
     vm.return
   }
@@ -35,8 +35,8 @@ vm.module @control_flow_ops {
   vm.func @fail_check_eq_never() {
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
-    %c1dno = util.optimization_barrier %c1 : i32
-    %c2dno = util.optimization_barrier %c2 : i32
+    %c1dno = vm.optimization_barrier %c1 : i32
+    %c2dno = vm.optimization_barrier %c2 : i32
     vm.check.eq %c1dno, %c2dno, "error!" : i32
     vm.return
   }
@@ -72,7 +72,7 @@ vm.module @control_flow_ops {
   vm.export @test_cond_br
   vm.func @test_cond_br() {
     %c1 = vm.const.i32 1
-    %c1dno = util.optimization_barrier %c1 : i32
+    %c1dno = vm.optimization_barrier %c1 : i32
     vm.cond_br %c1dno, ^bb1, ^bb2
   ^bb1:
     vm.check.eq %c1dno, %c1dno, "error!" : i32
@@ -85,7 +85,7 @@ vm.module @control_flow_ops {
   vm.export @test_cond_br_int_arg
   vm.func @test_cond_br_int_arg() {
     %c1 = vm.const.i32 1
-    %c1dno = util.optimization_barrier %c1 : i32
+    %c1dno = vm.optimization_barrier %c1 : i32
     vm.cond_br %c1dno, ^bb1(%c1dno : i32), ^bb2(%c1dno : i32)
   ^bb1(%arg1 : i32):
     vm.check.eq %arg1, %c1dno, "error!" : i32
@@ -98,7 +98,7 @@ vm.module @control_flow_ops {
   vm.export @test_cond_br_ref_arg
   vm.func @test_cond_br_ref_arg() {
     %c1 = vm.const.i32 1
-    %c1dno = util.optimization_barrier %c1 : i32
+    %c1dno = vm.optimization_barrier %c1 : i32
     %ref = vm.const.ref.zero : !vm.ref<?>
     vm.cond_br %c1dno, ^bb1(%ref : !vm.ref<?>), ^bb2(%ref : !vm.ref<?>)
   ^bb1(%arg1 : !vm.ref<?>):
@@ -115,9 +115,9 @@ vm.module @control_flow_ops {
   vm.export @test_cond_br_same_successor attributes {emitc.exclude}
   vm.func private @test_cond_br_same_successor() {
     %c1 = vm.const.i32 1
-    %c1dno = util.optimization_barrier %c1 : i32
+    %c1dno = vm.optimization_barrier %c1 : i32
     %c2 = vm.const.i32 2
-    %c2dno = util.optimization_barrier %c2 : i32
+    %c2dno = vm.optimization_barrier %c2 : i32
     vm.cond_br %c1dno, ^bb1(%c1dno : i32), ^bb1(%c2dno : i32)
   ^bb1(%arg1 : i32):
     vm.check.eq %arg1, %c1dno, "error!" : i32
@@ -129,7 +129,7 @@ vm.module @control_flow_ops {
     %c0 = vm.const.i32 0
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
-    %c1dno = util.optimization_barrier %c1 : i32
+    %c1dno = vm.optimization_barrier %c1 : i32
     vm.br_table %c1dno {
       default: ^bb1(%c2 : i32),
       0: ^bb2(%c0 : i32),
@@ -148,7 +148,7 @@ vm.module @control_flow_ops {
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
     %c-1 = vm.const.i32 -1
-    %c-1dno = util.optimization_barrier %c-1 : i32
+    %c-1dno = vm.optimization_barrier %c-1 : i32
     vm.br_table %c-1dno {
       default: ^bb1(%c0 : i32),
       0: ^bb2(%c1 : i32),

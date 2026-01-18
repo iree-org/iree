@@ -252,5 +252,8 @@ bool isPureMatmul(Operation *op);
 /// transpose/broadcast).
 bool isPureBatchMatmul(Operation *op);
 
+/// Returns true if the given linalg op represents a transpose.
+bool isaTransposeOpInterface(linalg::LinalgOp linalgOp);
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

@@ -43,8 +43,9 @@ void FloatRangeStats::addDomainValue(double value) {
 }
 
 std::string FloatRangeStats::getAsStr(AsmState &asmState) const {
-  if (!valid)
+  if (!valid) {
     return std::string("<<INVALID>>");
+  }
   std::string s("[");
   s += std::to_string(minValue);
   s += ", ";
@@ -192,8 +193,9 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
           newState ^= inner;
           // Stop traversal if tied OpOperand is not used in the op body.
           if (!linalgOp.payloadUsesValueFromOperand(
-                  linalgOp.getDpsInitOperand(result.getResultNumber())))
+                  linalgOp.getDpsInitOperand(result.getResultNumber()))) {
             return WalkResult::skip();
+          }
           return WalkResult::advance();
         } else if (auto minfOp = dyn_cast<arith::MinimumFOp>(definingOp)) {
           auto lhs = solver.getElementFor<FloatRangeValueElement>(

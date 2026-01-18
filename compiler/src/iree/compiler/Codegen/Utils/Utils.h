@@ -26,6 +26,10 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
 
+namespace mlir {
+class DataFlowSolver;
+} // namespace mlir
+
 namespace mlir::iree_compiler {
 
 static constexpr unsigned kNumMaxParallelDims = 3;
@@ -210,6 +214,17 @@ int getReductionTilingFactor(int64_t dimSize);
 // Returns the minimal element bitwidth used in the operands and results of the
 // given Linalg op.
 int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
+
+//===---------------------------------------------------------------------===//
+// Integer range analysis utility functions.
+//===---------------------------------------------------------------------===//
+
+/// Get the upper bound of a dynamic value. First tries IntegerRangeAnalysis
+/// (cached, efficient), then falls back to ValueBoundsConstraintSet for complex
+/// cases like affine.apply. The solver should have IntegerRangeAnalysis loaded
+/// and initialized before calling this function.
+FailureOr<int64_t> getDynamicUpperBound(Value value,
+                                        const DataFlowSolver &solver);
 
 //===---------------------------------------------------------------------===//
 // Bufferization utility functions
@@ -417,6 +432,21 @@ bool neverRunsSecondIteration(scf::ForOp op);
 ///  Here %4 is an external capture used via tensor.extract inside
 ///  linalg.generic hence the above `genericOp` has an external capture.
 bool hasExternalCapture(linalg::GenericOp genericOp);
+
+//===----------------------------------------------------------------------===//
+// Utility functions for accumulating operations
+//===----------------------------------------------------------------------===//
+
+/// Check if the init value of the DPS operation is read/write from the same
+/// buffer. This determines whether the operation is a valid in-place
+/// accumulating op. For GEMMs:
+/// - Returns true: The GEMM reads and writes to the same buffer
+/// (matmul_accumulate)
+///   The accumulator needs to be loaded from global memory.
+/// - Returns false: The GEMM will be converted to a non-accumulating GEMM + add
+///   by ConvertAccGEMMToGEMMPass, and the accumulator can be zero-initialized
+///   in registers.
+bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp);
 
 //===----------------------------------------------------------------------===//
 // Utility functions for copy operations

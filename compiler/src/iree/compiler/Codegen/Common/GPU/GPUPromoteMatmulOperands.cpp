@@ -68,8 +68,9 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
       // TODO (nirvedhmeshram) : This is fairly special case. Instead we should
       // just promote results before doing padding which introduces the extract
       // slice.
-      if (!valToMakeShared.hasOneUse())
+      if (!valToMakeShared.hasOneUse()) {
         return;
+      }
       valueToReplace = extractSliceOp.getResult();
       for (auto user : extractSliceOp->getUsers()) {
         opsToReplaceUseIn.insert(user);
@@ -120,8 +121,9 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
 void promoteOperand(OpBuilder &builder, Operation *op, unsigned index,
                     IREE::GPU::PromotionAttr promotionAttr) {
   auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
-  if (!dpsOp)
+  if (!dpsOp) {
     return;
+  }
   // We use the convention that if we are passing an index beyond the inputs
   // then we promote the result of the corresponding dps init.
   if (index >= dpsOp.getNumDpsInputs()) {

@@ -63,8 +63,9 @@ LogicalResult ImportTable::build(Operation *rootOp,
 
 std::optional<ImportTable::Import> ImportTable::find(StringRef symbolName) {
   auto it = symbols.find(symbolName);
-  if (it == symbols.end())
+  if (it == symbols.end()) {
     return std::nullopt;
+  }
   return it->second;
 }
 
@@ -110,8 +111,9 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
 
 Value castToImportType(Value value, Type targetType, OpBuilder &builder) {
   auto sourceType = value.getType();
-  if (sourceType == targetType)
+  if (sourceType == targetType) {
     return value;
+  }
   bool sourceIsInteger = isa<IntegerType>(sourceType);
 
   // Allow bitcast between same width float/int types. This is used for
@@ -202,8 +204,9 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
           rewriteAttrToOperands(loc, elementAttr, inputType, builder);
-      if (!flattenedValues)
+      if (!flattenedValues) {
         return std::nullopt;
+      }
       allValues.append(flattenedValues->begin(), flattenedValues->end());
     }
     return allValues;
@@ -226,8 +229,9 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
       int ordinal = 0;
       LogicalResult walkStatus = conversionInterface->walkAttributeStorage(
           attrValue, [&](Attribute elementAttr) {
-            if (anyFailed)
+            if (anyFailed) {
               return;
+            }
             auto elementType = tupleTypes[ordinal++];
             auto flattenedValues =
                 rewriteAttrToOperands(loc, elementAttr, elementType, builder);
@@ -237,14 +241,16 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
             }
             allValues.append(flattenedValues->begin(), flattenedValues->end());
           });
-      if (failed(walkStatus))
+      if (failed(walkStatus)) {
         return std::nullopt;
+      }
     } else {
       // Custom dialect type maps into zero or more input types (ala arrays).
       LogicalResult walkStatus = conversionInterface->walkAttributeStorage(
           attrValue, [&](Attribute elementAttr) {
-            if (anyFailed)
+            if (anyFailed) {
               return;
+            }
             auto flattenedValues =
                 rewriteAttrToOperands(loc, elementAttr, inputType, builder);
             if (!flattenedValues) {
@@ -253,11 +259,13 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
             }
             allValues.append(flattenedValues->begin(), flattenedValues->end());
           });
-      if (failed(walkStatus))
+      if (failed(walkStatus)) {
         return std::nullopt;
+      }
     }
-    if (anyFailed)
+    if (anyFailed) {
       return std::nullopt;
+    }
     return allValues;
   }
 

@@ -75,7 +75,7 @@ static iree_status_t iree_tooling_load_bytecode_module(
   // The module takes ownership of the file contents (when successful).
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      instance, file_contents->const_buffer,
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, file_contents->const_buffer,
       iree_io_file_contents_deallocator(file_contents), host_allocator,
       &module);
 
@@ -468,7 +468,8 @@ static iree_status_t iree_tooling_resolve_module_dependency_callback(
   } else if (iree_string_view_equal(dependency->name,
                                     IREE_SV("io_parameters"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_create_parameters_module_from_flags(
-        state->instance, state->host_allocator, &module));
+        state->instance, /*additional_provider_count=*/0,
+        /*additional_providers=*/NULL, state->host_allocator, &module));
   } else {
     // Defer to the generic module resolver registry.
     IREE_RETURN_IF_ERROR(iree_tooling_resolve_module_dependency(

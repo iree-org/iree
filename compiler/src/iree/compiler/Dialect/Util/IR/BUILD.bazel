@@ -18,6 +18,7 @@ exports_files(["UtilBase.td"])
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "UtilAttrs.td",
             "UtilBase.td",

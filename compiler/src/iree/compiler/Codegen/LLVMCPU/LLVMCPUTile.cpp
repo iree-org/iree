@@ -57,15 +57,17 @@ void LLVMCPUTilePass::runOnOperation() {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   for (auto computeOp : computeOps) {
     auto op = dyn_cast<TilingInterface>(computeOp);
-    if (!op || op.getLoopIteratorTypes().empty())
+    if (!op || op.getLoopIteratorTypes().empty()) {
       continue;
+    }
 
     // For now do not tile `tensor.pad` operations. The `tensor.pad`
     // operations might be those introduced by the padding-based
     // codegeneration strategy. Those are not meant to be tiled again.
     // Need a better way for handling this, but this works for now.
-    if (isa<tensor::PadOp>(computeOp))
+    if (isa<tensor::PadOp>(computeOp)) {
       continue;
+    }
 
     IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
         getLoweringConfig(op);
@@ -104,8 +106,9 @@ void LLVMCPUTilePass::runOnOperation() {
                     std::move(tileScalableFlags));
     FailureOr<scf::SCFTilingResult> tiledResults =
         scf::tileUsingSCF(rewriter, op, options);
-    if (failed(tiledResults))
+    if (failed(tiledResults)) {
       continue;
+    }
     rewriter.replaceOp(op, tiledResults->replacements);
   }
 

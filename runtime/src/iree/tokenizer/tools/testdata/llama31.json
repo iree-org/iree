@@ -1,0 +1,10 @@
+{
+  "model": "NousResearch/Meta-Llama-3.1-8B",
+  "description": "Llama 3.1 8B - #1 LLM (12.8M+ downloads) - ungated NousResearch mirror",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "instruction", "input": "Explain quantum computing in simple terms."},
+    {"name": "code", "input": "def fibonacci(n): return n if n < 2 else fibonacci(n-1) + fibonacci(n-2)"},
+    {"name": "no_special", "input": "test", "add_special_tokens": false}
+  ]
+}

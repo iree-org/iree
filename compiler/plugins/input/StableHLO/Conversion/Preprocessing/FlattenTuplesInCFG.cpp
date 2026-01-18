@@ -69,8 +69,9 @@ void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
     // Don't copy segment attributes as these correspond to the number operands,
     // which may be different.
     if (oldAttr.getName() == "operandSegmentSizes" ||
-        oldAttr.getName() == "resultSegmentSizes")
+        oldAttr.getName() == "resultSegmentSizes") {
       continue;
+    }
 
     newOp->setAttr(oldAttr.getName(), oldAttr.getValue());
   }
@@ -127,8 +128,9 @@ class DetupleReturnOp : public OpRewritePattern<func::ReturnOp> {
 
   LogicalResult matchAndRewrite(func::ReturnOp op,
                                 PatternRewriter &builder) const override {
-    if (!hasTuples(op.getOperands()))
+    if (!hasTuples(op.getOperands())) {
       return builder.notifyMatchFailure(op, "No detupling required");
+    }
 
     llvm::SmallVector<Value> newOperands;
     if (failed(untupleAndLookupValues(op.getOperands(), newOperands, builder,
@@ -147,8 +149,9 @@ class DetupleCallOp : public OpRewritePattern<func::CallOp> {
 
   LogicalResult matchAndRewrite(func::CallOp oldOp,
                                 PatternRewriter &builder) const override {
-    if (!hasTuples(oldOp.getOperands()) && !hasTuples(oldOp.getResults()))
+    if (!hasTuples(oldOp.getOperands()) && !hasTuples(oldOp.getResults())) {
       return builder.notifyMatchFailure(oldOp, "No detupling required");
+    }
 
     llvm::SmallVector<Value> newArgs;
     if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
@@ -180,8 +183,9 @@ class DetupleIndirectCallOp : public OpRewritePattern<func::CallIndirectOp> {
 
   LogicalResult matchAndRewrite(func::CallIndirectOp oldOp,
                                 PatternRewriter &builder) const override {
-    if (!hasTuples(oldOp.getOperands()) && !hasTuples(oldOp.getResults()))
+    if (!hasTuples(oldOp.getOperands()) && !hasTuples(oldOp.getResults())) {
       return builder.notifyMatchFailure(oldOp, "No detupling required");
+    }
 
     llvm::SmallVector<Value> newArgs;
     if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
@@ -202,8 +206,9 @@ class DetupleBranchOp : public OpRewritePattern<cf::BranchOp> {
 
   LogicalResult matchAndRewrite(cf::BranchOp oldOp,
                                 PatternRewriter &builder) const override {
-    if (!hasTuples(oldOp.getOperands()))
+    if (!hasTuples(oldOp.getOperands())) {
       return builder.notifyMatchFailure(oldOp, "No detupling required");
+    }
 
     llvm::SmallVector<Value> newArgs;
     if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
@@ -225,8 +230,9 @@ class DetupleConditionOp : public OpRewritePattern<cf::CondBranchOp> {
 
   LogicalResult matchAndRewrite(cf::CondBranchOp oldOp,
                                 PatternRewriter &builder) const override {
-    if (!hasTuples(oldOp.getOperands()))
+    if (!hasTuples(oldOp.getOperands())) {
       return builder.notifyMatchFailure(oldOp, "No detupling required");
+    }
 
     llvm::SmallVector<Value> trueArgs;
     if (failed(untupleAndLookupValues(oldOp.getTrueOperands(), trueArgs,
@@ -279,8 +285,9 @@ LogicalResult convertFunction(func::FuncOp oldFunction,
     // existing ones along path that produces tuples are used further, so just
     // remove instead of flattening.
     if (hasTupleSig && (attr.getName() == oldFunction.getArgAttrsAttrName() ||
-                        attr.getName() == oldFunction.getResAttrsAttrName()))
+                        attr.getName() == oldFunction.getResAttrsAttrName())) {
       continue;
+    }
     newFunction->setAttr(attr.getName(), attr.getValue());
   }
 

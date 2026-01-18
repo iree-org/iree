@@ -54,8 +54,9 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     if (auto inliningPolicy =
             callable->getAttrOfType<IREE::Util::InliningPolicyAttrInterface>(
                 "inlining_policy")) {
-      if (!inliningPolicy.isLegalToInline(call, callable))
+      if (!inliningPolicy.isLegalToInline(call, callable)) {
         return false;
+      }
     }
 
     // Check any extended inlining policies that may come from dialect
@@ -64,8 +65,9 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
       if (auto inliningPolicy =
               dyn_cast<IREE::Util::InliningPolicyAttrInterface>(
                   attr.getValue())) {
-        if (!inliningPolicy.isLegalToInline(call, callable))
+        if (!inliningPolicy.isLegalToInline(call, callable)) {
           return false;
+        }
       }
     }
 
@@ -86,8 +88,9 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
   }
 
   void handleTerminator(Operation *op, Block *newDest) const final {
-    if (!op->hasTrait<OpTrait::ReturnLike>())
+    if (!op->hasTrait<OpTrait::ReturnLike>()) {
       return;
+    }
 
     OpBuilder builder(op);
     if (auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op)) {
@@ -159,8 +162,9 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     }
     auto shapeAwareOp =
         dyn_cast_if_present<ShapeAwareOpInterface>(source.getDefiningOp());
-    if (!shapeAwareOp)
+    if (!shapeAwareOp) {
       return failure();
+    }
 
     // We only support static dimension indices today (as in general we only
     // support ranked shapes). If we find dynamic indices sneaking in we will

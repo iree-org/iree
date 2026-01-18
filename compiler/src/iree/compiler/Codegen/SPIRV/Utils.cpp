@@ -36,8 +36,9 @@ const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
 DictionaryAttr getTargetConfigAttr(Operation *op) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  if (!targetAttr)
+  if (!targetAttr) {
     return nullptr;
+  }
   return targetAttr.getConfiguration();
 }
 
@@ -62,8 +63,9 @@ getSPIRVTileSize(mlir::FunctionOpInterface funcOp, int tilingLevel) {
 FailureOr<linalg::TileSizeComputationFunction>
 getSPIRVTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel) {
   auto tileSizes = getSPIRVTileSize(funcOp, tilingLevel);
-  if (failed(tileSizes))
+  if (failed(tileSizes)) {
     return failure();
+  }
   linalg::TileSizeComputationFunction computeFn =
       [tileSizes](OpBuilder &builder, Operation *op) {
         auto range = llvm::map_range(*tileSizes, [&](int64_t size) -> Value {
@@ -79,8 +81,9 @@ getSPIRVScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp,
                              int tilingLevel) {
   FailureOr<SmallVector<int64_t>> tileSizes =
       getSPIRVTileSize(funcOp, tilingLevel);
-  if (failed(tileSizes))
+  if (failed(tileSizes)) {
     return failure();
+  }
   scf::SCFTileSizeComputationFunction computeFn =
       [tileSizes](OpBuilder &builder,
                   Operation *op) -> SmallVector<OpFoldResult> {

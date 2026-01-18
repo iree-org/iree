@@ -70,8 +70,9 @@ struct SPIRVLinkExecutablesPass final
 
     // Collect all source executable ops.
     auto sourceExecutableOps = gatherExecutablesForSPIRVCodegen(moduleOp);
-    if (sourceExecutableOps.size() <= 1)
+    if (sourceExecutableOps.size() <= 1) {
       return;
+    }
 
     // Note that at runtime, for a particular executable, only one variant of it
     // will be loaded. So, all variants of an executable are expected to provide
@@ -154,8 +155,9 @@ struct SPIRVLinkExecutablesPass final
         }
       });
 
-      if (failed(linkOneExecutableBucket(moduleOp, moduleName, key, bucket)))
+      if (failed(linkOneExecutableBucket(moduleOp, moduleName, key, bucket))) {
         return signalPassFailure();
+      }
     }
   }
 

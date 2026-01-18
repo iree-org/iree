@@ -1,0 +1,27 @@
+{
+  "config_name": "gpu_hip_rdna4",
+  "iree_compile_flags": [
+    "--iree-hal-target-device=hip",
+    "--iree-hip-target=gfx1201",
+    "--iree-input-demote-f64-to-f32=false",
+    "--iree-opt-level=O3"
+  ],
+  "iree_run_module_flags": [
+    "--device=hip"
+  ],
+  "skip_compile_tests": [
+    "onnx/node/generated/test_dequantizelinear",
+    "onnx/node/generated/test_einsum_inner_prod",
+    "onnx/node/generated/test_group_normalization_epsilon_expanded",
+    "onnx/node/generated/test_group_normalization_example_expanded",
+    "onnx/node/generated/test_nonmaxsuppression_two_batches",
+    "onnx/node/generated/test_constantofshape_int_shape_zero"
+  ],
+  "skip_run_tests": [
+    "onnx/node/generated/test_top_k",
+    "onnx/node/generated/test_top_k_negative_axis",
+    "onnx/node/generated/test_top_k_smallest"
+  ],
+  "expected_compile_failures": [],
+  "expected_run_failures": []
+}

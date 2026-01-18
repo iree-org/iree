@@ -256,6 +256,7 @@ iree_program_state_t* load_program(iree_sample_state_t* sample_state,
     // explicitly call `Module._free()`.
     status = iree_vm_bytecode_module_create(
         iree_runtime_instance_vm_instance(sample_state->instance),
+        IREE_VM_BYTECODE_MODULE_FLAG_NONE,
         iree_make_const_byte_span(vmfb_data, length),
         /*flatbuffer_allocator=*/iree_allocator_system(),
         iree_allocator_system(), &program_state->module);

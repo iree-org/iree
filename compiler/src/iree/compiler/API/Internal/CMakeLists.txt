@@ -34,6 +34,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C
     iree::compiler::Dialect::VM::Target::init_targets
+    iree::compiler::Dialect::VM::Transforms
     iree::compiler::Pipelines
     iree::compiler::PluginAPI
     iree::compiler::PluginAPI::PluginManager

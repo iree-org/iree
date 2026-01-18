@@ -1,0 +1,11 @@
+{
+  "model": "microsoft/deberta-v3-base",
+  "description": "DeBERTa v3 - disentangled attention (1.4M+ downloads)",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "nli", "input": "A man is playing guitar on stage."},
+    {"name": "question", "input": "What is the capital of France?"},
+    {"name": "whitespace_strip", "input": "  Hello world  "},
+    {"name": "no_special", "input": "test", "add_special_tokens": false}
+  ]
+}

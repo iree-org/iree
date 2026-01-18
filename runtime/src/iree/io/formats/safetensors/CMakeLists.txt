@@ -19,6 +19,7 @@ iree_cc_library(
     "safetensors_parser.c"
   DEPS
     iree::base
+    iree::base::internal::json
     iree::io::file_handle
     iree::io::parameter_index
   PUBLIC

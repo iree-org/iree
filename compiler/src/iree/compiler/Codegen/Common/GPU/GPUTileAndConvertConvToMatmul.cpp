@@ -57,8 +57,9 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
     return;
   }
   SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
-  if (indexingMaps.empty())
+  if (indexingMaps.empty()) {
     return;
+  }
   AffineMap inputMap = indexingMaps[0];
   AffineMap filterMap = indexingMaps[1];
   AffineMap outputMap = indexingMaps[2];

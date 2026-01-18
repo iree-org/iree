@@ -34,8 +34,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
            << stringifyEnum(CodeGenPipeline::SPIRVMatmulPromoteVectorize);
   }
 
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op))
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
     return success();
+  }
 
   LLVM_DEBUG(llvm::dbgs() << "verifying op: " << *op << "\n"
                           << "chosen workgroup size: "
@@ -55,8 +56,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
 
   auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
   std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
-  if (!subgroupSize)
+  if (!subgroupSize) {
     return funcOp->emitError("failed to query subgroup size");
+  }
   const int maxThreads = target.getWgp().getMaxThreadCountPerWorkgroup();
   const auto maxWorkGroupSize =
       target.getWgp().getMaxWorkgroupSizes().asArrayRef();
@@ -164,8 +166,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
 
   auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
   std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
-  if (!subgroupSize)
+  if (!subgroupSize) {
     return funcOp->emitError("failed to query subgroup size");
+  }
   const int maxThreads = target.getWgp().getMaxThreadCountPerWorkgroup();
   const auto maxWorkGroupSize =
       target.getWgp().getMaxWorkgroupSizes().asArrayRef();

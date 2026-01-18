@@ -50,15 +50,17 @@ public:
     // Fall back to check for setting the linker explicitly via environment
     // variables.
     char *envVarPath = std::getenv("IREE_LLVM_EMBEDDED_LINKER_PATH");
-    if (envVarPath && envVarPath[0] != '\0')
+    if (envVarPath && envVarPath[0] != '\0') {
       return std::string(envVarPath);
+    }
 
     // No explicit linker specified, search the install/build dir or env.
     const SmallVector<std::string> &toolNames{"iree-lld", "lld", "ld.lld",
                                               "lld-link"};
     std::string toolPath = findTool(toolNames);
-    if (!toolPath.empty())
+    if (!toolPath.empty()) {
       return toolPath;
+    }
 
     llvm::errs()
         << "error: required embedded linker tool (typically `lld`) not found "
@@ -119,8 +121,9 @@ public:
     artifacts.libraryFile.close();
 
     std::string embeddedToolPath = getEmbeddedToolPath();
-    if (embeddedToolPath.empty())
+    if (embeddedToolPath.empty()) {
       return std::nullopt;
+    }
 
     SmallVector<std::string, 8> flags = {
         embeddedToolPath,

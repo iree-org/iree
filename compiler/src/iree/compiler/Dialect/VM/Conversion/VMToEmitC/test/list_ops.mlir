@@ -27,9 +27,9 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: emitc.func private @my_module_list_reserve
   vm.func @list_reserve(%arg0: !vm.list<i32>, %arg1: i32) {
-    // CHECK-NEXT: %0 = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
-    // CHECK-NEXT: %1 = call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
-    // CHECK: %{{.+}} = call_opaque "iree_vm_list_reserve"(%1, %arg4) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32) -> !emitc.opaque<"iree_status_t">
+    // CHECK: %[[LIST_DEREF:.*]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK-NEXT: %[[LIST:.*]] = call_opaque "iree_vm_list_deref"(%[[LIST_DEREF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
+    // CHECK: %{{.+}} = call_opaque "iree_vm_list_reserve"(%[[LIST]], %arg4) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32) -> !emitc.opaque<"iree_status_t">
     vm.list.reserve %arg0, %arg1 : (!vm.list<i32>, i32)
     vm.return
   }
@@ -40,9 +40,9 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: emitc.func private @my_module_list_resize
   vm.func @list_resize(%arg0: !vm.list<i32>, %arg1: i32) {
-    // CHECK-NEXT: %0 = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
-    // CHECK-NEXT: %1 = call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
-    // CHECK: %{{.+}} = call_opaque "iree_vm_list_resize"(%1, %arg4) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32) -> !emitc.opaque<"iree_status_t">
+    // CHECK: %[[LIST_DEREF:.*]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK-NEXT: %[[LIST:.*]] = call_opaque "iree_vm_list_deref"(%[[LIST_DEREF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
+    // CHECK: %{{.+}} = call_opaque "iree_vm_list_resize"(%[[LIST]], %arg4) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32) -> !emitc.opaque<"iree_status_t">
     vm.list.resize %arg0, %arg1 : (!vm.list<i32>, i32)
     vm.return
   }
@@ -53,9 +53,9 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: emitc.func private @my_module_list_size
   vm.func @list_size(%arg0: !vm.list<i32>) -> i32 {
-    // CHECK-NEXT: %0 = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
-    // CHECK-NEXT: %1 = call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
-    // CHECK: %{{.+}} = call_opaque "iree_vm_list_size"(%1) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>) -> i32
+    // CHECK: %[[LIST_DEREF:.*]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK-NEXT: %[[LIST:.*]] = call_opaque "iree_vm_list_deref"(%[[LIST_DEREF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
+    // CHECK: %{{.+}} = call_opaque "iree_vm_list_size"(%[[LIST]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>) -> i32
     %0 = vm.list.size %arg0 : (!vm.list<i32>) -> i32
     vm.return %0 : i32
   }
@@ -81,11 +81,11 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: emitc.func private @my_module_list_get_ref
   vm.func @list_get_ref(%arg0: !vm.list<!vm.ref<?>>, %arg1: i32) -> !vm.buffer {
-    // CHECK-NEXT: %0 = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
-    // CHECK-NEXT: %1 = call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
-    // CHECK: %{{.+}} = call_opaque "iree_vm_list_get_ref_retain"(%1, %arg4, %arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
+    // CHECK: %[[LIST_DEREF:.*]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK-NEXT: %[[LIST:.*]] = call_opaque "iree_vm_list_deref"(%[[LIST_DEREF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
+    // CHECK: %{{.+}} = call_opaque "iree_vm_list_get_ref_retain"(%[[LIST]], %arg4, %arg5) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
     // CHECK: %[[REF_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>>
-    // CHECK-NEXT: assign %arg3 : !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">> to %[[REF_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>>
+    // CHECK-NEXT: assign %arg5 : !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">> to %[[REF_LVAL]] : <!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>>
     // CHECK: %[[TYPE_LVAL:.+]] = "emitc.member_of_ptr"(%[[REF_LVAL]]) <{member = "type"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>>) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_type_t">>
     // CHECK-NEXT: %[[TYPE:.+]] = load %[[TYPE_LVAL]] : <!emitc.opaque<"iree_vm_ref_type_t">>
     // CHECK: %[[B:.+]] = "emitc.constant"() <{value = #emitc.opaque<"IREE_VM_REF_TYPE_NULL">}> : () -> !emitc.opaque<"iree_vm_ref_type_t">
@@ -97,7 +97,7 @@ vm.module @my_module {
     // CHECK: %{{.+}} = logical_and %[[C]], %[[G]] : i1, i1
     // CHECK: cf.cond_br %{{.+}}, ^[[FAIL:.+]], ^[[CONTINUE:.+]]
     // CHECK: ^[[FAIL]]:
-    // CHECK-NEXT: call_opaque "iree_vm_ref_release"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> ()
+    // CHECK-NEXT: call_opaque "iree_vm_ref_release"(%arg5) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> ()
     // CHECK-NEXT: cf.br ^[[CONTINUE]]
     %0 = vm.list.get.ref %arg0, %arg1 : (!vm.list<!vm.ref<?>>, i32) -> !vm.buffer
     vm.return %0 : !vm.buffer
@@ -126,9 +126,9 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: emitc.func private @my_module_list_set_ref
   vm.func @list_set_ref(%arg0: !vm.list<!vm.ref<?>>, %arg1: i32, %arg2: !vm.buffer) {
-    // CHECK-NEXT: %0 = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
-    // CHECK-NEXT: %1 = call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
-    // CHECK: %{{.+}} = call_opaque "iree_vm_list_set_ref_retain"(%1, %arg4, %arg5) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
+    // CHECK: %[[LIST_DEREF:.*]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK-NEXT: %[[LIST:.*]] = call_opaque "iree_vm_list_deref"(%[[LIST_DEREF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
+    // CHECK: %{{.+}} = call_opaque "iree_vm_list_set_ref_retain"(%[[LIST]], %arg4, %arg5) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
     vm.list.set.ref %arg0, %arg1, %arg2 : (!vm.list<!vm.ref<?>>, i32, !vm.buffer)
     vm.return
   }

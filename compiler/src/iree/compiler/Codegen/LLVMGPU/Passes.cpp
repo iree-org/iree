@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -31,7 +32,7 @@
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
-#include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Affine/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -171,8 +172,9 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   if (hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
-  if (needsBarrier)
+  if (needsBarrier) {
     gpu::BarrierOp::create(builder, loc);
+  }
   Operation *copy = memref::CopyOp::create(builder, loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
@@ -188,14 +190,16 @@ static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
   if (!target) {
     return failure();
   }
-  if (target.getBackend() != "rocm")
+  if (target.getBackend() != "rocm") {
     return success();
+  }
 
   // Workgroup reordering on ROCm currently requires all workgrup counts to be
   // static.
   SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
-  if (llvm::any_of(workgroupCounts, ShapedType::isDynamic))
+  if (llvm::any_of(workgroupCounts, ShapedType::isDynamic)) {
     return failure();
+  }
 
   // This is further restricted to 2D+ grids as we reorder along the X and Y
   // workgroup IDs.
@@ -315,7 +319,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   // Post bufferization optimizations.
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
@@ -399,9 +403,8 @@ LogicalResult isAtBoundary(Operation *op) {
       return success();
     }
   } else if (isa<linalg::UnPackOp>(op)) {
-    if (llvm::all_of(op->getUsers(), [](Operation *user) {
-          return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
-        })) {
+    if (llvm::all_of(op->getUsers(),
+                     llvm::IsaPred<IREE::TensorExt::DispatchTensorStoreOp>)) {
       return success();
     }
   }
@@ -579,6 +582,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   // Step 9. Remaining post-bufferization optimizations/lowerings.
+  funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createUnrollAnnotatedLoopsPass());
@@ -597,7 +601,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass(prefetchOpts));
   }
 
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   {
@@ -642,7 +646,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   // Post bufferization optimizations.
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
@@ -690,8 +694,9 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
   if (hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
-  if (needsBarrier)
+  if (needsBarrier) {
     gpu::BarrierOp::create(builder, loc);
+  }
   VectorType vectorType =
       VectorType::get(fromType.getShape(), fromType.getElementType());
   Value c0 = arith::ConstantIndexOp::create(builder, loc, 0);
@@ -735,6 +740,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
+
+  funcPassManager.addPass(createGPUExpandDimensionsPass());
 
   // Tile to reduction loops.
   {
@@ -857,7 +864,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
     funcPassManager.addPass(createGPUReuseSharedMemoryAllocsPass());
   }
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -927,7 +934,7 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       // since some of the following patterns have trouble dealing with their
       // full complexity.
       .addPass(createVectorTransferLoweringPass)
-      .addPass(memref::createFoldMemRefAliasOpsPass)
+      .addPass(createIREECodegenFoldMemRefAliasOpsPass)
       // Propagate constants close to loads/stores to improve the ability for
       // swizzling to CSE.
       .addPass(createPropagateConstantOffsetsPass)
@@ -950,8 +957,8 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       .addPass(createCSEPass)
       // Hoist the resulting decompositions.
       .addPass(createIREELoopInvariantCodeMotionPass)
-      .addPass(affine::createAffineExpandIndexOpsPass)
-      .addPass(createLowerAffinePass)
+      .addPass(createIREECodegenAffineExpandIndexOpsPass)
+      .addPass(createIREECodegenLowerAffinePass)
       .addPass([]() {
         return IREE::Util::createOptimizeIntArithmeticPass(
             IREE::Util::OptimizeIntArithmeticPassOptions{/*narrowToI32=*/true});
@@ -1031,7 +1038,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
-      .addPass(memref::createFoldMemRefAliasOpsPass)
+      .addPass(createIREECodegenFoldMemRefAliasOpsPass)
       .addPass([]() {
         IREEExpandStridedMetadataPassOptions options;
         options.allowSubviewExpansion = true;
@@ -1039,8 +1046,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       })
       .addPass(forROCDL ? createAMDGPUEmulateNarrowTypePass
                         : createEmulateNarrowTypePass)
-      .addPass(affine::createAffineExpandIndexOpsPass)
-      .addPass(createLowerAffinePass);
+      .addPass(createIREECodegenAffineExpandIndexOpsPass)
+      .addPass(createIREECodegenLowerAffinePass);
 
   if (!preserveDebugInfo) {
     modulePassManager.addPass(createStripDebugInfoPass());
@@ -1138,7 +1145,8 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
     FunctionLikeNest(modulePassManager)
         .addPass(
             [&] { return createLLVMGPULowerExecutableTargetPass(options); })
-        .addPass(createVerifyWorkgroupDistributionPass);
+        .addPass(createVerifyWorkgroupDistributionPass)
+        .addPass(createRemoveIndexHintsPass);
     if (clPatchFuncOps) {
       modulePassManager.addPass(createPatchFuncOpsPass());
     }
@@ -1201,7 +1209,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager,
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
   variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
-  variantPassManager.addPass(createLowerAffinePass());
+  variantPassManager.addPass(createIREECodegenLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
       IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
@@ -1298,6 +1306,15 @@ void registerCodegenROCDLPasses() {
       "iree-codegen-llvmgpu-bufferization-pipeline",
       "Runs pass pipeline to bufferize for llvmgpu backends",
       [](OpPassManager &passManager) { addBufferizePasses(passManager); });
+
+  static PassPipelineRegistration<ROCDLPipelineOptions>
+      LowerToROCMLLVMGPUPasses(
+          "iree-codegen-lower-to-rocm-gpu",
+          "Runs pass pipeline to progressively lower Linalg to ROCDL",
+          [](OpPassManager &passManager, const ROCDLPipelineOptions &options) {
+            addLowerToLLVMGPUPasses(passManager, /*forROCDL=*/true,
+                                    options.preserveDebugInfo);
+          });
 }
 
 } // namespace mlir::iree_compiler

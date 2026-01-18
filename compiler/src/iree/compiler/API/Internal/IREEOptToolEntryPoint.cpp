@@ -93,8 +93,9 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   auto localBinder = mlir::iree_compiler::OptionsBinder::local();
   mlir::iree_compiler::PluginManagerSession pluginSession(
       pluginManager, localBinder, pluginManagerOptions);
-  if (failed(pluginSession.initializePlugins()))
+  if (failed(pluginSession.initializePlugins())) {
     return failure();
+  }
   pluginSession.registerDialects(registry);
 
   // In the normal compiler flow, activated plugins maintain a scoped registry
@@ -127,9 +128,10 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   // and the process "appears to be stuck". Print a message to let the user know
   // about it!
   if (inputFilename == "-" &&
-      sys::Process::FileDescriptorIsDisplayed(fileno(stdin)))
+      sys::Process::FileDescriptorIsDisplayed(fileno(stdin))) {
     llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to "
                     "interrupt)\n";
+  }
 
   // Set up the input file.
   std::string errorMessage;
@@ -144,8 +146,9 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
     llvm::errs() << errorMessage << "\n";
     return failure();
   }
-  if (failed(MlirOptMain(output->os(), std::move(file), registry, config)))
+  if (failed(MlirOptMain(output->os(), std::move(file), registry, config))) {
     return failure();
+  }
 
   // Keep the output file if the invocation of MlirOptMain was successful.
   output->keep();

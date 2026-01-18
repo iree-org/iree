@@ -116,8 +116,9 @@ struct ConvertHALEntryPointFuncOp
   LogicalResult
   matchAndRewrite(func::FuncOp stdFuncOp, func::FuncOpAdaptor operands,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!stdFuncOp.isPublic())
+    if (!stdFuncOp.isPublic()) {
       return failure();
+    }
     FunctionType fnType = stdFuncOp.getFunctionType();
     if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
       stdFuncOp->emitWarning()
@@ -773,8 +774,9 @@ struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
                                 PatternRewriter &rewriter) const override {
     auto symbol = dyn_cast<SymbolRefAttr>(callOp.getCallableForCallee());
     auto flatSymbol = dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
-    if (!flatSymbol)
+    if (!flatSymbol) {
       return failure();
+    }
 
     // Ensure the target function is extern.
     // To support conversion inserting calls in local patterns that can't add
@@ -821,8 +823,9 @@ struct RewriteExternCallOpToDynamicImportCallOp
     // Ignore indirect calls (they're probably already converted imports).
     auto symbol = dyn_cast<SymbolRefAttr>(callOp.getCallableForCallee());
     auto flatSymbol = dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
-    if (!flatSymbol)
+    if (!flatSymbol) {
       return failure();
+    }
 
     // Ensure the target function is extern.
     // To support conversion inserting calls in local patterns that can't add
@@ -1139,8 +1142,9 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet patterns(&getContext());
     patterns.insert<RewriteExternCallOpToDynamicImportCallOp, RewriteCallOpABI,
                     RewriteFuncOpABI>(abi, typeConverter);
-    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns))))
+    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns)))) {
       return signalPassFailure();
+    }
   }
 
   // Post conversion patterns.

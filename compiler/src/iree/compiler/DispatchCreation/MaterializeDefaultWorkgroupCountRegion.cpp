@@ -57,8 +57,9 @@ static LogicalResult createDefaultWorkgroupCountRegion(
   SmallVector<Location> workloadLocs;
   for (auto argument : workgroupsOp.getArguments()) {
     Type argumentType = argument.getType();
-    if (!isa<IndexType>(argumentType))
+    if (!isa<IndexType>(argumentType)) {
       continue;
+    }
     workload.push_back(argument);
     workloadTypes.push_back(argumentType);
     workloadLocs.push_back(argument.getLoc());
@@ -114,8 +115,9 @@ static LogicalResult createDefaultWorkgroupCountRegion(
     rewriter.setInsertionPointToStart(&body.front());
     int ordinalNumber = 0;
     for (auto [index, operand] : llvm::enumerate(workgroupsOp.getArguments())) {
-      if (!isa<IndexType>(operand.getType()))
+      if (!isa<IndexType>(operand.getType())) {
         continue;
+      }
       BlockArgument arg = workgroupsOp.getInputBlockArgument(index);
       auto ordinalOp = IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
           rewriter, loc, arg, rewriter.getIndexAttr(ordinalNumber++));

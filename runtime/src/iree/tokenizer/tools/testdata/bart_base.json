@@ -1,0 +1,27 @@
+{
+  "model": "facebook/bart-base",
+  "description": "BART Base - Denoising autoencoder for pretraining sequence-to-sequence models",
+  "tests": [
+    {
+      "name": "simple",
+      "input": "Hello, world!"
+    },
+    {
+      "name": "unicode",
+      "input": "Héllo wörld! café résumé"
+    },
+    {
+      "name": "summarize",
+      "input": "The quick brown fox jumps over the lazy dog."
+    },
+    {
+      "name": "sentence",
+      "input": "BART is a denoising autoencoder that combines bidirectional and autoregressive transformers."
+    },
+    {
+      "name": "no_special",
+      "input": "hello world",
+      "add_special_tokens": false
+    }
+  ]
+}

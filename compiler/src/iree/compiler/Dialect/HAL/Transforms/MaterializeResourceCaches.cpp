@@ -335,8 +335,9 @@ getDeviceFallbackGlobals(IREE::Util::GlobalOpInterface deviceGlobal,
                          SymbolTable &symbolTable) {
   SetVector<IREE::Util::GlobalOpInterface> resultSet;
   auto processAttr = [&](Attribute attr) {
-    if (!attr)
+    if (!attr) {
       return true; // ignore uninitialized devices
+    }
     return TypeSwitch<Attribute, bool>(attr)
         .Case<IREE::HAL::DeviceOrdinalAttr>([](auto attr) { return true; })
         .Case<IREE::HAL::DeviceTargetAttr>([](auto attr) { return true; })

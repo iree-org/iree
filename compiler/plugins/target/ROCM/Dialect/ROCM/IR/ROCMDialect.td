@@ -23,9 +23,15 @@ def ROCM_Dialect : Dialect {
     for AMD targets that lower to LLVM.
   }];
   let useDefaultAttributePrinterParser = 1;
-  let dependentDialects = ["::mlir::iree_compiler::IREE::Util::UtilDialect",
+  // AMDGPU, Bufferization, GPU, IREETensorExt, ROCDL, Vector dialect dependencies
+  // are to make sure these dialects are loaded when parsing the ukernels that contain them.
+  let dependentDialects = ["::mlir::amdgpu::AMDGPUDialect",
+                           "::mlir::bufferization::BufferizationDialect",
                            "::mlir::gpu::GPUDialect",
-                           "mlir::ROCDL::ROCDLDialect"];
+                           "::mlir::iree_compiler::IREE::TensorExt::IREETensorExtDialect",
+                           "::mlir::iree_compiler::IREE::Util::UtilDialect",
+                           "::mlir::ROCDL::ROCDLDialect",
+                           "::mlir::vector::VectorDialect"];
 
   let extraClassDeclaration = [{
     void registerAttributes();

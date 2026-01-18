@@ -1,0 +1,11 @@
+{
+  "model": "distilbert/distilbert-base-multilingual-cased",
+  "description": "Distilled multilingual BERT (630k+ downloads)",
+  "tests": [
+    {"name": "english", "input": "Hello, world!"},
+    {"name": "german", "input": "Guten Tag!"},
+    {"name": "french", "input": "Bonjour!"},
+    {"name": "spanish", "input": "Buenos dias!"},
+    {"name": "no_special", "input": "multilingual", "add_special_tokens": false}
+  ]
+}

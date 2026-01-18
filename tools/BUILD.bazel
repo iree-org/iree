@@ -14,6 +14,7 @@
 # Programs with a dependency on the compiler are not designed to run on device
 # platforms (e.g. Android), so they are tagged "hostonly".
 
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary", "iree_runtime_cc_binary")
 
 package(
@@ -135,6 +136,7 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/base/internal/flatcc:parsing",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
+        "//runtime/src/iree/vm",
         "//runtime/src/iree/vm/bytecode:module",
     ],
 )
@@ -149,6 +151,27 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:scope_map",
         "//runtime/src/iree/tooling:parameter_util",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "iree-encode-parameters",
+    srcs = ["iree-encode-parameters-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/io:parameter_index",
+        "//runtime/src/iree/io:parameter_index_provider",
+        "//runtime/src/iree/io:scope_map",
+        "//runtime/src/iree/io:stream",
+        "//runtime/src/iree/io/formats/irpa",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/tooling:context_util",
+        "//runtime/src/iree/tooling:function_util",
+        "//runtime/src/iree/tooling:parameter_util",
+        "//runtime/src/iree/vm",
     ],
 )
 
@@ -230,6 +253,20 @@ iree_compiler_cc_binary(
         "@llvm-project//mlir:MlirTableGenMain",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TableGen",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "iree-tokenize",
+    srcs = ["iree-tokenize-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/tokenizer",
+        "//runtime/src/iree/tokenizer/huggingface:tokenizer_json",
     ],
 )
 

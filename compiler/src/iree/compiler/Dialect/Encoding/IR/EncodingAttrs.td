@@ -90,6 +90,7 @@ def PackedStorageAttr :
           "isSerialized",
           "calculateStorageSizeInBytes",
           "isCompatibleWith",
+          "getCollapsedEncoding",
       ]>,
       DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
     ]> {

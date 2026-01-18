@@ -147,8 +147,9 @@ walkUseToGetDispatchStoreOp(Value value, const BufferizationPlan &plan,
       return user;
     }
     value = getTiedResultForOperand(use, plan);
-    if (!value)
+    if (!value) {
       return nullptr;
+    }
     traversedUses.push_back(&use);
   }
   // If the value has a use which is a store, then use that directly.
@@ -271,8 +272,9 @@ convertToDestinationPassingStyle(OpBuilder &b,
   auto walkResult = funcOp.walk<WalkOrder::PreOrder>(
       [&](tensor::EmptyOp emptyOp) -> WalkResult {
         for (auto result : emptyOp->getResults()) {
-          if (!isa<RankedTensorType>(result.getType()))
+          if (!isa<RankedTensorType>(result.getType())) {
             continue;
+          }
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);
           }
@@ -291,20 +293,23 @@ canUseInOperandAsInitOperand(OpOperand *inOperand, OpOperand *initOperand,
     return false;
   }
 
-  if (inOperand->getOwner() != initOperand->getOwner())
+  if (inOperand->getOwner() != initOperand->getOwner()) {
     return false;
+  }
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(inOperand->getOwner());
-  if (!linalgOp)
+  if (!linalgOp) {
     return false;
+  }
 
   if (linalgOp.getMatchingIndexingMap(inOperand) !=
       linalgOp.getMatchingIndexingMap(initOperand)) {
     return false;
   }
 
-  if (inOperand->get().getType() != initOperand->get().getType())
+  if (inOperand->get().getType() != initOperand->get().getType()) {
     return false;
+  }
 
   if (useWARForCooperativeMatrixCodegen) {
     return true;
@@ -330,8 +335,9 @@ canModifyUseToGetValueIntoStoreSet(BufferizationPlan &plan, OpOperand *use,
 
   // Currently only look at use in linalg.generic ops.
   auto genericOpConsumer = dyn_cast<linalg::GenericOp>(use->getOwner());
-  if (!genericOpConsumer)
+  if (!genericOpConsumer) {
     return std::nullopt;
+  }
 
   // All loops need to be parallel.
   if (genericOpConsumer.getNumLoops() !=
@@ -339,17 +345,20 @@ canModifyUseToGetValueIntoStoreSet(BufferizationPlan &plan, OpOperand *use,
     return std::nullopt;
   }
 
-  if (genericOpConsumer.isDpsInit(use))
+  if (genericOpConsumer.isDpsInit(use)) {
     return std::nullopt;
+  }
 
   for (auto [index, initOperand] :
        llvm::enumerate(genericOpConsumer.getDpsInitsMutable())) {
     // Output tensor is unused in the body computation.
-    if (genericOpConsumer.payloadUsesValueFromOperand(&initOperand))
+    if (genericOpConsumer.payloadUsesValueFromOperand(&initOperand)) {
       continue;
+    }
     // The result of this operation needs to be in a store set.
-    if (!plan.isInStoreSet(genericOpConsumer->getResult(index)))
+    if (!plan.isInStoreSet(genericOpConsumer->getResult(index))) {
       continue;
+    }
     if (!canUseInOperandAsInitOperand(use, &initOperand,
                                       useWARForCooperativeMatrixCodegen)) {
       continue;
@@ -441,8 +450,9 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
         [&](TilingInterface computeOp) -> WalkResult {
       for (auto result : computeOp->getResults()) {
         // If result is already in a store set. Nothing to do.
-        if (plan.isInStoreSet(result))
+        if (plan.isInStoreSet(result)) {
           continue;
+        }
 
         // Check if there are any uses that can be modified to reuse the output
         // buffer.
@@ -450,11 +460,13 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
           std::optional<OpOperand *> reusableOperand =
               canModifyUseToGetValueIntoStoreSet(
                   plan, &use, useWARForCooperativeMatrixCodegen);
-          if (!reusableOperand)
+          if (!reusableOperand) {
             continue;
-          if (failed(modifyUseToGetValueIntoStoreSet(rewriter, &use,
-                                                     reusableOperand.value())))
+          }
+          if (failed(modifyUseToGetValueIntoStoreSet(
+                  rewriter, &use, reusableOperand.value()))) {
             continue;
+          }
           return WalkResult::interrupt();
         }
       }
@@ -486,8 +498,9 @@ replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
       return;
     }
     auto emptyOp = unpackOp.getDest().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyOp)
+    if (!emptyOp) {
       return;
+    }
 
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointAfter(emptyOp);
@@ -511,13 +524,16 @@ struct RemoveCstOutsDependency
     Location loc = op.getLoc();
     for (OpOperand &opOperand : op.getDpsInitsMutable()) {
       ElementsAttr attr;
-      if (!matchPattern(opOperand.get(), m_Constant(&attr)))
+      if (!matchPattern(opOperand.get(), m_Constant(&attr))) {
         continue;
-      if (!attr.isSplat())
+      }
+      if (!attr.isSplat()) {
         continue;
+      }
       auto type = dyn_cast<RankedTensorType>(attr.getType());
-      if (!type)
+      if (!type) {
         continue;
+      }
       TypedAttr scalarAttr = attr.getValues<TypedAttr>()[0];
 
       modifiedOutput = true;

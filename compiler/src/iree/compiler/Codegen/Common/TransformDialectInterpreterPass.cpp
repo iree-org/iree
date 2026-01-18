@@ -69,8 +69,9 @@ public:
     }
     if (failed(transform::applyTransformNamedSequence(
             payloadRoot, transformEntryPoint, transformModule,
-            options.enableExpensiveChecks(true))))
+            options.enableExpensiveChecks(true)))) {
       return signalPassFailure();
+    }
   }
 };
 } // namespace

@@ -287,6 +287,7 @@ iree_check_single_backend_test_suite(
     "reduce_window.mlir"
     "remainder.mlir"
     "reshape.mlir"
+    "reverse.mlir"
     "rng_normal.mlir"
     "rng_uniform.mlir"
     "round.mlir"

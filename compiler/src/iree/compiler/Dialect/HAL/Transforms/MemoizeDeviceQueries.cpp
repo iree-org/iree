@@ -85,8 +85,9 @@ struct MemoizeDeviceQueriesPass
         // we can't memoize the query today.
         auto deviceGlobals =
             deviceAnalysis.lookupDeviceGlobals(queryOp.getDevice());
-        if (!deviceGlobals || deviceGlobals->size() != 1)
+        if (!deviceGlobals || deviceGlobals->size() != 1) {
           return WalkResult::advance();
+        }
         IREE::Util::GlobalOpInterface deviceGlobalOp = deviceGlobals->front();
 
         // Construct key used to dedupe/lookup the query.

@@ -55,6 +55,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTilingInterface
     MLIRTransformUtils
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface

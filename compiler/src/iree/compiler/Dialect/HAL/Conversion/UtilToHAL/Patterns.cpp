@@ -24,8 +24,9 @@ struct GlobalConversionPattern
   matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto newType = getTypeConverter()->convertType(op.getType());
-    if (newType == op.getType())
+    if (newType == op.getType()) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() {
       // NOTE: the initial value may be invalid here! We rely on
       // dialect-specific conversions to handle it.

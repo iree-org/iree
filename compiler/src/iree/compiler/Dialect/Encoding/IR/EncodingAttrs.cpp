@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Utils/EncodingUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -203,6 +204,11 @@ LogicalResult PackedStorageAttr::verifyEncoding(
   return success();
 }
 
+Attribute PackedStorageAttr::getCollapsedEncoding(ArrayRef<int64_t>,
+                                                  ArrayRef<int64_t>) const {
+  return *this;
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.encoding
 //===---------------------------------------------------------------------===//
@@ -223,9 +229,7 @@ static FailureOr<AffineMap> getComposedAffineMap(Attribute attr) {
       return AffineMap();
     }
     // All entries should have type `AffineMapAttr`.
-    if (!llvm::all_of(mapsAttr, [](Attribute attr) {
-          return isa<AffineMapAttr>(attr);
-        })) {
+    if (!llvm::all_of(mapsAttr, llvm::IsaPred<AffineMapAttr>)) {
       return failure();
     }
     AffineMap map =
@@ -250,60 +254,6 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
       iterationSizes.empty() ? ArrayAttr() : b.getI64ArrayAttr(iterationSizes);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
              b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
-}
-
-/// Parse a list of integer values and/or dynamic values ('?')
-static FailureOr<SmallVector<int64_t>>
-parseDynamicI64IntegerList(AsmParser &parser) {
-  SmallVector<int64_t> integerVals;
-  if (failed(parser.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&] {
-        int64_t value = ShapedType::kDynamic;
-        if (failed(parser.parseOptionalQuestion()) &&
-            failed(parser.parseInteger(value))) {
-          return failure();
-        }
-        integerVals.push_back(value);
-        return success();
-      }))) {
-    return failure();
-  }
-  return integerVals;
-}
-
-/// Utility to parse an array of integer and/or dynamic values (`?`).
-static ParseResult parseDynamicI64ArrayAttr(AsmParser &p, ArrayAttr &attr) {
-  FailureOr<SmallVector<int64_t>> integerVals = parseDynamicI64IntegerList(p);
-  if (failed(integerVals)) {
-    return failure();
-  }
-  auto integerValsAttr =
-      llvm::map_to_vector(integerVals.value(), [&](int64_t val) -> Attribute {
-        return IntegerAttr::get(IntegerType::get(p.getContext(), 64), val);
-      });
-  attr = ArrayAttr::get(p.getContext(), integerValsAttr);
-  return success();
-}
-
-/// Print a list of integer values and/or dynamic values ('?')
-static void printDynamicI64IntegerList(AsmPrinter &printer,
-                                       ArrayRef<int64_t> vals) {
-  printer << "[";
-  llvm::interleaveComma(vals, printer, [&](int64_t val) {
-    if (ShapedType::isDynamic(val)) {
-      printer << "?";
-    } else {
-      printer << val;
-    }
-  });
-  printer << "]";
-}
-
-/// Utility to print an array of integer and/or dynamic values. Dynamic values
-/// are printed as `?`.
-static void printDynamicI64ArrayAttr(AsmPrinter &p, ArrayAttr attrs) {
-  SmallVector<int64_t> intVals = llvm::map_to_vector(
-      attrs, [&](Attribute attr) { return cast<IntegerAttr>(attr).getInt(); });
-  return printDynamicI64IntegerList(p, intVals);
 }
 
 LogicalResult
@@ -368,8 +318,9 @@ SmallVector<AffineMap> EncodingAttr::getRootMaps() const {
           return cast<AffineMapAttr>(m).getAffineMap();
         }
         if (auto mapsAttr = dyn_cast<ArrayAttr>(m)) {
-          if (mapsAttr.empty())
+          if (mapsAttr.empty()) {
             return AffineMap();
+          }
           return cast<AffineMapAttr>(mapsAttr[0]).getAffineMap();
         }
         return AffineMap();
@@ -387,8 +338,9 @@ AffineMap EncodingAttr::getLastMapForOperandIndex() const {
     return mapAttr.getAffineMap();
   }
   if (auto mapsAttr = dyn_cast<ArrayAttr>(indexingMap)) {
-    if (mapsAttr.empty())
+    if (mapsAttr.empty()) {
       return AffineMap();
+    }
     return cast<AffineMapAttr>(mapsAttr[mapsAttr.size() - 1]).getAffineMap();
   }
   return AffineMap();

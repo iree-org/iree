@@ -42,8 +42,9 @@ class DropEmptyModuleInitializersPass
     auto initFuncOp = symbolTable.lookup<IREE::VM::FuncOp>("__init");
     if (initFuncOp && isFuncEmpty(initFuncOp)) {
       auto exportOp = exportOps[initFuncOp.getName()];
-      if (exportOp)
+      if (exportOp) {
         exportOp.erase();
+      }
       initFuncOp.erase();
     }
 
@@ -51,8 +52,9 @@ class DropEmptyModuleInitializersPass
     auto deinitFuncOp = symbolTable.lookup<IREE::VM::FuncOp>("__deinit");
     if (deinitFuncOp && isFuncEmpty(deinitFuncOp)) {
       auto exportOp = exportOps[deinitFuncOp.getName()];
-      if (exportOp)
+      if (exportOp) {
         exportOp.erase();
+      }
       deinitFuncOp.erase();
     }
   }

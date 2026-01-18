@@ -18,6 +18,7 @@ iree_check_single_backend_test_suite(
     "attention.mlir"
     "attention_i1_mask_encoding.mlir"
     "gather.mlir"
+    "map_gather.mlir"
     "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -56,7 +57,9 @@ iree_check_single_backend_test_suite(
     check_vmvx_local-task
   SRCS
     "arg_compare.mlir"
+    "attention.mlir"
     "gather.mlir"
+    "map_gather.mlir"
     "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -100,6 +103,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "gather.mlir"
+    "map_gather.mlir"
     "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -135,9 +139,12 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "gather.mlir"
+    "map_gather.mlir"
+    "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "top-k.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND

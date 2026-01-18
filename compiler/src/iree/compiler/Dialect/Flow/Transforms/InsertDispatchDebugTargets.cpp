@@ -29,8 +29,9 @@ namespace mlir::iree_compiler::IREE::Flow {
 static SmallVector<Value> filterNonTensorValues(ValueRange &&range) {
   SmallVector<Value> result;
   for (auto value : range) {
-    if (isa<TensorType>(value.getType()))
+    if (isa<TensorType>(value.getType())) {
       result.push_back(value);
+    }
   }
   return result;
 }
@@ -39,18 +40,21 @@ static SmallVector<Value> filterNonTensorValues(ValueRange &&range) {
 // a negative ordinal indicating no match.
 static std::tuple<std::string, int>
 getOrdinalFromDebugTarget(std::string marker) {
-  if (marker.empty() || marker[0] != '@')
+  if (marker.empty() || marker[0] != '@') {
     return std::make_tuple("", -1);
+  }
 
   SmallVector<StringRef, 2> parts;
   auto cropped = marker.substr(1);
   llvm::SplitString(llvm::StringRef(cropped), parts, ":");
-  if (parts.size() != 2)
+  if (parts.size() != 2) {
     return std::make_tuple("", -1);
+  }
 
   int ordinal;
-  if (parts[1].getAsInteger(10, ordinal))
+  if (parts[1].getAsInteger(10, ordinal)) {
     return std::make_tuple("", -1);
+  }
 
   return std::make_tuple(parts[0].str(), ordinal);
 }
@@ -78,18 +82,21 @@ static void traceOpWithName(IREE::Flow::DispatchOp dispatchOp,
 static LogicalResult replaceReturnWithOpResults(mlir::ModuleOp moduleOp,
                                                 IREE::Util::FuncOp funcOp,
                                                 Operation *op) {
-  if (!funcOp->isProperAncestor(op))
+  if (!funcOp->isProperAncestor(op)) {
     return failure();
+  }
 
   // TODO: Handle nested function calls.
-  if (!SymbolTable::symbolKnownUseEmpty(funcOp, moduleOp))
+  if (!SymbolTable::symbolKnownUseEmpty(funcOp, moduleOp)) {
     return failure();
+  }
 
   // TODO: Handle (nested) control flow.
   auto funcBlock = op->getBlock();
   if (funcBlock->getParentOp() != funcOp ||
-      &funcOp.getBody().front() != funcBlock)
+      &funcOp.getBody().front() != funcBlock) {
     return failure();
+  }
 
   // Collect the op results and create export ops for any tensor results.
   OpBuilder builder(funcOp);
@@ -119,8 +126,9 @@ static LogicalResult replaceReturnWithOpResults(mlir::ModuleOp moduleOp,
   rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(oldTerminator, exports);
 
   SmallVector<Type> argTypes;
-  for (const auto &arg : llvm::enumerate(funcOp.getArguments()))
+  for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
     argTypes.push_back(arg.value().getType());
+  }
 
   funcOp.setType(FunctionType::get(context,
                                    /*inputs=*/argTypes, /*results=*/newTypes));
@@ -151,12 +159,14 @@ struct InsertDebugTargetAtOrdinalPass
 
       // Only look for dispatches in util func ops.
       auto funcOp = dyn_cast<IREE::Util::FuncOp>(operation);
-      if (!funcOp)
+      if (!funcOp) {
         continue;
+      }
 
       std::string fName = funcOp.getName().str();
-      if (fName != breakFname && fName != traceFname)
+      if (fName != breakFname && fName != traceFname) {
         continue;
+      }
 
       int localBreakOrdinal = -1;
       if (fName == breakFname) {
@@ -188,8 +198,9 @@ struct InsertDebugTargetAtOrdinalPass
       if (localBreakOrdinal >= 0 && localBreakOrdinal < dispatchOps.size()) {
         auto breakTarget = dispatchOps[localBreakOrdinal];
         if (failed(replaceReturnWithOpResults(getOperation(), funcOp,
-                                              breakTarget)))
+                                              breakTarget))) {
           return signalPassFailure();
+        }
       }
     }
 
@@ -252,8 +263,9 @@ struct InsertDebugTargetAtSymbolPass
         Operation *operation = funcOp;
         auto mlirFuncOp = dyn_cast<IREE::Util::FuncOp>(operation);
         if (!mlirFuncOp || failed(replaceReturnWithOpResults(
-                               getOperation(), mlirFuncOp, breakTarget)))
+                               getOperation(), mlirFuncOp, breakTarget))) {
           return signalPassFailure();
+        }
       }
     }
 

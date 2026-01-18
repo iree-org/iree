@@ -47,8 +47,9 @@ static const StringRef kShapeNone = "plain";
 static const StringRef kShapeEllipse = "ellipse";
 
 static StringRef getShape(Operation *op) {
-  if (isa<DispatchOp>(op))
+  if (isa<DispatchOp>(op)) {
     return kShapeBox;
+  }
 
   return kShapeEllipse;
 }
@@ -57,8 +58,9 @@ static StringRef getShape(Operation *op) {
 static int64_t getLargeAttributeSizeLimit() {
   // Use the default from the printer flags if possible.
   if (std::optional<int64_t> limit =
-          OpPrintingFlags().getLargeElementsAttrLimit())
+          OpPrintingFlags().getLargeElementsAttrLimit()) {
     return *limit;
+  }
   return 16;
 }
 
@@ -142,8 +144,9 @@ public:
 
   void emitFunctions(ModuleOp module) {
     auto funcOps = module.getOps<mlir::FunctionOpInterface>();
-    if (funcOps.empty())
+    if (funcOps.empty()) {
       return;
+    }
 
     emitGraph([&]() {
       for (auto funcOp : funcOps) {
@@ -167,8 +170,9 @@ private:
   /// Emit all edges. This function should be called after all nodes have been
   /// emitted.
   void emitAllEdgeStmts() {
-    for (const std::string &edge : edges)
+    for (const std::string &edge : edges) {
       os << edge << ";\n";
+    }
     edges.clear();
   }
 
@@ -243,13 +247,16 @@ private:
     // Do not label edges that start/end at a cluster boundary. Such edges are
     // clipped at the boundary, but labels are not. This can lead to labels
     // floating around without any edge next to them.
-    if (!n1.clusterId && !n2.clusterId)
+    if (!n1.clusterId && !n2.clusterId) {
       attrs["label"] = quoteString(escapeString(std::move(label)));
+    }
     // Use `ltail` and `lhead` to draw edges between clusters.
-    if (n1.clusterId)
+    if (n1.clusterId) {
       attrs["ltail"] = "cluster_" + std::to_string(*n1.clusterId);
-    if (n2.clusterId)
+    }
+    if (n2.clusterId) {
       attrs["lhead"] = "cluster_" + std::to_string(*n2.clusterId);
+    }
 
     edges.push_back(strFromOs([&](raw_ostream &os) {
       os << llvm::format("v%i -> v%i ", n1.id, n2.id);
@@ -344,12 +351,14 @@ private:
   }
 
   void annotateOperation(raw_ostream &os, Operation *op, AsmState &state) {
-    if (isa<arith::ConstantOp>(op))
+    if (isa<arith::ConstantOp>(op)) {
       return;
+    }
 
     if (op->hasTrait<OpTrait::ReturnLike>() &&
-        isa<mlir::FunctionOpInterface>(op->getParentOp()))
+        isa<mlir::FunctionOpInterface>(op->getParentOp())) {
       return;
+    }
 
     if (auto load = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op)) {
       printDispatchTensorLoad(os, load, state);
@@ -385,18 +394,21 @@ private:
     auto entryPoint = *dispatchOp.getEntryPointRefs().begin();
     auto executableOp = cast<ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
         dispatchOp, entryPoint.getRootReference()));
-    if (!executableOp)
+    if (!executableOp) {
       return;
+    }
 
     auto calleeNameAttr = entryPoint.getLeafReference();
     auto innerModule = executableOp.getInnerModule();
-    if (!innerModule)
+    if (!innerModule) {
       return;
+    }
     auto funcOps = innerModule.getOps<mlir::FunctionOpInterface>();
     auto funcIt = llvm::find_if(
         funcOps, [&](auto op) { return op.getNameAttr() == calleeNameAttr; });
-    if (funcIt == funcOps.end())
+    if (funcIt == funcOps.end()) {
       return;
+    }
 
     auto callee = *funcIt;
 
@@ -506,25 +518,29 @@ private:
   /// operation inside the cluster.
   void processBlock(Block &block) {
     emitClusterStmt([&]() {
-      for (BlockArgument &blockArg : block.getArguments())
+      for (BlockArgument &blockArg : block.getArguments()) {
         valueToNode[blockArg] = emitNodeStmt(getLabel(blockArg));
+      }
 
       // Emit a node for each operation.
       std::optional<Node> prevNode;
       for (Operation &op : block) {
         Node nextNode = processOperation(&op);
-        if (printControlFlowEdges && prevNode)
+        if (printControlFlowEdges && prevNode) {
           emitEdgeStmt(*prevNode, nextNode, /*label=*/"",
                        kLineStyleControlFlow);
+        }
         prevNode = nextNode;
       }
     });
   }
 
   bool isScalarConstantOp(Operation *op) {
-    if (auto constOp = dyn_cast<mlir::arith::ConstantOp>(op))
-      if (constOp.getResult().getType().isIntOrIndexOrFloat())
+    if (auto constOp = dyn_cast<mlir::arith::ConstantOp>(op)) {
+      if (constOp.getResult().getType().isIntOrIndexOrFloat()) {
         return true;
+      }
+    }
 
     return false;
   }
@@ -555,8 +571,9 @@ private:
       // Emit cluster for op with regions.
       node = emitClusterStmt(
           [&]() {
-            for (Region &region : op->getRegions())
+            for (Region &region : op->getRegions()) {
               processRegion(region);
+            }
           },
           getLabel(op));
     } else {
@@ -578,22 +595,25 @@ private:
       }
     }
 
-    for (Value result : op->getResults())
+    for (Value result : op->getResults()) {
       valueToNode[result] = node;
+    }
 
     return node;
   }
 
   /// Process a region.
   void processRegion(Region &region) {
-    for (Block &block : region.getBlocks())
+    for (Block &block : region.getBlocks()) {
       processBlock(block);
+    }
   }
 
   /// Truncate long strings.
   std::string truncateString(std::string str) {
-    if (str.length() <= maxLabelLen)
+    if (str.length() <= maxLabelLen) {
       return str;
+    }
     return str.substr(0, maxLabelLen) + "...";
   }
 
@@ -629,8 +649,9 @@ public:
 
   void runOnOperation() override {
     auto modOp = dyn_cast<ModuleOp>(getOperation());
-    if (!modOp)
+    if (!modOp) {
       return;
+    }
 
     // Open the output file we'll be streaming to.
     // Since we are processing the entire module at once we overwrite the file.

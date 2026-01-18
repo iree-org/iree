@@ -23,11 +23,12 @@ exports_files([
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "VectorExtAttrs.td",
             "VectorExtBase.td",
-            "VectorExtOps.td",
             "VectorExtInterfaces.td",
+            "VectorExtOps.td",
         ],
         include = ["*.td"],
     ),

@@ -115,7 +115,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
 
     const auto* module_file_toc = iree_vm_bytecode_module_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
-        instance_,
+        instance_, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             static_cast<iree_host_size_t>(module_file_toc->size)},

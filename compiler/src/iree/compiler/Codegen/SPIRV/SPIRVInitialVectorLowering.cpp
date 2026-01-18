@@ -51,29 +51,34 @@ void debugPrint(Operation *op, const char *message) {
 
 int getComputeVectorSize(int64_t size) {
   for (int i : {4, 3, 2}) {
-    if (size % i == 0)
+    if (size % i == 0) {
       return i;
+    }
   }
   return 1;
 }
 
 int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
   int bitwidth = scalarType.getIntOrFloatBitWidth();
-  while (auto sliceOp = source.getDefiningOp<tensor::ExtractSliceOp>())
+  while (auto sliceOp = source.getDefiningOp<tensor::ExtractSliceOp>()) {
     source = sliceOp.getSource();
+  }
   if (!matchPattern(source, m_Constant())) {
     // If we are not reading from a constant array that is embedded in the
     // kernel, try to use a large vector size matching the bitwidth to read in
     // 128-bit chunks. This helps with memory access performance. Such vector
     // sizes are not native in SPIR-V though; this relies on following passes to
     // bitcast them to 32-bit 4-element vectors to be valid.
-    if (bitwidth <= 8 && size % 16 == 0)
+    if (bitwidth <= 8 && size % 16 == 0) {
       return 16;
-    if (bitwidth <= 16 && size % 8 == 0)
+    }
+    if (bitwidth <= 16 && size % 8 == 0) {
       return 8;
+    }
   }
-  if (bitwidth <= 32 && size % 4 == 0)
+  if (bitwidth <= 32 && size % 4 == 0) {
     return 4;
+  }
   return size % 2 == 0 ? 2 : 1;
 }
 
@@ -108,8 +113,9 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
             })
             .Default([](Operation *) { return nullptr; });
 
-    if (!source)
+    if (!source) {
       break;
+    }
     op = source;
   }
 
@@ -119,8 +125,9 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
 /// Returns true when |op| has the i32 element type that is likely to be result
 /// of a zero/sign extension from i8.
 bool mayExtI8ToI32(Value op) {
-  if (!getElementTypeOrSelf(op.getType()).isInteger(32))
+  if (!getElementTypeOrSelf(op.getType()).isInteger(32)) {
     return false;
+  }
 
   // Look through vector operations created by vector unrolling patterns,
   // hoping to find a zero/sign extension op. Note that we do not need to find
@@ -146,15 +153,18 @@ bool mayExtI8ToI32(Value op) {
 /// Succeeds when |contract| is a i32 matmul whose LHS and RHS operands may be
 /// result of zero/sign extension of i8 inputs.
 LogicalResult detectI8ToI32Matmul(vector::ContractionOp contract) {
-  if (contract.getKind() != vector::CombiningKind::ADD)
+  if (contract.getKind() != vector::CombiningKind::ADD) {
     return failure();
+  }
 
-  if (!mayExtI8ToI32(contract.getLhs()) || !mayExtI8ToI32(contract.getRhs()))
+  if (!mayExtI8ToI32(contract.getLhs()) || !mayExtI8ToI32(contract.getRhs())) {
     return failure();
+  }
 
   ArrayRef<Attribute> iteratorTypes = contract.getIteratorTypes().getValue();
-  if (iteratorTypes.size() != 3)
+  if (iteratorTypes.size() != 3) {
     return failure();
+  }
 
   return success(vector::isParallelIterator(iteratorTypes[0]) &&
                  vector::isParallelIterator(iteratorTypes[1]) &&
@@ -265,12 +275,14 @@ bool supportsIntegerDotProductOps(mlir::FunctionOpInterface fn) {
   // First check if the function op itself has a target env attribute. This may
   // be preferred in tests.
   auto targetEnvAttr = getGPUTargetAttr(fn);
-  if (!targetEnvAttr)
+  if (!targetEnvAttr) {
     return false;
+  }
 
   if (!IREE::GPU::bitEnumContainsAll(targetEnvAttr.getWgp().getDot().getValue(),
-                                     IREE::GPU::DotProductOps::DP4xI8ToI32))
+                                     IREE::GPU::DotProductOps::DP4xI8ToI32)) {
     return false;
+  }
 
   return true;
 }
@@ -332,8 +344,9 @@ public:
     // batch dimension. Try to drop that to map to matmul dimensions better.
     SmallVector<vector::ContractionOp> contractOps;
     funcOp.walk([&](vector::ContractionOp op) {
-      if (op.getIteratorTypes().size() > 3)
+      if (op.getIteratorTypes().size() > 3) {
         contractOps.push_back(op);
+      }
     });
     for (vector::ContractionOp op : contractOps) {
       OpBuilder builder(op);
@@ -373,8 +386,9 @@ public:
       funcOp.walk([&](vector::MultiDimReductionOp reductionOp) {
         if (llvm::any_of(reductionOp->getOperands(), [](Value operand) {
               return operand.getDefiningOp<vector::TransposeOp>();
-            }))
+            })) {
           reductionOps.push_back(reductionOp);
+        }
         return WalkResult::advance();
       });
       RewritePatternSet patterns(context);

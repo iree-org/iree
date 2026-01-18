@@ -26,8 +26,30 @@ func.func @conv_nhwc_fhwc(%arg0: tensor<16x50x34x576xf16>, %arg1: tensor<576x3x3
 
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1, 4]
-//  CHECK-SAME:     subgroup = [0, 0, 1, 1, 0, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 1, 32, 64, 0, 0, 0]
+//  CHECK-SAME:     subgroup = [1, 2, 1, 2, 0, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 4, 32, 64, 0, 0, 0]
+
+// -----
+
+func.func @conv_nhwc_named_dynamic(%arg0: tensor<16x?x34x576xf16>, %arg1: tensor<576x3x3x576xf16>, %arg2: tensor<16x?x32x576xf32>) -> tensor<16x?x32x576xf32> {
+  %0 = linalg.conv_2d_nhwc_fhwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+      ins(%arg0, %arg1 : tensor<16x?x34x576xf16>, tensor<576x3x3x576xf16>)
+      outs(%arg2 : tensor<16x?x32x576xf32>) -> tensor<16x?x32x576xf32>
+  return %0 : tensor<16x?x32x576xf32>
+}
+
+// CHECK-LABEL: func.func @conv_nhwc_named_dynamic
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = false
+
+//       CHECK:   linalg.conv_2d_nhwc_fhwc {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+
+//  CHECK-SAME:     promote_operands = [0, 1]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1, 4]
+//  CHECK-SAME:     subgroup = [2, 0, 1, 2, 0, 0, 0]
+//  CHECK-SAME:     workgroup = [4, 1, 32, 64, 0, 0, 0]
 
 // -----
 
@@ -47,18 +69,18 @@ func.func @conv_nhwc_fhwc_unaligned(%arg0: tensor<16x26x19x287xf16>, %arg1: tens
 }
 
 // CHECK-LABEL: func.func @conv_nhwc_fhwc_unaligned
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = false
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 
-//  CHECK-SAME:     padding_conv = [1, 1, 32, 32, 0, 0, 32]
+//  CHECK-SAME:     padding_conv = [1, 4, 32, 32, 0, 0, 32]
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1, 2]
-//  CHECK-SAME:     subgroup = [0, 0, 1, 1, 0, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 1, 32, 32, 0, 0, 0]
+//  CHECK-SAME:     subgroup = [1, 2, 1, 1, 0, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 4, 32, 32, 0, 0, 0]
 
 // -----
 
@@ -87,7 +109,7 @@ func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg
 //  CHECK-SAME:     padding_conv = [1, 32, 1, 64, 0, 0, 8]
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1, 1]
-//  CHECK-SAME:     subgroup = [0, 1, 0, 1, 0, 0, 0]
+//  CHECK-SAME:     subgroup = [1, 1, 0, 1, 0, 0, 0]
 //  CHECK-SAME:     workgroup = [1, 32, 1, 64, 0, 0, 0]
 
 // -----
@@ -117,8 +139,8 @@ func.func @conv_nhwc_fhc_two_batch_dims(%arg0: tensor<16x50x32x576xf16>, %arg1: 
 
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 4]
-//  CHECK-SAME:     subgroup = [0, 0, 1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 1, 32, 64, 0, 0]
+//  CHECK-SAME:     subgroup = [1, 2, 1, 2, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 4, 32, 64, 0, 0]
 
 // -----
 
@@ -140,8 +162,8 @@ func.func @conv_nchw_named(%3: tensor<2x128x34x34xf32>, %4: tensor<64x128x3x3xf3
 
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 16, 1, 1]
-//  CHECK-SAME:     subgroup = [0, 1, 0, 1, 0, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 64, 1, 32, 0, 0, 0]
+//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 64, 4, 32, 0, 0, 0]
 
 // -----
 
@@ -170,5 +192,5 @@ func.func @conv_chwn_fhwn(%arg0: tensor<16x26x18x144xf16>, %arg1: tensor<16x24x1
 
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1, 1]
-//  CHECK-SAME:     subgroup = [1, 0, 0, 1, 0, 0, 0]
+//  CHECK-SAME:     subgroup = [1, 1, 1, 1, 0, 0, 0]
 //  CHECK-SAME:     workgroup = [16, 1, 1, 16, 0, 0, 0]

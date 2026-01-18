@@ -185,6 +185,43 @@ def WorkgroupMappingAttr :
 }
 
 //===---------------------------------------------------------------------===//
+// IREE Codegen local mapping attribute
+//===---------------------------------------------------------------------===//
+
+def LocalMappingAttr :
+    AttrDef<IREECodegen_Dialect, "LocalMapping", [
+      DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>]> {
+  let mnemonic = "local_mapping";
+
+  let parameters = (ins
+    "int64_t":$dim
+  );
+  let assemblyFormat = "`<` $dim `>`";
+
+  let description = [{
+    Attribute for mapping `scf.forall` loops to sequential local execution.
+
+    Example:
+    ```mlir
+      scf.forall (%i, %j) in (4, 8) {
+        // body ... %i, %j
+      } {mapping = [#iree_codegen.local_mapping<1>,
+                    #iree_codegen.local_mapping<0>]}
+    ```
+
+    This forall approximately corresponds to the following loop nest:
+
+    ```mlir
+      scf.for %i = 0 to 4 {
+        scf.for %j = 0 to 8 {
+        // body ... %i, %j
+        }
+      }
+    ```
+  }];
+}
+
+//===---------------------------------------------------------------------===//
 // iree_codegen.simple_target
 //===---------------------------------------------------------------------===//
 
@@ -625,6 +662,27 @@ def DenormalFpMathAttr :
       return "iree_codegen.denormal_fp_math_f32";
     }
   }];
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.workgroup_scope
+//===---------------------------------------------------------------------===//
+
+def WorkgroupScopeAttr : AttrDef<IREECodegen_Dialect, "WorkgroupScope", []> {
+  let mnemonic = "workgroup_scope";
+  let summary = [{
+    Attribute representing parallel execution across workgroups.
+  }];
+  let description = [{
+    Parallel scope that maps to workgroup execution.
+
+    If |linearize| is set to true, workgroup ids are linearized into a single
+    id which is then typically delinearized based on the problem space.
+  }];
+  let parameters = (ins "bool":$linearize);
+  let hasCustomAssemblyFormat = 1;
+
+  // Interface is registered as an external model to avoid HAL dep.
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

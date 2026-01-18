@@ -21,6 +21,7 @@ package(
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_subbyte_emulation",
     srcs = enforce_glob(
+        # keep sorted
         [
             "subbyte_types.mlir",
         ],

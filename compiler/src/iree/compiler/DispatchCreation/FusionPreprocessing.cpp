@@ -50,8 +50,9 @@ struct ElementwiseOpInterchangePattern final
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1 ||
-        genericOp.getNumDpsInputs() == 0)
+        genericOp.getNumDpsInputs() == 0) {
       return failure();
+    }
 
     // All input maps must be equal and non-identity. All maps, including
     // output, must be be permutations. Permutation maps are checked by

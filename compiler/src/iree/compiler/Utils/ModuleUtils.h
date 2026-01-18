@@ -38,6 +38,10 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
                                     Operation *targetOp,
                                     OpBuilder &targetBuilder);
 
+// Writes |moduleOp| to the file at |path|.
+// The module will be written as MLIR text unless it has the .mlirbc extension.
+LogicalResult writeModule(mlir::ModuleOp moduleOp, StringRef path);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_MODULEUTILS_H_

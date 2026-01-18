@@ -28,8 +28,9 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
   SmallVector<linalg::LinalgOp> linalgOps;
   SmallVector<linalg::LinalgOp> keepOps;
   module.walk([&](linalg::LinalgOp op) {
-    if (!op.hasPureTensorSemantics())
+    if (!op.hasPureTensorSemantics()) {
       return;
+    }
     // Op should have at least one tensor input, otherwise the operation is
     // already a fill-like operation.
     // TODO(Groverkss): Explore if we can remove in this case too.
@@ -41,14 +42,17 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
       }
     }
 
-    if (!hasAtleastOneTensorInput)
+    if (!hasAtleastOneTensorInput) {
       return;
+    }
 
     // There should be only 1 tensor output.
-    if (op.getNumDpsInits() != 1)
+    if (op.getNumDpsInits() != 1) {
       return;
-    if (!isa<RankedTensorType>(op.getDpsInitOperand(0)->get().getType()))
+    }
+    if (!isa<RankedTensorType>(op.getDpsInitOperand(0)->get().getType())) {
       return;
+    }
 
     if (!chunker.shouldFeatureBeKept()) {
       linalgOps.push_back(op);
@@ -84,8 +88,9 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
     if (outType.hasStaticShape()) {
       for (auto *input : linalgOp.getDpsInputOperands()) {
         auto inType = dyn_cast<RankedTensorType>(input->get().getType());
-        if (!inType)
+        if (!inType) {
           continue;
+        }
 
         // Check if we can replace an input directly with the output.
         if (inType == outType) {
@@ -124,6 +129,7 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
   pm.addPass(createCanonicalizerPass());
   // Remove dead globals.
   pm.addPass(createSymbolDCEPass());
-  if (failed(pm.run(module)))
+  if (failed(pm.run(module))) {
     return;
+  }
 }

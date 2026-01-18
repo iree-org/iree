@@ -21,14 +21,18 @@ OperationEquivalenceCache::OperationEquivalenceCache(MLIRContext *context)
           StringAttr::get(context, SymbolTable::getSymbolAttrName())) {}
 
 OperationEquivalenceCache::~OperationEquivalenceCache() {
-  for (auto *mapping : mappingFreeList)
+  for (auto *mapping : mappingFreeList) {
     delete mapping;
-  for (auto region : regions)
+  }
+  for (auto region : regions) {
     delete region.second;
-  for (auto block : blocks)
+  }
+  for (auto block : blocks) {
     delete block.second;
-  for (auto op : ops)
+  }
+  for (auto op : ops) {
     delete op.second;
+  }
 }
 
 bool OperationEquivalenceCache::isSymbolAttrName(StringAttr name) const {
@@ -52,8 +56,9 @@ OperationEquivalenceCache::acquireMapping() {
 OperationEquivalenceCache::RegionEntry &
 OperationEquivalenceCache::getRegion(Region *region) {
   auto it = regions.find(region);
-  if (it != regions.end())
+  if (it != regions.end()) {
     return *it->second;
+  }
   RegionEntry *entry = new RegionEntry();
   for (Block &block : region->getBlocks()) {
     llvm::ReversePostOrderTraversal<Block *> traversal(&block);
@@ -66,8 +71,9 @@ OperationEquivalenceCache::getRegion(Region *region) {
 OperationEquivalenceCache::BlockEntry &
 OperationEquivalenceCache::getBlock(Block *block) {
   auto it = blocks.find(block);
-  if (it != blocks.end())
+  if (it != blocks.end()) {
     return *it->second;
+  }
   BlockEntry *entry = new BlockEntry();
   entry->count = block->getOperations().size();
   blocks[block] = entry;
@@ -77,8 +83,9 @@ OperationEquivalenceCache::getBlock(Block *block) {
 OperationEquivalenceCache::OperationEntry &
 OperationEquivalenceCache::getOp(Operation *op) {
   auto it = ops.find(op);
-  if (it != ops.end())
+  if (it != ops.end()) {
     return *it->second;
+  }
   OperationEntry *entry = new OperationEntry();
   entry->attrs.append(op->getRawDictionaryAttrs().getValue());
   if (op->getPropertiesStorageSize()) {
@@ -95,8 +102,9 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
   auto lhsEnd = lhs.end();
   auto rhsEnd = rhs.end();
   while (lhsIt != lhsEnd && rhsIt != rhsEnd) {
-    if (!pred(*lhsIt++, *rhsIt++))
+    if (!pred(*lhsIt++, *rhsIt++)) {
       return false;
+    }
   }
   if ((lhsIt == lhsEnd) != (rhsIt == rhsEnd)) {
     // Block count mismatch. We do this here so that we avoid the O(n) scan
@@ -157,18 +165,21 @@ bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
                                 Region &rhs, IRMapping &mapping) {
   auto &lhsRegionEntry = cache.getRegion(&lhs);
   auto &rhsRegionEntry = cache.getRegion(&rhs);
-  if (lhsRegionEntry.blocks.size() != rhsRegionEntry.blocks.size())
+  if (lhsRegionEntry.blocks.size() != rhsRegionEntry.blocks.size()) {
     return false;
+  }
 
   // Map blocks and their arguments so that we can compare their use by ops.
   for (auto [lhsBlock, rhsBlock] :
        llvm::zip_equal(lhsRegionEntry.blocks, rhsRegionEntry.blocks)) {
-    if (lhsBlock->getNumArguments() != rhsBlock->getNumArguments())
+    if (lhsBlock->getNumArguments() != rhsBlock->getNumArguments()) {
       return false;
+    }
     for (auto [lhsArg, rhsArg] :
          llvm::zip_equal(lhsBlock->getArguments(), rhsBlock->getArguments())) {
-      if (lhsArg.getType() != rhsArg.getType())
+      if (lhsArg.getType() != rhsArg.getType()) {
         return false;
+      }
       mapping.map(lhsArg, rhsArg);
     }
     mapping.map(lhsBlock, rhsBlock);
@@ -180,13 +191,15 @@ bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
        llvm::zip_equal(lhsRegionEntry.blocks, rhsRegionEntry.blocks)) {
     const auto &lhsBlockEntry = cache.getBlock(lhsBlock);
     const auto &rhsBlockEntry = cache.getBlock(rhsBlock);
-    if (lhsBlockEntry.count != rhsBlockEntry.count)
+    if (lhsBlockEntry.count != rhsBlockEntry.count) {
       return false;
+    }
 
     for (auto [lhsOp, rhsOp] : llvm::zip_equal(lhsBlock->getOperations(),
                                                rhsBlock->getOperations())) {
-      if (!isStructurallyEquivalentTo(cache, lhsOp, rhsOp, mapping))
+      if (!isStructurallyEquivalentTo(cache, lhsOp, rhsOp, mapping)) {
         return false;
+      }
     }
   }
 
@@ -210,13 +223,15 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
   auto &rhsEntry = cache.getOp(&rhs);
 
   // TODO(#3996): symbol mapping; for now allow them to differ unconditionally.
-  if (lhsEntry.attrs.getAttrs().size() != rhsEntry.attrs.getAttrs().size())
+  if (lhsEntry.attrs.getAttrs().size() != rhsEntry.attrs.getAttrs().size()) {
     return false;
+  }
   for (auto [lhsAttr, rhsAttr] :
        llvm::zip_equal(lhsEntry.attrs, rhsEntry.attrs)) {
     if (!cache.isSymbolAttrName(lhsAttr.getName())) {
-      if (lhsAttr != rhsAttr)
+      if (lhsAttr != rhsAttr) {
         return false;
+      }
     }
   }
 
@@ -224,8 +239,9 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
   // in the mapping already from the parent region to do the lhs->rhs mapping.
   for (auto [lhsSuccessor, rhsSuccessor] :
        llvm::zip_equal(lhs.getSuccessors(), rhs.getSuccessors())) {
-    if (rhsSuccessor != parentMapping.lookup(lhsSuccessor))
+    if (rhsSuccessor != parentMapping.lookup(lhsSuccessor)) {
       return false;
+    }
   }
 
   // Ensure result types match first and add to the block and value mapping.
@@ -234,8 +250,9 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
   // exit prior to the full traversal.
   for (auto [lhsValue, rhsValue] :
        llvm::zip_equal(lhs.getResults(), rhs.getResults())) {
-    if (lhsValue.getType() != rhsValue.getType())
+    if (lhsValue.getType() != rhsValue.getType()) {
       return false;
+    }
     parentMapping.map(lhsValue, rhsValue);
   }
 
@@ -243,10 +260,12 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
   // these values they should already be defined in the mapping.
   for (auto [lhsValue, rhsValue] :
        llvm::zip_equal(lhs.getOperands(), rhs.getOperands())) {
-    if (lhsValue.getType() != rhsValue.getType())
+    if (lhsValue.getType() != rhsValue.getType()) {
       return false;
-    if (rhsValue != parentMapping.lookup(lhsValue))
+    }
+    if (rhsValue != parentMapping.lookup(lhsValue)) {
       return false;
+    }
   }
 
   // Recurse into regions.

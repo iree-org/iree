@@ -21,8 +21,9 @@ namespace mlir::iree_compiler::IREE::HAL {
 //===----------------------------------------------------------------------===//
 
 llvm::MaybeAlign commonAlignment(llvm::MaybeAlign lhs, llvm::MaybeAlign rhs) {
-  if (!lhs.has_value() || !rhs.has_value())
+  if (!lhs.has_value() || !rhs.has_value()) {
     return std::nullopt;
+  }
   return llvm::MaybeAlign(
       llvm::MinAlign(lhs.value().value(), rhs.value().value()));
 }
@@ -37,8 +38,9 @@ std::optional<uint64_t> lookupOffsetOrAlignment(Value value) {
   }
 
   auto op = value.getDefiningOp();
-  if (!op)
+  if (!op) {
     return std::nullopt;
+  }
   if (auto alignmentAttr = op->getAttrOfType<IntegerAttr>("stream.alignment")) {
     // The op has an alignment tagged on it we can use directly.
     return alignmentAttr.getValue().getZExtValue();
@@ -107,8 +109,9 @@ void HALDialect::registerTypes() {
 
 Type HALDialect::parseType(DialectAsmParser &parser) const {
   StringRef typeKind;
-  if (parser.parseKeyword(&typeKind))
+  if (parser.parseKeyword(&typeKind)) {
     return {};
+  }
   auto type = llvm::StringSwitch<Type>(typeKind)
                   .Case("allocator", AllocatorType::get(getContext()))
                   .Case("buffer", BufferType::get(getContext()))

@@ -827,8 +827,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   }
   SetVector<int64_t> batchPosSet(getBatchPos().begin(), getBatchPos().end());
   for (auto [idx, size] : enumerate(inputSizes)) {
-    if (batchPosSet.contains(idx))
+    if (batchPosSet.contains(idx)) {
       continue;
+    }
     if (mPosSet.contains(idx)) {
       kBasis.push_back(kernelSize[mKernelIdx[idx]]);
       continue;
@@ -861,8 +862,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   int delinKIdx = 0;
   SmallVector<int64_t> invInputKPerm = invertPermutationVector(inputKPerm);
   for (int i = 0; i < getInputRank(); ++i) {
-    if (batchPosSet.contains(i))
+    if (batchPosSet.contains(i)) {
       continue;
+    }
     if (mPosSet.contains(i)) {
       windowOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
       continue;

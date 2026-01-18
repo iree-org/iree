@@ -24,8 +24,9 @@ namespace mlir::iree_compiler::IREE::Util {
 
 static OpOperand *findOperandFor(Operation *op, Value input) {
   for (OpOperand &operand : op->getOpOperands()) {
-    if (operand.get() == input)
+    if (operand.get() == input) {
       return &operand;
+    }
   }
   return nullptr;
 }
@@ -33,10 +34,12 @@ static OpOperand *findOperandFor(Operation *op, Value input) {
 bool ConstExprAnalysis::isConstExprOperation(Operation *queryOp) const {
   if (queryOp->getNumResults() == 0) {
     bool hasNoMemoryEffects = false;
-    if (auto effectOp = dyn_cast<MemoryEffectOpInterface>(queryOp))
+    if (auto effectOp = dyn_cast<MemoryEffectOpInterface>(queryOp)) {
       hasNoMemoryEffects = effectOp.hasNoEffect();
-    if (hasNoMemoryEffects && queryOp->hasTrait<OpTrait::ReturnLike>())
+    }
+    if (hasNoMemoryEffects && queryOp->hasTrait<OpTrait::ReturnLike>()) {
       return true;
+    }
     return false;
   }
   // NOTE: this only checks the first result as all results are added to the map
@@ -79,25 +82,31 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
   // such as if they are initialized based on values only available at runtime.
   explorer.forEachGlobal([&](const Explorer::GlobalInfo *info) {
     // Rely on globals having been canonicalized to immutable correctly.
-    if (info->isIndirect || info->op.isGlobalMutable())
+    if (info->isIndirect || info->op.isGlobalMutable()) {
       return;
-    if (!isLegalConstExprRootType(info->op.getGlobalType()))
+    }
+    if (!isLegalConstExprRootType(info->op.getGlobalType())) {
       return;
-    for (auto loadOp : info->getLoads())
+    }
+    for (auto loadOp : info->getLoads()) {
       constantRoots[loadOp.getLoadedGlobalValue()] = loadOp;
+    }
   });
 
   // Populate the constant roots for all inline constants in the program.
   explorer.forEachFunctionLikeOp([&](FunctionOpInterface funcOp) {
     funcOp.walk([&](Operation *op) {
-      if (!op->hasTrait<OpTrait::ConstantLike>())
+      if (!op->hasTrait<OpTrait::ConstantLike>()) {
         return;
-      for (auto resultType : op->getResultTypes()) {
-        if (!isLegalConstExprRootType(resultType))
-          return;
       }
-      for (auto result : op->getResults())
+      for (auto resultType : op->getResultTypes()) {
+        if (!isLegalConstExprRootType(resultType)) {
+          return;
+        }
+      }
+      for (auto result : op->getResults()) {
         constantRoots[result] = op;
+      }
     });
   });
 
@@ -135,8 +144,9 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
     iterWorklist.clear();
     iterWorklist.swap(worklist);
     for (ConstValueInfo *info : iterWorklist) {
-      if (info->state != ConstValueInfo::UNKNOWN)
+      if (info->state != ConstValueInfo::UNKNOWN) {
         continue;
+      }
       bool allConstants = true;
       for (ConstValueInfo *producerInfo : info->producers) {
         assert(producerInfo->state != ConstValueInfo::UNANALYZED &&
@@ -220,12 +230,14 @@ void ConstExprAnalysis::expandToOpStep(
   ConstExprOpInfo opInfo = ConstExprOpInfo::getForOp(op);
   for (auto result : op->getResults()) {
     auto *valueInfo = constInfoMap.lookup(result);
-    if (valueInfo && valueInfo->state != ConstValueInfo::UNANALYZED)
+    if (valueInfo && valueInfo->state != ConstValueInfo::UNANALYZED) {
       continue;
+    }
 
     // Generate new info record.
-    if (!valueInfo)
+    if (!valueInfo) {
       valueInfo = addInfo(result);
+    }
 
     // Update the producers first as we might early-return below.
     for (Value producer : opInfo.producers) {
@@ -288,8 +300,9 @@ void ConstExprAnalysis::expandToOpStep(
 void ConstExprAnalysis::print(raw_ostream &os) const {
   os << "[ConstExprAnalysis] found constants:\n";
   for (auto &info : allocedConstInfos) {
-    if (info->state != ConstValueInfo::CONSTANT || info->isRoot)
+    if (info->state != ConstValueInfo::CONSTANT || info->isRoot) {
       continue;
+    }
     if (!info->roots.empty()) {
       os << "\n[ConstExprAnalysis] constexpr ";
       info->constValue.print(os, asmState);
@@ -334,8 +347,9 @@ void ConstExprHoistingPolicy::initialize() {
   for (auto &it : analysis.allocedConstInfos) {
     auto *info = it.get();
     // Skip unanalyzed values.
-    if (info->state == ConstExprAnalysis::ConstValueInfo::UNANALYZED)
+    if (info->state == ConstExprAnalysis::ConstValueInfo::UNANALYZED) {
       continue;
+    }
     worklist.push_back(info);
   }
 
@@ -366,8 +380,9 @@ void ConstExprHoistingPolicy::initialize() {
     bool madeChange = false;
     for (auto *info : worklist) {
       Decision *decision = getDecision(info);
-      if (decision->getOutcome() != UNDECIDED)
+      if (decision->getOutcome() != UNDECIDED) {
         continue;
+      }
       makeDecision(info, decision);
 
       if (decision->getOutcome() != UNDECIDED) {
@@ -481,8 +496,9 @@ void ConstExprHoistingPolicy::makeDecision(
   if (!hasLegalEscape) {
     for (auto *consumerInfo : info->consumers) {
       Decision *consumerDecision = getDecision(consumerInfo);
-      if (consumerDecision->getOutcome() != DISABLE_HOIST)
+      if (consumerDecision->getOutcome() != DISABLE_HOIST) {
         continue;
+      }
 
       Operation *consumerOp = consumerInfo->getOperation();
       OpOperand *consumerOperand = findOperandFor(consumerOp, info->constValue);
@@ -544,13 +560,15 @@ struct DOTGraphTraits<const ConstExprHoistingPolicy *>
   getNodeAttributes(const ConstExprAnalysis::ConstValueInfo *Node,
                     const ConstExprHoistingPolicy *g) {
     // Roots are colored red.
-    if (Node->isRoot)
+    if (Node->isRoot) {
       return "fillcolor=red,style=filled";
+    }
 
     // Hoisted values are colored green.
     ConstExprHoistingPolicy::Outcome outcome = g->getOutcome(Node);
-    if (outcome == ConstExprHoistingPolicy::Outcome::ENABLE_HOIST)
+    if (outcome == ConstExprHoistingPolicy::Outcome::ENABLE_HOIST) {
       return "fillcolor=green,style=filled";
+    }
 
     return "";
   }

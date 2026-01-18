@@ -77,8 +77,9 @@ class DeduplicateRodataPass
     replacer.addReplacement(
         [&](SymbolRefAttr attr) -> std::pair<Attribute, WalkResult> {
           auto replacement = replacements.find(attr);
-          if (replacement != replacements.end())
+          if (replacement != replacements.end()) {
             return {replacement->getSecond(), WalkResult::skip()};
+          }
           return {attr, WalkResult::skip()};
         });
     moduleOp.walk([&](Operation *op) { replacer.replaceElementsIn(op); });

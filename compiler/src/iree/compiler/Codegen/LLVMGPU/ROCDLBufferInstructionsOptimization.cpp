@@ -82,13 +82,15 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
   for (Operation *user : maskOp.getResult().getUsers()) {
     auto readOp = dyn_cast<vector::TransferReadOp>(user);
     // Only TransferReadOps are supported.
-    if (!readOp)
+    if (!readOp) {
       continue;
+    }
 
     auto sourceType = dyn_cast<MemRefType>(readOp.getBase().getType());
     // only supported for fat raw buffers.
-    if (!sourceType || !hasAMDGPUFatRawBufferAddressSpace(sourceType))
+    if (!sourceType || !hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
       continue;
+    }
 
     SmallVector<bool> inBounds = readOp.getInBoundsValues();
     // Only supported for reads that are fully in_bounds.

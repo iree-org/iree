@@ -70,14 +70,16 @@ struct GenerateSplatParameterArchivePass
 
   void runOnOperation() override {
     // Nothing to do if no path specified.
-    if (filePath.empty())
+    if (filePath.empty()) {
       return;
+    }
 
     // Create a builder used to accumulate the parameters.
     ModuleOp moduleOp = getOperation();
     auto builder = createArchiveBuilder(moduleOp);
-    if (failed(builder))
+    if (failed(builder)) {
       return signalPassFailure();
+    }
 
     // Find all parameters in the module and add them to the builder.
     // NOTE: there may be no parameters but we still will create the archive
@@ -86,8 +88,9 @@ struct GenerateSplatParameterArchivePass
     for (auto [loc, parameterAttr] : parameterAttrs) {
       // Only support types we can meaningfully generate splats for.
       auto shapedType = dyn_cast<ShapedType>(parameterAttr.getType());
-      if (!shapedType)
+      if (!shapedType) {
         continue;
+      }
 
       // TODO: support other patterns/generators.
       auto elementAttr = getDefaultSplatAttr(shapedType.getElementType());
@@ -122,8 +125,9 @@ struct GenerateSplatParameterArchivePass
     // Create the parameter archive file.
     auto fileStreamIndexOr =
         createParameterIndex(moduleOp, std::move(builder.value()), filePath);
-    if (failed(fileStreamIndexOr))
+    if (failed(fileStreamIndexOr)) {
       return signalPassFailure();
+    }
     auto [file, stream, index] = *std::move(fileStreamIndexOr);
 
     // Commit the written file.

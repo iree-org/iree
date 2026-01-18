@@ -191,8 +191,9 @@ BindingLayoutAnalysis::BindingLayoutAnalysis(Operation *rootOp,
   // before we derive the layouts.
   auto getExportInfo = [&](Operation *exportOp) -> ExportInfo & {
     auto &exportInfo = exportInfos[exportOp];
-    if (!exportInfo)
+    if (!exportInfo) {
       exportInfo = std::make_unique<ExportInfo>();
+    }
     return *exportInfo;
   };
   rootOp->walk([&](Operation *op) {
@@ -238,8 +239,9 @@ bool BindingLayoutAnalysis::hasDispatches() const {
 ArrayRef<IREE::Stream::CmdDispatchOp>
 BindingLayoutAnalysis::getExportDispatches(Operation *exportOp) const {
   auto it = exportInfos.find(exportOp);
-  if (it == exportInfos.end())
+  if (it == exportInfos.end()) {
     return {}; // not analyzed
+  }
   return it->second.get()->dispatchOps;
 }
 

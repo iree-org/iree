@@ -149,15 +149,17 @@ struct DispatchTensorStoreOpInterface
 
     auto maybeBuffer =
         getBuffer(rewriter, storeOp->getOpOperand(0).get(), options, state);
-    if (failed(maybeBuffer))
+    if (failed(maybeBuffer)) {
       return failure();
+    }
     Value srcMemref = *maybeBuffer;
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
     if (failed(options.createMemCpy(rewriter, storeOp->getLoc(), srcMemref,
-                                    target)))
+                                    target))) {
       return failure();
+    }
 
     rewriter.eraseOp(storeOp);
     return success();
@@ -176,8 +178,9 @@ struct LoadFromBufferOpInterface
         getSourceSubspanMemref(
             cast<TypedValue<MemRefType>>(loadFromBufferOp.getBuffer()));
     // Conservatively return false if the subspan is not found.
-    if (!subspanOp)
+    if (!subspanOp) {
       return false;
+    }
     std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
         subspanOp->getDescriptorFlags();
     return !descriptorFlags.has_value() ||
@@ -219,15 +222,17 @@ struct StoreToBufferOpInterface
     auto storeOp = cast<IREE::Codegen::StoreToBufferOp>(op);
     FailureOr<Value> maybeBuffer =
         getBuffer(rewriter, storeOp.getTensor(), options, state);
-    if (failed(maybeBuffer))
+    if (failed(maybeBuffer)) {
       return failure();
+    }
     Value srcMemref = *maybeBuffer;
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
     if (failed(options.createMemCpy(rewriter, storeOp.getLoc(), srcMemref,
-                                    storeOp.getBuffer())))
+                                    storeOp.getBuffer()))) {
       return failure();
+    }
 
     rewriter.eraseOp(storeOp);
     return success();
@@ -285,13 +290,15 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   rewriter.setInsertionPoint(op);
 
   // Nothing to do. This op is already bufferized.
-  if (dspOp.hasPureBufferSemantics())
+  if (dspOp.hasPureBufferSemantics()) {
     return success();
+  }
 
   // Ensure op has only tensors. Allow mixed tensor-buffer mode on a per-need
   // basis.
-  if (!dspOp.hasPureTensorSemantics())
+  if (!dspOp.hasPureTensorSemantics()) {
     return op->emitError() << "op does not have tensor semantics";
+  }
 
   // New input operands for the cloned op.
   SmallVector<Value> newOperands, newOutputBuffers;
@@ -305,8 +312,9 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
     }
     if (!dspOp.isDpsInit(&opOperand)) {
       auto maybeBuffer = getBuffer(rewriter, opOperand.get(), options, state);
-      if (failed(maybeBuffer))
+      if (failed(maybeBuffer)) {
         return failure();
+      }
       // Input operands are never written to.
       newOperands.push_back(*maybeBuffer);
       continue;
@@ -319,8 +327,9 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
     FailureOr<Value> resultBuffer = getBuffer(
         rewriter, aliasingOpOperands.getAliases().front().opOperand->get(),
         options, state);
-    if (failed(resultBuffer))
+    if (failed(resultBuffer)) {
       return failure();
+    }
     newOperands.push_back(*resultBuffer);
     newOutputBuffers.push_back(*resultBuffer);
   }
@@ -385,8 +394,9 @@ getSourceAndDestFromPackUnPackOp(RewriterBase &rewriter, OpTy op,
   static_assert(llvm::is_one_of<OpTy, linalg::PackOp, linalg::UnPackOp>::value);
   Value source;
   auto maybeBuffer = getBuffer(rewriter, op.getSource(), options, state);
-  if (failed(maybeBuffer))
+  if (failed(maybeBuffer)) {
     return failure();
+  }
   source = *maybeBuffer;
 
   Value dest;
@@ -397,8 +407,9 @@ getSourceAndDestFromPackUnPackOp(RewriterBase &rewriter, OpTy op,
   FailureOr<Value> resultBuffer = getBuffer(
       rewriter, aliasingOpOperands.getAliases().front().opOperand->get(),
       options, state);
-  if (failed(resultBuffer))
+  if (failed(resultBuffer)) {
     return failure();
+  }
   dest = *resultBuffer;
   return std::make_pair(source, dest);
 }
@@ -412,8 +423,9 @@ static LogicalResult bufferizePackOp(RewriterBase &rewriter, linalg::PackOp op,
 
   auto maybeSrcAndDest =
       getSourceAndDestFromPackUnPackOp(rewriter, op, options, state);
-  if (failed(maybeSrcAndDest))
+  if (failed(maybeSrcAndDest)) {
     return failure();
+  }
   auto [source, dest] = *maybeSrcAndDest;
 
   // Set insertion point now that potential alloc/dealloc are introduced.
@@ -438,8 +450,9 @@ static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
 
   auto maybeSrcAndDest =
       getSourceAndDestFromPackUnPackOp(rewriter, op, options, state);
-  if (failed(maybeSrcAndDest))
+  if (failed(maybeSrcAndDest)) {
     return failure();
+  }
   auto [source, dest] = *maybeSrcAndDest;
 
   // Set insertion point now that potential alloc/dealloc are introduced.
@@ -482,8 +495,9 @@ struct PackUnPackOpInterface
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand))
+    if (dspOp.isDpsInit(&opOperand)) {
       return {dspOp.getTiedOpResult(&opOperand)};
+    }
     return {};
   }
 
@@ -493,10 +507,11 @@ struct PackUnPackOpInterface
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand))
+    if (dspOp.isDpsInit(&opOperand)) {
       return {AliasingValue(dspOp.getTiedOpResult(&opOperand),
                             BufferRelation::Equivalent,
                             /*isDefinite=*/false)};
+    }
     return {};
   }
 
@@ -531,8 +546,9 @@ struct DispatchTensorLoadOpSubsetInterface
     // DispatchTensorStoreOp result that bufferizes inplace.
     auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
     auto storeOp = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
-    if (!storeOp)
+    if (!storeOp) {
       return false;
+    }
     return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
   }
 
@@ -556,8 +572,9 @@ struct DispatchTensorStoreOpSubsetInterface
     // DispatchTensorLoadOp result that bufferizes inplace.
     auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
     auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
-    if (!loadOp)
+    if (!loadOp) {
       return false;
+    }
     return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
   }
 

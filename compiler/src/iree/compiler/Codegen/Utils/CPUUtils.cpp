@@ -32,8 +32,9 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       // Do not treat linalg ops that are all parallel as root operations in
       // this sweep.
-      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops())
+      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops()) {
         continue;
+      }
 
       // All other linalg ops are root ops.
       rootOperation = op;

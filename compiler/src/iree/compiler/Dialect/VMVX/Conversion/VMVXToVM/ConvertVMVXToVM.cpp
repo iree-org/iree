@@ -66,8 +66,9 @@ public:
       return failure();
     }
     auto results = emitCall(op, adaptor, importOp, rewriter);
-    if (!results.has_value())
+    if (!results.has_value()) {
       return failure();
+    }
     rewriter.replaceOp(op, results.value());
     return success();
   }

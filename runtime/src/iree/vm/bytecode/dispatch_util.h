@@ -8,9 +8,9 @@
 #define IREE_VM_BYTECODE_DISPATCH_UTIL_H_
 
 #include <assert.h>
-#include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/bytecode/utils/isa.h"
 
@@ -78,6 +78,14 @@ typedef struct iree_vm_bytecode_frame_storage_t {
   // will be stored by callees upon return.
   const iree_vm_register_list_t* return_registers;
 
+  // Result status code from function execution.
+  // Initialized to IREE_STATUS_UNKNOWN to indicate the frame has not yet
+  // completed. On successful return, set to IREE_STATUS_OK to signal that the
+  // compiler-guaranteed ref cleanup has run and the frame cleanup loop can be
+  // skipped. Frames that error or get unwound (due to callee errors) retain
+  // the non-OK value, causing cleanup to release any remaining refs.
+  iree_status_code_t result_code;
+
   // Counts of each register type and their relative byte offsets from the head
   // of this struct.
   uint32_t i32_register_count;
@@ -123,107 +131,6 @@ static inline iree_vm_type_def_t iree_vm_map_type(
 #define IREE_DISPATCH_MODE_SWITCH 1
 #endif  // IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
 
-//===----------------------------------------------------------------------===//
-// Utilities matching the tablegen op encoding scheme
-//===----------------------------------------------------------------------===//
-// These utilities match the VM_Enc* statements in VMBase.td 1:1, allowing us
-// to have the inverse of the encoding which make things easier to read.
-//
-// Each macro will increment the pc by the number of bytes read and as such must
-// be called in the same order the values are encoded.
-
-#define VM_DecConstI8(name) \
-  OP_I8(0);                 \
-  ++pc;
-#define VM_DecConstI16(name) \
-  OP_I16(0);                 \
-  pc += 2;
-#define VM_DecConstI32(name) \
-  OP_I32(0);                 \
-  pc += 4;
-#define VM_DecConstI64(name) \
-  OP_I64(0);                 \
-  pc += 8;
-#define VM_DecConstF32(name) \
-  OP_F32(0);                 \
-  pc += 4;
-#define VM_DecConstF64(name) \
-  OP_F64(0);                 \
-  pc += 8;
-#define VM_DecFuncAttr(name) VM_DecConstI32(name)
-#define VM_DecGlobalAttr(name) VM_DecConstI32(name)
-#define VM_DecRodataAttr(name) VM_DecConstI32(name)
-#define VM_DecType(name)               \
-  iree_vm_map_type(module, OP_I32(0)); \
-  pc += 4;
-#define VM_DecTypeOf(name) VM_DecType(name)
-#define VM_DecAttrI32(name) VM_DecConstI32(name)
-#define VM_DecAttrI64(name) VM_DecConstI64(name)
-#define VM_DecAttrF32(name) VM_DecConstF32(name)
-#define VM_DecAttrF64(name) VM_DecConstF64(name)
-#define VM_DecStrAttr(name, out_str)                     \
-  (out_str)->size = (iree_host_size_t)OP_I16(0);         \
-  (out_str)->data = (const char*)&bytecode_data[pc + 2]; \
-  pc += 2 + (out_str)->size;
-#define VM_DecBranchTarget(block_name) VM_DecConstI32(name)
-#define VM_DecBranchOperands(operands_name) \
-  VM_DecBranchOperandsImpl(bytecode_data, &pc)
-static inline const iree_vm_register_remap_list_t* VM_DecBranchOperandsImpl(
-    const uint8_t* IREE_RESTRICT bytecode_data, iree_vm_source_offset_t* pc) {
-  VM_AlignPC(*pc, IREE_REGISTER_ORDINAL_SIZE);
-  const iree_vm_register_remap_list_t* list =
-      (const iree_vm_register_remap_list_t*)&bytecode_data[*pc];
-  *pc = *pc + IREE_REGISTER_ORDINAL_SIZE +
-        list->size * 2 * IREE_REGISTER_ORDINAL_SIZE;
-  return list;
-}
-#define VM_DecOperandRegI32(name) \
-  regs_i32[OP_I16(0)];            \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecOperandRegI64(name)    \
-  *((int64_t*)&regs_i32[OP_I16(0)]); \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecOperandRegI64HostSize(name) \
-  (iree_host_size_t) VM_DecOperandRegI64(name)
-#define VM_DecOperandRegF32(name)  \
-  *((float*)&regs_i32[OP_I16(0)]); \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecOperandRegF64(name)   \
-  *((double*)&regs_i32[OP_I16(0)]); \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecOperandRegRef(name, out_is_move)                      \
-  &regs_ref[OP_I16(0) & IREE_REF_REGISTER_MASK];                    \
-  *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecVariadicOperands(name) \
-  VM_DecVariadicOperandsImpl(bytecode_data, &pc)
-static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
-    const uint8_t* IREE_RESTRICT bytecode_data, iree_vm_source_offset_t* pc) {
-  VM_AlignPC(*pc, IREE_REGISTER_ORDINAL_SIZE);
-  const iree_vm_register_list_t* list =
-      (const iree_vm_register_list_t*)&bytecode_data[*pc];
-  *pc = *pc + IREE_REGISTER_ORDINAL_SIZE +
-        list->size * IREE_REGISTER_ORDINAL_SIZE;
-  return list;
-}
-#define VM_DecResultRegI32(name) \
-  &regs_i32[OP_I16(0)];          \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecResultRegI64(name)    \
-  ((int64_t*)&regs_i32[OP_I16(0)]); \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecResultRegF32(name)  \
-  ((float*)&regs_i32[OP_I16(0)]); \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecResultRegF64(name)   \
-  ((double*)&regs_i32[OP_I16(0)]); \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecResultRegRef(name, out_is_move)                       \
-  &regs_ref[OP_I16(0) & IREE_REF_REGISTER_MASK];                    \
-  *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_DecVariadicResults(name) VM_DecVariadicOperands(name)
-
 #define IREE_VM_BLOCK_MARKER_SIZE 1
 
 //===----------------------------------------------------------------------===//
@@ -249,83 +156,90 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
 // Because the performance difference is significant we support both here but
 // prefer the computed goto path where available. Empirical data shows them to
 // still be a win in 2019 on x64 desktops and arm32/arm64 mobile devices.
-#define BEGIN_DISPATCH_CORE()                     \
+#define IREE_VM_ISA_DISPATCH_BEGIN_CORE()         \
   goto* kDispatchTable_CORE[bytecode_data[pc++]]; \
   while (1)
-#define END_DISPATCH_CORE()
+#define IREE_VM_ISA_DISPATCH_END_CORE()
 
-#define DECLARE_DISPATCH_CORE_OPC(ordinal, name) &&_dispatch_CORE_##name,
-#define DECLARE_DISPATCH_CORE_RSV(ordinal) &&_dispatch_unhandled,
-#define DEFINE_DISPATCH_TABLE_CORE()                                    \
-  static const void* kDispatchTable_CORE[256] = {IREE_VM_OP_CORE_TABLE( \
-      DECLARE_DISPATCH_CORE_OPC, DECLARE_DISPATCH_CORE_RSV)};
+#define IREE_VM_ISA_DISPATCH_DECLARE_CORE_OPC(ordinal, name) \
+  &&_dispatch_CORE_##name,
+#define IREE_VM_ISA_DISPATCH_DECLARE_CORE_RSV(ordinal) &&_dispatch_unhandled,
+#define IREE_VM_ISA_DISPATCH_DEFINE_TABLE_CORE()                   \
+  static const void* kDispatchTable_CORE[256] = {                  \
+      IREE_VM_OP_CORE_TABLE(IREE_VM_ISA_DISPATCH_DECLARE_CORE_OPC, \
+                            IREE_VM_ISA_DISPATCH_DECLARE_CORE_RSV)};
 
-#define DECLARE_DISPATCH_EXT_RSV(ordinal) &&_dispatch_unhandled,
+#define IREE_VM_ISA_DISPATCH_DECLARE_EXT_RSV(ordinal) &&_dispatch_unhandled,
 #if IREE_VM_EXT_F32_ENABLE
-#define DECLARE_DISPATCH_EXT_F32_OPC(ordinal, name) &&_dispatch_EXT_F32_##name,
-#define DEFINE_DISPATCH_TABLE_EXT_F32()                                       \
-  static const void* kDispatchTable_EXT_F32[256] = {IREE_VM_OP_EXT_F32_TABLE( \
-      DECLARE_DISPATCH_EXT_F32_OPC, DECLARE_DISPATCH_EXT_RSV)};
+#define IREE_VM_ISA_DISPATCH_DECLARE_EXT_F32_OPC(ordinal, name) \
+  &&_dispatch_EXT_F32_##name,
+#define IREE_VM_ISA_DISPATCH_DEFINE_TABLE_EXT_F32()                      \
+  static const void* kDispatchTable_EXT_F32[256] = {                     \
+      IREE_VM_OP_EXT_F32_TABLE(IREE_VM_ISA_DISPATCH_DECLARE_EXT_F32_OPC, \
+                               IREE_VM_ISA_DISPATCH_DECLARE_EXT_RSV)};
 #else
-#define DEFINE_DISPATCH_TABLE_EXT_F32()
+#define IREE_VM_ISA_DISPATCH_DEFINE_TABLE_EXT_F32()
 #endif  // IREE_VM_EXT_F32_ENABLE
 #if IREE_VM_EXT_F64_ENABLE
-#define DECLARE_DISPATCH_EXT_F64_OPC(ordinal, name) &&_dispatch_EXT_F64_##name,
-#define DEFINE_DISPATCH_TABLE_EXT_F64()                                       \
-  static const void* kDispatchTable_EXT_F64[256] = {IREE_VM_OP_EXT_F64_TABLE( \
-      DECLARE_DISPATCH_EXT_F64_OPC, DECLARE_DISPATCH_EXT_RSV)};
+#define IREE_VM_ISA_DISPATCH_DECLARE_EXT_F64_OPC(ordinal, name) \
+  &&_dispatch_EXT_F64_##name,
+#define IREE_VM_ISA_DISPATCH_DEFINE_TABLE_EXT_F64()                      \
+  static const void* kDispatchTable_EXT_F64[256] = {                     \
+      IREE_VM_OP_EXT_F64_TABLE(IREE_VM_ISA_DISPATCH_DECLARE_EXT_F64_OPC, \
+                               IREE_VM_ISA_DISPATCH_DECLARE_EXT_RSV)};
 #else
-#define DEFINE_DISPATCH_TABLE_EXT_F64()
+#define IREE_VM_ISA_DISPATCH_DEFINE_TABLE_EXT_F64()
 #endif  // IREE_VM_EXT_F64_ENABLE
 
-#define DEFINE_DISPATCH_TABLES()   \
-  DEFINE_DISPATCH_TABLE_CORE();    \
-  DEFINE_DISPATCH_TABLE_EXT_F32(); \
-  DEFINE_DISPATCH_TABLE_EXT_F64();
+#define IREE_VM_ISA_DISPATCH_DEFINE_TABLES()   \
+  IREE_VM_ISA_DISPATCH_DEFINE_TABLE_CORE();    \
+  IREE_VM_ISA_DISPATCH_DEFINE_TABLE_EXT_F32(); \
+  IREE_VM_ISA_DISPATCH_DEFINE_TABLE_EXT_F64();
 
-#define DISPATCH_UNHANDLED_CORE()                                           \
+#define IREE_VM_ISA_DISPATCH_UNHANDLED_CORE()                               \
   _dispatch_unhandled /*verifier should prevent this*/ : {                  \
     IREE_ASSERT(0);                                                         \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unhandled opcode"); \
   }
-#define UNHANDLED_DISPATCH_PREFIX(op_name, ext)                    \
+#define IREE_VM_ISA_DISPATCH_UNHANDLED_PREFIX(op_name, ext)        \
   _dispatch_CORE_##op_name : {                                     \
     IREE_ASSERT(0);                                                \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,             \
                             "unhandled dispatch extension " #ext); \
   }
 
-#define DISPATCH_OP(ext, op_name, body)                               \
-  _dispatch_##ext##_##op_name :;                                      \
-  IREE_DISPATCH_TRACE_INSTRUCTION(IREE_VM_PC_OFFSET_##ext, #op_name); \
-  body;                                                               \
+#define IREE_VM_ISA_DISPATCH_OP(ext, op_name, body)                       \
+  _dispatch_##ext##_##op_name :;                                          \
+  IREE_DISPATCH_TRACE_INSTRUCTION(IREE_VM_ISA_PC_OFFSET_##ext, #op_name); \
+  body;                                                                   \
   goto* kDispatchTable_CORE[bytecode_data[pc++]];
 
-#define BEGIN_DISPATCH_PREFIX(op_name, ext)                                   \
+#define IREE_VM_ISA_DISPATCH_BEGIN_PREFIX(op_name, ext)                       \
   _dispatch_CORE_##op_name : goto* kDispatchTable_##ext[bytecode_data[pc++]]; \
   while (1)
-#define END_DISPATCH_PREFIX() goto* kDispatchTable_CORE[bytecode_data[pc++]];
+#define IREE_VM_ISA_DISPATCH_END_PREFIX() \
+  goto* kDispatchTable_CORE[bytecode_data[pc++]];
 
 #else
 
 // Switch-based dispatch. This is strictly less efficient than the computed
 // goto approach above but is universally supported.
 
-#define BEGIN_DISPATCH_CORE() \
-  while (1) {                 \
+#define IREE_VM_ISA_DISPATCH_BEGIN_CORE() \
+  while (1) {                             \
     switch (bytecode_data[pc++])
-#define END_DISPATCH_CORE() }
+#define IREE_VM_ISA_DISPATCH_END_CORE() }
 
-#define DEFINE_DISPATCH_TABLES()
+#define IREE_VM_ISA_DISPATCH_DEFINE_TABLES()
 
-#define DISPATCH_UNHANDLED_CORE()                         \
+#define IREE_VM_ISA_DISPATCH_UNHANDLED_CORE()             \
   default: {                                              \
     IREE_ASSERT(0);                                       \
     IREE_BUILTIN_UNREACHABLE(); /* ok because verified */ \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,    \
                             "unhandled core opcode");     \
   }
-#define UNHANDLED_DISPATCH_PREFIX(op_name, ext)                    \
+#define IREE_VM_ISA_DISPATCH_UNHANDLED_PREFIX(op_name, ext)        \
   case IREE_VM_OP_CORE_##op_name: {                                \
     IREE_ASSERT(0);                                                \
     IREE_BUILTIN_UNREACHABLE(); /* ok because verified */          \
@@ -333,117 +247,117 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
                             "unhandled dispatch extension " #ext); \
   }
 
-#define DISPATCH_OP(ext, op_name, body)                                 \
-  case IREE_VM_OP_##ext##_##op_name: {                                  \
-    IREE_DISPATCH_TRACE_INSTRUCTION(IREE_VM_PC_OFFSET_##ext, #op_name); \
-    body;                                                               \
+#define IREE_VM_ISA_DISPATCH_OP(ext, op_name, body)                         \
+  case IREE_VM_OP_##ext##_##op_name: {                                      \
+    IREE_DISPATCH_TRACE_INSTRUCTION(IREE_VM_ISA_PC_OFFSET_##ext, #op_name); \
+    body;                                                                   \
   } break;
 
-#define BEGIN_DISPATCH_PREFIX(op_name, ext) \
-  case IREE_VM_OP_CORE_##op_name: {         \
+#define IREE_VM_ISA_DISPATCH_BEGIN_PREFIX(op_name, ext) \
+  case IREE_VM_OP_CORE_##op_name: {                     \
     switch (bytecode_data[pc++])
-#define END_DISPATCH_PREFIX() \
-  break;                      \
+#define IREE_VM_ISA_DISPATCH_END_PREFIX() \
+  break;                                  \
   }
 
 #endif  // IREE_DISPATCH_MODE_COMPUTED_GOTO
 
 // Common dispatch op macros
 
-#define DISPATCH_OP_CORE_UNARY_I32(op_name, op_func)  \
-  DISPATCH_OP(CORE, op_name, {                        \
-    int32_t operand = VM_DecOperandRegI32("operand"); \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = op_func(operand);                       \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);            \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);              \
+    *result = op_func(operand);                                  \
   });
 
-#define DISPATCH_OP_CORE_UNARY_I64(op_name, op_func)  \
-  DISPATCH_OP(CORE, op_name, {                        \
-    int64_t operand = VM_DecOperandRegI64("operand"); \
-    int64_t* result = VM_DecResultRegI64("result");   \
-    *result = op_func(operand);                       \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);            \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);              \
+    *result = op_func(operand);                                  \
   });
 
-#define DISPATCH_OP_CORE_BINARY_I32(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                        \
-    int32_t lhs = VM_DecOperandRegI32("lhs");         \
-    int32_t rhs = VM_DecOperandRegI32("rhs");         \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = op_func(lhs, rhs);                      \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                        \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(lhs);                 \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(rhs);                 \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);               \
+    *result = op_func(lhs, rhs);                                  \
   });
 
-#define DISPATCH_OP_CORE_BINARY_I64(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                        \
-    int64_t lhs = VM_DecOperandRegI64("lhs");         \
-    int64_t rhs = VM_DecOperandRegI64("rhs");         \
-    int64_t* result = VM_DecResultRegI64("result");   \
-    *result = op_func(lhs, rhs);                      \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                        \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(lhs);                 \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(rhs);                 \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);               \
+    *result = op_func(lhs, rhs);                                  \
   });
 
-#define DISPATCH_OP_CORE_TERNARY_I32(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                         \
-    int32_t a = VM_DecOperandRegI32("a");              \
-    int32_t b = VM_DecOperandRegI32("b");              \
-    int32_t c = VM_DecOperandRegI32("c");              \
-    int32_t* result = VM_DecResultRegI32("result");    \
-    *result = op_func(a, b, c);                        \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_TERNARY_I32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                         \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(a);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(b);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(c);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);                \
+    *result = op_func(a, b, c);                                    \
   });
 
-#define DISPATCH_OP_CORE_TERNARY_I64(op_name, op_func) \
-  DISPATCH_OP(CORE, op_name, {                         \
-    int64_t a = VM_DecOperandRegI64("a");              \
-    int64_t b = VM_DecOperandRegI64("b");              \
-    int64_t c = VM_DecOperandRegI64("c");              \
-    int64_t* result = VM_DecResultRegI64("result");    \
-    *result = op_func(a, b, c);                        \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_TERNARY_I64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                         \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(a);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(b);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(c);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);                \
+    *result = op_func(a, b, c);                                    \
   });
 
-#define DISPATCH_OP_EXT_F32_UNARY_F32(op_name, op_func) \
-  DISPATCH_OP(EXT_F32, op_name, {                       \
-    float operand = VM_DecOperandRegF32("operand");     \
-    float* result = VM_DecResultRegF32("result");       \
-    *result = op_func(operand);                         \
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F32, op_name, {                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(operand);               \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);                 \
+    *result = op_func(operand);                                     \
   });
 
-#define DISPATCH_OP_EXT_F32_BINARY_F32(op_name, op_func) \
-  DISPATCH_OP(EXT_F32, op_name, {                        \
-    float lhs = VM_DecOperandRegF32("lhs");              \
-    float rhs = VM_DecOperandRegF32("rhs");              \
-    float* result = VM_DecResultRegF32("result");        \
-    *result = op_func(lhs, rhs);                         \
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F32, op_name, {                        \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(lhs);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(rhs);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);                  \
+    *result = op_func(lhs, rhs);                                     \
   });
 
-#define DISPATCH_OP_EXT_F32_TERNARY_F32(op_name, op_func) \
-  DISPATCH_OP(EXT_F32, op_name, {                         \
-    float a = VM_DecOperandRegF32("a");                   \
-    float b = VM_DecOperandRegF32("b");                   \
-    float c = VM_DecOperandRegF32("c");                   \
-    float* result = VM_DecResultRegF32("result");         \
-    *result = op_func(a, b, c);                           \
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F32_TERNARY_F32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F32, op_name, {                         \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(a);                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(b);                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(c);                       \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);                   \
+    *result = op_func(a, b, c);                                       \
   });
 
-#define DISPATCH_OP_EXT_F64_UNARY_F64(op_name, op_func) \
-  DISPATCH_OP(EXT_F64, op_name, {                       \
-    double operand = VM_DecOperandRegF64("operand");    \
-    double* result = VM_DecResultRegF64("result");      \
-    *result = op_func(operand);                         \
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F64, op_name, {                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(operand);               \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);                 \
+    *result = op_func(operand);                                     \
   });
 
-#define DISPATCH_OP_EXT_F64_BINARY_F64(op_name, op_func) \
-  DISPATCH_OP(EXT_F64, op_name, {                        \
-    double lhs = VM_DecOperandRegF64("lhs");             \
-    double rhs = VM_DecOperandRegF64("rhs");             \
-    double* result = VM_DecResultRegF64("result");       \
-    *result = op_func(lhs, rhs);                         \
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F64, op_name, {                        \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(lhs);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(rhs);                    \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);                  \
+    *result = op_func(lhs, rhs);                                     \
   });
 
-#define DISPATCH_OP_EXT_F64_TERNARY_F64(op_name, op_func) \
-  DISPATCH_OP(EXT_F64, op_name, {                         \
-    double a = VM_DecOperandRegF64("a");                  \
-    double b = VM_DecOperandRegF64("b");                  \
-    double c = VM_DecOperandRegF64("c");                  \
-    double* result = VM_DecResultRegF64("result");        \
-    *result = op_func(a, b, c);                           \
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F64_TERNARY_F64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F64, op_name, {                         \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(a);                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(b);                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(c);                       \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);                   \
+    *result = op_func(a, b, c);                                       \
   });
 
 #endif  // IREE_VM_BYTECODE_DISPATCH_UTIL_H_

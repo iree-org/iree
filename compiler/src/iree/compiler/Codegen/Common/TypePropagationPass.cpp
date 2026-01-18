@@ -62,8 +62,9 @@ namespace mlir::iree_compiler {
 static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
                                 Value source) {
   Type sourceType = source.getType();
-  if (sourceType == targetType)
+  if (sourceType == targetType) {
     return source;
+  }
   if (isa<IntegerType>(sourceType) && isa<IntegerType>(targetType)) {
     unsigned sourceBitWidth = sourceType.getIntOrFloatBitWidth();
     unsigned destBitWidth = targetType.getIntOrFloatBitWidth();
@@ -82,8 +83,9 @@ static std::optional<Type> getLegalizedType(Type t) {
   if (auto shapedType = dyn_cast<RankedTensorType>(t)) {
     std::optional<Type> legalizedElementType =
         legalizeStorageElementType(shapedType);
-    if (!legalizedElementType)
+    if (!legalizedElementType) {
       return std::nullopt;
+    }
     return RankedTensorType::get(shapedType.getShape(),
                                  legalizedElementType.value(),
                                  shapedType.getEncoding());
@@ -117,8 +119,9 @@ struct TypePropagationTypeConverter : public TypeConverter {
   TypePropagationTypeConverter() {
     addConversion([](Type t) {
       auto convertedType = getLegalizedType(t);
-      if (!convertedType)
+      if (!convertedType) {
         return t;
+      }
       return convertedType.value();
     });
   }

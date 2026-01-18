@@ -34,6 +34,12 @@
 
 #define DEBUG_TYPE "iree-gpu-config-utils"
 
+llvm::cl::opt<bool> clGPUTestCpromotion(
+    "iree-codegen-test-c-promtion",
+    llvm::cl::desc("C promote in specific case of elemetwise operations that "
+                   "codegen cant yet support without it if also doing padding"),
+    llvm::cl::init(true));
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
@@ -328,8 +334,11 @@ getContractionHeuristicSeeds(GPUMatmulShapeType problem, bool isGemm,
 
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
+/// When `doCPromotion` is true, the accumulator uses shared memory. This can be
+/// due to padding requirements or because the operation has an existing
+/// accumulator that needs to be loaded from global memory (matmul_accumulate).
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
-    IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
+    IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
     bool transposedLhs, bool transposedRhs, bool isGemm,
     bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false,
     int64_t splitReductionTripCnt = 0) {
@@ -339,10 +348,12 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     for (IREE::GPU::ScaledMMAAttr smma : target.getWgp().getScaledMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
-      if (!smma.getDistributionMappingKind())
+      if (!smma.getDistributionMappingKind()) {
         continue;
-      if (smma.getSubgroupSize() != targetSubgroupSize)
+      }
+      if (smma.getSubgroupSize() != targetSubgroupSize) {
         continue;
+      }
 
       auto [m, n, k, kB] = smma.getScaledMNKShape();
       SmallVector<Type> elementTypes;
@@ -356,10 +367,12 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
-      if (!mma.getDistributionMappingKind())
+      if (!mma.getDistributionMappingKind()) {
         continue;
-      if (mma.getSubgroupSize() != targetSubgroupSize)
+      }
+      if (mma.getSubgroupSize() != targetSubgroupSize) {
         continue;
+      }
 
       auto [mSize, nSize, kSize] = mma.getMNKShape();
       auto [aType, bType, cType] = mma.getABCElementTypes();
@@ -370,8 +383,9 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     return std::nullopt;
   }
 
-  assert(problem.aType == problem.bType &&
-         "expected the same aType and bType.");
+  if (problem.aType != problem.bType) {
+    return std::nullopt;
+  }
   GemmCutoff gemmCutoffs =
       computeGemmCutoffsForAI(target, problem.aType, scaled);
 
@@ -423,7 +437,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-      wgpCount, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
+      wgpCount, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
       /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt);
   return schedule;
 }
@@ -574,6 +588,34 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
+/// Helper to check if a linalg operation has elementwise users that have
+/// additional operands beyond the result of the linalg operation.
+/// This function a workaround until we have map_gather op that
+/// can allow us to codegen without c promotion for such elementwise ops
+/// we will track progress of this in
+/// https://github.com/iree-org/iree/issues/23038
+static bool checkForElementwiseUsersWithNewOperands(linalg::LinalgOp linalgOp) {
+  // Iterate through all users of the linalg operation's results
+  for (OpResult result : linalgOp->getResults()) {
+    for (Operation *user : result.getUsers()) {
+      // All elementwise operations are expected to be linalg at this stage.
+      auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
+      if (!linalgUser) {
+        continue;
+      }
+      // Check if the linalg user has operands other than the result from
+      // linalgOp.
+      for (Value operand : linalgUser.getDpsInputs()) {
+        // If the operand is not from this linalg operation, return true.
+        if (operand.getDefiningOp() != linalgOp.getOperation()) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -581,11 +623,16 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
 /// determine the convolution dimensions for padding when creating
 /// `padding_conv` config. `padding_conv` attribute is only used when padding
 /// convolutions before converting them to IGEMM.
+/// `hasExistingAccumulator` indicates whether the accumulator is read from
+/// global memory (matmul_accumulate) vs zero-initialized in registers. When
+/// true, the accumulator needs shared memory, similar to when padding requires
+/// C promotion.
 static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
     bool isGemm, bool scaled, int64_t splitReductionTripCnt,
+    bool CPromoteIfPadding, bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -731,24 +778,24 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   assert((operands.size() == 3 || scaled) && "expected 3 operands");
   assert((operands.size() == 5 || !scaled) && "expected 5 operands");
 
-  Value lhs = operands[0];
-  Value rhs = operands[1];
-
-  Value init = operands[2];
+  Type lhsElemType = getElementTypeOrSelf(operands[0]);
+  Type rhsElemType = getElementTypeOrSelf(operands[1]);
+  Type initElemType = getElementTypeOrSelf(operands[2]);
+  Type lhsScaleType;
+  Type rhsScaleType;
   if (scaled) {
-    init = operands[4];
     assert(llvm::all_of(operands,
                         [](Value a) { return isa<ShapedType>(a.getType()); }) &&
            "All operands must be a shaped type");
-    assert(*getRank(lhs) > *getRank(operands[2]) &&
-           *getRank(rhs) > *getRank(operands[3]) &&
+    assert(*getRank(operands[0]) > *getRank(operands[2]) &&
+           *getRank(operands[1]) > *getRank(operands[3]) &&
            "Expected operand #0 (lhs) and operand #1 (rhs) to have a greater "
            "rank than their corresponding scales, operand #2 (lhs_scale) and "
            "operand #3 (rhs_scale)");
+    lhsScaleType = getElementTypeOrSelf(operands[2]);
+    rhsScaleType = getElementTypeOrSelf(operands[3]);
+    initElemType = getElementTypeOrSelf(operands[4]);
   }
-  Type lhsElemType = getElementTypeOrSelf(lhs);
-  Type rhsElemType = getElementTypeOrSelf(rhs);
-  Type initElemType = getElementTypeOrSelf(init);
   // Intentionally padded GEMM proved to be beneficial for performance for
   // the following layouts: 1) [M, K] x [K, N] 2) [M, K] x [N, K]
   // Therefore we disallow padding only when LHS is transposed.
@@ -758,24 +805,31 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              getDimBoundsNoPad(batchDims),
                              lhsElemType,
                              rhsElemType,
-                             initElemType};
+                             initElemType,
+                             lhsScaleType,
+                             rhsScaleType};
+
+  // Accumulator needs shared memory if:
+  // - Padding requires C promotion, OR
+  // - The operation has an existing accumulator (matmul_accumulate)
+  bool doCPromotion =
+      (couldNeedPadding && CPromoteIfPadding) || hasExistingAccumulator;
 
   bool mustBeAligned = true;
+  Location loc = operands[0].getLoc();
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, transposedLhs, transposedRhs, isGemm,
-      /*mustBeAligned=*/true,
-      /*doCPromotion=*/false, scaled, splitReductionTripCnt);
+      target, problem, loc, transposedLhs, transposedRhs, isGemm,
+      /*mustBeAligned=*/true, doCPromotion, scaled, splitReductionTripCnt);
 
-  // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
-  // the GEMM is accumulating (i.e., doesn't have a zero fill dpsInit) as that
-  // buffer currently gets materialized as private memory. We need to add
-  // missing patterns to fix that.
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
     mustBeAligned = false;
+    // For unaligned schedules, C promotion is needed for padding OR existing
+    // accumulator.
+    bool doCPromotionUnaligned = CPromoteIfPadding || hasExistingAccumulator;
     schedule = getMmaScheduleFromProblemAndTarget(
-        target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
-        /*doCPromotion=*/false, scaled, splitReductionTripCnt);
+        target, problem, loc, transposedLhs, transposedRhs, isGemm,
+        mustBeAligned, doCPromotionUnaligned, scaled, splitReductionTripCnt);
   }
 
   if (!schedule) {
@@ -843,7 +897,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
-  MLIRContext *context = lhs.getContext();
+  MLIRContext *context = target.getContext();
   Builder b(context);
   SmallVector<NamedAttribute> attrs = {
       {"workgroup", b.getI64ArrayAttr(workgroupTileSizes)},
@@ -862,6 +916,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // load DMA here when possible.
     promotionArray = {};
     promotionList.append({2, 3});
+  }
+  if ((!mustBeAligned || couldNeedPadding) && CPromoteIfPadding) {
+    // If needed then add C operand which would be operand 2 or 4 for unscaled
+    // and scaled GEMM respectively.
+    promotionList.push_back(promotionList.size());
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
                                            ? ArrayRef<Attribute>(promotionArray)
@@ -971,11 +1030,20 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   SmallVector<int64_t> igemmLoopBounds =
       igemmGenericConvDetails->igemmLoopBounds;
   SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
+  bool CPromoteIfPadding = false;
+  if (clGPUTestCpromotion) {
+    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp);
+  }
+  // Detect if the convolution is accumulating (reads existing accumulator).
+  bool hasExistingAccumulator = isValidInPlaceAccumulatingOp(
+      cast<DestinationStyleOpInterface>(linalgOp.getOperation()));
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
           useDirectLoad, /*isGemm=*/false,
-          /*scaled=*/false, splitReductionTripCnt, convToIgemmInfo);
+          /*scaled=*/false, splitReductionTripCnt,
+          /*CPromoteIfPadding=*/CPromoteIfPadding, hasExistingAccumulator,
+          convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -1018,11 +1086,21 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
 
   LDBG() << "Matmul TileAndFuse Config";
+  bool CPromoteIfPadding = false;
+  if (clGPUTestCpromotion) {
+    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp);
+  }
+
+  // Detect if the matmul is accumulating (reads existing accumulator from
+  // global memory). This affects shared memory usage for scaled MMA operations.
+  bool hasExistingAccumulator = isValidInPlaceAccumulatingOp(
+      cast<DestinationStyleOpInterface>(linalgOp.getOperation()));
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-          /*scaled=*/false, splitReductionTripCnt);
+          /*scaled=*/false, splitReductionTripCnt, CPromoteIfPadding,
+          hasExistingAccumulator);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -1032,7 +1110,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     useDirectLoad = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-        /*scaled=*/true, splitReductionTripCnt);
+        /*scaled=*/true, splitReductionTripCnt, CPromoteIfPadding,
+        hasExistingAccumulator);
   }
 
   if (failed(configAndWgSize)) {
@@ -1479,8 +1558,9 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
     int64_t lossFactor = 32;
 
     for (; lossFactor >= 1; lossFactor >>= 1) {
-      if (distributeToThreads(numThreads, lossFactor) == 1)
+      if (distributeToThreads(numThreads, lossFactor) == 1) {
         break;
+      }
     }
   }
 
@@ -1658,8 +1738,9 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  if (target.getWgp().getMma().empty())
+  if (target.getWgp().getMma().empty()) {
     return failure();
+  }
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
@@ -1671,19 +1752,16 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // This strategy turns non-strided convolution problems into matmul problems
-  // by tiling certain dimensions to 1:
-  //  - Filter dimensions (reduction on the filter, and convolved on the image).
-  //  - All parallel dimensions except the innermost output channel dimension
-  //    and output image/batch dimension.
-  //
-  // After this, the remaining non-unit dimensions are:
-  //  - One output image or batch dimension corresponding to the M dimension of
-  //    a matmul.
-  //  - One output channel dimension, corresponding to the N dimension.
-  //  - One input channel dimension, corresponding to the K dimension.
+  // This strategy configures direct convolution by treating it as a matmul-like
+  // operation. The approach:
+  //  - Maps batch and output image dimensions to M dimensions.
+  //  - Maps output channel dimensions to N dimensions.
+  //  - Maps input channel and filter loop dimensions to K dimensions.
+  //  - Maps depth (if any) dimensions to batch(-matmul) dimensions.
+  //  - Tiles all but the innermost M, N dimensions to size 1.
+  //  - Tiles all filter loop and non-innermost input channel dimensions to 1.
+  //  - Deduces an MMA schedule based on static dimensions only.
 
-  // TODO: Relax this condition to strictly alignment requirements.
   if (convolutionDims->outputChannel.size() < 1 ||
       convolutionDims->inputChannel.size() < 1 ||
       convolutionDims->filterLoop.size() < 1 ||
@@ -1708,36 +1786,95 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
-  SmallVector<unsigned> batchAndImageDims;
-  batchAndImageDims.append(convolutionDims->batch.begin(),
-                           convolutionDims->batch.end());
-  batchAndImageDims.append(convolutionDims->outputImage.begin(),
-                           convolutionDims->outputImage.end());
-  llvm::sort(batchAndImageDims);
+  SmallVector<int64_t> mDims, nDims, kDims, batchDims;
+  mDims.append(convolutionDims->batch.begin(), convolutionDims->batch.end());
+  mDims.append(convolutionDims->outputImage.begin(),
+               convolutionDims->outputImage.end());
+  llvm::sort(mDims);
+  nDims.append(convolutionDims->outputChannel.begin(),
+               convolutionDims->outputChannel.end());
+  kDims.append(convolutionDims->filterLoop.begin(),
+               convolutionDims->filterLoop.end());
+  kDims.append(convolutionDims->inputChannel.begin(),
+               convolutionDims->inputChannel.end());
+  batchDims.append(convolutionDims->depth.begin(),
+                   convolutionDims->depth.end());
 
-  // TODO: Support tiling and finding mma schedule on multiple M/N/K dimensions.
-  int64_t mDim = batchAndImageDims.back();
-  int64_t nDim = convolutionDims->outputChannel.back();
-  int64_t kDim = convolutionDims->inputChannel.back();
-  GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
-                             lhsElemType,  rhsElemType,  initElemType};
+  // TODO(Max191): add dynamic shape support for inner most dims.
+  if (ShapedType::isDynamic(bounds[mDims.back()]) ||
+      ShapedType::isDynamic(bounds[nDims.back()]) ||
+      ShapedType::isDynamic(bounds[kDims.back()])) {
+    return failure();
+  }
 
+  // We can support unaligned shapes as long as there are no dynamic dimensions
+  // as finding padding bounds for dynamic dimensions is not guaranteed.
+  bool canSupportUnaligned = true;
+
+  // Gather all static M, N, and K dimensions to deduce the MMASchedule. Dynamic
+  // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
+  // computing an MMA schedule.
+  SmallVector<int64_t> staticMDims, staticNDims, staticKDims, staticBatchDims;
+  for (int64_t mDim : mDims) {
+    if (ShapedType::isDynamic(bounds[mDim])) {
+      canSupportUnaligned = false;
+      continue;
+    }
+    staticMDims.push_back(mDim);
+  }
+  for (int64_t nDim : nDims) {
+    if (ShapedType::isDynamic(bounds[nDim])) {
+      canSupportUnaligned = false;
+      continue;
+    }
+    staticNDims.push_back(nDim);
+  }
+  // Since all the filter loop dimensions have to be tiled to 1, only use input
+  // channel dimensions to deduce the MMASchedule to avoid problem.
+  for (int64_t kDim : convolutionDims->inputChannel) {
+    if (ShapedType::isDynamic(bounds[kDim])) {
+      canSupportUnaligned = false;
+      continue;
+    }
+    staticKDims.push_back(kDim);
+  }
+  for (int64_t batchDim : batchDims) {
+    if (ShapedType::isDynamic(bounds[batchDim])) {
+      canSupportUnaligned = false;
+      continue;
+    }
+    staticBatchDims.push_back(batchDim);
+  }
+
+  auto getDimBounds = [&](ArrayRef<int64_t> dims) -> SmallVector<int64_t> {
+    return llvm::map_to_vector(dims, [&](int64_t dim) { return bounds[dim]; });
+  };
+
+  GPUMatmulShapeType problem{getDimBounds(staticMDims),
+                             getDimBounds(staticNDims),
+                             getDimBounds(staticKDims),
+                             getDimBounds(staticBatchDims),
+                             lhsElemType,
+                             rhsElemType,
+                             initElemType};
+
+  // Infer if lhs or rhs is transposed to help generate better schedule.
   AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
   AffineMap filterMap = linalgOp.getIndexingMapsArray()[1];
   int64_t mPos, nPos, lhsKPos, rhsKPos;
   for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
-    if (e.isFunctionOfDim(mDim)) {
+    if (e.isFunctionOfDim(staticMDims.back())) {
       mPos = idx;
     }
-    if (e.isFunctionOfDim(kDim)) {
+    if (e.isFunctionOfDim(staticKDims.back())) {
       lhsKPos = idx;
     }
   }
   for (auto [idx, e] : llvm::enumerate(filterMap.getResults())) {
-    if (e.isFunctionOfDim(nDim)) {
+    if (e.isFunctionOfDim(staticNDims.back())) {
       nPos = idx;
     }
-    if (e.isFunctionOfDim(kDim)) {
+    if (e.isFunctionOfDim(staticKDims.back())) {
       rhsKPos = idx;
     }
   }
@@ -1745,17 +1882,17 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   bool transposedRhs = rhsKPos > nPos;
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, transposedLhs, transposedRhs, /*isGemm=*/false,
-      mustBeAligned, /*doCPromotion=*/false, /*scaled=*/false,
-      splitReductionTripCnt);
+      target, problem, linalgOp.getLoc(), transposedLhs, transposedRhs,
+      /*isGemm=*/false, mustBeAligned, /*doCPromotion=*/false,
+      /*scaled=*/false, splitReductionTripCnt);
 
-  if (!schedule) {
+  if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
     mustBeAligned = false;
     schedule = getMmaScheduleFromProblemAndTarget(
-        target, problem, transposedLhs, transposedRhs, /*isGemm=*/false,
-        mustBeAligned, /*doCPromotion=*/false, /*scaled=*/false,
-        splitReductionTripCnt);
+        target, problem, linalgOp.getLoc(), transposedLhs, transposedRhs,
+        /*isGemm=*/false, mustBeAligned, /*doCPromotion=*/false,
+        /*scaled=*/false, splitReductionTripCnt);
   }
   if (!schedule) {
     LDBG() << "Failed to deduce TileAndFuse MMA schedule";
@@ -1771,36 +1908,47 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> workgroupTileSizes(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> subgroupTileSizes(linalgOp.getNumLoops(), 0);
-  // Tile all depth dimensions to 1.
-  for (int64_t depth : convolutionDims->depth) {
-    workgroupTileSizes[depth] = 1;
-  }
-  // Tile all filter loop dimensions to 1.
-  for (int64_t f : convolutionDims->filterLoop) {
-    reductionTileSizes[f] = 1;
+  // Tile all batch dimensions with unit size.
+  for (int64_t batch : batchDims) {
+    workgroupTileSizes[batch] = 1;
   }
   // Tile all m, n, k dimensions to 1 except the innermost.
-  for (int64_t oi : llvm::drop_end(batchAndImageDims)) {
-    workgroupTileSizes[oi] = 1;
+  for (int64_t m : llvm::drop_end(mDims)) {
+    workgroupTileSizes[m] = 1;
   }
-  for (int64_t oc : llvm::drop_end(convolutionDims->outputChannel)) {
-    workgroupTileSizes[oc] = 1;
+  for (int64_t n : llvm::drop_end(nDims)) {
+    workgroupTileSizes[n] = 1;
   }
-  for (int64_t ic : llvm::drop_end(convolutionDims->inputChannel)) {
-    reductionTileSizes[ic] = 1;
+  for (int64_t k : llvm::drop_end(kDims)) {
+    reductionTileSizes[k] = 1;
   }
 
-  // Compute the M/N dimension tile size by multiply subgroup information.
-  assert(schedule->hasSingleDimensions() && "expected single M/N/K dimension");
-  workgroupTileSizes[mDim] = schedule->mSubgroupCounts[0] *
-                             schedule->mTileSizes[0] * schedule->mSizes[0];
-  subgroupTileSizes[mDim] = schedule->mTileSizes[0];
-  workgroupTileSizes[nDim] = schedule->nSubgroupCounts[0] *
-                             schedule->nTileSizes[0] * schedule->nSizes[0];
-  subgroupTileSizes[nDim] = schedule->nTileSizes[0];
+  // Compute the M/N dimension tile sizes by multiplying subgroup information.
+  for (auto [i, mDim] : llvm::enumerate(staticMDims)) {
+    workgroupTileSizes[mDim] =
+        schedule->mSubgroupCounts[i] * schedule->mTileSizes[i];
+    // Multiply by the intrinsic shape for the inner most dim as we distribute
+    // to workgroups before packing to intrinsic.
+    if (i == staticMDims.size() - 1) {
+      workgroupTileSizes[mDim] *= schedule->getTotalMSize();
+    }
+    subgroupTileSizes[mDim] = schedule->mTileSizes[i];
+  }
+  for (auto [i, nDim] : llvm::enumerate(staticNDims)) {
+    workgroupTileSizes[nDim] =
+        schedule->nSubgroupCounts[i] * schedule->nTileSizes[i];
+    // Multiply by the intrinsic shape for the inner most dim as we distribute
+    // to workgroups before packing to intrinsic.
+    if (i == staticNDims.size() - 1) {
+      workgroupTileSizes[nDim] *= schedule->getTotalNSize();
+    }
+    subgroupTileSizes[nDim] = schedule->nTileSizes[i];
+  }
 
-  // The reduction tile size is just the post-packing tile count.
-  reductionTileSizes[kDim] = schedule->kTileSizes[0];
+  // Similarly the reduction tile size is just the post-packing tile count.
+  for (auto [i, kDim] : llvm::enumerate(staticKDims)) {
+    reductionTileSizes[kDim] = schedule->kTileSizes[i];
+  }
 
   MLIRContext *context = linalgOp.getContext();
   Builder b(context);
@@ -1809,11 +1957,20 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
       {"reduction", b.getI64ArrayAttr(reductionTileSizes)},
       {"subgroup", b.getI64ArrayAttr(subgroupTileSizes)}};
   IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
-  IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
+  IREE::Codegen::InnerTileDescAttrInterface kind = schedule->mmaKind;
+  IREE::GPU::setMmaKind(context, attrs, kind);
 
   if (!mustBeAligned) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
-    paddingTileSizes[kDim] = reductionTileSizes[kDim] * schedule->kSizes[0];
+    // Initialize inner and outer padding sizes from reductionTileSizes.
+    for (int64_t kDim : staticKDims) {
+      paddingTileSizes[kDim] = reductionTileSizes[kDim];
+    }
+
+    auto mmaKind = cast<IREE::GPU::MmaInterfaceAttr>(kind);
+    int64_t kPackFactor = std::get<2>(mmaKind.getMNKShape());
+    int64_t innerKDim = staticKDims.back();
+    paddingTileSizes[innerKDim] *= kPackFactor;
     attrs.emplace_back("padding_conv", b.getI64ArrayAttr(paddingTileSizes));
   }
 

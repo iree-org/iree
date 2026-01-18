@@ -220,6 +220,23 @@ def IREEEncoding_SerializableAttr :
         assert(false && "unimplemented interface method");
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the new encoding after collapsing the type from `origShape`
+        to `targetShape`. If the type with this encoding cannot be collapsed,
+        returns `nullptr`.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getCollapsedEncoding",
+      /*args=*/(ins
+        "::llvm::ArrayRef<int64_t>":$origShape,
+        "::llvm::ArrayRef<int64_t>":$targetShape
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return nullptr;
+      }]
     >
   ];
 

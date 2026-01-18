@@ -291,8 +291,9 @@ populateReassocAndMaps(tensor::ExtractSliceOp sliceOp,
 
     auto isZeroOffsetAndFullSize =
         [&](OpFoldResult offset, OpFoldResult sliceSize, int64_t inputDim) {
-          if (!isZeroInteger(offset))
+          if (!isZeroInteger(offset)) {
             return false;
+          }
           ValueBoundsConstraintSet::Variable inputSize(sliceOp.getSource(),
                                                        inputDim);
           FailureOr<bool> maybeEqual =

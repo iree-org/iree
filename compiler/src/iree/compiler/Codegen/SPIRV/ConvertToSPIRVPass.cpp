@@ -101,8 +101,9 @@ createResourceVariable(Location loc, const SubspanResourceInfo &resource,
         llvm::formatv("__resource_var_{}_{}_", resource.set, resource.binding);
     variable = spirv::GlobalVariableOp::create(
         builder, loc, globalVariableType, name, resource.set, resource.binding);
-    if (resource.aliased)
+    if (resource.aliased) {
       variable->setAttr("aliased", builder.getUnitAttr());
+    }
   } else {
     std::string name =
         llvm::formatv("__resource_var_indirect_{}_", resource.set);
@@ -543,8 +544,9 @@ public:
   LogicalResult initializeOptions(
       StringRef options,
       function_ref<LogicalResult(const Twine &)> errorHandler) override {
-    if (failed(Pass::initializeOptions(options, errorHandler)))
+    if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
+    }
     indexBits = indexBitsOption;
     return success();
   }
@@ -561,17 +563,20 @@ void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
 
-  if (moduleOp.getBody()->empty())
+  if (moduleOp.getBody()->empty()) {
     return;
+  }
 
   bool useIndirectBindings = usesIndirectBindingsAttr(moduleOp);
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = getEntryPoint(funcOp);
-    if (!exportOp)
+    if (!exportOp) {
       continue;
-    if (funcOp->hasAttr(spirv::getEntryPointABIAttrName()))
+    }
+    if (funcOp->hasAttr(spirv::getEntryPointABIAttrName())) {
       continue;
+    }
     std::optional<ArrayAttr> workgroupSize = exportOp->getWorkgroupSize();
     if (!workgroupSize) {
       exportOp->emitOpError(
@@ -757,8 +762,9 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SmallVector<mlir::FunctionOpInterface, 1> functions;
   for (auto fn : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    if (!fn.isPublic())
+    if (!fn.isPublic()) {
       continue;
+    }
     functions.push_back(fn);
   }
 
@@ -770,8 +776,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   }
 
   auto addressingModel = spirv::AddressingModel::Logical;
-  if (useIndirectBindings)
+  if (useIndirectBindings) {
     addressingModel = spirv::AddressingModel::PhysicalStorageBuffer64;
+  }
 
   // Collect all SPIR-V ops into a spirv.module.
   OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
@@ -781,10 +788,12 @@ void ConvertToSPIRVPass::runOnOperation() {
   Dialect *spvDialect = spvModule->getDialect();
   for (Operation &op : llvm::make_early_inc_range(*moduleOp.getBody())) {
     // Skip the newly created spirv.module itself.
-    if (&op == spvModule)
+    if (&op == spvModule) {
       continue;
-    if (op.getDialect() == spvDialect)
+    }
+    if (op.getDialect() == spvDialect) {
       op.moveBefore(body, body->end());
+    }
   }
 }
 

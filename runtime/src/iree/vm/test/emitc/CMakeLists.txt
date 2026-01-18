@@ -10,14 +10,10 @@ if(IREE_OUTPUT_FORMAT_C)
 
 iree_cc_test(
   NAME
-    module_test
+    emitc_module_test
   SRCS
-    "module_test.cc"
+    "emitc_module_test.cc"
   DEPS
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
-    iree::vm
     ::arithmetic_ops
     ::arithmetic_ops_f32
     ::arithmetic_ops_i64
@@ -41,6 +37,14 @@ iree_cc_test(
     ::ref_ops
     ::shift_ops
     ::shift_ops_i64
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
+    iree::vm::ops
+    iree::vm::ops_emitc
+    iree::vm::shims_emitc
+    iree::vm::testing::test_runner
 )
 
 iree_c_module(

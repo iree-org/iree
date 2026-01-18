@@ -91,8 +91,9 @@ static void annotateOperandsAndResults(Operation *op,
 
 static void annotateFuncOp(FunctionOpInterface funcOp,
                            DeviceAnalysis &deviceAnalysis) {
-  if (funcOp.empty())
+  if (funcOp.empty()) {
     return;
+  }
   for (auto arg : funcOp.front().getArguments()) {
     if (isa<IREE::HAL::DeviceType>(arg.getType())) {
       funcOp.setArgAttr(
@@ -117,8 +118,9 @@ struct AnnotateTargetDevicesPass
 
     // Annotate all ops with derived affinities.
     for (auto &op : getOperation().getOps()) {
-      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>())
+      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
         continue;
+      }
       if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
         annotateGlobalOp(globalOp, deviceAnalysis);
       } else if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {

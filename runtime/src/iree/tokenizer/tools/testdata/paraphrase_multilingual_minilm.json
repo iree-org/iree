@@ -1,0 +1,11 @@
+{
+  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "description": "#3 most downloaded - Multilingual paraphrase embeddings (23M+ downloads)",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "german", "input": "Hallo Welt! Wie geht es dir?"},
+    {"name": "french", "input": "Bonjour le monde!"},
+    {"name": "spanish", "input": "Hola mundo! Como estas?"},
+    {"name": "no_special", "input": "hello world", "add_special_tokens": false}
+  ]
+}

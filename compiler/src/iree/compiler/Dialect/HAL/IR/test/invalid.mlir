@@ -77,3 +77,15 @@ hal.executable @ex_with_constants {
     }
   }
 }
+
+// -----
+
+util.func public @dealloc_same_wait_and_signal_fence(%device: !hal.device, %affinity: i64, %fence: !hal.fence, %buffer: !hal.buffer){
+  // expected-error @+1 {{device queue operations cannot wait and signal on the same fence}}
+  hal.device.queue.dealloca<%device: !hal.device>
+      affinity(%affinity)
+      wait(%fence) signal (%fence)
+      buffer(%buffer : !hal.buffer)
+      flags("None")
+  util.return
+}

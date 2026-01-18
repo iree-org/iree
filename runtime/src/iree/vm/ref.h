@@ -24,6 +24,23 @@ typedef struct iree_vm_instance_t iree_vm_instance_t;
 // Enable additional expensive checks to track down ref counting issues.
 // #define IREE_VM_REF_PARANOID
 
+// Enable printing every VM-aware retain/release to stderr.
+// #define IREE_VM_REF_LOG
+// #define IREE_VM_REF_LOG_INCLUDE_BACKTRACES
+
+// Enable use-after-move detection for refs. When enabled, moved-from refs are
+// poisoned with a sentinel value and assertions fire if they're accessed before
+// being reassigned. This helps catch incorrect MOVE bit computation in the
+// compiler (where a ref is marked as last-use when it's actually used again).
+// #define IREE_VM_REF_DEBUG_MOVE
+
+// Enable refs-clean verification for debugging. When enabled, the runtime
+// asserts that all ref registers are zeroed on normal return, verifying the
+// compiler's guarantee that all refs are explicitly released via MOVE bits
+// and vm.discard.refs operations. Helps catch ref lifetime bugs in the
+// compiler.
+// #define IREE_VM_REF_DEBUG_CLEAN
+
 // Number of least significant bits available in an iree_vm_ref_type_t value.
 // These can be used for any purpose.
 #define IREE_VM_REF_TYPE_TAG_BITS 3
@@ -57,6 +74,13 @@ enum iree_vm_ref_type_bits_t {
   // unspecified internal type. Note that we mask off the bottom bits to allow
   // for tagging (all ref type values )
   IREE_VM_REF_TYPE_ANY = UINTPTR_MAX ^ IREE_VM_REF_TYPE_TAG_BIT_MASK,
+
+#if defined(IREE_VM_REF_DEBUG_MOVE)
+  // Poison value used to mark moved-from refs in debug mode.
+  // Uses a distinctive pattern (0xDEAD...) that will cause obvious crashes if
+  // dereferenced and is easily recognizable in debuggers.
+  IREE_VM_REF_TYPE_POISONED = (uintptr_t)0xDEADCAFEDEADF00Dull,
+#endif  // IREE_VM_REF_DEBUG_MOVE
 };
 
 typedef void(IREE_API_PTR* iree_vm_ref_destroy_t)(void* ptr);

@@ -1,0 +1,11 @@
+{
+  "model": "sentence-transformers/all-mpnet-base-v2",
+  "description": "#8 most downloaded - MPNet sentence embeddings (22M+ downloads)",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "unicode", "input": "Héllo wörld! café résumé"},
+    {"name": "sentence", "input": "This is a sample sentence for embedding."},
+    {"name": "long_sentence", "input": "The quick brown fox jumps over the lazy dog, demonstrating pangram properties."},
+    {"name": "no_special", "input": "hello world", "add_special_tokens": false}
+  ]
+}

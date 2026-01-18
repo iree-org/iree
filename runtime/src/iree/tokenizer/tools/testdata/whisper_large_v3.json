@@ -1,0 +1,11 @@
+{
+  "model": "openai/whisper-large-v3",
+  "description": "#26 - Whisper Large V3 for speech-to-text (7M+ downloads)",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "unicode", "input": "Héllo wörld! café résumé"},
+    {"name": "transcription", "input": "The quick brown fox jumps over the lazy dog."},
+    {"name": "numbers", "input": "The meeting is at 3:30 PM on January 15th, 2026."},
+    {"name": "no_special", "input": "hello world", "add_special_tokens": false}
+  ]
+}

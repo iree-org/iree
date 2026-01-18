@@ -148,6 +148,15 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_fuzz(
+  NAME
+    string_view_fuzz
+  SRCS
+    "string_view_fuzz.cc"
+  DEPS
+    ::base
+)
+
 iree_cc_test(
   NAME
     string_view_test

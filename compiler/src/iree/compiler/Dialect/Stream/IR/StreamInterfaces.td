@@ -213,6 +213,18 @@ def Stream_AffinityOp : Stream_OpInterface<"AffinityOpInterface"> {
         return $_op.getAffinityAttr();
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Removes all affinities specified on the op.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"removeAffinityAttrs",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        $_op.setAffinityAttr(nullptr);
+      }]
+    >,
   ];
 }
 

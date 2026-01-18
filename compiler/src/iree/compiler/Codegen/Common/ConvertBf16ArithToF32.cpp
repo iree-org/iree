@@ -46,8 +46,9 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type))) {
     return nullptr;
+  }
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
     return arith::TruncFOp::create(builder, loc, type, inputs[0]);
@@ -66,8 +67,9 @@ struct PrimitiveTypeConverter : public TypeConverter {
   explicit PrimitiveTypeConverter() {
     addConversion([](Type type) { return type; });
     addConversion([&](SourceType type) -> Type {
-      if (!isSourceType(type))
+      if (!isSourceType(type)) {
         return type;
+      }
       return getTargetType(type);
     });
     addConversion([&](ComplexType type) {
@@ -262,16 +264,19 @@ struct ConvertBf16ArithToF32Pass final
 
     auto checkOp = [&](Operation *op) {
       for (Type type : op->getResultTypes()) {
-        if (!typeConverter.isLegal(type))
+        if (!typeConverter.isLegal(type)) {
           return false;
+        }
       }
       for (Type type : op->getOperandTypes()) {
-        if (!typeConverter.isLegal(type))
+        if (!typeConverter.isLegal(type)) {
           return false;
+        }
       }
       for (auto &region : op->getRegions()) {
-        if (!typeConverter.isLegal(&region))
+        if (!typeConverter.isLegal(&region)) {
           return false;
+        }
       }
       return true;
     };

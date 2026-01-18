@@ -22,8 +22,9 @@ struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
                                 PatternRewriter &rewriter) const override {
     auto emptyOp =
         dyn_cast_if_present<tensor::EmptyOp>(op.getSource().getDefiningOp());
-    if (!emptyOp)
+    if (!emptyOp) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, op.getResult().getType(),
                                                  op.getResultDims());
     return success();
@@ -36,8 +37,9 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
   LogicalResult matchAndRewrite(BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const final {
     auto tensorCastOp = bitcastOp.getSource().getDefiningOp<tensor::CastOp>();
-    if (!tensorCastOp)
+    if (!tensorCastOp) {
       return failure();
+    }
     auto tensorCastSrcType =
         dyn_cast<RankedTensorType>(tensorCastOp.getOperand().getType());
     if (!tensorCastSrcType) {
@@ -66,8 +68,9 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
     // Drop the dynamic dims that become static after incorporating the cast.
     for (auto [castSize, sourceSize] : llvm::zip_equal(
              tensorCastSrcType.getShape(), intermediateTensorType.getShape())) {
-      if (!ShapedType::isDynamic(sourceSize))
+      if (!ShapedType::isDynamic(sourceSize)) {
         continue;
+      }
 
       while (!ShapedType::isDynamic(resShape[resDynamicDim])) {
         ++resDynamicDim;
@@ -135,8 +138,9 @@ static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
                                MutableOperandRange mutableDimValues) {
   auto dynamicDimsOr = IREE::Util::findDynamicDims(tensorValue, op->getBlock(),
                                                    Block::iterator(op));
-  if (!dynamicDimsOr.has_value())
+  if (!dynamicDimsOr.has_value()) {
     return false;
+  }
   auto dynamicDims = dynamicDimsOr.value();
   bool anyChanged = false;
   OperandRange oldValueRange = mutableDimValues;
@@ -235,8 +239,9 @@ canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
   llvm::SmallVector<int64_t> newShape;
   llvm::SmallBitVector droppedDims = op.getDroppedDims();
   for (auto size : llvm::enumerate(mixedSizes)) {
-    if (droppedDims.test(size.index()))
+    if (droppedDims.test(size.index())) {
       continue;
+    }
     std::optional<int64_t> staticSize = getConstantIntValue(size.value());
     newShape.push_back(staticSize ? staticSize.value() : ShapedType::kDynamic);
   }
@@ -256,8 +261,9 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     RankedTensorType resultType = loadOp.getType();
     auto newResultType = canonicalizeSubViewParts(
         loadOp, resultType, mixedOffsets, mixedSizes, mixedStrides);
-    if (failed(newResultType))
+    if (failed(newResultType)) {
       return failure();
+    }
 
     // We need to resolve the new inferred type with the specified type.
     Location loc = loadOp.getLoc();
@@ -355,8 +361,9 @@ struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
     RankedTensorType valueType = storeOp.getValueType();
     auto newValueType = canonicalizeSubViewParts(
         storeOp, valueType, mixedOffsets, mixedSizes, mixedStrides);
-    if (failed(newValueType))
+    if (failed(newValueType)) {
       return failure();
+    }
 
     Value value = storeOp.getValue();
     Location loc = storeOp.getLoc();

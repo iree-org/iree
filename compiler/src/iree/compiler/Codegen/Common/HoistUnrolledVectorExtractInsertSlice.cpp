@@ -37,19 +37,22 @@ getUnrolledExtractSlices(
   SmallVector<vector::ExtractStridedSliceOp> res;
   for (auto user : srcTensor.getUsers()) {
     auto extractStridedSliceOp = dyn_cast<vector::ExtractStridedSliceOp>(user);
-    if (!extractStridedSliceOp)
+    if (!extractStridedSliceOp) {
       return failure();
+    }
     res.push_back(extractStridedSliceOp);
   }
-  if (res.size() != insertOps.size())
+  if (res.size() != insertOps.size()) {
     return failure();
+  }
 
   std::reverse(res.begin(), res.end());
   for (auto [extractOp, insertOp] : llvm::zip_equal(res, insertOps)) {
     auto offset0 = insertOp.getOffsets();
     auto offset1 = extractOp.getOffsets();
-    if (offset0 != offset1)
+    if (offset0 != offset1) {
       return failure();
+    }
   }
 
   return res;
@@ -72,8 +75,9 @@ getUnrolledInsertSlices(scf::ForOp forOp, BlockArgument bbArg,
   SmallVector<vector::InsertStridedSliceOp> res;
   Value v = yieldOperand.get();
   auto insertStridedSliceOp = v.getDefiningOp<vector::InsertStridedSliceOp>();
-  if (!insertStridedSliceOp)
+  if (!insertStridedSliceOp) {
     return failure();
+  }
 
   ArrayRef<int64_t> vecShape =
       insertStridedSliceOp.getSourceVectorType().getShape();
@@ -81,8 +85,9 @@ getUnrolledInsertSlices(scf::ForOp forOp, BlockArgument bbArg,
       insertStridedSliceOp.getDestVectorType().getShape();
   int numOps = 1;
   for (auto [vecSize, destSize] : llvm::zip_equal(vecShape, destShape)) {
-    if (destSize % vecSize)
+    if (destSize % vecSize) {
       return failure();
+    }
     numOps *= destSize / vecSize;
   }
 
@@ -91,19 +96,22 @@ getUnrolledInsertSlices(scf::ForOp forOp, BlockArgument bbArg,
     insertStridedSliceOp = insertStridedSliceOp.getDest()
                                .getDefiningOp<vector::InsertStridedSliceOp>();
   }
-  if (res.size() != numOps)
+  if (res.size() != numOps) {
     return failure();
+  }
 
   std::reverse(res.begin(), res.end());
   SmallVector<int64_t> expectedOffsets(vecShape.size(), 0);
   for (vector::InsertStridedSliceOp op : res) {
     SmallVector<int64_t> offsets = getI64SubArray(op.getOffsets());
-    if (expectedOffsets != offsets)
+    if (expectedOffsets != offsets) {
       return failure();
+    }
     expectedOffsets.back() += vecShape.back();
     for (int pos = expectedOffsets.size() - 1; pos > 0; pos--) {
-      if (expectedOffsets[pos] != destShape[pos])
+      if (expectedOffsets[pos] != destShape[pos]) {
         break;
+      }
       expectedOffsets[pos] = 0;
       expectedOffsets[pos - 1] += vecShape[pos - 1];
     }
@@ -189,11 +197,13 @@ static scf::ForOp hoistUnrolledVectorExtractInsert(RewriterBase &rewriter,
       LLVM_DEBUG(DBGS() << "Consider " << it.value() << "\n");
       OpOperand &ret = yield->getOpOperand(it.index());
       auto insertOps = getUnrolledInsertSlices(forOp, it.value(), ret);
-      if (failed(insertOps))
+      if (failed(insertOps)) {
         continue;
+      }
       auto extractOps = getUnrolledExtractSlices(it.value(), insertOps.value());
-      if (failed(extractOps))
+      if (failed(extractOps)) {
         continue;
+      }
       newForOp = hoistVectorExtractInsertSlice(rewriter, extractOps.value(),
                                                insertOps.value(), it.value());
       break;

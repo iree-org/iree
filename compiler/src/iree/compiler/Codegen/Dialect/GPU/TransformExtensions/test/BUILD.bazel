@@ -17,6 +17,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "convert_to_multi_mma.mlir",
             "distribute_inner_tiled.mlir",
@@ -28,8 +29,8 @@ iree_lit_test_suite(
             "transform_fuse_extract_slice_with_forall.mlir",
             "transform_fuse_forall.mlir",
             "transform_lower_barrier_region.mlir",
-            "vectorize_iree_gpu_ops.mlir",
             "unroll_multi_mma.mlir",
+            "vectorize_iree_gpu_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

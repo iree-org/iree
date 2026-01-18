@@ -37,18 +37,21 @@ struct MakeReductionInnermostPattern final
     SmallVector<unsigned> interchange;
     bool needInterchange = false;
     unsigned numParallelLoop = genericOp.getNumParallelLoops();
-    if (numParallelLoop == 0)
+    if (numParallelLoop == 0) {
       return failure();
+    }
     for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
       if (linalg::isParallelIterator(iter.value())) {
         interchange.push_back(iter.index());
-        if (iter.index() >= numParallelLoop)
+        if (iter.index() >= numParallelLoop) {
           needInterchange = true;
+        }
       }
     }
     // If all the parallel loops are outter loops skip the pattern.
-    if (!needInterchange)
+    if (!needInterchange) {
       return failure();
+    }
     for (auto iter : llvm::enumerate(genericOp.getIteratorTypesArray())) {
       if (linalg::isReductionIterator(iter.value())) {
         interchange.push_back(iter.index());
@@ -83,8 +86,9 @@ struct TransposeGenericOpPattern final
       // elementwise op) with a single use.
       auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
       if (!producer || !llvm::hasSingleElement(producer->getUsers()) ||
-          linalg::isElementwise(producer))
+          linalg::isElementwise(producer)) {
         continue;
+      }
 
       // check if the generic op has a non-identity map for the operand.
       auto indexingMap = genericOp.getMatchingIndexingMap(operand);
@@ -93,11 +97,13 @@ struct TransposeGenericOpPattern final
         return rewriter.notifyMatchFailure(genericOp, "already normalized");
       }
       // The map must be a permutation. If not, then look for other operand.
-      if (!indexingMap.isPermutation())
+      if (!indexingMap.isPermutation()) {
         continue;
+      }
 
-      if (!mapForInterchange)
+      if (!mapForInterchange) {
         mapForInterchange = indexingMap;
+      }
     }
 
     if (!mapForInterchange) {

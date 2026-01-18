@@ -142,8 +142,9 @@ static bool predicateDeviceLibImpl(StringRef name,
   bool hasFastExp = isROCMBackend(target);
 
   // If fast exp is not available, don't use device-lib implementations.
-  if (!hasFastExp)
+  if (!hasFastExp) {
     return false;
+  }
 
   // Only apply to erf for now.
   StringRef erf = math::ErfOp::getOperationName();

@@ -25,8 +25,9 @@ struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
     Operation *linalgCopy =
         createLinalgCopyOp(rewriter, copyOp.getLoc(), copyOp.getSource(),
                            copyOp.getTarget(), copyOp->getAttrs());
-    if (!linalgCopy)
+    if (!linalgCopy) {
       return failure();
+    }
     rewriter.replaceOp(copyOp, linalgCopy->getResults());
     return success();
   }

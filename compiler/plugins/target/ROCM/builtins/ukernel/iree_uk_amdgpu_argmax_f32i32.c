@@ -24,8 +24,9 @@
     int32_t idx = warpSize * i + laneID;
     float newIn =
         idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
-    if (newIn == laneMax)
+    if (newIn == laneMax) {
       continue;
+    }
     laneMax = __builtin_fmaxf(newIn, laneMax);
     laneResult = newIn == laneMax ? idx : laneResult;
   }

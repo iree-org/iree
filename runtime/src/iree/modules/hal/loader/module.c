@@ -327,8 +327,11 @@ static iree_status_t iree_vm_shim_dispatch_v(
         constants_ptr + sizeof(iree_vm_size_t) +
         args.constant_count * sizeof(args.constants[0]);
     args.binding_count = *(const iree_vm_size_t*)bindings_ptr;
-    args.bindings =
-        (const iree_vm_abi_rII_t*)(bindings_ptr + sizeof(iree_vm_size_t));
+    // Align to struct alignment after count field.
+    const uint8_t* bindings_data_ptr = (const uint8_t*)iree_host_align(
+        (uintptr_t)(bindings_ptr + sizeof(iree_vm_size_t)),
+        iree_alignof(iree_vm_abi_rII_t));
+    args.bindings = (const iree_vm_abi_rII_t*)bindings_data_ptr;
     const uint8_t* max_ptr = (const uint8_t*)args.bindings +
                              args.binding_count * sizeof(args.bindings[0]);
     const uint8_t* end_ptr = args_storage.data + args_storage.data_length;

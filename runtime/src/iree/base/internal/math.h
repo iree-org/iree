@@ -334,6 +334,15 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
                 (src_exp >> src_exp_shift) - src_exp_bias - src_mantissa_bits);
 }
 
+// Helper for rounding to nearest-even. Does not right-shift. Returns the
+// biased value suitable for right-shifting.
+static inline uint32_t bias_to_nearest_even(uint32_t input, int shift_amount) {
+  uint32_t even_bit = 1u << shift_amount;
+  uint32_t odd_bit = even_bit >> 1;
+  uint32_t bias = (input & even_bit) ? (odd_bit) : (odd_bit - 1);
+  return input + bias;
+}
+
 // Generic conversion from f32 to any less-than-32-bit floating-point format,
 // rounding to nearest-even. The return value is typed as a uint32_t for
 // genericity but occupies only the bottom (1 + exp_bits + mantissa_bits) bits.
@@ -370,8 +379,8 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       // can remain nonzero. This happens only with the bf16 type.
       // Just divide the mantissa (rounding shift).
       int shift_amount = f32_mantissa_bits - dst_mantissa_bits;
-      uint32_t rounding_term = 1 << (shift_amount - 1);
-      dst_mantissa = (f32_mantissa + rounding_term) >> shift_amount;
+      dst_mantissa =
+          bias_to_nearest_even(f32_mantissa, shift_amount) >> shift_amount;
     }
     // The destination type has fewer exponent bits, so f32 subnormal values
     // become exactly zero. Leave the mantissa zero.
@@ -398,21 +407,18 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
         dst_mantissa = 0;
       } else {
         // Source f32 value is normal so has an implied 1... leading bit.
-        int effective_f32_mantissa = (1 << f32_mantissa_bits) + f32_mantissa;
-        // Add this term to achieve rounding to nearest instead of truncation
-        // towards zero.
-        int rounding_term = 1 << (shift_amount - 1);
-        // Finally compute the destination mantissa as a rounded right shift.
-        dst_mantissa = (effective_f32_mantissa + rounding_term) >> shift_amount;
+        uint32_t effective_f32_mantissa =
+            (1u << f32_mantissa_bits) + f32_mantissa;
+        dst_mantissa =
+            bias_to_nearest_even(effective_f32_mantissa, shift_amount) >>
+            shift_amount;
       }
     } else {
       // Normal case.
       // Implement round-to-nearest-even, by adding a bias before truncating.
-      int even_bit = 1u << (f32_mantissa_bits - dst_mantissa_bits);
-      int odd_bit = even_bit >> 1;
+      int shift_amount = f32_mantissa_bits - dst_mantissa_bits;
       uint32_t biased_f32_mantissa =
-          f32_mantissa +
-          ((f32_mantissa & even_bit) ? (odd_bit) : (odd_bit - 1));
+          bias_to_nearest_even(f32_mantissa, shift_amount);
       // Adding the bias may cause an exponent increment.
       if (biased_f32_mantissa > f32_mantissa_mask) {
         // Note: software implementations that try to be fast tend to get this

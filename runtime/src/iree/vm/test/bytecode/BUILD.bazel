@@ -1,0 +1,37 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT IREE_BUILD_COMPILER OR NOT IREE_BUILD_TESTS)
+  return()
+endif()
+""",
+    inline = True,
+)
+
+iree_runtime_cc_test(
+    name = "bytecode_module_test",
+    srcs = ["bytecode_module_test.cc"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm/bytecode:module",
+        "//runtime/src/iree/vm/test:all_bytecode_modules_c",
+        "//runtime/src/iree/vm/testing:test_runner",
+        "//runtime/src/iree/vm/testing:yieldable_test_module",
+    ],
+)

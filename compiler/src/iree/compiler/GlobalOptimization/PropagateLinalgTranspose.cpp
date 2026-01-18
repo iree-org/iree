@@ -103,29 +103,11 @@ static bool isReshapeBlockingFusion(Operation *producer, Operation *consumer) {
 // Transpose specialization
 //===----------------------------------------------------------------------===//
 
-// Indicates whether the given linalg op represents a transpose. In particular,
-// it requires a single input where the indexing maps are full permutations and
-// non-equal.
-static bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
-    return false;
-
-  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
-    return false;
-  auto mapRange = linalgOp.getIndexingMapsArray();
-  if (mapRange.size() != 2 || !mapRange.front().isPermutation() ||
-      !mapRange.back().isPermutation() || mapRange.front() == mapRange.back()) {
-    return false;
-  }
-  return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
-}
-
 // Specializes linalg.generic op to linalg.transpose if it is transposing a
 // single input.
 static void specializeGenericTransposeOp(RewriterBase &rewriter,
                                          linalg::GenericOp genericOp) {
-  if (!mlir::iree_compiler::GlobalOptimization::isaTransposeOpInterface(
-          genericOp)) {
+  if (!IREE::LinalgExt::isaTransposeOpInterface(genericOp)) {
     return;
   }
 
@@ -303,8 +285,9 @@ public:
     rewriter.replaceOp(transposeOp, newGenericOp->getResult(resultIndex));
     for (auto [oldRes, newRes] :
          llvm::zip_equal(genericOp.getResults(), newGenericOp->getResults())) {
-      if (oldRes.getResultNumber() == resultIndex)
+      if (oldRes.getResultNumber() == resultIndex) {
         continue;
+      }
       rewriter.replaceAllUsesWith(oldRes, newRes);
     }
     return success();
@@ -605,6 +588,52 @@ public:
 
 private:
   bool enableEdgeReshapePropagation = true;
+};
+
+// Sinks a transpose through a tensor.pad.
+class SinkTransposeThroughPad : public OpRewritePattern<tensor::PadOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(padOp)) {
+      return failure();
+    }
+    Value source = padOp.getSource();
+    auto transposeOp = source.getDefiningOp<linalg::TransposeOp>();
+    if (!transposeOp) {
+      return failure();
+    }
+
+    Block &block = padOp.getRegion().front();
+    if (llvm::any_of(block.getArguments(), [](BlockArgument blockArg) {
+          return blockArg.getNumUses();
+        })) {
+      return failure();
+    }
+
+    auto invPerm = invertPermutationVector(transposeOp.getPermutation());
+    SmallVector<OpFoldResult> lowSizes = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highSizes = padOp.getMixedHighPad();
+    applyPermutationToVector(lowSizes, invPerm);
+    applyPermutationToVector(highSizes, invPerm);
+
+    RankedTensorType oldPaddedType = cast<RankedTensorType>(padOp.getType());
+    RankedTensorType newPaddedType = oldPaddedType.clone(
+        applyPermutation(oldPaddedType.getShape(), invPerm));
+
+    auto newPadOp = tensor::PadOp::create(
+        rewriter, padOp.getLoc(), newPaddedType, transposeOp.getInput(),
+        lowSizes, highSizes, padOp.getNofold());
+    rewriter.cloneRegionBefore(padOp.getRegion(), newPadOp.getRegion(),
+                               newPadOp.getRegion().begin());
+
+    Value newTransposeOp =
+        createTranspose(rewriter, newPadOp, transposeOp.getPermutation());
+    rewriter.replaceOp(padOp, newTransposeOp);
+    return success();
+  }
 };
 
 // Fuses a transpose with the input of a linalg.generic op or contraction op.
@@ -1310,6 +1339,9 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(
         context, enableEdgeReshapePropagation);
+    if (enableSinkTransposeThroughPad) {
+      sinkingPatterns.insert<SinkTransposeThroughPad>(context);
+    }
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
         context, enableAggressivePropagation, enableConvolutionPropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);

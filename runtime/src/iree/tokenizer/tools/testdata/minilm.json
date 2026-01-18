@@ -1,0 +1,10 @@
+{
+  "model": "microsoft/MiniLM-L12-H384-uncased",
+  "description": "MiniLM - Microsoft small BERT",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "unicode", "input": "Héllo wörld!"},
+    {"name": "special_chars", "input": "x = 1 + 2"},
+    {"name": "no_special", "input": "hello", "add_special_tokens": false}
+  ]
+}

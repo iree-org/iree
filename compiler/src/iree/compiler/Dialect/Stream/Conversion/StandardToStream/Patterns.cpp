@@ -32,8 +32,9 @@ namespace {
 /// Flatten the given value ranges into a single vector of values.
 static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
   SmallVector<Value> result;
-  for (const auto &vals : values)
+  for (const auto &vals : values) {
     llvm::append_range(result, vals);
+  }
   return result;
 }
 
@@ -130,8 +131,9 @@ struct SelectOpConversion
   matchAndRewrite(mlir::arith::SelectOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle selects where the operands are tensors (resources).
-    if (!isa<TensorType>(op.getTrueValue().getType()))
+    if (!isa<TensorType>(op.getTrueValue().getType())) {
       return failure();
+    }
     auto trueOperand = resolveTensorOperands(op.getLoc(), op.getTrueValue(),
                                              adaptor.getTrueValue(), rewriter);
     auto falseOperand = resolveTensorOperands(

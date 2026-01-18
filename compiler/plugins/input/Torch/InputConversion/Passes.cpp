@@ -50,9 +50,10 @@ void createTorchToIREEPipeline(
       torch::Torch::createReduceOpVariantsPass(llvm::StringRef()));
   pm.addNestedPass<func::FuncOp>(
       mlir::torch::TorchConversion::createConvertCustomQuantOpPass());
-  if (options.decompose)
+  if (options.decompose) {
     pm.addNestedPass<func::FuncOp>(
         torch::Torch::createDecomposeComplexOpsPass(BackendLegalOps::get()));
+  }
   pm.addNestedPass<func::FuncOp>(torch::Torch::createFuseQuantizedOpsPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(torch::Torch::createScalarizeShapesPass());

@@ -19,8 +19,9 @@ namespace {
 using DlHandle = HMODULE;
 DlHandle loadLibrary(const char *libraryPath) {
   HMODULE lib = LoadLibraryExA(libraryPath, nullptr, 0);
-  if (lib)
+  if (lib) {
     return lib;
+  }
   DWORD errorMessageID = GetLastError();
   LPSTR messageBuffer = nullptr;
   size_t size = FormatMessageA(
@@ -48,8 +49,9 @@ DlHandle loadLibrary(const char *libraryPath) {
   DlHandle lib = dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL);
   if (!lib) {
     const char *reason = dlerror();
-    if (!reason)
+    if (!reason) {
       reason = "";
+    }
     fprintf(stderr,
             "IREE COMPILER ERROR: Could not open compiler library %s : %s\n",
             libraryPath, reason);
@@ -73,8 +75,9 @@ DlHandle libraryHandle = nullptr;
 #undef HANDLE_VERSIONED_SYMBOL
 
 void assertLoaded() {
-  if (libraryHandle)
+  if (libraryHandle) {
     return;
+  }
   fprintf(stderr,
           "FATAL ERROR: Attempt to call IREE compiler stub methods before "
           "library loaded\n");

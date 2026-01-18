@@ -69,13 +69,15 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 
 static llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os, const ScalableTileFlags &scalableTileFlags) {
-  if (scalableTileFlags.empty())
+  if (scalableTileFlags.empty()) {
     return os;
+  }
   os << "scalableTiles = [";
   for (unsigned i = 0; i < scalableTileFlags.size(); ++i) {
     os << (scalableTileFlags[i] ? "true" : "false");
-    if (i + 1 < scalableTileFlags.size())
+    if (i + 1 < scalableTileFlags.size()) {
       os << ", ";
+    }
   }
   return os;
 }
@@ -279,8 +281,9 @@ deserializeEncodingInfo(DictionaryAttr attr) {
   }
   if (attr.contains("scalableTiles")) {
     auto value = attr.getNamed("scalableTiles");
-    if (!value || !isa<ArrayAttr>(value->getValue()))
+    if (!value || !isa<ArrayAttr>(value->getValue())) {
       return std::nullopt;
+    }
     ScalableTileFlags res = llvm::map_to_vector(
         cast<ArrayAttr>(value->getValue()),
         [](Attribute a) { return cast<BoolAttr>(a).getValue(); });

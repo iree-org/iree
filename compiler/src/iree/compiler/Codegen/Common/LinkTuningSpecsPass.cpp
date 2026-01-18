@@ -161,8 +161,9 @@ static void updateNamedSequenceOp(
   seenNames.insert(newSeqName);
 
   // Skip updating ForeachMatchOp if the NamedSequenceOp is not used in it.
-  if (!namedSequenceToUser.contains(op))
+  if (!namedSequenceToUser.contains(op)) {
     return;
+  }
 
   ForeachMatchOp foreachMatchOp = namedSequenceToUser[op];
 
@@ -408,12 +409,8 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   SmallVector<Attribute> mergedActions;
 
   for (ForeachMatchOp foreachMatchOp : foreachMatchOps) {
-    ArrayAttr matchers = foreachMatchOp.getMatchers();
-    ArrayAttr actions = foreachMatchOp.getActions();
-    for (auto [matcher, action] : llvm::zip_equal(matchers, actions)) {
-      mergedMatchers.push_back(cast<SymbolRefAttr>(matcher));
-      mergedActions.push_back(cast<SymbolRefAttr>(action));
-    }
+    llvm::append_range(mergedMatchers, foreachMatchOp.getMatchers());
+    llvm::append_range(mergedActions, foreachMatchOp.getActions());
   }
 
   Region &region = newEntryPoint.getRegion();
@@ -422,8 +419,8 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   builder.setInsertionPointToStart(body);
   auto mergedForeachMatch = ForeachMatchOp::create(
       builder, loc, resultTypes, newEntryPoint.getArgument(0),
-      /* forwarded_inputs = */ ValueRange(),
-      /* restrictRoot = */ nullptr, /* flattenResults = */ nullptr,
+      /*forwarded_inputs=*/ValueRange(),
+      /*restrict_root=*/false, /*flatten_results=*/false,
       builder.getArrayAttr(mergedMatchers),
       builder.getArrayAttr(mergedActions));
   transform::YieldOp::create(builder, loc, mergedForeachMatch->getResult(0));

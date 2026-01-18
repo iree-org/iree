@@ -58,8 +58,9 @@ int64_t DispatchTensorType::getNumElements() const {
   assert(hasStaticShape() && "cannot get element count of dynamic shaped type");
   auto shape = getShape();
   int64_t num = 1;
-  for (auto dim : shape)
+  for (auto dim : shape) {
     num *= dim;
+  }
   return num;
 }
 
@@ -197,10 +198,12 @@ void printType(DispatchTensorType &type, DialectAsmPrinter &p) {
 
 Type IREETensorExtDialect::parseType(DialectAsmParser &parser) const {
   StringRef mnemonic;
-  if (parser.parseKeyword(&mnemonic))
+  if (parser.parseKeyword(&mnemonic)) {
     return {};
-  if (mnemonic == "dispatch.tensor")
+  }
+  if (mnemonic == "dispatch.tensor") {
     return DispatchTensorType::parse(parser);
+  }
   parser.emitError(parser.getCurrentLocation())
       << "unknown TensorExt type: " << mnemonic;
   return {};

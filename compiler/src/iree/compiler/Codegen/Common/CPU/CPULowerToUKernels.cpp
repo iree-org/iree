@@ -77,8 +77,9 @@ public:
 /// Returns `true` if an `outsOperand` value is initialized to zero.
 static bool isInitializedToZero(Value outsOperand) {
   auto fillOp = outsOperand.getDefiningOp<linalg::FillOp>();
-  if (!fillOp)
+  if (!fillOp) {
     return false;
+  }
   Value fillVal = fillOp.getDpsInputOperand(0)->get();
   return matchPattern(fillVal, m_Zero()) ||
          matchPattern(fillVal, m_AnyZeroFloat());

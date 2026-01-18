@@ -681,7 +681,7 @@ class MatmulTestModuleState final {
   // The pseudorandom values are reproducible both across runs and across
   // machines.
   StatusOr<vm::ref<iree_hal_buffer_view_t>> GenerateRandomMatrix(
-      const vm::ref<iree_hal_device_t> device, int64_t dim0, int64_t dim1,
+      iree_hal_device_t* device, int64_t dim0, int64_t dim1,
       iree_hal_element_type_t element_type, int32_t seed) {
     iree_hal_dim_t dims[2] = {
         (iree_hal_dim_t)dim0,
@@ -700,9 +700,8 @@ class MatmulTestModuleState final {
         seed,
     };
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
-        device.get(), iree_hal_device_allocator(device.get()),
-        IREE_ARRAYSIZE(dims), dims, element_type,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
+        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(dims), dims,
+        element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
         +[](iree_hal_buffer_mapping_t* mapping, void* user_data) {
           callback_state_t callback_state = *(callback_state_t*)user_data;
           iree_byte_span_t span = mapping->contents;
@@ -730,17 +729,17 @@ class MatmulTestModuleState final {
     return std::move(result_view);
   }
 
-  Status CheckMatmulResults(
-      const vm::ref<iree_hal_device_t> device, int64_t m, int64_t k, int64_t n,
-      int32_t transpose_rhs, const vm::ref<iree_hal_buffer_view_t> lhs,
-      const vm::ref<iree_hal_buffer_view_t> rhs,
-      const vm::ref<iree_hal_buffer_view_t> acc,
-      const vm::ref<iree_hal_buffer_view_t> actual_result) {
+  Status CheckMatmulResults(iree_hal_device_t* device, int64_t m, int64_t k,
+                            int64_t n, int32_t transpose_rhs,
+                            iree_hal_buffer_view_t* lhs,
+                            iree_hal_buffer_view_t* rhs,
+                            iree_hal_buffer_view_t* acc,
+                            iree_hal_buffer_view_t* actual_result) {
     matmul_results_t results = {};
     IREE_RETURN_IF_ERROR(matmul_results_initialize(
-        device.get(), (iree_hal_dim_t)m, (iree_hal_dim_t)k, (iree_hal_dim_t)n,
-        transpose_rhs, lhs.get(), rhs.get(), acc.get(), actual_result.get(),
-        host_allocator_, &results));
+        device, (iree_hal_dim_t)m, (iree_hal_dim_t)k, (iree_hal_dim_t)n,
+        transpose_rhs, lhs, rhs, acc, actual_result, host_allocator_,
+        &results));
     iree_status_t status = check_matmul_results(stderr, &results);
     matmul_results_deinitialize(&results);
     return status;

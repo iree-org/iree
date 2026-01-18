@@ -61,10 +61,12 @@ FixedPointIteratorPass::FixedPointIteratorPass(OpPassManager pipeline)
 LogicalResult FixedPointIteratorPass::initializeOptions(
     StringRef options,
     function_ref<LogicalResult(const Twine &)> errorHandler) {
-  if (failed(Pass::initializeOptions(options, errorHandler)))
+  if (failed(Pass::initializeOptions(options, errorHandler))) {
     return failure();
-  if (pipeline)
+  }
+  if (pipeline) {
     return success();
+  }
 
   // Pipelines are expected to be of the form `<op-name>(<pipeline>)`.
   // TODO: This was lifted from the Inliner pass. We should provide a parse
@@ -73,12 +75,14 @@ LogicalResult FixedPointIteratorPass::initializeOptions(
   // See: https://github.com/llvm/llvm-project/issues/52813
   StringRef pipelineSr = pipelineStr;
   size_t pipelineStart = pipelineSr.find_first_of('(');
-  if (pipelineStart == StringRef::npos || !pipelineSr.consume_back(")"))
+  if (pipelineStart == StringRef::npos || !pipelineSr.consume_back(")")) {
     return failure();
+  }
   StringRef opName = pipelineSr.take_front(pipelineStart);
   OpPassManager pm(opName);
-  if (failed(parsePassPipeline(pipelineSr.drop_front(1 + pipelineStart), pm)))
+  if (failed(parsePassPipeline(pipelineSr.drop_front(1 + pipelineStart), pm))) {
     return failure();
+  }
   pipeline = std::move(pm);
   return success();
 }

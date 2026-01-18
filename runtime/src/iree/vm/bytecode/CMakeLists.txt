@@ -41,8 +41,6 @@ iree_cc_test(
   NAME
     module_test
   SRCS
-    "dispatch_async_test.cc"
-    "dispatch_test.cc"
     "module_test.cc"
   DEPS
     ::module
@@ -51,8 +49,6 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
-    iree::vm::test::all_bytecode_modules_c
-    iree::vm::test::async_bytecode_modules_c
 )
 
 iree_bytecode_module(

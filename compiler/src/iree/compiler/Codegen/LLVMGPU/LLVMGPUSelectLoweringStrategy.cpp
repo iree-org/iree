@@ -43,8 +43,9 @@ static LogicalResult verifyLoweringConfiguration(
     IREE::Codegen::TranslationInfoAttr translationInfo) {
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
     auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
-    if (!loweringConfig)
+    if (!loweringConfig) {
       return success();
+    }
 
     if (translationInfo.getDispatchLoweringPassPipeline() ==
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute) {

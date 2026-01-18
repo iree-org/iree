@@ -38,6 +38,22 @@ namespace mlir::iree_compiler::IREE::VM {
 #define GEN_PASS_DEF_CONVERSIONPASS
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
 
+namespace {
+/// Drops util.assume.int ops during VM conversion.
+/// These hints have no VM-level meaning and would otherwise fail legalization
+/// when their types need conversion (e.g., index -> i32).
+struct DropAssumeIntPattern
+    : public OpConversionPattern<IREE::Util::AssumeIntOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::AssumeIntOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, adaptor.getOperands());
+    return success();
+  }
+};
+} // namespace
+
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
 template <typename T>
@@ -57,11 +73,13 @@ gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
       // Generic dialect lookup.
       dialect = op->getDialect();
     }
-    if (!dialect)
+    if (!dialect) {
       return;
+    }
     auto *dialectInterface = dialect->getRegisteredInterface<T>();
-    if (!dialectInterface)
+    if (!dialectInterface) {
       return;
+    }
     resultSet.insert(dialectInterface);
   });
 
@@ -81,8 +99,9 @@ class ConversionPass
     : public IREE::VM::impl::ConversionPassBase<ConversionPass> {
   using Base::Base;
   void runOnOperation() override {
-    if (getOperation().getBody()->empty())
+    if (getOperation().getBody()->empty()) {
       return;
+    }
 
     auto targetOptions = targetOptionsFromConversionPass();
 
@@ -124,6 +143,12 @@ class ConversionPass
     RewritePatternSet patterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);
+    // Drop util.assume.int - has no VM-level meaning and would fail
+    // legalization when types need conversion (e.g., index -> i32).
+    conversionTarget.addIllegalOp<IREE::Util::AssumeIntOp>();
+    patterns.add<DropAssumeIntPattern>(typeConverter, context);
+    // Convert util.optimization_barrier to vm.optimization_barrier.
+    conversionTarget.addIllegalOp<IREE::Util::OptimizationBarrierOp>();
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
                              importTable, patterns);
 

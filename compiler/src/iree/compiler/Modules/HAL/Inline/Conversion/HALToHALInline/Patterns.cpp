@@ -27,9 +27,10 @@ struct ElementTypeOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto value =
         IREE::HAL::ElementTypeOp::getTypeValue(op.getTypeAttr().getValue());
-    if (!value.has_value())
+    if (!value.has_value()) {
       return rewriter.notifyMatchFailure(op.getLoc(),
                                          "unsupported element type");
+    }
     rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, value.value(), 32);
     return success();
   }
@@ -42,9 +43,10 @@ struct EncodingTypeOpConversion
   matchAndRewrite(IREE::HAL::EncodingTypeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto value = IREE::HAL::EncodingTypeOp::getTypeValue(op.getEncodingAttr());
-    if (!value.has_value())
+    if (!value.has_value()) {
       return rewriter.notifyMatchFailure(op.getLoc(),
                                          "unsupported encoding type");
+    }
     rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, value.value(), 32);
     return success();
   }

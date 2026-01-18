@@ -114,8 +114,9 @@ class DetupleYieldOp : public OpRewritePattern<scf::YieldOp> {
       recursiveUntuple(operand, b, mapping, operands);
     }
 
-    if (!hasTuples)
+    if (!hasTuples) {
       return rewriter.notifyMatchFailure(op, "no tupled arguments");
+    }
 
     rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, operands);
     return success();
@@ -137,8 +138,9 @@ class DetupleConditionOp : public OpRewritePattern<scf::ConditionOp> {
       recursiveUntuple(operand, b, mapping, operands);
     }
 
-    if (!hasTuples)
+    if (!hasTuples) {
       return rewriter.notifyMatchFailure(op, "no tupled arguments");
+    }
 
     rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(op, op.getCondition(),
                                                         operands);
@@ -159,8 +161,9 @@ class DetupleIfOp : public OpRewritePattern<scf::IfOp> {
       hasTuples |= isa<TupleType>(type);
     }
 
-    if (!hasTuples)
+    if (!hasTuples) {
       return rewriter.notifyMatchFailure(op, "no tupled arguments");
+    }
 
     llvm::SmallVector<Type> types;
     untupleTypes(op.getResultTypes(), types);
@@ -204,8 +207,9 @@ class DetupleWhileOp : public OpRewritePattern<scf::WhileOp> {
       recursiveUntuple(operand, b, mapping, operands);
     }
 
-    if (!hasTuples)
+    if (!hasTuples) {
       return rewriter.notifyMatchFailure(op, "no tupled arguments");
+    }
 
     llvm::SmallVector<Type> types;
     untupleTypes(op.getResultTypes(), types);

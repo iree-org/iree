@@ -43,6 +43,8 @@ vm.module @mutability_change {
   vm.global.i32 private mutable @g1 = 123 : i32
   // CHECK: vm.global.i32 private mutable @g2 : i32
   vm.global.i32 private @g2 : i32
+  // CHECK: vm.global.i64 private mutable @g3
+  vm.global.i64 private @g3 = 12345 : i64
 
   vm.initializer {
     %c456 = vm.const.i32 456
@@ -58,12 +60,16 @@ vm.module @mutability_change {
     vm.global.load.i32 @g1 : i32
     // CHECK: vm.global.load.i32 @g2
     vm.global.load.i32 immutable @g2 : i32
+    // CHECK: vm.global.load.i64 @g3
+    vm.global.load.i64 immutable @g3 : i64
     vm.return
   }
 
   // CHECK: vm.func private @__init() {
   // CHECK-NEXT:   %c123 = vm.const.i32 123
   // CHECK-NEXT:   vm.global.store.i32 %c123, @g1
+  // CHECK-NEXT:   %c12345 = vm.const.i64 12345
+  // CHECK-NEXT:   vm.global.store.i64 %c12345, @g3
   // CHECK-NEXT:   %c456 = vm.const.i32 456
   // CHECK-NEXT:   vm.global.store.i32 %c456, @g2
   // CHECK-NEXT:   vm.return

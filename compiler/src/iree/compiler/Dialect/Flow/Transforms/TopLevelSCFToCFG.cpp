@@ -43,9 +43,10 @@ void TopLevelSCFToCFGPass::runOnOperation() {
   target.addLegalOp<linalg::GenericOp>();
   target.markOpRecursivelyLegal<linalg::GenericOp>();
 
-  if (failed(
-          applyPartialConversion(getOperation(), target, std::move(patterns))))
+  if (failed(applyPartialConversion(getOperation(), target,
+                                    std::move(patterns)))) {
     signalPassFailure();
+  }
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

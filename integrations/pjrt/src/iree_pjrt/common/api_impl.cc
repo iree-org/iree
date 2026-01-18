@@ -2015,7 +2015,7 @@ iree_status_t LoadedExecutableInstance::LoadAll() {
     // binary CompilerOutput (mmap).
     auto* binary = image_->binary.get();
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-        client_.vm_instance(),
+        client_.vm_instance(), IREE_VM_BYTECODE_MODULE_FLAG_NONE,
         iree_make_const_byte_span(binary->GetData(), binary->GetDataSize()),
         /*archive_allocator=*/iree_allocator_null(), client_.host_allocator(),
         &loaded.main_module));

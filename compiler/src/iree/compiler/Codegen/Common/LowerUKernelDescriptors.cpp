@@ -120,8 +120,9 @@ convertToUKernelGeneric(RewriterBase &rewriter, Operation *op, StringRef name,
         provider.createAndReplaceWithUkernelOp(
             rewriter, name, targetConfiguration, op, tensorInputs,
             tensorOutputs, otherOperands);
-    if (retVal)
+    if (retVal) {
       return retVal.value();
+    }
   }
   // Default ukernel generic op is created when a provider doesn't exist or when
   // the provider doesn't implement the replacement method.

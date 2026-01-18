@@ -50,8 +50,9 @@ static void hoistImmutableLoads(Region &region,
     auto ops =
         llvm::to_vector<8>(block.getOps<IREE::Util::GlobalLoadOpInterface>());
     for (auto &op : ops) {
-      if (!immutableGlobals.contains(op.getGlobalName()))
+      if (!immutableGlobals.contains(op.getGlobalName())) {
         continue;
+      }
       auto globalRef = cast<Attribute>(op.getGlobalAttr());
       auto it = loadOps.find(globalRef);
       if (it == loadOps.end()) {
@@ -89,8 +90,9 @@ static bool doesOpBlockMotion(Operation *op) {
 static SetVector<Operation *> getOpsThatBlockMotion(Block &block) {
   SetVector<Operation *> ops;
   for (auto &op : block.getOperations()) {
-    if (doesOpBlockMotion(&op))
+    if (doesOpBlockMotion(&op)) {
       ops.insert(&op);
+    }
   }
   return ops;
 }
@@ -100,12 +102,14 @@ static void moveOpUpInBlock(Block &block, Operation *op,
   // Find the earliest node that does not block op motion then move before it.
   mlir::Operation *earliestValidNode = op;
   while (earliestValidNode->getPrevNode()) {
-    if (opsThatBlockMotion.contains(earliestValidNode->getPrevNode()))
+    if (opsThatBlockMotion.contains(earliestValidNode->getPrevNode())) {
       break;
+    }
     earliestValidNode = earliestValidNode->getPrevNode();
   }
-  if (earliestValidNode != op)
+  if (earliestValidNode != op) {
     op->moveBefore(earliestValidNode);
+  }
 }
 
 static void
@@ -114,12 +118,14 @@ moveOpDownInBlock(Block &block, Operation *op,
   // Find the latest node that does not block op motion then move after it.
   mlir::Operation *latestValidNode = op;
   while (latestValidNode->getNextNode()) {
-    if (opsThatBlockMotion.contains(latestValidNode->getNextNode()))
+    if (opsThatBlockMotion.contains(latestValidNode->getNextNode())) {
       break;
+    }
     latestValidNode = latestValidNode->getNextNode();
   }
-  if (latestValidNode != op)
+  if (latestValidNode != op) {
     op->moveAfter(latestValidNode);
+  }
 }
 
 // Optimizes the load/store ops for each given bucket.
@@ -176,8 +182,9 @@ optimizeBuckets(Block &block,
         didRemoveAny = true;
       }
     }
-    if (ops.empty())
+    if (ops.empty()) {
       continue;
+    }
 
     if (auto loadOp =
             dyn_cast<IREE::Util::GlobalLoadOpInterface>(ops.front())) {

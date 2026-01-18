@@ -80,6 +80,10 @@ def iree_c_module(
         srcs = ["//runtime/src/iree/vm:module_impl_emitc.c", h_file_output],
         copts = [
             "-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output,
+            # Generated EmitC code may have unused variables from optimization
+            # barriers and other cases where an SSA value is consumed by an op
+            # that produces a new value.
+            "-Wno-unused-but-set-variable",
         ],
         deps = deps_list,
         **kwargs

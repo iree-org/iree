@@ -18,6 +18,10 @@
 #include "iree/vm/stack.h"
 #include "iree/vm/value.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
 //===----------------------------------------------------------------------===//
 // Argument/result struct utilities
 //===----------------------------------------------------------------------===//
@@ -32,8 +36,7 @@
                               IREE_VM_ABI_TYPE_NAME(types), body)
 
 #define IREE_VM_ABI_FIXED_STRUCT_IMPL(struct_type, types, body)        \
-  typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED    \
-      struct_type;                                                     \
+  typedef struct iree_vm_abi_##types##_t body struct_type;             \
   static inline struct_type* iree_vm_abi_##types##_checked_deref(      \
       iree_byte_span_t buffer) {                                       \
     return IREE_LIKELY(buffer.data_length == sizeof(struct_type))      \
@@ -47,8 +50,7 @@
 #define IREE_VM_ABI_FIELD_SIZE(type, member) sizeof(((type*)NULL)->member)
 #define IREE_VM_ABI_VLA_STRUCT_IMPL(types, vla_count, vla_field, struct_type, \
                                     body)                                     \
-  typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED           \
-      struct_type;                                                            \
+  typedef struct iree_vm_abi_##types##_t body struct_type;                    \
   static inline struct_type* iree_vm_abi_##types##_checked_deref(             \
       iree_byte_span_t buffer) {                                              \
     return IREE_LIKELY(buffer.data_length >= sizeof(struct_type)) &&          \
@@ -155,10 +157,6 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
 // Structures used for arguments and results.
 //===----------------------------------------------------------------------===//
 
-#if defined(IREE_COMPILER_MSVC)
-#pragma pack(push, 1)
-#endif  // IREE_COMPILER_MSVC
-
 // Special case for void (empty args/rets) as C structs can't have a 0 length.
 typedef struct iree_vm_abi_v_t {
   int unused;
@@ -183,6 +181,35 @@ IREE_VM_ABI_FIXED_STRUCT(ii, {
 IREE_VM_ABI_FIXED_STRUCT(iI, {
   int32_t i0;
   int64_t i1;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(Ii, {
+  int64_t i0;
+  int32_t i1;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(iIi, {
+  int32_t i0;
+  int64_t i1;
+  int32_t i2;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(ir, {
+  int32_t i0;
+  iree_vm_ref_t r1;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(rir, {
+  iree_vm_ref_t r0;
+  int32_t i1;
+  iree_vm_ref_t r2;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(iiir, {
+  int32_t i0;
+  int32_t i1;
+  int32_t i2;
+  iree_vm_ref_t r3;
 });
 
 IREE_VM_ABI_FIXED_STRUCT(II, {
@@ -738,15 +765,12 @@ IREE_VM_ABI_VLA_STRUCT(ICrD, a1_count, a1, {
   iree_vm_abi_r_t a1[0];
 });
 
-#if defined(IREE_COMPILER_MSVC)
-#pragma pack(pop)
-#endif  // IREE_COMPILER_MSVC
-
 //===----------------------------------------------------------------------===//
 // Shims for marshaling arguments and results
 //===----------------------------------------------------------------------===//
 
 IREE_VM_ABI_DECLARE_SHIM(irIi, v);
+IREE_VM_ABI_DECLARE_SHIM(i, i);
 IREE_VM_ABI_DECLARE_SHIM(i, r);
 IREE_VM_ABI_DECLARE_SHIM(r, i);
 IREE_VM_ABI_DECLARE_SHIM(r, I);
@@ -790,6 +814,7 @@ IREE_VM_ABI_DECLARE_SHIM(rriiiirrIIIII, v);
 IREE_VM_ABI_DECLARE_SHIM(rrrr, r);
 IREE_VM_ABI_DECLARE_SHIM(rrrrCrD, r);
 IREE_VM_ABI_DECLARE_SHIM(ririi, v);
+IREE_VM_ABI_DECLARE_SHIM(rir, i);
 IREE_VM_ABI_DECLARE_SHIM(rr, i);
 IREE_VM_ABI_DECLARE_SHIM(rr, r);
 IREE_VM_ABI_DECLARE_SHIM(rr, v);
@@ -828,11 +853,20 @@ IREE_VM_ABI_DECLARE_SHIM(CrID, r);
 IREE_VM_ABI_DECLARE_SHIM(CrD, r);
 IREE_VM_ABI_DECLARE_SHIM(iICrD, i);
 IREE_VM_ABI_DECLARE_SHIM(ICrD, r);
+IREE_VM_ABI_DECLARE_SHIM(Ii, i);
+IREE_VM_ABI_DECLARE_SHIM(iI, I);
 IREE_VM_ABI_DECLARE_SHIM(iI, rr);
+IREE_VM_ABI_DECLARE_SHIM(iIi, I);
+IREE_VM_ABI_DECLARE_SHIM(iiir, i);
+IREE_VM_ABI_DECLARE_SHIM(ir, i);
 IREE_VM_ABI_DECLARE_SHIM(irII, rr);
 IREE_VM_ABI_DECLARE_SHIM(iiICrID, rI);
 IREE_VM_ABI_DECLARE_SHIM(v, i);
 IREE_VM_ABI_DECLARE_SHIM(v, r);
 IREE_VM_ABI_DECLARE_SHIM(v, v);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_VM_SHIMS_H_

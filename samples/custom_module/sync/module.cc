@@ -89,10 +89,10 @@ class CustomModuleState final {
   ~CustomModuleState() = default;
 
   StatusOr<vm::ref<iree_hal_buffer_view_t>> CallSync(
-      const vm::ref<iree_hal_buffer_view_t> arg_view) {
+      iree_hal_buffer_view_t* arg_view) {
     // We can directly access the buffer here but only for reading.
     // In the future it'll be possible to pass in-place buffers.
-    auto* arg_buffer = iree_hal_buffer_view_buffer(arg_view.get());
+    auto* arg_buffer = iree_hal_buffer_view_buffer(arg_view);
 
     // Synchronously allocate the memory from the device allocator. We could
     // use queue-ordered allocations but that's unsafe to use from arbitrary
@@ -118,20 +118,20 @@ class CustomModuleState final {
     vm::ref<iree_hal_buffer_t> result_buffer;
     IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
         device_allocator, buffer_params,
-        iree_hal_buffer_view_byte_length(arg_view.get()), &result_buffer));
+        iree_hal_buffer_view_byte_length(arg_view), &result_buffer));
 
     // Hacky example accessing the source contents and producing the result
     // contents. This emulates what an external library the user is calling that
     // expects host void* buffers does.
-    IREE_RETURN_IF_ERROR(SyncSimulatedHostOpI32(
-        arg_buffer, result_buffer.get(),
-        iree_hal_buffer_view_element_count(arg_view.get())));
+    IREE_RETURN_IF_ERROR(
+        SyncSimulatedHostOpI32(arg_buffer, result_buffer.get(),
+                               iree_hal_buffer_view_element_count(arg_view)));
 
     // Wrap the buffer in a buffer view that provides the metadata for
     // runtime verification.
     vm::ref<iree_hal_buffer_view_t> result_view;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create_like(
-        result_buffer.get(), arg_view.get(), host_allocator_, &result_view));
+        result_buffer.get(), arg_view, host_allocator_, &result_view));
 
     // Note that the caller may immediately use the buffer contents without
     // waiting as by being synchronous we've indicated that we waited ourselves

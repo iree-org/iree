@@ -57,8 +57,9 @@ canonicalizeMinMaxOp(RewriterBase &rewriter, Operation *op,
   rewriter.setInsertionPoint(op);
   FailureOr<affine::AffineValueMap> simplified =
       mlir::affine::simplifyConstrainedMinMaxOp(op, std::move(constraints));
-  if (failed(simplified))
+  if (failed(simplified)) {
     return failure();
+  }
   return rewriter.replaceOpWithNewOp<affine::AffineApplyOp>(
       op, simplified->getAffineMap(), simplified->getOperands());
 }
@@ -89,22 +90,26 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
     auto loopMatcher = [&](Value iv, OpFoldResult &lb, OpFoldResult &ub,
                            OpFoldResult &step) {
       scf::ForOp forOp = scf::getForInductionVarOwner(iv);
-      if (!forOp)
+      if (!forOp) {
         return failure();
+      }
 
       auto loopInfo = isTiledAndDistributedLoop(forOp);
-      if (!loopInfo)
+      if (!loopInfo) {
         return failure();
+      }
       LLVM_DEBUG(llvm::dbgs() << *loopInfo);
 
       std::optional<int64_t> untiledStep =
           getConstantIntValue(loopInfo->untiledStep);
       // For IREE right now the original untiled loop should have step 1..
-      if (!untiledStep || *untiledStep != 1)
+      if (!untiledStep || *untiledStep != 1) {
         return failure();
+      }
       // ..and we tile according to some static tile sizes for processors.
-      if (!loopInfo->tileSize)
+      if (!loopInfo->tileSize) {
         return failure();
+      }
 
       lb = loopInfo->untiledLowerBound;
       ub = loopInfo->untiledUpperBound;
@@ -132,17 +137,21 @@ struct FoldAffineMinOverWorkgroupIDs final
     // Find all iteration variables among `minOp`'s operands add constrain them.
     for (Value operand : minOp->getOperands()) {
       // Skip duplicate ids.
-      if (!allIds.insert(operand).second)
+      if (!allIds.insert(operand).second) {
         continue;
+      }
       auto idOp = operand.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>();
-      if (!idOp)
+      if (!idOp) {
         continue;
+      }
       // Can't infer the range when workroupCount is unknown.
       unsigned index = idOp.getDimension().getZExtValue();
-      if (index >= numWorkgroup.size())
+      if (index >= numWorkgroup.size()) {
         return failure();
-      if (numWorkgroup[index] == ShapedType::kDynamic)
+      }
+      if (numWorkgroup[index] == ShapedType::kDynamic) {
         continue;
+      }
       constraints.appendDimVar({idOp});
       constraints.addBound(presburger::BoundType::LB, idOp, 0);
       constraints.addBound(presburger::BoundType::UB, idOp,

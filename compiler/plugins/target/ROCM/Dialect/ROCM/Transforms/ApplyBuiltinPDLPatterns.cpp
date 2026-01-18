@@ -15,12 +15,12 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Regex.h"
-#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
@@ -75,7 +75,9 @@ static LogicalResult matchContraction(RewriterBase &rewriter, Operation *rootOp,
                                       Attribute elementTypes,
                                       Attribute indexingMaps) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
-  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
+  if (!linalgOp ||
+      !(linalg::isaContractionOpInterface(linalgOp) ||
+        IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp))) {
     return rewriter.notifyMatchFailure(rootOp,
                                        "not a contraction like linalg op");
   }

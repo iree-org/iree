@@ -1,0 +1,10 @@
+{
+  "model": "sentence-transformers/paraphrase-MiniLM-L6-v2",
+  "description": "Fast paraphrase embeddings (2M+ downloads)",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "paraphrase", "input": "I love programming"},
+    {"name": "unicode", "input": "Cafe with accents: cafe resume"},
+    {"name": "no_special", "input": "test input", "add_special_tokens": false}
+  ]
+}

@@ -46,8 +46,9 @@ struct EraseHALDescriptorTypeFromMemRefPass final
     AttrTypeReplacer replacer;
     replacer.addReplacement(
         [](BaseMemRefType memRefType) -> std::optional<BaseMemRefType> {
-          if (isLegalType(memRefType))
+          if (isLegalType(memRefType)) {
             return std::nullopt;
+          }
 
           // Erase the #hal.descriptor_type memory space.
           if (auto rankedType = dyn_cast<MemRefType>(memRefType)) {
@@ -74,8 +75,9 @@ struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
     AttrTypeReplacer replacer;
     replacer.addReplacement(
         [](BaseMemRefType memRefType) -> std::optional<BaseMemRefType> {
-          if (isLegalType(memRefType))
+          if (isLegalType(memRefType)) {
             return std::nullopt;
+          }
 
           Attribute globalSpace = gpu::AddressSpaceAttr::get(
               memRefType.getContext(), gpu::AddressSpace::Global);

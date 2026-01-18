@@ -461,13 +461,23 @@ static inline void iree_unaligned_store_le_f64(double* ptr, double value) {
        int64_t*: iree_unaligned_load_le_u64((const uint64_t*)(ptr)),           \
       uint64_t*: iree_unaligned_load_le_u64((const uint64_t*)(ptr)),           \
          float*: iree_unaligned_load_le_f32((const float*)(ptr)),              \
-        double*: iree_unaligned_load_le_f64((const double*)(ptr))              \
+        double*: iree_unaligned_load_le_f64((const double*)(ptr)),             \
+  const int8_t*: iree_unaligned_load_le_u8((const uint8_t*)(ptr)),             \
+ const uint8_t*: iree_unaligned_load_le_u8((const uint8_t*)(ptr)),             \
+ const int16_t*: iree_unaligned_load_le_u16((const uint16_t*)(ptr)),           \
+const uint16_t*: iree_unaligned_load_le_u16((const uint16_t*)(ptr)),           \
+ const int32_t*: iree_unaligned_load_le_u32((const uint32_t*)(ptr)),           \
+const uint32_t*: iree_unaligned_load_le_u32((const uint32_t*)(ptr)),           \
+ const int64_t*: iree_unaligned_load_le_u64((const uint64_t*)(ptr)),           \
+const uint64_t*: iree_unaligned_load_le_u64((const uint64_t*)(ptr)),           \
+   const float*: iree_unaligned_load_le_f32((const float*)(ptr)),              \
+  const double*: iree_unaligned_load_le_f64((const double*)(ptr))              \
   )
 
 // Dereferences |ptr| and writes the given |value|.
 // Automatically handles unaligned accesses on architectures that may not
 // support them natively (or efficiently). Memory is treated as little-endian.
-#define iree_unaligned_store(ptr, value)                                       \
+#define iree_unaligned_store_le(ptr, value)                                    \
   _Generic((ptr),                                                              \
         int8_t*: iree_unaligned_store_le_u8((uint8_t*)(ptr), value),           \
        uint8_t*: iree_unaligned_store_le_u8((uint8_t*)(ptr), value),           \

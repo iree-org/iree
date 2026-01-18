@@ -16,8 +16,9 @@ namespace mlir::iree_compiler::IREE::HAL {
 static const iree_file_toc_t *lookupMuslFile(StringRef filename) {
   for (size_t i = 0; i < iree_builtins_libmusl_size(); ++i) {
     const auto &file_toc = iree_builtins_libmusl_create()[i];
-    if (filename == file_toc.name)
+    if (filename == file_toc.name) {
       return &file_toc;
+    }
   }
   return nullptr;
 }

@@ -115,8 +115,8 @@ iree_status_t Run() {
   const iree_const_byte_span_t module_data = load_bytecode_module_data();
   iree_vm_module_t* bytecode_module = NULL;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      instance, module_data, iree_allocator_null(), host_allocator,
-      &bytecode_module));
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, module_data,
+      iree_allocator_null(), host_allocator, &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* context = NULL;

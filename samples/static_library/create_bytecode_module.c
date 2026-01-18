@@ -16,8 +16,8 @@ iree_status_t create_module(iree_vm_instance_t* instance,
   iree_const_byte_span_t module_data =
       iree_make_const_byte_span(module_file_toc->data, module_file_toc->size);
   return iree_vm_bytecode_module_create(
-      instance, module_data, iree_allocator_null(),
-      iree_vm_instance_allocator(instance), out_module);
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, module_data,
+      iree_allocator_null(), iree_vm_instance_allocator(instance), out_module);
 }
 
 void print_success() { printf("static_library_run_bytecode passed\n"); }

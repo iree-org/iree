@@ -34,8 +34,9 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
   if (succeeded(setCooperativeMatrixConfig(
           target, op, AMDNumSubgroupsPerWorkgroup, AMDNumMNTilesPerSubgroup,
           AMDCoopMatrixSoftwarePipelineDepth,
-          AMDCoopMatrixSoftwarePipelineStoreStage)))
+          AMDCoopMatrixSoftwarePipelineStoreStage))) {
     return success();
+  }
 
   int subgroupSize = target.getPreferredSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
@@ -69,16 +70,18 @@ LogicalResult setAMDCodeGenConfig(IREE::GPU::TargetAttr target,
   int subgroupSize = target.getPreferredSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
-    if (isMatmulOrBatchMatmul(linalgOp))
+    if (isMatmulOrBatchMatmul(linalgOp)) {
       return setAMDMatmulConfig(linalgOp, target);
+    }
   }
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
     // Use the result type in case of larger bitwidth for accumulators.
     auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
-    if (bitwidth > 32)
+    if (bitwidth > 32) {
       return failure();
+    }
     const int multipler = 32 / bitwidth;
     bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
     const int bestTilingFactor = (hasPaddedInput ? 16 : 32) * multipler;

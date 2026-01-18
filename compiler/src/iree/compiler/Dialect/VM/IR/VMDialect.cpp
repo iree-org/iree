@@ -74,8 +74,9 @@ struct VMInlinerInterface : public DialectInlinerInterface {
     if (auto inliningPolicy =
             callable->getAttrOfType<IREE::Util::InliningPolicyAttrInterface>(
                 "inlining_policy")) {
-      if (!inliningPolicy.isLegalToInline(call, callable))
+      if (!inliningPolicy.isLegalToInline(call, callable)) {
         return false;
+      }
     }
     // Sure!
     return true;
@@ -259,8 +260,9 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
 Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                           Type type, Location loc) {
   auto typedValue = dyn_cast<TypedAttr>(value);
-  if (!typedValue)
+  if (!typedValue) {
     return nullptr;
+  }
 
   if (ConstI32Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstI32Op::convertConstValue(typedValue);

@@ -56,8 +56,9 @@ Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
   // extra IR for the indices. We should batch them up and append in one go.
   for (auto constantValue : llvm::enumerate(constantValues)) {
     // Buffer is zero-initialized so we can skip zero values.
-    if (mlir::matchPattern(constantValue.value(), m_Zero()))
+    if (mlir::matchPattern(constantValue.value(), m_Zero())) {
       continue;
+    }
     auto constantLoc = constantValue.value().getLoc();
     IREE::VM::BufferStoreI32Op::create(
         builder, constantLoc, constantBuffer,

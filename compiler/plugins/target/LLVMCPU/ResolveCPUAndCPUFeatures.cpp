@@ -6,6 +6,7 @@
 
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/TargetParser/AArch64TargetParser.h"
@@ -29,9 +30,18 @@ resolveHostCPUAndCPUFeatures(std::string &cpu, std::string &cpuFeatures) {
     return ResolveCPUAndCPUFeaturesStatus::InconsistentHost;
   }
   cpu = llvm::sys::getHostCPUName();
+  // Sort features to ensure deterministic iteration order. The StringMap
+  // returned by getHostCPUFeatures() has non-deterministic iteration order.
+  llvm::StringMap<bool, llvm::MallocAllocator> hostFeatures =
+      llvm::sys::getHostCPUFeatures();
+  auto sortedFeatures =
+      llvm::to_vector_of<llvm::StringRef>(hostFeatures.keys());
+  llvm::sort(sortedFeatures);
+
+  // Add all features in lexicographically sorted order.
   llvm::SubtargetFeatures features;
-  for (auto &feature : llvm::sys::getHostCPUFeatures()) {
-    features.AddFeature(feature.first(), feature.second);
+  for (llvm::StringRef feature : sortedFeatures) {
+    features.AddFeature(feature, hostFeatures.lookup(feature));
   }
   cpuFeatures = features.getString();
   return ResolveCPUAndCPUFeaturesStatus::OK;

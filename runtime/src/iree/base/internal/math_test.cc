@@ -313,6 +313,22 @@ TEST(BF16ConversionTest, F32ToBF16) {
   EXPECT_EQ(0xff80, iree_math_f32_to_bf16(-FLT_MAX));
   EXPECT_EQ(0x0080, iree_math_f32_to_bf16(FLT_MIN));
   EXPECT_EQ(0x8080, iree_math_f32_to_bf16(-FLT_MIN));
+  // Test some round-to-nearest-even. F32->BF16 is interesting because F32
+  // denormals can round to nonzero BF16 denormals.
+  EXPECT_EQ(0x0000, iree_math_f32_to_bf16(FLT_MIN * 1.0f / 256.f));
+  EXPECT_EQ(0x0001, iree_math_f32_to_bf16(FLT_MIN * 2.0f / 256.f));
+  EXPECT_EQ(0x0002, iree_math_f32_to_bf16(FLT_MIN * 3.0f / 256.f));
+  EXPECT_EQ(0x0002, iree_math_f32_to_bf16(FLT_MIN * 4.0f / 256.f));
+  EXPECT_EQ(0x0002, iree_math_f32_to_bf16(FLT_MIN * 5.0f / 256.f));
+  EXPECT_EQ(0x0003, iree_math_f32_to_bf16(FLT_MIN * 6.0f / 256.f));
+  EXPECT_EQ(0x0004, iree_math_f32_to_bf16(FLT_MIN * 7.0f / 256.f));
+  EXPECT_EQ(0x8000, iree_math_f32_to_bf16(FLT_MIN * -1.0f / 256.f));
+  EXPECT_EQ(0x8001, iree_math_f32_to_bf16(FLT_MIN * -2.0f / 256.f));
+  EXPECT_EQ(0x8002, iree_math_f32_to_bf16(FLT_MIN * -3.0f / 256.f));
+  EXPECT_EQ(0x8002, iree_math_f32_to_bf16(FLT_MIN * -4.0f / 256.f));
+  EXPECT_EQ(0x8002, iree_math_f32_to_bf16(FLT_MIN * -5.0f / 256.f));
+  EXPECT_EQ(0x8003, iree_math_f32_to_bf16(FLT_MIN * -6.0f / 256.f));
+  EXPECT_EQ(0x8004, iree_math_f32_to_bf16(FLT_MIN * -7.0f / 256.f));
 }
 
 TEST(BF16ConversionTest, Denormals) {
@@ -503,6 +519,22 @@ TEST(F8E4M3FNConversionTest, F32ToF8E4M3FN) {
   EXPECT_EQ(0x7A, iree_math_f32_to_f8e4m3fn(304.0f));
   EXPECT_EQ(0x7A, iree_math_f32_to_f8e4m3fn(336.0f));
   EXPECT_EQ(0x7C, iree_math_f32_to_f8e4m3fn(368.0f));
+  // Test round-to-nearest-even for denormals.
+  EXPECT_EQ(0x00, iree_math_f32_to_f8e4m3fn(0.5f / 512.f));
+  EXPECT_EQ(0x01, iree_math_f32_to_f8e4m3fn(1.f / 512.f));
+  EXPECT_EQ(0x02, iree_math_f32_to_f8e4m3fn(1.5f / 512.f));
+  EXPECT_EQ(0x02, iree_math_f32_to_f8e4m3fn(2.f / 512.f));
+  EXPECT_EQ(0x02, iree_math_f32_to_f8e4m3fn(2.5f / 512.f));
+  EXPECT_EQ(0x03, iree_math_f32_to_f8e4m3fn(3.f / 512.f));
+  EXPECT_EQ(0x04, iree_math_f32_to_f8e4m3fn(3.5f / 512.f));
+  EXPECT_EQ(0x80, iree_math_f32_to_f8e4m3fn(-0.5f / 512.f));
+  EXPECT_EQ(0x81, iree_math_f32_to_f8e4m3fn(-1.f / 512.f));
+  EXPECT_EQ(0x82, iree_math_f32_to_f8e4m3fn(-1.5f / 512.f));
+  EXPECT_EQ(0x82, iree_math_f32_to_f8e4m3fn(-2.f / 512.f));
+  EXPECT_EQ(0x82, iree_math_f32_to_f8e4m3fn(-2.5f / 512.f));
+  EXPECT_EQ(0x83, iree_math_f32_to_f8e4m3fn(-3.f / 512.f));
+  EXPECT_EQ(0x84, iree_math_f32_to_f8e4m3fn(-3.5f / 512.f));
+
   // Important case to test: overflow due to rounding to nearest-even of 465
   // to 512, while 464 gets rounded to nearest-even 448, not overflowing.
   EXPECT_EQ(0x7E, iree_math_f32_to_f8e4m3fn(464.f));

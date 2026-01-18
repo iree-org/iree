@@ -195,12 +195,14 @@ struct BooleanState : public IntegerStateBase<bool, 1, 0> {
 
 private:
   void handleNewKnownValue(base_t value) override {
-    if (value)
+    if (value) {
       known = (assumed = value);
+    }
   }
   void handleNewAssumedValue(base_t value) override {
-    if (!value)
+    if (!value) {
       assumed = known;
+    }
   }
 
   void joinOR(base_t assumedValue, base_t knownValue) override {
@@ -423,12 +425,15 @@ struct PotentialValuesState : AbstractState {
   }
 
   bool operator==(const PotentialValuesState &rhs) const {
-    if (isValidState() != rhs.isValidState())
+    if (isValidState() != rhs.isValidState()) {
       return false;
-    if (!isValidState() && !rhs.isValidState())
+    }
+    if (!isValidState() && !rhs.isValidState()) {
       return true;
-    if (isUndefContained() != rhs.isUndefContained())
+    }
+    if (isUndefContained() != rhs.isUndefContained()) {
       return false;
+    }
     return set == rhs.getAssumedSet();
   }
 
@@ -487,8 +492,9 @@ private:
 
   // Inserts an element into this set.
   void insert(const MemberTy &c) {
-    if (!isValidState())
+    if (!isValidState()) {
       return;
+    }
     set.insert(c);
     checkAndInvalidate();
   }
@@ -496,15 +502,17 @@ private:
   // Takes union with |rhs|.
   void unionWith(const PotentialValuesState &rhs) {
     // If this is a full set, do nothing.
-    if (!isValidState())
+    if (!isValidState()) {
       return;
+    }
     // If rhs is full set, change L to a full set.
     if (!rhs.isValidState()) {
       indicatePessimisticFixpoint();
       return;
     }
-    for (const MemberTy &c : rhs.set)
+    for (const MemberTy &c : rhs.set) {
       set.insert(c);
+    }
     undefIsContained |= rhs.isUndefContained();
     checkAndInvalidate();
   }
@@ -518,8 +526,9 @@ private:
   // Takes intersection with |rhs|.
   void intersectWith(const PotentialValuesState &rhs) {
     // If rhs is a full set, do nothing.
-    if (!rhs.isValidState())
+    if (!rhs.isValidState()) {
       return;
+    }
     // If this is a full set, change this to rhs.
     if (!isValidState()) {
       *this = rhs;
@@ -527,8 +536,9 @@ private:
     }
     SetTy intersectSet;
     for (const MemberTy &c : set) {
-      if (rhs.set.count(c))
+      if (rhs.set.count(c)) {
         intersectSet.insert(c);
+      }
     }
     set = intersectSet;
     undefIsContained &= rhs.isUndefContained();

@@ -123,6 +123,26 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def ConvertWorkgroupForallToPCFPass
+    : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
+  let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
+  let description = [{
+    Converts `scf.forall` ops with `#iree_codegen.workgroup_mapping` attributes
+    to `pcf.loop` ops with workgroup scope.
+
+    The input is IR containing `scf.forall` ops mapped to workgroups via
+    `#iree_codegen.workgroup_mapping<x/y/z>` attributes. The pass linearizes
+    all workgroup IDs down to a single dimension to handle cases where multiple
+    foralls have incompatible delinearization bases.
+
+    The output replaces each matching forall with a `pcf.loop` using
+    `#iree_codegen.workgroup_scope<linearize>` scope. Additionally, an
+    `iree_codegen.workgroup_count_hint` is inserted before each loop to
+    communicate the required workgroup count to the export's count region.
+  }];
+  let dependentDialects = ["iree_compiler::IREE::PCF::PCFDialect"];
+}
+
 def CombineLayoutTransformationPass :
     InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
@@ -476,6 +496,11 @@ def FlattenMemRefSubspanPass : Pass<"iree-codegen-flatten-memref-subspan", "Modu
   }];
 }
 
+def FlattenSwizzleHintAllocsPass :
+    InterfacePass<"iree-codegen-flatten-swizzle-hint-allocs", "mlir::FunctionOpInterface"> {
+  let summary = "Flattens allocations associated with iree_codegen.swizzle_hint ops";
+}
+
 def FoldAffineMinInDistributedLoopsPass :
   InterfacePass<"iree-codegen-fold-affinemin-in-distributed-loops", "mlir::FunctionOpInterface"> {
   let summary = "Fold `affine.min` ops in distributed loops";
@@ -589,6 +614,11 @@ def IREEBufferizeConstantsPass :
   let summary = "Convert from arith.constant on tensors to buffers";
 }
 
+def IREECodegenAffineExpandIndexOpsPass :
+    Pass<"iree-codegen-affine-expand-index-ops", ""> {
+  let summary = "Expand affine index ops with region simplification config";
+}
+
 def IREECodegenCanonicalizerPass :
     Pass<"iree-codegen-canonicalize", ""> {
   let summary = "Codegen canonicalization pass with IREE specific patterns";
@@ -596,6 +626,16 @@ def IREECodegenCanonicalizerPass :
     Option<"testConvergence", "test-convergence", "bool",
            /*default=*/"false", "Fails if the patterns fail to converge">
   ];
+}
+
+def IREECodegenFoldMemRefAliasOpsPass :
+    Pass<"iree-codegen-fold-memref-alias-ops", ""> {
+  let summary = "Fold memref alias ops with region simplification config";
+}
+
+def IREECodegenLowerAffinePass :
+    Pass<"iree-codegen-lower-affine", ""> {
+  let summary = "Lower affine operations to standard with region simplification config";
 }
 
 def IREEComprehensiveBufferizePass :
@@ -844,6 +884,21 @@ def PropagateReshapesByExpansionPass :
 def RematerializeParallelOpsPass :
     InterfacePass<"iree-codegen-rematerialize-parallel-ops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to rematerialize and merge parallel ops into consumers.";
+}
+
+def RemoveIndexHintsPass :
+    InterfacePass<"iree-codegen-remove-index-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Remove iree_codegen.index_hint operations";
+  let description = [{
+    This pass removes all iree_codegen.index_hint operations by replacing
+    them with their input values (pass-through semantics).
+
+    Index hints are used to convey optimization information to downstream
+    passes and should be cleaned up once that information has been consumed.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect"
+  ];
 }
 
 def RemoveSingleIterationLoopPass :

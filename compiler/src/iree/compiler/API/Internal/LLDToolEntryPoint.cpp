@@ -71,11 +71,13 @@ static Flavor getFlavor(StringRef s) {
 static Flavor parseFlavor(std::vector<const char *> &v) {
   // Parse -flavor option.
   if (v.size() > 1 && v[1] == StringRef("-flavor")) {
-    if (v.size() <= 2)
+    if (v.size() <= 2) {
       die("missing arg value for '-flavor'");
+    }
     Flavor f = getFlavor(v[2]);
-    if (f == Invalid)
+    if (f == Invalid) {
       die("Unknown flavor: " + StringRef(v[2]));
+    }
     v.erase(v.begin() + 1, v.begin() + 3);
     return f;
   }

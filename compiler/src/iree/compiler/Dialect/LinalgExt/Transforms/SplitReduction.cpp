@@ -658,9 +658,10 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         Value outVal = args[1];
         Value outIdx = args[2];
         Value reductionIdx = linalg::IndexOp::create(b, loc, reductionDim + 1);
-        if (outIdx.getType() != reductionIdx.getType())
+        if (outIdx.getType() != reductionIdx.getType()) {
           reductionIdx = arith::IndexCastOp::create(b, loc, outIdx.getType(),
                                                     reductionIdx);
+        }
         Value inCast = in;
         Type inType = in.getType();
         Type outType = outVal.getType();
@@ -715,8 +716,9 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         Value outIdx = inputs[3];
         Value outer = linalg::IndexOp::create(b, loc, insertSplitDimension);
         Value offset = arith::MulIOp::create(b, loc, outer, tileSize);
-        if (offset.getType() != local.getType())
+        if (offset.getType() != local.getType()) {
           offset = arith::IndexCastOp::create(b, loc, local.getType(), offset);
+        }
         // gidx = outer * ratio + local.
         Value gidx = arith::AddIOp::create(b, loc, offset, local);
         Operation *clonedMax = b.clone(*combinerOps.maxOp);

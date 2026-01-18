@@ -103,6 +103,8 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
     const iree_vm_register_list_t* segment_size_list,
     iree_host_size_t* out_required_size) {
   iree_host_size_t required_size = 0;
+  // Track max alignment for struct trailing padding.
+  iree_host_size_t max_alignment = sizeof(int32_t);
   for (iree_host_size_t i = 0, seg_i = 0; i < cconv_fragment.size;
        ++i, ++seg_i) {
     switch (cconv_fragment.data[i]) {
@@ -114,10 +116,17 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
         break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64:
+        required_size = iree_host_align(required_size, sizeof(int64_t));
         required_size += sizeof(int64_t);
+        if (sizeof(int64_t) > max_alignment) max_alignment = sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:
+        required_size =
+            iree_host_align(required_size, iree_alignof(iree_vm_ref_t));
         required_size += sizeof(iree_vm_ref_t);
+        if (iree_alignof(iree_vm_ref_t) > max_alignment) {
+          max_alignment = iree_alignof(iree_vm_ref_t);
+        }
         break;
       case IREE_VM_CCONV_TYPE_SPAN_START: {
         if (IREE_UNLIKELY(!segment_size_list) ||
@@ -128,7 +137,9 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
         }
         iree_host_size_t span_count = segment_size_list->registers[seg_i];
         required_size += sizeof(int32_t);  // count
+        // Compute size of one span element with proper alignment.
         iree_host_size_t span_size = 0;
+        iree_host_size_t span_max_alignment = sizeof(int32_t);
         for (i = i + 1; i < cconv_fragment.size &&
                         cconv_fragment.data[i] != IREE_VM_CCONV_TYPE_SPAN_END;
              ++i) {
@@ -141,10 +152,25 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
               break;
             case IREE_VM_CCONV_TYPE_I64:
             case IREE_VM_CCONV_TYPE_F64:
+              span_size = iree_host_align(span_size, sizeof(int64_t));
               span_size += sizeof(int64_t);
+              if (sizeof(int64_t) > max_alignment) {
+                max_alignment = sizeof(int64_t);
+              }
+              if (sizeof(int64_t) > span_max_alignment) {
+                span_max_alignment = sizeof(int64_t);
+              }
               break;
             case IREE_VM_CCONV_TYPE_REF:
+              span_size =
+                  iree_host_align(span_size, iree_alignof(iree_vm_ref_t));
               span_size += sizeof(iree_vm_ref_t);
+              if (iree_alignof(iree_vm_ref_t) > max_alignment) {
+                max_alignment = iree_alignof(iree_vm_ref_t);
+              }
+              if (iree_alignof(iree_vm_ref_t) > span_max_alignment) {
+                span_max_alignment = iree_alignof(iree_vm_ref_t);
+              }
               break;
             default:
               return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -152,6 +178,8 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
                                       cconv_fragment.data[i]);
           }
         }
+        // Align to span element alignment before adding span elements.
+        required_size = iree_host_align(required_size, span_max_alignment);
         required_size += span_size * span_count;
       } break;
       default:
@@ -160,6 +188,8 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
                                 cconv_fragment.data[i]);
     }
   }
+  // Add struct trailing padding to align to max element alignment.
+  required_size = iree_host_align(required_size, max_alignment);
   *out_required_size = required_size;
   return iree_ok_status();
 }

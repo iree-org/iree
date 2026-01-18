@@ -7,6 +7,7 @@
 #ifndef IREE_VM_LIST_H_
 #define IREE_VM_LIST_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"
@@ -173,6 +174,19 @@ IREE_API_EXPORT iree_status_t iree_vm_list_get_ref_assign(
 // The ref will be retained and must be released by the caller.
 IREE_API_EXPORT iree_status_t iree_vm_list_get_ref_retain(
     const iree_vm_list_t* list, iree_host_size_t i, iree_vm_ref_t* out_value);
+
+// Returns the ref value of the element at the given index.
+// If |is_move|=true then the ref will be moved out of the list and the list
+// element will be cleared. Otherwise the ref will be retained and must be
+// released by the caller.
+IREE_API_EXPORT iree_status_t
+iree_vm_list_get_ref_retain_or_move(iree_vm_list_t* list, iree_host_size_t i,
+                                    bool is_move, iree_vm_ref_t* out_value);
+
+// Returns the ref value of the element at the given index.
+// The ref will be moved out of the list and the list element will be cleared.
+IREE_API_EXPORT iree_status_t iree_vm_list_get_ref_move(
+    iree_vm_list_t* list, iree_host_size_t i, iree_vm_ref_t* out_value);
 
 // Sets the ref value of the element at the given index, retaining a reference
 // in the list until the element is cleared or the list is disposed.

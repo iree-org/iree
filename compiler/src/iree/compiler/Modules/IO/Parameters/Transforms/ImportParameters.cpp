@@ -76,8 +76,9 @@ loadParameterIndex(ModuleOp moduleOp, StringRef path,
                    iree_io_parameter_index_t *parameterIndex) {
   // Open the archive file (hopefully mapping it).
   auto fileHandle = openArchiveFile(moduleOp, path);
-  if (failed(fileHandle))
+  if (failed(fileHandle)) {
     return failure();
+  }
 
   // Parse the archive as a particular format.
   iree_allocator_t hostAllocator = iree_allocator_system();
@@ -103,8 +104,9 @@ public:
   iree_io_parameter_index_t *lookupOrCreate(ModuleOp moduleOp,
                                             StringRef scope) {
     iree_allocator_t hostAllocator = iree_allocator_system();
-    if (iree_io_parameter_index_t *existing = lookup(scope))
+    if (iree_io_parameter_index_t *existing = lookup(scope)) {
       return existing;
+    }
     iree_io_parameter_index_t *parameterIndexPtr = nullptr;
     if (failed(handleRuntimeError(
             moduleOp,
@@ -133,8 +135,9 @@ loadParameterArchives(ModuleOp moduleOp, ArrayRef<std::string> scopePaths) {
   for (auto &scopePath : scopePaths) {
     auto [scope, path] = splitScopePath(scopePath);
     auto *parameterIndex = parameterIndices.lookupOrCreate(moduleOp, scope);
-    if (failed(loadParameterIndex(moduleOp, path, parameterIndex)))
+    if (failed(loadParameterIndex(moduleOp, path, parameterIndex))) {
       return failure();
+    }
   }
   return parameterIndices;
 }
@@ -143,12 +146,14 @@ loadParameterArchives(ModuleOp moduleOp, ArrayRef<std::string> scopePaths) {
 // data as stored in the file.
 static bool isTypeSupported(Type type) {
   auto shapedType = dyn_cast<ShapedType>(type);
-  if (!shapedType)
+  if (!shapedType) {
     return false;
+  }
   auto elementType = shapedType.getElementType();
   // NOTE: packed types not yet supported.
-  if (!elementType.isIntOrFloat())
+  if (!elementType.isIntOrFloat()) {
     return false;
+  }
   const unsigned logicalBitWidth = elementType.getIntOrFloatBitWidth();
   switch (logicalBitWidth) {
   case 8:
@@ -280,29 +285,34 @@ struct ImportParametersPass
 
   void runOnOperation() override {
     // Nothing to do if no path specified.
-    if (scopePaths.empty())
+    if (scopePaths.empty()) {
       return;
+    }
 
     // Open the archive file (hopefully mapping it) and parse the index.
     ModuleOp moduleOp = getOperation();
     auto parameterIndices = loadParameterArchives(moduleOp, scopePaths);
-    if (failed(parameterIndices))
+    if (failed(parameterIndices)) {
       return signalPassFailure();
+    }
 
     // Decide whether to import a particular parameter.
     DenseSet<StringRef> importKeys;
-    for (auto &key : keys)
+    for (auto &key : keys) {
       importKeys.insert(key);
+    }
     auto shouldImportParameter =
         [&](IREE::Flow::NamedParameterAttr parameterAttr) -> bool {
       // Always try to import explicitly named parameters.
-      if (importKeys.contains(parameterAttr.getKey().getValue()))
+      if (importKeys.contains(parameterAttr.getKey().getValue())) {
         return true; // key match
+      }
       // If a maximum size is specified use that to limit what we import
       // (users may want to bring in small parameters but leave the big ones
       // out).
-      if (maximumSize && parameterAttr.getStorageSize() <= maximumSize)
+      if (maximumSize && parameterAttr.getStorageSize() <= maximumSize) {
         return true; // <= max size
+      }
       // Default to not importing.
       return false;
     };
@@ -312,14 +322,16 @@ struct ImportParametersPass
       // Only inspect parameter globals.
       auto parameterAttr = dyn_cast_if_present<IREE::Flow::NamedParameterAttr>(
           globalOp.getGlobalInitialValue());
-      if (!parameterAttr)
+      if (!parameterAttr) {
         continue;
+      }
 
       // Lookup the parameter index for the scope.
       auto scope = parameterAttr.getScope().getValue();
       auto *parameterIndex = parameterIndices->lookup(scope);
-      if (!parameterIndex)
+      if (!parameterIndex) {
         continue;
+      }
 
       // See if the parameter is present in the scope (we may have only been
       // provided as partial index).
@@ -351,8 +363,9 @@ struct ImportParametersPass
         auto valueOr = importParameter(
             fullName, cast<ShapedType>(globalOp.getGlobalType()), parameterAttr,
             entry);
-        if (failed(valueOr))
+        if (failed(valueOr)) {
           return signalPassFailure();
+        }
 
         // Replace the initial value with the constant.
         globalOp.setGlobalInitialValue(*valueOr);

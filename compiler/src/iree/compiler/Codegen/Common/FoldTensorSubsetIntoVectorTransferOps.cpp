@@ -22,8 +22,9 @@ using namespace mlir;
 static bool areAllRankReducedLeadingDim(tensor::ExtractSliceOp extractOp,
                                         unsigned trailingRank) {
   // If no ranks are reduced at all, it's a degenerated case; always true.
-  if (extractOp.getSourceType().getRank() == extractOp.getType().getRank())
+  if (extractOp.getSourceType().getRank() == extractOp.getType().getRank()) {
     return true;
+  }
 
   RankedTensorType inferredType = extractOp.inferResultType(
       extractOp.getSourceType(), extractOp.getMixedSizes());
@@ -57,19 +58,25 @@ public:
   LogicalResult matchAndRewrite(vector::TransferReadOp xferOp,
                                 PatternRewriter &rewriter) const override {
     // TODO: support 0-d corner case.
-    if (xferOp.getTransferRank() == 0)
+    if (xferOp.getTransferRank() == 0) {
       return failure();
-    if (xferOp.hasOutOfBoundsDim())
+    }
+    if (xferOp.hasOutOfBoundsDim()) {
       return failure();
-    if (!xferOp.getPermutationMap().isMinorIdentity())
+    }
+    if (!xferOp.getPermutationMap().isMinorIdentity()) {
       return failure();
-    if (xferOp.getMask())
+    }
+    if (xferOp.getMask()) {
       return failure();
+    }
     auto extractOp = xferOp.getBase().getDefiningOp<tensor::ExtractSliceOp>();
-    if (!extractOp)
+    if (!extractOp) {
       return failure();
-    if (!extractOp.hasUnitStride())
+    }
+    if (!extractOp.hasUnitStride()) {
       return failure();
+    }
 
     // Bail on illegal rank-reduction: we need to check that the rank-reduced
     // dims are exactly the leading dims. I.e. the following is illegal:
@@ -87,8 +94,10 @@ public:
     // ```
     // For this, check the trailing `vectorRank` dims of the extract_slice
     // result tensor match the trailing dims of the inferred result tensor.
-    if (!areAllRankReducedLeadingDim(extractOp, extractOp.getType().getRank()))
+    if (!areAllRankReducedLeadingDim(extractOp,
+                                     extractOp.getType().getRank())) {
       return failure();
+    }
 
     int64_t rankReduced =
         extractOp.getSourceType().getRank() - extractOp.getType().getRank();
@@ -132,12 +141,15 @@ public:
 /// dynamic tensors, where it resolves the tensor sizes via value-bounds
 /// analysis, and then checks if the vector type fully overwrites the tensor.
 static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
-  if (writeOp.hasOutOfBoundsDim())
+  if (writeOp.hasOutOfBoundsDim()) {
     return false;
-  if (writeOp.getVectorType().getRank() != writeOp.getShapedType().getRank())
+  }
+  if (writeOp.getVectorType().getRank() != writeOp.getShapedType().getRank()) {
     return false;
-  if (writeOp.getMask())
+  }
+  if (writeOp.getMask()) {
     return false;
+  }
 
   std::optional<vector::VscaleRange> vscaleRange;
   auto vecType = writeOp.getVectorType();
@@ -155,8 +167,9 @@ static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
       [&](unsigned dimIndex) -> FailureOr<iree_compiler::DimBoundSize> {
     auto size = destShape[dimIndex];
     // Fixed-size dimensions are simply included in the shape.
-    if (size != ShapedType::kDynamic)
+    if (size != ShapedType::kDynamic) {
       return iree_compiler::DimBoundSize{size};
+    }
     // (Attempt to) resolve dynamic dimensions via value-bounds analysis.
     return iree_compiler::computeDimUpperBound(dest, dimIndex, vscaleRange);
   };
@@ -165,12 +178,15 @@ static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
   ArrayRef<bool> vecScalableFlags = vecType.getScalableDims();
   for (unsigned d = 0, e = destShape.size(); d < e; ++d) {
     auto dimSize = resolveDestinationDimSize(d);
-    if (failed(dimSize))
+    if (failed(dimSize)) {
       return false;
-    if (dimSize->scalable && !vecScalableFlags[d])
+    }
+    if (dimSize->scalable && !vecScalableFlags[d]) {
       return false;
-    if (vecShape[d] != dimSize->baseSize)
+    }
+    if (vecShape[d] != dimSize->baseSize) {
       return false;
+    }
   }
   return true;
 }
@@ -198,23 +214,28 @@ public:
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
-    if (!insertOp.hasUnitStride())
+    if (!insertOp.hasUnitStride()) {
       return failure();
+    }
 
     auto xferOp = insertOp.getSource().getDefiningOp<vector::TransferWriteOp>();
-    if (!xferOp)
+    if (!xferOp) {
       return failure();
+    }
 
     // TODO: support 0-d corner case.
-    if (xferOp.getTransferRank() == 0)
+    if (xferOp.getTransferRank() == 0) {
       return failure();
-    if (!xferOp.getPermutationMap().isIdentity())
+    }
+    if (!xferOp.getPermutationMap().isIdentity()) {
       return failure();
+    }
     // Fold only if the TransferWriteOp completely overwrites the `source` with
     // a vector. I.e., the result of the TransferWriteOp is a new tensor whose
     // content is the data of the vector.
-    if (!isDestinationFullyOverwritten(xferOp))
+    if (!isDestinationFullyOverwritten(xferOp)) {
       return failure();
+    }
 
     // Bail on illegal rank-reduction: we need to check that the rank-reduced
     // dims are exactly the leading dims. I.e. the following is illegal:
@@ -241,8 +262,9 @@ public:
     auto actualSourceTensorShape = insertOp.getSourceType().getShape();
     if (rankReduced > 0 &&
         actualSourceTensorShape.take_back(vectorRank) !=
-            inferredSourceTensorType.getShape().take_back(vectorRank))
+            inferredSourceTensorType.getShape().take_back(vectorRank)) {
       return failure();
+    }
 
     SmallVector<Value> indices = getValueOrCreateConstantIndexOp(
         rewriter, insertOp.getLoc(), insertOp.getMixedOffsets());
@@ -328,8 +350,9 @@ public:
       if (!maybeDestSize || !maybeIndex) {
         continue;
       }
-      if (vecSize + *maybeIndex <= *maybeDestSize)
+      if (vecSize + *maybeIndex <= *maybeDestSize) {
         inBounds[idx] = true;
+      }
     }
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(

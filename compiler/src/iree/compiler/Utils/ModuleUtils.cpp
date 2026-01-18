@@ -7,13 +7,17 @@
 #include "iree/compiler/Utils/ModuleUtils.h"
 
 #include "iree/compiler/Utils/StringUtils.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler {
@@ -27,22 +31,26 @@ std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
     // Recurse through fused locations.
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
-      if (childResult)
+      if (childResult) {
         return childResult;
+      }
     }
   } else if (auto loc = dyn_cast<CallSiteLoc>(baseLoc)) {
     // First check caller...
     auto callerResult = findFirstFileLoc(loc.getCaller());
-    if (callerResult)
+    if (callerResult) {
       return callerResult;
+    }
     // Then check callee...
     auto calleeResult = findFirstFileLoc(loc.getCallee());
-    if (calleeResult)
+    if (calleeResult) {
       return calleeResult;
+    }
   } else if (auto loc = dyn_cast<NameLoc>(baseLoc)) {
     auto childResult = findFirstFileLoc(loc.getChildLoc());
-    if (childResult)
+    if (childResult) {
       return childResult;
+    }
   } else if (auto loc = dyn_cast<OpaqueLoc>(baseLoc)) {
     // TODO(scotttodd): Use loc.fallbackLocation()?
   } else if (auto loc = dyn_cast<UnknownLoc>(baseLoc)) {
@@ -54,8 +62,9 @@ std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
 
 std::string guessModuleName(mlir::ModuleOp moduleOp, StringRef defaultName) {
   std::string moduleName = moduleOp.getName().value_or("").str();
-  if (!moduleName.empty())
+  if (!moduleName.empty()) {
     return moduleName;
+  }
   auto loc = findFirstFileLoc(moduleOp.getLoc());
   if (loc.has_value()) {
     return sanitizeSymbolName(
@@ -148,8 +157,9 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
 
   // Resolve conflicts and move the op.
   for (auto &sourceOp : sourceOps) {
-    if (sourceOp->hasTrait<OpTrait::IsTerminator>())
+    if (sourceOp->hasTrait<OpTrait::IsTerminator>()) {
       continue;
+    }
     if (auto symbolOp = dyn_cast<SymbolOpInterface>(sourceOp)) {
       auto symbolName = symbolOp.getName();
 
@@ -219,6 +229,36 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
 
   // Merge all of the module contents.
   return mergeModuleInto(*sourceModuleRef, targetOp, targetBuilder);
+}
+
+LogicalResult writeModule(mlir::ModuleOp moduleOp, StringRef path) {
+  // Ensure the parent paths exist.
+  llvm::sys::fs::create_directories(llvm::sys::path::parent_path(path));
+
+  // Attempt to open file - should succeed as long as permissions are ok.
+  std::string error;
+  auto file = mlir::openOutputFile(path, &error);
+  if (!file) {
+    return mlir::emitError(moduleOp.getLoc())
+           << "while dumping to '" << path << "': " << error << "\n";
+  }
+
+  // If going to binary serialize out and otherwise print as text.
+  if (llvm::sys::path::extension(path) == ".mlirbc") {
+    BytecodeWriterConfig config;
+    if (failed(mlir::writeBytecodeToFile(moduleOp, file->os(), config))) {
+      return mlir::emitError(moduleOp.getLoc())
+             << "failed to serialize module to '" << path << "'\n";
+    }
+  } else {
+    OpPrintingFlags flags;
+    moduleOp.print(file->os(), flags);
+  }
+
+  // Keep the temporary file after the write succeeds.
+  file->keep();
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler

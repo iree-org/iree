@@ -98,8 +98,9 @@ struct FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     for (auto retainAttrName : retainedAttributes) {
       StringRef attrName(retainAttrName);
       Attribute attr = srcOp->getAttr(attrName);
-      if (attr)
+      if (attr) {
         newFuncOp->setAttr(attrName, attr);
+      }
     }
 
     // Copy all arg/result attrs. We could filter these.

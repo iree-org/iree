@@ -240,6 +240,30 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    json
+  HDRS
+    "json.h"
+  SRCS
+    "json.c"
+  DEPS
+    ::unicode
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    json_test
+  SRCS
+    "json_test.cc"
+  DEPS
+    ::json
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     memory
   HDRS
     "memory.h"
@@ -356,6 +380,39 @@ iree_cc_library(
   DEPS
     iree::base::core_headers
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    unicode
+  HDRS
+    "unicode.h"
+  SRCS
+    "unicode.c"
+    "unicode_tables.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_fuzz(
+  NAME
+    unicode_fuzz
+  SRCS
+    "unicode_fuzz.cc"
+  DEPS
+    ::unicode
+)
+
+iree_cc_test(
+  NAME
+    unicode_test
+  SRCS
+    "unicode_test.cc"
+  DEPS
+    ::unicode
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

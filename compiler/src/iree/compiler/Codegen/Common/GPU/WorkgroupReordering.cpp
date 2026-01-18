@@ -139,20 +139,23 @@ struct ReorderWorkgroupsPass final
             .Case("", ReorderWorkgroupsStrategy::None)
             .Case("transpose", ReorderWorkgroupsStrategy::Transpose)
             .Default(failure());
-    if (failed(selectedStrategy))
+    if (failed(selectedStrategy)) {
       return failure();
+    }
 
     reorderingStrategy = *selectedStrategy;
     return success();
   }
 
   void runOnOperation() override {
-    if (reorderingStrategy == ReorderWorkgroupsStrategy::None)
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::None) {
       return;
+    }
 
     FunctionOpInterface funcOp = getOperation();
-    if (filterFn && failed(filterFn(funcOp)))
+    if (filterFn && failed(filterFn(funcOp))) {
       return;
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- Before reorder workgroups with workgroup counts ---";

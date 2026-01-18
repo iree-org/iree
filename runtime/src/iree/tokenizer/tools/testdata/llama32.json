@@ -1,0 +1,9 @@
+{
+  "model": "unsloth/Llama-3.2-1B-Instruct",
+  "description": "Llama 3.2 1B - Small efficient model (2.9M+ downloads) - ungated unsloth mirror",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "chat", "input": "What is the weather like today?"},
+    {"name": "no_special", "input": "test", "add_special_tokens": false}
+  ]
+}

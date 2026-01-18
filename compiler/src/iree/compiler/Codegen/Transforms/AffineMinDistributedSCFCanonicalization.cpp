@@ -40,8 +40,9 @@ static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
   // Check if any of the dimensions is a ForOp or ParallelOp induction variable.
   for (auto dim : minOp.getDimOperands()) {
     auto ivArg = dyn_cast<BlockArgument>(dim);
-    if (!ivArg)
+    if (!ivArg) {
       continue;
+    }
     Operation *containingOp = ivArg.getOwner()->getParentOp();
     auto forOp = dyn_cast_if_present<scf::ForOp>(containingOp);
     if (forOp && forOp.getInductionVar() == dim) {
@@ -52,8 +53,9 @@ static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
       break;
     }
     auto parallelOp = dyn_cast_if_present<scf::ParallelOp>(containingOp);
-    if (!parallelOp)
+    if (!parallelOp) {
       continue;
+    }
     for (auto [index, inductionVar] :
          llvm::enumerate(parallelOp.getInductionVars())) {
       if (inductionVar == dim) {
@@ -64,11 +66,13 @@ static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
         break;
       }
     }
-    if (iv)
+    if (iv) {
       break;
+    }
   }
-  if (!iv)
+  if (!iv) {
     return false;
+  }
   // Calculate the affine map representing `%ub - %iv`.
   AffineExpr ivDim;
   AffineExpr ubDim;
@@ -94,11 +98,13 @@ static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
   // `dividend` or equal to `%ub - %iv`.
   for (AffineExpr result : minOp.getAffineMap().getResults()) {
     if (auto cst = dyn_cast<AffineConstantExpr>(result)) {
-      if (cst.getValue() <= 0 || cst.getValue() % dividend != 0)
+      if (cst.getValue() <= 0 || cst.getValue() % dividend != 0) {
         return false;
+      }
     } else {
-      if (diffExp != result)
+      if (diffExp != result) {
         return false;
+      }
     }
   }
   // Now check that for every value of the induction variable `%ub - %iv` is
@@ -121,13 +127,15 @@ static bool isDivisible(Value v, int64_t dividend) {
   affine::canonicalizeMapAndOperands(&modMap, &ops);
   modMap = simplifyAffineMap(modMap);
   auto cst = dyn_cast<AffineConstantExpr>(modMap.getResult(0));
-  if (cst)
+  if (cst) {
     return (cst.getValue() == 0);
+  }
   // If the map doesn't fold to 0 but simplifies to (d0 %n) with d0 an
   // affine.min, check if all the results of the affine.min's map are divisible
   // by `dividend`.
-  if (modMap.getResult(0) != mod)
+  if (modMap.getResult(0) != mod) {
     return false;
+  }
   assert(ops.size() == 1);
   auto minOp = ops[0].getDefiningOp<affine::AffineMinOp>();
   return (minOp && affineMinOpDivisible(minOp, dividend));
@@ -149,12 +157,14 @@ static std::optional<int64_t> foldAffineMin(affine::AffineMinOp minOp) {
       constantResult = cst.getValue();
     }
   }
-  if (constantResult == 0)
+  if (constantResult == 0) {
     return {};
+  }
   // If afine.min map's results are all positive and divisible by
   // `constantResult` then it can be replaced by `constantResult`.
-  if (affineMinOpDivisible(minOp, constantResult))
+  if (affineMinOpDivisible(minOp, constantResult)) {
     return constantResult;
+  }
   return {};
 }
 
@@ -167,8 +177,9 @@ struct AffineMinDistributedSCFCanonicalizationPattern
   matchAndRewrite(mlir::affine::AffineMinOp minOp,
                   mlir::PatternRewriter &rewriter) const override {
     std::optional<int64_t> cst = foldAffineMin(minOp);
-    if (!cst)
+    if (!cst) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(minOp,
                                                    rewriter.getIndexAttr(*cst));
     return success();

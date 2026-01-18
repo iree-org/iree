@@ -12,6 +12,26 @@
 
 namespace mlir::iree_compiler {
 
+// Optional register allocation analysis interface used during encoding.
+// Encoders that can provide this (such as the bytecode encoder) may use it to
+// enable encoding-time optimizations (MOVE bit propagation, discard elision,
+// etc). Other encoders (such as EmitC) return nullptr and ops must
+// conservatively encode without analysis.
+class VMRegisterAllocation {
+public:
+  virtual ~VMRegisterAllocation() = default;
+
+  // Returns true if the operand at |operandIndex| of the given discard op can
+  // be elided because it was already released via MOVE on a preceding op.
+  virtual bool isDiscardOperandElidable(Operation *op,
+                                        unsigned operandIndex) const = 0;
+
+  // Maps an SSA |value| to its allocated register ordinal.
+  // Returns a packed ordinal (matching the VM register encoding) such that
+  // ref registers have the type bit set.
+  virtual int mapValueToRegisterOrdinal(Value value) const = 0;
+};
+
 // Interface for encoding of VM operations within functions.
 // This base manages source map construction and vm.func walking while
 // subclasses provide actual emission.
@@ -60,6 +80,9 @@ public:
                                      Operation::operand_range operands,
                                      int successorIndex) = 0;
 
+  // Encodes just a branch target (PC offset) without operand mappings.
+  virtual LogicalResult encodeBranchTarget(Block *targetBlock) = 0;
+
   // Encodes a branch table.
   virtual LogicalResult encodeBranchTable(SuccessorRange caseSuccessors,
                                           OperandRangeRange caseOperands,
@@ -71,11 +94,29 @@ public:
   // Encodes a variable list of operands (by reference), including a count.
   virtual LogicalResult encodeOperands(Operation::operand_range values) = 0;
 
+  // Encodes a filtered list of operands (by reference), including a count.
+  // Each pair contains the value and its original operand index for MOVE bit
+  // computation.
+  virtual LogicalResult
+  encodeOperands(ArrayRef<std::pair<Value, int>> valuesWithIndices) = 0;
+
   // Encodes a result value (by reference).
   virtual LogicalResult encodeResult(Value value) = 0;
 
   // Encodes a variable list of results (by reference), including a count.
   virtual LogicalResult encodeResults(Operation::result_range values) = 0;
+
+  // Encodes result destination registers from successor block arguments.
+  // Used for operations like CallYieldable where call results go to block args.
+  virtual LogicalResult encodeBlockArgResults(Block *targetBlock) = 0;
+
+  // Returns the register allocation analysis, if available.
+  // Bytecode encoder provides this; other encoders (e.g., EmitC) return
+  // nullptr. Ops can use this for register-allocation-aware encoding decisions
+  // such as per-operand elision.
+  virtual const VMRegisterAllocation *getRegisterAllocation() const {
+    return nullptr;
+  }
 };
 
 } // namespace mlir::iree_compiler

@@ -263,7 +263,7 @@ static iree_status_t iree_io_memory_stream_fill(
       uint16_t* data = (uint16_t*)data_ptr;
       uint16_t value_bits = *(const uint16_t*)(pattern);
       for (iree_device_size_t i = 0; i < count; ++i) {
-        iree_unaligned_store(&data[i], value_bits);
+        iree_unaligned_store_le(&data[i], value_bits);
       }
       break;
     }
@@ -271,7 +271,7 @@ static iree_status_t iree_io_memory_stream_fill(
       uint32_t* data = (uint32_t*)data_ptr;
       uint32_t value_bits = *(const uint32_t*)(pattern);
       for (iree_device_size_t i = 0; i < count; ++i) {
-        iree_unaligned_store(&data[i], value_bits);
+        iree_unaligned_store_le(&data[i], value_bits);
       }
       break;
     }
@@ -279,7 +279,7 @@ static iree_status_t iree_io_memory_stream_fill(
       uint64_t* data = (uint64_t*)data_ptr;
       uint64_t value_bits = *(const uint64_t*)(pattern);
       for (iree_device_size_t i = 0; i < count; ++i) {
-        iree_unaligned_store(&data[i], value_bits);
+        iree_unaligned_store_le(&data[i], value_bits);
       }
       break;
     }

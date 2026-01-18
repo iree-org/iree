@@ -1,0 +1,31 @@
+{
+  "model": "BAAI/bge-large-en-v1.5",
+  "description": "BGE Large English v1.5 - Popular text embedding model (3.6M+ downloads)",
+  "tests": [
+    {
+      "name": "simple",
+      "input": "Hello, world!"
+    },
+    {
+      "name": "unicode",
+      "input": "Héllo wörld! café résumé"
+    },
+    {
+      "name": "sentence",
+      "input": "This is a sample sentence for embedding."
+    },
+    {
+      "name": "query",
+      "input": "What is machine learning?"
+    },
+    {
+      "name": "passage",
+      "input": "Machine learning is a subset of artificial intelligence that enables systems to learn from data."
+    },
+    {
+      "name": "no_special",
+      "input": "hello world",
+      "add_special_tokens": false
+    }
+  ]
+}

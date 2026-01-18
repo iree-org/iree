@@ -15,6 +15,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "constant_encoding.mlir",
             "dependencies.mlir",

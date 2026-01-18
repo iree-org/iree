@@ -50,6 +50,11 @@ declare -a CMAKE_ARGS=(
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
 
+  # Enable split dwarf and thin archives for smaller object files and faster
+  # linking (for builds with debug info).
+  "-DIREE_ENABLE_SPLIT_DWARF=ON"
+  "-DIREE_ENABLE_THIN_ARCHIVES=ON"
+
   # Enable docs build on the CI. The additional builds are pretty fast and
   # give us early warnings for some types of website publication errors.
   "-DIREE_BUILD_DOCS=ON"

@@ -32,22 +32,25 @@ TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
 }
 SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
   SmallVector<tensor::DimOp> result;
-  for (Operation *op : dimOps)
+  for (Operation *op : dimOps) {
     result.push_back(cast<tensor::DimOp>(op));
+  }
   return result;
 }
 void TensorDimTrackingRewriter::notifyOperationErased(Operation *op) {
   IRRewriter::Listener::notifyOperationErased(op);
-  if (isa<tensor::DimOp>(op))
+  if (isa<tensor::DimOp>(op)) {
     dimOps.erase(op);
+  }
 }
 
 void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op,
                                                         InsertPoint previous) {
   IRRewriter::Listener::notifyOperationInserted(op, previous);
   auto dimOp = dyn_cast<tensor::DimOp>(op);
-  if (dimOp && isa<OpResult>(dimOp.getSource()))
+  if (dimOp && isa<OpResult>(dimOp.getSource())) {
     dimOps.insert(op);
+  }
 }
 
 } // namespace mlir
@@ -59,8 +62,9 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
   for (tensor::DimOp dimOp : dimOps) {
     // Only DimOps with static indices are supported.
     std::optional<int64_t> idx = dimOp.getConstantIndex();
-    if (!idx.has_value())
+    if (!idx.has_value()) {
       continue;
+    }
 
     if (isa<BlockArgument>(dimOp.getSource())) {
       continue;
@@ -68,8 +72,9 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
 
     // Only DimOps with ranked tensors are supported.
     auto tensorType = dyn_cast<RankedTensorType>(dimOp.getSource().getType());
-    if (!tensorType)
+    if (!tensorType) {
       continue;
+    }
 
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(dimOp);
@@ -85,9 +90,11 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
     if (succeeded(IREE::Flow::getOptimizedDynamicResultDims(
             rewriter, dimOp.getSource(), dynamicDims))) {
       unsigned ctr = 0;
-      for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i)
-        if (tensorType.isDynamicDim(i))
+      for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i) {
+        if (tensorType.isDynamicDim(i)) {
           ++ctr;
+        }
+      }
       rewriter.replaceOp(dimOp, dynamicDims[ctr]);
     }
   }

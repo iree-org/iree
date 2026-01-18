@@ -16,18 +16,51 @@ iree_cc_library(
   HDRS
     "RegisterAllocation.h"
     "TestPasses.h"
-    "ValueLiveness.h"
   SRCS
+    "LiveIntervalsTest.cpp"
     "RegisterAllocation.cpp"
     "RegisterAllocationTest.cpp"
-    "ValueLiveness.cpp"
     "ValueLivenessTest.cpp"
   DEPS
+    ::ValueLiveness
     LLVMSupport
     MLIRAnalysis
     MLIRIR
     MLIRPass
     MLIRSupport
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::VM::Analysis::LinearScan
+    iree::compiler::Dialect::VM::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    ValueLiveness
+  HDRS
+    "ValueLiveness.h"
+  SRCS
+    "ValueLiveness.cpp"
+  DEPS
+    LLVMSupport
+    MLIRAnalysis
+    MLIRControlFlowInterfaces
+    MLIRIR
+    MLIRSupport
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::VM::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    OrdinalAnalysis
+  HDRS
+    "OrdinalAnalysis.h"
+  SRCS
+    "OrdinalAnalysis.cpp"
+  DEPS
+    LLVMSupport
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::IR
   PUBLIC

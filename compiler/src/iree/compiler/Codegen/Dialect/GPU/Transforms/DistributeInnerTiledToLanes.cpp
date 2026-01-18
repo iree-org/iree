@@ -63,8 +63,9 @@ LogicalResult fuseProducersGreedily(RewriterBase &rewriter,
     // Materialize the slice of the producer in place.
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
         scf::tileAndFuseProducerOfSlice(rewriter, candidateSliceOp, loops);
-    if (!fusedProducer)
+    if (!fusedProducer) {
       continue;
+    }
 
     // We have no way to know whether a multi-use value can be yielded from the
     // parallel loop so never yield a replacement.
@@ -73,8 +74,9 @@ LogicalResult fuseProducersGreedily(RewriterBase &rewriter,
     for (auto tiledOp : fusedProducer->tiledOps) {
       for (OpOperand &operand : tiledOp->getOpOperands()) {
         auto sliceOp = operand.get().getDefiningOp<tensor::ExtractSliceOp>();
-        if (!sliceOp)
+        if (!sliceOp) {
           continue;
+        }
         candidates.push_back(sliceOp);
       }
     }

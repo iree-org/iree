@@ -14,7 +14,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "live_intervals.mlir"
     "register_allocation.mlir"
+    "register_allocation_ints.mlir"
+    "register_allocation_refs.mlir"
     "value_liveness.mlir"
   TOOLS
     FileCheck

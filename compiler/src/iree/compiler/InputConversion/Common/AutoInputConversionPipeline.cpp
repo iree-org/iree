@@ -32,15 +32,17 @@ public:
 };
 
 void AutoInputConversionPipelinePass::runOnOperation() {
-  if (!pipelineExtensions)
+  if (!pipelineExtensions) {
     return;
+  }
 
   mlir::ModuleOp moduleOp = getOperation();
   llvm::StringSet<> detectedTypeMnemonics;
   pipelineExtensions->populateDetectedCustomInputConversionTypes(
       moduleOp, detectedTypeMnemonics);
-  if (detectedTypeMnemonics.empty())
+  if (detectedTypeMnemonics.empty()) {
     return;
+  }
 
   if (detectedTypeMnemonics.getNumItems() > 1) {
     // TODO(scotttodd): handle multiple typeMnemonics (use all?)

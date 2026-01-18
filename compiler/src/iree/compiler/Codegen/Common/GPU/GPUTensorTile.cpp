@@ -45,8 +45,9 @@ public:
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, op)))
+    if (failed(filter.checkAndNotify(rewriter, op))) {
       return failure();
+    }
 
     // Make sure we have a PartitionableLoopInterface op here and query the tile
     // sizes from the partitionable loops.
@@ -63,8 +64,9 @@ public:
     }
     // Mask out non reduction dimensions.
     for (unsigned depth : partitionedLoops) {
-      if (depth < tileSizes.size())
+      if (depth < tileSizes.size()) {
         tileSizes[depth] = 0;
+      }
     }
 
     // Make sure we have a tile size for each dimension.
@@ -120,11 +122,13 @@ private:
       return rewriter.notifyMatchFailure(consumer, "failed to tile consumer");
     }
 
-    if (!fuseInputProducer)
+    if (!fuseInputProducer) {
       return tilingResult;
+    }
     // If there are no generated loops generated, fusion is immaterial.
-    if (tilingResult->loops.empty())
+    if (tilingResult->loops.empty()) {
       return tilingResult;
+    }
 
     // Collect immediate input operands that are fusable into the tiled loop.
     // We have tensor extract slice ops taking slices of the untiled op.
@@ -135,15 +139,18 @@ private:
     assert(tilingResult->tiledOps.size() == 1);
     Operation *tiledOp = tilingResult->tiledOps.front();
     auto dsOp = dyn_cast<DestinationStyleOpInterface>(tiledOp);
-    if (!dsOp)
+    if (!dsOp) {
       return tilingResult;
+    }
     for (OpOperand *operand : dsOp.getDpsInputOperands()) {
       auto sliceOp = operand->get().getDefiningOp<tensor::ExtractSliceOp>();
-      if (!sliceOp)
+      if (!sliceOp) {
         continue;
+      }
       auto tilingOp = sliceOp.getSource().getDefiningOp<TilingInterface>();
-      if (!tilingOp)
+      if (!tilingOp) {
         continue;
+      }
       if (isa<tensor::PadOp>(sliceOp.getSource().getDefiningOp())) {
         continue;
       }
@@ -248,13 +255,15 @@ static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
 
   for (TilingInterface tilingOp : computeOps) {
     auto attr = tilingOp->getAttr(LinalgTransforms::kLinalgTransformMarker);
-    if (attr == marker)
+    if (attr == marker) {
       continue;
+    }
 
     size_t numLoops = 0;
     for (auto type : tilingOp.getLoopIteratorTypes()) {
-      if (type == utils::IteratorType::parallel)
+      if (type == utils::IteratorType::parallel) {
         numLoops++;
+      }
     }
     IRRewriter rewriter(tilingOp->getContext());
     rewriter.setInsertionPoint(tilingOp);
@@ -263,8 +272,9 @@ static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     // If there are no dimensions to tile skip the transformation.
-    if (partitionedLoops.empty())
+    if (partitionedLoops.empty()) {
       continue;
+    }
     SmallVector<OpFoldResult> numThreads(numLoops, rewriter.getIndexAttr(0));
     int64_t id = 0, threadDim = 0;
     SmallVector<Attribute> idDims;
@@ -307,8 +317,9 @@ static LogicalResult tileAndUnrollConv(mlir::FunctionOpInterface funcOp) {
     IRRewriter rewriter(funcOp.getContext());
     SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
         funcOp.getContext(), getTileSizes(consumerOp, 1));
-    if (tileSizes.empty())
+    if (tileSizes.empty()) {
       return success();
+    }
 
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
         scf::tileConsumerAndFuseProducersUsingSCF(
@@ -375,8 +386,9 @@ struct GPUTensorTilePass final
     // Tile to serial loops to the wg tile size to handle reductions and other
     // dimension that have not been distributed.
     if (failed(tileReductionToSerialLoops(funcOp, /*fuseInputProducer=*/false,
-                                          /*coalesceLoops=*/false)))
+                                          /*coalesceLoops=*/false))) {
       return signalPassFailure();
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "// --- After tile reductions:\n";

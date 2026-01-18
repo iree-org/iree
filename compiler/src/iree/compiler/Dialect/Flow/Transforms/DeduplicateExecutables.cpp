@@ -19,8 +19,9 @@ namespace {
 // Utilities to make SymbolRefAttr easier to construct.
 static SymbolRefAttr nestSymbolRef(SymbolRefAttr baseRefAttr,
                                    FlatSymbolRefAttr leafRefAttr) {
-  if (!baseRefAttr)
+  if (!baseRefAttr) {
     return leafRefAttr;
+  }
   SmallVector<FlatSymbolRefAttr> nestedRefAttrs;
   llvm::append_range(nestedRefAttrs, baseRefAttr.getNestedReferences());
   nestedRefAttrs.push_back(leafRefAttr);
@@ -43,8 +44,9 @@ static void gatherReplacements(
     for (auto [oldNestedSymbolOp, newNestedSymbolOp] :
          llvm::zip_equal(nestedOldRegion.getOps<SymbolOpInterface>(),
                          nestedNewRegion.getOps<SymbolOpInterface>())) {
-      if (!oldNestedSymbolOp.isPublic())
+      if (!oldNestedSymbolOp.isPublic()) {
         continue; // ignore private symbols
+      }
       auto oldNestedSymbolRefAttr =
           nestSymbolRef(oldSymbolRefAttr, oldNestedSymbolOp);
       auto newNestedSymbolRefAttr =
@@ -140,8 +142,9 @@ static int deduplicateObjects(Operation *scopeOp,
   // We could rely on SymbolDCE for this but that makes looking at IR dumps
   // harder as after this pass runs and until SymbolDCE runs there are lots of
   // dead objects in the output.
-  for (auto *op : deadOps)
+  for (auto *op : deadOps) {
     op->erase();
+  }
 
   return deadOps.size();
 }
@@ -156,11 +159,13 @@ class DeduplicateExecutablesPass
     mlir::ModuleOp moduleOp = getOperation();
     SmallVector<Operation *> allObjects;
     for (auto &op : moduleOp.getOps()) {
-      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>())
+      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
         allObjects.push_back(&op);
+      }
     }
-    if (allObjects.empty())
+    if (allObjects.empty()) {
       return;
+    }
     (void)deduplicateObjects(moduleOp, allObjects);
     // totalObjects = allObjects.size();
     // objectsDeduplicated = deduplicateObjects(moduleOp, allObjects);

@@ -7,11 +7,16 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/MathExtras.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
@@ -41,8 +46,9 @@ static Value stripIntegerCasts(Value val) {
 /// loads, which is a conservative approximatino for workgroup-uniformity that
 /// can be made more extensive if needed.
 static bool isDefinitelyWorkgroupUniform(Value arg) {
-  if (!arg)
+  if (!arg) {
     return true;
+  }
   SetVector<Operation *> dependencies;
   BackwardSliceOptions opts;
   arg = stripIntegerCasts(arg);
@@ -55,8 +61,9 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
       getBackwardSlice(arg, &dependencies, opts);
   assert(result.succeeded());
   return llvm::all_of(dependencies, [&](Operation *op) {
-    if (matchPattern(op, m_Constant()))
+    if (matchPattern(op, m_Constant())) {
       return true;
+    }
     if (isa<IREE::HAL::InterfaceConstantLoadOp, IREE::Util::AssumeIntOp>(op)) {
       return true;
     }
@@ -67,49 +74,42 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
   });
 }
 
-/// Return the maximum value that has been `util.assume.int`'d about this value
-/// if there is one.
-/// TODO: it'd be nice to be able to run the IntRangeAnalysis just up to the
-/// value in question, but we don't have that, so we approximate it.
-static std::optional<int64_t> getDynamicSizeMax(Value size) {
-  size = stripIntegerCasts(size);
-  // Special case for constants that're still dynamic.
-  APInt constVal;
-  if (matchPattern(size, m_ConstantInt(&constVal))) {
-    return constVal.getZExtValue();
-  }
-  auto assumeOp = size.getDefiningOp<IREE::Util::AssumeIntOp>();
-  if (!assumeOp)
-    return std::nullopt;
-  std::optional<int64_t> maybeMax =
-      assumeOp.getUnionedUnsignedRange(cast<OpResult>(size).getResultNumber())
-          .second;
-  return maybeMax;
-}
-
+/// Return the maximum number of bytes spanned by the binding, or nullopt if
+/// unable to determine or if the calculation would overflow.
 static std::optional<int64_t>
-getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
+getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding,
+                const DataFlowSolver &solver) {
   int64_t maxNumElems = 1;
   ShapedType resultTy = dyn_cast<ShapedType>(binding.getType());
   if (auto tensorType =
           dyn_cast<IREE::TensorExt::DispatchTensorType>(binding.getType())) {
     resultTy = tensorType.asRankedTensorType();
   }
-  if (!resultTy || !resultTy.hasRank())
+  if (!resultTy || !resultTy.hasRank()) {
     return std::nullopt;
+  }
+  // Handle dynamic dimensions.
   for (Value dynArg : binding.getResultDynamicDims(0)) {
-    std::optional<int64_t> dimMax = getDynamicSizeMax(dynArg);
-    if (!dimMax)
+    FailureOr<int64_t> dimMax = getDynamicUpperBound(dynArg, solver);
+    if (failed(dimMax)) {
       return std::nullopt;
-    maxNumElems *= (*dimMax);
+    }
+    if (llvm::MulOverflow(maxNumElems, *dimMax, maxNumElems)) {
+      return std::nullopt;
+    }
   }
-  for (int64_t dim : resultTy.getShape()) {
-    if (ShapedType::isDynamic(dim))
-      continue;
-    maxNumElems *= dim;
+  // Handle static dimensions.
+  for (int64_t dim :
+       llvm::make_filter_range(resultTy.getShape(), ShapedType::isStatic)) {
+    if (llvm::MulOverflow(maxNumElems, dim, maxNumElems)) {
+      return std::nullopt;
+    }
   }
-  return maxNumElems * IREE::Util::getTypeBitWidth(resultTy.getElementType()) /
-         8;
+  int64_t elementBits = IREE::Util::getTypeBitWidth(resultTy.getElementType());
+  if (llvm::MulOverflow(maxNumElems, elementBits, maxNumElems)) {
+    return std::nullopt;
+  }
+  return maxNumElems / 8;
 }
 
 namespace {
@@ -118,13 +118,26 @@ struct ROCDLConfigureBufferInstructionsPass final
     : impl::ROCDLConfigureBufferInstructionsPassBase<
           ROCDLConfigureBufferInstructionsPass> {
   void runOnOperation() override {
-    if (!clROCDLlEnableBufferInstructions)
+    if (!clROCDLlEnableBufferInstructions) {
       return;
+    }
     mlir::FunctionOpInterface funcOp = getOperation();
-    // Is this really he best way to skip this pass on non-rocdl targets?
+    // Is this really the best way to skip this pass on non-rocdl targets?
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target || !target.isAMD())
+    if (!target || !target.isAMD()) {
       return;
+    }
+
+    // Initialize the DataFlowSolver with IntegerRangeAnalysis.
+    DataFlowSolver solver;
+    solver.load<dataflow::SparseConstantPropagation>();
+    solver.load<dataflow::DeadCodeAnalysis>();
+    solver.load<dataflow::IntegerRangeAnalysis>();
+    if (failed(solver.initializeAndRun(funcOp))) {
+      funcOp.emitOpError("failed to run integer range analysis");
+      return signalPassFailure();
+    }
+
     auto *gpuDialect =
         getContext().getLoadedDialect<IREE::GPU::IREEGPUDialect>();
     auto annotationHelper =
@@ -137,7 +150,7 @@ struct ROCDLConfigureBufferInstructionsPass final
                << " not known workgroup-uniform\n";
         return;
       }
-      std::optional<int64_t> maxBytes = getSpannedBytes(binding);
+      std::optional<int64_t> maxBytes = getSpannedBytes(binding, solver);
       if (!maxBytes) {
         LDBG() << "Couldn't bound binding size for " << binding;
         return;

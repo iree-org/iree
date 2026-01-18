@@ -45,6 +45,8 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Stream::Transforms
+    iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::TransformOps
     iree::compiler::Dialect::Util::Transforms

@@ -87,7 +87,7 @@ static iree_status_t RunFunction(iree_benchmark_state_t* benchmark_state,
       iree_vm_bytecode_module_benchmark_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      instance,
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           static_cast<iree_host_size_t>(module_file_toc->size)},
@@ -143,7 +143,7 @@ IREE_BENCHMARK_FN(BM_ModuleCreate) {
         iree_vm_bytecode_module_benchmark_module_create();
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
-        instance,
+        instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             static_cast<iree_host_size_t>(module_file_toc->size)},
@@ -169,7 +169,7 @@ IREE_BENCHMARK_FN(BM_ModuleCreateState) {
       iree_vm_bytecode_module_benchmark_module_create();
   iree_vm_module_t* module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      instance,
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           static_cast<iree_host_size_t>(module_file_toc->size)},
@@ -202,7 +202,7 @@ IREE_BENCHMARK_FN(BM_FullModuleInit) {
         iree_vm_bytecode_module_benchmark_module_create();
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
-        instance,
+        instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             static_cast<iree_host_size_t>(module_file_toc->size)},

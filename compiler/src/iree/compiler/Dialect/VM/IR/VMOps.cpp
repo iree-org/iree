@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
@@ -57,6 +58,43 @@ void setResultIntegerName(OpAsmSetValueNameFn &setNameFn, Value result,
 }
 
 } // namespace
+
+//===----------------------------------------------------------------------===//
+// custom<ResultTypeList>
+//===----------------------------------------------------------------------===//
+// (type, type, ...)
+
+ParseResult parseResultTypeList(OpAsmParser &parser, ArrayAttr &resultTypes) {
+  if (failed(parser.parseLParen())) {
+    return failure();
+  }
+  SmallVector<Attribute> typeAttrs;
+  if (succeeded(parser.parseOptionalRParen())) {
+    goto done; // empty list
+  }
+  do {
+    Type type;
+    if (failed(parser.parseType(type))) {
+      return failure();
+    }
+    typeAttrs.push_back(TypeAttr::get(type));
+  } while (succeeded(parser.parseOptionalComma()));
+  if (failed(parser.parseRParen())) {
+    return failure();
+  }
+done:
+  resultTypes = parser.getBuilder().getArrayAttr(typeAttrs);
+  return success();
+}
+
+void printResultTypeList(OpAsmPrinter &p, Operation *op,
+                         ArrayAttr resultTypes) {
+  p << '(';
+  llvm::interleaveComma(resultTypes, p.getStream(), [&](Attribute attr) {
+    p.printType(cast<TypeAttr>(attr).getValue());
+  });
+  p << ')';
+}
 
 //===----------------------------------------------------------------------===//
 // Structural ops
@@ -138,9 +176,10 @@ Block *FuncOp::addEntryBlock() {
 
 LogicalResult FuncOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
-  if (!isa<FunctionType>(type))
+  if (!isa<FunctionType>(type)) {
     return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
+  }
   return success();
 }
 
@@ -370,9 +409,10 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
 LogicalResult ImportOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
-  if (!isa<FunctionType>(type))
+  if (!isa<FunctionType>(type)) {
     return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
+  }
   return success();
 }
 
@@ -575,8 +615,9 @@ static bool isConstFloatBuildableWith(TypedAttr value, Type type) {
   } else if (auto elementsAttr = dyn_cast<ElementsAttr>(value)) {
     elementType = elementsAttr.getShapedType().getElementType();
   }
-  if (!elementType)
+  if (!elementType) {
     return false;
+  }
   return elementType.getIntOrFloatBitWidth() == SZ;
 }
 
@@ -785,6 +826,55 @@ void ConstRefZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultName(setNameFn, getResult(), "null");
 }
 
+FailureOr<bool> DiscardRefsOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Collect non-elidable operands. An operand is elidable if it was already
+  // released via MOVE on a preceding operation.
+  SmallVector<std::pair<Value, int>> toEncode;
+  for (auto [idx, ref] : llvm::enumerate(getRefs())) {
+    bool elidable = regAlloc && regAlloc->isDiscardOperandElidable(
+                                    getOperation(), static_cast<unsigned>(idx));
+    if (!elidable) {
+      toEncode.push_back({ref, static_cast<int>(idx)});
+    }
+  }
+
+  // Skip entirely if all operands are elidable.
+  if (toEncode.empty()) {
+    return false;
+  }
+
+  // Encode opcode + filtered operands.
+  if (failed(e.encodeOpcode("DiscardRefs",
+                            static_cast<int>(Opcode::DiscardRefs))) ||
+      failed(e.encodeOperands(toEncode))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
+}
+
+FailureOr<bool> AssignRefOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Elide when source and result are the same register.
+  if (regAlloc) {
+    int srcOrdinal = regAlloc->mapValueToRegisterOrdinal(getSource());
+    int dstOrdinal = regAlloc->mapValueToRegisterOrdinal(getResult());
+    if (srcOrdinal == dstOrdinal) {
+      return false;
+    }
+  }
+
+  if (failed(
+          e.encodeOpcode("AssignRef", static_cast<int>(Opcode::AssignRef))) ||
+      failed(e.encodeOperand(getSource(), 0)) ||
+      failed(e.encodeResult(getResult()))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
+}
+
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      Attribute value, ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("sym_name", builder.getStringAttr(name));
@@ -837,8 +927,9 @@ static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
   llvm::raw_string_ostream os(result);
   bool lastUnderscore = true;
   for (char c : unsafeIdentifier) {
-    if (!llvm::isPrint(c))
+    if (!llvm::isPrint(c)) {
       continue;
+    }
     if (llvm::isAlnum(c)) {
       os << llvm::toLower(c);
       lastUnderscore = false;
@@ -995,6 +1086,28 @@ ParseResult SwitchRefOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void SwitchRefOp::print(OpAsmPrinter &p) { printSwitchOp(p, *this); }
+
+FailureOr<bool> CastRefAnyOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Elide when operand and result are the same register.
+  if (regAlloc) {
+    int srcOrdinal = regAlloc->mapValueToRegisterOrdinal(getOperand());
+    int dstOrdinal = regAlloc->mapValueToRegisterOrdinal(getResult());
+    if (srcOrdinal == dstOrdinal) {
+      return false;
+    }
+  }
+
+  // Uses same encoding as AssignRef since widening casts are no-ops at runtime.
+  if (failed(
+          e.encodeOpcode("AssignRef", static_cast<int>(Opcode::AssignRef))) ||
+      failed(e.encodeOperand(getOperand(), 0)) ||
+      failed(e.encodeResult(getResult()))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 // Comparison ops
@@ -1305,8 +1418,9 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
               }
               p << tupleOperands;
               p << ')';
-              if (i < segmentSize - 1)
+              if (i < segmentSize - 1) {
                 p << ", ";
+              }
             }
           } else {
             SmallVector<Value> segmentOperands;
@@ -1346,6 +1460,103 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
   }
 }
 
+void CallYieldableOp::setDest(Block *block) {
+  return getOperation()->setSuccessor(block, 0);
+}
+
+SuccessorOperands CallYieldableOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  // Results are produced by the callee at runtime and passed to the successor
+  // block arguments. Use produced operand count to tell MLIR about this.
+  unsigned producedCount = getResultTypes().size();
+  return SuccessorOperands(producedCount,
+                           MutableOperandRange(getOperation(), 0, 0));
+}
+
+void CallYieldableOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // Yieldable calls always have side effects (the yield itself).
+  effects.emplace_back(MemoryEffects::Read::get());
+  effects.emplace_back(MemoryEffects::Write::get());
+}
+
+LogicalResult CallYieldableOp::verify() {
+  // Verify that the result types count matches the destination block arguments.
+  Block *destBlock = getDest();
+  size_t resultCount = getResultTypes().size();
+  size_t destArgCount = destBlock->getNumArguments();
+  if (resultCount != destArgCount) {
+    return emitOpError() << "result type count (" << resultCount
+                         << ") must match successor block argument count ("
+                         << destArgCount << ")";
+  }
+
+  // Verify result types match destination block argument types.
+  for (auto [i, pair] : llvm::enumerate(
+           llvm::zip_equal(getResultTypes(), destBlock->getArguments()))) {
+    Type resultType = cast<TypeAttr>(std::get<0>(pair)).getValue();
+    Type argType = std::get<1>(pair).getType();
+    if (resultType != argType) {
+      return emitOpError() << "result type #" << i << " (" << resultType
+                           << ") must match successor block argument type ("
+                           << argType << ")";
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// vm.call.variadic.yieldable
+//===----------------------------------------------------------------------===//
+
+void CallVariadicYieldableOp::setDest(Block *block) {
+  return getOperation()->setSuccessor(block, 0);
+}
+
+SuccessorOperands
+CallVariadicYieldableOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  // Results are produced by the callee at runtime and passed to the successor
+  // block arguments. Use produced operand count to tell MLIR about this.
+  unsigned producedCount = getResultTypes().size();
+  return SuccessorOperands(producedCount,
+                           MutableOperandRange(getOperation(), 0, 0));
+}
+
+void CallVariadicYieldableOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // Yieldable calls always have side effects (the yield itself).
+  effects.emplace_back(MemoryEffects::Read::get());
+  effects.emplace_back(MemoryEffects::Write::get());
+}
+
+LogicalResult CallVariadicYieldableOp::verify() {
+  // Verify that the result types count matches the destination block arguments.
+  Block *destBlock = getDest();
+  size_t resultCount = getResultTypes().size();
+  size_t destArgCount = destBlock->getNumArguments();
+  if (resultCount != destArgCount) {
+    return emitOpError() << "result type count (" << resultCount
+                         << ") must match successor block argument count ("
+                         << destArgCount << ")";
+  }
+
+  // Verify result types match destination block argument types.
+  for (auto [i, pair] : llvm::enumerate(
+           llvm::zip_equal(getResultTypes(), destBlock->getArguments()))) {
+    Type resultType = cast<TypeAttr>(std::get<0>(pair)).getValue();
+    Type argType = std::get<1>(pair).getType();
+    if (resultType != argType) {
+      return emitOpError() << "result type #" << i << " (" << resultType
+                           << ") must match successor block argument type ("
+                           << argType << ")";
+    }
+  }
+
+  return success();
+}
+
 SuccessorOperands CondBranchOp::getSuccessorOperands(unsigned index) {
   assert(index < getNumSuccessors() && "invalid successor index");
   return index == trueIndex ? SuccessorOperands(getTrueDestOperandsMutable())
@@ -1360,32 +1571,39 @@ static ParseResult parseBranchTableCases(
     SmallVectorImpl<SmallVector<OpAsmParser::UnresolvedOperand>> &caseOperands,
     SmallVectorImpl<SmallVector<Type>> &caseOperandTypes) {
   if (parser.parseKeyword("default") || parser.parseColon() ||
-      parser.parseSuccessor(defaultDestination))
+      parser.parseSuccessor(defaultDestination)) {
     return failure();
+  }
   if (succeeded(parser.parseOptionalLParen())) {
     if (parser.parseOperandList(defaultOperands, OpAsmParser::Delimiter::None,
                                 /*allowResultNumber=*/false) ||
-        parser.parseColonTypeList(defaultOperandTypes) || parser.parseRParen())
+        parser.parseColonTypeList(defaultOperandTypes) ||
+        parser.parseRParen()) {
       return failure();
+    }
   }
   while (succeeded(parser.parseOptionalComma())) {
     int64_t index = 0;
-    if (failed(parser.parseInteger(index)))
+    if (failed(parser.parseInteger(index))) {
       return failure();
-    if (index != caseDestinations.size())
+    }
+    if (index != caseDestinations.size()) {
       return failure();
+    }
     Block *destination;
     SmallVector<OpAsmParser::UnresolvedOperand> operands;
     SmallVector<Type> operandTypes;
     if (failed(parser.parseColon()) ||
-        failed(parser.parseSuccessor(destination)))
+        failed(parser.parseSuccessor(destination))) {
       return failure();
+    }
     if (succeeded(parser.parseOptionalLParen())) {
       if (failed(parser.parseOperandList(operands, OpAsmParser::Delimiter::None,
                                          /*allowResultNumber=*/false)) ||
           failed(parser.parseColonTypeList(operandTypes)) ||
-          failed(parser.parseRParen()))
+          failed(parser.parseRParen())) {
         return failure();
+      }
     }
     caseDestinations.push_back(destination);
     caseOperands.emplace_back(operands);
@@ -1426,8 +1644,9 @@ Block *BranchTableOp::getSuccessorForOperands(ArrayRef<Attribute> operands) {
   SuccessorRange caseDestinations = getCaseDestinations();
   if (auto valueAttr = dyn_cast_if_present<IntegerAttr>(operands.front())) {
     int64_t value = valueAttr.getValue().getSExtValue();
-    if (value < 0 || value >= caseDestinations.size())
+    if (value < 0 || value >= caseDestinations.size()) {
       return getDefaultDestination();
+    }
     return caseDestinations[value];
   }
   return nullptr;
@@ -1538,6 +1757,18 @@ void CondBreakOp::eraseOperand(unsigned index) {
 SuccessorOperands CondBreakOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
   return SuccessorOperands(getDestOperandsMutable());
+}
+
+//===----------------------------------------------------------------------===//
+// vm.optimization_barrier
+//===----------------------------------------------------------------------===//
+
+void OptimizationBarrierOp::build(OpBuilder &builder, OperationState &state,
+                                  ValueRange operands,
+                                  ArrayRef<NamedAttribute> attributes) {
+  state.addOperands(operands);
+  state.addTypes(llvm::to_vector(operands.getTypes()));
+  state.addAttributes(attributes);
 }
 
 } // namespace mlir::iree_compiler::IREE::VM

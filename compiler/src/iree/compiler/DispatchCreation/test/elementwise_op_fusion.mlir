@@ -619,3 +619,42 @@ util.func public @dont_fuse_extract_into_matmul(
 //       CHECK:   %[[MATMUL:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[EXTRACT]]
 //       CHECK:   return %[[MATMUL]]
+
+// -----
+
+util.func public @fuse_transpose_with_index_flip(%arg0: tensor<64x3x3x64xbf16>) -> tensor<64x64x3x3xbf16> {
+  %c2 = arith.constant 2 : index
+  %0 = tensor.empty() : tensor<64x64x3x3xbf16>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<64x3x3x64xbf16>) outs(%0 : tensor<64x64x3x3xbf16>) {
+  ^bb0(%in: bf16, %out: bf16):
+    linalg.yield %in : bf16
+  } -> tensor<64x64x3x3xbf16>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%0 : tensor<64x64x3x3xbf16>) {
+  ^bb0(%out: bf16):
+    %3 = linalg.index 0 : index
+    %4 = linalg.index 1 : index
+    %5 = linalg.index 2 : index
+    %6 = linalg.index 3 : index
+    %7 = arith.subi %c2, %5 : index
+    %8 = arith.subi %c2, %6 : index
+    %extracted = tensor.extract %1[%3, %4, %7, %8] : tensor<64x64x3x3xbf16>
+    linalg.yield %extracted : bf16
+  } -> tensor<64x64x3x3xbf16>
+  util.return %2 : tensor<64x64x3x3xbf16>
+}
+// CHECK-LABEL: util.func public @fuse_transpose_with_index_flip
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<64x3x3x64xbf16>
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//       CHECK:   %[[RESULT:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>]
+//  CHECK-SAME:     outs(%{{.+}} : tensor<64x64x3x3xbf16>)
+//       CHECK:     ^bb0(%{{.+}}: bf16):
+//       CHECK:       %[[IDX0:.+]] = linalg.index 0 : index
+//       CHECK:       %[[IDX1:.+]] = linalg.index 1 : index
+//       CHECK:       %[[IDX2:.+]] = linalg.index 2 : index
+//       CHECK:       %[[IDX3:.+]] = linalg.index 3 : index
+//       CHECK:       %[[SUB0:.+]] = arith.subi %[[C2]], %[[IDX2]] : index
+//       CHECK:       %[[SUB1:.+]] = arith.subi %[[C2]], %[[IDX3]] : index
+//       CHECK:       %[[EXTRACT:.+]] = tensor.extract %[[ARG0]][%[[IDX0]], %[[SUB0]], %[[SUB1]], %[[IDX1]]] : tensor<64x3x3x64xbf16>
+//       CHECK:       linalg.yield %[[EXTRACT]] : bf16
+//       CHECK:   util.return %[[RESULT]]

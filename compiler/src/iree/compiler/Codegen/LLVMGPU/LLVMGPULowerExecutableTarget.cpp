@@ -71,8 +71,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);
-  if (!translationInfo)
+  if (!translationInfo) {
     return;
+  }
 
   std::optional<OpPassManager> maybePipeline =
       getFunctionOpInterfacePassManager(funcOp);
