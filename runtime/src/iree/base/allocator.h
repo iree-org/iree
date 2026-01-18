@@ -300,13 +300,25 @@ iree_struct_layout_calculate(iree_host_size_t base_size,
 #define IREE_STRUCT_FIELD_FAM(count_expr, type) \
   { (count_expr), sizeof(type), 0, NULL }
 
-// Calculates struct layout using compound literal for inline field descriptors.
+// Calculates struct layout using inline field descriptors.
+// C++ version uses a lambda to create a local array (compound literals are a
+// GCC extension in C++ and taking their address fails with GCC).
+#ifdef __cplusplus
+#define IREE_STRUCT_LAYOUT(base_size, out_total, ...)                      \
+  [&]() -> iree_status_t {                                                 \
+    const iree_struct_field_t fields[] = {__VA_ARGS__};                    \
+    return iree_struct_layout_calculate(                                   \
+        (base_size), fields, sizeof(fields) / sizeof(iree_struct_field_t), \
+        (out_total));                                                      \
+  }()
+#else
 #define IREE_STRUCT_LAYOUT(base_size, out_total, ...)                         \
   iree_struct_layout_calculate((base_size),                                   \
                                (const iree_struct_field_t[]){__VA_ARGS__},    \
                                sizeof((iree_struct_field_t[]){__VA_ARGS__}) / \
                                    sizeof(iree_struct_field_t),               \
                                (out_total))
+#endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
 // Totally shady stack allocation
