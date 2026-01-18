@@ -1131,7 +1131,7 @@ static bool canDistributeShape(ArrayRef<int64_t> shape, int64_t groupSize) {
 // 74, which fails for group size = 32, so we bail out of the reduction
 // pipeline.
 static bool isConsumerCompatible(linalg::LinalgOp consumerOp, Value result,
-                                 SmallVector<unsigned> reductionDims,
+                                 ArrayRef<unsigned> reductionDims,
                                  int64_t groupSize) {
   // Collect dims used by operands referencing the reduction result.
   llvm::SmallDenseSet<unsigned> usedDims;
@@ -1168,7 +1168,7 @@ static bool isConsumerCompatible(linalg::LinalgOp consumerOp, Value result,
 }
 
 static bool allConsumersCompatible(linalg::LinalgOp reductionOp,
-                                   SmallVector<unsigned> reductionDims,
+                                   ArrayRef<unsigned> reductionDims,
                                    int64_t groupSize, int64_t candidate) {
   for (Value result : reductionOp->getResults()) {
     for (Operation *user : result.getUsers()) {
@@ -1188,7 +1188,7 @@ static bool allConsumersCompatible(linalg::LinalgOp reductionOp,
 // halving from groupSize down to subgroupSize.
 static FailureOr<int>
 maybeFindConsumerCompatibleSize(linalg::LinalgOp reductionOp,
-                                SmallVector<unsigned> reductionDims,
+                                ArrayRef<unsigned> reductionDims,
                                 int64_t groupSize, int64_t subgroupSize) {
   for (int64_t candidate = groupSize; candidate >= subgroupSize;
        candidate /= 2) {

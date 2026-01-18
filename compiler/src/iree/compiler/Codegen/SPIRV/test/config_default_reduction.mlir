@@ -119,11 +119,6 @@ func.func @subgroup_reduce_dynamic(%10: tensor<8x?xf32>) -> tensor<8xf32> attrib
 #map6 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map7 = affine_map<(d0, d1, d2, d3) -> (d0)>
 #map8 = affine_map<(d0, d1) -> ()>
-#map9 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
-#map10 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-#map11 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map12 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
-#map13 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 func.func @reduction_with_elementwise_consumer(
     %input: tensor<6144xf32>,
@@ -206,6 +201,45 @@ func.func @reduction_with_distributable_elementwise_consumer(
   return %epilogue : tensor<512x12xf32>
 }
 
+//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [256]{{\]}}>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 256]{{\]}}>
+//  CHECK-DAG: #[[CONFIG3:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [2048]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION1:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION2:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [512, 1, 1]>
+//      CHECK: func.func @reduction_with_elementwise_consumer(
+// CHECK-SAME:     translation_info = #[[TRANSLATION1]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG1]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG1]]
+//      CHECK: func.func @batch_reduction_and_elementwise_consumer(
+// CHECK-SAME:     translation_info = #[[TRANSLATION1]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG2]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG2]]
+//      CHECK: func.func @reduction_with_distributable_elementwise_consumer(
+// CHECK-SAME:     translation_info = #[[TRANSLATION2]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG3]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG3]]
+
+// -----
+
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle,
+    subgroup_size_choices = [32], max_workgroup_sizes = [512, 512, 512],
+    max_thread_count_per_workgroup = 512, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+#map9 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map10 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map11 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map12 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map13 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
 func.func @fail_reduction_with_nondistributable_consumer(
     %input: tensor<16x64x74xf32>,
     %filled: tensor<16x74xf32>,
@@ -239,31 +273,8 @@ func.func @fail_reduction_with_nondistributable_consumer(
   return %epilogue : tensor<16x74x64xf32>
 }
 
-//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [256]{{\]}}>
-//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 256]{{\]}}>
-//  CHECK-DAG: #[[CONFIG3:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [2048]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION1:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
-//  CHECK-DAG: #[[TRANSLATION2:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [512, 1, 1]>
-//  CHECK-DAG: #[[TRANSLATION3:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute {{.*}}>
-//      CHECK: func.func @reduction_with_elementwise_consumer(
-// CHECK-SAME:     translation_info = #[[TRANSLATION1]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG1]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG1]]
-//      CHECK: func.func @batch_reduction_and_elementwise_consumer(
-// CHECK-SAME:     translation_info = #[[TRANSLATION1]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG2]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG2]]
-//      CHECK: func.func @reduction_with_distributable_elementwise_consumer(
-// CHECK-SAME:     translation_info = #[[TRANSLATION2]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG3]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG3]]
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute {{.*}}>
 //      CHECK: func.func @fail_reduction_with_nondistributable_consumer(
-// CHECK-SAME:     translation_info = #[[TRANSLATION3]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-NOT: pipeline = SPIRVSubgroupReduce
 //      CHECK: return
