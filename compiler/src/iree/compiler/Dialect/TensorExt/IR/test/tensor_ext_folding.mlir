@@ -24,6 +24,23 @@ util.func public @tensorBitCastCastProducer(%arg0: tensor<10x3x6xi8>, %arg1: ind
 
 // -----
 
+// CHECK-LABEL: @bitcastOfCastWithConstAndDynDims
+util.func public @bitcastOfCastWithConstAndDynDims(%arg0: tensor<4x?x4096xi8>, %d0: index) -> tensor<?x?x?xf4E2M1FN> {
+  // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]: tensor<4x?x4096xi8>
+  // CHECK-SAME: %[[D0:[A-Za-z0-9]+]]: index
+  %c4 = arith.constant 4 : index
+  %c4096 = arith.constant 4096 : index
+  %c8192 = arith.constant 8192 : index
+  %0 = tensor.cast %arg0 : tensor<4x?x4096xi8> to tensor<?x?x?xi8>
+  // CHECK: %[[BITCAST:.+]] = iree_tensor_ext.bitcast %[[ARG0]] : tensor<4x?x4096xi8>{%[[D0]]} -> tensor<4x?x8192xf4E2M1FN>{%[[D0]]}
+  %1 = iree_tensor_ext.bitcast %0 : tensor<?x?x?xi8>{%c4, %d0, %c4096} -> tensor<?x?x?xf4E2M1FN>{%c4, %d0, %c8192}
+  // CHECK: %[[CAST:.+]] = tensor.cast %[[BITCAST]] : tensor<4x?x8192xf4E2M1FN> to tensor<?x?x?xf4E2M1FN>
+  util.return %1 : tensor<?x?x?xf4E2M1FN>
+  // CHECK: util.return %[[CAST]]
+}
+
+// -----
+
 // CHECK-LABEL: @barrierStartFoldDuplicate
 util.func public @barrierStartFoldDuplicate(%arg0: tensor<4x8xf32>) -> tensor<4x8xf32> {
   // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]

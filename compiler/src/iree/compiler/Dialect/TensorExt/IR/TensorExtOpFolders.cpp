@@ -52,8 +52,10 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
       return failure();
     }
 
-    // TODO: Support partial static info incorporation.
-    if (bitcastOp.getSourceDims() != bitcastOp.getResultDims()) {
+    // All dims except last must match (last dim can differ due to element type
+    // size change).
+    if (bitcastOp.getSourceDims().drop_back() !=
+        bitcastOp.getResultDims().drop_back()) {
       return failure();
     }
 
@@ -61,7 +63,8 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
     RankedTensorType resTensorType = bitcastOp.getResult().getType();
     ArrayRef<int64_t> resShape = resTensorType.getShape();
 
-    SmallVector<Value> newDynamicDims;
+    SmallVector<Value> newDynSrcDims;
+    SmallVector<Value> newDynDestDims;
     int64_t intermediateDynamicDim = 0;
     int64_t resDynamicDim = 0;
     SmallVector<int64_t> newResultSizes(resShape);
@@ -76,9 +79,15 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
         ++resDynamicDim;
       }
 
+      APInt cst;
       if (ShapedType::isDynamic(castSize)) {
-        newDynamicDims.push_back(
+        newDynSrcDims.push_back(
             bitcastOp.getSourceDims()[intermediateDynamicDim]);
+        newDynDestDims.push_back(
+            bitcastOp.getResultDims()[intermediateDynamicDim]);
+      } else if (matchPattern(bitcastOp.getResultDims()[intermediateDynamicDim],
+                              m_ConstantInt(&cst))) {
+        newResultSizes[resDynamicDim] = cst.getSExtValue();
       } else {
         newResultSizes[resDynamicDim] = castSize;
       }
@@ -91,7 +100,7 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
                               resTensorType.getEncoding());
     Value newBitcast = BitCastOp::create(rewriter, bitcastOp.getLoc(), newType,
                                          tensorCastOp.getOperand(),
-                                         newDynamicDims, newDynamicDims);
+                                         newDynSrcDims, newDynDestDims);
     // We create a new cast to continue propagating static information.
     rewriter.replaceOpWithNewOp<tensor::CastOp>(bitcastOp, resTensorType,
                                                 newBitcast);
